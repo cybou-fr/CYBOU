@@ -24,9 +24,17 @@ nix build .#packages.x86_64-linux.cybou-theme
 Phase 1 adds:
 
 ```bash
-nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
-nix build .#nixosConfigurations.cybou-iso.config.system.build.isoImage
+nix build .#nixosConfigurations.cybou-vm.config.system.build.vm -o result-vm
+./result-vm/bin/run-cybou-vm
 ```
+
+**Always pass `-o`.** Without it every build overwrites the same `result` symlink, so running a
+check after building the VM removes the runner and the next launch fails with “No such file or
+directory”. One output link per artefact.
+
+The VM writes `cybou.qcow2` into the working directory and reuses it; run it from a scratch
+directory and delete that file for a clean boot. Under WSL the QEMU window reaches the Windows
+desktop through WSLg. Reaching SDDM takes about a minute and a half.
 
 The ISO is built here, in WSL — not on a hosted CI runner, whose disk is too small to make the
 result trustworthy.
