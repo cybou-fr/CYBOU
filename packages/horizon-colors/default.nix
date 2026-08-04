@@ -1,5 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
-# SPDX-License-Identifier: CC-BY-SA-4.0
+# SPDX-License-Identifier: MIT
+#
+# The build expression is code and therefore MIT; the colour schemes it produces are design
+# assets under CC-BY-SA-4.0, which is what `meta.license` below records.
 #
 # Cybou Horizon colour schemes, generated from spec/design-tokens.json at build time.
 # Nothing here is hand-written: the tokens file is authoritative, and a checked-in .colors

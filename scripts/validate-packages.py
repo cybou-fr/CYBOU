@@ -162,8 +162,10 @@ def main(argv: list[str]) -> int:
 
     packages = find_packages(root)
     if not packages:
-        print(f"validate-packages: no packages found under {root}", file=sys.stderr)
-        return 1
+        # Not an error. This runs against a built output tree, and before Phase 3 there are
+        # no KDE packages in it yet. Failing here would only teach people to ignore the check.
+        print(f"validate-packages: no KDE packages under {root} (nothing to validate)")
+        return 0
 
     for pkg in packages:
         check_metadata(pkg)

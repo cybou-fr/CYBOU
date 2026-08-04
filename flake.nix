@@ -107,14 +107,13 @@
         # Static KDE package validation. Catches the Gate B failures - wrong metadata
         # file name, ID/directory mismatch, wrong layout script name, symlinks,
         # malformed SVG, TBD licences - without needing a Plasma session.
+        # Runs against the *built* theme, not the source tree: the thing that has to be a
+        # valid KDE package is what gets installed, and packages/ holds Nix expressions.
         package-metadata =
           pkgs.runCommand "check-package-metadata" { nativeBuildInputs = [ pkgs.python3 ]; }
             ''
-              if [ -d ${src}/packages ]; then
-                python3 ${src}/scripts/validate-packages.py ${src}/packages
-              else
-                echo "no packages/ yet - Phase 0"
-              fi
+              python3 ${src}/scripts/validate-packages.py \
+                ${self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-theme}/share
               touch $out
             '';
       });
