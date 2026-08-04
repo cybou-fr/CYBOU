@@ -33,10 +33,13 @@ def svg(name, colours):
             f"  </g>"
         )
     body = "\n".join(cells)
+    # The two tags are assembled rather than written literally: reuse scans this file too, and
+    # a complete tag inside a string is read as a declaration about the script itself.
+    tag = "SPDX-License" + "-Identifier: CC-BY-SA-4.0"
     return (
         "<!--\n"
-        "SPDX-FileCopyrightText: 2026 Stanislav Saveliev\n"
-        "SPDX-License-Identifier: CC-BY-SA-4.0\n\n"
+        "SPDX-FileCopyright" + "Text: 2026 Stanislav Saveliev\n"
+        f"{tag}\n\n"
         f"Aurorae button: {name}. Four states side by side, each in its own 24x24 cell, with the\n"
         "element ids Aurorae looks up. Generated from spec/design-tokens.json.\n"
         "-->\n"
