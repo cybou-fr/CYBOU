@@ -46,6 +46,7 @@
         horizon-plasma-style = pkgs.callPackage ./packages/horizon-plasma-style { };
         horizon-sddm = pkgs.callPackage ./packages/horizon-sddm { inherit horizon-wallpaper; };
         horizon-aurorae = pkgs.callPackage ./packages/horizon-aurorae { };
+        cybou-tools = pkgs.callPackage ./packages/cybou-tools { };
 
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme

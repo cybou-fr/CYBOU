@@ -8,6 +8,7 @@
     cybouPackages.cybou-theme
     cybouPackages.cybou-branding
     cybouPackages.horizon-sddm
+    cybouPackages.cybou-tools
   ];
 
   # SDDM has its own theme directory and does not follow the Global Theme, which is why the
