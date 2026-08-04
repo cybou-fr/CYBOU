@@ -10,11 +10,15 @@
 // Geometry comes from spec/design-tokens.json: top edge, 44 px, 12 px margin, floating.
 // Applet order comes from docs/04-desktop-layout.md.
 
-var desktops = desktops();
-for (var i = 0; i < desktops.length; i++) {
-    desktops[i].wallpaperPlugin = "org.kde.image";
-    desktops[i].currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
-    desktops[i].writeConfig("Image", "CybouHorizonDark");
+// NEVER name this variable `desktops`. `var` hoists, so the name shadows the desktops()
+// function for the whole scope and the call throws before anything is created - the layout
+// dies silently and the session comes up as a black screen with no containment. That is
+// exactly what shipped on 2026-08-04 and it cost a full image rebuild to find.
+var allDesktops = desktops();
+for (var i = 0; i < allDesktops.length; i++) {
+    allDesktops[i].wallpaperPlugin = "org.kde.image";
+    allDesktops[i].currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
+    allDesktops[i].writeConfig("Image", "CybouHorizonDark");
 }
 
 var panel = new Panel;
