@@ -20,6 +20,7 @@
   imports = [
     "${modulesPath}/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix"
     ../modules/branding.nix
+    ./iso-calamares-branding.nix
   ];
 
   networking.hostName = "cybou";
