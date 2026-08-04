@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+# SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
 # Installs the Cybou theme and makes it the system default.
@@ -7,7 +7,12 @@
   environment.systemPackages = [
     cybouPackages.cybou-theme
     cybouPackages.cybou-branding
+    cybouPackages.horizon-sddm
   ];
+
+  # SDDM has its own theme directory and does not follow the Global Theme, which is why the
+  # login screen stayed Breeze while the desktop was already Cybou.
+  services.displayManager.sddm.theme = "cybou-horizon";
 
   # System-wide defaults only. KDE reads /etc/xdg/kdeglobals as a fallback beneath the user's
   # own ~/.config/kdeglobals, so a fresh account starts on Cybou Horizon while anyone who has

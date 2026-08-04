@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+# SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 {
   description = "Cybou - a calm, reproducible KDE Plasma desktop on NixOS";
@@ -44,6 +44,7 @@
 
         horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { };
         horizon-plasma-style = pkgs.callPackage ./packages/horizon-plasma-style { };
+        horizon-sddm = pkgs.callPackage ./packages/horizon-sddm { inherit horizon-wallpaper; };
 
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
