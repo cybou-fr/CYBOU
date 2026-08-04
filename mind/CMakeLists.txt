@@ -22,6 +22,7 @@ add_subdirectory(foundation/storage)
 add_subdirectory(organs/identityd)
 add_subdirectory(organs/intentiond)
 add_subdirectory(organs/predictord)
+add_subdirectory(organs/selfd)
 
 include(CTest)
 if(BUILD_TESTING)

@@ -30,3 +30,8 @@ qt_add_executable(test-predictor tst_predictor.cpp)
 target_link_libraries(test-predictor PRIVATE cybou-predictor Qt6::Test)
 add_test(NAME predictor COMMAND test-predictor)
 set_tests_properties(predictor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-selfmodel tst_selfmodel.cpp)
+target_link_libraries(test-selfmodel PRIVATE cybou-self Qt6::Sql Qt6::Test)
+add_test(NAME selfmodel COMMAND test-selfmodel)
+set_tests_properties(selfmodel PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
