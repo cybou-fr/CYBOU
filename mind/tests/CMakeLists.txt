@@ -35,3 +35,8 @@ qt_add_executable(test-selfmodel tst_selfmodel.cpp)
 target_link_libraries(test-selfmodel PRIVATE cybou-self Qt6::Sql Qt6::Test)
 add_test(NAME selfmodel COMMAND test-selfmodel)
 set_tests_properties(selfmodel PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-workspace tst_workspace.cpp)
+target_link_libraries(test-workspace PRIVATE cybou-workspace Qt6::Test)
+add_test(NAME workspace COMMAND test-workspace)
+set_tests_properties(workspace PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
