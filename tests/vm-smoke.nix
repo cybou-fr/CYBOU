@@ -11,7 +11,7 @@
 # processes existed and no unit had failed - both true of a KWin that cannot get an EGL
 # context and draws no frames. The lesson is that "the process is alive" says nothing about
 # graphics. Hence two nodes and the pixel check below.
-{ pkgs }:
+{ pkgs, cybouPackages }:
 let
   common =
     { ... }:
@@ -19,7 +19,9 @@ let
       imports = [
         ../modules/base.nix
         ../modules/desktop-plasma.nix
+        ../modules/branding.nix
       ];
+      _module.args.cybouPackages = cybouPackages;
 
       users.users.cybou = {
         isNormalUser = true;
@@ -87,6 +89,25 @@ pkgs.testers.runNixOSTest {
             machine.fail(
                 "journalctl -b | grep -q 'ZINK: failed to choose pdev'"
             )
+
+    with subtest("Plasma itself accepts the Global Theme"):
+        # Gate B, asked of the tool that actually loads the package rather than of a static
+        # reader. A package kpackagetool6 cannot see does not exist as far as Plasma is
+        # concerned.
+        #
+        # XDG_DATA_DIRS is set explicitly: this runs as root in a bare shell, which does not
+        # inherit the session environment, so without it the tool searches only its built-in
+        # paths and reports nothing - a false failure that says nothing about the package.
+        # `--list` alone reports only ~/.local/share and lists nothing at all, not even
+        # Breeze; `--global` is the one that looks where a distribution installs.
+        print(session.succeed(
+            "kpackagetool6 --type=Plasma/LookAndFeel --list --global 2>&1 || true"
+        ))
+        session.succeed(
+            "kpackagetool6 --type=Plasma/LookAndFeel --list --global "
+            "| grep -q org.cybou.horizon.desktop"
+        )
+        session.succeed("grep -q CybouHorizonDark /etc/xdg/kdeglobals")
 
     with subtest("PipeWire is active"):
         session.wait_until_succeeds(

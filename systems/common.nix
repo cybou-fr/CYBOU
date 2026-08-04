@@ -6,5 +6,6 @@
   imports = [
     ../modules/base.nix
     ../modules/desktop-plasma.nix
+    ../modules/branding.nix
   ];
 }

@@ -70,12 +70,14 @@
       nixosConfigurations = {
         cybou-vm = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
+          specialArgs.cybouPackages = self.packages.x86_64-linux;
           modules = [ ./systems/vm.nix ];
         };
 
         # Development image for Hyper-V; build system.build.hypervImage.
         cybou-hyperv = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
+          specialArgs.cybouPackages = self.packages.x86_64-linux;
           modules = [ ./systems/hyperv.nix ];
         };
       };
@@ -119,7 +121,10 @@
 
         # Gate A, service level. Heavy: boots a full Plasma VM under KVM. CI runs the three
         # cheap checks on every push and the whole set on a tag - see .github/workflows.
-        vm-smoke = import ./tests/vm-smoke.nix { inherit pkgs; };
+        vm-smoke = import ./tests/vm-smoke.nix {
+          inherit pkgs;
+          cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
+        };
 
         # Static KDE package validation. Catches the Gate B failures - wrong metadata
         # file name, ID/directory mismatch, wrong layout script name, symlinks,
