@@ -139,8 +139,8 @@ QString SelfModel::narrate(const SelfReport &report) const
 
     // Continuity. Day zero is worth naming rather than rounding to "0 days old".
     if (report.ageInDays <= 0) {
-        lines << QObject::tr("This is my first day, and my %n session.", nullptr,
-                             static_cast<int>(report.sessions));
+        lines << QObject::tr("This is my first day.") + QLatin1Char(' ')
+                     + QObject::tr("This is session %1.").arg(report.sessions);
     } else {
         lines << QObject::tr("I am %n day(s) old.", nullptr, static_cast<int>(report.ageInDays))
                      + QLatin1Char(' ')

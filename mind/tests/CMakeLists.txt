@@ -40,3 +40,8 @@ qt_add_executable(test-workspace tst_workspace.cpp)
 target_link_libraries(test-workspace PRIVATE cybou-workspace Qt6::Test)
 add_test(NAME workspace COMMAND test-workspace)
 set_tests_properties(workspace PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-presence tst_presence.cpp)
+target_link_libraries(test-presence PRIVATE cybou-presence Qt6::Test)
+add_test(NAME presence COMMAND test-presence)
+set_tests_properties(presence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
