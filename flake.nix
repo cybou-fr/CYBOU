@@ -97,14 +97,41 @@
       # `nix develop` gives the tools the checks use, so a failing check can be reproduced
       # by hand instead of only inside the build sandbox.
       devShells = forAllSystems (pkgs: {
+        # Everything the project is built with, pinned by flake.lock. Nothing is installed by
+        # hand - not Qt, not a compiler, not on Windows and not in WSL (ADR-0008).
         default = pkgs.mkShell {
           packages = [
-            # pyyaml included: the spec package carries YAML that CI parses, and without it
-            # the check can only be run by pulling a one-off shell.
+            # pyyaml: the spec package carries YAML that CI parses.
             (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
             pkgs.nixfmt
             pkgs.reuse
+
+            # C++ toolchain for mind/ (ADR-0008, docs/13-cpp-development.md).
+            pkgs.clang-tools
+            pkgs.cmake
+            pkgs.ninja
+            pkgs.gdb
+            pkgs.pkg-config
+
+            # Qt 6. qtdeclarative brings QML; qttools brings Designer and the profiler.
+            pkgs.qt6.qtbase
+            pkgs.qt6.qtdeclarative
+            pkgs.qt6.qtsvg
+            pkgs.qt6.qttools
+            pkgs.qt6.qtwayland
+
+            # KDE frameworks the Presence surface needs.
+            pkgs.kdePackages.kirigami
+            pkgs.kdePackages.kcoreaddons
+            pkgs.kdePackages.libplasma
+
+            # Optional, heavy, and worth having: Qt Creator opens through WSLg for QML work.
+            pkgs.qtcreator
           ];
+
+          shellHook = ''
+            echo "cybou dev shell ready: $(cmake --version | head -1)"
+          '';
         };
       });
 
