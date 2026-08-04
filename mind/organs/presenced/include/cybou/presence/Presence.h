@@ -46,6 +46,10 @@ class Presence : public QObject
 public:
     /// dataDir is where the journal and identity live. Creating a Presence does not wake it.
     explicit Presence(const QString &dataDir, QObject *parent = nullptr);
+
+    /// The constructor QML uses: the journal goes where the user's data goes. Kept separate
+    /// from the one above so tests can never touch the real journal by accident.
+    explicit Presence(QObject *parent = nullptr);
     ~Presence() override;
 
     /// Opens the journal, begins a session, and restores the moment. Returns false if any of
@@ -67,7 +71,12 @@ public:
     int contributions() const;
 
     /// The recent activity list, newest first.
-    Q_INVOKABLE QList<Moment> recent(int limit = 12) const;
+    QList<Moment> recent(int limit = 12) const;
+
+    /// The same list in the shape QML can consume: maps with when/organ/kind/thread. A separate
+    /// method rather than a metatype conversion, so the field names the panel binds to are
+    /// visible here and cannot drift silently.
+    Q_INVOKABLE QVariantList activity(int limit = 12) const;
 
     /// The panel may state an intention on the user's behalf - this is the one thing it can
     /// write. Returns a null uuid while asleep.

@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # clangd reads this; without it the editor cannot resolve Qt headers.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Qml)
 
 qt_standard_project_setup()
 
@@ -25,6 +25,7 @@ add_subdirectory(organs/predictord)
 add_subdirectory(organs/selfd)
 add_subdirectory(organs/workspaced)
 add_subdirectory(organs/presenced)
+add_subdirectory(shell/qmlplugin)
 
 include(CTest)
 if(BUILD_TESTING)

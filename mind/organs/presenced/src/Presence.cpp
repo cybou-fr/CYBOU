@@ -6,12 +6,20 @@
 #include <QCborMap>
 #include <QCborValue>
 #include <QDir>
+#include <QStandardPaths>
 
 namespace cybou {
 
 Presence::Presence(const QString &dataDir, QObject *parent)
     : QObject(parent)
     , m_dataDir(dataDir)
+{
+}
+
+Presence::Presence(QObject *parent)
+    : Presence(QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                   .filePath(QStringLiteral("cybou")),
+               parent)
 {
 }
 
@@ -123,6 +131,20 @@ QList<Moment> Presence::recent(int limit) const
         m.kind = kindToString(e.kind);
         m.thread = e.correlationId;
         result.append(m);
+    }
+    return result;
+}
+
+QVariantList Presence::activity(int limit) const
+{
+    QVariantList result;
+    for (const Moment &m : recent(limit)) {
+        QVariantMap entry;
+        entry[QStringLiteral("when")] = m.when.toLocalTime();
+        entry[QStringLiteral("organ")] = m.organ;
+        entry[QStringLiteral("kind")] = m.kind;
+        entry[QStringLiteral("thread")] = m.thread.toString(QUuid::WithoutBraces);
+        result.append(entry);
     }
     return result;
 }
