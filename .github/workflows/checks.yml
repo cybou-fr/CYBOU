@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# Cybou CI — template, per docs/adr/0005..0007 and CYB-004.
+#
+# Copy to .github/workflows/checks.yml in the implementation repository.
+# GitHub Actions is assumed but not required; the split below is what matters:
+#
+#   every push  -> cheap checks only, minutes, always green or genuinely broken
+#   tag         -> VM build if it fits the runner
+#   ISO         -> built locally in WSL, never on a hosted runner
+#
+# Why the ISO is not here: hosted runners give roughly 14 GB of free disk. A NixOS
+# Plasma ISO sits at or past that line, so it fails for reasons unrelated to the change
+# and trains everyone to ignore red CI. docs/09-development-on-windows.md makes WSL the
+# build environment; release ISO + SHA256 is a documented manual step in
+# prompts/release-agent.md.
+#
+# Note there is almost nothing here. That is the point: `nix flake check` already runs
+# formatting, REUSE compliance and package-metadata validation, each pinned by flake.lock,
+# each reproducible with the same command on a developer machine. Re-listing them as
+# separate CI steps would create a second source of truth that drifts.
+
+name: checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # Fails on an unformatted tree, a REUSE violation, or an invalid KDE package.
+      - run: nix flake check --print-build-logs
+
+      # Not covered by the checks above: catches a formatter that rewrites files.
+      - run: nix fmt && git diff --exit-code
+
+  vm:
+    name: VM build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - run: nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
+
+# Not in CI, by decision:
+#   nix build .#nixosConfigurations.cybou-iso.config.system.build.isoImage
+#   sha256sum result/iso/*.iso
+# Run both in WSL for a release and publish the hash per spec/acceptance.yaml:iso_sha256_published.
