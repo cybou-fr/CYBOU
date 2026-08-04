@@ -43,13 +43,15 @@
         horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
 
         horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { };
+        horizon-plasma-style = pkgs.callPackage ./packages/horizon-plasma-style { };
 
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
         # that silently fails to load. checks.package-metadata caught exactly that.
         cybou-theme = pkgs.runCommand "cybou-theme" { } ''
           mkdir -p $out
-          for p in ${horizon-colors} ${horizon-wallpaper} ${horizon-global-theme}; do
+          for p in ${horizon-colors} ${horizon-wallpaper} ${horizon-global-theme} \
+                   ${horizon-plasma-style}; do
             cp -rL "$p"/. $out/
             # Store files arrive read-only; without this the next package cannot be
             # merged into the directories the previous one created.

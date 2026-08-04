@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Theme",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Cybou contributors"
+            }
+        ],
+        "Category": "Plasma Theme",
+        "Description": "Cybou Horizon panel and widget styling",
+        "Id": "CybouHorizon",
+        "License": "CC-BY-SA-4.0",
+        "Name": "Cybou Horizon",
+        "Version": "0.1"
+    }
+}

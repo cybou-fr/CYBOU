@@ -109,6 +109,21 @@ pkgs.testers.runNixOSTest {
         )
         session.succeed("grep -q CybouHorizonDark /etc/xdg/kdeglobals")
 
+        # Open question, tracked as CYB-037: kpackagetool6 lists our Plasma Style but rejects
+        # every upstream Breeze style with a KPackageStructure mismatch, so upstream clearly
+        # declares something other than "Plasma/Theme". Being listed here therefore proves the
+        # file is readable, not that Plasma will use the style.
+        #
+        # plasma-apply-desktoptheme would settle it, but it needs a Qt platform and core-dumps
+        # when run as root with no display; it has to be QT_QPA_PLATFORM=offscreen, or run
+        # inside the user session. Until that is done, treat the style as unverified.
+        print(session.succeed(
+            "kpackagetool6 --type=Plasma/Theme --list --global 2>&1 || true"
+        ))
+        session.succeed(
+            "test -f /run/current-system/sw/share/plasma/desktoptheme/CybouHorizon/colors"
+        )
+
     with subtest("PipeWire is active"):
         session.wait_until_succeeds(
             "systemctl --user -M cybou@ is-active pipewire.service"

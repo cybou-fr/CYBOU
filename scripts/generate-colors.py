@@ -169,6 +169,17 @@ def main(argv):
         (out / f"{name}.colors").write_text(body, encoding="utf-8")
         print(f"{name}.colors")
 
+    # A Plasma Style tints its SVGs from a `colors` file using the same groups, so the panel
+    # and widgets follow the tokens without shipping a single overridden SVG. Same source,
+    # same contrast guarantee.
+    if len(argv) > 3:
+        style = pathlib.Path(argv[3])
+        style.mkdir(parents=True, exist_ok=True)
+        (style / "colors").write_text(
+            scheme("CybouHorizon", tokens["colors"]["dark"], dark=True), encoding="utf-8"
+        )
+        print("plasma style colors")
+
     print("contrast: all token pairs pass")
     return 0
 
