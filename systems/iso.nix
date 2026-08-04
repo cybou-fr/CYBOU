@@ -10,7 +10,12 @@
 # The upstream profile already brings Plasma 6, SDDM and Calamares, so this file adds the Cybou
 # layer on top instead of importing systems/common.nix, which would set the same options a
 # second time.
-{ config, modulesPath, ... }:
+{
+  config,
+  lib,
+  modulesPath,
+  ...
+}:
 {
   imports = [
     "${modulesPath}/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix"
@@ -26,11 +31,11 @@
   system.nixos.distroName = "Cybou";
   system.nixos.distroId = "cybou";
 
-  # `isoImage.isoName` was renamed to `image.fileName` in 26.05; the old name still works
-  # but warns, and a warning nobody fixes becomes a warning nobody reads.
-  image.fileName = "cybou-${config.system.nixos.label}-x86_64.iso";
-
   isoImage = {
+    # isoBaseName, not image.fileName: the installation-CD profile composes the final name
+    # from this base, and setting the composed name instead is silently overridden - the
+    # first build came out as nixos-plasma6-*.iso despite image.fileName evaluating to cybou-*.
+    isoBaseName = lib.mkForce "cybou";
     volumeID = "CYBOU";
     # Must boot without a network after it is built (docs/06).
     squashfsCompression = "zstd -Xcompression-level 6";
