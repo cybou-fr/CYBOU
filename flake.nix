@@ -42,17 +42,26 @@
         horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
         horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
 
-        cybou-theme = pkgs.symlinkJoin {
-          name = "cybou-theme";
-          paths = [
-            horizon-colors
-            horizon-wallpaper
-          ];
-        };
-        cybou-branding = pkgs.symlinkJoin {
-          name = "cybou-branding";
-          paths = [ horizon-assets ];
-        };
+        horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { };
+
+        # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
+        # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
+        # that silently fails to load. checks.package-metadata caught exactly that.
+        cybou-theme = pkgs.runCommand "cybou-theme" { } ''
+          mkdir -p $out
+          for p in ${horizon-colors} ${horizon-wallpaper} ${horizon-global-theme}; do
+            cp -rL "$p"/. $out/
+            # Store files arrive read-only; without this the next package cannot be
+            # merged into the directories the previous one created.
+            chmod -R u+w $out
+          done
+        '';
+
+        cybou-branding = pkgs.runCommand "cybou-branding" { } ''
+          mkdir -p $out
+          cp -rL ${horizon-assets}/. $out/
+          chmod -R u+w $out
+        '';
         # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
         # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
         default = cybou-theme;
