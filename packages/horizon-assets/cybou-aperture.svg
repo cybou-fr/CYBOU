@@ -1,0 +1,18 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Cybou Aperture, for dark backgrounds. Constructed from docs/03-design-system.md, not traced:
+viewBox 0 0 64 64 · centre 32,32 · outer radius 22 · stroke 6 · round caps
+opening 42 degrees centred toward the upper-right · inner point radius 4.5
+
+Gap edges at 45 +/- 21 degrees, i.e. 24 and 66, measured with y up:
+  24 deg -> (52.10, 23.05)
+  66 deg -> (40.95, 11.90)
+so the stroke spans the remaining 318 degrees (large-arc=1, sweep=1).
+Both endpoints verified at r = 22.00.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <path d="M52.1 23.05A22 22 0 1 1 40.95 11.9" stroke="#F2F5F8" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="4.5" fill="#70E1C8"/>
+</svg>

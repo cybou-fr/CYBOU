@@ -39,12 +39,20 @@
       # checked before any visual work starts (docs/07-implementation-plan.md).
       packages = forAllSystems (pkgs: rec {
         horizon-colors = pkgs.callPackage ./packages/horizon-colors { };
+        horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
+        horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
 
         cybou-theme = pkgs.symlinkJoin {
           name = "cybou-theme";
-          paths = [ horizon-colors ];
+          paths = [
+            horizon-colors
+            horizon-wallpaper
+          ];
         };
-        cybou-branding = pkgs.runCommand "cybou-branding" { } "mkdir -p $out";
+        cybou-branding = pkgs.symlinkJoin {
+          name = "cybou-branding";
+          paths = [ horizon-assets ];
+        };
         # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
         # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
         default = cybou-theme;
