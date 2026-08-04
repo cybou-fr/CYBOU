@@ -79,6 +79,13 @@
           modules = [ ./systems/vm.nix ];
         };
 
+        # Live ISO; build system.build.isoImage (ADR-0005).
+        cybou-iso = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs.cybouPackages = self.packages.x86_64-linux;
+          modules = [ ./systems/iso.nix ];
+        };
+
         # Development image for Hyper-V; build system.build.hypervImage.
         cybou-hyperv = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
