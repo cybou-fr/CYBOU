@@ -21,6 +21,7 @@ add_subdirectory(protocol)
 add_subdirectory(foundation/storage)
 add_subdirectory(organs/identityd)
 add_subdirectory(organs/intentiond)
+add_subdirectory(organs/predictord)
 
 include(CTest)
 if(BUILD_TESTING)
