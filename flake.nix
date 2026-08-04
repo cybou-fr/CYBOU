@@ -45,6 +45,13 @@
         default = cybou-theme;
       });
 
+      nixosConfigurations = {
+        cybou-vm = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [ ./systems/vm.nix ];
+        };
+      };
+
       # `nix develop` gives the tools the checks use, so a failing check can be reproduced
       # by hand instead of only inside the build sandbox.
       devShells = forAllSystems (pkgs: {
@@ -79,6 +86,10 @@
           reuse lint
           touch $out
         '';
+
+        # Gate A, service level. Heavy: boots a full Plasma VM under KVM. CI runs the three
+        # cheap checks on every push and the whole set on a tag - see .github/workflows.
+        vm-smoke = import ./tests/vm-smoke.nix { inherit pkgs; };
 
         # Static KDE package validation. Catches the Gate B failures - wrong metadata
         # file name, ID/directory mismatch, wrong layout script name, symlinks,

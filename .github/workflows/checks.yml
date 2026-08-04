@@ -29,8 +29,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  check:
-    name: nix flake check
+  fast:
+    name: cheap checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,15 +40,22 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      # Fails on an unformatted tree, a REUSE violation, or an invalid KDE package.
-      - run: nix flake check --print-build-logs
+      # Named explicitly rather than `nix flake check`, which would also run vm-smoke:
+      # that boots a full Plasma VM and needs KVM, which hosted runners do not offer.
+      - run: |
+          nix build --print-build-logs \
+            .#checks.x86_64-linux.formatting \
+            .#checks.x86_64-linux.reuse \
+            .#checks.x86_64-linux.package-metadata
 
-      # Not covered by the checks above: catches a formatter that rewrites files.
+      # Not covered above: catches a formatter that rewrites files.
       - run: nix fmt && git diff --exit-code
 
-  vm:
-    name: VM build
+  full:
+    name: full check and VM build
     if: startsWith(github.ref, 'refs/tags/')
+    # Needs a KVM-capable runner for checks.vm-smoke. On hosted runners this job will
+    # fail honestly rather than silently skipping the test.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +63,7 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+      - run: nix flake check --print-build-logs
       - run: nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
 
 # Not in CI, by decision:
