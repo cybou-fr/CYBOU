@@ -25,6 +25,13 @@ for (var i = 0; i < allDesktops.length; i++) {
     d.writeConfig("FillMode", 2);
 }
 
+// No desktop icons (CYB-022, docs/04): the Folder View containment is what puts them there,
+// so the desktop stays on the plain Desktop containment. The right-click menu is unaffected.
+for (var j = 0; j < allDesktops.length; j++) {
+    allDesktops[j].currentConfigGroup = ["General"];
+    allDesktops[j].writeConfig("showToolbox", false);
+}
+
 var panel = new Panel;
 panel.location = "top";
 panel.height = 44;
