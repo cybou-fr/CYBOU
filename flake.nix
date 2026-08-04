@@ -17,21 +17,58 @@
       src = nixpkgs.lib.cleanSource ./.;
     in
     {
-      formatter = forAllSystems (pkgs: pkgs.nixfmt-rfc-style);
+      # `nix fmt` passes no path when invoked bare, and nixfmt then reads stdin and fails.
+      # Wrap it so both `nix fmt` and `nix fmt path/` work. In 26.05 `nixfmt-rfc-style`
+      # is a deprecated alias for `nixfmt`.
+      formatter = forAllSystems (
+        pkgs:
+        pkgs.writeShellApplication {
+          name = "cybou-fmt";
+          runtimeInputs = [
+            pkgs.nixfmt
+            pkgs.findutils
+          ];
+          text = ''
+            if [ "$#" -eq 0 ]; then set -- .; fi
+            find "$@" -type f -name '*.nix' -print0 | xargs -0 --no-run-if-empty nixfmt
+          '';
+        }
+      );
 
       # Phase 0 ships empty derivations on purpose: the build interface exists and is
       # checked before any visual work starts (docs/07-implementation-plan.md).
-      packages = forAllSystems (pkgs: {
+      packages = forAllSystems (pkgs: rec {
         cybou-theme = pkgs.runCommand "cybou-theme" { } "mkdir -p $out";
         cybou-branding = pkgs.runCommand "cybou-branding" { } "mkdir -p $out";
-        default = self.packages.${pkgs.system}.cybou-theme;
+        # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
+        # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
+        default = cybou-theme;
+      });
+
+      # `nix develop` gives the tools the checks use, so a failing check can be reproduced
+      # by hand instead of only inside the build sandbox.
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = [
+            pkgs.python3
+            pkgs.nixfmt
+            pkgs.reuse
+          ];
+        };
       });
 
       checks = forAllSystems (pkgs: {
         formatting =
-          pkgs.runCommand "check-formatting" { nativeBuildInputs = [ pkgs.nixfmt-rfc-style ]; }
+          pkgs.runCommand "check-formatting"
+            {
+              nativeBuildInputs = [
+                pkgs.nixfmt
+                pkgs.findutils
+              ];
+            }
             ''
-              nixfmt --check ${src}
+              find ${src} -type f -name '*.nix' -print0 \
+                | xargs -0 --no-run-if-empty nixfmt --check
               touch $out
             '';
 
