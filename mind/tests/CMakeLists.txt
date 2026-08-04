@@ -20,3 +20,8 @@ qt_add_executable(test-identity tst_identity.cpp)
 target_link_libraries(test-identity PRIVATE cybou-identity Qt6::Test)
 add_test(NAME identity COMMAND test-identity)
 set_tests_properties(identity PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-intentions tst_intentions.cpp)
+target_link_libraries(test-intentions PRIVATE cybou-intentions Qt6::Test)
+add_test(NAME intentions COMMAND test-intentions)
+set_tests_properties(intentions PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
