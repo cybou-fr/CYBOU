@@ -62,6 +62,11 @@ tasks.writeConfig("launchers", [
     "applications:org.kde.konsole.desktop"
 ]);
 
+// The Presence applet, immediately left of the system tray. Placed by id: if the package is
+// missing, plasmashell logs an unknown-applet warning and the rest of the panel still builds -
+// the layout script must never be the reason a session has no panel.
+panel.addWidget("org.cybou.presence");
+
 panel.addWidget("org.kde.plasma.marginsseparator");
 panel.addWidget("org.kde.plasma.systemtray");
 

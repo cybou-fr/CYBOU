@@ -48,6 +48,11 @@
         horizon-aurorae = pkgs.callPackage ./packages/horizon-aurorae { };
         cybou-tools = pkgs.callPackage ./packages/cybou-tools { };
 
+        # The Mind and the panel that shows it. Separate derivations: ADR-0008 keeps the
+        # cognitive code isolated, and the applet is data that must not force a C++ rebuild.
+        cybou-mind = pkgs.callPackage ./packages/cybou-mind { };
+        cybou-presence-applet = pkgs.callPackage ./packages/cybou-presence-applet { };
+
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
         # that silently fails to load. checks.package-metadata caught exactly that.

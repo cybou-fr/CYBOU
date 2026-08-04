@@ -15,3 +15,15 @@ qt_add_qml_module(cybou-presence-qml
 )
 
 target_link_libraries(cybou-presence-qml PRIVATE Qt6::Qml cybou-presence)
+
+# Installed only when a destination is given, so a plain developer build stays in the build
+# tree and never writes outside it.
+if(DEFINED CYBOU_QML_INSTALL_DIR)
+    set(_dest "${CYBOU_QML_INSTALL_DIR}/org/cybou/presence")
+    install(TARGETS cybou-presence-qml LIBRARY DESTINATION "${_dest}")
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/qmldir"
+        "${CMAKE_CURRENT_BINARY_DIR}/cybou-presence-qml.qmltypes"
+        DESTINATION "${_dest}"
+    )
+endif()

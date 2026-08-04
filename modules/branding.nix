@@ -9,6 +9,12 @@
     cybouPackages.cybou-branding
     cybouPackages.horizon-sddm
     cybouPackages.cybou-tools
+
+    # The Mind and its panel. The QML module has to be in the system environment because
+    # plasmashell resolves org.cybou.presence through QML2_IMPORT_PATH, which NixOS builds
+    # from systemPackages - a user-level install would leave the applet blank.
+    cybouPackages.cybou-mind
+    cybouPackages.cybou-presence-applet
   ];
 
   # SDDM has its own theme directory and does not follow the Global Theme, which is why the
