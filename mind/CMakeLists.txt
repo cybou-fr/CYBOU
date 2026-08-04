@@ -19,6 +19,7 @@ qt_standard_project_setup()
 
 add_subdirectory(protocol)
 add_subdirectory(foundation/storage)
+add_subdirectory(organs/identityd)
 
 include(CTest)
 if(BUILD_TESTING)
