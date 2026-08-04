@@ -50,6 +50,12 @@
           system = "x86_64-linux";
           modules = [ ./systems/vm.nix ];
         };
+
+        # Development image for Hyper-V; build system.build.hypervImage.
+        cybou-hyperv = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [ ./systems/hyperv.nix ];
+        };
       };
 
       # `nix develop` gives the tools the checks use, so a failing check can be reproduced
