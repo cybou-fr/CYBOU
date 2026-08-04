@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compileCommands": [
+                "${workspaceFolder}/build/dev/compile_commands.json"
+            ]
+        }
+    ],
+    "version": 4
+}

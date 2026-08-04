@@ -10,3 +10,8 @@ target_link_libraries(test-protocol PRIVATE cybou-protocol Qt6::Test)
 # failure that core-dumped plasma-apply-desktoptheme during Phase 3.
 add_test(NAME protocol COMMAND test-protocol)
 set_tests_properties(protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-journal tst_journal.cpp)
+target_link_libraries(test-journal PRIVATE cybou-storage Qt6::Test)
+add_test(NAME journal COMMAND test-journal)
+set_tests_properties(journal PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
