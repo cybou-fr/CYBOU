@@ -42,7 +42,7 @@
         horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
         horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
 
-        horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { };
+        horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { inherit horizon-assets; };
         horizon-plasma-style = pkgs.callPackage ./packages/horizon-plasma-style { };
         horizon-sddm = pkgs.callPackage ./packages/horizon-sddm { inherit horizon-wallpaper; };
         horizon-aurorae = pkgs.callPackage ./packages/horizon-aurorae { };

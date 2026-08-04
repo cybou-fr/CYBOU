@@ -21,4 +21,4 @@ library=org.kde.kwin.aurorae
 theme=__aurorae__svg__CybouHorizon
 
 [ksplashrc][KSplash]
-Theme=org.kde.breeze.desktop
+Theme=org.cybou.horizon.desktop

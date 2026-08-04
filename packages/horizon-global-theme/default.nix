@@ -17,6 +17,7 @@
 {
   lib,
   runCommand,
+  horizon-assets,
 }:
 let
   id = "org.cybou.horizon.desktop";
@@ -36,4 +37,7 @@ runCommand "cybou-horizon-global-theme"
     # that checks.package-metadata exists to catch.
     install -Dm444 ${./layout.js} \
       $dir/contents/layouts/org.kde.plasma.desktop-layout.js
+    install -Dm444 ${./Splash.qml} $dir/contents/splash/Splash.qml
+    install -Dm444 ${horizon-assets}/share/cybou/branding/cybou-aperture.svg \
+      $dir/contents/splash/images/cybou-aperture.svg
   ''
