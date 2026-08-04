@@ -1,0 +1,158 @@
+{
+  "product": "Cybou",
+  "theme": "Cybou Horizon",
+  "version": "0.1",
+  "authority": "This file is the single source of truth for Cybou Horizon numeric design values. docs/03-design-system.md mirrors it in prose; on conflict this file wins.",
+  "colors": {
+    "dark": {
+      "canvas": "#0A0D12",
+      "canvasRaised": "#10151D",
+      "surface": "#171D27",
+      "surfaceElevated": "#202938",
+      "border": "#2E394A",
+      "text": "#F2F5F8",
+      "textMuted": "#9AA7B8",
+      "accent": "#70E1C8",
+      "accentStrong": "#38CBB0",
+      "information": "#7DA6FF",
+      "warning": "#F5C56B",
+      "danger": "#FF6B7D",
+      "success": "#6ED59B"
+    },
+    "light": {
+      "canvas": "#F2F5F6",
+      "canvasRaised": "#E9EEF0",
+      "surface": "#FFFFFF",
+      "surfaceElevated": "#E3E9EC",
+      "border": "#CDD7DC",
+      "text": "#182027",
+      "textMuted": "#5C6975",
+      "accent": "#0C9581",
+      "accentStrong": "#08715F",
+      "information": "#315FB5",
+      "warning": "#9A6814",
+      "danger": "#BE314B",
+      "success": "#287A4C"
+    }
+  },
+  "contrast": {
+    "thresholds": {
+      "text": 4.5,
+      "nonText": 3.0
+    },
+    "rules": {
+      "accent": "non-text only: indicators, edges, focus rings, running dots",
+      "accentText": "use accentStrong for any accent-coloured text",
+      "semanticOnElevated": "light warning/information reach text contrast on surface only; on surfaceElevated use the text token plus an icon"
+    },
+    "measured": {
+      "light.accent/surface": 3.7,
+      "light.accent/surfaceElevated": 3.0,
+      "light.accentStrong/surface": 5.9,
+      "light.accentStrong/surfaceElevated": 4.8,
+      "dark.accent/surface": 10.8,
+      "dark.textMuted/surface": 7.0
+    }
+  },
+  "spacingPx": [
+    4,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32,
+    40
+  ],
+  "radiiPx": {
+    "control": 8,
+    "windowVisual": 10,
+    "menu": 12,
+    "panel": 14
+  },
+  "iconsPx": {
+    "standard": 20,
+    "panel": 22,
+    "launcher": 24
+  },
+  "focusOutlinePx": 2,
+  "panel": {
+    "edge": "top",
+    "heightPx": 44,
+    "marginPx": 12,
+    "floating": true,
+    "dock": false
+  },
+  "opacity": {
+    "panelDark": 0.92,
+    "panelLight": 0.94,
+    "menu": 0.96,
+    "blurBehindPanelAndMenus": true
+  },
+  "shadow": {
+    "layers": 1,
+    "css": "0 10px 30px rgba(0, 0, 0, 0.22)"
+  },
+  "typography": {
+    "ui": [
+      "Inter Variable",
+      "Noto Sans"
+    ],
+    "mono": [
+      "JetBrains Mono",
+      "Noto Sans Mono"
+    ],
+    "normalPt": 11,
+    "panelPt": 10.5,
+    "windowTitlePt": 10.5,
+    "weights": {
+      "body": "regular",
+      "panelClock": "medium",
+      "windowTitle": "medium",
+      "heading": "semibold"
+    },
+    "minWeight": "regular",
+    "allCapsHeadings": false
+  },
+  "motionMs": {
+    "hover": 120,
+    "menuOpen": 160,
+    "panelReveal": 180,
+    "workspace": 240,
+    "splashMax": 1500
+  },
+  "logo": {
+    "viewBox": "0 0 64 64",
+    "outerRadius": 22,
+    "outerStroke": 6,
+    "arcOpeningDeg": 42,
+    "innerPointRadius": 4.5,
+    "strokeCaps": "round",
+    "onDark": {
+      "arc": "#F2F5F8",
+      "point": "#70E1C8"
+    },
+    "onLight": {
+      "arc": "#182027",
+      "point": "#0C9581"
+    }
+  },
+  "wallpaper": {
+    "canvas": "3840x2160",
+    "format": "svg",
+    "horizonAtHeightRatio": 0.61,
+    "horizonLineOpacityRange": [
+      0.18,
+      0.25
+    ],
+    "arcs": 3,
+    "arcMaxOpacity": 0.1,
+    "safeCropRatios": [
+      "16:9",
+      "16:10",
+      "3:2",
+      "21:9"
+    ],
+    "safeZone": "the horizon line and all arc apices must stay inside the 21:9 centre crop of the 16:9 canvas"
+  }
+}

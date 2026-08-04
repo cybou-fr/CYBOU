@@ -38,7 +38,12 @@
       # Phase 0 ships empty derivations on purpose: the build interface exists and is
       # checked before any visual work starts (docs/07-implementation-plan.md).
       packages = forAllSystems (pkgs: rec {
-        cybou-theme = pkgs.runCommand "cybou-theme" { } "mkdir -p $out";
+        horizon-colors = pkgs.callPackage ./packages/horizon-colors { };
+
+        cybou-theme = pkgs.symlinkJoin {
+          name = "cybou-theme";
+          paths = [ horizon-colors ];
+        };
         cybou-branding = pkgs.runCommand "cybou-branding" { } "mkdir -p $out";
         # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
         # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
