@@ -19,6 +19,14 @@
   # already chosen something keeps it. This is the "provide system defaults where KDE supports
   # them" step from docs/02-architecture.md - not the first-login initializer, which is
   # CYB-023 and may only run once, against a clean profile.
+  # Four virtual desktops (docs/04). Not settable from the layout script: KWin owns this,
+  # and the layout script owns the panel.
+  environment.etc."xdg/kwinrc".text = ''
+    [Desktops]
+    Number=4
+    Rows=1
+  '';
+
   environment.etc."xdg/kdeglobals".text = ''
     [KDE]
     LookAndFeelPackage=org.cybou.horizon.desktop

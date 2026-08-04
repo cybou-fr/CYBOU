@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+# SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
 # Cybou Horizon Global Theme (KPackage, Plasma/LookAndFeel).
@@ -32,4 +32,8 @@ runCommand "cybou-horizon-global-theme"
     dir=$out/share/plasma/look-and-feel/${id}
     install -Dm444 ${./metadata.json} $dir/metadata.json
     install -Dm444 ${./defaults} $dir/contents/defaults
+    # Fixed upstream name. Renaming it to match the package id is the silent-failure trap
+    # that checks.package-metadata exists to catch.
+    install -Dm444 ${./layout.js} \
+      $dir/contents/layouts/org.kde.plasma.desktop-layout.js
   ''
