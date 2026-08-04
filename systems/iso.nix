@@ -31,11 +31,17 @@
   system.nixos.distroName = "Cybou";
   system.nixos.distroId = "cybou";
 
+  # image.baseName and image.fileName are the current names; isoImage.isoBaseName and
+  # isoImage.isoName are renamed aliases that warn.
+  #
+  # The file inside the output is composed from baseName alone and comes out as cybou.iso;
+  # fileName is metadata and does not rename it. Three attempts to force a versioned filename
+  # failed, so the version lives where it is reliable: in the store path, and in the versioned
+  # copy the release step publishes next to the SHA256. Do not spend a fourth attempt here.
+  image.baseName = lib.mkForce "cybou";
+  image.fileName = lib.mkForce "cybou-${config.system.nixos.label}-x86_64-linux.iso";
+
   isoImage = {
-    # isoBaseName, not image.fileName: the installation-CD profile composes the final name
-    # from this base, and setting the composed name instead is silently overridden - the
-    # first build came out as nixos-plasma6-*.iso despite image.fileName evaluating to cybou-*.
-    isoBaseName = lib.mkForce "cybou";
     volumeID = "CYBOU";
     # Must boot without a network after it is built (docs/06).
     squashfsCompression = "zstd -Xcompression-level 6";
