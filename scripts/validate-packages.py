@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
 """Static validation of Cybou KDE packages.
 
 Catches the Gate B failures that would otherwise only surface on a running Plasma session.

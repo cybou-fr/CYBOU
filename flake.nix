@@ -72,6 +72,14 @@
               touch $out
             '';
 
+        # Licence compliance (ADR-0007). Turns the Gate D "licence manifest" from a
+        # hand-maintained checkbox into a machine-verified artifact.
+        reuse = pkgs.runCommand "check-reuse" { nativeBuildInputs = [ pkgs.reuse ]; } ''
+          cd ${src}
+          reuse lint
+          touch $out
+        '';
+
         # Static KDE package validation. Catches the Gate B failures - wrong metadata
         # file name, ID/directory mismatch, wrong layout script name, symlinks,
         # malformed SVG, TBD licences - without needing a Plasma session.
