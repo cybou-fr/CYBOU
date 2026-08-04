@@ -37,6 +37,21 @@
 
   # Four virtual desktops (docs/04). Not settable from the layout script: KWin owns this,
   # and the layout script owns the panel.
+  # Switching shortcuts for those desktops (CYB-021). Meta+1..4 and nothing else invented:
+  # docs/04 forbids a large custom scheme in v0.1, so every other binding stays at the KDE
+  # default. These are system defaults, so a user who rebinds them keeps their choice.
+  environment.etc."xdg/kglobalshortcutsrc".text = ''
+    [kwin]
+    Switch to Desktop 1=Meta+1,Ctrl+F1,Switch to Desktop 1
+    Switch to Desktop 2=Meta+2,Ctrl+F2,Switch to Desktop 2
+    Switch to Desktop 3=Meta+3,Ctrl+F3,Switch to Desktop 3
+    Switch to Desktop 4=Meta+4,Ctrl+F4,Switch to Desktop 4
+    Overview=Meta+W,Meta+W,Toggle Overview
+
+    [org.kde.spectacle.desktop]
+    _launch=Print,Print,Launch Screenshot Tool
+  '';
+
   environment.etc."xdg/kwinrc".text = ''
     [Desktops]
     Number=4
