@@ -16,9 +16,13 @@
 // exactly what shipped on 2026-08-04 and it cost a full image rebuild to find.
 var allDesktops = desktops();
 for (var i = 0; i < allDesktops.length; i++) {
-    allDesktops[i].wallpaperPlugin = "org.kde.image";
-    allDesktops[i].currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
-    allDesktops[i].writeConfig("Image", "CybouHorizonDark");
+    var d = allDesktops[i];
+    d.wallpaperPlugin = "org.kde.image";
+    d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
+    // A bare package name gives "unknown wallpaper provider type" in the journal and a
+    // fallback wallpaper. The provider wants a file URL, so point at the installed SVG.
+    d.writeConfig("Image", "file:///run/current-system/sw/share/wallpapers/CybouHorizonDark/contents/images/3840x2160.svg");
+    d.writeConfig("FillMode", 2);
 }
 
 var panel = new Panel;
@@ -35,9 +39,15 @@ launcher.writeConfig("icon", "cybou");
 // Pager: four desktops, compact, active one carries the accent (docs/04).
 panel.addWidget("org.kde.plasma.pager");
 
-// Icons only, no window titles - the panel is an anchor, not a task list.
-var tasks = panel.addWidget("org.kde.plasma.icontasks");
+// org.kde.plasma.taskmanager, NOT org.kde.plasma.icontasks: in nixpkgs 26.05 the icontasks
+// package ships without ui/main.qml, plasmashell fails to build the panel, and the session
+// comes up as a black screen. Found in the guest journal:
+//   Could not find required file "mainscript" for package ".../org.kde.plasma.icontasks/"
+// Icon-only behaviour is a setting here, not a separate applet.
+var tasks = panel.addWidget("org.kde.plasma.taskmanager");
 tasks.currentConfigGroup = ["General"];
+tasks.writeConfig("onlyGroupWhenFull", false);
+tasks.writeConfig("iconOnly", true);
 tasks.writeConfig("launchers", [
     "applications:systemsettings.desktop",
     "applications:org.kde.dolphin.desktop",
