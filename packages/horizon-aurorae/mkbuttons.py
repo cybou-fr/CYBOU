@@ -37,13 +37,25 @@ HEADER_COPY = "SPDX-FileCopyright" + "Text: 2026 Stanislav Saveliev"
 
 
 def svg(name, states):
+    # Each state is a group whose bounding box is the whole 24x24 cell, not just the glyph.
+    #
+    # This is the fix for buttons that exist, respond to clicks and hover, and are invisible:
+    # the ids were right all along. Aurorae scales an element's bounding box to the button
+    # size, so a bare 8x8 glyph was being blown up from an 8x8 box - drawn a quarter size and
+    # off-centre, which reads as nothing at all. The transparent rect pins the box to the cell.
+    #
+    # fill-opacity="0" rather than fill="none": a rect with no fill contributes nothing to the
+    # bounding box in some renderers, which would put us straight back here.
     cells = []
     for i, (state, colour, opacity) in enumerate(states):
         suffix = "" if state == "normal" else "-" + state
+        x = i * 24
         cells.append(
-            '  <path id="%s%s" d="%s" fill="none" stroke="%s" stroke-width="1.6" '
-            'stroke-linecap="round" stroke-linejoin="round" opacity="%s"/>'
-            % (name, suffix, glyph(name, i * 24), colour, opacity)
+            '  <g id="%s%s">\n'
+            '    <rect x="%d" y="0" width="24" height="24" fill="#000000" fill-opacity="0"/>\n'
+            '    <path d="%s" fill="none" stroke="%s" stroke-width="1.6" '
+            'stroke-linecap="round" stroke-linejoin="round" opacity="%s"/>\n'
+            "  </g>" % (name, suffix, x, glyph(name, x), colour, opacity)
         )
     return (
         "<!--\n"
