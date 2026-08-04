@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 """Generate the Horizon Field wallpapers from spec/design-tokens.json.
 
@@ -90,7 +90,7 @@ def metadata(name, mode):
         "[Desktop Entry]\n"
         f"Name=Cybou Horizon {mode}\n"
         "X-KDE-PluginInfo-Name=" + name + "\n"
-        "X-KDE-PluginInfo-Author=Cybou contributors\n"
+        "X-KDE-PluginInfo-Author=Stanislav Saveliev\n"
         "X-KDE-PluginInfo-License=CC-BY-SA-4.0\n"
         "X-KDE-PluginInfo-Version=0.1\n"
     )

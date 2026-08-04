@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
 # Cybou Horizon Plasma Style (KPackage, Plasma/Theme).

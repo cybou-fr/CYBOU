@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
 # Hyper-V development image. Produces a VHDX that boots straight to the desktop, so the

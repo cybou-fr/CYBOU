@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
 # KDE Plasma 6 on Wayland with SDDM. Phase 1 is deliberately unbranded: Gate A must pass

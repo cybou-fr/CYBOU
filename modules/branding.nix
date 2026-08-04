@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
 # Installs the Cybou theme and makes it the system default.
