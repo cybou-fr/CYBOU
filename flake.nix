@@ -63,7 +63,9 @@
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
-            pkgs.python3
+            # pyyaml included: the spec package carries YAML that CI parses, and without it
+            # the check can only be run by pulling a one-off shell.
+            (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
             pkgs.nixfmt
             pkgs.reuse
           ];
