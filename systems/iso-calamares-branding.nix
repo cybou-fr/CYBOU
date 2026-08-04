@@ -33,6 +33,27 @@
           cp -f ${cybouPackages.cybou-branding}/share/cybou/branding/cybou-aperture.svg \
             "$branding/nix-snowflake.svg"
 
+          # productLogo is white.png, a raster file shown in the sidebar. Writing SVG into a
+          # .png renders as nothing, so the mark is rasterised properly instead. 256 px keeps
+          # it sharp at the sizes Calamares uses.
+          ${final.resvg}/bin/resvg --width 256 --height 256 \
+            ${cybouPackages.cybou-branding}/share/cybou/branding/cybou-aperture.svg \
+            "$branding/white.png"
+
+          # The welcome text uses versionedName, not productName - which is why the installer
+          # still said "Welcome to the NixOS installer" while the window title was already
+          # Cybou. Only the product-name strings are touched; componentName and every URL are
+          # left exactly as upstream wrote them.
+          substituteInPlace "$desc" \
+            --replace-quiet 'versionedName:       NixOS' \
+                            'versionedName:       Cybou' \
+            --replace-quiet 'shortVersionedName:  NixOS' \
+                            'shortVersionedName:  Cybou' \
+            --replace-quiet 'shortProductName:    NixOS' \
+                            'shortProductName:    Cybou' \
+            --replace-quiet 'bootloaderEntryName: NixOS' \
+                            'bootloaderEntryName: Cybou'
+
           # Sidebar colours from spec/design-tokens.json: surface, text, canvas, accent.
           substituteInPlace "$desc" \
             --replace-quiet '"#5277C3"' '"#171D27"' \

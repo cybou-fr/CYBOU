@@ -48,14 +48,22 @@ def svg(name, states):
     # bounding box in some renderers, which would put us straight back here.
     cells = []
     for i, (state, colour, opacity) in enumerate(states):
-        suffix = "" if state == "normal" else "-" + state
+        # FrameSvg, not a flat SVG. Aurorae renders buttons through Plasma's FrameSvg exactly
+        # as it renders the frame, and every state must supply a `center` element:
+        # https://develop.kde.org/docs/plasma/aurorae/
+        #
+        # Ids named after the button ("close", "close-hover") are never looked up, so nothing
+        # is drawn - while KWin still creates the button widget, which is why the controls
+        # were clickable and invisible at the same time. Four guesses went past this because
+        # they all assumed the state name was wrong rather than the whole model.
+        prefix = "active" if state == "normal" else state
         x = i * 24
         cells.append(
-            '  <g id="%s%s">\n'
+            '  <g id="%s-center">\n'
             '    <rect x="%d" y="0" width="24" height="24" fill="#000000" fill-opacity="0"/>\n'
             '    <path d="%s" fill="none" stroke="%s" stroke-width="1.6" '
             'stroke-linecap="round" stroke-linejoin="round" opacity="%s"/>\n'
-            "  </g>" % (name, suffix, x, glyph(name, x), colour, opacity)
+            "  </g>" % (prefix, x, glyph(name, x), colour, opacity)
         )
     return (
         "<!--\n"
