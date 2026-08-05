@@ -52,6 +52,7 @@
         # cognitive code isolated, and the applet is data that must not force a C++ rebuild.
         cybou-mind = pkgs.callPackage ./packages/cybou-mind { };
         cybou-presence-applet = pkgs.callPackage ./packages/cybou-presence-applet { };
+        cybou-layout-templates = pkgs.callPackage ./packages/cybou-layout-templates { };
 
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
