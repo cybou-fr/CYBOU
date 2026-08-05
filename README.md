@@ -3,9 +3,11 @@ SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 SPDX-License-Identifier: MIT
 -->
 
-# Cybou
+# Cybou — Умная ОС на базе NixOS
 
-**Cybou** — calm, reproducible KDE Plasma desktop on NixOS.
+**Cybou** — умная операционная система на базе NixOS с KDE Plasma.
+
+Это не просто desktop-окружение, а **полноценная ОС с когнитивными способностями** — Mind.
 
 This is the implementation repository for **Cybou v0.1 — Visual Foundation**.
 The specification package (vision, design system, packaging rules, acceptance gates, ADRs) lives separately in its own repository. When in conflict, `spec/` from the specification repository is authoritative.
@@ -75,12 +77,12 @@ nix build .#nixosConfigurations.cybou-vm.config.system.build.vm -o result-vm
 
 | Component | Description | Language |
 |-----------|-------------|----------|
-| **cybou-mind** | Cognitive engine (Presence organs) | C++/Qt6 |
+| **cybou-mind** | **Когнитивный движок** — умная часть ОС (Presence organs) | C++/Qt6 |
 | **cybou-presence-applet** | Plasma panel applet showing Presence | C++/QML |
 | **cybou-theme** | Complete desktop theme (colors, wallpapers, icons, styles) | Nix |
 | **cybou-vm** | NixOS configuration with Cybou desktop | Nix |
 
-### Mind Architecture
+### Mind — Умная часть ОС
 
 The Mind implements the **Presence** cognitive surface through isolated organs:
 
@@ -145,6 +147,8 @@ GitHub Actions runs the following on every push:
 ---
 
 ## Technical Stack
+
+Cybou — это **полноценная операционная система**, а не просто desktop-окружение.
 
 | Layer | Technology |
 |-------|------------|
