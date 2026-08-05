@@ -175,4 +175,83 @@ bool Presence::reflect()
     return true;
 }
 
+bool Presence::fulfillIndex(int index)
+{
+    if (!m_awake || !m_intentions) {
+        return false;
+    }
+    const auto open = m_intentions->open();
+    if (index < 0 || index >= open.size()) {
+        return false;
+    }
+    bool ok = m_intentions->close(open.at(index).id, Resolution::Fulfilled);
+    if (ok) {
+        Q_EMIT changed();
+    }
+    return ok;
+}
+
+bool Presence::abandonIndex(int index)
+{
+    if (!m_awake || !m_intentions) {
+        return false;
+    }
+    const auto open = m_intentions->open();
+    if (index < 0 || index >= open.size()) {
+        return false;
+    }
+    bool ok = m_intentions->close(open.at(index).id, Resolution::Abandoned);
+    if (ok) {
+        Q_EMIT changed();
+    }
+    return ok;
+}
+
+QVariantList Presence::detailedObligations() const
+{
+    QVariantList list;
+    if (!m_awake || !m_intentions) {
+        return list;
+    }
+    for (const Intention &i : m_intentions->open()) {
+        QVariantMap map;
+        map[QStringLiteral("id")] = i.id.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("description")] = i.description;
+        map[QStringLiteral("trigger")] = i.trigger;
+        map[QStringLiteral("formed")] = i.formed.toLocalTime();
+        list.append(map);
+    }
+    return list;
+}
+
+bool Presence::observe(const QString &subject, double value)
+{
+    if (!m_awake || !m_predictor) {
+        return false;
+    }
+    bool ok = m_predictor->observe(subject, value);
+    if (ok) {
+        Q_EMIT changed();
+    }
+    return ok;
+}
+
+QVariantMap Presence::stats() const
+{
+    QVariantMap map;
+    if (!m_awake || !m_self) {
+        return map;
+    }
+    const SelfReport r = m_self->measure();
+    map[QStringLiteral("ageInDays")] = r.ageInDays;
+    map[QStringLiteral("sessions")] = r.sessions;
+    map[QStringLiteral("openIntentions")] = r.openIntentions;
+    map[QStringLiteral("oldestObligationDays")] = r.oldestObligationDays;
+    map[QStringLiteral("settledPredictions")] = r.settledPredictions;
+    map[QStringLiteral("contributions")] = r.contributions;
+    map[QStringLiteral("journalIntact")] = r.journalIntact;
+    map[QStringLiteral("firstBrokenAt")] = r.firstBrokenAt;
+    return map;
+}
+
 } // namespace cybou

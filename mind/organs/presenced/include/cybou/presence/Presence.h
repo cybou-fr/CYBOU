@@ -86,6 +86,19 @@ public:
     /// worth remembering, and it is what keeps the narration current.
     Q_INVOKABLE bool reflect();
 
+    /// Fulfills or abandons an open intention by its 0-based index.
+    Q_INVOKABLE bool fulfillIndex(int index);
+    Q_INVOKABLE bool abandonIndex(int index);
+
+    /// Detailed list of open intentions as maps with id, description, trigger, formed.
+    Q_INVOKABLE QVariantList detailedObligations() const;
+
+    /// Records an empirical observation for predictor history.
+    Q_INVOKABLE bool observe(const QString &subject, double value);
+
+    /// Self-assessment metrics as a map for detailed diagnostic inspection.
+    Q_INVOKABLE QVariantMap stats() const;
+
     QString lastError() const { return m_lastError; }
 
 Q_SIGNALS:

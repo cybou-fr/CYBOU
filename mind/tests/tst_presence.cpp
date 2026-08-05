@@ -154,6 +154,38 @@ private Q_SLOTS:
         QVERIFY(again.wake());
         QVERIFY(again.narration().contains(QStringLiteral("session 2")));
     }
+
+    void fulfillingAndAbandoningObligationsRemovesThemAndUpdatesStats()
+    {
+        QTemporaryDir dir;
+        Presence p(dir.filePath(QStringLiteral("state")));
+        QVERIFY(p.wake());
+
+        p.promise(QStringLiteral("task 1"));
+        p.promise(QStringLiteral("task 2"));
+        p.promise(QStringLiteral("task 3"));
+        QCOMPARE(p.obligations().size(), 3);
+
+        const auto detailed = p.detailedObligations();
+        QCOMPARE(detailed.size(), 3);
+        QCOMPARE(detailed.at(0).toMap().value(QStringLiteral("description")).toString(), QStringLiteral("task 1"));
+
+        // Fulfill task 1 (index 0)
+        QVERIFY(p.fulfillIndex(0));
+        QCOMPARE(p.obligations().size(), 2);
+        QCOMPARE(p.obligations().at(0), QStringLiteral("task 2"));
+
+        // Abandon task 3 (now index 1)
+        QVERIFY(p.abandonIndex(1));
+        QCOMPARE(p.obligations().size(), 1);
+        QCOMPARE(p.obligations().at(0), QStringLiteral("task 2"));
+
+        QVERIFY(p.observe(QStringLiteral("cpu-load"), 12.5));
+
+        const QVariantMap stats = p.stats();
+        QCOMPARE(stats.value(QStringLiteral("openIntentions")).toInt(), 1);
+        QVERIFY(stats.value(QStringLiteral("journalIntact")).toBool());
+    }
 };
 
 QTEST_MAIN(TestPresence)
