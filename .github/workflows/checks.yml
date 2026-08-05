@@ -48,6 +48,12 @@ jobs:
             .#checks.x86_64-linux.reuse \
             .#checks.x86_64-linux.package-metadata
 
+      # Build C++ packages to ensure they compile correctly
+      - run: |
+          nix build --print-build-logs \
+            .#packages.x86_64-linux.cybou-mind \
+            .#packages.x86_64-linux.cybou-presence-applet
+
       # Not covered above: catches a formatter that rewrites files.
       - run: nix fmt && git diff --exit-code
 

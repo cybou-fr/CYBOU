@@ -13,12 +13,17 @@ it, and on conflict the spec wins.
 
 **Current phase:** Phase 0 — repository bootstrap.
 
+**Status:** C++ Mind and Presence applet are implemented and building. Build artifacts have been cleaned from the repository history. CI now validates C++ compilation.
+
 ## Build interface
 
 ```bash
 nix fmt
 nix flake check
 nix build .#packages.x86_64-linux.cybou-theme
+# C++ packages
+nix build .#packages.x86_64-linux.cybou-mind
+nix build .#packages.x86_64-linux.cybou-presence-applet
 ```
 
 Phase 1 adds:
@@ -60,3 +65,6 @@ result trustworthy.
   failures (wrong metadata file name, `KPlugin.Id` not matching its directory, a layout script
   not named `org.kde.plasma.desktop-layout.js`, symlinks inside a package, malformed SVG,
   `TBD` licences) without needing a running Plasma session.
+
+CI additionally builds the C++ packages (`cybou-mind` and `cybou-presence-applet`) to ensure
+compilation succeeds on every push.
