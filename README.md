@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 
 # Cybou
 
-**Умная операционная система на базе NixOS с KDE Plasma**
+**Smart Operating System based on NixOS with KDE Plasma**
 
 [![REUSE compliant](https://img.shields.io/badge/REUSE-compliant-green.svg)](https://reuse.software/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -19,79 +19,79 @@ SPDX-License-Identifier: MIT
 
 ---
 
-## О проекте
+## About
 
-**Cybou** — это не просто desktop-окружение, а **полноценная умная операционная система** на базе NixOS с KDE Plasma 6.
+Cybou is a smart operating system built on NixOS with KDE Plasma 6 desktop environment.
 
-Ключевая особенность — **Mind**: когнитивный движок, который предоставляет когнитивные способности через изолированные органы (identity, intention, prediction, self, workspace, presence).
+The core innovation is **Mind** — a cognitive engine that provides cognitive capabilities through isolated organs (identity, intention, prediction, self, workspace, presence).
 
 ---
 
-## Состояние проекта
+## Project Status
 
-| Компонент | Статус |
+| Component | Status |
 |-----------|--------|
-| **Фаза** | Phase 0 — repository bootstrap |
-| **C++ Mind** | ✅ Реализован и собирается |
-| **Presence Applet** | ✅ Реализован и собирается |
-| **Артефакты сборки** | ✅ Очищены из истории |
-| **CI** | ✅ Проверяет C++ компиляцию |
-| **REUSE** | ✅ Все файлы с SPDX заголовками |
+| **Phase** | Phase 0 — repository bootstrap |
+| **C++ Mind** | ✅ Implemented and building |
+| **Presence Applet** | ✅ Implemented and building |
+| **Build Artifacts** | ✅ Cleaned from repository history |
+| **CI** | ✅ Validates C++ compilation |
+| **REUSE** | ✅ All files have SPDX headers |
 
 ---
 
-## Быстрый старт
+## Quick Start
 
 ```bash
-# Форматирование
+# Format
 nix fmt
 
-# Проверка
+# Check
 nix flake check
 
-# Сборка темы
+# Build theme
 nix build .#packages.x86_64-linux.cybou-theme
 
-# Сборка C++ пакетов
+# Build C++ packages
 nix build .#packages.x86_64-linux.cybou-mind
 nix build .#packages.x86_64-linux.cybou-presence-applet
 ```
 
 ---
 
-## Архитектура
+## Architecture
 
-### Когнитивный движок (Mind)
+### Mind — Cognitive Engine
 
-- **identityd** — непрерывность субъекта между перезагрузками
-- **intentiond** — обязательства, выведенные из журнала
-- **predictord** — прогнозы, соединённые с результатами
-- **selfd** — самооценка на основе измеренных фактов
-- **workspaced** — ограниченное внимание и коалиции
-- **presenced** — поверхность, показывающая содержимое журнала
+- **identityd** — subject continuity across restarts
+- **intentiond** — obligations derived from the journal
+- **predictord** — forecasts joined to outcomes for measurable error
+- **selfd** — self-assessment from measured facts only
+- **workspaced** — bounded attention and coalitions over the journal
+- **presenced** — the surface that shows what the journal holds
 
-### Технический стек
+### Technology Stack
 
-| Слой | Технология |
-|------|------------|
-| ОС | NixOS 26.05 (stable) |
+| Layer | Technology |
+|-------|------------|
+| OS | NixOS 26.05 (stable) |
 | Desktop | KDE Plasma 6, Wayland, SDDM |
-| Язык | C++20 / Qt6 |
-| Сборка | CMake + Ninja |
-| Лицензия | MIT (код), CC-BY-SA-4.0 (ассеты) |
+| Language | C++20 / Qt6 |
+| Build | CMake + Ninja |
+| License | MIT (code), CC-BY-SA-4.0 (assets) |
 
 ---
 
-## Документация
+## Documentation
 
-- **Спецификация**: отдельный репозиторий (authoritative)
-- **ADRs**: в репозитории спецификации
-- **Разработка**: см. `docs/`
+- **Specification**: separate repository (authoritative)
+- **ADRs**: in the specification repository
+- **Development**: see `docs/`
 
 ---
 
-## Лицензия
+## License
 
-- Код: [MIT](LICENSES/MIT.txt)
-- Ассеты: [CC-BY-SA-4.0](LICENSES/CC-BY-SA-4.0.txt)
-- Соответствие: [REUSE 3.x](https://reuse.software/spec/)
+- Code: [MIT](LICENSES/MIT.txt)
+- Assets: [CC-BY-SA-4.0](LICENSES/CC-BY-SA-4.0.txt)
+- Compliance: [REUSE 3.x](https://reuse.software/spec/)
