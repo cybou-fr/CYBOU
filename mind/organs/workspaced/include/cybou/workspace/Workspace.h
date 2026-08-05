@@ -36,6 +36,17 @@ struct Coalition {
     /// The organs that contributed. A concern several organs agree on is not the same as one
     /// organ repeating itself, and the salience function treats them differently.
     QStringList organs() const;
+    int threadCount() const { return members.size(); }
+};
+
+/// Current moment state for display in the Workspace tab.
+struct MomentState {
+    QUuid focus; // Current focus coalition id
+    double salience{0.0};
+    QStringList organs;
+
+    bool isValid() const { return !focus.isNull(); }
+};
 };
 
 class Workspace : public QObject
@@ -60,6 +71,9 @@ public:
     /// Contributions currently in the moment, newest first.
     QList<CognitiveEnvelope> moment() const { return m_moment; }
     int capacity() const { return m_capacity; }
+
+    /// Current moment state for display in QML.
+    MomentState momentState() const;
 
     /// Restores the moment from the journal after a restart, so the system does not wake up
     /// with nothing on its mind.

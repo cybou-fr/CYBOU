@@ -239,4 +239,30 @@ Calibration Predictor::calibration(const QString &subject) const
     return c;
 }
 
+QList<Calibration> Predictor::allCalibrations() const
+{
+    QList<Calibration> result;
+    if (!m_journal) {
+        return result;
+    }
+
+    // Collect all unique subjects with outcomes
+    QSet<QString> subjects;
+    for (const auto &e : m_journal->recent(0)) {
+        if (e.kind == ContributionKind::Outcome && e.originOrgan == QLatin1String(kOrgan)) {
+            const QCborMap p = payloadOf(e);
+            if (p.contains(QStringLiteral("subject"))) {
+                subjects.insert(subjectOf(p));
+            }
+        }
+    }
+
+    // Get calibration for each subject
+    for (const QString &subject : subjects) {
+        result.append(calibration(subject));
+    }
+
+    return result;
+}
+
 } // namespace cybou

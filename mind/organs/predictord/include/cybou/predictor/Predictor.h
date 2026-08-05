@@ -65,6 +65,9 @@ public:
     /// Measured accuracy over settled predictions for a subject.
     Calibration calibration(const QString &subject) const;
 
+    /// All calibrations for all subjects with settled predictions.
+    QList<Calibration> allCalibrations() const;
+
     QString lastError() const { return m_lastError; }
 
 private:

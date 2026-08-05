@@ -99,6 +99,21 @@ public:
     /// Self-assessment metrics as a map for detailed diagnostic inspection.
     Q_INVOKABLE QVariantMap stats() const;
 
+    /// Identity organ state as a map for display in the Identity tab.
+    Q_INVOKABLE QVariantMap identityState() const;
+
+    /// Predictor calibration data as a list for display in the Predictor tab.
+    Q_INVOKABLE QVariantList calibrations() const;
+
+    /// Predict a value for a given subject using the Predictor organ.
+    Q_INVOKABLE QVariantMap predict(const QString &subject) const;
+
+    /// Workspace coalitions as a list for display in the Workspace tab.
+    Q_INVOKABLE QVariantList coalitions() const;
+
+    /// Current workspace moment as a map for display in the Workspace tab.
+    Q_INVOKABLE QVariantMap moment() const;
+
     QString lastError() const { return m_lastError; }
 
 Q_SIGNALS:

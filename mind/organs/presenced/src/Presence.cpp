@@ -254,4 +254,82 @@ QVariantMap Presence::stats() const
     return map;
 }
 
+QVariantMap Presence::identityState() const
+{
+    QVariantMap map;
+    if (!m_awake || !m_identity) {
+        return map;
+    }
+    const IdentityState state = m_identity->state();
+    map[QStringLiteral("uuid")] = state.uuid.toString(QUuid::WithoutBraces);
+    map[QStringLiteral("origin")] = state.origin;
+    map[QStringLiteral("sessionCount")] = state.sessionCount;
+    map[QStringLiteral("archVersion")] = state.archVersion;
+    map[QStringLiteral("wasBorn")] = state.wasBorn;
+    return map;
+}
+
+QVariantList Presence::calibrations() const
+{
+    QVariantList list;
+    if (!m_awake || !m_predictor) {
+        return list;
+    }
+    const auto calibrations = m_predictor->allCalibrations();
+    for (const auto &cal : calibrations) {
+        QVariantMap map;
+        map[QStringLiteral("subject")] = cal.subject;
+        map[QStringLiteral("settled")] = cal.settled;
+        map[QStringLiteral("meanError")] = cal.meanError;
+        map[QStringLiteral("bias")] = cal.bias;
+        list.append(map);
+    }
+    return list;
+}
+
+QVariantMap Presence::predict(const QString &subject) const
+{
+    QVariantMap map;
+    if (!m_awake || !m_predictor) {
+        return map;
+    }
+    const Prediction prediction = m_predictor->predict(subject);
+    map[QStringLiteral("subject")] = prediction.subject;
+    map[QStringLiteral("value")] = prediction.value;
+    map[QStringLiteral("confidence")] = prediction.confidence;
+    map[QStringLiteral("error")] = prediction.error;
+    return map;
+}
+
+QVariantList Presence::coalitions() const
+{
+    QVariantList list;
+    if (!m_awake || !m_workspace) {
+        return list;
+    }
+    const auto coalitions = m_workspace->coalitions();
+    for (const auto &coalition : coalitions) {
+        QVariantMap map;
+        map[QStringLiteral("id")] = coalition.id.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("salience")] = coalition.salience;
+        map[QStringLiteral("organs")] = coalition.organs();
+        map[QStringLiteral("threads")] = coalition.threadCount();
+        list.append(map);
+    }
+    return list;
+}
+
+QVariantMap Presence::moment() const
+{
+    QVariantMap map;
+    if (!m_awake || !m_workspace) {
+        return map;
+    }
+    const MomentState moment = m_workspace->momentState();
+    map[QStringLiteral("focus")] = moment.focus.toString(QUuid::WithoutBraces);
+    map[QStringLiteral("salience")] = moment.salience;
+    map[QStringLiteral("organs")] = moment.organs;
+    return map;
+}
+
 } // namespace cybou

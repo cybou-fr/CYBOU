@@ -156,4 +156,17 @@ void Workspace::reevaluateFocus()
     Q_EMIT focusChanged(current);
 }
 
+MomentState Workspace::momentState() const
+{
+    MomentState state;
+    const Coalition current = focus();
+    if (!current.isValid()) {
+        return state;
+    }
+    state.focus = current.correlationId;
+    state.salience = current.salience;
+    state.organs = current.organs();
+    return state;
+}
+
 } // namespace cybou
