@@ -6,3 +6,36 @@ result-*
 artifacts/
 .direnv/
 build/
+
+# CMake
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+
+# Ninja
+*.ninja
+.ninja_deps
+.ninja_log
+build.ninja
+
+# Compiled objects
+*.o
+*.a
+*.so
+*.exe
+*.dll
+
+# Qt
+*.moc
+moc_*
+*.qm
+
+# IDE
+.idea/
+.vs/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
