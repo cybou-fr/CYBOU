@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Cybou Mind Dock
+Comment=Vertical dock panel with Mind organ tabs
+Icon=cybou
+Type=Service
+X-KDE-ServiceTypes=Plasma/LayoutTemplate
+X-KDE-Library=plasma-layout-template
+X-KDE-PluginInfo-Name=org.cybou.plasma.minddock
+X-KDE-PluginInfo-Category=LayoutTemplate
+X-KDE-PluginInfo-Version=1.0
+X-KDE-PluginInfo-Website=https://github.com/cybou-fr/CYBOU
+X-KDE-PluginInfo-License=MIT
+X-KDE-PluginInfo-Copyright=2026 Cybou contributors
