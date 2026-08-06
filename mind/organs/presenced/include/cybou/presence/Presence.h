@@ -42,6 +42,11 @@ class Presence : public QObject
     Q_PROPERTY(QStringList obligations READ obligations NOTIFY changed)
     Q_PROPERTY(QString attention READ attention NOTIFY changed)
     Q_PROPERTY(int contributions READ contributions NOTIFY changed)
+    Q_PROPERTY(QVariantMap stats READ stats NOTIFY changed)
+    Q_PROPERTY(QVariantMap identityState READ identityState NOTIFY changed)
+    Q_PROPERTY(QVariantList calibrations READ calibrations NOTIFY changed)
+    Q_PROPERTY(QVariantList coalitions READ coalitions NOTIFY changed)
+    Q_PROPERTY(QVariantMap moment READ moment NOTIFY changed)
 
 public:
     /// dataDir is where the journal and identity live. Creating a Presence does not wake it.
