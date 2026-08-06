@@ -25,18 +25,20 @@ Cybou is a smart operating system built on NixOS with KDE Plasma 6 desktop envir
 
 The core innovation is **Mind** — a cognitive engine that provides cognitive capabilities through isolated organs (identity, intention, prediction, self, workspace, presence).
 
+**Current phase:** Phase 0 — repository bootstrap with Mind implementation complete.
+
 ---
 
 ## Project Status
 
 | Component | Status |
 |-----------|--------|
-| **Phase** | Phase 0 — repository bootstrap |
+| **Phase** | Phase 0 — Mind implementation complete |
 | **C++ Mind** | ✅ Implemented and building |
-| **Presence Applet** | ✅ Implemented and building |
+| **Presence Applet** | ✅ Implemented with Mind Dock UI |
 | **Build Artifacts** | ✅ Cleaned from repository history |
-| **CI** | ✅ Validates C++ compilation |
-| **REUSE** | ✅ All files have SPDX headers |
+| **CI** | ⚠️ Being fixed (REUSE and C++ compilation) |
+| **REUSE** | ⚠️ Being fixed (new files licensed) |
 
 ---
 
@@ -46,7 +48,7 @@ The core innovation is **Mind** — a cognitive engine that provides cognitive c
 # Format
 nix fmt
 
-# Check
+# Check (includes REUSE validation)
 nix flake check
 
 # Build theme
@@ -85,7 +87,7 @@ nix build .#packages.x86_64-linux.cybou-presence-applet
 ## Documentation
 
 - **Specification**: separate repository (authoritative)
-- **ADRs**: in the specification repository
+- **ADRs**: in `docs/adr/` (this repository)
 - **Development**: see `docs/`
 
 ---
