@@ -1,0 +1,511 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+SPDX-License-Identifier: MIT
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0A0D12">
+  <meta name="description" content="Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, reproducibility and zero telemetry.">
+  <meta property="og:title" content="Cybou — Technical Blueprint & Architecture">
+  <meta property="og:description" content="Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, reproducibility and zero telemetry.">
+  <meta property="og:type" content="article">
+  <meta property="og:image" content="assets/cybou-mark.svg">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://cybou.fr/blueprint.html">
+  <link rel="alternate" hreflang="en" href="https://cybou.fr/blueprint.html#lang=en">
+  <link rel="alternate" hreflang="fr" href="https://cybou.fr/blueprint.html#lang=fr">
+  <link rel="alternate" hreflang="ru" href="https://cybou.fr/blueprint.html#lang=ru">
+  <title>Cybou — Technical Blueprint & Architecture</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Cybou Technical Blueprint & Architecture",
+    "author": {
+      "@type": "Person",
+      "name": "Stanislav Saveliev"
+    },
+    "description": "Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, reproducibility and zero telemetry.",
+    "inLanguage": ["en", "fr", "ru"],
+    "url": "https://cybou.fr/blueprint.html"
+  }
+  </script>
+  <style>
+    .blueprint-page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 120px 24px 80px;
+    }
+    .bp-header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 32px;
+      margin-bottom: 48px;
+    }
+    .bp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(112, 225, 200, 0.1);
+      border: 1px solid var(--accent-border);
+      border-radius: 20px;
+      color: var(--accent-text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .bp-title {
+      font-size: 2.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+      line-height: 1.15;
+    }
+    .bp-lead {
+      font-size: 1.2rem;
+      color: var(--ink-2);
+      max-width: 760px;
+      line-height: 1.6;
+    }
+    .bp-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-top: 24px;
+      font-size: 0.9rem;
+      color: var(--ink-3);
+    }
+    .bp-section {
+      margin-bottom: 56px;
+      scroll-margin-top: 100px;
+    }
+    .bp-section h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--ink-0);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .bp-section h2::before {
+      content: '';
+      display: block;
+      width: 4px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    .bp-section h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 28px 0 12px;
+      color: var(--ink-1);
+    }
+    .bp-section p, .bp-section ul {
+      font-size: 1.025rem;
+      line-height: 1.7;
+      color: var(--ink-2);
+      margin-bottom: 16px;
+    }
+    .bp-section ul {
+      padding-left: 24px;
+    }
+    .bp-section li {
+      margin-bottom: 8px;
+    }
+    .bp-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    .bp-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin: 24px 0;
+    }
+    .table-container {
+      overflow-x: auto;
+      margin: 24px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    table.bp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.925rem;
+      text-align: left;
+    }
+    table.bp-table th, table.bp-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    table.bp-table th {
+      background: var(--surface);
+      color: var(--ink-1);
+      font-weight: 600;
+    }
+    table.bp-table td {
+      color: var(--ink-2);
+    }
+    .status-tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .status-tag.done { background: rgba(112, 225, 200, 0.15); color: #70E1C8; border: 1px solid rgba(112, 225, 200, 0.3); }
+    .status-tag.inprogress { background: rgba(125, 166, 255, 0.15); color: #7DA6FF; border: 1px solid rgba(125, 166, 255, 0.3); }
+    .status-tag.todo { background: rgba(255, 255, 255, 0.05); color: var(--ink-3); border: 1px solid var(--line); }
+    
+    .action-bar {
+      display: flex;
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    /* Print styles for PDF export */
+    @media print {
+      body {
+        background: #fff !important;
+        color: #111 !important;
+      }
+      .site-header, .page-atmosphere, .action-bar, .lang-dropdown {
+        display: none !important;
+      }
+      .blueprint-page {
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+      .bp-card {
+        border: 1px solid #ccc !important;
+        background: #f9f9f9 !important;
+      }
+      .bp-section h2::before {
+        background: #000 !important;
+      }
+      table.bp-table th {
+        background: #eee !important;
+        color: #000 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-atmosphere" aria-hidden="true">
+    <div class="atmosphere-glow atmosphere-glow--one"></div>
+    <div class="atmosphere-glow atmosphere-glow--two"></div>
+    <div class="horizon-line"></div>
+    <div class="grain"></div>
+  </div>
+
+  <header class="site-header" data-header>
+    <a class="brand" href="index.html" aria-label="Cybou home">
+      <img src="assets/cybou-mark.svg" width="34" height="34" alt="">
+      <span>Cybou</span>
+    </a>
+
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      <a href="index.html#experience" data-i18n="nav_experience">Experience</a>
+      <a href="index.html#foundation" data-i18n="nav_foundation">Foundation</a>
+      <a href="index.html#progress" data-i18n="nav_progress">Progress</a>
+      <a href="index.html#design" data-i18n="nav_design">Design</a>
+      <a href="index.html#roadmap" data-i18n="nav_roadmap">Roadmap</a>
+      <a href="partners.html" data-i18n="nav_partners">Partners</a>
+    </nav>
+
+    <div class="header-right-group">
+      <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" class="github-icon-link" aria-label="GitHub Repository" title="GitHub Repository">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      </a>
+      <div class="lang-dropdown" data-lang-dropdown>
+        <button type="button" class="lang-dropdown-trigger" data-lang-trigger aria-haspopup="true" aria-expanded="false" aria-label="Select Language">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <span data-lang-current>EN</span>
+          <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+        </button>
+        <div class="lang-dropdown-menu" data-lang-menu aria-hidden="true">
+          <button type="button" data-lang="en" class="active"><span>English</span><code>EN</code></button>
+          <button type="button" data-lang="fr"><span>Français</span><code>FR</code></button>
+          <button type="button" data-lang="ru"><span>Русский</span><code>RU</code></button>
+        </div>
+      </div>
+      <a class="header-cta" href="index.html" data-i18n="btn_back_home">← Back to home</a>
+    </div>
+
+    <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" data-menu-button>
+      <span></span><span></span>
+    </button>
+  </header>
+
+  <div class="mobile-nav" data-mobile-nav>
+    <div class="lang-dropdown" data-lang-dropdown style="margin-bottom: 16px;">
+      <button type="button" class="lang-dropdown-trigger" data-lang-trigger aria-haspopup="true" aria-expanded="false" aria-label="Select Language">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <span data-lang-current>EN</span>
+        <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </button>
+      <div class="lang-dropdown-menu" data-lang-menu aria-hidden="true">
+        <button type="button" data-lang="en" class="active"><span>English</span><code>EN</code></button>
+        <button type="button" data-lang="fr"><span>Français</span><code>FR</code></button>
+        <button type="button" data-lang="ru"><span>Русский</span><code>RU</code></button>
+      </div>
+    </div>
+    <a href="index.html#experience" data-i18n="nav_experience">Experience</a>
+    <a href="index.html#foundation" data-i18n="nav_foundation">Foundation</a>
+    <a href="index.html#progress" data-i18n="nav_progress">Progress</a>
+    <a href="index.html#design" data-i18n="nav_design">Design</a>
+    <a href="index.html#roadmap" data-i18n="nav_roadmap">Roadmap</a>
+    <a href="partners.html" data-i18n="nav_partners">Partners</a>
+    <a href="index.html" data-i18n="btn_back_home">← Back to home</a>
+  </div>
+
+  <main class="blueprint-page">
+    <header class="bp-header reveal">
+      <div class="bp-badge">
+        <span class="eyebrow-dot"></span>
+        <span data-i18n="bp_badge">Official Technical Blueprint · v0.1 & Architecture</span>
+      </div>
+      <h1 class="bp-title" data-i18n="bp_title">Cybou: A Smarter, Reproducible Operating System</h1>
+      <p class="bp-lead" data-i18n="bp_lead">
+        A technical blueprint defining the vision, NixOS architecture, KDE Plasma 6 visual system, staged roadmap and acceptance matrix for Cybou.
+      </p>
+      <div class="bp-meta">
+        <span><strong>Base:</strong> NixOS 26.05 Stable</span>
+        <span><strong>Desktop:</strong> KDE Plasma 6 (Wayland)</span>
+        <span><strong>Status:</strong> Implementation Active</span>
+        <span><strong>Updated:</strong> August 2026</span>
+      </div>
+
+      <div class="action-bar">
+        <button class="button button--primary" onclick="window.print()" data-i18n="btn_print_pdf">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 3 0 0 1-2-2v-5a2 2 3 0 0 1 2-2h16a2 2 3 0 0 1 2 2v5a2 2 3 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+          Export to PDF / Print
+        </button>
+        <a class="button button--ghost" href="index.html" data-i18n="btn_explore_landing">Explore Web Landing</a>
+      </div>
+    </header>
+
+    <section class="bp-section reveal" id="summary">
+      <h2 data-i18n="bp_sec1_title">1. Executive Summary & Core Vision</h2>
+      <p data-i18n="bp_sec1_p1">
+        Cybou is a smarter personal Linux distribution engineered around reproducibility and spatial design. It operates under a strict release principle: build a trustworthy body first, and earn every capability added after it.
+      </strong>
+      </p>
+      <div class="bp-grid-2">
+        <div class="bp-card">
+          <h3 data-i18n="bp_layer1_title">Layer 1: Visual & Technical Body (v0.1)</h3>
+          <p data-i18n="bp_layer1_desc">
+            Declarative NixOS foundation with atomic generation rollbacks, custom KDE Plasma 6 Wayland desktop theme ("Cybou Horizon"), curated default applications, and zero telemetry.
+          </p>
+        </div>
+        <div class="bp-card">
+          <h3 data-i18n="bp_layer2_title">Layer 2: Product foundation (v0.2+)</h3>
+          <p data-i18n="bp_layer2_desc">
+        Welcome and About applications, a readable generation viewer, better recovery, hardware profiles and guided application installation. Still no autonomous behaviour.
+      </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="bp-section reveal" id="architecture">
+      <h2 data-i18n="bp_sec2_title">2. Architecture & Technical Stack</h2>
+      <p data-i18n="bp_sec2_p1">
+        Cybou combines the immutable, declarative package management of NixOS with modern Wayland desktop infrastructure.
+      </p>
+      <div class="bp-card">
+        <h3 data-i18n="bp_stack_title">Core System Stack</h3>
+        <ul>
+          <li><strong>Base System:</strong> NixOS 26.05 locked via Nix Flakes (<code style="color:var(--accent);">flake.lock</code>).</li>
+          <li><strong>Display & Session:</strong> SDDM greeter + KDE Plasma 6 running natively on Wayland.</li>
+          <li><strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, custom Aurorae window decorations, and single floating top horizon panel.</li>
+          <li><strong>Audio & Networking:</strong> PipeWire audio graph server + NetworkManager for declarative network profiles.</li>
+          <li><strong>Build Output:</strong> Bootable NixOS ISO, qemu/KVM virtual machine targets, and Hyper-V development images.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="bp-section reveal" id="cognitive">
+      <h2 data-i18n="bp_sec3_title">3. Smarter Linux: what comes after v0.1</h2>
+      <p data-i18n="bp_sec3_p1">
+        Cybou earns capability in stages. Nothing below ships in v0.1, and nothing is implemented ahead of the stage that justifies it:
+      </p>
+      <ul>
+        <li data-i18n="bp_ai_point1"><strong>Understandable updates:</strong> see what changed between two NixOS generations, and why a build failed, without reading raw logs.</li>
+        <li data-i18n="bp_ai_point2"><strong>Recoverable by default:</strong> every state is a generation you can return to, so an update is never a one-way door.</li>
+        <li data-i18n="bp_ai_point3"><strong>Private by construction:</strong> no telemetry, no account, no runtime downloads — a constraint on every later stage, not a v0.1 detail.</li>
+        <li data-i18n="bp_ai_point4"><strong>Proposals, never surprises:</strong> any future system change is a declarative diff presented for approval, applied only by the user.</li>
+      </ul>
+    </section>
+
+    <section class="bp-section reveal" id="progress">
+      <h2 data-i18n="bp_sec4_title">4. Implementation Status & Progress Matrix</h2>
+      <p data-i18n="bp_sec4_p1">
+        Development progress is tracked rigorously across milestone phases and verified against automated acceptance gates.
+      </p>
+      <div class="table-container">
+        <table class="bp-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Phase</th>
+              <th>Task Description</th>
+              <th>Verification Criteria</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CYB-001</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>0</td>
+              <td>Flake & Formatter Skeleton</td>
+              <td><code>nix fmt</code> and <code>nix flake check</code> pass cleanly on NixOS 26.05</td>
+            </tr>
+            <tr>
+              <td>CYB-002</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>1</td>
+              <td>Unbranded Plasma Wayland VM</td>
+              <td>VM builds and boots; SDDM and Wayland verified by <code>checks.vm-smoke</code></td>
+            </tr>
+            <tr>
+              <td>CYB-005</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>0</td>
+              <td>Installer & ADR Decisions</td>
+              <td>ADR-0005 (Calamares), ADR-0006 (stateVersion), ADR-0007 (Licensing) accepted</td>
+            </tr>
+            <tr>
+              <td>CYB-007</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>0</td>
+              <td>REUSE 3.3 Compliance</td>
+              <td>All files lint clean under REUSE 3.3 with SPDX headers</td>
+            </tr>
+            <tr>
+              <td>CYB-008</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>0</td>
+              <td>Static Web System Integration</td>
+              <td>Dependency-free landing page accepted into repository</td>
+            </tr>
+            <tr>
+              <td>CYB-009</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>2</td>
+              <td>Light & Dark Contrast Optimization</td>
+              <td>WCAG AA contrast verified in-browser across 36+ text tokens</td>
+            </tr>
+            <tr>
+              <td>CYB-010</td>
+              <td><span class="status-tag done">DONE</span></td>
+              <td>2</td>
+              <td>Cybou Asset Package</td>
+              <td>Horizon assets, colors, and wallpaper SVG derivations built</td>
+            </tr>
+            <tr>
+              <td>CYB-019</td>
+              <td><span class="status-tag inprogress">IN PROGRESS</span></td>
+              <td>2</td>
+              <td>Aperture Brand Mark SVG</td>
+              <td>Geometric opening 42° verified without bitmap embeds</td>
+            </tr>
+            <tr>
+              <td>CYB-003</td>
+              <td><span class="status-tag todo">TODO</span></td>
+              <td>1</td>
+              <td>NixOS ISO Image Build</td>
+              <td>Bootable live ISO image generation via Flake package</td>
+            </tr>
+            <tr>
+              <td>CYB-020</td>
+              <td><span class="status-tag todo">TODO</span></td>
+              <td>4</td>
+              <td>Horizon Floating Top Panel</td>
+              <td>KDE Plasma layout script active on initial login</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bp-section reveal" id="licensing">
+      <h2 data-i18n="bp_sec5_title">5. Security, Licensing & Trademarks</h2>
+      <p data-i18n="bp_sec5_p1">
+        Cybou is free software built for sovereignty and privacy:
+      </p>
+      <ul>
+        <li><strong>Code License:</strong> MIT License for all Nix code, build scripts, web assets, and core logic.</li>
+        <li><strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0) for logos, wallpapers, and desktop themes.</li>
+        <li><strong>Trademark:</strong> The Cybou name and Aperture mark are protected to prevent unauthorized re-branding (see <code style="color:var(--accent);">TRADEMARK.md</code>).</li>
+        <li><strong>Zero Telemetry Mandate:</strong> `docs/11-security-licensing.md` explicitly forbids remote tracking, analytics, and unauthorized cloud telemetry.</li>
+      </ul>
+    </section>
+
+    <section class="bp-section reveal" id="faq">
+      <h2>6. Frequently Asked Questions</h2>
+      <div class="faq-list" data-faq-list>
+        <article class="faq-item">
+          <button type="button" class="faq-question">
+            <span data-i18n="faq_q1">What is Cybou?</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="faq-answer"><p data-i18n="faq_a1">Cybou is an intelligent, personal Linux distribution created by Stanislav Saveliev. Built on NixOS 26.05 and KDE Plasma 6 Wayland, it provides a calm, mathematically reproducible desktop paired with on-device local AI assistance.</p></div>
+        </article>
+
+        <article class="faq-item">
+          <button type="button" class="faq-question">
+            <span data-i18n="faq_q2">Why is Cybou called a "Smarter Linux"?</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="faq-answer"><p data-i18n="faq_a2">Cybou integrates local SLMs/LLMs directly into the system layer. It offers natural language introspection of NixOS generation changes, build error diagnostics, and local vector context with 100% privacy and zero cloud telemetry.</p></div>
+        </article>
+
+        <article class="faq-item">
+          <button type="button" class="faq-question">
+            <span data-i18n="faq_q3">Does Cybou require cloud services or send telemetry?</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="faq-answer"><p data-i18n="faq_a3">No. Cybou strictly enforces 100% Zero Telemetry. No accounts, API keys, or external servers are required. All AI models run locally on your GPU/NPU in sandboxed systemd containers.</p></div>
+        </article>
+
+        <article class="faq-item">
+          <button type="button" class="faq-question">
+            <span data-i18n="faq_q4">How does Cybou guarantee system stability?</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="faq-answer"><p data-i18n="faq_a4">Through declarative NixOS Flakes (flake.lock) and atomic generation rollbacks. If any package update fails or breaks, you can instantly select a previous working generation at boot time.</p></div>
+        </article>
+
+        <article class="faq-item">
+          <button type="button" class="faq-question">
+            <span data-i18n="faq_q5">What open-source licenses apply?</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="faq-answer"><p data-i18n="faq_a5">Cybou code and Nix expressions are licensed under MIT. Original visual assets (wallpapers, desktop themes, SVGs) are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev.</p></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand" href="index.html"><img src="assets/cybou-mark.svg" width="28" height="28" alt=""><span>Cybou</span></a>
+    <p>Visual foundation · Built on NixOS and KDE Plasma.</p>
+    <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

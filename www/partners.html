@@ -1,0 +1,288 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+SPDX-License-Identifier: MIT
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0A0D12">
+  <meta name="description" content="Cybou OS — Contact, Sponsorship, Donations & Partnerships with Stanislav Saveliev. Email: info@cybou.fr">
+  <meta property="og:title" content="Cybou — Partners, Support & Contact">
+  <meta property="og:description" content="Support Cybou OS development, donate to the project, or get in touch for hardware and software partnerships. Contact: info@cybou.fr">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/cybou-mark.svg">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://cybou.fr/partners.html">
+  <link rel="alternate" hreflang="en" href="https://cybou.fr/partners.html#lang=en">
+  <link rel="alternate" hreflang="fr" href="https://cybou.fr/partners.html#lang=fr">
+  <link rel="alternate" hreflang="ru" href="https://cybou.fr/partners.html#lang=ru">
+  <title>Cybou — Partners, Support & Contact</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    "name": "Cybou Partners & Contact",
+    "description": "Contact and donation page for Cybou OS by Stanislav Saveliev.",
+    "url": "https://cybou.fr/partners.html",
+    "author": {
+      "@type": "Person",
+      "name": "Stanislav Saveliev",
+      "email": "info@cybou.fr"
+    }
+  }
+  </script>
+  <style>
+    .partners-page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 120px 24px 80px;
+    }
+    .partners-header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 32px;
+      margin-bottom: 48px;
+    }
+    .partners-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 28px;
+      margin-bottom: 56px;
+    }
+    .partner-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: border-color 0.25s ease, transform 0.25s ease;
+    }
+    .partner-card:hover {
+      border-color: var(--accent-border);
+      transform: translateY(-2px);
+    }
+    .partner-card h3 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--ink-0);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .partner-card p {
+      color: var(--ink-2);
+      font-size: 0.975rem;
+      line-height: 1.65;
+    }
+    .email-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      background: rgba(var(--fg-rgb), 0.05);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-family: monospace;
+      font-size: 1.05rem;
+      color: var(--accent-text);
+      width: fit-content;
+      margin-top: 8px;
+    }
+    .donate-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .donate-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(var(--fg-rgb), 0.04);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--ink-1);
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .donate-btn:hover {
+      border-color: var(--accent-border);
+      color: var(--accent-text);
+      background: rgba(var(--accent-rgb), 0.08);
+    }
+    .crypto-address {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--ink-3);
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-atmosphere" aria-hidden="true">
+    <div class="atmosphere-glow atmosphere-glow--one"></div>
+    <div class="atmosphere-glow atmosphere-glow--two"></div>
+    <div class="horizon-line"></div>
+    <div class="grain"></div>
+  </div>
+
+  <header class="site-header" data-header>
+    <a class="brand" href="index.html" aria-label="Cybou home">
+      <img src="assets/cybou-mark.svg" width="34" height="34" alt="">
+      <span>Cybou</span>
+    </a>
+
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      <a href="index.html#experience" data-i18n="nav_experience">Experience</a>
+      <a href="index.html#foundation" data-i18n="nav_foundation">Foundation</a>
+      <a href="index.html#progress" data-i18n="nav_progress">Progress</a>
+      <a href="index.html#design" data-i18n="nav_design">Design</a>
+      <a href="index.html#roadmap" data-i18n="nav_roadmap">Roadmap</a>
+      <a href="blueprint.html" data-i18n="nav_blueprint">Blueprint</a>
+      <a href="partners.html" class="active" data-i18n="nav_partners">Partners</a>
+    </nav>
+
+    <div class="header-right-group">
+      <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" class="github-icon-link" aria-label="GitHub Repository" title="GitHub Repository">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      </a>
+      <div class="lang-dropdown" data-lang-dropdown>
+        <button type="button" class="lang-dropdown-trigger" data-lang-trigger aria-haspopup="true" aria-expanded="false" aria-label="Select Language">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <span data-lang-current>EN</span>
+          <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+        </button>
+        <div class="lang-dropdown-menu" data-lang-menu aria-hidden="true">
+          <button type="button" data-lang="en" class="active"><span>English</span><code>EN</code></button>
+          <button type="button" data-lang="fr"><span>Français</span><code>FR</code></button>
+          <button type="button" data-lang="ru"><span>Русский</span><code>RU</code></button>
+        </div>
+      </div>
+      <a class="header-cta" href="blueprint.html" data-i18n="btn_view_blueprint">Blueprint</a>
+    </div>
+
+    <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" data-menu-button>
+      <span></span><span></span>
+    </button>
+  </header>
+
+  <div class="mobile-nav" data-mobile-nav>
+    <div class="lang-dropdown" data-lang-dropdown style="margin-bottom: 16px;">
+      <button type="button" class="lang-dropdown-trigger" data-lang-trigger aria-haspopup="true" aria-expanded="false" aria-label="Select Language">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <span data-lang-current>EN</span>
+        <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </button>
+      <div class="lang-dropdown-menu" data-lang-menu aria-hidden="true">
+        <button type="button" data-lang="en" class="active"><span>English</span><code>EN</code></button>
+        <button type="button" data-lang="fr"><span>Français</span><code>FR</code></button>
+        <button type="button" data-lang="ru"><span>Русский</span><code>RU</code></button>
+      </div>
+    </div>
+    <a href="index.html#experience" data-i18n="nav_experience">Experience</a>
+    <a href="index.html#foundation" data-i18n="nav_foundation">Foundation</a>
+    <a href="index.html#progress" data-i18n="nav_progress">Progress</a>
+    <a href="index.html#design" data-i18n="nav_design">Design</a>
+    <a href="index.html#roadmap" data-i18n="nav_roadmap">Roadmap</a>
+    <a href="blueprint.html" data-i18n="nav_blueprint">Blueprint</a>
+    <a href="partners.html" class="active" data-i18n="nav_partners">Partners</a>
+  </div>
+
+  <main class="partners-page">
+    <header class="partners-header reveal">
+      <div class="bp-badge">
+        <span class="eyebrow-dot"></span>
+        <span data-i18n="part_badge">Partnership & Support Hub</span>
+      </div>
+      <h1 class="bp-title" data-i18n="part_title">Partners, Contact & Donations</h1>
+      <p class="bp-lead" data-i18n="part_lead">
+        Get in touch with creator Stanislav Saveliev, explore hardware & software partnerships, or support Cybou's independent open-source development.
+      </p>
+    </header>
+
+    <div class="partners-grid">
+      <!-- Card 1: Official Contact -->
+      <article class="partner-card reveal">
+        <h3>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span data-i18n="part_contact_head">Official Contact</span>
+        </h3>
+        <p data-i18n="part_contact_text">
+          For general inquiries, press, security disclosures, distributions collaboration, or hardware support:
+        </p>
+        <a href="mailto:info@cybou.fr" class="email-box">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>info@cybou.fr</span>
+        </a>
+      </article>
+
+      <!-- Card 2: Support & Donations -->
+      <article class="partner-card reveal reveal-delay-1">
+        <h3>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.72-8.72 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span data-i18n="part_donate_head">Support & Donations</span>
+        </h3>
+        <p data-i18n="part_donate_text">
+          Cybou is an independent open-source project. Your financial support directly funds theme development, ISO build infrastructure, and local AI integration.
+        </p>
+        <div class="donate-options">
+          <a href="https://github.com/sponsors" target="_blank" rel="noopener" class="donate-btn">
+            <span>GitHub Sponsors</span>
+            <code>Sponsor →</code>
+          </a>
+          <a href="https://buymeacoffee.com" target="_blank" rel="noopener" class="donate-btn">
+            <span>Buy Me a Coffee</span>
+            <code>Coffee →</code>
+          </a>
+        </div>
+      </article>
+
+      <!-- Card 3: Crypto Donations -->
+      <article class="partner-card reveal reveal-delay-2">
+        <h3>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v2m0 8v2"/></svg>
+          <span data-i18n="part_crypto_head">Crypto Donations</span>
+        </h3>
+        <p data-i18n="part_crypto_text">
+          Support Stanislav Saveliev directly via cryptocurrency:
+        </p>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+          <div>
+            <strong style="font-size:0.85rem; color:var(--ink-1);">Solana (SOL):</strong>
+            <div class="crypto-address">39iqkHNMqncEPp3p52zKwUHnYzk2MJbcaHyY4Hhg2fWC</div>
+          </div>
+          <div>
+            <strong style="font-size:0.85rem; color:var(--ink-1);">Bitcoin (BTC):</strong>
+            <div class="crypto-address">bc1q5a0yq9kflu755jz9a7juveelj3lrnaml6cnjur</div>
+          </div>
+          <div>
+            <strong style="font-size:0.85rem; color:var(--ink-1);">Ethereum / USDT (ERC-20):</strong>
+            <div class="crypto-address">0xf4B7fF998600617785ad7D4d0aad3D2Ea342526B</div>
+          </div>
+          <div>
+            <strong style="font-size:0.85rem; color:var(--ink-1);">TRON / USDT (TRC-20):</strong>
+            <div class="crypto-address">TCWmbxJXwes4GLZkVjpKpY3p34mjg4C6qo</div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <a class="brand" href="index.html"><img src="assets/cybou-mark.svg" width="28" height="28" alt=""><span>Cybou</span></a>
+    <p>Visual foundation & Blueprint · Built on NixOS and KDE Plasma.</p>
+    <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

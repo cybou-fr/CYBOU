@@ -1,0 +1,42 @@
+# Cybou
+
+> Cybou is an intelligent, reproducible personal Linux distribution built on NixOS 26.05 and KDE Plasma 6 Wayland. Created by Stanislav Saveliev.
+
+## Overview
+Cybou follows a strict two-stage philosophy: **Build a trustworthy body first, then grow the cognitive mind.**
+
+- **Visual & Technical Body (v0.1)**: Immutable NixOS Flakes base, atomic generation rollbacks, custom KDE Plasma 6 Wayland desktop theme ("Cybou Horizon"), zero telemetry, WCAG AA contrast compliance.
+- **On-Device Cognition (v0.2+)**: Local SLM/LLM system services executing strictly on local NPU/GPU hardware. Natural-language system state introspection, log diagnostic assistance, and local vector context with 100% privacy and zero cloud dependencies.
+
+## Key Links
+- [Homepage](https://cybou.fr/index.html): Visual desktop overview and live progress metrics.
+- [Technical Blueprint](https://cybou.fr/blueprint.html): Comprehensive technical blueprint, architecture specs, progress matrix, and printable PDF.
+- [Partners & Contact](https://cybou.fr/partners.html): Contact info (`info@cybou.fr`), hardware/software partnerships, and donation channels.
+- [GitHub Repository](https://github.com/cybou-fr/CYBOU): Official GitHub repository.
+
+## Technical Details & Contact
+- Base System: NixOS 26.05 stable locked via `flake.lock`.
+- Desktop Environment: KDE Plasma 6 (Wayland) + SDDM greeter.
+- Security & Telemetry: 100% zero remote telemetry. No external API keys required.
+- Official Contact: info@cybou.fr
+- Official Website: https://cybou.fr
+- GitHub: https://github.com/cybou-fr/CYBOU
+- Author: Stanislav Saveliev
+- Licenses: MIT for code/Nix expressions, CC BY-SA 4.0 for original visual assets. Copyright (c) 2026 Stanislav Saveliev.
+
+## Frequently Asked Questions (FAQ)
+
+### Q: What is Cybou?
+A: Cybou is an intelligent personal Linux distribution created by Stanislav Saveliev. Built on NixOS 26.05 and KDE Plasma 6 Wayland, it provides a calm, mathematically reproducible desktop paired with on-device local AI assistance.
+
+### Q: Why is Cybou called a "Smarter Linux"?
+A: Cybou integrates local SLMs/LLMs directly into the system layer. It offers natural language introspection of NixOS generation changes, build error diagnostics, and local vector context with 100% privacy and zero cloud telemetry.
+
+### Q: Does Cybou require cloud services or send telemetry?
+A: No. Cybou strictly enforces 100% Zero Telemetry. No accounts, API keys, or external servers are required. All AI models run locally on GPU/NPU in sandboxed systemd containers.
+
+### Q: How does Cybou guarantee system stability?
+A: Through declarative NixOS Flakes (flake.lock) and atomic generation rollbacks. If any package update fails or breaks, you can instantly select a previous working generation at boot time.
+
+### Q: What open-source licenses apply?
+A: Cybou code and Nix expressions are licensed under MIT. Original visual assets (wallpapers, desktop themes, SVGs) are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev.

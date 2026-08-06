@@ -1,0 +1,22 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Cybou Aperture. Drawn from the geometric specification in docs/03-design-system.md:
+viewBox 0 0 64 64 · centre 32,32 · outer radius 22 · stroke 6 · round caps
+opening 42 degrees centred toward the upper-right · inner point radius 4.5
+
+Gap edges at 24 and 66 degrees (45 +/- 21), so the stroke spans the remaining 318 degrees:
+  24 deg -> (52.10, 23.05)
+  66 deg -> (40.95, 11.90)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+  <path d="M52.1 23.05A22 22 0 1 1 40.95 11.9" stroke="#F2F5F8" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="6.7" fill="#70E1C8" opacity=".18" filter="url(#glow)"/>
+  <circle cx="32" cy="32" r="4.5" fill="#70E1C8"/>
+</svg>
