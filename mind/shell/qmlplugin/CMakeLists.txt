@@ -16,6 +16,21 @@ qt_add_qml_module(cybou-presence-qml
 
 target_link_libraries(cybou-presence-qml PRIVATE Qt6::Qml cybou-presence)
 
+# QML files for the Mind Dock
+set(QML_FILES
+    MindDock.qml
+    MindTabBar.qml
+    MindTab.qml
+    tabs/DashboardTab.qml
+    tabs/IdentityTab.qml
+    tabs/IntentionsTab.qml
+    tabs/ActivityTab.qml
+    tabs/SelfTab.qml
+    tabs/PredictorTab.qml
+    tabs/WorkspaceTab.qml
+    utils/StatCard.qml
+)
+
 # Installed only when a destination is given, so a plain developer build stays in the build
 # tree and never writes outside it.
 if(DEFINED CYBOU_QML_INSTALL_DIR)
@@ -26,4 +41,10 @@ if(DEFINED CYBOU_QML_INSTALL_DIR)
         "${CMAKE_CURRENT_BINARY_DIR}/cybou-presence-qml.qmltypes"
         DESTINATION "${_dest}"
     )
+    
+    # Install QML files
+    foreach(qml_file ${QML_FILES})
+        install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${qml_file}
+                DESTINATION "${_dest}")
+    endforeach()
 endif()
