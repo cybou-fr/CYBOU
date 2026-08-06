@@ -47,7 +47,6 @@ struct MomentState {
 
     bool isValid() const { return !focus.isNull(); }
 };
-};
 
 class Workspace : public QObject
 {

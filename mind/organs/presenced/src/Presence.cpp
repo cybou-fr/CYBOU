@@ -215,7 +215,7 @@ QVariantList Presence::detailedObligations() const
     }
     for (const Intention &i : m_intentions->open()) {
         QVariantMap map;
-        map[QStringLiteral("id")] = i.id.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("correlationId")] = i.id.toString(QUuid::WithoutBraces);
         map[QStringLiteral("description")] = i.description;
         map[QStringLiteral("trigger")] = i.trigger;
         map[QStringLiteral("formed")] = i.formed.toLocalTime();
@@ -261,11 +261,11 @@ QVariantMap Presence::identityState() const
         return map;
     }
     const IdentityState state = m_identity->state();
-    map[QStringLiteral("uuid")] = state.uuid.toString(QUuid::WithoutBraces);
-    map[QStringLiteral("origin")] = state.origin;
-    map[QStringLiteral("sessionCount")] = state.sessionCount;
-    map[QStringLiteral("archVersion")] = state.archVersion;
-    map[QStringLiteral("wasBorn")] = state.wasBorn;
+    map[QStringLiteral("uuid")] = state.identityId.toString(QUuid::WithoutBraces);
+    map[QStringLiteral("origin")] = state.origin.toString();
+    map[QStringLiteral("sessionCount")] = static_cast<qint64>(state.sessionCount);
+    map[QStringLiteral("architectureVersion")] = state.architectureVersion;
+    map[QStringLiteral("wasBorn")] = m_identity->wasBorn();
     return map;
 }
 
@@ -293,11 +293,12 @@ QVariantMap Presence::predict(const QString &subject) const
     if (!m_awake || !m_predictor) {
         return map;
     }
-    const Prediction prediction = m_predictor->predict(subject);
-    map[QStringLiteral("subject")] = prediction.subject;
-    map[QStringLiteral("value")] = prediction.value;
-    map[QStringLiteral("confidence")] = prediction.confidence;
-    map[QStringLiteral("error")] = prediction.error;
+    const Forecast forecast = m_predictor->predict(subject);
+    map[QStringLiteral("subject")] = forecast.subject;
+    map[QStringLiteral("estimate")] = forecast.estimate;
+    map[QStringLiteral("margin")] = forecast.margin;
+    map[QStringLiteral("confidence")] = forecast.confidence;
+    map[QStringLiteral("samples")] = forecast.samples;
     return map;
 }
 
@@ -310,7 +311,7 @@ QVariantList Presence::coalitions() const
     const auto coalitions = m_workspace->coalitions();
     for (const auto &coalition : coalitions) {
         QVariantMap map;
-        map[QStringLiteral("id")] = coalition.id.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("correlationId")] = coalition.correlationId.toString(QUuid::WithoutBraces);
         map[QStringLiteral("salience")] = coalition.salience;
         map[QStringLiteral("organs")] = coalition.organs();
         map[QStringLiteral("threads")] = coalition.threadCount();
