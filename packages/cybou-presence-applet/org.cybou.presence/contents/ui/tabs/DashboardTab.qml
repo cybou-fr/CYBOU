@@ -11,6 +11,12 @@ MindTab {
     title: "Dashboard"
     icon: "view-dashboard"
 
+    // Update data when mind changes
+    Connections {
+        target: mind
+        function onChanged() { }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11

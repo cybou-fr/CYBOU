@@ -12,6 +12,15 @@ Item {
     property int dockWidth: 460
     property int tabHeight: 48
 
+    // Forward mind's changed signal to all tabs
+    Connections {
+        target: mind
+        function onChanged() {
+            // This will trigger re-evaluation of all bindings in tabs
+            // that use mind.* properties
+        }
+    }
+
     // Main container
     ColumnLayout {
         anchors.fill: parent

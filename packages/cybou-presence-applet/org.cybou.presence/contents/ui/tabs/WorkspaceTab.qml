@@ -11,6 +11,15 @@ MindTab {
     title: "Workspace"
     icon: "folder-workspace"
 
+    // Update data when mind changes
+    Connections {
+        target: mind
+        function onChanged() {
+            coalitions = mind.coalitions()
+            moment = mind.moment()
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -33,14 +42,14 @@ MindTab {
 
         StatCard {
             title: "Salience"
-            value: moment.salience.toFixed(2)
+            value: moment.salience ? moment.salience.toFixed(2) : "0.00"
             icon: "chart-line"
             Layout.alignment: Qt.AlignHCenter
         }
 
         StatCard {
             title: "Organs Involved"
-            value: moment.organs.join(", ")
+            value: moment.organs ? moment.organs.join(", ") : "None"
             icon: "nodes"
             Layout.alignment: Qt.AlignHCenter
         }
