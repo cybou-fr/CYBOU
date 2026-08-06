@@ -45,3 +45,8 @@ qt_add_executable(test-presence tst_presence.cpp)
 target_link_libraries(test-presence PRIVATE cybou-presence Qt6::Test)
 add_test(NAME presence COMMAND test-presence)
 set_tests_properties(presence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-presence-extended tst_presence_extended.cpp)
+target_link_libraries(test-presence-extended PRIVATE cybou-presence Qt6::Test)
+add_test(NAME presence-extended COMMAND test-presence-extended)
+set_tests_properties(presence-extended PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
