@@ -9,6 +9,7 @@
     cybouPackages.cybou-branding
     cybouPackages.horizon-sddm
     cybouPackages.cybou-tools
+    cybouPackages.cybou-layout-templates
 
     # The Mind and its panel. The QML module has to be in the system environment because
     # plasmashell resolves org.cybou.presence through QML2_IMPORT_PATH, which NixOS builds

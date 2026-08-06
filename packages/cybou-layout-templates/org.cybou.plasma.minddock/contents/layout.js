@@ -13,4 +13,4 @@ mindDock.alignment = "center";
 mindDock.floating = true;
 
 // Add the main dock widget that contains all tabs
-mindDock.addWidget("org.cybou.presence.dock");
+mindDock.addWidget("org.cybou.presence");
