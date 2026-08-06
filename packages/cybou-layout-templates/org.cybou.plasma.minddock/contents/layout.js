@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
 // Cybou Mind Dock - Vertical panel with organ tabs
 // Based on Plasma 6.7.3 API
 

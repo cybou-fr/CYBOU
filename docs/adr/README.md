@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: MIT
+-->
+
 # Architecture Decision Records (ADRs)
 
 This directory contains Architecture Decision Records (ADRs) for the Cybou project. ADRs document important architectural decisions along with their context and consequences.

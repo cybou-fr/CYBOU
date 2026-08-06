@@ -23,14 +23,14 @@ This means:
 All source files must start with:
 ```c
 // SPDX-FileCopyrightText: <year> <copyright holder>
-// SPDX-License-Identifier: <SPDX license>
+// SPDX-License-Identifier: MIT
 ```
 
 Or for non-code files:
 ```markdown
 <!--
 SPDX-FileCopyrightText: <year> <copyright holder>
-SPDX-License-Identifier: <SPDX license>
+SPDX-License-Identifier: MIT
 -->
 ```
 

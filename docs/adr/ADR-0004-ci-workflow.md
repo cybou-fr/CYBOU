@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: MIT
+-->
+
 # ADR-0004: CI Workflow
 
 ## Status
