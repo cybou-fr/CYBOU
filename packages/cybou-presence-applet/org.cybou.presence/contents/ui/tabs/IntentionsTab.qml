@@ -11,11 +11,6 @@ MindTab {
     title: "Intentions"
     icon: "task-complete"
 
-    Presence {
-        id: presence
-        onChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -35,13 +30,13 @@ MindTab {
 
             StatCard {
                 title: "Total"
-                value: detailedObligations.length
+                value: mind.detailedObligations.length
                 icon: "list"
             }
 
             StatCard {
                 title: "Oldest"
-                value: oldestObligationDays
+                value: mind.stats.oldestObligationDays
                 icon: "calendar"
             }
         }
@@ -50,21 +45,11 @@ MindTab {
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: detailedObligations
+            model: mind.detailedObligations
             delegate: ItemDelegate {
                 text: modelData.description
                 onClicked: console.log("Intention clicked:", modelData.description)
             }
         }
     }
-
-    property QVariantList detailedObligations: presence.detailedObligations()
-    property int oldestObligationDays: presence.stats.oldestObligationDays
-
-    function updateData() {
-        detailedObligations = presence.detailedObligations()
-        oldestObligationDays = presence.stats.oldestObligationDays
-    }
-
-    Component.onCompleted: updateData()
 }

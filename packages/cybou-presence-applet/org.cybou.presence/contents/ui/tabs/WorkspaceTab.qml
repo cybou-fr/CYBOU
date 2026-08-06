@@ -11,11 +11,6 @@ MindTab {
     title: "Workspace"
     icon: "folder-workspace"
 
-    Presence {
-        id: presence
-        onChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -71,13 +66,6 @@ MindTab {
         }
     }
 
-    property QVariantList coalitions: presence.coalitions()
-    property QVariantMap moment: presence.moment()
-
-    function updateData() {
-        coalitions = presence.coalitions()
-        moment = presence.moment()
-    }
-
-    Component.onCompleted: updateData()
+    property QVariantList coalitions: mind.coalitions()
+    property QVariantMap moment: mind.moment()
 }

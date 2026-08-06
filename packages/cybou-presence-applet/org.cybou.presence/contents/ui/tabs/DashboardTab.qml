@@ -11,12 +11,6 @@ MindTab {
     title: "Dashboard"
     icon: "view-dashboard"
 
-    Presence {
-        id: presence
-        onNarrationChanged: updateData()
-        onStatsChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -25,7 +19,7 @@ MindTab {
         // Narration
         Label {
             Layout.alignment: Qt.AlignHCenter
-            text: presence.narration
+            text: mind.narration
             font.pixelSize: 16
             wrapMode: Text.WordWrap
             elide: Text.ElideRight
@@ -39,13 +33,13 @@ MindTab {
 
             StatCard {
                 title: "Attention"
-                value: presence.stats.attention
+                value: mind.attention
                 icon: "eye"
             }
 
             StatCard {
                 title: "Contributions"
-                value: presence.stats.contributions
+                value: mind.contributions
                 icon: "star"
             }
         }
@@ -56,14 +50,10 @@ MindTab {
             columns: 2
             spacing: 11
 
-            StatCard { title: "Age"; value: presence.stats.ageInDays; icon: "calendar" }
-            StatCard { title: "Sessions"; value: presence.stats.sessions; icon: "history" }
-            StatCard { title: "Open Intentions"; value: presence.stats.openIntentions; icon: "task" }
-            StatCard { title: "Settled Predictions"; value: presence.stats.settledPredictions; icon: "check" }
+            StatCard { title: "Age"; value: mind.stats.ageInDays; icon: "calendar" }
+            StatCard { title: "Sessions"; value: mind.stats.sessions; icon: "history" }
+            StatCard { title: "Open Intentions"; value: mind.stats.openIntentions; icon: "task" }
+            StatCard { title: "Settled Predictions"; value: mind.stats.settledPredictions; icon: "check" }
         }
-    }
-
-    function updateData() {
-        // Data is automatically updated through Presence signals
     }
 }

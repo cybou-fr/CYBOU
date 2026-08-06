@@ -11,11 +11,6 @@ MindTab {
     title: "Self"
     icon: "user"
 
-    Presence {
-        id: presence
-        onChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -34,28 +29,20 @@ MindTab {
             columns: 2
             spacing: 11
 
-            StatCard { title: "Age (days)"; value: selfStats.ageInDays; icon: "calendar" }
-            StatCard { title: "Sessions"; value: selfStats.sessions; icon: "history" }
-            StatCard { title: "Open Intentions"; value: selfStats.openIntentions; icon: "task" }
-            StatCard { title: "Settled Predictions"; value: selfStats.settledPredictions; icon: "check" }
-            StatCard { title: "Contributions"; value: selfStats.contributions; icon: "database" }
-            StatCard { title: "Journal Intact"; value: selfStats.journalIntact ? "Yes" : "No"; icon: "shield-check" }
+            StatCard { title: "Age (days)"; value: mind.stats.ageInDays; icon: "calendar" }
+            StatCard { title: "Sessions"; value: mind.stats.sessions; icon: "history" }
+            StatCard { title: "Open Intentions"; value: mind.stats.openIntentions; icon: "task" }
+            StatCard { title: "Settled Predictions"; value: mind.stats.settledPredictions; icon: "check" }
+            StatCard { title: "Contributions"; value: mind.stats.contributions; icon: "database" }
+            StatCard { title: "Journal Intact"; value: mind.stats.journalIntact ? "Yes" : "No"; icon: "shield-check" }
         }
 
         // First broken at
         StatCard {
             title: "First Broken At"
-            value: selfStats.firstBrokenAt ? selfStats.firstBrokenAt.toLocaleDateTime().toString("yyyy-MM-dd HH:mm") : "Never"
+            value: mind.stats.firstBrokenAt ? mind.stats.firstBrokenAt.toLocaleDateTime().toString("yyyy-MM-dd HH:mm") : "Never"
             icon: "alert"
             Layout.alignment: Qt.AlignHCenter
         }
     }
-
-    property QVariantMap selfStats: presence.stats()
-
-    function updateData() {
-        selfStats = presence.stats()
-    }
-
-    Component.onCompleted: updateData()
 }

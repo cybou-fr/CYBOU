@@ -11,11 +11,6 @@ MindTab {
     title: "Activity"
     icon: "history"
 
-    Presence {
-        id: presence
-        onChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -31,7 +26,7 @@ MindTab {
         // Stats
         StatCard {
             title: "Total Contributions"
-            value: presence.contributions
+            value: mind.contributions
             icon: "database"
             Layout.alignment: Qt.AlignHCenter
         }
@@ -40,7 +35,7 @@ MindTab {
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: activity
+            model: mind.activity(20)
             delegate: ItemDelegate {
                 text: "[%1] %2: %3".arg(modelData.when.toLocaleTime().toString("HH:mm"))
                                       .arg(modelData.organ)
@@ -49,12 +44,4 @@ MindTab {
             }
         }
     }
-
-    property QVariantList activity: presence.activity(20)
-
-    function updateData() {
-        activity = presence.activity(20)
-    }
-
-    Component.onCompleted: updateData()
 }

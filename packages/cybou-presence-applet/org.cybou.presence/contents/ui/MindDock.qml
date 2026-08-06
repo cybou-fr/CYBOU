@@ -4,13 +4,11 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import org.kde.plasma.plasmoid 2.0
 import org.cybou.presence 1.0
 
-PlasmoidItem {
+Item {
     id: root
-    preferredRepresentation: fullRepresentation
-
+    property var mind  // Shared Presence instance from parent
     property int dockWidth: 460
     property int tabHeight: 48
 
@@ -37,53 +35,49 @@ PlasmoidItem {
             DashboardTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                mind: root.mind
             }
 
             // Identity Tab
             IdentityTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                mind: root.mind
             }
 
             // Intentions Tab
             IntentionsTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                mind: root.mind
             }
 
             // Activity Tab
             ActivityTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                mind: root.mind
             }
 
             // Self Tab
             SelfTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                mind: root.mind
             }
 
             // Predictor Tab
             PredictorTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                mind: root.mind
             }
 
             // Workspace Tab
             WorkspaceTab {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-            }
-        }
-    }
-
-    // Register the dock widget
-    Plasmoid.fullRepresentation: Component {
-        Item {
-            width: dockWidth
-            height: childrenRect.height
-            MindDock {
-                anchors.fill: parent
+                mind: root.mind
             }
         }
     }

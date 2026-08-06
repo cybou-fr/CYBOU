@@ -8,6 +8,7 @@ Item {
     id: root
     property string title
     property string icon
+    property var mind  // Shared Presence instance from parent
 
     // Common styling
     padding: 11

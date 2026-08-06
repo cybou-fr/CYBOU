@@ -11,11 +11,6 @@ MindTab {
     title: "Identity"
     icon: "user-identity"
 
-    Presence {
-        id: presence
-        onChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -34,19 +29,11 @@ MindTab {
             columns: 1
             spacing: 11
 
-            StatCard { title: "UUID"; value: identityState.uuid; icon: "fingerprint" }
-            StatCard { title: "Origin"; value: identityState.origin; icon: "calendar" }
-            StatCard { title: "Sessions"; value: identityState.sessionCount; icon: "history" }
-            StatCard { title: "Architecture Version"; value: identityState.archVersion; icon: "code" }
-            StatCard { title: "Was Born"; value: identityState.wasBorn ? "Yes" : "No"; icon: "heart" }
+            StatCard { title: "UUID"; value: mind.identityState.uuid; icon: "fingerprint" }
+            StatCard { title: "Origin"; value: mind.identityState.origin; icon: "calendar" }
+            StatCard { title: "Sessions"; value: mind.identityState.sessionCount; icon: "history" }
+            StatCard { title: "Architecture Version"; value: mind.identityState.architectureVersion; icon: "code" }
+            StatCard { title: "Was Born"; value: mind.identityState.wasBorn ? "Yes" : "No"; icon: "heart" }
         }
     }
-
-    property QVariantMap identityState: presence.identityState()
-
-    function updateData() {
-        identityState = presence.identityState()
-    }
-
-    Component.onCompleted: updateData()
 }

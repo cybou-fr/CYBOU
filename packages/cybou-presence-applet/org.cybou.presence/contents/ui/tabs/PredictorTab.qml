@@ -11,11 +11,6 @@ MindTab {
     title: "Predictor"
     icon: "predictive-text"
 
-    Presence {
-        id: presence
-        onChanged: updateData()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 11
@@ -32,7 +27,7 @@ MindTab {
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: calibrations
+            model: mind.calibrations
             delegate: ItemDelegate {
                 text: "%1: %2 settled, error: %3, bias: %4".arg(modelData.subject)
                                                                  .arg(modelData.settled)
@@ -69,22 +64,17 @@ MindTab {
         }
     }
 
-    property QVariantList calibrations: presence.calibrations()
     property string predictionSubject: ""
     property string predictionResult: ""
 
-    function updateData() {
-        calibrations = presence.calibrations()
-    }
-
     function predict() {
         if (predictionSubject) {
-            const result = presence.predict(predictionSubject)
-            predictionResult = "Subject: %1, Value: %2, Confidence: %3".arg(result.subject)
-                                                                     .arg(result.value.toFixed(2))
+            const result = mind.predict(predictionSubject)
+            predictionResult = "Subject: %1, Estimate: %2, Margin: %3, Confidence: %4, Samples: %5".arg(result.subject)
+                                                                     .arg(result.estimate.toFixed(2))
+                                                                     .arg(result.margin.toFixed(2))
                                                                      .arg(result.confidence.toFixed(2))
+                                                                     .arg(result.samples)
         }
     }
-
-    Component.onCompleted: updateData()
 }
