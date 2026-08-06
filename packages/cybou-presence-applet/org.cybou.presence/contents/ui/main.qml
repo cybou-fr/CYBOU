@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-import QtQuick
-import QtQuick.Layouts
-import org.kde.plasma.plasmoid
+import QtQuick 2.15
+import QtQuick.Layouts 1.15
+import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
-import org.cybou.presence
+import org.cybou.presence 1.0
 
 PlasmoidItem {
     id: root
@@ -66,9 +66,13 @@ PlasmoidItem {
         }
     }
 
-    fullRepresentation: MindDock {
-        width: 460
-        height: childrenRect.height
+    // Main dock representation - MindDock with organ tabs
+    // Using Component to load MindDock.qml from the same directory
+    fullRepresentation: Component {
+        MindDock {
+            width: 460
+            height: childrenRect.height
+        }
     }
 
     // Nothing behind the panel: say so plainly instead of showing an empty frame.
