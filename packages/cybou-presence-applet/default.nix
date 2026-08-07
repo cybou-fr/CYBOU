@@ -25,4 +25,5 @@ runCommand "cybou-presence-applet"
     cp -rL ${./org.cybou.presence}/. "$dir"/
     chmod -R u+w "$dir"
     python3 ${../../scripts/validate-packages.py} "$dir"
+    python3 ${../../scripts/validate-qml-api.py} "$dir"
   ''

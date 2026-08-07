@@ -12,7 +12,6 @@ RowLayout {
     property int currentIndex: 0
     signal tabSelected(int index)
 
-    // Tab buttons
     Repeater {
         model: [
             { "name": "Dashboard", "icon": "view-dashboard", "tooltip": "Mind Dashboard" },
@@ -26,13 +25,21 @@ RowLayout {
 
         delegate: ToolButton {
             id: tabButton
+
+            required property int index
+            required property var modelData
+
             text: modelData.name
             icon.name: modelData.icon
-            toolTip: modelData.tooltip
+
+            ToolTip.text: modelData.tooltip
+            ToolTip.visible: hovered
+            ToolTip.delay: 500
+
             checkable: true
             checked: index === root.currentIndex
             Layout.fillWidth: true
-            Layout.preferredHeight: parent.Layout.preferredHeight
+            Layout.fillHeight: true
 
             onClicked: {
                 root.currentIndex = index
