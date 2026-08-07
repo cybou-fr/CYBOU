@@ -4,7 +4,7 @@
 
 set -uo pipefail
 
-VERSION=3
+VERSION=4
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/cybou"
 MARKER="$STATE/desktop-layout-version"

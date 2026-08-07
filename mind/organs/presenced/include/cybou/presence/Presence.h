@@ -28,6 +28,7 @@ class Presence : public QObject
     Q_OBJECT
 
     Q_PROPERTY(bool awake READ isAwake NOTIFY changed)
+    Q_PROPERTY(QString lastError READ lastError NOTIFY changed)
     Q_PROPERTY(QString narration READ narration NOTIFY changed)
     Q_PROPERTY(QStringList obligations READ obligations NOTIFY changed)
     Q_PROPERTY(QString attention READ attention NOTIFY changed)
@@ -43,7 +44,7 @@ public:
     explicit Presence(QObject *parent = nullptr);
     ~Presence() override;
 
-    bool wake();
+    Q_INVOKABLE bool wake();
     bool isAwake() const { return m_awake; }
 
     QString narration() const;

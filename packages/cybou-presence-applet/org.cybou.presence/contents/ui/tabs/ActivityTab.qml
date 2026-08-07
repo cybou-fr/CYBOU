@@ -4,6 +4,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import org.kde.kirigami as Kirigami
 import "../utils"
 
 Item {
@@ -16,48 +17,102 @@ Item {
     property var activityModel: []
 
     function refreshActivity() {
-        activityModel = mind.activity(20)
+        activityModel = mind.activity(30)
     }
 
     Component.onCompleted: refreshActivity()
 
     Connections {
         target: mind
-        function onChanged() { activityTab.refreshActivity() }
+        function onChanged() {
+            activityTab.refreshActivity()
+        }
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 11
-        spacing: 11
-
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Recent Moments"
-            font.pixelSize: 18
-            font.bold: true
-        }
+        anchors.margins: 12
+        spacing: 9
 
         StatCard {
-            title: "Total Contributions"
+            Layout.fillWidth: true
+            title: i18n("Total contributions")
             value: mind.contributions
             icon: "database"
-            Layout.alignment: Qt.AlignHCenter
         }
 
-        ListView {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: true
-            model: activityTab.activityModel
 
-            delegate: ItemDelegate {
-                required property var modelData
-                width: ListView.view.width
-                text: "[%1] %2: %3"
-                    .arg(Qt.formatTime(modelData.when, "HH:mm"))
-                    .arg(modelData.organ)
-                    .arg(modelData.kind)
+            ListView {
+                id: activityList
+                anchors.fill: parent
+                clip: true
+                spacing: 4
+                model: activityTab.activityModel
+
+                delegate: ItemDelegate {
+                    id: activityDelegate
+
+                    required property var modelData
+
+                    width: ListView.view.width
+                    implicitHeight: 54
+
+                    background: Rectangle {
+                        radius: 8
+                        color: activityDelegate.hovered
+                            ? Kirigami.Theme.highlightColor
+                            : "transparent"
+                        opacity: activityDelegate.hovered ? 0.08 : 1.0
+                    }
+
+                    contentItem: RowLayout {
+                        spacing: 9
+
+                        Label {
+                            Layout.preferredWidth: 42
+                            text: Qt.formatTime(modelData.when, "HH:mm")
+                            font.pixelSize: 11
+                            opacity: 0.58
+                        }
+
+                        Kirigami.Icon {
+                            Layout.preferredWidth: 18
+                            Layout.preferredHeight: 18
+                            source: "media-record"
+                            opacity: 0.70
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: modelData.kind || i18n("Contribution")
+                                font.bold: true
+                                elide: Text.ElideRight
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: modelData.organ || i18n("Unknown organ")
+                                font.pixelSize: 11
+                                opacity: 0.60
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                visible: activityTab.activityModel.length === 0
+                text: i18n("No activity yet")
+                opacity: 0.55
             }
         }
     }

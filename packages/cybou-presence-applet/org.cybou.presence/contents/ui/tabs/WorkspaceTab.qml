@@ -4,6 +4,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import org.kde.kirigami as Kirigami
 import "../utils"
 
 Item {
@@ -13,65 +14,101 @@ Item {
     readonly property string title: "Workspace"
     readonly property string icon: "folder-workspace"
 
-    readonly property var currentMoment: mind.moment
+    readonly property var currentMoment: mind.moment || ({})
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 11
-        spacing: 11
+        anchors.margins: 12
+        spacing: 9
 
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Current Moment"
-            font.pixelSize: 18
-            font.bold: true
-        }
-
-        StatCard {
-            title: "Focus Coalition"
-            value: currentMoment.focus && currentMoment.focus.length > 0
-                ? currentMoment.focus.slice(0, 8)
-                : "None"
+        InfoCard {
+            Layout.fillWidth: true
+            title: i18n("Current focus")
+            text: currentMoment.focus && currentMoment.focus.length > 0
+                ? i18n(
+                    "%1 · salience %2",
+                    String(currentMoment.focus).slice(0, 12),
+                    Number(currentMoment.salience || 0).toFixed(2)
+                )
+                : i18n("No coalition currently owns attention.")
             icon: "target"
-            Layout.alignment: Qt.AlignHCenter
+            emphasized: Boolean(currentMoment.focus && currentMoment.focus.length > 0)
         }
 
         StatCard {
-            title: "Salience"
-            value: currentMoment.salience ? Number(currentMoment.salience).toFixed(2) : "0.00"
-            icon: "chart-line"
-            Layout.alignment: Qt.AlignHCenter
-        }
-
-        StatCard {
-            title: "Organs Involved"
+            Layout.fillWidth: true
+            title: i18n("Organs involved")
             value: currentMoment.organs && currentMoment.organs.length > 0
                 ? currentMoment.organs.join(", ")
-                : "None"
-            icon: "nodes"
-            Layout.alignment: Qt.AlignHCenter
+                : i18n("None")
+            icon: "network-connect"
         }
 
         Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Coalitions"
-            font.pixelSize: 16
+            Layout.fillWidth: true
+            text: i18n("Coalitions")
             font.bold: true
+            opacity: 0.72
         }
 
-        ListView {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: true
-            model: mind.coalitions
 
-            delegate: ItemDelegate {
-                required property var modelData
-                width: ListView.view.width
-                text: "%1: %2 organs, salience: %3"
-                    .arg(String(modelData.correlationId).slice(0, 8))
-                    .arg(modelData.organs.length)
-                    .arg(Number(modelData.salience).toFixed(2))
+            ListView {
+                id: coalitionList
+                anchors.fill: parent
+                clip: true
+                spacing: 4
+                model: mind.coalitions
+
+                delegate: ItemDelegate {
+                    id: coalitionDelegate
+
+                    required property var modelData
+
+                    width: ListView.view.width
+                    implicitHeight: 58
+
+                    background: Rectangle {
+                        radius: 8
+                        color: coalitionDelegate.hovered
+                            ? Kirigami.Theme.highlightColor
+                            : "transparent"
+                        opacity: coalitionDelegate.hovered ? 0.08 : 1.0
+                    }
+
+                    contentItem: ColumnLayout {
+                        spacing: 2
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: String(modelData.correlationId).slice(0, 12)
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: i18n(
+                                "%1 organs · salience %2 · %3 threads",
+                                modelData.organs ? modelData.organs.length : 0,
+                                Number(modelData.salience || 0).toFixed(2),
+                                modelData.threads || 0
+                            )
+                            font.pixelSize: 11
+                            opacity: 0.62
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                visible: mind.coalitions.length === 0
+                text: i18n("No active coalitions")
+                opacity: 0.55
             }
         }
     }

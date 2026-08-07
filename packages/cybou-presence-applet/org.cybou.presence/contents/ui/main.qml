@@ -2,34 +2,35 @@
 // SPDX-License-Identifier: MIT
 
 import QtQuick 2.15
+import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.core as PlasmaCore
-import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import org.cybou.presence 1.0
 
 PlasmoidItem {
     id: root
-    property bool ready: false
 
     Presence {
         id: presenceBackend
-        Component.onCompleted: root.ready = wake()
+        Component.onCompleted: wake()
     }
 
-    Plasmoid.status: root.ready ? PlasmaCore.Types.ActiveStatus
-                                : PlasmaCore.Types.PassiveStatus
+    Plasmoid.status: presenceBackend.awake
+        ? PlasmaCore.Types.ActiveStatus
+        : PlasmaCore.Types.PassiveStatus
 
     // Horizontal panel -> compact icon. Dedicated vertical panel -> embedded full Mind UI.
-    // Plasma 6: preferredRepresentation belongs to PlasmoidItem itself.
     preferredRepresentation:
         plasmoid.formFactor === PlasmaCore.Types.Vertical
             ? root.fullRepresentation
             : root.compactRepresentation
 
     toolTipMainText: i18n("Cybou")
-    toolTipSubText: root.ready ? presenceBackend.narration : i18n("Not awake.")
+    toolTipSubText: presenceBackend.awake
+        ? presenceBackend.narration
+        : i18n("Mind services are unavailable.")
 
     compactRepresentation: Item {
         Layout.minimumWidth: Kirigami.Units.iconSizes.small
@@ -40,7 +41,18 @@ PlasmoidItem {
             width: Math.min(parent.width, parent.height)
             height: width
             source: "cybou"
-            opacity: root.ready ? 1.0 : 0.4
+            opacity: presenceBackend.awake ? 1.0 : 0.45
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            width: 7
+            height: 7
+            radius: width / 2
+            color: presenceBackend.awake
+                ? Kirigami.Theme.highlightColor
+                : Kirigami.Theme.disabledTextColor
         }
 
         MouseArea {
@@ -58,14 +70,5 @@ PlasmoidItem {
             Layout.fillHeight: true
             mind: presenceBackend
         }
-    }
-
-    PlasmaExtras.PlaceholderMessage {
-        anchors.centerIn: parent
-        width: parent.width - Kirigami.Units.gridUnit * 4
-        visible: !root.ready
-        iconName: "dialog-cancel"
-        text: i18n("Not awake")
-        explanation: i18n("The journal could not be opened, so there is nothing to show.")
     }
 }

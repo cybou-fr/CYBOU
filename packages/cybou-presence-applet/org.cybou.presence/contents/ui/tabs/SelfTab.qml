@@ -15,37 +15,70 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 11
-        spacing: 11
+        anchors.margins: 12
+        spacing: 9
 
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Self Assessment"
-            font.pixelSize: 18
-            font.bold: true
+        InfoCard {
+            Layout.fillWidth: true
+            title: i18n("Self assessment")
+            text: mind.narration || i18n("No self-assessment is available yet.")
+            icon: "user"
+            emphasized: true
         }
 
         GridLayout {
             Layout.fillWidth: true
             columns: 2
-            rowSpacing: 11
-            columnSpacing: 11
+            rowSpacing: 9
+            columnSpacing: 9
 
-            StatCard { Layout.fillWidth: true; title: "Age (days)"; value: mind.stats.ageInDays; icon: "calendar" }
-            StatCard { Layout.fillWidth: true; title: "Sessions"; value: mind.stats.sessions; icon: "history" }
-            StatCard { Layout.fillWidth: true; title: "Open Intentions"; value: mind.stats.openIntentions; icon: "task" }
-            StatCard { Layout.fillWidth: true; title: "Settled Predictions"; value: mind.stats.settledPredictions; icon: "check" }
-            StatCard { Layout.fillWidth: true; title: "Contributions"; value: mind.stats.contributions; icon: "database" }
-            StatCard { Layout.fillWidth: true; title: "Journal Intact"; value: mind.stats.journalIntact ? "Yes" : "No"; icon: "shield-check" }
+            StatCard {
+                Layout.fillWidth: true
+                title: i18n("Age")
+                value: i18n("%1 d", mind.stats.ageInDays || 0)
+                icon: "calendar"
+            }
+
+            StatCard {
+                Layout.fillWidth: true
+                title: i18n("Sessions")
+                value: mind.stats.sessions
+                icon: "history"
+            }
+
+            StatCard {
+                Layout.fillWidth: true
+                title: i18n("Intentions")
+                value: mind.stats.openIntentions
+                icon: "task-complete"
+            }
+
+            StatCard {
+                Layout.fillWidth: true
+                title: i18n("Predictions")
+                value: mind.stats.settledPredictions
+                icon: "checkmark"
+            }
         }
 
-        StatCard {
-            title: "First Broken Row"
-            value: mind.stats.firstBrokenAt > 0 ? "#" + mind.stats.firstBrokenAt : "Never"
-            icon: "alert"
+        InfoCard {
+            Layout.fillWidth: true
+            title: i18n("Journal integrity")
+            text: mind.stats.journalIntact
+                ? i18n("The durable memory chain verifies successfully.")
+                : i18n("Memory verification failed at row %1.", mind.stats.firstBrokenAt)
+            icon: mind.stats.journalIntact ? "security-high" : "dialog-warning"
+        }
+
+        Button {
             Layout.alignment: Qt.AlignHCenter
+            text: i18n("Reflect now")
+            icon.name: "view-refresh"
+            onClicked: mind.reflect()
         }
 
-        Item { Layout.fillHeight: true }
+        Item {
+            Layout.fillHeight: true
+        }
     }
 }

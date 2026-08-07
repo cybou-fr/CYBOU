@@ -7,7 +7,7 @@ mindDock.location = "right";
 mindDock.height = 420;
 mindDock.lengthMode = "fill";
 mindDock.alignment = "center";
-// Keep it visible while the Mind UI is under active development.
+// Production default: reveal from the right screen edge and hide when the pointer leaves.
 mindDock.hiding = "autohide";
 mindDock.floating = true;
 mindDock.addWidget("org.cybou.presence");

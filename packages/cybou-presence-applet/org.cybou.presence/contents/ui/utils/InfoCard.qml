@@ -10,51 +10,53 @@ Rectangle {
     id: root
 
     property string title: ""
-    property var value: ""
+    property string text: ""
     property string icon: ""
+    property bool emphasized: false
 
-    implicitWidth: 142
-    implicitHeight: 76
+    implicitWidth: 220
+    implicitHeight: content.implicitHeight + 24
     radius: 10
 
     color: Kirigami.Theme.backgroundColor
     border.width: 1
-    border.color: Kirigami.Theme.disabledTextColor
+    border.color: root.emphasized
+        ? Kirigami.Theme.highlightColor
+        : Kirigami.Theme.disabledTextColor
 
     RowLayout {
+        id: content
         anchors.fill: parent
-        anchors.margins: 11
-        spacing: 9
+        anchors.margins: 12
+        spacing: 10
 
         Kirigami.Icon {
+            Layout.alignment: Qt.AlignTop
             Layout.preferredWidth: 24
             Layout.preferredHeight: 24
             source: root.icon
+            visible: root.icon.length > 0
             opacity: 0.82
         }
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 2
+            spacing: 4
 
             Label {
                 Layout.fillWidth: true
                 text: root.title
                 font.pixelSize: 11
-                opacity: 0.66
+                font.bold: true
+                opacity: 0.72
                 elide: Text.ElideRight
-                maximumLineCount: 1
             }
 
             Label {
                 Layout.fillWidth: true
-                text: root.value === undefined || root.value === null
-                    ? ""
-                    : String(root.value)
-                font.pixelSize: 16
-                font.bold: true
-                elide: Text.ElideRight
-                maximumLineCount: 1
+                text: root.text
+                wrapMode: Text.WordWrap
+                font.pixelSize: 13
             }
         }
     }

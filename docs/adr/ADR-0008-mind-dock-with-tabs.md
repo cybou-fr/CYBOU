@@ -11,69 +11,75 @@ Accepted
 
 ## Context
 
-The Presence surface needs enough space to inspect Mind projections without turning the normal top
-panel into a large popup.
+Presence needs enough space to inspect Mind projections without turning the normal top panel into
+a large popup.
 
-Inline dock creation in the global layout would couple a failure in the Mind panel to the rest of
-the default desktop layout. Plasma layout templates provide a reusable, isolated boundary that can
-be loaded with `loadTemplate()`.
+Plasma layout templates provide an isolated, reusable boundary for the dedicated Mind surface.
 
 ## Decision
 
-Use a dedicated Plasma layout template, `org.cybou.plasma.minddock`, loaded from the Cybou global
-layout.
+Use the dedicated `org.cybou.plasma.minddock` layout template loaded by the Cybou global layout.
 
-The current accepted implementation uses:
+The accepted desktop contract is:
 
 ```text
 location   right
 height     420        # Plasma vertical-panel width
 lengthMode fill
 alignment  center
-hiding     none
+hiding     autohide
 floating   true
 ```
 
-`hiding = "none"` is deliberate while the Mind UI is under active development.
+The panel reveals from the right screen edge and hides when the pointer leaves.
 
-The template contains the `org.cybou.presence` applet. The applet chooses its full representation
-when Plasma gives it a vertical form factor, and the full representation embeds `MindDock`.
+Inside the panel, the Presence applet uses its full representation. The shell is organized as:
 
-`MindDock` currently provides a Dashboard plus projections for Identity, Intentions, Activity,
-Self, Predictor, and Workspace.
+```text
+64px icon rail
++ compact page header
++ one active content page
+```
 
-Presence remains the surface boundary: QML does not open the cognitive Journal directly.
+The rail exposes Dashboard, Identity, Intentions, Activity, Self, Predictor, and Workspace.
+
+Unavailable runtime state is presented inside the content area. It does not replace the dock shell
+and it does not claim that QML owns or opens the Journal.
+
+## Runtime boundary
+
+After M4, `plasmashell` contains only the QML Presence proxy/cache.
+
+The real presentation backend is `cybou-presenced`, and the organ processes remain outside Plasma.
 
 ## Consequences
 
 ### Positive
 
-- Mind inspection has a dedicated full-height surface;
-- the normal top panel remains compact;
-- the dock is reusable as a Plasma layout template;
-- template/package validation can fail during the build rather than silently at desktop runtime;
-- Presence remains the normal UI boundary.
+- normal top panel stays compact;
+- Mind has a dedicated full-height inspection surface;
+- the dock gives most horizontal space to content rather than navigation labels;
+- auto-hide returns desktop space when Mind is not being inspected;
+- unavailable state can expose the proxy error and retry connection;
+- Plasma restart does not recreate the cognitive organ graph;
+- QML validation checks the key Plasma 6 shell contracts.
 
-### Current limitations
+### Trade-offs
 
-- the Presence backend is still constructed in-process by the applet;
-- adding multiple Presence applets can still create multiple backend object graphs;
-- Workspace is not yet live for every direct Journal write;
-- process isolation and reconnect behavior are separate future milestones.
-
-These limitations are not contradictions of the dock decision; they are M1/M3 runtime work.
+- 420px is intentionally an inspection surface, not a general application window;
+- richer degraded-mode diagnosis remains M6 work;
+- panel reveal timing and animation are owned by Plasma rather than custom QML.
 
 ## Alternatives Considered
 
 ### Compact top-panel popup only
 
-Rejected because the inspection surface is too dense for the normal panel role.
+Rejected because the inspection surface is too dense for a normal panel popup.
 
-### Direct SQL access from QML
+### Text-heavy navigation rail
 
-Rejected because the UI must talk through Presence rather than own/read cognitive persistence
-directly.
+Rejected after VM visual testing because it consumed too much of the 420px dock width.
 
-### Separate applet per organ
+### Direct SQL/Journal diagnosis from QML
 
-Rejected because it fragments one presentation boundary and does not solve process ownership.
+Rejected because the UI talks through Presence and must not infer cognitive persistence ownership.

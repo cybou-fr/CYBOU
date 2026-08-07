@@ -53,17 +53,20 @@ bool Presence::wake()
             QStringLiteral("cannot migrate legacy Mind state: %1")
                 .arg(migrationError);
         m_awake = false;
+        Q_EMIT changed();
         return false;
     }
 
     if (!m_client->ready()) {
         m_lastError = m_client->lastError();
         m_awake = false;
+        Q_EMIT changed();
         return false;
     }
 
     if (!refresh()) {
         m_awake = false;
+        Q_EMIT changed();
         return false;
     }
 

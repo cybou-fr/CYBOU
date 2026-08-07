@@ -3,6 +3,7 @@
 
 #include "cybou/presence/Presence.h"
 
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -13,7 +14,7 @@ class TestPresenceProxy : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
-    void noBackendFailsClosed()
+    void noBackendFailsClosedAndNotifiesUi()
     {
         QTemporaryDir state;
         QVERIFY(state.isValid());
@@ -25,16 +26,25 @@ private Q_SLOTS:
 
         qputenv(
             "DBUS_SESSION_BUS_ADDRESS",
-            QByteArrayLiteral("unix:path=/nonexistent/cybou-m4-test-bus"));
+            QByteArrayLiteral("unix:path=/nonexistent/cybou-ui-test-bus"));
         qputenv(
             "XDG_STATE_HOME",
             state.path().toUtf8());
 
         Presence presence;
+        QSignalSpy changed(
+            &presence,
+            &Presence::changed);
 
         QVERIFY(!presence.isAwake());
         QVERIFY(!presence.wake());
+        QCOMPARE(changed.count(), 1);
+
         QVERIFY(!presence.lastError().isEmpty());
+        QCOMPARE(
+            presence.property("lastError").toString(),
+            presence.lastError());
+
         QVERIFY(!presence.isAwake());
         QVERIFY(presence.obligations().isEmpty());
         QCOMPARE(presence.contributions(), 0);

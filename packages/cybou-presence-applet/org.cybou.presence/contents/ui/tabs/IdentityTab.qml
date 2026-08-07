@@ -15,29 +15,61 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 11
-        spacing: 11
+        anchors.margins: 12
+        spacing: 9
 
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Subject Continuity"
-            font.pixelSize: 18
-            font.bold: true
+        InfoCard {
+            Layout.fillWidth: true
+            title: i18n("Subject continuity")
+            text: i18n("One persistent identity across daemon restarts and user sessions.")
+            icon: "user-identity"
+            emphasized: true
+        }
+
+        StatCard {
+            Layout.fillWidth: true
+            title: i18n("Identity UUID")
+            value: mind.identityState.uuid || i18n("Unknown")
+            icon: "fingerprint"
+        }
+
+        StatCard {
+            Layout.fillWidth: true
+            title: i18n("Origin")
+            value: mind.identityState.origin || i18n("Unknown")
+            icon: "calendar"
         }
 
         GridLayout {
             Layout.fillWidth: true
-            columns: 1
-            rowSpacing: 11
-            columnSpacing: 11
+            columns: 2
+            rowSpacing: 9
+            columnSpacing: 9
 
-            StatCard { Layout.fillWidth: true; title: "UUID"; value: mind.identityState.uuid; icon: "fingerprint" }
-            StatCard { Layout.fillWidth: true; title: "Origin"; value: mind.identityState.origin; icon: "calendar" }
-            StatCard { Layout.fillWidth: true; title: "Sessions"; value: mind.identityState.sessionCount; icon: "history" }
-            StatCard { Layout.fillWidth: true; title: "Architecture Version"; value: mind.identityState.architectureVersion; icon: "code" }
-            StatCard { Layout.fillWidth: true; title: "Was Born"; value: mind.identityState.wasBorn ? "Yes" : "No"; icon: "heart" }
+            StatCard {
+                Layout.fillWidth: true
+                title: i18n("Sessions")
+                value: mind.identityState.sessionCount
+                icon: "history"
+            }
+
+            StatCard {
+                Layout.fillWidth: true
+                title: i18n("Born now")
+                value: mind.identityState.wasBorn ? i18n("Yes") : i18n("No")
+                icon: "heart"
+            }
         }
 
-        Item { Layout.fillHeight: true }
+        StatCard {
+            Layout.fillWidth: true
+            title: i18n("Architecture")
+            value: mind.identityState.architectureVersion || i18n("Unknown")
+            icon: "code-context"
+        }
+
+        Item {
+            Layout.fillHeight: true
+        }
     }
 }

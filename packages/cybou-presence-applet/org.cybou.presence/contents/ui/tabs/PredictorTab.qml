@@ -4,6 +4,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import org.kde.kirigami as Kirigami
 import "../utils"
 
 Item {
@@ -14,7 +15,7 @@ Item {
     readonly property string icon: "predictive-text"
 
     property string predictionSubject: ""
-    property string predictionResult: ""
+    property var predictionResult: ({})
 
     function requestPrediction() {
         const subject = predictionSubject.trim()
@@ -22,62 +23,46 @@ Item {
             return
 
         const result = mind.predict(subject)
-        if (!result || !result.subject) {
-            predictionResult = "No prediction available."
-            return
-        }
-
-        predictionResult = "Subject: %1, Estimate: %2, Margin: %3, Confidence: %4, Samples: %5"
-            .arg(result.subject)
-            .arg(Number(result.estimate).toFixed(2))
-            .arg(Number(result.margin).toFixed(2))
-            .arg(Number(result.confidence).toFixed(2))
-            .arg(result.samples)
+        predictionResult = result || ({})
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 11
-        spacing: 11
+        anchors.margins: 12
+        spacing: 9
 
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Prediction Calibration"
-            font.pixelSize: 18
-            font.bold: true
-        }
-
-        ListView {
+        InfoCard {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            model: mind.calibrations
-
-            delegate: ItemDelegate {
-                required property var modelData
-                width: ListView.view.width
-                text: "%1: %2 settled, error: %3, bias: %4"
-                    .arg(modelData.subject)
-                    .arg(modelData.settled)
-                    .arg(Number(modelData.meanError).toFixed(2))
-                    .arg(Number(modelData.bias).toFixed(2))
-            }
+            title: i18n("Prediction")
+            text: predictorTab.predictionResult.subject
+                ? i18n(
+                    "%1 ≈ %2 ± %3 · confidence %4 · %5 samples",
+                    predictorTab.predictionResult.subject,
+                    Number(predictorTab.predictionResult.estimate).toFixed(2),
+                    Number(predictorTab.predictionResult.margin).toFixed(2),
+                    Number(predictorTab.predictionResult.confidence).toFixed(2),
+                    predictorTab.predictionResult.samples
+                )
+                : i18n("Choose a subject to ask the predictor.")
+            icon: "predictive-text"
+            emphasized: Boolean(predictorTab.predictionResult.subject)
         }
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 11
+            spacing: 7
 
             TextField {
                 Layout.fillWidth: true
-                placeholderText: "Enter subject to predict..."
+                placeholderText: i18n("Subject")
                 text: predictorTab.predictionSubject
                 onTextChanged: predictorTab.predictionSubject = text
                 onAccepted: predictorTab.requestPrediction()
             }
 
             Button {
-                text: "Predict"
+                text: i18n("Predict")
+                icon.name: "go-next"
                 enabled: predictorTab.predictionSubject.trim().length > 0
                 onClicked: predictorTab.requestPrediction()
             }
@@ -85,11 +70,70 @@ Item {
 
         Label {
             Layout.fillWidth: true
-            Layout.alignment: Qt.AlignHCenter
-            text: predictorTab.predictionResult
-            font.pixelSize: 14
-            wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
+            text: i18n("Calibration")
+            font.bold: true
+            opacity: 0.72
+        }
+
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            ListView {
+                id: calibrationList
+                anchors.fill: parent
+                clip: true
+                spacing: 4
+                model: mind.calibrations
+
+                delegate: ItemDelegate {
+                    id: calibrationDelegate
+
+                    required property var modelData
+
+                    width: ListView.view.width
+                    implicitHeight: 58
+
+                    background: Rectangle {
+                        radius: 8
+                        color: calibrationDelegate.hovered
+                            ? Kirigami.Theme.highlightColor
+                            : "transparent"
+                        opacity: calibrationDelegate.hovered ? 0.08 : 1.0
+                    }
+
+                    contentItem: ColumnLayout {
+                        spacing: 2
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: modelData.subject || i18n("Unnamed subject")
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: i18n(
+                                "%1 settled · mean error %2 · bias %3",
+                                modelData.settled,
+                                Number(modelData.meanError).toFixed(2),
+                                Number(modelData.bias).toFixed(2)
+                            )
+                            font.pixelSize: 11
+                            opacity: 0.62
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                visible: mind.calibrations.length === 0
+                text: i18n("No settled predictions yet")
+                opacity: 0.55
+            }
         }
     }
 }

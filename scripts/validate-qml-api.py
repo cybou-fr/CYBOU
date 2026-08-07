@@ -86,19 +86,28 @@ def validate_layouts(path: Path, text: str) -> list[str]:
     return errors
 
 
+def require(path: Path, text: str, label: str, pattern: str, errors: list[str]) -> None:
+    if re.search(pattern, text, re.MULTILINE) is None:
+        errors.append(f"{path}: missing {label}")
+
+
 def main(argv: list[str]) -> int:
-    root = Path(argv[1] if len(argv) > 1 else
-                "packages/cybou-presence-applet/org.cybou.presence")
+    root = Path(
+        argv[1]
+        if len(argv) > 1
+        else "packages/cybou-presence-applet/org.cybou.presence"
+    )
     if not root.is_dir():
         print(f"validate-qml-api: {root} is not a directory", file=sys.stderr)
         return 1
 
     errors = []
-    files = sorted(root.rglob("*.qml"))
+    qml_files = sorted(root.rglob("*.qml"))
 
-    for path in files:
+    for path in qml_files:
         text = path.read_text(encoding="utf-8")
         errors.extend(validate_layouts(path, text))
+
         for pattern, message in (
             (r"(?m)^\s*toolTip\s*:", "use ToolTip.text/visible/delay"),
             (r"(?m)^\s*Icon\s*\{", "qualify Kirigami.Icon or PlasmaCore.Icon"),
@@ -107,28 +116,97 @@ def main(argv: list[str]) -> int:
                 "Plasma 6 PlasmoidItem owns preferredRepresentation directly; "
                 "use preferredRepresentation and plasmoid.formFactor",
             ),
+            (
+                r"The journal could not be opened",
+                "the M4 QML proxy must not diagnose Journal ownership directly",
+            ),
         ):
             for match in re.finditer(pattern, text):
                 line = text.count("\n", 0, match.start()) + 1
                 errors.append(f"{path}:{line}: {message}")
 
+    required_files = (
+        root / "contents/ui/MindDock.qml",
+        root / "contents/ui/MindTabBar.qml",
+        root / "contents/ui/MindHeader.qml",
+        root / "contents/ui/MindUnavailable.qml",
+        root / "contents/ui/utils/StatCard.qml",
+        root / "contents/ui/utils/InfoCard.qml",
+    )
+    for path in required_files:
+        if not path.is_file():
+            errors.append(f"{path}: missing")
+
+    main_qml = root / "contents/ui/main.qml"
+    if main_qml.is_file():
+        text = main_qml.read_text(encoding="utf-8")
+        require(
+            main_qml,
+            text,
+            "direct Plasma 6 preferredRepresentation",
+            r"^\s*preferredRepresentation\s*:",
+            errors,
+        )
+        if "PlasmaExtras.PlaceholderMessage" in text:
+            errors.append(
+                f"{main_qml}: obsolete applet-level unavailable overlay; "
+                "use MindUnavailable inside MindDock"
+            )
+
+    tab_bar = root / "contents/ui/MindTabBar.qml"
+    if tab_bar.is_file():
+        text = tab_bar.read_text(encoding="utf-8")
+        require(
+            tab_bar,
+            text,
+            "icon-only navigation",
+            r"display\s*:\s*AbstractButton\.IconOnly",
+            errors,
+        )
+        require(
+            tab_bar,
+            text,
+            "48px icon button contract",
+            r"Layout\.preferredWidth\s*:\s*48",
+            errors,
+        )
+
+    dock = root / "contents/ui/MindDock.qml"
+    if dock.is_file():
+        text = dock.read_text(encoding="utf-8")
+        require(
+            dock,
+            text,
+            "64px navigation rail",
+            r"Layout\.preferredWidth\s*:\s*64",
+            errors,
+        )
+        require(
+            dock,
+            text,
+            "unavailable page inside the dock shell",
+            r"\bMindUnavailable\s*\{",
+            errors,
+        )
+
     card = root / "contents/ui/utils/StatCard.qml"
-    if not card.is_file():
-        errors.append(f"{card}: missing")
-    else:
+    if card.is_file():
         text = card.read_text(encoding="utf-8")
         for label, pattern in {
-            "title property": r"(?m)^\s*property\s+string\s+title\s*:",
-            "value property": r"(?m)^\s*property\s+var\s+value\s*:",
-            "icon property": r"(?m)^\s*property\s+string\s+icon\s*:",
-            "qualified Icon": r"\b(?:Kirigami|PlasmaCore)\.Icon\s*\{",
+            "title property": r"^\s*property\s+string\s+title\s*:",
+            "value property": r"^\s*property\s+var\s+value\s*:",
+            "icon property": r"^\s*property\s+string\s+icon\s*:",
+            "qualified Icon": r"\bKirigami\.Icon\s*\{",
         }.items():
-            if re.search(pattern, text) is None:
-                errors.append(f"{card}: missing {label}")
+            require(card, text, label, pattern, errors)
 
     for error in errors:
         print(f"error: {error}", file=sys.stderr)
-    print(f"validate-qml-api: {len(files)} QML file(s), {len(errors)} error(s)")
+
+    print(
+        f"validate-qml-api: {len(qml_files)} QML file(s), "
+        f"{len(errors)} error(s)"
+    )
     return 1 if errors else 0
 
 
