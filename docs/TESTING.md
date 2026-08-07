@@ -5,9 +5,9 @@ SPDX-License-Identifier: MIT
 
 # Testing Strategy
 
-## Current suites
+## M4 suite
 
-The Mind package runs eleven suites:
+The Mind package builds twelve CTest suites:
 
 ```text
 protocol
@@ -17,48 +17,42 @@ intentions
 predictor
 selfmodel
 workspace
-presence
-presence-extended
+presence-proxy
 m1-runtime
+fabric-codec
 eventd-integration
+m4-process-integration
 ```
 
-## M3 integration test
+## Process integration
 
-`eventd-integration` is executed through `dbus-run-session`, giving it a private user bus.
-
-It proves:
+`m4-process-integration` runs inside an isolated `dbus-run-session`, launches seven executables,
+and verifies:
 
 ```text
-eventd registers Event1
-Event1 reports Journal schema v2
-Submit -> COMMIT -> Accepted
-invalid Submit -> no Accepted
-Recent / Contribution / Count / Verify round-trip over IPC
-default Presence uses Event1
-two default Presence surfaces share one session/runtime
-second eventd cannot acquire the service name
-eventd failure does not trigger a local SQLite fallback
+seven distinct process IDs
+all organ D-Bus services become ready
+two QML Presence proxies do not create another identity session
+Promise crosses presenced -> intentiond -> eventd
+Observe/Predict crosses presenced -> predictord -> eventd
+Workspace receives accepted events
+restarting identityd does not increment the same login session
+restarting presenced leaves the cognitive organs alive
+one organ failure does not kill the remaining processes
 ```
 
-The existing unit/domain tests continue using direct temporary Journals through the same
-`EventStore` contract. That keeps domain tests fast while production topology is integration-tested
-separately.
+## VM gate
 
-## Build
+`vm-smoke` starts `cybou-presenced.service` through the user manager and asserts that all seven
+Mind user services become active as separate processes.
+
+## Build order
 
 ```bash
 nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
+nix build .#packages.x86_64-linux.cybou-presence-applet --print-build-logs
+nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
+nix build .#checks.x86_64-linux.vm-smoke --print-build-logs
 ```
 
-Expected suite count after M3:
-
-```text
-11/11
-```
-
-Full repository validation remains:
-
-```bash
-nix flake check --print-build-logs
-```
+Do not mark M4 complete from compilation alone.

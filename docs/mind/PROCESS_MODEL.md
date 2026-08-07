@@ -5,29 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Process Model
 
-## Current after M3
-
-There are now two failure domains:
-
-```text
-cybou-eventd
-└── Journal v2
-
-plasmashell
-└── shared PresenceRuntime
-    ├── EventClient
-    ├── Identity
-    ├── Intentions
-    ├── Predictor
-    ├── SelfModel
-    └── Workspace
-```
-
-`cybou-eventd` is D-Bus-activated and is no longer a library object inside Presence.
-
-The remaining daemon-like source directories are still in-process components.
-
-## M4 target
+## Current
 
 ```text
 cybou-eventd
@@ -39,4 +17,36 @@ cybou-workspaced
 cybou-presenced
 ```
 
-M4 moves lifecycle ownership out of `plasmashell`; M6 later adds explicit health/degraded states.
+Each is a real executable and D-Bus service managed by `systemd --user`.
+
+## Dependencies
+
+```text
+eventd
+├── identityd
+├── intentiond
+├── predictord
+├── workspaced
+├── selfd
+│   ├── identityd
+│   ├── intentiond
+│   └── predictord
+└── presenced
+    ├── identityd
+    ├── intentiond
+    ├── predictord
+    ├── selfd
+    └── workspaced
+```
+
+The services are D-Bus activated and stop with the graphical session.
+
+## QML
+
+`plasmashell` owns only a Presence proxy. Recreating the visual surface does not construct or
+destroy cognitive organ processes.
+
+## Health
+
+M4 exposes `Ready()` and `Health()` on organ interfaces. The richer
+Available/Starting/Healthy/Degraded/Unavailable/Recovering model remains M6.

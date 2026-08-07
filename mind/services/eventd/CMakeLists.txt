@@ -19,7 +19,12 @@ qt_add_executable(cybou-eventd
 )
 
 target_link_libraries(cybou-eventd
-    PRIVATE Qt6::Core Qt6::DBus cybou-eventd-core cybou-runtime
+    PRIVATE
+        Qt6::Core
+        Qt6::DBus
+        cybou-eventd-core
+        cybou-fabric
+        cybou-runtime
 )
 
 install(TARGETS cybou-eventd

@@ -1,0 +1,108 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+#include "WorkspaceService.h"
+
+#include "cybou/fabric/FabricCodec.h"
+
+namespace cybou {
+
+WorkspaceService::WorkspaceService(
+    EventStore *events,
+    QObject *parent)
+    : QObject(parent)
+    , m_events(events)
+    , m_workspace(events)
+{
+    m_workspace.rehydrate();
+
+    connect(
+        &m_workspace,
+        &Workspace::contributed,
+        this,
+        [this](const CognitiveEnvelope &) {
+            Q_EMIT Changed();
+        });
+}
+
+bool WorkspaceService::Ready() const
+{
+    return m_events && m_events->isOpen();
+}
+
+QString WorkspaceService::Health() const
+{
+    return Ready()
+        ? QStringLiteral("healthy")
+        : QStringLiteral("unavailable");
+}
+
+QString WorkspaceService::LastError() const
+{
+    return m_events ? m_events->lastError() : QString();
+}
+
+QByteArray WorkspaceService::Coalitions() const
+{
+    QVariantList result;
+
+    for (const Coalition &coalition :
+         m_workspace.coalitions()) {
+        QVariantMap map;
+        map[QStringLiteral("correlationId")] =
+            coalition.correlationId.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("salience")] =
+            coalition.salience;
+        map[QStringLiteral("organs")] =
+            coalition.organs();
+        map[QStringLiteral("threads")] =
+            coalition.threadCount();
+        map[QStringLiteral("latest")] =
+            coalition.latest;
+        result.append(map);
+    }
+
+    return FabricCodec::encodeList(result);
+}
+
+QByteArray WorkspaceService::Moment() const
+{
+    const MomentState state = m_workspace.momentState();
+
+    QVariantMap map;
+    map[QStringLiteral("focus")] =
+        state.focus.toString(QUuid::WithoutBraces);
+    map[QStringLiteral("salience")] =
+        state.salience;
+    map[QStringLiteral("organs")] =
+        state.organs;
+
+    return FabricCodec::encodeMap(map);
+}
+
+QString WorkspaceService::Attention() const
+{
+    const Coalition focus = m_workspace.focus();
+    if (!focus.isValid()) {
+        return {};
+    }
+
+    const CognitiveEnvelope &latest =
+        focus.members.last();
+    const QStringList voices = focus.organs();
+
+    if (voices.size() > 1) {
+        return QObject::tr(
+                   "%1, with %n organ(s) involved",
+                   nullptr,
+                   voices.size())
+            .arg(kindToString(latest.kind));
+    }
+
+    return QObject::tr("%1, from %2")
+        .arg(
+            kindToString(latest.kind),
+            latest.originOrgan);
+}
+
+} // namespace cybou

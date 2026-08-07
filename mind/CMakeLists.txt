@@ -18,6 +18,7 @@ add_subdirectory(foundation/events)
 add_subdirectory(foundation/runtime)
 add_subdirectory(foundation/storage)
 add_subdirectory(foundation/ipc)
+add_subdirectory(foundation/fabric)
 add_subdirectory(services/eventd)
 
 add_subdirectory(organs/identityd)

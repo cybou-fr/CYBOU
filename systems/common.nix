@@ -7,5 +7,6 @@
     ../modules/base.nix
     ../modules/desktop-plasma.nix
     ../modules/branding.nix
+    ../modules/mind-services.nix
   ];
 }

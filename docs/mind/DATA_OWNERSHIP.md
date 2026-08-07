@@ -5,37 +5,40 @@ SPDX-License-Identifier: MIT
 
 # Data Ownership
 
-## Current
+## Current M4 owners
 
-| Resource | Current owner |
+| Resource | Owner |
 |---|---|
 | canonical `journal.db` | `cybou-eventd` |
-| identity JSON | in-process Identity component |
-| transient Workspace | in-process Workspace component |
-| presentation wrappers | `plasmashell` |
-| QML view state | Plasma applet |
+| `identity.json` | `cybou-identityd` |
+| volatile identity login marker | `cybou-identityd` |
+| bounded Workspace | `cybou-workspaced` |
+| presentation aggregation | `cybou-presenced` |
+| visual cache | QML Presence proxy |
 
-The default production Presence reaches Journal only through Event1.
+Intentions, Predictor, and Self derive their state from Event1 plus their narrow operation logic.
 
-The explicit temporary/local Presence constructor is a test/tool seam and does not represent the
-installed QML topology.
+## Locations
 
-## Persistent location
+Persistent:
 
 ```text
 $XDG_STATE_HOME/cybou
 ```
 
-with the standard `~/.local/state/cybou` fallback on Unix.
+Runtime:
 
-Legacy migration still runs before the first Event1 activation so eventd never opens a newly
-created canonical Journal ahead of the one-time M1 state move.
+```text
+$XDG_RUNTIME_DIR/cybou
+```
 
-## Target after M4
+The runtime identity marker prevents a daemon restart from being confused with a new logical login.
 
-| Resource | Target owner |
-|---|---|
-| `journal.db` | `cybou-eventd` |
-| identity state | `cybou-identityd` |
-| transient workspace | `cybou-workspaced` |
-| presentation snapshots | `cybou-presenced` |
+## Invariants
+
+- Plasma does not own cognitive persistence.
+- presenced does not open `journal.db`.
+- only identityd writes `identity.json`;
+- only workspaced owns live bounded attention;
+- opening another UI surface does not create another Mind;
+- process isolation does not introduce duplicate authoritative copies.

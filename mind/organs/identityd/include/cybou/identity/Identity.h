@@ -91,6 +91,10 @@ public:
     // РУС:   не записана, не является непрерывностью.
     bool beginSession();
 
+    /// Reload an already-open logical user session after an identityd process restart.
+    /// Does not increment sessionCount and writes no new biography event.
+    bool resumeSession();
+
     IdentityState state() const { return m_state; }
 
     /// True when this run created the identity rather than continuing one.

@@ -5,75 +5,76 @@ SPDX-License-Identifier: MIT
 
 # Organ Contracts
 
-Every organ should have one narrow cognitive responsibility. Process isolation is the Target
-architecture; current components are in-process C++ objects/libraries.
+M4 makes the source-level organ boundaries real process boundaries.
 
-## Current implementation
+## eventd
 
-### Identity
+Owns the canonical Journal and Event1.
 
-Maintains subject identity and session state in the current Presence-owned object graph.
+Responsibilities:
 
-### Intentions
+```text
+validate proposal
+serialize append
+assign durable sequence/hash
+commit
+publish Accepted
+answer Journal queries
+```
 
-Creates and resolves commitments using prior Journal contributions.
+## identityd
 
-### Predictor
+Owns `identity.json` and the volatile same-login session marker.
 
-Records numeric observations, creates measurable predictions from persisted history, and can
-settle a prediction with a terminal Outcome.
+It begins one logical identity session per user runtime and resumes that session after an
+identityd process restart.
 
-### SelfModel
+## intentiond
 
-Measures and narrates self-state from persisted/domain facts.
+Owns intention operations/projection:
 
-### Workspace
+```text
+Form
+Close
+Open
+```
 
-Maintains bounded transient attention and reconstructs it from recent Journal history.
+Durable facts remain in Event1/Journal.
 
-### Presence
+## predictord
 
-Is the normal UI boundary and exposes projections/commands to the Plasma surface. Today it also
-constructs the current Mind object graph, which is a temporary lifecycle responsibility.
+Owns measurement/prediction/calibration operations:
 
-### Journal
+```text
+Observe
+Predict
+Settle
+Calibrations
+```
 
-Provides durable append, validation, ordering, migration, and verification. It is currently a
-library object, not `cybou-eventd`.
+## selfd
 
-## Target process contracts
+Builds self projection from Identity1, Intention1, Predictor1, and Event1. It records
+SelfAssessment contributions through Event1.
 
-### `cybou-eventd`
+It does not instantiate local copies of those organs.
 
-Exclusively owns the Journal, validates proposals, assigns durable order, appends, and publishes
-accepted contributions.
+## workspaced
 
-### `cybou-identityd`
+Owns bounded transient attention.
 
-Owns identity/session state. It must not overwrite damaged identity state or rewrite biography.
+It rehydrates from Event1 on startup, follows Event1 Accepted live, and emits Workspace1 Changed
+only after admission.
 
-### `cybou-intentiond`
+## presenced
 
-Owns commitment lifecycle projections and commands derived from accepted contributions.
+Owns presentation aggregation and user-facing command routing.
 
-### `cybou-predictord`
+It talks to the organ interfaces and Event1. It does not construct domain organ objects or open
+persistent cognitive stores.
 
-Owns prediction/calibration behavior and settles each prediction at most once.
+## QML Presence proxy
 
-### `cybou-selfd`
+Not an organ. It caches Presence1 Snapshot data and forwards commands for Plasma/QML.
 
-Produces self-assessment only from measured facts and available organ health.
-
-### `cybou-workspaced`
-
-Owns transient bounded attention, not biography, and consumes the accepted-contribution stream.
-
-### `cybou-presenced`
-
-Creates stable UI projections and commands without owning cognition or opening organ-owned
-persistent stores directly.
-
-## Process-boundary rule
-
-Source-directory names ending in `d` are not evidence that the daemon exists. A Target process is
-implemented only when an executable/service, IPC contract, lifecycle behavior, and tests exist.
+Opening another surface creates another proxy, not another Mind.

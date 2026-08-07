@@ -38,25 +38,28 @@ add_test(NAME selfmodel COMMAND test-selfmodel)
 set_tests_properties(selfmodel PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 qt_add_executable(test-workspace tst_workspace.cpp)
-target_link_libraries(test-workspace PRIVATE cybou-workspace cybou-storage Qt6::Test)
+target_link_libraries(
+    test-workspace
+    PRIVATE cybou-workspace cybou-storage Qt6::Test
+)
 add_test(NAME workspace COMMAND test-workspace)
 set_tests_properties(workspace PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-qt_add_executable(test-presence tst_presence.cpp)
-target_link_libraries(test-presence PRIVATE cybou-presence cybou-storage Qt6::Test)
-add_test(NAME presence COMMAND test-presence)
-set_tests_properties(presence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-
-qt_add_executable(test-presence-extended tst_presence_extended.cpp)
-target_link_libraries(test-presence-extended PRIVATE cybou-presence Qt6::Test)
-add_test(NAME presence-extended COMMAND test-presence-extended)
-set_tests_properties(presence-extended PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+qt_add_executable(test-presence-proxy tst_presence.cpp)
+target_link_libraries(
+    test-presence-proxy
+    PRIVATE cybou-presence Qt6::Test
+)
+add_test(NAME presence-proxy COMMAND test-presence-proxy)
+set_tests_properties(
+    presence-proxy
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
 
 qt_add_executable(test-m1-runtime tst_m1_runtime.cpp)
 target_link_libraries(
     test-m1-runtime
     PRIVATE
-        cybou-presence
         cybou-runtime
         cybou-workspace
         cybou-storage
@@ -65,13 +68,20 @@ target_link_libraries(
 add_test(NAME m1-runtime COMMAND test-m1-runtime)
 set_tests_properties(m1-runtime PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-fabric-codec tst_fabric_codec.cpp)
+target_link_libraries(
+    test-fabric-codec
+    PRIVATE cybou-fabric Qt6::Test
+)
+add_test(NAME fabric-codec COMMAND test-fabric-codec)
+set_tests_properties(fabric-codec PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(test-eventd-integration tst_eventd_integration.cpp)
 target_link_libraries(
     test-eventd-integration
     PRIVATE
         cybou-event-client
         cybou-events
-        cybou-presence
         Qt6::Test
 )
 add_test(
@@ -84,5 +94,33 @@ add_test(
 )
 set_tests_properties(
     eventd-integration
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+qt_add_executable(test-m4-process-integration tst_m4_process_integration.cpp)
+target_link_libraries(
+    test-m4-process-integration
+    PRIVATE
+        cybou-event-client
+        cybou-fabric
+        cybou-presence
+        Qt6::Test
+)
+add_test(
+    NAME m4-process-integration
+    COMMAND
+        ${DBUS_RUN_SESSION_EXECUTABLE}
+        --
+        $<TARGET_FILE:test-m4-process-integration>
+        $<TARGET_FILE:cybou-eventd>
+        $<TARGET_FILE:cybou-identityd>
+        $<TARGET_FILE:cybou-intentiond>
+        $<TARGET_FILE:cybou-predictord>
+        $<TARGET_FILE:cybou-selfd>
+        $<TARGET_FILE:cybou-workspaced>
+        $<TARGET_FILE:cybou-presenced>
+)
+set_tests_properties(
+    m4-process-integration
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )

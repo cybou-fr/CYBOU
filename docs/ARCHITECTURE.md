@@ -5,85 +5,62 @@ SPDX-License-Identifier: MIT
 
 # Cybou Architecture
 
-## Current
+## Current M4 topology
 
 ```text
-Plasma/QML
-   │
-   ▼
-Presence wrappers
-   │
-   ▼
-shared PresenceRuntime (plasmashell)
-   ├── Identity
-   ├── Intentions
-   ├── Predictor
-   ├── SelfModel
-   ├── Workspace
-   └── EventClient
-          │
-          │ org.cybou.Mind.Event1
-          ▼
-     cybou-eventd
-          │
-          ▼
-       Journal v2
+                          ┌───────────────────────┐
+                          │      Plasma/QML       │
+                          │ Presence proxy only   │
+                          └───────────┬───────────┘
+                                      │ Presence1
+                                      ▼
+                             ┌─────────────────┐
+                             │ cybou-presenced │
+                             └───────┬─────────┘
+                                     │
+          ┌──────────────┬───────────┼───────────┬──────────────┐
+          ▼              ▼           ▼           ▼              ▼
+   identityd       intentiond   predictord      selfd      workspaced
+          │              │           │           │              │
+          └──────────────┴───────────┴───────────┴──────┬───────┘
+                                                        │ Event1
+                                                        ▼
+                                                 cybou-eventd
+                                                        │
+                                                        ▼
+                                                   Journal v2
 ```
 
-M3 changes the persistence boundary without pretending the remaining organs are already daemons.
+Each daemon is a separate executable, D-Bus name, and `systemd --user` service.
 
-## Event boundary
+## Shared libraries
 
-All current organ code depends on `EventStore`, not `Journal`.
+Shared libraries contain protocol/domain code and IPC utilities. They do not create a hidden
+second Mind behind the QML surface.
 
-Two implementations exist:
+The QML Presence library links only fabric/runtime client code; it no longer owns domain organ
+objects.
+
+## Failure domains
+
+- stopping `predictord` does not terminate eventd, identityd, intentiond, workspaced, or presenced;
+- restarting presenced does not start a new identity session;
+- restarting identityd in the same login resumes the current identity through its runtime marker;
+- restarting workspaced reconstructs bounded attention from Event1 history.
+
+Full capability-deficit policy is M6, but M4 creates the isolation required for it.
+
+## Presentation ordering
+
+Presence listens to Workspace1 `Changed`, not directly to raw Event1 `Accepted`:
 
 ```text
-Journal      low-level/local implementation, used by eventd and isolated tests
-EventClient  production runtime transport to eventd
-```
-
-The semantic order is:
-
-```text
-proposal
-→ durable validation and COMMIT in eventd
-→ Accepted
+durable COMMIT
+→ accepted event
 → Workspace admission
 → presentation notification
 ```
 
-The same ordering established locally in M1 is preserved across D-Bus.
+## Next
 
-## IPC
-
-Event1 uses:
-
-```text
-service   org.cybou.Mind.Event1
-object    /org/cybou/Mind/Event1
-interface org.cybou.Mind.Event1
-```
-
-Cognitive envelopes use versioned CBOR that is deliberately independent of canonical Journal hash
-encoding.
-
-## Target after M4
-
-```text
-Plasma/QML
-    │
-    ▼
-cybou-presenced
-    │
-    ▼
-typed local fabric
-    ├── cybou-eventd
-    ├── cybou-identityd
-    ├── cybou-intentiond
-    ├── cybou-predictord
-    ├── cybou-selfd
-    └── cybou-workspaced
-```
-
-`eventd` is already a real process. The others remain future process boundaries.
+M5 strengthens continuity/recovery. M6 turns process health into explicit capability deficits.

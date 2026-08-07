@@ -20,6 +20,7 @@ let
         ../modules/base.nix
         ../modules/desktop-plasma.nix
         ../modules/branding.nix
+        ../modules/mind-services.nix
       ];
       _module.args.cybouPackages = cybouPackages;
 
@@ -123,6 +124,42 @@ pkgs.testers.runNixOSTest {
         session.succeed(
             "test -f /run/current-system/sw/share/plasma/desktoptheme/CybouHorizon/colors"
         )
+
+
+    with subtest("Mind organs are separate user services"):
+        session.succeed(
+            "systemctl --user -M cybou@ start cybou-presenced.service"
+        )
+
+        for unit in (
+            "cybou-eventd.service",
+            "cybou-identityd.service",
+            "cybou-intentiond.service",
+            "cybou-predictord.service",
+            "cybou-selfd.service",
+            "cybou-workspaced.service",
+            "cybou-presenced.service",
+        ):
+            session.wait_until_succeeds(
+                f"systemctl --user -M cybou@ is-active {unit}"
+            )
+
+        mind_pids = []
+        for unit in (
+            "cybou-eventd.service",
+            "cybou-identityd.service",
+            "cybou-intentiond.service",
+            "cybou-predictord.service",
+            "cybou-selfd.service",
+            "cybou-workspaced.service",
+            "cybou-presenced.service",
+        ):
+            pid = session.succeed(
+                f"systemctl --user -M cybou@ show -p MainPID --value {unit}"
+            ).strip()
+            assert int(pid) > 0, f"{unit} has no MainPID"
+            mind_pids.append(pid)
+        assert len(set(mind_pids)) == 7, mind_pids
 
     with subtest("PipeWire is active"):
         session.wait_until_succeeds(

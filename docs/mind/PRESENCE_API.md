@@ -5,25 +5,17 @@ SPDX-License-Identifier: MIT
 
 # Presence API
 
-Presence remains the normal QML/UI boundary.
+## Process boundary
 
-## Default runtime
+The real backend is `cybou-presenced` on:
 
-Default/QML Presence uses a shared process-local PresenceRuntime whose event backend is
-`EventClient`.
+```text
+org.cybou.Mind.Presence1
+```
 
-It does not open the canonical Journal. Commands and projections reach `cybou-eventd` through
-Event1.
+The C++ `Presence` type exported to QML is only a proxy/cache.
 
-Multiple Presence surfaces in one `plasmashell` process still share one runtime and Identity
-session as established by M1.
-
-## Explicit local constructor
-
-`Presence(dataDir)` remains for isolated tests/tools and uses a temporary/local Journal backend.
-It is not the QML production constructor.
-
-## Current properties
+## QML properties
 
 ```text
 awake
@@ -36,9 +28,10 @@ identityState
 calibrations
 coalitions
 moment
+organHealth
 ```
 
-## Current commands
+## Commands
 
 ```text
 promise(description)
@@ -49,7 +42,7 @@ observe(subject, value)
 predict(subject)
 ```
 
-Successful durable changes propagate back through Event1 `Accepted` and then update Workspace and
-Presence notifications.
+presenced routes each operation to the organ that owns it; it does not construct domain organ
+objects itself.
 
-M4 replaces this process-local presentation runtime with `presenced`.
+Creating another QML Presence object creates another proxy only.

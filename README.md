@@ -15,65 +15,51 @@ SPDX-License-Identifier: MIT
 
 ## Current implementation position
 
-M1, M2, and M3 are implemented.
-
-The durable cognitive path is now:
+After Package 06 passes its gates, M1 through M4 are implemented.
 
 ```text
-organs in Presence runtime
-        │
-        ▼
-EventStore / EventClient
-        │ Qt D-Bus Event1
-        ▼
-cybou-eventd
-        │
-        ▼
-Journal v2
-        │
-        └── accepted after COMMIT
-                 │
-                 ▼
-        Workspace / Presence
+Plasma/QML
+    │
+    ▼
+Presence QML proxy
+    │ Presence1
+    ▼
+cybou-presenced
+    ├── Identity1   ─► cybou-identityd
+    ├── Intention1  ─► cybou-intentiond
+    ├── Predictor1  ─► cybou-predictord
+    ├── Self1       ─► cybou-selfd
+    ├── Workspace1  ─► cybou-workspaced
+    └── Event1      ─► cybou-eventd ─► Journal v2
 ```
 
-`cybou-eventd` is the normal production owner of `journal.db`. Identity, Intentions, Predictor,
-SelfModel, Workspace, and Presence no longer depend on the SQLite Journal class; they depend on
-the transport-neutral `EventStore` contract.
-
-The remaining organs are still in-process inside `plasmashell`. Process isolation of those organs
-and `presenced` is M4.
+The QML module no longer owns hidden mutable cognition. `plasmashell` contains only a Presence
+proxy and visual state.
 
 ## Status
 
 | Component | Status |
 |---|---|
-| NixOS / Plasma foundation | ✅ |
 | Journal v2 | ✅ M2 |
-| Shared Presence runtime / live Workspace | ✅ M1 |
-| Stable `$XDG_STATE_HOME/cybou` state | ✅ |
-| `cybou-eventd` | ✅ M3 |
-| Event1 Qt D-Bus + versioned CBOR | ✅ M3 |
-| Exclusive normal production Journal writer | ✅ M3 |
-| Process-isolated remaining organs | ❌ M4 |
-| Degraded process modes | ❌ M6 |
-| Language faculty | ❌ M8 |
-| Authorized OS action boundary | ❌ M9 |
+| accepted-event semantics | ✅ M1 |
+| single-writer `cybou-eventd` | ✅ M3 |
+| `cybou-identityd` | ✅ M4 |
+| `cybou-intentiond` | ✅ M4 |
+| `cybou-predictord` | ✅ M4 |
+| `cybou-selfd` | ✅ M4 |
+| `cybou-workspaced` | ✅ M4 |
+| `cybou-presenced` | ✅ M4 |
+| QML Presence as remote proxy only | ✅ M4 |
+| explicit degraded-mode policy | ❌ M6 |
+| distributed nodes | ❌ M7 |
+| optional language faculty | ❌ M8 |
+| authorized action boundary | ❌ M9 |
 
 ## Build
 
 ```bash
 nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
-```
-
-The Mind package now includes `cybou-eventd`, its D-Bus activation file, the Presence QML module,
-and eleven CTest suites.
-
-VM:
-
-```bash
 nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
-./result/bin/run-cybou-vm
 ```
 
-See `docs/CURRENT_STATE.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/mind/`.
+See `docs/CURRENT_STATE.md`, `docs/ARCHITECTURE.md`, and `docs/ROADMAP.md`.

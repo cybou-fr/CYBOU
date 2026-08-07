@@ -7,72 +7,61 @@ SPDX-License-Identifier: MIT
 
 ## M0 — Green Build
 
-**Status: ongoing gate discipline.**
+Ongoing gate discipline.
 
-## M1 — One Presence, One Journal
+## M1 — One Presence / live accepted contribution
 
-**Status: Complete for the in-process runtime.**
-
-Shared Presence runtime, live accepted-contribution Workspace, and stable persistent state root.
+**Complete.**
 
 ## M2 — Journal v2
 
-**Status: Complete.**
-
-Versioned schema/hash, canonical encoding, migration, validation, serialized writes, normalized
-evidence, and terminal Outcome constraints.
+**Complete.**
 
 ## M3 — eventd
 
-**Status: Complete.**
+**Complete after the Package 06 prerequisite compile repair.**
 
-Implemented:
-
-- `cybou-eventd` executable;
-- normal production ownership of `journal.db` moved out of `plasmashell`;
-- `EventStore` transport abstraction;
-- `EventClient` Qt D-Bus client;
-- versioned `org.cybou.Mind.Event1` interface;
-- versioned CBOR CognitiveEnvelope transport;
-- query IPC needed by current organs;
-- post-COMMIT `Accepted` signal bridged from Journal to D-Bus and back to Workspace;
-- D-Bus service activation from the Nix package;
-- integration tests under an isolated session bus;
-- no silent local-SQLite fallback when eventd is unavailable.
+Exclusive canonical Journal ownership and Event1 semantics are unchanged.
 
 ## M4 — Process-Isolated Organs
 
-**Status: Next.**
+**Complete after Package 06 gates pass.**
 
-Extract Identity, Intentions, Predictor, SelfModel, Workspace, and Presence into user services.
-`presenced` becomes the shared presentation backend and survives Plasma surface restarts.
+Implemented:
+
+- `cybou-identityd`;
+- `cybou-intentiond`;
+- `cybou-predictord`;
+- `cybou-selfd`;
+- `cybou-workspaced`;
+- `cybou-presenced`;
+- one versioned D-Bus endpoint per organ;
+- `systemd --user` `Type=dbus` units;
+- D-Bus activation through those units;
+- QML Presence reduced to a remote proxy;
+- identity restart guard for one logical login;
+- process integration tests;
+- VM smoke assertions for the service graph.
 
 ## M5 — Continuity
 
-**Status: Planned.**
+**Next.**
 
-Reboot-surviving intention and verified identity/architecture transitions.
+Stronger restart/reboot continuity, recovery, architecture-transition records, and reconstruction
+guarantees.
 
 ## M6 — Degraded Modes
 
-**Status: Planned.**
-
-Health, capability deficits, recovery, and reconciliation.
+Health state, capability deficits, recovery, reconciliation.
 
 ## M7 — Distributed Node Prototype
-
-**Status: Planned.**
 
 Selective replication and partition handling.
 
 ## M8 — Optional Language Faculty
 
-**Status: Planned.**
-
 Language is a faculty, not identity or executor.
 
 ## M9 — Authorized Action Boundary
-
-**Status: Planned.**
 
 Typed proposal, criticism, authorization, build/test, confirmation, execution, outcome, rollback.

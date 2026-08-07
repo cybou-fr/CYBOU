@@ -7,110 +7,94 @@ SPDX-License-Identifier: MIT
 
 Status date: 2026-08-07.
 
-## Implemented milestones
+## Process topology
 
-- M1 — shared Presence runtime, stable state root, live accepted-contribution Workspace;
-- M2 — Journal v2;
-- M3 — `cybou-eventd` single production Journal writer and Event1 IPC.
-
-## Current process topology
+After M4, Mind has seven real user-session processes:
 
 ```text
-user D-Bus
-│
-├── cybou-eventd
-│     └── Journal v2
-│
-└── plasmashell
-      ├── Presence surface(s)
-      └── shared PresenceRuntime
-            ├── EventClient ────────────────┐
-            ├── Identity                   │
-            ├── Intentions                 │ EventStore
-            ├── Predictor                  │
-            ├── SelfModel                  │
-            └── Workspace ◄────────────────┘
+cybou-eventd
+cybou-identityd
+cybou-intentiond
+cybou-predictord
+cybou-selfd
+cybou-workspaced
+cybou-presenced
 ```
 
-The daemon-like source directory names for Identity/Intentions/Predictor/Self/Workspace/Presence
-still do not mean those components are separate processes. `cybou-eventd` is the first real
-process-isolated Mind service.
+`plasmashell` no longer constructs Identity, Intentions, Predictor, SelfModel, Workspace, Journal,
+or EventClient. It loads a lightweight `Presence` QObject whose runtime job is Presence1 IPC and
+QML property caching.
 
-## Journal ownership
+## Ownership
 
-Normal default/QML Presence no longer opens `journal.db`.
+| Resource / responsibility | Owner |
+|---|---|
+| `journal.db` | `cybou-eventd` |
+| `identity.json` | `cybou-identityd` |
+| identity login marker | `cybou-identityd` under `$XDG_RUNTIME_DIR/cybou` |
+| intention commands/projection | `cybou-intentiond` |
+| prediction/calibration | `cybou-predictord` |
+| self projection/assessment | `cybou-selfd` |
+| bounded attention | `cybou-workspaced` |
+| presentation aggregation | `cybou-presenced` |
+| visual cache | Plasma Presence proxy |
 
-Organs depend on `EventStore`. The default runtime supplies `EventClient`, which talks to:
+## IPC
+
+Versioned Qt D-Bus interfaces:
 
 ```text
-service   org.cybou.Mind.Event1
-object    /org/cybou/Mind/Event1
-interface org.cybou.Mind.Event1
+org.cybou.Mind.Event1
+org.cybou.Mind.Identity1
+org.cybou.Mind.Intention1
+org.cybou.Mind.Predictor1
+org.cybou.Mind.Self1
+org.cybou.Mind.Workspace1
+org.cybou.Mind.Presence1
 ```
 
-`cybou-eventd` owns the actual `Journal` object and SQLite connection.
+Complex organ projections use fabric CBOR version 1. Event1 CognitiveEnvelope encoding remains
+separate from generic projection encoding and from canonical Journal hashing.
 
-The explicit `Presence(dataDir)` constructor remains a local test/tool seam and may instantiate a
-Journal for isolated temporary directories. It is not the production QML path.
+## Lifecycle
 
-## Accepted ordering
+The NixOS module installs each organ as a `systemd --user` `Type=dbus` service. The services are
+D-Bus activated.
+
+They are intentionally not eagerly wanted by the graphical target: the Plasma-hosted proxy first
+performs the one-time pre-M1 state-location migration, then its first Presence1 request can
+activate the Mind graph.
+
+Identity uses a volatile runtime-session marker. Restarting `identityd` inside the same user login
+reloads the current identity without incrementing `sessionCount`.
+
+## Durable-to-visible ordering
 
 ```text
-proposal
-→ EventClient
-→ Event1 Submit
+command
+→ owning organ process
+→ Event1
 → eventd
-→ Journal validation
-→ BEGIN IMMEDIATE
-→ COMMIT
-→ Journal accepted
+→ Journal COMMIT
 → Event1 Accepted
-→ EventClient accepted
-→ Workspace accept
-→ Presence changed
+→ workspaced admission
+→ Workspace1 Changed
+→ presenced Changed
+→ QML proxy refresh
 ```
-
-A rejected or rolled-back proposal never produces `Accepted`.
-
-## State migration
-
-The existing M1 legacy-state migration remains in Presence bootstrap and runs before the first
-Event1 call. This is intentional: the first Event1 call may D-Bus-activate eventd, so legacy files
-must be moved to `$XDG_STATE_HOME/cybou` before eventd opens the canonical Journal.
-
-## D-Bus activation
-
-The Nix package installs:
-
-```text
-share/dbus-1/services/org.cybou.Mind.Event1.service
-```
-
-The first Event1 method call can therefore start `cybou-eventd` without coupling it to Plasma
-startup ordering.
-
-## Automated tests
-
-The Mind package now runs eleven CTest suites. The new `eventd-integration` suite runs under its own
-`dbus-run-session` and checks:
-
-- Event1 startup and schema version;
-- post-COMMIT accepted delivery;
-- rejection produces no accepted signal;
-- query round trips;
-- default Presence uses eventd and preserves one shared session;
-- a second eventd cannot own the same bus service;
-- after eventd dies, default Presence/EventClient do not silently fall back to local SQLite.
 
 ## Current limitations
 
-- Identity, Intentions, Predictor, SelfModel, Workspace, and Presence still run in `plasmashell`;
-- Identity JSON state is still written by the in-process Identity component;
-- Event1 reads are currently synchronous and can be chatty for large projections;
-- explicit process health/degraded-mode projection is not implemented;
-- same-user D-Bus authorization/capability policy is not yet a security boundary;
-- remaining organ process isolation is M4.
+- health is a minimal `Ready()/Health()` contract, not the full M6 degraded-mode model;
+- most local RPC is synchronous;
+- same-user IPC authorization is not yet a capability security boundary;
+- stronger restart/reconciliation guarantees belong to M5/M6;
+- no inter-node transport exists.
 
-## Next milestone
+## Milestones
 
-M4 — process-isolated organs and `presenced`.
+- M1: complete.
+- M2: complete.
+- M3: complete after the M3 compile repair included by M4.
+- M4: complete after process-integration and VM gates pass.
+- M5: next.

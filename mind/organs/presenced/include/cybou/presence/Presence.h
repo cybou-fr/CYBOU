@@ -3,16 +3,17 @@
 
 #pragma once
 
-#include "cybou/self/SelfModel.h"
-#include "cybou/workspace/Workspace.h"
-
-#include <QCborMap>
+#include <QDateTime>
 #include <QObject>
 #include <QVariant>
+#include <QStringList>
+#include <QUuid>
 
 #include <memory>
 
 namespace cybou {
+
+class PresenceClient;
 
 struct Moment {
     QDateTime when;
@@ -21,13 +22,7 @@ struct Moment {
     QUuid thread;
 };
 
-class PresenceRuntime;
-
-/// Current presentation wrapper.
-///
-/// Default/QML construction uses Event1 and therefore cybou-eventd for the canonical Journal.
-/// The explicit data-directory constructor is retained as a local test seam and uses a local
-/// Journal only for isolated tests/tools.
+/// QML proxy only. No mutable cognition is constructed in plasmashell.
 class Presence : public QObject
 {
     Q_OBJECT
@@ -42,14 +37,14 @@ class Presence : public QObject
     Q_PROPERTY(QVariantList calibrations READ calibrations NOTIFY changed)
     Q_PROPERTY(QVariantList coalitions READ coalitions NOTIFY changed)
     Q_PROPERTY(QVariantMap moment READ moment NOTIFY changed)
+    Q_PROPERTY(QVariantMap organHealth READ organHealth NOTIFY changed)
 
 public:
-    explicit Presence(const QString &dataDir, QObject *parent = nullptr);
     explicit Presence(QObject *parent = nullptr);
     ~Presence() override;
 
     bool wake();
-    bool isAwake() const;
+    bool isAwake() const { return m_awake; }
 
     QString narration() const;
     QStringList obligations() const;
@@ -72,6 +67,7 @@ public:
     Q_INVOKABLE QVariantMap predict(const QString &subject);
     Q_INVOKABLE QVariantList coalitions() const;
     Q_INVOKABLE QVariantMap moment() const;
+    Q_INVOKABLE QVariantMap organHealth() const;
 
     QString lastError() const { return m_lastError; }
 
@@ -79,15 +75,13 @@ Q_SIGNALS:
     void changed();
 
 private:
-    void subscribeToRuntime();
-    bool appendUserObservation(
-        const QString &event,
-        const QCborMap &details,
-        QUuid *messageId);
+    bool refresh();
+    void remoteChanged();
 
-    std::shared_ptr<PresenceRuntime> m_runtime;
+    std::unique_ptr<PresenceClient> m_client;
+    QVariantMap m_snapshot;
     QString m_lastError;
-    bool m_subscribed{false};
+    bool m_awake{false};
 };
 
 } // namespace cybou

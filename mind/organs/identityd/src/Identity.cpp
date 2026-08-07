@@ -19,7 +19,7 @@ namespace cybou {
 namespace {
 // РУС: Версия архитектуры вшита в бинарник. При смене этой строки beginSession()
 // РУС: обнаружит миграцию и запишет факт в журнал.
-constexpr auto kArchitectureVersion = "eventd-0.1";
+constexpr auto kArchitectureVersion = "process-m4-0.1";
 
 // РУС: Монотонные миллисекунды для поля monotonicTime в CognitiveEnvelope.
 // РУС: wallTime может прыгнуть (синхронизация NTP); monotonicTime — никогда.
@@ -132,6 +132,22 @@ void Identity::record(ContributionKind kind, const QString &summary)
     // An Observation needs no cause; a later Learning about migration would.
     // РУС: Observation не требует причины (causationId) — это точка входа мира в журнал.
     m_events->append(e);
+}
+
+bool Identity::resumeSession()
+{
+    m_lastError.clear();
+    m_born = false;
+
+    if (!load()) {
+        if (m_lastError.isEmpty()) {
+            m_lastError = QStringLiteral(
+                "identity state is absent while resuming the current user session");
+        }
+        return false;
+    }
+
+    return true;
 }
 
 // РУС: Главный метод жизненного цикла — три ветки:

@@ -3,10 +3,10 @@
 
 #pragma once
 
+#include "cybou/events/EventStore.h"
 #include "cybou/identity/Identity.h"
 #include "cybou/intentions/Intentions.h"
 #include "cybou/predictor/Predictor.h"
-#include "cybou/events/EventStore.h"
 
 namespace cybou {
 
@@ -30,16 +30,24 @@ struct SelfReport {
     bool isValid() const { return taken.isValid(); }
 };
 
+QString narrateSelfReport(const SelfReport &report);
+
 class SelfModel
 {
 public:
-    SelfModel(EventStore *journal, Identity *identity, Intentions *intentions, Predictor *predictor);
+    SelfModel(
+        EventStore *events,
+        Identity *identity,
+        Intentions *intentions,
+        Predictor *predictor);
 
-    /// Records a self-assessment caused by an existing contribution.
     SelfReport assess(const QUuid &causeId);
-
     SelfReport measure() const;
-    QString narrate(const SelfReport &report) const;
+
+    QString narrate(const SelfReport &report) const
+    {
+        return narrateSelfReport(report);
+    }
 
     QString lastError() const { return m_lastError; }
 

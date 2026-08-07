@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# The QML surface still instantiates Presence in plasmashell, but Presence now talks to the
-# process-isolated cybou-eventd over Event1. Remaining organs move out in M4.
+# The exported Presence type is only a D-Bus proxy to cybou-presenced.
 
 qt_add_qml_module(cybou-presence-qml
     URI org.cybou.presence
@@ -14,14 +13,21 @@ qt_add_qml_module(cybou-presence-qml
         QmlTypes.h
 )
 
-target_link_libraries(cybou-presence-qml PRIVATE Qt6::Qml cybou-presence)
+target_link_libraries(
+    cybou-presence-qml
+    PRIVATE Qt6::Qml cybou-presence
+)
 
 if(DEFINED CYBOU_QML_INSTALL_DIR)
     set(_dest "${CYBOU_QML_INSTALL_DIR}/org/cybou/presence")
-    install(TARGETS cybou-presence-qml LIBRARY DESTINATION "${_dest}")
-    install(FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/qmldir"
-        "${CMAKE_CURRENT_BINARY_DIR}/cybou-presence-qml.qmltypes"
+    install(
+        TARGETS cybou-presence-qml
+        LIBRARY DESTINATION "${_dest}"
+    )
+    install(
+        FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/qmldir"
+            "${CMAKE_CURRENT_BINARY_DIR}/cybou-presence-qml.qmltypes"
         DESTINATION "${_dest}"
     )
 endif()

@@ -18,9 +18,9 @@ SPDX-License-Identifier: MIT
 | [0009](ADR-0009-one-presence-per-user-session.md) | One Presence per Session | Accepted |
 | [0010](ADR-0010-journal-v2-schema-and-canonical-hashing.md) | Journal v2 | Accepted |
 | [0011](ADR-0011-single-writer-event-journal.md) | Single-Writer Journal | Accepted |
-| [0012](ADR-0012-organ-process-isolation-and-lifecycle.md) | Organ Process Isolation | Proposed |
+| [0012](ADR-0012-organ-process-isolation-and-lifecycle.md) | Organ Process Isolation | Accepted |
 | [0013](ADR-0013-local-cognitive-fabric-qt-dbus.md) | Qt D-Bus Fabric | Accepted |
-| [0014](ADR-0014-workspace-admission-and-global-attention.md) | Workspace Admission | Proposed |
+| [0014](ADR-0014-workspace-admission-and-global-attention.md) | Workspace Admission | Accepted |
 | [0015](ADR-0015-terminal-outcome-semantics.md) | Terminal Outcomes | Proposed |
 | [0016](ADR-0016-identity-continuity.md) | Identity Continuity | Proposed |
 | [0017](ADR-0017-cognitive-state-locations.md) | State Locations | Proposed |
@@ -29,6 +29,3 @@ SPDX-License-Identifier: MIT
 | [0020](ADR-0020-presence-surface-for-v0.1.md) | Presence Surface for v0.1 | Proposed |
 | [0021](ADR-0021-language-models-are-optional-faculties.md) | Optional Language Faculties | Proposed |
 | [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary | Proposed |
-
-Accepted records the architecture decision; later process milestones may still implement further
-consequences of that decision.

@@ -44,6 +44,23 @@ QString StatePaths::persistentRoot()
 #endif
 }
 
+QString StatePaths::runtimeRoot()
+{
+#ifdef Q_OS_UNIX
+    const QString runtime = qEnvironmentVariable("XDG_RUNTIME_DIR");
+    if (runtime.isEmpty() || !QDir::isAbsolutePath(runtime)) {
+        return {};
+    }
+    return cleanAbsolute(QDir(runtime).filePath(QStringLiteral("cybou")));
+#else
+    const QString runtime =
+        QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    return runtime.isEmpty()
+        ? QString()
+        : cleanAbsolute(QDir(runtime).filePath(QStringLiteral("cybou")));
+#endif
+}
+
 QString StatePaths::legacyPresenceRoot()
 {
     const QString appData =
@@ -82,18 +99,20 @@ bool StatePaths::migrateLegacy(
     }
 
     if (!QDir().mkpath(target)) {
-        setError(error, QStringLiteral("cannot create canonical state root %1").arg(target));
+        setError(
+            error,
+            QStringLiteral("cannot create canonical state root %1").arg(target));
         return false;
     }
 
-    // Fail before moving anything if the two roots already contain the same name. Never guess
-    // which biography is authoritative.
     for (const QFileInfo &entry : entries) {
-        const QString destination = QDir(target).filePath(entry.fileName());
+        const QString destination =
+            QDir(target).filePath(entry.fileName());
         if (QFileInfo::exists(destination)) {
             setError(
                 error,
-                QStringLiteral("state migration collision for %1").arg(entry.fileName()));
+                QStringLiteral("state migration collision for %1")
+                    .arg(entry.fileName()));
             return false;
         }
     }
@@ -101,7 +120,8 @@ bool StatePaths::migrateLegacy(
     QStringList moved;
     for (const QFileInfo &entry : entries) {
         const QString sourcePath = entry.absoluteFilePath();
-        const QString destination = QDir(target).filePath(entry.fileName());
+        const QString destination =
+            QDir(target).filePath(entry.fileName());
 
         if (!QDir().rename(sourcePath, destination)) {
             bool rollbackOk = true;
@@ -116,7 +136,8 @@ bool StatePaths::migrateLegacy(
             setError(
                 error,
                 rollbackOk
-                    ? QStringLiteral("cannot migrate state entry %1; migration rolled back")
+                    ? QStringLiteral(
+                          "cannot migrate state entry %1; migration rolled back")
                           .arg(entry.fileName())
                     : QStringLiteral(
                           "cannot migrate state entry %1 and rollback was incomplete")
@@ -127,15 +148,16 @@ bool StatePaths::migrateLegacy(
         moved.append(entry.fileName());
     }
 
-    // The old root is expected to be empty. Failure to remove an empty directory does not fork
-    // state, so it is not a reason to reject an otherwise complete migration.
     QDir().rmdir(source);
     return true;
 }
 
 bool StatePaths::migrateLegacy(QString *error)
 {
-    return migrateLegacy(legacyPresenceRoot(), persistentRoot(), error);
+    return migrateLegacy(
+        legacyPresenceRoot(),
+        persistentRoot(),
+        error);
 }
 
 } // namespace cybou

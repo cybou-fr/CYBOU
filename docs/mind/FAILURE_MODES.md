@@ -5,20 +5,20 @@ SPDX-License-Identifier: MIT
 
 # Failure Modes
 
-## Current M3 behavior
+## M4 isolation guarantees
 
-| Failure | Current behavior |
+| Failure | Current M4 behavior |
 |---|---|
-| invalid proposal | eventd/Journal rejects it; no Accepted signal |
-| failed Journal transaction | rollback; no Accepted signal |
-| duplicate Outcome | rejected by Journal and SQLite constraint |
-| eventd unavailable during default Presence wake | Presence stays not-awake; no local SQLite fallback |
-| second eventd process | cannot own the same D-Bus service name |
-| plasmashell restart | eventd can remain independent, but other organs are recreated |
-| Journal verification failure | query exposes failure; explicit degraded UI state is not yet implemented |
-| D-Bus timeout after wake | command/query fails; full health/capability projection is M6 |
+| QML Presence destroyed | cognitive services remain independent |
+| presenced restarts | organ processes and identity session remain |
+| identityd restarts in same login | persistent identity resumes without incrementing session |
+| workspaced restarts | bounded attention can rehydrate from Event1 history |
+| predictord fails | other organ processes remain alive; prediction calls fail |
+| eventd write rejected | no accepted event enters Workspace |
+| duplicate D-Bus owner | second daemon instance fails service-name acquisition |
 
-## Pending
+## Not yet M6
 
-Process-specific degraded modes, automatic reconnect/reconstruction for every organ, and explicit
-capability deficits are M4/M6 work.
+M4 creates failure domains and a minimal Ready/Health contract. It does not yet define the complete
+capability-deficit UI, retry/backoff policy, dependency reconciliation, or user-facing degraded
+state machine.
