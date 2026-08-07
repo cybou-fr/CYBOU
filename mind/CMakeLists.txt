@@ -1,8 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
-#
-# Cybou Mind. See docs/14-mind-architecture.md for what this becomes, and
-# docs/adr/0008-cognition-development-model.md for what may depend on it.
 
 cmake_minimum_required(VERSION 3.28)
 
@@ -12,13 +9,17 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Qml)
+find_package(Qt6 REQUIRED COMPONENTS Core DBus Sql Qml)
 
 qt_standard_project_setup()
 
 add_subdirectory(protocol)
+add_subdirectory(foundation/events)
 add_subdirectory(foundation/runtime)
 add_subdirectory(foundation/storage)
+add_subdirectory(foundation/ipc)
+add_subdirectory(services/eventd)
+
 add_subdirectory(organs/identityd)
 add_subdirectory(organs/intentiond)
 add_subdirectory(organs/predictord)

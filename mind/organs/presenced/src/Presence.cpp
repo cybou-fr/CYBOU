@@ -3,7 +3,10 @@
 
 #include "cybou/presence/Presence.h"
 
+#include "cybou/events/EventStore.h"
+#include "cybou/ipc/EventClient.h"
 #include "cybou/runtime/StatePaths.h"
+#include "cybou/storage/Journal.h"
 
 #include <QCborMap>
 #include <QCborValue>
@@ -18,19 +21,26 @@
 
 namespace cybou {
 
+enum class RuntimeTransport {
+    LocalJournal,
+    Event1,
+};
+
 class PresenceRuntime
 {
 public:
-    explicit PresenceRuntime(QString path)
+    PresenceRuntime(QString path, RuntimeTransport transportValue)
         : dataDir(std::move(path))
+        , transport(transportValue)
     {
     }
 
     QString dataDir;
+    RuntimeTransport transport;
     QString lastError;
     bool awake{false};
 
-    std::unique_ptr<Journal> journal;
+    std::unique_ptr<EventStore> events;
     std::unique_ptr<Identity> identity;
     std::unique_ptr<Intentions> intentions;
     std::unique_ptr<Predictor> predictor;
@@ -42,9 +52,20 @@ public:
 
 namespace {
 
-QString runtimeKey(const QString &dataDir)
+QString cleanPath(const QString &path)
 {
-    return QDir::cleanPath(QFileInfo(dataDir).absoluteFilePath());
+    return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+}
+
+QString registryKey(
+    const QString &dataDir,
+    RuntimeTransport transport)
+{
+    const QString prefix =
+        transport == RuntimeTransport::Event1
+            ? QStringLiteral("event1:")
+            : QStringLiteral("local:");
+    return prefix + cleanPath(dataDir);
 }
 
 QMutex &registryMutex()
@@ -59,9 +80,11 @@ QHash<QString, std::weak_ptr<PresenceRuntime>> &runtimeRegistry()
     return registry;
 }
 
-std::shared_ptr<PresenceRuntime> acquireRuntime(const QString &dataDir)
+std::shared_ptr<PresenceRuntime> acquireRuntime(
+    const QString &dataDir,
+    RuntimeTransport transport)
 {
-    const QString key = runtimeKey(dataDir);
+    const QString key = registryKey(dataDir, transport);
     QMutexLocker locker(&registryMutex());
 
     auto &registry = runtimeRegistry();
@@ -69,26 +92,30 @@ std::shared_ptr<PresenceRuntime> acquireRuntime(const QString &dataDir)
         return existing;
     }
 
-    auto runtime = std::make_shared<PresenceRuntime>(key);
+    auto runtime =
+        std::make_shared<PresenceRuntime>(cleanPath(dataDir), transport);
     registry.insert(key, runtime);
     return runtime;
 }
 
 bool usesCanonicalState(const QString &dataDir)
 {
-    return runtimeKey(dataDir) == runtimeKey(StatePaths::persistentRoot());
+    return cleanPath(dataDir) == cleanPath(StatePaths::persistentRoot());
 }
 
 } // namespace
 
 Presence::Presence(const QString &dataDir, QObject *parent)
     : QObject(parent)
-    , m_runtime(acquireRuntime(dataDir))
+    , m_runtime(acquireRuntime(dataDir, RuntimeTransport::LocalJournal))
 {
 }
 
 Presence::Presence(QObject *parent)
-    : Presence(StatePaths::persistentRoot(), parent)
+    : QObject(parent)
+    , m_runtime(acquireRuntime(
+          StatePaths::persistentRoot(),
+          RuntimeTransport::Event1))
 {
 }
 
@@ -101,15 +128,17 @@ bool Presence::isAwake() const
 
 void Presence::subscribeToRuntime()
 {
-    if (m_subscribed || !m_runtime || !m_runtime->awake || !m_runtime->journal) {
+    if (m_subscribed || !m_runtime || !m_runtime->awake || !m_runtime->events) {
         return;
     }
 
     connect(
-        m_runtime->journal.get(),
-        &Journal::accepted,
+        m_runtime->events.get(),
+        &EventStore::accepted,
         this,
-        [this](const CognitiveEnvelope &, quint64) { Q_EMIT changed(); });
+        [this](const CognitiveEnvelope &, quint64) {
+            Q_EMIT changed();
+        });
 
     m_subscribed = true;
 }
@@ -121,67 +150,79 @@ bool Presence::wake()
         return false;
     }
 
-    bool becameAwake = false;
-
     {
         QMutexLocker locker(&m_runtime->wakeMutex);
 
         if (!m_runtime->awake) {
             m_runtime->lastError.clear();
 
-            if (usesCanonicalState(m_runtime->dataDir)) {
-                QString migrationError;
-                if (!StatePaths::migrateLegacy(&migrationError)) {
-                    m_runtime->lastError =
-                        QStringLiteral("cannot migrate legacy Mind state: %1")
-                            .arg(migrationError);
+            std::unique_ptr<EventStore> events;
+
+            if (m_runtime->transport == RuntimeTransport::Event1) {
+                // M1 migration must happen before the first Event1 call, because that call can
+                // D-Bus-activate eventd and make the canonical Journal live.
+                if (usesCanonicalState(m_runtime->dataDir)) {
+                    QString migrationError;
+                    if (!StatePaths::migrateLegacy(&migrationError)) {
+                        m_runtime->lastError =
+                            QStringLiteral("cannot migrate legacy Mind state: %1")
+                                .arg(migrationError);
+                        m_lastError = m_runtime->lastError;
+                        return false;
+                    }
+                }
+
+                auto client = std::make_unique<EventClient>();
+                if (!client->isOpen()) {
+                    m_runtime->lastError = client->lastError();
                     m_lastError = m_runtime->lastError;
                     return false;
                 }
-            }
+                events = std::move(client);
+            } else {
+                if (!QDir().mkpath(m_runtime->dataDir)) {
+                    m_runtime->lastError =
+                        QStringLiteral("cannot create %1").arg(m_runtime->dataDir);
+                    m_lastError = m_runtime->lastError;
+                    return false;
+                }
 
-            if (!QDir().mkpath(m_runtime->dataDir)) {
-                m_runtime->lastError =
-                    QStringLiteral("cannot create %1").arg(m_runtime->dataDir);
-                m_lastError = m_runtime->lastError;
-                return false;
-            }
-
-            auto journal = std::make_unique<Journal>(
-                QDir(m_runtime->dataDir).filePath(QStringLiteral("journal.db")));
-            if (!journal->isOpen()) {
-                m_runtime->lastError = journal->lastError();
-                m_lastError = m_runtime->lastError;
-                return false;
+                auto journal = std::make_unique<Journal>(
+                    QDir(m_runtime->dataDir).filePath(QStringLiteral("journal.db")));
+                if (!journal->isOpen()) {
+                    m_runtime->lastError = journal->lastError();
+                    m_lastError = m_runtime->lastError;
+                    return false;
+                }
+                events = std::move(journal);
             }
 
             auto identity = std::make_unique<Identity>(
                 QDir(m_runtime->dataDir).filePath(QStringLiteral("identity.json")),
-                journal.get());
+                events.get());
             if (!identity->beginSession()) {
                 m_runtime->lastError = identity->lastError();
                 m_lastError = m_runtime->lastError;
                 return false;
             }
 
-            auto intentions = std::make_unique<Intentions>(journal.get());
-            auto predictor = std::make_unique<Predictor>(journal.get());
+            auto intentions = std::make_unique<Intentions>(events.get());
+            auto predictor = std::make_unique<Predictor>(events.get());
             auto self = std::make_unique<SelfModel>(
-                journal.get(),
+                events.get(),
                 identity.get(),
                 intentions.get(),
                 predictor.get());
-            auto workspace = std::make_unique<Workspace>(journal.get());
+            auto workspace = std::make_unique<Workspace>(events.get());
             workspace->rehydrate();
 
-            m_runtime->journal = std::move(journal);
+            m_runtime->events = std::move(events);
             m_runtime->identity = std::move(identity);
             m_runtime->intentions = std::move(intentions);
             m_runtime->predictor = std::move(predictor);
             m_runtime->self = std::move(self);
             m_runtime->workspace = std::move(workspace);
             m_runtime->awake = true;
-            becameAwake = true;
         }
     }
 
@@ -189,13 +230,7 @@ bool Presence::wake()
 
     const bool wasSubscribed = m_subscribed;
     subscribeToRuntime();
-
-    // Every surface gets one initial snapshot notification. Repeated wake() on the same wrapper
-    // remains idempotent.
     if (!wasSubscribed && m_subscribed) {
-        Q_EMIT changed();
-    } else if (becameAwake && !m_subscribed) {
-        // Defensive: normally impossible because a healthy awake runtime has a Journal.
         Q_EMIT changed();
     }
 
@@ -238,7 +273,10 @@ QString Presence::attention() const
     const CognitiveEnvelope &latest = focus.members.last();
     const QStringList voices = focus.organs();
     if (voices.size() > 1) {
-        return QObject::tr("%1, with %n organ(s) involved", nullptr, voices.size())
+        return QObject::tr(
+                   "%1, with %n organ(s) involved",
+                   nullptr,
+                   voices.size())
             .arg(kindToString(latest.kind));
     }
     return QObject::tr("%1, from %2")
@@ -247,19 +285,19 @@ QString Presence::attention() const
 
 int Presence::contributions() const
 {
-    return isAwake() && m_runtime->journal
-               ? static_cast<int>(m_runtime->journal->count())
+    return isAwake() && m_runtime->events
+               ? static_cast<int>(m_runtime->events->count())
                : 0;
 }
 
 QList<Moment> Presence::recent(int limit) const
 {
     QList<Moment> result;
-    if (!isAwake() || !m_runtime->journal || limit <= 0) {
+    if (!isAwake() || !m_runtime->events || limit <= 0) {
         return result;
     }
 
-    const auto envelopes = m_runtime->journal->recent(limit);
+    const auto envelopes = m_runtime->events->recent(limit);
     result.reserve(envelopes.size());
     for (const auto &envelope : envelopes) {
         Moment moment;
@@ -292,7 +330,7 @@ bool Presence::appendUserObservation(
     const QCborMap &details,
     QUuid *messageId)
 {
-    if (!isAwake() || !m_runtime->journal) {
+    if (!isAwake() || !m_runtime->events) {
         return false;
     }
 
@@ -309,8 +347,8 @@ bool Presence::appendUserObservation(
     payload[QStringLiteral("event")] = event;
     observation.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_runtime->journal->append(observation) == 0) {
-        m_lastError = m_runtime->journal->lastError();
+    if (m_runtime->events->append(observation) == 0) {
+        m_lastError = m_runtime->events->lastError();
         return false;
     }
 
@@ -384,7 +422,9 @@ bool Presence::fulfillIndex(int index)
     }
 
     const bool ok =
-        m_runtime->intentions->close(open.at(index).id, Resolution::Fulfilled);
+        m_runtime->intentions->close(
+            open.at(index).id,
+            Resolution::Fulfilled);
     if (!ok) {
         m_lastError = m_runtime->intentions->lastError();
     }
@@ -404,7 +444,9 @@ bool Presence::abandonIndex(int index)
     }
 
     const bool ok =
-        m_runtime->intentions->close(open.at(index).id, Resolution::Abandoned);
+        m_runtime->intentions->close(
+            open.at(index).id,
+            Resolution::Abandoned);
     if (!ok) {
         m_lastError = m_runtime->intentions->lastError();
     }
@@ -476,8 +518,10 @@ QVariantMap Presence::identityState() const
     map[QStringLiteral("origin")] = state.origin.toString();
     map[QStringLiteral("sessionCount")] =
         static_cast<qint64>(state.sessionCount);
-    map[QStringLiteral("architectureVersion")] = state.architectureVersion;
-    map[QStringLiteral("wasBorn")] = m_runtime->identity->wasBorn();
+    map[QStringLiteral("architectureVersion")] =
+        state.architectureVersion;
+    map[QStringLiteral("wasBorn")] =
+        m_runtime->identity->wasBorn();
     return map;
 }
 
@@ -529,7 +573,8 @@ QVariantList Presence::coalitions() const
         return list;
     }
 
-    for (const Coalition &coalition : m_runtime->workspace->coalitions()) {
+    for (const Coalition &coalition :
+         m_runtime->workspace->coalitions()) {
         QVariantMap map;
         map[QStringLiteral("correlationId")] =
             coalition.correlationId.toString(QUuid::WithoutBraces);

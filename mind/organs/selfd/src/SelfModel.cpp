@@ -13,8 +13,8 @@
 namespace cybou {
 
 SelfModel::SelfModel(
-    Journal *journal, Identity *identity, Intentions *intentions, Predictor *predictor)
-    : m_journal(journal)
+    EventStore *journal, Identity *identity, Intentions *intentions, Predictor *predictor)
+    : m_events(journal)
     , m_identity(identity)
     , m_intentions(intentions)
     , m_predictor(predictor)
@@ -24,11 +24,11 @@ SelfModel::SelfModel(
 QStringList SelfModel::testedSubjects() const
 {
     QStringList subjects;
-    if (!m_journal) {
+    if (!m_events) {
         return subjects;
     }
 
-    const auto all = m_journal->recent(0);
+    const auto all = m_events->recent(0);
     for (auto it = all.crbegin(); it != all.crend(); ++it) {
         if (it->kind != ContributionKind::Outcome
             || it->originOrgan != QLatin1String("predictord")) {
@@ -51,7 +51,7 @@ QStringList SelfModel::testedSubjects() const
 SelfReport SelfModel::measure() const
 {
     SelfReport report;
-    if (!m_journal || !m_identity || !m_intentions || !m_predictor) {
+    if (!m_events || !m_identity || !m_intentions || !m_predictor) {
         return report;
     }
 
@@ -76,8 +76,8 @@ SelfReport SelfModel::measure() const
         }
     }
 
-    report.contributions = m_journal->count();
-    report.firstBrokenAt = m_journal->verify();
+    report.contributions = m_events->count();
+    report.firstBrokenAt = m_events->verify();
     report.journalIntact = report.firstBrokenAt == 0;
     return report;
 }
@@ -92,7 +92,7 @@ SelfReport SelfModel::assess(const QUuid &causeId)
         return report;
     }
 
-    const auto cause = m_journal->contribution(causeId);
+    const auto cause = m_events->contribution(causeId);
     if (!cause) {
         m_lastError = QStringLiteral("the self-assessment cause does not exist");
         return SelfReport{};
@@ -132,8 +132,8 @@ SelfReport SelfModel::assess(const QUuid &causeId)
     payload[QStringLiteral("accuracy")] = accuracy;
     e.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_journal->append(e) == 0) {
-        m_lastError = m_journal->lastError();
+    if (m_events->append(e) == 0) {
+        m_lastError = m_events->lastError();
         return SelfReport{};
     }
     return report;

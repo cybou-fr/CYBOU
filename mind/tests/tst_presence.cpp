@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/presence/Presence.h"
+#include "cybou/storage/Journal.h"
 
 #include <QDir>
 #include <QSignalSpy>

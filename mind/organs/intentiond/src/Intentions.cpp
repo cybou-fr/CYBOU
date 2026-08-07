@@ -21,8 +21,8 @@ QString resolutionToString(Resolution r)
     return QStringLiteral("abandoned");
 }
 
-Intentions::Intentions(Journal *journal)
-    : m_journal(journal)
+Intentions::Intentions(EventStore *journal)
+    : m_events(journal)
 {
 }
 
@@ -31,13 +31,13 @@ QUuid Intentions::form(
 {
     m_lastError.clear();
 
-    if (!m_journal || description.trimmed().isEmpty() || causeId.isNull()) {
+    if (!m_events || description.trimmed().isEmpty() || causeId.isNull()) {
         m_lastError = QStringLiteral(
             "an intention needs a journal, a description, and an existing cause");
         return {};
     }
 
-    const auto cause = m_journal->contribution(causeId);
+    const auto cause = m_events->contribution(causeId);
     if (!cause) {
         m_lastError = QStringLiteral("the intention cause does not exist");
         return {};
@@ -59,8 +59,8 @@ QUuid Intentions::form(
     payload[QStringLiteral("trigger")] = trigger.trimmed();
     e.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_journal->append(e) == 0) {
-        m_lastError = m_journal->lastError();
+    if (m_events->append(e) == 0) {
+        m_lastError = m_events->lastError();
         return {};
     }
     return e.messageId;
@@ -71,12 +71,12 @@ bool Intentions::close(
 {
     m_lastError.clear();
 
-    if (!m_journal || intentionId.isNull()) {
+    if (!m_events || intentionId.isNull()) {
         m_lastError = QStringLiteral("closing needs a journal and an intention");
         return false;
     }
 
-    const auto intention = m_journal->contribution(intentionId);
+    const auto intention = m_events->contribution(intentionId);
     if (!intention) {
         m_lastError = QStringLiteral("the intention does not exist");
         return false;
@@ -85,7 +85,7 @@ bool Intentions::close(
         m_lastError = QStringLiteral("the target contribution is not an intention");
         return false;
     }
-    if (m_journal->hasOutcomeFor(intentionId, QStringLiteral("intentiond"))) {
+    if (m_events->hasOutcomeFor(intentionId, QStringLiteral("intentiond"))) {
         m_lastError = QStringLiteral("the intention is already closed");
         return false;
     }
@@ -106,8 +106,8 @@ bool Intentions::close(
     payload[QStringLiteral("note")] = note;
     e.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_journal->append(e) == 0) {
-        m_lastError = m_journal->lastError();
+    if (m_events->append(e) == 0) {
+        m_lastError = m_events->lastError();
         return false;
     }
     return true;
@@ -116,11 +116,11 @@ bool Intentions::close(
 QList<Intention> Intentions::open() const
 {
     QList<Intention> result;
-    if (!m_journal) {
+    if (!m_events) {
         return result;
     }
 
-    const auto all = m_journal->recent(0);
+    const auto all = m_events->recent(0);
 
     QSet<QUuid> intentionIds;
     for (const auto &e : all) {

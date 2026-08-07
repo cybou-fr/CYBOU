@@ -11,126 +11,69 @@ SPDX-License-Identifier: MIT
 
 **Smart Operating System based on NixOS with KDE Plasma**
 
-[![REUSE compliant](https://img.shields.io/badge/REUSE-compliant-green.svg)](https://reuse.software/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![NixOS 26.05](https://img.shields.io/badge/NixOS-26.05-blue.svg)](https://nixos.org/)
-
 </div>
 
----
+## Current implementation position
 
-## About
+M1, M2, and M3 are implemented.
 
-Cybou is a smart operating-system project built on NixOS with KDE Plasma 6.
+The durable cognitive path is now:
 
-Its experimental core is **Mind**: a typed cognitive runtime prototype with identity, intentions,
-prediction, self-model, bounded attention, an append-only Journal, and a Presence surface.
+```text
+organs in Presence runtime
+        │
+        ▼
+EventStore / EventClient
+        │ Qt D-Bus Event1
+        ▼
+cybou-eventd
+        │
+        ▼
+Journal v2
+        │
+        └── accepted after COMMIT
+                 │
+                 ▼
+        Workspace / Presence
+```
 
-Current code deliberately remains an in-process prototype inside `plasmashell`; daemon-like source
-directory names describe future process boundaries.
+`cybou-eventd` is the normal production owner of `journal.db`. Identity, Intentions, Predictor,
+SelfModel, Workspace, and Presence no longer depend on the SQLite Journal class; they depend on
+the transport-neutral `EventStore` contract.
 
-**Current implementation position:** M1 and M2 are complete for the in-process runtime. The next
-architecture milestone is M3: make `cybou-eventd` the exclusive Journal owner without changing the
-post-COMMIT accepted-contribution semantics established by M1.
+The remaining organs are still in-process inside `plasmashell`. Process isolation of those organs
+and `presenced` is M4.
 
----
-
-## Project Status
+## Status
 
 | Component | Status |
 |---|---|
-| NixOS 26.05 / Plasma 6 foundation | ✅ Implemented |
-| Cybou Horizon / right-side Mind Dock | ✅ Implemented |
-| Cognitive protocol invariants | ✅ Implemented |
-| Journal v2 | ✅ Implemented |
-| Shared in-process Presence runtime | ✅ Implemented |
-| Live Workspace accepted-contribution admission | ✅ Implemented |
-| Stable Unix Mind state root `$XDG_STATE_HOME/cybou` | ✅ Implemented |
-| Legacy host-derived state migration | ✅ Implemented, fail-closed |
-| `cybou-eventd` exclusive Journal owner | ❌ Next milestone |
-| Process-isolated organs / D-Bus fabric | ❌ Planned |
-| Degraded process modes | ❌ Planned |
-| Language-model faculty | ❌ Planned |
-| Authorized OS action boundary | ❌ Planned |
+| NixOS / Plasma foundation | ✅ |
+| Journal v2 | ✅ M2 |
+| Shared Presence runtime / live Workspace | ✅ M1 |
+| Stable `$XDG_STATE_HOME/cybou` state | ✅ |
+| `cybou-eventd` | ✅ M3 |
+| Event1 Qt D-Bus + versioned CBOR | ✅ M3 |
+| Exclusive normal production Journal writer | ✅ M3 |
+| Process-isolated remaining organs | ❌ M4 |
+| Degraded process modes | ❌ M6 |
+| Language faculty | ❌ M8 |
+| Authorized OS action boundary | ❌ M9 |
 
----
-
-## Quick Start
+## Build
 
 ```bash
-nix develop
-
 nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
-nix build .#packages.x86_64-linux.cybou-presence-applet
-nix build .#packages.x86_64-linux.cybou-layout-templates
-nix build .#packages.x86_64-linux.cybou-tools
+```
 
-nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
+The Mind package now includes `cybou-eventd`, its D-Bus activation file, the Presence QML module,
+and eleven CTest suites.
+
+VM:
+
+```bash
+nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
 ./result/bin/run-cybou-vm
 ```
 
----
-
-## Current Architecture
-
-```text
-plasmashell
-├── Presence surface ─┐
-├── Presence surface ─┼── shared PresenceRuntime
-└── Presence surface ─┘        ├── Journal v2
-                               ├── Identity
-                               ├── Intentions
-                               ├── Predictor
-                               ├── SelfModel
-                               └── Workspace
-```
-
-Durable/live ordering:
-
-```text
-organ action
-→ Journal validate + COMMIT
-→ accepted(envelope, sequence)
-→ Workspace admission
-→ Presence notification
-```
-
-The default Unix Mind state is independent of the hosting UI process:
-
-```text
-$XDG_STATE_HOME/cybou
-```
-
-The Target architecture moves this runtime behind `eventd`, `presenced`, and other isolated
-services.
-
-See:
-
-- [Current State](docs/CURRENT_STATE.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Testing](docs/TESTING.md)
-- [Mind docs](docs/mind/README.md)
-- [ADRs](docs/adr/README.md)
-
----
-
-## Technology Stack
-
-| Layer | Technology |
-|---|---|
-| OS | NixOS 26.05 |
-| Desktop | KDE Plasma 6 / Wayland |
-| Mind | C++20 / Qt 6 |
-| Persistence | SQLite Journal v2 |
-| UI | QML / Plasma |
-| Build | Nix flakes + CMake + Ninja |
-| License | MIT code / CC-BY-SA-4.0 assets |
-
----
-
-## License
-
-- Code: [MIT](LICENSES/MIT.txt)
-- Assets: [CC-BY-SA-4.0](LICENSES/CC-BY-SA-4.0.txt)
-- Compliance: [REUSE 3.x](https://reuse.software/spec/)
+See `docs/CURRENT_STATE.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/mind/`.

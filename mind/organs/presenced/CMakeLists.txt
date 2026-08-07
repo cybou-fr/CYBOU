@@ -1,7 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
-#
-# The surface. The single place where "may this be shown?" is decided.
 
 qt_add_library(cybou-presence STATIC
     src/Presence.cpp
@@ -13,5 +11,12 @@ target_include_directories(cybou-presence
 )
 
 target_link_libraries(cybou-presence
-    PUBLIC Qt6::Core cybou-runtime cybou-self cybou-workspace
+    PUBLIC
+        Qt6::Core
+        cybou-events
+        cybou-event-client
+        cybou-runtime
+        cybou-self
+        cybou-storage
+        cybou-workspace
 )

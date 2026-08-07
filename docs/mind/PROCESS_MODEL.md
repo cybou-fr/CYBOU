@@ -5,14 +5,17 @@ SPDX-License-Identifier: MIT
 
 # Process Model
 
-## Current
+## Current after M3
 
-Mind is not process-isolated.
+There are now two failure domains:
 
 ```text
+cybou-eventd
+└── Journal v2
+
 plasmashell
-└── Presence
-    ├── Journal
+└── shared PresenceRuntime
+    ├── EventClient
     ├── Identity
     ├── Intentions
     ├── Predictor
@@ -20,12 +23,11 @@ plasmashell
     └── Workspace
 ```
 
-The daemon-like source directory names describe intended component boundaries, but the current
-build produces libraries/QML integration rather than one user service per organ.
+`cybou-eventd` is D-Bus-activated and is no longer a library object inside Presence.
 
-A `plasmashell` restart therefore also destroys the current in-process Mind object graph.
+The remaining daemon-like source directories are still in-process components.
 
-## Target
+## M4 target
 
 ```text
 cybou-eventd
@@ -37,29 +39,4 @@ cybou-workspaced
 cybou-presenced
 ```
 
-Each cognitive process is intended to be a `systemd --user` service and a separate
-`QCoreApplication` or appropriate Qt application, with GUI-specific code confined to the
-presentation boundary.
-
-## Target lifecycle
-
-- explicit startup dependencies;
-- restart after recoverable failure;
-- reconstruction from owned state or Journal;
-- capability-deficit reporting;
-- Presence reconnect after UI restart;
-- Plasma restart does not restart the Mind;
-- one authoritative owner for each persistent resource.
-
-## Target health model
-
-```text
-Available
-Starting
-Healthy
-Degraded
-Unavailable
-Recovering
-```
-
-These process-level health states are not implemented by the current in-process prototype.
+M4 moves lifecycle ownership out of `plasmashell`; M6 later adds explicit health/degraded states.

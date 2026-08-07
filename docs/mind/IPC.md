@@ -5,28 +5,56 @@ SPDX-License-Identifier: MIT
 
 # Local Cognitive IPC
 
-## Transport
+## Current transport
 
-Use versioned Qt D-Bus interfaces locally and keep service logic behind a transport abstraction.
-
-## Proposed names
+M3 implements Qt D-Bus Event1.
 
 ```text
-org.cybou.Mind.Event1
-org.cybou.Mind.Identity1
-org.cybou.Mind.Intention1
-org.cybou.Mind.Presence1
+service   org.cybou.Mind.Event1
+object    /org/cybou/Mind/Event1
+interface org.cybou.Mind.Event1
 ```
 
-## Error names
+## Current Event1 methods
 
 ```text
-org.cybou.Error.InvalidEnvelope
-org.cybou.Error.MissingCause
-org.cybou.Error.MissingEvidence
-org.cybou.Error.DuplicateOutcome
-org.cybou.Error.UnsupportedVersion
-org.cybou.Error.UnavailableCapability
+Ready() -> bool
+SchemaVersion() -> int
+
+Submit(envelopeCbor) -> submitResultCbor
+
+Count() -> uint64
+Head() -> bytes
+Verify() -> uint64
+
+Recent(limit) -> envelopeListCbor
+Episode(correlationId) -> envelopeListCbor
+
+Contains(messageId) -> bool
+Contribution(messageId) -> envelopeCbor
+EvidenceFor(messageId) -> uuidListCbor
+HasOutcomeFor(causeId, originOrgan) -> bool
 ```
 
-Use typed arguments or versioned CBOR. Free-form organ-to-organ agent chat is prohibited.
+## Current signal
+
+```text
+Accepted(envelopeCbor, sequence)
+```
+
+It is emitted only after the Journal COMMIT succeeds.
+
+## CBOR versioning
+
+Envelope IPC carries `ipcVersion = 1`. It transports all CognitiveEnvelope fields but is separate
+from Journal canonical hash bytes. An IPC representation change must not alter historical hashes.
+
+## Client abstraction
+
+Organs depend on `EventStore`. `EventClient` implements that contract over Event1. This is the
+transport abstraction required by ADR-0013.
+
+## Future
+
+M4 adds versioned interfaces for the remaining process-isolated organs. Free-form organ-to-organ
+natural-language chat remains prohibited.

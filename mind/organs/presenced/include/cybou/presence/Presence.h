@@ -23,11 +23,11 @@ struct Moment {
 
 class PresenceRuntime;
 
-/// A presentation wrapper over one shared in-process Mind runtime.
+/// Current presentation wrapper.
 ///
-/// Multiple Plasma/QML Presence objects pointing at the same canonical data directory share the
-/// same Journal, Identity session, organs, and Workspace. The wrappers only provide QObject/QML
-/// lifetime and notifications. M4 will replace this in-process sharing with presenced IPC.
+/// Default/QML construction uses Event1 and therefore cybou-eventd for the canonical Journal.
+/// The explicit data-directory constructor is retained as a local test seam and uses a local
+/// Journal only for isolated tests/tools.
 class Presence : public QObject
 {
     Q_OBJECT

@@ -5,64 +5,70 @@ SPDX-License-Identifier: MIT
 
 # Cybou Architecture
 
-## Body
-
-NixOS, Plasma, devices, processes, storage, networking, and reversible system generations.
-
-## Mind
-
-Typed cognitive contributions, biography, identity, intentions, predictions, self-model,
-attention, and future faculties.
-
-## Presence
-
-The presentation boundary: Plasma UI, explanations, inspection, and user commands.
-
 ## Current
 
 ```text
-plasmashell
-├── Presence wrapper ─┐
-├── Presence wrapper ─┼── one shared in-process PresenceRuntime per canonical state root
-└── Presence wrapper ─┘        │
-                               ├── Journal v2
-                               ├── Identity
-                               ├── Intentions
-                               ├── Predictor
-                               ├── SelfModel
-                               └── Workspace
+Plasma/QML
+   │
+   ▼
+Presence wrappers
+   │
+   ▼
+shared PresenceRuntime (plasmashell)
+   ├── Identity
+   ├── Intentions
+   ├── Predictor
+   ├── SelfModel
+   ├── Workspace
+   └── EventClient
+          │
+          │ org.cybou.Mind.Event1
+          ▼
+     cybou-eventd
+          │
+          ▼
+       Journal v2
 ```
 
-Current properties:
+M3 changes the persistence boundary without pretending the remaining organs are already daemons.
 
-- QML may instantiate more than one Presence wrapper without creating more than one current Mind
-  backend for the same data root;
-- the shared runtime is process-local and dies when its last wrapper is destroyed;
-- new default state is stable under `$XDG_STATE_HOME/cybou` on Unix;
-- Journal emits `accepted` only after successful COMMIT;
-- Workspace follows that accepted stream live;
-- `rehydrate()` is a startup/recovery mechanism rather than the normal update loop;
-- organs remain in-process C++ components and share one Journal object in the Presence runtime.
+## Event boundary
 
-## Current local cognitive flow
+All current organ code depends on `EventStore`, not `Journal`.
+
+Two implementations exist:
 
 ```text
-proposal / organ action
-        ↓
-Journal v2 validation
-        ↓
-BEGIN IMMEDIATE
-        ↓
-COMMIT
-        ↓
-accepted(envelope, seq)
-        ↓
-Workspace admission + Presence notification
+Journal      low-level/local implementation, used by eventd and isolated tests
+EventClient  production runtime transport to eventd
 ```
 
-This ordering is the local precursor of the M3 eventd contract.
+The semantic order is:
 
-## Target
+```text
+proposal
+→ durable validation and COMMIT in eventd
+→ Accepted
+→ Workspace admission
+→ presentation notification
+```
+
+The same ordering established locally in M1 is preserved across D-Bus.
+
+## IPC
+
+Event1 uses:
+
+```text
+service   org.cybou.Mind.Event1
+object    /org/cybou/Mind/Event1
+interface org.cybou.Mind.Event1
+```
+
+Cognitive envelopes use versioned CBOR that is deliberately independent of canonical Journal hash
+encoding.
+
+## Target after M4
 
 ```text
 Plasma/QML
@@ -71,7 +77,7 @@ Plasma/QML
 cybou-presenced
     │
     ▼
-Typed cognitive fabric
+typed local fabric
     ├── cybou-eventd
     ├── cybou-identityd
     ├── cybou-intentiond
@@ -80,36 +86,4 @@ Typed cognitive fabric
     └── cybou-workspaced
 ```
 
-Target properties:
-
-- `eventd` exclusively owns the durable Journal;
-- accepted-contribution semantics survive the move across IPC;
-- Presence projects state rather than owning cognitive lifecycle;
-- Mind survives Plasma restart;
-- persistent resources have one process-level owner;
-- failures become explicit capability deficits.
-
-## Migration position
-
-Completed:
-
-1. typed protocol and in-process Mind baseline;
-2. causal/reference/privacy invariants;
-3. Journal v2;
-4. right-side Presence/Mind Dock;
-5. M1 shared in-process Presence runtime;
-6. stable canonical state root with legacy migration;
-7. live Workspace admission from post-COMMIT accepted events.
-
-Next:
-
-1. extract Journal ownership into `eventd`;
-2. expose the accepted stream through typed IPC;
-3. extract Presence lifecycle from `plasmashell`;
-4. isolate remaining organs;
-5. add health/degraded-mode semantics.
-
-## Naming rule
-
-A source directory ending in `d` does not prove a daemon exists. Process topology is determined by
-built executables/services and runtime tests.
+`eventd` is already a real process. The others remain future process boundaries.

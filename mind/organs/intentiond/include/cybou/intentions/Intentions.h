@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "cybou/storage/Journal.h"
+#include "cybou/events/EventStore.h"
 
 #include <QString>
 
@@ -25,7 +25,7 @@ enum class Resolution : quint8 {
 class Intentions
 {
 public:
-    explicit Intentions(Journal *journal);
+    explicit Intentions(EventStore *journal);
 
     /// Forms an intention from a contribution already present in the journal.
     QUuid form(const QString &description, const QString &trigger, const QUuid &causeId);
@@ -37,7 +37,7 @@ public:
     QString lastError() const { return m_lastError; }
 
 private:
-    Journal *m_journal;
+    EventStore *m_events;
     QString m_lastError;
 };
 

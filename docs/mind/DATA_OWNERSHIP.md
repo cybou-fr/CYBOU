@@ -5,68 +5,37 @@ SPDX-License-Identifier: MIT
 
 # Data Ownership
 
-One persistent resource should have one authoritative owner.
-
 ## Current
 
-Within one `plasmashell` process and canonical state root, multiple Presence surface wrappers share
-one `PresenceRuntime`.
+| Resource | Current owner |
+|---|---|
+| canonical `journal.db` | `cybou-eventd` |
+| identity JSON | in-process Identity component |
+| transient Workspace | in-process Workspace component |
+| presentation wrappers | `plasmashell` |
+| QML view state | Plasma applet |
 
-```text
-Presence wrappers
-       ↓
-shared PresenceRuntime
-       ├── one Journal object
-       ├── one Identity object/session
-       ├── one Intentions object
-       ├── one Predictor object
-       ├── one SelfModel object
-       └── one Workspace object
-```
+The default production Presence reaches Journal only through Event1.
 
-This closes duplicate ownership caused by multiple QML Presence instances in the current
-architecture.
+The explicit temporary/local Presence constructor is a test/tool seam and does not represent the
+installed QML topology.
 
-It is not yet process-level ownership: there is no `eventd`/`presenced` daemon.
-
-## Current persistent location
-
-On Unix:
+## Persistent location
 
 ```text
 $XDG_STATE_HOME/cybou
 ```
 
-with fallback:
+with the standard `~/.local/state/cybou` fallback on Unix.
 
-```text
-~/.local/state/cybou
-```
+Legacy migration still runs before the first Event1 activation so eventd never opens a newly
+created canonical Journal ahead of the one-time M1 state move.
 
-The path is independent of the hosting Qt application's name.
+## Target after M4
 
-Presence migrates the former AppDataLocation-derived Cybou directory into this root before opening
-the default Journal. Existing target entries are never overwritten; collisions fail closed.
-
-The desktop `desktop-layout-version` marker may coexist in the same Cybou state root and is
-preserved during legacy Mind migration.
-
-## Target owners
-
-| Resource | Authoritative process |
+| Resource | Target owner |
 |---|---|
 | `journal.db` | `cybou-eventd` |
 | identity state | `cybou-identityd` |
 | transient workspace | `cybou-workspaced` |
 | presentation snapshots | `cybou-presenced` |
-| QML view state | Plasma applet |
-
-Target runtime/cache roots remain `$XDG_RUNTIME_DIR/cybou` and `$XDG_CACHE_HOME/cybou`.
-
-## Invariants
-
-- QML does not open cognitive databases.
-- Opening another Presence surface does not create a second current backend/session.
-- A UI host rename must not move or fork persistent Mind state.
-- A legacy/canonical state collision is an error, not an implicit merge policy.
-- M3 must not create a second Journal owner while the old owner remains active.

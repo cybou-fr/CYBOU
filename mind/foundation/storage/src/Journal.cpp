@@ -46,7 +46,7 @@ Journal::Journal(
     const QString &path,
     const QString &connectionName,
     QObject *parent)
-    : QObject(parent)
+    : EventStore(parent)
     , m_connectionName(connectionName.isEmpty() ? defaultConnectionName() : connectionName)
     , m_path(path == QLatin1String(":memory:") ? path : QFileInfo(path).absoluteFilePath())
 {

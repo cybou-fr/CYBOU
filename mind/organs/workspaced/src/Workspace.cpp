@@ -3,8 +3,6 @@
 
 #include "cybou/workspace/Workspace.h"
 
-#include <QSet>
-
 #include <algorithm>
 #include <cmath>
 
@@ -42,34 +40,37 @@ double attentionWeight(ContributionKind kind)
 QStringList Coalition::organs() const
 {
     QStringList result;
-    for (const auto &e : members) {
-        if (!e.originOrgan.isEmpty() && !result.contains(e.originOrgan)) {
-            result.append(e.originOrgan);
+    for (const auto &envelope : members) {
+        if (!envelope.originOrgan.isEmpty()
+            && !result.contains(envelope.originOrgan)) {
+            result.append(envelope.originOrgan);
         }
     }
     return result;
 }
 
-Workspace::Workspace(Journal *journal, int capacity, QObject *parent)
+Workspace::Workspace(
+    EventStore *events,
+    int capacity,
+    QObject *parent)
     : QObject(parent)
-    , m_journal(journal)
+    , m_events(events)
     , m_capacity(std::max(1, capacity))
 {
-    if (m_journal) {
-        // Journal emits only after COMMIT. This connection is intentionally installed before
-        // Presence subscribes, so a surface observing the same accepted event reads an already
-        // updated Workspace.
+    if (m_events) {
         connect(
-            m_journal,
-            &Journal::accepted,
+            m_events,
+            &EventStore::accepted,
             this,
-            [this](const CognitiveEnvelope &envelope, quint64) { accept(envelope); });
+            [this](const CognitiveEnvelope &envelope, quint64) {
+                accept(envelope);
+            });
     }
 }
 
 bool Workspace::publish(const CognitiveEnvelope &envelope)
 {
-    return m_journal && m_journal->append(envelope) != 0;
+    return m_events && m_events->append(envelope) != 0;
 }
 
 void Workspace::accept(const CognitiveEnvelope &envelope)
@@ -95,21 +96,26 @@ void Workspace::accept(const CognitiveEnvelope &envelope)
 
 void Workspace::rehydrate()
 {
-    if (!m_journal) {
+    if (!m_events) {
         return;
     }
 
-    m_moment = m_journal->recent(m_capacity);
+    m_moment = m_events->recent(m_capacity);
     reevaluateFocus();
 }
 
-double Workspace::salienceOf(const Coalition &coalition, const QDateTime &now) const
+double Workspace::salienceOf(
+    const Coalition &coalition,
+    const QDateTime &now) const
 {
     double total = 0.0;
-    for (const auto &e : coalition.members) {
-        const double ageSeconds = std::max(0.0, e.wallTime.msecsTo(now) / 1000.0);
-        const double recency = std::pow(0.5, ageSeconds / kHalfLifeSeconds);
-        total += attentionWeight(e.kind) * e.confidence * recency;
+    for (const auto &envelope : coalition.members) {
+        const double ageSeconds =
+            std::max(0.0, envelope.wallTime.msecsTo(now) / 1000.0);
+        const double recency =
+            std::pow(0.5, ageSeconds / kHalfLifeSeconds);
+        total +=
+            attentionWeight(envelope.kind) * envelope.confidence * recency;
     }
 
     const int voices = coalition.organs().size();
@@ -127,30 +133,34 @@ QList<Coalition> Workspace::coalitions(const QDateTime &nowOrNull) const
     for (auto it = m_moment.crbegin(); it != m_moment.crend(); ++it) {
         const QUuid key =
             it->correlationId.isNull() ? it->messageId : it->correlationId;
+
         if (!indexOf.contains(key)) {
-            Coalition c;
-            c.correlationId = key;
+            Coalition coalition;
+            coalition.correlationId = key;
             indexOf.insert(key, result.size());
-            result.append(c);
+            result.append(coalition);
         }
 
-        Coalition &c = result[indexOf.value(key)];
-        c.members.append(*it);
-        if (!c.latest.isValid() || it->wallTime > c.latest) {
-            c.latest = it->wallTime;
+        Coalition &coalition = result[indexOf.value(key)];
+        coalition.members.append(*it);
+        if (!coalition.latest.isValid() || it->wallTime > coalition.latest) {
+            coalition.latest = it->wallTime;
         }
     }
 
-    for (Coalition &c : result) {
-        c.salience = salienceOf(c, now);
+    for (Coalition &coalition : result) {
+        coalition.salience = salienceOf(coalition, now);
     }
 
-    std::stable_sort(result.begin(), result.end(), [](const Coalition &a, const Coalition &b) {
-        if (a.salience != b.salience) {
-            return a.salience > b.salience;
-        }
-        return a.latest > b.latest;
-    });
+    std::stable_sort(
+        result.begin(),
+        result.end(),
+        [](const Coalition &a, const Coalition &b) {
+            if (a.salience != b.salience) {
+                return a.salience > b.salience;
+            }
+            return a.latest > b.latest;
+        });
 
     return result;
 }

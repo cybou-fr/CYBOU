@@ -5,9 +5,9 @@ SPDX-License-Identifier: MIT
 
 # Testing Strategy
 
-## Current CTest suites
+## Current suites
 
-The current Mind package runs ten suites:
+The Mind package runs eleven suites:
 
 ```text
 protocol
@@ -20,79 +20,45 @@ workspace
 presence
 presence-extended
 m1-runtime
+eventd-integration
 ```
 
-## M1 runtime invariants
+## M3 integration test
 
-`m1-runtime` specifically proves:
+`eventd-integration` is executed through `dbus-run-session`, giving it a private user bus.
+
+It proves:
 
 ```text
-Journal accepted event appears only after successful COMMIT
-failed append never reaches the accepted stream
-direct Journal append updates Workspace immediately
-Workspace accepted admission is idempotent
-two Presence surfaces for one state root share one runtime/session
-commands from one Presence surface are visible to another
-a new runtime session starts only after all old wrappers are gone
-persistent root follows XDG_STATE_HOME/cybou on Unix
-legacy state migrates while preserving an existing desktop marker
-legacy/canonical collisions fail closed without overwriting either side
+eventd registers Event1
+Event1 reports Journal schema v2
+Submit -> COMMIT -> Accepted
+invalid Submit -> no Accepted
+Recent / Contribution / Count / Verify round-trip over IPC
+default Presence uses Event1
+two default Presence surfaces share one session/runtime
+second eventd cannot acquire the service name
+eventd failure does not trigger a local SQLite fallback
 ```
 
-## Existing Journal/protocol invariants
+The existing unit/domain tests continue using direct temporary Journals through the same
+`EventStore` contract. That keeps domain tests fast while production topology is integration-tested
+separately.
 
-The other suites continue to protect protocol structure, cause/evidence integrity, privacy,
-Journal migration/hash integrity, domain lifecycles, Workspace behavior, and Presence projections.
-
-## Pending runtime invariants
-
-These belong to M3/M4 and later:
-
-```text
-eventd is the only process allowed to write journal.db
-accepted events cross typed IPC without reordering
-Mind remains alive after plasmashell restart
-Presence reconnects to presenced
-individual organ failure produces a capability deficit
-process restart reconstructs owned projections
-```
-
-## Local validation
+## Build
 
 ```bash
 nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
 ```
 
-For a direct CMake build:
+Expected suite count after M3:
 
-```bash
-nix develop
-cmake -S mind -B build/dev -G Ninja -DBUILD_TESTING=ON
-cmake --build build/dev
-ctest --test-dir build/dev --output-on-failure
+```text
+11/11
 ```
 
-Repository validation:
-
-```bash
-nix build --print-build-logs \
-  .#checks.x86_64-linux.formatting \
-  .#checks.x86_64-linux.reuse \
-  .#checks.x86_64-linux.package-metadata \
-  .#packages.x86_64-linux.cybou-mind \
-  .#packages.x86_64-linux.cybou-presence-applet
-
-nix fmt
-git diff --exit-code
-```
-
-Full/tag validation remains:
+Full repository validation remains:
 
 ```bash
 nix flake check --print-build-logs
 ```
-
-## Definition of Done
-
-A runtime milestone is complete when the behavior is represented by code, focused tests, relevant
-Nix package builds, and documentation that distinguishes Current from Target.

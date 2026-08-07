@@ -5,6 +5,7 @@
 // quietly become a different one.
 
 #include "cybou/identity/Identity.h"
+#include "cybou/storage/Journal.h"
 
 #include <QFile>
 #include <QTemporaryDir>

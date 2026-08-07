@@ -5,69 +5,37 @@ SPDX-License-Identifier: MIT
 
 # Cognitive Journal
 
-## Purpose
+## Current owner
 
-The Journal is Cybou's append-only biography.
+`cybou-eventd` is the normal production owner of `journal.db`.
 
-## Ownership
+The remaining organs do not link their domain APIs to Journal. They submit and query through the
+`EventStore` abstraction, whose production implementation is `EventClient`.
 
-**Current:** one Journal object is shared by the current in-process Presence runtime. New Presence
-surface wrappers for the same state root reuse that runtime.
-
-**Target:** only `cybou-eventd` opens the durable Journal for writes.
-
-## Current versions
-
-- database schema: `PRAGMA user_version = 2`;
-- new envelope schema: `2`;
-- new row hash: `2`;
-- migrated historical rows: envelope/hash version `1`.
-
-## Append order
+## Durable append
 
 ```text
-structural validation
+Event1 Submit
+→ decode versioned CBOR
+→ Journal::append
+→ structural/reference/privacy validation
 → BEGIN IMMEDIATE
-→ reject duplicate messageId
-→ verify cause/evidence existence and privacy
-→ reject an existing terminal Outcome
-→ read tail and determine sequence
-→ calculate canonical v2 hash
+→ assign sequence/hash
 → insert contribution/evidence
 → COMMIT
-→ emit accepted(envelope, sequence)
+→ Journal::accepted
+→ Event1 Accepted
 ```
 
-Any failure before COMMIT rolls back and emits no accepted event.
+No accepted signal is emitted on rollback.
 
-## Accepted contribution event
+## Journal v2
 
-`Journal::accepted` is the current local runtime boundary between durability and live cognition.
+Journal v2 behavior from M2 is unchanged: schema/hash versions, v1 migration and backup, canonical
+hashing, normalized evidence, reference/privacy validation, writer serialization, and terminal
+Outcome uniqueness remain inside the low-level Journal implementation.
 
-It exists so consumers never infer acceptance from an attempted proposal:
+## Test seam
 
-```text
-append returned 0
-→ no accepted signal
-→ no Workspace admission
-```
-
-Workspace consumes this event today. M3 should preserve the semantics while moving the durable
-append behind `eventd`/IPC.
-
-## Hash v2
-
-The hash binds sequence, previous hash, and canonical envelope bytes including schema, IDs,
-origin, kind, wall/monotonic/logical time, confidence, evidence, payload, privacy, and capability
-scope.
-
-## Migration
-
-Opening v1 creates `journal.db.v1.bak`, then migrates transactionally. V1 hashes are never
-rewritten. Migration fails closed for malformed legacy evidence, duplicate terminal Outcomes,
-damaged legacy history, partial schemas, or unsupported newer schema versions.
-
-## Remaining architecture step
-
-M3 replaces the in-process Journal owner with `cybou-eventd`; the accepted-event contract is
-intended to survive that extraction.
+Unit tests may instantiate a Journal directly with a temporary path. This is not the default
+production Presence path and does not weaken eventd ownership of the canonical user Journal.

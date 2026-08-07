@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/predictor/Predictor.h"
+#include "cybou/storage/Journal.h"
 
 #include <QTemporaryDir>
 #include <QTest>

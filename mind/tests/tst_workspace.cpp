@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/workspace/Workspace.h"
+#include "cybou/storage/Journal.h"
 
 #include <QSignalSpy>
 #include <QTemporaryDir>

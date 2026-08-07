@@ -28,19 +28,19 @@ QString subjectOf(const QCborMap &payload)
 
 } // namespace
 
-Predictor::Predictor(Journal *journal)
-    : m_journal(journal)
+Predictor::Predictor(EventStore *journal)
+    : m_events(journal)
 {
 }
 
 QList<Predictor::PredictionSample> Predictor::history(const QString &subject) const
 {
     QList<PredictionSample> values;
-    if (!m_journal) {
+    if (!m_events) {
         return values;
     }
 
-    const auto all = m_journal->recent(0);
+    const auto all = m_events->recent(0);
     for (const auto &e : all) {
         const bool measured = e.kind == ContributionKind::Outcome
                               || e.kind == ContributionKind::Observation;
@@ -68,7 +68,7 @@ bool Predictor::observe(const QString &subject, double value)
 {
     m_lastError.clear();
 
-    if (!m_journal || subject.trimmed().isEmpty() || !std::isfinite(value)) {
+    if (!m_events || subject.trimmed().isEmpty() || !std::isfinite(value)) {
         m_lastError = QStringLiteral("an observation needs a journal, a subject, and a value");
         return false;
     }
@@ -87,8 +87,8 @@ bool Predictor::observe(const QString &subject, double value)
     payload[QStringLiteral("actual")] = value;
     e.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_journal->append(e) == 0) {
-        m_lastError = m_journal->lastError();
+    if (m_events->append(e) == 0) {
+        m_lastError = m_events->lastError();
         return false;
     }
     return true;
@@ -101,7 +101,7 @@ Forecast Predictor::predict(const QString &subject, const QUuid &correlationId)
     Forecast forecast;
     forecast.subject = subject.trimmed();
 
-    if (!m_journal || forecast.subject.isEmpty()) {
+    if (!m_events || forecast.subject.isEmpty()) {
         m_lastError = QStringLiteral("a forecast needs a journal and a subject");
         return forecast;
     }
@@ -148,8 +148,8 @@ Forecast Predictor::predict(const QString &subject, const QUuid &correlationId)
     payload[QStringLiteral("samples")] = forecast.samples;
     e.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_journal->append(e) == 0) {
-        m_lastError = m_journal->lastError();
+    if (m_events->append(e) == 0) {
+        m_lastError = m_events->lastError();
         return Forecast{{}, forecast.subject, 0.0, 0.0, 0.0, forecast.samples};
     }
 
@@ -161,18 +161,18 @@ bool Predictor::settle(const QUuid &forecastId, double actual)
 {
     m_lastError.clear();
 
-    if (!m_journal || forecastId.isNull() || !std::isfinite(actual)) {
+    if (!m_events || forecastId.isNull() || !std::isfinite(actual)) {
         m_lastError = QStringLiteral("settling needs a journal, a forecast, and an actual value");
         return false;
     }
 
-    const auto forecast = m_journal->contribution(forecastId);
+    const auto forecast = m_events->contribution(forecastId);
     if (!forecast || forecast->kind != ContributionKind::Prediction
         || forecast->originOrgan != QLatin1String(kOrgan)) {
         m_lastError = QStringLiteral("no such forecast in the journal");
         return false;
     }
-    if (m_journal->hasOutcomeFor(forecastId, QString::fromLatin1(kOrgan))) {
+    if (m_events->hasOutcomeFor(forecastId, QString::fromLatin1(kOrgan))) {
         m_lastError = QStringLiteral("the forecast is already settled");
         return false;
     }
@@ -198,8 +198,8 @@ bool Predictor::settle(const QUuid &forecastId, double actual)
     payload[QStringLiteral("error")] = actual - estimate;
     e.payloadCbor = payload.toCborValue().toCbor();
 
-    if (m_journal->append(e) == 0) {
-        m_lastError = m_journal->lastError();
+    if (m_events->append(e) == 0) {
+        m_lastError = m_events->lastError();
         return false;
     }
     return true;
@@ -209,14 +209,14 @@ Calibration Predictor::calibration(const QString &subject) const
 {
     Calibration calibration;
     calibration.subject = subject;
-    if (!m_journal) {
+    if (!m_events) {
         return calibration;
     }
 
     double absolute = 0.0;
     double signedSum = 0.0;
 
-    for (const auto &e : m_journal->recent(0)) {
+    for (const auto &e : m_events->recent(0)) {
         if (e.kind != ContributionKind::Outcome || e.originOrgan != QLatin1String(kOrgan)) {
             continue;
         }
@@ -241,12 +241,12 @@ Calibration Predictor::calibration(const QString &subject) const
 QList<Calibration> Predictor::allCalibrations() const
 {
     QList<Calibration> result;
-    if (!m_journal) {
+    if (!m_events) {
         return result;
     }
 
     QSet<QString> subjects;
-    for (const auto &e : m_journal->recent(0)) {
+    for (const auto &e : m_events->recent(0)) {
         if (e.kind == ContributionKind::Outcome && e.originOrgan == QLatin1String(kOrgan)) {
             const QString subject = subjectOf(payloadOf(e));
             if (!subject.isEmpty()) {

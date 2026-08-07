@@ -118,6 +118,7 @@
             pkgs.ninja
             pkgs.gdb
             pkgs.pkg-config
+            pkgs.dbus
 
             # Qt 6. qtdeclarative brings QML; qttools brings Designer and the profiler.
             pkgs.qt6.qtbase

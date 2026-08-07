@@ -7,160 +7,110 @@ SPDX-License-Identifier: MIT
 
 Status date: 2026-08-07.
 
-This file describes implemented behavior only. Target architecture belongs in the architecture,
-roadmap, and ADR documents and must be labeled accordingly.
+## Implemented milestones
 
-## Implemented
-
-### Body and desktop
-
-- NixOS 26.05 / KDE Plasma 6 / Wayland foundation;
-- Cybou Horizon branding;
-- VM, ISO, and Hyper-V development targets;
-- first-login layout versioning;
-- right-side Mind Dock;
-- static KDE package and QML API validation.
-
-### Mind runtime
-
-- in-process Identity, Intentions, Predictor, SelfModel, Workspace, Journal, and Presence;
-- multiple Presence QObject/QML surfaces for one canonical data root share one in-process runtime;
-- a second surface does not create a second Journal or increment the current Identity session;
-- the shared runtime remains alive while at least one Presence wrapper still references it;
-- after all wrappers are gone, a later runtime begins a new Identity session normally.
-
-### Live accepted-contribution path
-
-`Journal::append()` now emits:
-
-```text
-accepted(envelope, sequence)
-```
-
-only after a successful COMMIT.
-
-Workspace subscribes to that event and admits the contribution idempotently. Therefore direct
-writes from Identity, Intentions, Predictor, SelfModel, or Presence update the live Workspace
-without rereading recent Journal history after each action.
-
-Startup/recovery still uses `Workspace::rehydrate()`.
-
-### Persistent state root
-
-On Unix, the default Mind root is:
-
-```text
-$XDG_STATE_HOME/cybou
-```
-
-with `~/.local/state/cybou` as the XDG fallback.
-
-Before opening the canonical Journal, Presence checks the previous host-derived AppDataLocation
-root. Legacy entries are migrated into the canonical root without overwriting existing target
-entries. A collision fails closed. Existing entries such as `desktop-layout-version` are
-preserved.
-
-Explicit data directories passed by tests/tools remain supported.
-
-### Journal v2
-
-- SQLite database schema v2;
-- canonical hash v2;
-- v1 hash preservation;
-- v1→v2 backup/migration;
-- normalized evidence;
-- cause/evidence existence validation;
-- privacy inheritance;
-- `BEGIN IMMEDIATE` writer serialization;
-- terminal Outcome uniqueness.
+- M1 — shared Presence runtime, stable state root, live accepted-contribution Workspace;
+- M2 — Journal v2;
+- M3 — `cybou-eventd` single production Journal writer and Event1 IPC.
 
 ## Current process topology
 
 ```text
-plasmashell
-├── Presence surface A ─┐
-├── Presence surface B ─┼── shared PresenceRuntime
-└── Presence surface N ─┘        ├── Journal v2
-                                 ├── Identity
-                                 ├── Intentions
-                                 ├── Predictor
-                                 ├── SelfModel
-                                 └── Workspace
+user D-Bus
+│
+├── cybou-eventd
+│     └── Journal v2
+│
+└── plasmashell
+      ├── Presence surface(s)
+      └── shared PresenceRuntime
+            ├── EventClient ────────────────┐
+            ├── Identity                   │
+            ├── Intentions                 │ EventStore
+            ├── Predictor                  │
+            ├── SelfModel                  │
+            └── Workspace ◄────────────────┘
 ```
 
-The shared runtime is process-local. There is still no `presenced` or `eventd` daemon.
+The daemon-like source directory names for Identity/Intentions/Predictor/Self/Workspace/Presence
+still do not mean those components are separate processes. `cybou-eventd` is the first real
+process-isolated Mind service.
 
-## Current event ordering
+## Journal ownership
+
+Normal default/QML Presence no longer opens `journal.db`.
+
+Organs depend on `EventStore`. The default runtime supplies `EventClient`, which talks to:
 
 ```text
-organ / Presence
-       │
-       ▼
- Journal::append
-       │
- validate + BEGIN IMMEDIATE
-       │
-      COMMIT
-       │
-       ▼
- Journal::accepted
-       │
-       ├──► Workspace::accept
-       │
-       └──► Presence wrappers changed()
+service   org.cybou.Mind.Event1
+object    /org/cybou/Mind/Event1
+interface org.cybou.Mind.Event1
 ```
 
-Workspace installs its Journal subscription when it is created, before Presence wrappers
-subscribe, so a surface handling the accepted event sees the updated Workspace.
+`cybou-eventd` owns the actual `Journal` object and SQLite connection.
+
+The explicit `Presence(dataDir)` constructor remains a local test/tool seam and may instantiate a
+Journal for isolated temporary directories. It is not the production QML path.
+
+## Accepted ordering
+
+```text
+proposal
+→ EventClient
+→ Event1 Submit
+→ eventd
+→ Journal validation
+→ BEGIN IMMEDIATE
+→ COMMIT
+→ Journal accepted
+→ Event1 Accepted
+→ EventClient accepted
+→ Workspace accept
+→ Presence changed
+```
+
+A rejected or rolled-back proposal never produces `Accepted`.
+
+## State migration
+
+The existing M1 legacy-state migration remains in Presence bootstrap and runs before the first
+Event1 call. This is intentional: the first Event1 call may D-Bus-activate eventd, so legacy files
+must be moved to `$XDG_STATE_HOME/cybou` before eventd opens the canonical Journal.
+
+## D-Bus activation
+
+The Nix package installs:
+
+```text
+share/dbus-1/services/org.cybou.Mind.Event1.service
+```
+
+The first Event1 method call can therefore start `cybou-eventd` without coupling it to Plasma
+startup ordering.
 
 ## Automated tests
 
-The Mind package now has ten CTest suites:
+The Mind package now runs eleven CTest suites. The new `eventd-integration` suite runs under its own
+`dbus-run-session` and checks:
 
-```text
-protocol
-journal
-identity
-intentions
-predictor
-selfmodel
-workspace
-presence
-presence-extended
-m1-runtime
-```
+- Event1 startup and schema version;
+- post-COMMIT accepted delivery;
+- rejection produces no accepted signal;
+- query round trips;
+- default Presence uses eventd and preserves one shared session;
+- a second eventd cannot own the same bus service;
+- after eventd dies, default Presence/EventClient do not silently fall back to local SQLite.
 
-The M1 suite specifically covers:
+## Current limitations
 
-- accepted events only after successful durable append;
-- direct Journal writes becoming visible to Workspace immediately;
-- idempotent Workspace admission;
-- two Presence surfaces sharing one Identity session/runtime;
-- runtime lifetime across multiple surfaces;
-- XDG state-root selection;
-- legacy state merge and collision fail-closed behavior.
+- Identity, Intentions, Predictor, SelfModel, Workspace, and Presence still run in `plasmashell`;
+- Identity JSON state is still written by the in-process Identity component;
+- Event1 reads are currently synchronous and can be chatty for large projections;
+- explicit process health/degraded-mode projection is not implemented;
+- same-user D-Bus authorization/capability policy is not yet a security boundary;
+- remaining organ process isolation is M4.
 
-## Not implemented
+## Next milestone
 
-- `cybou-eventd`;
-- an exclusive process-level Journal owner;
-- stable local D-Bus contracts;
-- process-isolated organs;
-- cross-process `presenced`;
-- Mind survival across `plasmashell` restart;
-- process-level health/degraded-mode reporting;
-- inter-node distribution;
-- language-model faculties;
-- authorized autonomous operating-system mutation.
-
-## Milestone position
-
-- **M0:** fast gate green; heavy full/VM validation remains a separate gate.
-- **M1:** complete for the current in-process architecture.
-- **M2:** complete.
-- **M3:** next — extract exclusive Journal ownership into `eventd`.
-
-## Documentation rule
-
-Current claims require code/tests. Future behavior must be labeled Target, Proposed, Planned, or
-Pending.
+M4 — process-isolated organs and `presenced`.

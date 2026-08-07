@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include "cybou/storage/Journal.h"
+#include "cybou/events/EventStore.h"
 
 #include <QDateTime>
 #include <QString>
@@ -73,7 +73,7 @@ public:
     /// only the pointer that says whose biography it is.
     // РУС: statePath — маленький файл рядом с журналом. Журнал — биография, а файл —
     // РУС: только указатель на то, чья это биография.
-    Identity(const QString &statePath, Journal *journal);
+    Identity(const QString &statePath, EventStore *journal);
 
     /// Loads existing state, or creates it on first run. Increments the session counter and
     /// writes one contribution to the journal either way, because "I woke up" is an event and
@@ -112,7 +112,7 @@ private:
     void record(ContributionKind kind, const QString &summary);
 
     QString m_statePath;
-    Journal *m_journal;
+    EventStore *m_events;
     IdentityState m_state;
     // РУС: m_born — true, если текущий запуск создал идентичность, а не продолжил.
     bool m_born{false};

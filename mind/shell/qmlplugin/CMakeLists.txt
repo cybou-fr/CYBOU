@@ -1,9 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# The QML type the panel instantiates. In-process on purpose for the current prototype:
-# no daemon, no bus, no listener. The Plasma package owns all visual QML files; this
-# module exports only the C++ Presence type under org.cybou.presence.
+# The QML surface still instantiates Presence in plasmashell, but Presence now talks to the
+# process-isolated cybou-eventd over Event1. Remaining organs move out in M4.
 
 qt_add_qml_module(cybou-presence-qml
     URI org.cybou.presence
@@ -17,8 +16,6 @@ qt_add_qml_module(cybou-presence-qml
 
 target_link_libraries(cybou-presence-qml PRIVATE Qt6::Qml cybou-presence)
 
-# Installed only when a destination is given, so a plain developer build stays in the build
-# tree and never writes outside it.
 if(DEFINED CYBOU_QML_INSTALL_DIR)
     set(_dest "${CYBOU_QML_INSTALL_DIR}/org/cybou/presence")
     install(TARGETS cybou-presence-qml LIBRARY DESTINATION "${_dest}")

@@ -5,67 +5,47 @@ SPDX-License-Identifier: MIT
 
 # Roadmap
 
-Status snapshot: 2026-08-07.
-
-Milestone numbers describe architectural dependencies. Implementation can land out of numeric
-order.
-
 ## M0 — Green Build
 
-**Status: In progress / fast gate green.**
-
-Core C++/QML/package gates are green. The tag-only full `nix flake check` / VM gate remains the
-heavy validation path.
+**Status: ongoing gate discipline.**
 
 ## M1 — One Presence, One Journal
 
-**Status: Complete for the current in-process runtime.**
+**Status: Complete for the in-process runtime.**
 
-Implemented:
-
-- multiple Presence surface objects for the same state root share one in-process Mind runtime;
-- one shared Journal/Identity/organ/Workspace object graph exists for those surfaces;
-- opening another Presence surface does not increment the Identity session;
-- Journal emits an accepted-contribution event only after successful COMMIT;
-- Workspace consumes every accepted contribution live, including direct organ `Journal::append()`;
-- Workspace no longer requires a full rehydrate after each normal action;
-- the default persistent Mind root is stable at `$XDG_STATE_HOME/cybou` on Unix;
-- legacy host-derived Presence state is migrated fail-closed without overwriting canonical state;
-- focused M1 runtime tests cover shared Presence, live Workspace, accepted-after-commit, and state
-  migration.
-
-Scope note: this is one backend inside the current `plasmashell` process. Session-wide
-cross-process ownership belongs to `presenced`/M4.
+Shared Presence runtime, live accepted-contribution Workspace, and stable persistent state root.
 
 ## M2 — Journal v2
 
 **Status: Complete.**
 
-Schema/hash versions, canonical encoding, v1→v2 migration, reference/privacy validation,
-serialized writes, normalized evidence, and terminal-Outcome uniqueness are implemented.
+Versioned schema/hash, canonical encoding, migration, validation, serialized writes, normalized
+evidence, and terminal Outcome constraints.
 
 ## M3 — eventd
 
-**Status: Next.**
+**Status: Complete.**
 
-Make `cybou-eventd` the exclusive Journal owner.
+Implemented:
 
-The M1 semantic boundary is intentionally reusable:
-
-```text
-proposal
-→ durable validation/COMMIT
-→ accepted contribution
-→ Workspace / Presence projections
-```
-
-M3 changes ownership and transport; it should not change that ordering.
+- `cybou-eventd` executable;
+- normal production ownership of `journal.db` moved out of `plasmashell`;
+- `EventStore` transport abstraction;
+- `EventClient` Qt D-Bus client;
+- versioned `org.cybou.Mind.Event1` interface;
+- versioned CBOR CognitiveEnvelope transport;
+- query IPC needed by current organs;
+- post-COMMIT `Accepted` signal bridged from Journal to D-Bus and back to Workspace;
+- D-Bus service activation from the Nix package;
+- integration tests under an isolated session bus;
+- no silent local-SQLite fallback when eventd is unavailable.
 
 ## M4 — Process-Isolated Organs
 
-**Status: Planned.**
+**Status: Next.**
 
-`identityd`, `intentiond`, `predictord`, `selfd`, `workspaced`, and `presenced`.
+Extract Identity, Intentions, Predictor, SelfModel, Workspace, and Presence into user services.
+`presenced` becomes the shared presentation backend and survives Plasma surface restarts.
 
 ## M5 — Continuity
 
@@ -95,5 +75,4 @@ Language is a faculty, not identity or executor.
 
 **Status: Planned.**
 
-Typed proposal, criticism, authorization, Nix build/test, confirmation, execution, outcome, and
-rollback.
+Typed proposal, criticism, authorization, build/test, confirmation, execution, outcome, rollback.

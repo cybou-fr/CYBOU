@@ -1,7 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
-#
-# The global workspace. Orders what organs offered; decides nothing itself.
 
 qt_add_library(cybou-workspace STATIC
     src/Workspace.cpp
@@ -13,5 +11,5 @@ target_include_directories(cybou-workspace
 )
 
 target_link_libraries(cybou-workspace
-    PUBLIC Qt6::Core cybou-storage
+    PUBLIC Qt6::Core cybou-events
 )

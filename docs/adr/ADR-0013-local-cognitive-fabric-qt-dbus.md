@@ -7,20 +7,42 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
-Independent local organs need typed IPC integrated with Qt.
+Process-isolated local Mind components need inspectable typed IPC integrated with Qt.
+
+M3 is the first concrete process boundary: `cybou-eventd`.
 
 ## Decision
 
-Use versioned Qt D-Bus interfaces and versioned CBOR where extensibility is needed. Service logic depends on a transport abstraction.
+Use versioned Qt D-Bus interfaces locally and versioned CBOR where an extensible typed payload is
+needed. Domain logic depends on a transport abstraction rather than directly on QDBus classes.
+
+The first implemented interface is:
+
+```text
+org.cybou.Mind.Event1
+```
+
+CognitiveEnvelope transport is CBOR `ipcVersion = 1`. Primitive query parameters/results remain
+typed D-Bus values.
+
+Current organs depend on `EventStore`; `EventClient` is the D-Bus implementation.
 
 ## Consequences
 
-Local integration is inspectable and can later be bridged to a network transport.
+Local IPC is inspectable, versioned, and separated from domain logic.
+
+The CBOR IPC encoding is intentionally independent of canonical Journal hashing.
+
+M4 can add Identity/Intention/Prediction/Self/Workspace/Presence interfaces without changing the
+transport decision.
 
 ## Alternatives Considered
 
 Free-form natural-language organ chat was rejected.
+
+Unversioned JSON blobs were rejected because they provide a weaker protocol boundary and invite
+silent schema drift.

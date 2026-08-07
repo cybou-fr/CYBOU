@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/self/SelfModel.h"
+#include "cybou/storage/Journal.h"
 
 #include <QSqlDatabase>
 #include <QSqlQuery>

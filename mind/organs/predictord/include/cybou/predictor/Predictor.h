@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "cybou/storage/Journal.h"
+#include "cybou/events/EventStore.h"
 
 namespace cybou {
 
@@ -26,7 +26,7 @@ struct Calibration {
 class Predictor
 {
 public:
-    explicit Predictor(Journal *journal);
+    explicit Predictor(EventStore *journal);
 
     bool observe(const QString &subject, double value);
     Forecast predict(const QString &subject, const QUuid &correlationId = QUuid());
@@ -46,7 +46,7 @@ private:
 
     QList<PredictionSample> history(const QString &subject) const;
 
-    Journal *m_journal;
+    EventStore *m_events;
     QString m_lastError;
 };
 

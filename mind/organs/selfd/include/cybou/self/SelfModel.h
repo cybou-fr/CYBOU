@@ -6,7 +6,7 @@
 #include "cybou/identity/Identity.h"
 #include "cybou/intentions/Intentions.h"
 #include "cybou/predictor/Predictor.h"
-#include "cybou/storage/Journal.h"
+#include "cybou/events/EventStore.h"
 
 namespace cybou {
 
@@ -33,7 +33,7 @@ struct SelfReport {
 class SelfModel
 {
 public:
-    SelfModel(Journal *journal, Identity *identity, Intentions *intentions, Predictor *predictor);
+    SelfModel(EventStore *journal, Identity *identity, Intentions *intentions, Predictor *predictor);
 
     /// Records a self-assessment caused by an existing contribution.
     SelfReport assess(const QUuid &causeId);
@@ -46,7 +46,7 @@ public:
 private:
     QStringList testedSubjects() const;
 
-    Journal *m_journal;
+    EventStore *m_events;
     Identity *m_identity;
     Intentions *m_intentions;
     Predictor *m_predictor;

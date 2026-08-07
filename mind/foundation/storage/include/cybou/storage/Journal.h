@@ -3,9 +3,8 @@
 
 #pragma once
 
-#include "cybou/protocol/CognitiveEnvelope.h"
+#include "cybou/events/EventStore.h"
 
-#include <QObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QString>
@@ -18,7 +17,11 @@ inline constexpr int kCurrentDatabaseSchemaVersion = 2;
 inline constexpr int kLegacyJournalHashVersion = 1;
 inline constexpr int kCurrentJournalHashVersion = 2;
 
-class Journal : public QObject
+/// Low-level SQLite implementation.
+///
+/// Production organs do not depend on this class after M3. cybou-eventd owns the production
+/// instance; tests may still instantiate Journal directly behind the EventStore contract.
+class Journal : public EventStore
 {
     Q_OBJECT
 
@@ -32,31 +35,25 @@ public:
     Journal(const Journal &) = delete;
     Journal &operator=(const Journal &) = delete;
 
-    bool isOpen() const;
-    QString lastError() const;
-    int databaseSchemaVersion() const;
+    bool isOpen() const override;
+    QString lastError() const override;
+    int databaseSchemaVersion() const override;
 
-    /// Persist one contribution. A non-zero sequence means the transaction committed.
-    quint64 append(const CognitiveEnvelope &envelope);
+    quint64 append(const CognitiveEnvelope &envelope) override;
 
-    quint64 count() const;
-    QByteArray head() const;
-    quint64 verify() const;
+    quint64 count() const override;
+    QByteArray head() const override;
+    quint64 verify() const override;
 
-    QList<CognitiveEnvelope> recent(int limit = 50) const;
-    QList<CognitiveEnvelope> episode(const QUuid &correlationId) const;
+    QList<CognitiveEnvelope> recent(int limit = 50) const override;
+    QList<CognitiveEnvelope> episode(const QUuid &correlationId) const override;
 
-    bool contains(const QUuid &messageId) const;
-    std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const;
-    QList<QUuid> evidenceFor(const QUuid &messageId) const;
-    bool hasOutcomeFor(const QUuid &causeId, const QString &originOrgan = QString()) const;
-
-Q_SIGNALS:
-    /// The local in-process precursor of eventd's accepted-contribution stream.
-    ///
-    /// Emitted synchronously only after COMMIT succeeds. Validation failures and rolled-back
-    /// writes never appear on this stream.
-    void accepted(const CognitiveEnvelope &envelope, quint64 sequence);
+    bool contains(const QUuid &messageId) const override;
+    std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const override;
+    QList<QUuid> evidenceFor(const QUuid &messageId) const override;
+    bool hasOutcomeFor(
+        const QUuid &causeId,
+        const QString &originOrgan = QString()) const override;
 
 private:
     bool ensureSchema();
