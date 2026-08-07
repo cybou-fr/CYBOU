@@ -59,9 +59,13 @@ Journal::Journal(const QString &path, const QString &connectionName)
 
     QSqlQuery pragma(m_db);
     pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
+    pragma.finish();
     pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
+    pragma.finish();
     pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
+    pragma.finish();
     pragma.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+    pragma.finish();
 
     if (!ensureSchema()) {
         m_db.close();
@@ -520,7 +524,8 @@ quint64 Journal::append(const CognitiveEnvelope &e)
                             ? QVariant()
                             : QVariant(e.causationId.toString(QUuid::WithoutBraces)));
     insert.addBindValue(e.originOrgan);
-    insert.addBindValue(e.originNode);
+    insert.addBindValue(
+        e.originNode.isNull() ? QStringLiteral("") : e.originNode);
     insert.addBindValue(static_cast<int>(e.kind));
     insert.addBindValue(e.wallTime.toString(Qt::ISODateWithMs));
     insert.addBindValue(static_cast<qulonglong>(e.monotonicTime));

@@ -199,6 +199,22 @@ private Q_SLOTS:
         QCOMPARE(journal.verify(), 0u);
     }
 
+    void nullOriginNodeIsStoredAsEmptyText()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+
+        CognitiveEnvelope root = observation();
+        root.originNode = QString();
+        QVERIFY(root.originNode.isNull());
+        QVERIFY2(journal.append(root) > 0, qPrintable(journal.lastError()));
+
+        const auto stored = journal.contribution(root.messageId);
+        QVERIFY(stored.has_value());
+        QVERIFY(!stored->originNode.isNull());
+        QVERIFY(stored->originNode.isEmpty());
+    }
+
     void missingCauseAndEvidenceAreRejected()
     {
         QTemporaryDir dir;
