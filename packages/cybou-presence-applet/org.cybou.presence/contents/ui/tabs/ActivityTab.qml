@@ -12,7 +12,7 @@ Item {
 
     required property var mind
     readonly property string title: "Activity"
-    readonly property string icon: "history"
+    readonly property string icon: "view-history"
 
     property var activityModel: []
 
@@ -32,13 +32,13 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
-        spacing: 9
+        spacing: 8
 
         StatCard {
             Layout.fillWidth: true
             title: i18n("Total contributions")
             value: mind.contributions
-            icon: "database"
+            emphasized: true
         }
 
         Item {
@@ -47,10 +47,14 @@ Item {
 
             ListView {
                 id: activityList
+
                 anchors.fill: parent
                 clip: true
-                spacing: 4
+                spacing: 3
                 model: activityTab.activityModel
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ThinScrollBar {}
 
                 delegate: ItemDelegate {
                     id: activityDelegate
@@ -58,31 +62,36 @@ Item {
                     required property var modelData
 
                     width: ListView.view.width
-                    implicitHeight: 54
+                    implicitHeight: 52
+                    activeFocusOnTab: true
 
                     background: Rectangle {
                         radius: 8
                         color: activityDelegate.hovered
                             ? Kirigami.Theme.highlightColor
                             : "transparent"
-                        opacity: activityDelegate.hovered ? 0.08 : 1.0
+                        opacity: activityDelegate.hovered ? 0.07 : 1.0
+
+                        border.width: activityDelegate.activeFocus ? 1 : 0
+                        border.color: Kirigami.Theme.focusColor
                     }
 
                     contentItem: RowLayout {
                         spacing: 9
 
                         Label {
-                            Layout.preferredWidth: 42
+                            Layout.preferredWidth: 38
                             text: Qt.formatTime(modelData.when, "HH:mm")
-                            font.pixelSize: 11
-                            opacity: 0.58
+                            font.pixelSize: 10
+                            opacity: 0.48
                         }
 
-                        Kirigami.Icon {
-                            Layout.preferredWidth: 18
-                            Layout.preferredHeight: 18
-                            source: "media-record"
-                            opacity: 0.70
+                        Rectangle {
+                            Layout.preferredWidth: 6
+                            Layout.preferredHeight: 6
+                            radius: width / 2
+                            color: Kirigami.Theme.highlightColor
+                            opacity: 0.62
                         }
 
                         ColumnLayout {
@@ -99,8 +108,8 @@ Item {
                             Label {
                                 Layout.fillWidth: true
                                 text: modelData.organ || i18n("Unknown organ")
-                                font.pixelSize: 11
-                                opacity: 0.60
+                                font.pixelSize: 10
+                                opacity: 0.52
                                 elide: Text.ElideRight
                             }
                         }
@@ -112,7 +121,7 @@ Item {
                 anchors.centerIn: parent
                 visible: activityTab.activityModel.length === 0
                 text: i18n("No activity yet")
-                opacity: 0.55
+                opacity: 0.48
             }
         }
     }

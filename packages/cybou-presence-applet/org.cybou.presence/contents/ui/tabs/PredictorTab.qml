@@ -12,7 +12,7 @@ Item {
 
     required property var mind
     readonly property string title: "Predictor"
-    readonly property string icon: "predictive-text"
+    readonly property string icon: "edit-find"
 
     property string predictionSubject: ""
     property var predictionResult: ({})
@@ -29,7 +29,7 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
-        spacing: 9
+        spacing: 8
 
         InfoCard {
             Layout.fillWidth: true
@@ -44,7 +44,7 @@ Item {
                     predictorTab.predictionResult.samples
                 )
                 : i18n("Choose a subject to ask the predictor.")
-            icon: "predictive-text"
+            icon: "edit-find"
             emphasized: Boolean(predictorTab.predictionResult.subject)
         }
 
@@ -56,6 +56,8 @@ Item {
                 Layout.fillWidth: true
                 placeholderText: i18n("Subject")
                 text: predictorTab.predictionSubject
+                selectByMouse: true
+                activeFocusOnTab: true
                 onTextChanged: predictorTab.predictionSubject = text
                 onAccepted: predictorTab.requestPrediction()
             }
@@ -63,6 +65,7 @@ Item {
             Button {
                 text: i18n("Predict")
                 icon.name: "go-next"
+                activeFocusOnTab: true
                 enabled: predictorTab.predictionSubject.trim().length > 0
                 onClicked: predictorTab.requestPrediction()
             }
@@ -71,8 +74,9 @@ Item {
         Label {
             Layout.fillWidth: true
             text: i18n("Calibration")
+            font.pixelSize: 10
             font.bold: true
-            opacity: 0.72
+            opacity: 0.56
         }
 
         Item {
@@ -81,10 +85,14 @@ Item {
 
             ListView {
                 id: calibrationList
+
                 anchors.fill: parent
                 clip: true
-                spacing: 4
+                spacing: 3
                 model: mind.calibrations
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ThinScrollBar {}
 
                 delegate: ItemDelegate {
                     id: calibrationDelegate
@@ -92,14 +100,18 @@ Item {
                     required property var modelData
 
                     width: ListView.view.width
-                    implicitHeight: 58
+                    implicitHeight: 56
+                    activeFocusOnTab: true
 
                     background: Rectangle {
                         radius: 8
                         color: calibrationDelegate.hovered
                             ? Kirigami.Theme.highlightColor
                             : "transparent"
-                        opacity: calibrationDelegate.hovered ? 0.08 : 1.0
+                        opacity: calibrationDelegate.hovered ? 0.07 : 1.0
+
+                        border.width: calibrationDelegate.activeFocus ? 1 : 0
+                        border.color: Kirigami.Theme.focusColor
                     }
 
                     contentItem: ColumnLayout {
@@ -120,8 +132,8 @@ Item {
                                 Number(modelData.meanError).toFixed(2),
                                 Number(modelData.bias).toFixed(2)
                             )
-                            font.pixelSize: 11
-                            opacity: 0.62
+                            font.pixelSize: 10
+                            opacity: 0.52
                             elide: Text.ElideRight
                         }
                     }
@@ -132,7 +144,7 @@ Item {
                 anchors.centerIn: parent
                 visible: mind.calibrations.length === 0
                 text: i18n("No settled predictions yet")
-                opacity: 0.55
+                opacity: 0.48
             }
         }
     }

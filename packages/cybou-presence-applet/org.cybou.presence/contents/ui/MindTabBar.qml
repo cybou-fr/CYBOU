@@ -17,10 +17,10 @@ ColumnLayout {
         { "name": i18n("Dashboard"), "icon": "view-dashboard", "tooltip": i18n("Mind Dashboard") },
         { "name": i18n("Identity"), "icon": "user-identity", "tooltip": i18n("Identity") },
         { "name": i18n("Intentions"), "icon": "task-complete", "tooltip": i18n("Intentions") },
-        { "name": i18n("Activity"), "icon": "history", "tooltip": i18n("Activity") },
-        { "name": i18n("Self"), "icon": "user", "tooltip": i18n("Self assessment") },
-        { "name": i18n("Predictor"), "icon": "predictive-text", "tooltip": i18n("Predictor") },
-        { "name": i18n("Workspace"), "icon": "folder-workspace", "tooltip": i18n("Workspace") }
+        { "name": i18n("Activity"), "icon": "view-history", "tooltip": i18n("Activity") },
+        { "name": i18n("Self"), "icon": "user-identity", "tooltip": i18n("Self assessment") },
+        { "name": i18n("Predictor"), "icon": "edit-find", "tooltip": i18n("Predictor") },
+        { "name": i18n("Workspace"), "icon": "folder", "tooltip": i18n("Workspace") }
     ]
 
     readonly property string currentTitle:
@@ -28,21 +28,38 @@ ColumnLayout {
     readonly property string currentIcon:
         entries[currentIndex] ? entries[currentIndex].icon : "cybou"
 
-    spacing: 4
+    spacing: 2
+
+    function select(index, moveFocus) {
+        const bounded = Math.max(0, Math.min(entries.length - 1, index))
+        currentIndex = bounded
+
+        if (moveFocus) {
+            const item = tabRepeater.itemAt(bounded)
+            if (item)
+                item.forceActiveFocus()
+        }
+    }
+
+    function move(delta) {
+        select((currentIndex + delta + entries.length) % entries.length, true)
+    }
 
     Item {
         Layout.fillWidth: true
-        Layout.preferredHeight: 52
+        Layout.preferredHeight: 48
 
         Kirigami.Icon {
             anchors.centerIn: parent
-            width: 30
-            height: 30
+            width: 27
+            height: 27
             source: "cybou"
+            opacity: 0.92
         }
     }
 
     Repeater {
+        id: tabRepeater
         model: root.entries
 
         delegate: ToolButton {
@@ -53,38 +70,77 @@ ColumnLayout {
 
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 48
-            Layout.preferredHeight: 44
+            Layout.preferredHeight: 42
 
             enabled: root.navigationEnabled
+            activeFocusOnTab: true
             checkable: true
             checked: index === root.currentIndex
+
             text: modelData.name
             display: AbstractButton.IconOnly
             icon.name: modelData.icon
-            icon.width: 21
-            icon.height: 21
+            icon.width: 20
+            icon.height: 20
+            icon.color: button.checked
+                ? Kirigami.Theme.highlightColor
+                : Kirigami.Theme.textColor
+
+            Accessible.name: modelData.name
+            Accessible.description: modelData.tooltip
 
             ToolTip.text: modelData.tooltip
-            ToolTip.visible: hovered
-            ToolTip.delay: 350
+            ToolTip.visible: hovered || activeFocus
+            ToolTip.delay: activeFocus ? 0 : 300
 
             background: Rectangle {
-                radius: 10
+                anchors.centerIn: parent
+                width: 34
+                height: 34
+                radius: 9
+
                 color: Kirigami.Theme.highlightColor
-                opacity: button.checked ? 0.20 : button.hovered ? 0.08 : 0.0
+                opacity: button.checked
+                    ? 0.07
+                    : button.hovered
+                        ? 0.06
+                        : 0.0
+
+                border.width: button.activeFocus ? 1 : 0
+                border.color: Kirigami.Theme.focusColor
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 110 }
+                }
             }
 
             Rectangle {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: 3
-                height: 24
-                radius: 2
+                width: 2
+                height: 26
+                radius: 1
                 visible: button.checked
                 color: Kirigami.Theme.highlightColor
             }
 
-            onClicked: root.currentIndex = index
+            onClicked: root.select(index, false)
+
+            Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Up) {
+                    root.move(-1)
+                    event.accepted = true
+                } else if (event.key === Qt.Key_Down) {
+                    root.move(1)
+                    event.accepted = true
+                } else if (event.key === Qt.Key_Home) {
+                    root.select(0, true)
+                    event.accepted = true
+                } else if (event.key === Qt.Key_End) {
+                    root.select(root.entries.length - 1, true)
+                    event.accepted = true
+                }
+            }
         }
     }
 
@@ -92,14 +148,24 @@ ColumnLayout {
         Layout.fillHeight: true
     }
 
-    Rectangle {
+    Item {
         Layout.alignment: Qt.AlignHCenter
-        Layout.preferredWidth: 9
-        Layout.preferredHeight: 9
-        radius: width / 2
-        color: root.runtimeAvailable
-            ? Kirigami.Theme.highlightColor
-            : Kirigami.Theme.disabledTextColor
+        Layout.preferredWidth: 24
+        Layout.preferredHeight: 24
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 8
+            height: 8
+            radius: width / 2
+            color: root.runtimeAvailable
+                ? Kirigami.Theme.highlightColor
+                : Kirigami.Theme.disabledTextColor
+
+            Behavior on color {
+                ColorAnimation { duration: 140 }
+            }
+        }
 
         ToolTip.text: root.runtimeAvailable
             ? i18n("Mind connected")

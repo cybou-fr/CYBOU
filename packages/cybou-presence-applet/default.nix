@@ -36,4 +36,8 @@ runCommand "cybou-presence-applet"
       "$presence" \
       "$handle" \
       ${../cybou-layout-templates/org.cybou.plasma.minddock/contents/layout.js}
+
+    python3 ${../../scripts/validate-ui-polish.py} \
+      "$presence" \
+      "$handle"
   ''

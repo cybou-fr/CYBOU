@@ -82,31 +82,45 @@ PlasmoidItem {
             Layout.preferredHeight: 82
             Layout.maximumHeight: 96
 
+            Accessible.name: i18n("Cybou Mind handle")
+            Accessible.description: dockAccess.pinned
+                ? i18n("Mind is pinned open")
+                : i18n("Hover to peek, click to pin, or press Meta+M")
+
             Rectangle {
                 id: capsule
 
                 anchors.centerIn: parent
-                width: 10
-                height: 58
+                width: handleMouse.containsMouse || dockAccess.pinned ? 9 : 7
+                height: handleMouse.containsMouse || dockAccess.pinned ? 54 : 48
                 radius: width / 2
 
                 color: Kirigami.Theme.highlightColor
                 opacity: dockAccess.pinned
-                    ? 1.0
+                    ? 0.96
                     : handleMouse.containsMouse
-                        ? 0.92
-                        : 0.62
+                        ? 0.86
+                        : 0.56
 
-                border.width: 1
-                border.color: Kirigami.Theme.textColor
+                Behavior on width {
+                    NumberAnimation { duration: 110 }
+                }
+
+                Behavior on height {
+                    NumberAnimation { duration: 110 }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 110 }
+                }
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 5
-                    height: 5
+                    width: 3
+                    height: 3
                     radius: width / 2
-                    color: Kirigami.Theme.textColor
-                    opacity: dockAccess.pinned ? 1.0 : 0.72
+                    color: Kirigami.Theme.highlightedTextColor
+                    opacity: dockAccess.pinned ? 0.95 : 0.68
                 }
 
                 ToolTip.text: root.onboardingVisible

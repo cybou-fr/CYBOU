@@ -49,8 +49,6 @@ placement   right / centered
 hiding      none
 ```
 
-Only icons live in the navigation rail. Labels are shown through tooltips and the page header.
-
 ## Opening Mind
 
 The user has four equivalent paths:
@@ -79,6 +77,57 @@ Cybou Mind lives here · hover to peek · Meta+M to pin
 
 The handle persists an `onboardingSeen` flag so this hint is not repeated every login.
 
+## Navigation and keyboard interaction
+
+The 64px rail is icon-only. The active page uses:
+
+```text
+2px accent indicator
+accent-colored icon
+very light selected surface
+```
+
+The rail does not use a large selected tile.
+
+When a rail item has keyboard focus:
+
+```text
+Up / Down -> previous / next page
+Home      -> Dashboard
+End       -> Workspace
+Enter     -> activate focused button
+Tab       -> continue through actionable page controls
+```
+
+Focus is shown with the active theme focus color rather than relying only on hover.
+
+## Visual hierarchy
+
+Package 07 establishes the following hierarchy:
+
+- the common header is compact and owns page title + runtime state;
+- static metric cards use a quiet alternate surface with a small accent strip;
+- generic file-looking icons are not shown in metric cards by default;
+- emphasized information uses accent, not a thick border;
+- list rows use subtle hover and keyboard-focus surfaces;
+- empty states are deliberately quiet;
+- scrollbars are thin, as-needed, and fade visually when not interacted with.
+
+## Responsive behavior
+
+Dashboard, Identity, and Self are scrollable even on short VM windows.
+
+Two-column metric grids collapse to one column when their available width is below the local
+threshold:
+
+```text
+>= 280px -> 2 columns
+<  280px -> 1 column
+```
+
+This does not resize the Plasma panel itself; it only makes page content robust to narrower
+containment geometry.
+
 ## Unavailable state
 
 The dock shell remains stable when Presence cannot connect.
@@ -93,16 +142,6 @@ Retry connection
 
 It must not say that QML failed to open `journal.db`. Journal ownership belongs to eventd.
 
-## Visual language
-
-- use the active Plasma/Kirigami theme;
-- use the theme highlight color for selection and healthy status;
-- use compact cards rather than large centered labels;
-- keep page headings in the common header, not duplicated inside every page;
-- lists should use subtle hover surfaces and keep primary text left aligned;
-- empty states should be explicit rather than leaving blank space;
-- the handle is a small accent-colored capsule, not a second toolbar.
-
 ## Runtime boundary
 
 The access handle and `DockAccess` live in the Plasma shell layer only.
@@ -110,15 +149,22 @@ The access handle and `DockAccess` live in the Plasma shell layer only.
 `DockAccess` may alter Plasma panel visibility through the plasmashell scripting interface. It must
 not own Presence state, call cognitive organs, or read/write cognitive persistence.
 
+Visual polish is QML-only. It must not change organ ownership, Journal behavior, or the Presence
+process boundary.
+
 ## Validation
 
 `scripts/validate-qml-api.py` checks the main Presence shell.
 
-`scripts/validate-mind-access.py` additionally checks:
+`scripts/validate-mind-access.py` checks discoverability and access.
 
-- separate Presence and handle packages;
-- hover/click/global-shortcut access hooks;
-- persistent onboarding flag;
-- main panel remains native `autohide`;
-- handle panel is separate, visible, centered, and custom-length;
-- the layout assigns `Meta+M` to the handle applet.
+`scripts/validate-ui-polish.py` checks the Package 07 visual/interaction contracts:
+
+- thin active rail indicator;
+- keyboard rail navigation and focus rings;
+- compact header;
+- soft cards and reduced generic icon use;
+- thin as-needed scrollbars;
+- responsive static pages;
+- keyboard-focusable list/action controls;
+- animated and accessible Mind handle.

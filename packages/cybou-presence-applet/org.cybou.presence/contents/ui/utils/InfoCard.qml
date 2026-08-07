@@ -12,43 +12,55 @@ Rectangle {
     property string title: ""
     property string text: ""
     property string icon: ""
+    property bool showIcon: true
     property bool emphasized: false
 
     implicitWidth: 220
-    implicitHeight: content.implicitHeight + 24
+    implicitHeight: content.implicitHeight + 22
     radius: 10
 
-    color: Kirigami.Theme.backgroundColor
-    border.width: 1
-    border.color: root.emphasized
-        ? Kirigami.Theme.highlightColor
-        : Kirigami.Theme.disabledTextColor
+    color: Kirigami.Theme.alternateBackgroundColor
+    border.width: 0
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.emphasized ? 3 : 2
+        radius: width / 2
+        color: Kirigami.Theme.highlightColor
+        opacity: root.emphasized ? 0.95 : 0.32
+    }
 
     RowLayout {
         id: content
+
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 10
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.topMargin: 11
+        anchors.bottomMargin: 11
+        spacing: 9
 
         Kirigami.Icon {
             Layout.alignment: Qt.AlignTop
-            Layout.preferredWidth: 24
-            Layout.preferredHeight: 24
+            Layout.preferredWidth: 21
+            Layout.preferredHeight: 21
             source: root.icon
-            visible: root.icon.length > 0
-            opacity: 0.82
+            visible: root.showIcon && root.icon.length > 0
+            opacity: 0.76
         }
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 4
+            spacing: 3
 
             Label {
                 Layout.fillWidth: true
                 text: root.title
-                font.pixelSize: 11
+                font.pixelSize: 10
                 font.bold: true
-                opacity: 0.72
+                opacity: 0.60
                 elide: Text.ElideRight
             }
 
@@ -57,6 +69,7 @@ Rectangle {
                 text: root.text
                 wrapMode: Text.WordWrap
                 font.pixelSize: 13
+                lineHeight: 1.12
             }
         }
     }

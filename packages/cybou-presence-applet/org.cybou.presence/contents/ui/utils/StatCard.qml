@@ -12,36 +12,48 @@ Rectangle {
     property string title: ""
     property var value: ""
     property string icon: ""
+    property bool showIcon: false
+    property bool emphasized: false
 
-    implicitWidth: 142
-    implicitHeight: 76
+    implicitWidth: 138
+    implicitHeight: 70
     radius: 10
 
-    color: Kirigami.Theme.backgroundColor
-    border.width: 1
-    border.color: Kirigami.Theme.disabledTextColor
+    color: Kirigami.Theme.alternateBackgroundColor
+    border.width: root.emphasized ? 1 : 0
+    border.color: Kirigami.Theme.highlightColor
 
     RowLayout {
         anchors.fill: parent
         anchors.margins: 11
         spacing: 9
 
+        Rectangle {
+            Layout.preferredWidth: 3
+            Layout.preferredHeight: 30
+            radius: 2
+            color: Kirigami.Theme.highlightColor
+            opacity: root.emphasized ? 0.90 : 0.40
+        }
+
         Kirigami.Icon {
-            Layout.preferredWidth: 24
-            Layout.preferredHeight: 24
+            Layout.preferredWidth: 20
+            Layout.preferredHeight: 20
             source: root.icon
-            opacity: 0.82
+            visible: root.showIcon && root.icon.length > 0
+            opacity: 0.76
         }
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 2
+            spacing: 1
 
             Label {
                 Layout.fillWidth: true
                 text: root.title
-                font.pixelSize: 11
-                opacity: 0.66
+                font.pixelSize: 10
+                font.bold: true
+                opacity: 0.58
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
@@ -51,7 +63,7 @@ Rectangle {
                 text: root.value === undefined || root.value === null
                     ? ""
                     : String(root.value)
-                font.pixelSize: 16
+                font.pixelSize: 17
                 font.bold: true
                 elide: Text.ElideRight
                 maximumLineCount: 1

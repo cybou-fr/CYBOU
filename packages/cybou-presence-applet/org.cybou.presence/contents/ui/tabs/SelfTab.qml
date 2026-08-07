@@ -11,74 +11,82 @@ Item {
 
     required property var mind
     readonly property string title: "Self"
-    readonly property string icon: "user"
+    readonly property string icon: "user-identity"
 
-    ColumnLayout {
+    Flickable {
+        id: scroll
+
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 9
+        clip: true
+        contentWidth: width
+        contentHeight: contentColumn.implicitHeight + 24
+        boundsBehavior: Flickable.StopAtBounds
 
-        InfoCard {
-            Layout.fillWidth: true
-            title: i18n("Self assessment")
-            text: mind.narration || i18n("No self-assessment is available yet.")
-            icon: "user"
-            emphasized: true
-        }
+        ScrollBar.vertical: ThinScrollBar {}
 
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            rowSpacing: 9
-            columnSpacing: 9
+        ColumnLayout {
+            id: contentColumn
 
-            StatCard {
+            x: 12
+            y: 12
+            width: Math.max(0, scroll.width - 28)
+            spacing: 8
+
+            InfoCard {
                 Layout.fillWidth: true
-                title: i18n("Age")
-                value: i18n("%1 d", mind.stats.ageInDays || 0)
-                icon: "calendar"
+                title: i18n("Self assessment")
+                text: mind.narration || i18n("No self-assessment is available yet.")
+                icon: "user-identity"
+                emphasized: true
             }
 
-            StatCard {
+            GridLayout {
                 Layout.fillWidth: true
-                title: i18n("Sessions")
-                value: mind.stats.sessions
-                icon: "history"
+                columns: width >= 280 ? 2 : 1
+                rowSpacing: 8
+                columnSpacing: 8
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Age")
+                    value: i18n("%1 d", mind.stats.ageInDays || 0)
+                }
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Sessions")
+                    value: mind.stats.sessions
+                }
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Intentions")
+                    value: mind.stats.openIntentions
+                }
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Predictions")
+                    value: mind.stats.settledPredictions
+                }
             }
 
-            StatCard {
+            InfoCard {
                 Layout.fillWidth: true
-                title: i18n("Intentions")
-                value: mind.stats.openIntentions
-                icon: "task-complete"
+                title: i18n("Journal integrity")
+                text: mind.stats.journalIntact
+                    ? i18n("The durable memory chain verifies successfully.")
+                    : i18n("Memory verification failed at row %1.", mind.stats.firstBrokenAt)
+                icon: mind.stats.journalIntact ? "security-high" : "dialog-warning"
             }
 
-            StatCard {
-                Layout.fillWidth: true
-                title: i18n("Predictions")
-                value: mind.stats.settledPredictions
-                icon: "checkmark"
+            Button {
+                Layout.alignment: Qt.AlignHCenter
+                text: i18n("Reflect now")
+                icon.name: "view-refresh"
+                activeFocusOnTab: true
+                onClicked: mind.reflect()
             }
-        }
-
-        InfoCard {
-            Layout.fillWidth: true
-            title: i18n("Journal integrity")
-            text: mind.stats.journalIntact
-                ? i18n("The durable memory chain verifies successfully.")
-                : i18n("Memory verification failed at row %1.", mind.stats.firstBrokenAt)
-            icon: mind.stats.journalIntact ? "security-high" : "dialog-warning"
-        }
-
-        Button {
-            Layout.alignment: Qt.AlignHCenter
-            text: i18n("Reflect now")
-            icon.name: "view-refresh"
-            onClicked: mind.reflect()
-        }
-
-        Item {
-            Layout.fillHeight: true
         }
     }
 }

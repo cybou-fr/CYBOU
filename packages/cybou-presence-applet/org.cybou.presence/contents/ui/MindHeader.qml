@@ -15,28 +15,29 @@ Item {
 
     readonly property bool awake: Boolean(mind && mind.awake)
 
-    implicitHeight: 68
+    implicitHeight: 58
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 14
-        anchors.rightMargin: 14
-        spacing: 10
+        anchors.leftMargin: 13
+        anchors.rightMargin: 12
+        spacing: 8
 
         Kirigami.Icon {
-            Layout.preferredWidth: 24
-            Layout.preferredHeight: 24
+            Layout.preferredWidth: 20
+            Layout.preferredHeight: 20
             source: root.icon
+            opacity: 0.86
         }
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 1
+            spacing: 0
 
             Label {
                 Layout.fillWidth: true
                 text: root.title
-                font.pixelSize: 16
+                font.pixelSize: 15
                 font.bold: true
                 elide: Text.ElideRight
             }
@@ -46,30 +47,33 @@ Item {
                 text: root.awake
                     ? i18n("Cognitive runtime connected")
                     : i18n("Waiting for cognitive services")
-                font.pixelSize: 11
-                opacity: 0.68
+                font.pixelSize: 10
+                opacity: 0.54
                 elide: Text.ElideRight
             }
         }
 
-        Rectangle {
-            Layout.preferredWidth: stateRow.implicitWidth + 18
-            Layout.preferredHeight: 28
-            radius: 14
-            color: "transparent"
-            border.width: 1
-            border.color: root.awake
-                ? Kirigami.Theme.highlightColor
-                : Kirigami.Theme.disabledTextColor
+        Item {
+            Layout.preferredWidth: stateRow.implicitWidth + 16
+            Layout.preferredHeight: 24
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 12
+                color: root.awake
+                    ? Kirigami.Theme.highlightColor
+                    : Kirigami.Theme.disabledTextColor
+                opacity: root.awake ? 0.12 : 0.08
+            }
 
             RowLayout {
                 id: stateRow
                 anchors.centerIn: parent
-                spacing: 6
+                spacing: 5
 
                 Rectangle {
-                    Layout.preferredWidth: 7
-                    Layout.preferredHeight: 7
+                    Layout.preferredWidth: 6
+                    Layout.preferredHeight: 6
                     radius: width / 2
                     color: root.awake
                         ? Kirigami.Theme.highlightColor
@@ -78,7 +82,7 @@ Item {
 
                 Label {
                     text: root.awake ? i18n("Online") : i18n("Offline")
-                    font.pixelSize: 11
+                    font.pixelSize: 10
                     font.bold: true
                 }
             }

@@ -37,70 +37,77 @@ Item {
             : i18n("Attention required: %1", unhealthy.join(", "))
     }
 
-    ColumnLayout {
+    Flickable {
+        id: scroll
+
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 10
+        clip: true
+        contentWidth: width
+        contentHeight: contentColumn.implicitHeight + 24
+        boundsBehavior: Flickable.StopAtBounds
 
-        InfoCard {
-            Layout.fillWidth: true
-            title: i18n("Current self-narration")
-            text: mind.narration || i18n("No narration yet.")
-            icon: "user"
-            emphasized: true
-        }
+        ScrollBar.vertical: ThinScrollBar {}
 
-        InfoCard {
-            Layout.fillWidth: true
-            title: i18n("Runtime")
-            text: dashboardTab.runtimeSummary()
-            icon: "system-run"
-        }
+        ColumnLayout {
+            id: contentColumn
 
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            rowSpacing: 9
-            columnSpacing: 9
+            x: 12
+            y: 12
+            width: Math.max(0, scroll.width - 28)
+            spacing: 9
 
-            StatCard {
+            InfoCard {
                 Layout.fillWidth: true
-                title: i18n("Contributions")
-                value: mind.contributions
-                icon: "database"
+                title: i18n("Current self-narration")
+                text: mind.narration || i18n("No narration yet.")
+                icon: "user-identity"
+                emphasized: true
             }
 
-            StatCard {
+            InfoCard {
                 Layout.fillWidth: true
-                title: i18n("Open intentions")
-                value: mind.stats.openIntentions
-                icon: "task-complete"
+                title: i18n("Runtime")
+                text: dashboardTab.runtimeSummary()
+                icon: "system-run"
             }
 
-            StatCard {
+            GridLayout {
                 Layout.fillWidth: true
-                title: i18n("Sessions")
-                value: mind.stats.sessions
-                icon: "history"
+                columns: width >= 280 ? 2 : 1
+                rowSpacing: 8
+                columnSpacing: 8
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Contributions")
+                    value: mind.contributions
+                }
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Open intentions")
+                    value: mind.stats.openIntentions
+                }
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Sessions")
+                    value: mind.stats.sessions
+                }
+
+                StatCard {
+                    Layout.fillWidth: true
+                    title: i18n("Predictions settled")
+                    value: mind.stats.settledPredictions
+                }
             }
 
-            StatCard {
+            InfoCard {
                 Layout.fillWidth: true
-                title: i18n("Predictions settled")
-                value: mind.stats.settledPredictions
-                icon: "checkmark"
+                title: i18n("Attention")
+                text: mind.attention || i18n("Quiet")
+                icon: "view-visible"
             }
-        }
-
-        InfoCard {
-            Layout.fillWidth: true
-            title: i18n("Attention")
-            text: mind.attention || i18n("Quiet")
-            icon: "eye"
-        }
-
-        Item {
-            Layout.fillHeight: true
         }
     }
 }

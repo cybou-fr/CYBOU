@@ -32,26 +32,25 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
-        spacing: 9
+        spacing: 8
 
         GridLayout {
             Layout.fillWidth: true
-            columns: 2
-            rowSpacing: 9
-            columnSpacing: 9
+            columns: width >= 280 ? 2 : 1
+            rowSpacing: 8
+            columnSpacing: 8
 
             StatCard {
                 Layout.fillWidth: true
                 title: i18n("Open")
                 value: intentionsTab.intentionModel.length
-                icon: "view-list-details"
+                emphasized: intentionsTab.intentionModel.length > 0
             }
 
             StatCard {
                 Layout.fillWidth: true
                 title: i18n("Oldest")
                 value: i18n("%1 d", mind.stats.oldestObligationDays || 0)
-                icon: "calendar"
             }
         }
 
@@ -61,10 +60,14 @@ Item {
 
             ListView {
                 id: intentionsList
+
                 anchors.fill: parent
                 clip: true
                 spacing: 5
                 model: intentionsTab.intentionModel
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ThinScrollBar {}
 
                 delegate: ItemDelegate {
                     id: intentionDelegate
@@ -73,21 +76,23 @@ Item {
                     required property var modelData
 
                     width: ListView.view.width
-                    implicitHeight: intentionRow.implicitHeight + 16
+                    implicitHeight: intentionRow.implicitHeight + 14
+                    activeFocusOnTab: true
 
                     background: Rectangle {
                         radius: 9
                         color: intentionDelegate.hovered
                             ? Kirigami.Theme.highlightColor
-                            : Kirigami.Theme.backgroundColor
-                        opacity: intentionDelegate.hovered ? 0.10 : 1.0
-                        border.width: intentionDelegate.hovered ? 0 : 1
-                        border.color: Kirigami.Theme.disabledTextColor
+                            : Kirigami.Theme.alternateBackgroundColor
+                        opacity: intentionDelegate.hovered ? 0.08 : 1.0
+
+                        border.width: intentionDelegate.activeFocus ? 1 : 0
+                        border.color: Kirigami.Theme.focusColor
                     }
 
                     contentItem: RowLayout {
                         id: intentionRow
-                        spacing: 8
+                        spacing: 7
 
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -103,8 +108,8 @@ Item {
                             Label {
                                 Layout.fillWidth: true
                                 text: modelData.trigger || i18n("No trigger recorded")
-                                font.pixelSize: 11
-                                opacity: 0.64
+                                font.pixelSize: 10
+                                opacity: 0.55
                                 elide: Text.ElideRight
                             }
                         }
@@ -112,8 +117,9 @@ Item {
                         ToolButton {
                             icon.name: "checkmark"
                             display: AbstractButton.IconOnly
+                            activeFocusOnTab: true
                             ToolTip.text: i18n("Fulfill")
-                            ToolTip.visible: hovered
+                            ToolTip.visible: hovered || activeFocus
                             onClicked: {
                                 if (mind.fulfillIndex(intentionDelegate.index))
                                     intentionsTab.refreshIntentions()
@@ -123,8 +129,9 @@ Item {
                         ToolButton {
                             icon.name: "edit-delete"
                             display: AbstractButton.IconOnly
+                            activeFocusOnTab: true
                             ToolTip.text: i18n("Abandon")
-                            ToolTip.visible: hovered
+                            ToolTip.visible: hovered || activeFocus
                             onClicked: {
                                 if (mind.abandonIndex(intentionDelegate.index))
                                     intentionsTab.refreshIntentions()
@@ -138,7 +145,7 @@ Item {
                 anchors.centerIn: parent
                 visible: intentionsTab.intentionModel.length === 0
                 text: i18n("No open obligations")
-                opacity: 0.55
+                opacity: 0.48
             }
         }
     }
