@@ -28,7 +28,11 @@ RowLayout {
             id: tabButton
             text: modelData.name
             icon.name: modelData.icon
-            toolTip: modelData.tooltip
+
+            ToolTip.text: modelData.tooltip
+            ToolTip.visible: hovered
+            ToolTip.delay: 500
+
             checkable: true
             checked: index === root.currentIndex
             Layout.fillWidth: true
