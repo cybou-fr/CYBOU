@@ -8,7 +8,7 @@
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
-class DockAccess final : public QObject
+class DockAccess : public QObject
 {
     Q_OBJECT
     QML_NAMED_ELEMENT(DockAccess)
