@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # The exported Presence type is only a D-Bus proxy to cybou-presenced.
+# DockAccess is shell-only plumbing for the discoverable Mind panel handle.
 
 qt_add_qml_module(cybou-presence-qml
     URI org.cybou.presence
@@ -11,11 +12,16 @@ qt_add_qml_module(cybou-presence-qml
     SOURCES
         QmlTypes.cpp
         QmlTypes.h
+        DockAccess.cpp
+        DockAccess.h
 )
 
 target_link_libraries(
     cybou-presence-qml
-    PRIVATE Qt6::Qml cybou-presence
+    PRIVATE
+        Qt6::Qml
+        Qt6::DBus
+        cybou-presence
 )
 
 if(DEFINED CYBOU_QML_INSTALL_DIR)

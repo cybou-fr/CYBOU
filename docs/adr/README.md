@@ -29,3 +29,4 @@ SPDX-License-Identifier: MIT
 | [0020](ADR-0020-presence-surface-for-v0.1.md) | Presence Surface for v0.1 | Proposed |
 | [0021](ADR-0021-language-models-are-optional-faculties.md) | Optional Language Faculties | Proposed |
 | [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary | Proposed |
+| [0023](ADR-0023-mind-dock-discoverability-and-access.md) | Mind Dock Discoverability and Access | Accepted |

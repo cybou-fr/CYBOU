@@ -2,8 +2,8 @@
   "KPlugin": {
     "Id": "org.cybou.plasma.minddock",
     "Name": "Cybou Mind Dock",
-    "Description": "Persistent right-side Mind surface for Cybou OS",
-    "Version": "1.1",
+    "Description": "Right-side Mind surface with discoverable access handle",
+    "Version": "1.2",
     "Website": "https://github.com/cybou-fr/CYBOU",
     "License": "MIT"
   },

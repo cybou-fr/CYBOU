@@ -126,6 +126,28 @@ pkgs.testers.runNixOSTest {
         )
 
 
+    with subtest("Mind access handle is installed and initialized"):
+        session.succeed(
+            "test -f /run/current-system/sw/share/plasma/plasmoids/"
+            "org.cybou.mindhandle/metadata.json"
+        )
+        session.succeed(
+            "test -f /run/current-system/sw/share/plasma/plasmoids/"
+            "org.cybou.mindhandle/contents/ui/main.qml"
+        )
+        session.wait_until_succeeds(
+            "test \"$(cat /home/cybou/.local/state/cybou/"
+            "desktop-layout-version 2>/dev/null)\" = 5"
+        )
+        session.wait_until_succeeds(
+            "grep -q 'org.cybou.mindhandle' "
+            "/home/cybou/.config/plasma-org.kde.plasma.desktop-appletsrc"
+        )
+        session.wait_until_succeeds(
+            "grep -q 'org.cybou.presence' "
+            "/home/cybou/.config/plasma-org.kde.plasma.desktop-appletsrc"
+        )
+
     with subtest("Mind organs are separate user services"):
         session.succeed(
             "systemctl --user -M cybou@ start cybou-presenced.service"
