@@ -7,7 +7,23 @@ SPDX-License-Identifier: MIT
 
 ## Current
 
-Mind organs are C++ objects in the Presence process.
+Mind is not process-isolated.
+
+```text
+plasmashell
+└── Presence
+    ├── Journal
+    ├── Identity
+    ├── Intentions
+    ├── Predictor
+    ├── SelfModel
+    └── Workspace
+```
+
+The daemon-like source directory names describe intended component boundaries, but the current
+build produces libraries/QML integration rather than one user service per organ.
+
+A `plasmashell` restart therefore also destroys the current in-process Mind object graph.
 
 ## Target
 
@@ -21,16 +37,29 @@ cybou-workspaced
 cybou-presenced
 ```
 
-Each is a `systemd --user` service and separate `QCoreApplication`, except GUI-specific presentation code.
+Each cognitive process is intended to be a `systemd --user` service and a separate
+`QCoreApplication` or appropriate Qt application, with GUI-specific code confined to the
+presentation boundary.
 
-## Lifecycle
+## Target lifecycle
 
 - explicit startup dependencies;
 - restart after recoverable failure;
 - reconstruction from owned state or Journal;
 - capability-deficit reporting;
-- Plasma restart does not restart Mind.
+- Presence reconnect after UI restart;
+- Plasma restart does not restart the Mind;
+- one authoritative owner for each persistent resource.
 
-## Health
+## Target health model
 
-Available, Starting, Healthy, Degraded, Unavailable, and Recovering.
+```text
+Available
+Starting
+Healthy
+Degraded
+Unavailable
+Recovering
+```
+
+These process-level health states are not implemented by the current in-process prototype.

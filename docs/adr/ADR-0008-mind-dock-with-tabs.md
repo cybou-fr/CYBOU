@@ -6,82 +6,74 @@ SPDX-License-Identifier: MIT
 # ADR-0008: Mind Dock with Organ Tabs
 
 ## Status
+
 Accepted
 
 ## Context
-The Presence applet currently shows a subset of Mind data (narration, attention, obligations, activity). To provide full visibility into all 6 Mind organs, we need a comprehensive UI that displays data from each organ in an organized way.
 
-The initial consideration was to add inline Panel creation in layout.js, but Panda's analysis revealed several issues:
-- Inline Panel creation means a failure in the dock code breaks the entire layout
-- The Plasma 6.7.3 API officially supports `loadTemplate()` for layout templates
-- Using templates provides better isolation and reusability
+The Presence surface needs enough space to inspect Mind projections without turning the normal top
+panel into a large popup.
+
+Inline dock creation in the global layout would couple a failure in the Mind panel to the rest of
+the default desktop layout. Plasma layout templates provide a reusable, isolated boundary that can
+be loaded with `loadTemplate()`.
 
 ## Decision
-Implement a vertical dock panel with tabs for each Mind organ using the `loadTemplate()` approach:
 
-1. **Extend Presence C++ API** with read-only getters for all organs:
-   - `identityState()` → QVariantMap: Identity organ state
-   - `calibrations()` → QVariantList: All Predictor calibrations
-   - `predict(subject)` → QVariantMap: Prediction for a subject
-   - `coalitions()` → QVariantList: All Workspace coalitions
-   - `moment()` → QVariantMap: Current Workspace moment state
+Use a dedicated Plasma layout template, `org.cybou.plasma.minddock`, loaded from the Cybou global
+layout.
 
-2. **Create layout-template package** (`cybou-layout-templates`):
-   - Contains `org.cybou.plasma.minddock` template
-   - Uses `loadTemplate()` in layout.js for better isolation
-   - Template creates vertical dock with proper properties:
-     - `location: "right"`
-     - `hiding: "autohide"`
-     - `height: 460` (width for vertical panel)
-     - `lengthMode: "fill"` (stretches along full screen height)
-     - `alignment: "center"`
-     - `floating: true`
+The current accepted implementation uses:
 
-3. **Implement QML components**:
-   - `MindDock.qml`: Main dock container with tab bar and stack
-   - `MindTabBar.qml`: Tab navigation with 6 organ tabs
-   - Individual tab components for each organ
-   - `StatCard.qml`: Reusable component for displaying statistics
+```text
+location   right
+height     420        # Plasma vertical-panel width
+lengthMode fill
+alignment  center
+hiding     none
+floating   true
+```
 
-4. **Maintain architectural invariants**:
-   - Presence remains the only interface the surface talks to
-   - All data access goes through Presence methods
-   - Fail-closed behavior: if an organ is not available, show empty/placeholder
-   - QtTest coverage for all new methods
+`hiding = "none"` is deliberate while the Mind UI is under active development.
+
+The template contains the `org.cybou.presence` applet. The applet chooses its full representation
+when Plasma gives it a vertical form factor, and the full representation embeds `MindDock`.
+
+`MindDock` currently provides a Dashboard plus projections for Identity, Intentions, Activity,
+Self, Predictor, and Workspace.
+
+Presence remains the surface boundary: QML does not open the cognitive Journal directly.
 
 ## Consequences
 
 ### Positive
-- All 6 Mind organs are accessible through the UI
-- Maintains architectural invariant (Presence as single interface)
-- Fail-closed behavior preserved
-- Better isolation with `loadTemplate()` (dock failure doesn't break entire layout)
-- Official API usage (loadTemplate is documented in Plasma 6.7.3)
-- Reusable template can be called from update scripts
-- Extensible for future organs
 
-### Negative
-- Epic scope: C++ + QML + Nix changes
-- Requires more development time
-- Needs Designer input for optimal tab layout
+- Mind inspection has a dedicated full-height surface;
+- the normal top panel remains compact;
+- the dock is reusable as a Plasma layout template;
+- template/package validation can fail during the build rather than silently at desktop runtime;
+- Presence remains the normal UI boundary.
+
+### Current limitations
+
+- the Presence backend is still constructed in-process by the applet;
+- adding multiple Presence applets can still create multiple backend object graphs;
+- Workspace is not yet live for every direct Journal write;
+- process isolation and reconnect behavior are separate future milestones.
+
+These limitations are not contradictions of the dock decision; they are M1/M3 runtime work.
 
 ## Alternatives Considered
 
-### Alternative B: Tabs with Current API Only
-- Only 4 working tabs (Dashboard, Intentions, Activity, Self)
-- Placeholder pages for Identity, Predictor, Workspace
-- Faster to implement but incomplete
-- **Rejected**: Doesn't provide full visibility into Mind organs
+### Compact top-panel popup only
 
-### Alternative C: Direct SQL Access from QML
-- QML accesses journal.db directly
-- **Rejected**: Violates Presence.h:7 invariant ("the only class the surface talks to")
+Rejected because the inspection surface is too dense for the normal panel role.
 
-### Alternative D: Separate Applet per Organ
-- Each organ has its own applet
-- **Rejected**: No advantage over Solution A, organs are C++ classes anyway
+### Direct SQL access from QML
 
-## Related
-- ADR-0003: AI in v0.1 - none (affirms fail-closed principle)
-- ADR-0005: Calamares installer - upstream profile (similar isolation principle)
-- Panda's analysis: Confirmed `loadTemplate()` is the recommended approach
+Rejected because the UI must talk through Presence rather than own/read cognitive persistence
+directly.
+
+### Separate applet per organ
+
+Rejected because it fragments one presentation boundary and does not solve process ownership.
