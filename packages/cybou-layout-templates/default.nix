@@ -13,7 +13,7 @@ stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/share/plasma/layouts
-    cp -r org.cybou.plasma.minddock $out/share/plasma/layouts/
+    cp -r "$src/org.cybou.plasma.minddock" "$out/share/plasma/layouts/"
   '';
 
   meta = {
