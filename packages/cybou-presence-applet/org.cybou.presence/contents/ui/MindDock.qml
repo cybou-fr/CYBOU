@@ -8,29 +8,30 @@ import "tabs"
 
 Item {
     id: root
-
     required property var mind
-
-    property int dockWidth: 460
-    property int dockHeight: 640
-    property int tabHeight: 48
-
-    implicitWidth: dockWidth
-    implicitHeight: dockHeight
+    implicitWidth: 420
+    implicitHeight: 720
     clip: true
 
-    ColumnLayout {
+    RowLayout {
         anchors.fill: parent
         spacing: 0
 
         MindTabBar {
             id: tabBar
-            Layout.fillWidth: true
-            Layout.preferredHeight: root.tabHeight
+            Layout.preferredWidth: 132
+            Layout.minimumWidth: 116
+            Layout.fillHeight: true
+        }
+
+        Rectangle {
+            Layout.preferredWidth: 1
+            Layout.fillHeight: true
+            color: palette.mid
+            opacity: 0.45
         }
 
         StackLayout {
-            id: tabStack
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: tabBar.currentIndex

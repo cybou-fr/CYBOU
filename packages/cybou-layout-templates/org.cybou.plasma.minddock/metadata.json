@@ -2,15 +2,11 @@
   "KPlugin": {
     "Id": "org.cybou.plasma.minddock",
     "Name": "Cybou Mind Dock",
-    "Description": "Vertical dock panel with Mind organ tabs for Cybou OS",
-    "Version": "1.0",
+    "Description": "Persistent right-side Mind surface for Cybou OS",
+    "Version": "1.1",
     "Website": "https://github.com/cybou-fr/CYBOU",
     "License": "MIT"
   },
-  "X-KDE-Library": "plasma-layout-template",
-  "X-KDE-PluginInfo-Name": "org.cybou.plasma.minddock",
-  "X-KDE-PluginInfo-Category": "LayoutTemplate",
-  "X-KDE-PluginInfo-Version": "1.0",
-  "X-KDE-PluginInfo-Website": "https://github.com/cybou-fr/CYBOU",
-  "X-KDE-PluginInfo-License": "MIT"
+  "KPackageStructure": "Plasma/LayoutTemplate",
+  "X-Plasma-ContainmentCategories": ["panel"]
 }

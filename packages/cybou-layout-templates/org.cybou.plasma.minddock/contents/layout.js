@@ -1,16 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-// Cybou Mind Dock - Vertical panel with organ tabs
-// Based on Plasma 6.7.3 API
-
 var mindDock = new Panel;
 mindDock.location = "right";
-mindDock.hiding = "autohide";
-mindDock.height = 460;           // Width for vertical panel
-mindDock.lengthMode = "fill";    // Stretch along full screen height
+// Plasma calls this `height`; on a vertical panel it is the width.
+mindDock.height = 420;
+mindDock.lengthMode = "fill";
 mindDock.alignment = "center";
+// Keep it visible while the Mind UI is under active development.
+mindDock.hiding = "none";
 mindDock.floating = true;
-
-// Add the main dock widget that contains all tabs
 mindDock.addWidget("org.cybou.presence");

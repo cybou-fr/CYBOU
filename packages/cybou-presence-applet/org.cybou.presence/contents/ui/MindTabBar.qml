@@ -5,10 +5,9 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
-RowLayout {
+ColumnLayout {
     id: root
-    spacing: 0
-
+    spacing: 2
     property int currentIndex: 0
     signal tabSelected(int index)
 
@@ -24,27 +23,23 @@ RowLayout {
         ]
 
         delegate: ToolButton {
-            id: tabButton
-
             required property int index
             required property var modelData
-
+            Layout.fillWidth: true
+            Layout.preferredHeight: 48
             text: modelData.name
             icon.name: modelData.icon
-
             ToolTip.text: modelData.tooltip
             ToolTip.visible: hovered
             ToolTip.delay: 500
-
             checkable: true
             checked: index === root.currentIndex
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
             onClicked: {
                 root.currentIndex = index
                 root.tabSelected(index)
             }
         }
     }
+
+    Item { Layout.fillHeight: true }
 }
