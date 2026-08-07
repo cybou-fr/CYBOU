@@ -2,7 +2,33 @@
 # SPDX-License-Identifier: MIT
 
 find_package(Qt6 REQUIRED COMPONENTS Test)
+
 find_program(DBUS_RUN_SESSION_EXECUTABLE dbus-run-session REQUIRED)
+find_program(DBUS_DAEMON_EXECUTABLE dbus-daemon REQUIRED)
+
+# In a Nix build sandbox, dbus-run-session's default `--session` makes dbus-daemon look for
+# /etc/dbus-1/session.conf, but the sandbox intentionally does not populate host /etc.
+# Resolve the immutable session.conf next to the actual dbus-daemon and pass it explicitly.
+get_filename_component(_cybou_dbus_bin_dir "${DBUS_DAEMON_EXECUTABLE}" DIRECTORY)
+get_filename_component(_cybou_dbus_prefix "${_cybou_dbus_bin_dir}" DIRECTORY)
+set(
+    CYBOU_DBUS_SESSION_CONFIG
+    "${_cybou_dbus_prefix}/share/dbus-1/session.conf"
+)
+
+if(NOT EXISTS "${CYBOU_DBUS_SESSION_CONFIG}")
+    message(
+        FATAL_ERROR
+        "D-Bus session configuration not found at ${CYBOU_DBUS_SESSION_CONFIG}"
+    )
+endif()
+
+set(CYBOU_DBUS_TEST_RUNNER
+    "${DBUS_RUN_SESSION_EXECUTABLE}"
+    "--dbus-daemon=${DBUS_DAEMON_EXECUTABLE}"
+    "--config-file=${CYBOU_DBUS_SESSION_CONFIG}"
+    "--"
+)
 
 qt_add_executable(test-protocol tst_protocol.cpp)
 target_link_libraries(test-protocol PRIVATE cybou-protocol Qt6::Test)
@@ -87,8 +113,7 @@ target_link_libraries(
 add_test(
     NAME eventd-integration
     COMMAND
-        ${DBUS_RUN_SESSION_EXECUTABLE}
-        --
+        ${CYBOU_DBUS_TEST_RUNNER}
         $<TARGET_FILE:test-eventd-integration>
         $<TARGET_FILE:cybou-eventd>
 )
@@ -109,8 +134,7 @@ target_link_libraries(
 add_test(
     NAME m4-process-integration
     COMMAND
-        ${DBUS_RUN_SESSION_EXECUTABLE}
-        --
+        ${CYBOU_DBUS_TEST_RUNNER}
         $<TARGET_FILE:test-m4-process-integration>
         $<TARGET_FILE:cybou-eventd>
         $<TARGET_FILE:cybou-identityd>
