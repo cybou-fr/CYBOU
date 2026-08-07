@@ -28,7 +28,8 @@ Item {
         GridLayout {
             Layout.fillWidth: true
             columns: 1
-            spacing: 11
+            rowSpacing: 11
+            columnSpacing: 11
 
             StatCard { Layout.fillWidth: true; title: "UUID"; value: mind.identityState.uuid; icon: "fingerprint" }
             StatCard { Layout.fillWidth: true; title: "Origin"; value: mind.identityState.origin; icon: "calendar" }
