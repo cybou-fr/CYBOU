@@ -8,6 +8,6 @@ mindDock.height = 420;
 mindDock.lengthMode = "fill";
 mindDock.alignment = "center";
 // Keep it visible while the Mind UI is under active development.
-mindDock.hiding = "none";
+mindDock.hiding = "autohide";
 mindDock.floating = true;
 mindDock.addWidget("org.cybou.presence");

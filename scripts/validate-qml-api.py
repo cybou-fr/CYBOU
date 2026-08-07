@@ -102,6 +102,11 @@ def main(argv: list[str]) -> int:
         for pattern, message in (
             (r"(?m)^\s*toolTip\s*:", "use ToolTip.text/visible/delay"),
             (r"(?m)^\s*Icon\s*\{", "qualify Kirigami.Icon or PlasmaCore.Icon"),
+            (
+                r"(?m)^\s*Plasmoid\.preferredRepresentation\s*:",
+                "Plasma 6 PlasmoidItem owns preferredRepresentation directly; "
+                "use preferredRepresentation and plasmoid.formFactor",
+            ),
         ):
             for match in re.finditer(pattern, text):
                 line = text.count("\n", 0, match.start()) + 1

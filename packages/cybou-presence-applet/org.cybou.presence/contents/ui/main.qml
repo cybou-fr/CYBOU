@@ -22,10 +22,11 @@ PlasmoidItem {
                                 : PlasmaCore.Types.PassiveStatus
 
     // Horizontal panel -> compact icon. Dedicated vertical panel -> embedded full Mind UI.
-    Plasmoid.preferredRepresentation:
-        Plasmoid.formFactor === PlasmaCore.Types.Vertical
-            ? Plasmoid.fullRepresentation
-            : Plasmoid.compactRepresentation
+    // Plasma 6: preferredRepresentation belongs to PlasmoidItem itself.
+    preferredRepresentation:
+        plasmoid.formFactor === PlasmaCore.Types.Vertical
+            ? root.fullRepresentation
+            : root.compactRepresentation
 
     toolTipMainText: i18n("Cybou")
     toolTipSubText: root.ready ? presenceBackend.narration : i18n("Not awake.")
