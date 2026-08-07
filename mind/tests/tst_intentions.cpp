@@ -1,8 +1,5 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+// SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
-//
-// The promise: an intention outlives the process, and closing it is a fact in the biography
-// rather than a deletion.
 
 #include "cybou/intentions/Intentions.h"
 
@@ -11,98 +8,138 @@
 
 using namespace cybou;
 
+namespace {
+
+CognitiveEnvelope requestObservation(const QString &description = QStringLiteral("request"))
+{
+    CognitiveEnvelope e;
+    e.messageId = QUuid::createUuid();
+    e.correlationId = e.messageId;
+    e.originOrgan = QStringLiteral("presenced");
+    e.kind = ContributionKind::Observation;
+    e.wallTime = QDateTime::currentDateTimeUtc();
+    e.privacy = PrivacyClass::Node;
+    e.payloadCbor = description.toUtf8();
+    return e;
+}
+
+} // namespace
+
 class TestIntentions : public QObject
 {
     Q_OBJECT
 
 private Q_SLOTS:
-    void formedIntentionIsOpen()
+    void formingNeedsAnExistingCause()
     {
         QTemporaryDir dir;
-        Journal j(dir.filePath(QStringLiteral("j.db")));
-        Intentions intentions(&j);
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Intentions intentions(&journal);
 
-        const QUuid id = intentions.form(QStringLiteral("verify sound after reboot"),
-                                         QStringLiteral("next session"));
+        QVERIFY(intentions.form(
+            QStringLiteral("verify sound"), QString(), QUuid::createUuid()).isNull());
+        QCOMPARE(journal.count(), 0u);
+    }
+
+    void formedIntentionIsCausallyGrounded()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Intentions intentions(&journal);
+
+        const CognitiveEnvelope request = requestObservation();
+        QVERIFY(journal.append(request) > 0);
+
+        const QUuid id = intentions.form(
+            QStringLiteral("verify sound after reboot"),
+            QStringLiteral("next session"),
+            request.messageId);
         QVERIFY(!id.isNull());
 
-        const auto open = intentions.open();
-        QCOMPARE(open.size(), 1);
-        QCOMPARE(open.at(0).id, id);
-        QCOMPARE(open.at(0).description, QStringLiteral("verify sound after reboot"));
-        QCOMPARE(open.at(0).trigger, QStringLiteral("next session"));
+        const auto stored = journal.contribution(id);
+        QVERIFY(stored.has_value());
+        QCOMPARE(stored->kind, ContributionKind::Intention);
+        QCOMPARE(stored->causationId, request.messageId);
+        QVERIFY(stored->causationId != stored->messageId);
+        QVERIFY(stored->evidence.isEmpty());
     }
 
-    void closingRemovesItFromTheOpenList()
+    void closingValidatesTheTargetAndCannotRepeat()
     {
         QTemporaryDir dir;
-        Journal j(dir.filePath(QStringLiteral("j.db")));
-        Intentions intentions(&j);
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Intentions intentions(&journal);
 
-        const QUuid id = intentions.form(QStringLiteral("check the network"));
-        QVERIFY(intentions.close(id, Resolution::Fulfilled, QStringLiteral("link is up")));
+        const CognitiveEnvelope request = requestObservation();
+        QVERIFY(journal.append(request) > 0);
+        QVERIFY(!intentions.close(request.messageId, Resolution::Fulfilled));
 
+        const QUuid id = intentions.form(
+            QStringLiteral("check the network"), QString(), request.messageId);
+        QVERIFY(!id.isNull());
+        QVERIFY(intentions.close(id, Resolution::Fulfilled));
+        QVERIFY(!intentions.close(id, Resolution::Abandoned));
         QVERIFY(intentions.open().isEmpty());
 
-        // Closed, not deleted: both the intention and its outcome are still in the biography.
-        QCOMPARE(j.count(), 2u);
-        QCOMPARE(j.verify(), 0u);
+        const auto outcome = journal.recent(1).first();
+        QCOMPARE(outcome.kind, ContributionKind::Outcome);
+        QCOMPARE(outcome.causationId, id);
+        QVERIFY(outcome.evidence.isEmpty());
     }
 
-    void survivesRestart()
+    void survivesRestartAndReplaysTheWholeEpisode()
     {
         QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("j.db"));
 
-        QUuid id;
+        QUuid requestId;
+        QUuid intentionId;
         {
-            Journal j(path);
-            Intentions intentions(&j);
-            id = intentions.form(QStringLiteral("verify sound and network after reboot"));
-            QVERIFY(!id.isNull());
+            Journal journal(path);
+            Intentions intentions(&journal);
+            const CognitiveEnvelope request = requestObservation();
+            requestId = request.messageId;
+            QVERIFY(journal.append(request) > 0);
+            intentionId = intentions.form(
+                QStringLiteral("verify sound and network after reboot"),
+                QString(),
+                request.messageId);
+            QVERIFY(!intentionId.isNull());
         }
 
-        // A reboot happens here: new process, new objects, same journal.
         {
-            Journal j(path);
-            Intentions intentions(&j);
-            const auto open = intentions.open();
-            QCOMPARE(open.size(), 1);
-            QCOMPARE(open.at(0).id, id);
+            Journal journal(path, QStringLiteral("second"));
+            Intentions intentions(&journal);
+            QCOMPARE(intentions.open().size(), 1);
+            QVERIFY(intentions.close(intentionId, Resolution::Obsolete));
+
+            const auto episode = journal.episode(requestId);
+            QCOMPARE(episode.size(), 3);
+            QCOMPARE(episode.at(0).kind, ContributionKind::Observation);
+            QCOMPARE(episode.at(1).kind, ContributionKind::Intention);
+            QCOMPARE(episode.at(2).kind, ContributionKind::Outcome);
         }
     }
 
     void oldestObligationComesFirst()
     {
         QTemporaryDir dir;
-        Journal j(dir.filePath(QStringLiteral("j.db")));
-        Intentions intentions(&j);
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Intentions intentions(&journal);
 
-        intentions.form(QStringLiteral("first"));
-        intentions.form(QStringLiteral("second"));
-        intentions.form(QStringLiteral("third"));
+        for (const QString &description : {
+                 QStringLiteral("first"),
+                 QStringLiteral("second"),
+                 QStringLiteral("third")}) {
+            const CognitiveEnvelope request = requestObservation(description);
+            QVERIFY(journal.append(request) > 0);
+            QVERIFY(!intentions.form(description, QString(), request.messageId).isNull());
+        }
 
         const auto open = intentions.open();
         QCOMPARE(open.size(), 3);
         QCOMPARE(open.at(0).description, QStringLiteral("first"));
         QCOMPARE(open.at(2).description, QStringLiteral("third"));
-    }
-
-    void theReasonIsReadableAfterClosing()
-    {
-        QTemporaryDir dir;
-        Journal j(dir.filePath(QStringLiteral("j.db")));
-        Intentions intentions(&j);
-
-        const QUuid id = intentions.form(QStringLiteral("watch the build"));
-        intentions.close(id, Resolution::Obsolete, QStringLiteral("the build was cancelled"));
-
-        // The whole episode replays: why it existed, and how it ended.
-        const auto episode = j.episode(id);
-        QCOMPARE(episode.size(), 2);
-        QCOMPARE(episode.at(0).kind, ContributionKind::Intention);
-        QCOMPARE(episode.at(1).kind, ContributionKind::Outcome);
-        QCOMPARE(episode.at(1).causationId, id);
     }
 };
 

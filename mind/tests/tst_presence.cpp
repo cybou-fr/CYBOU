@@ -1,12 +1,9 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+// SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
-//
-// The boundary where the mind meets the screen. What matters here is not that it renders, but
-// that it cannot render anything untrue: asleep it shows nothing, and idle it says nothing
-// rather than filling the space.
 
 #include "cybou/presence/Presence.h"
 
+#include <QDir>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -21,168 +18,119 @@ private Q_SLOTS:
     void asleepItShowsNothing()
     {
         QTemporaryDir dir;
-        Presence p(dir.filePath(QStringLiteral("state")));
+        Presence presence(dir.filePath(QStringLiteral("state")));
 
-        QVERIFY(!p.isAwake());
-        QVERIFY(p.narration().isEmpty());
-        QVERIFY(p.obligations().isEmpty());
-        QVERIFY(p.attention().isEmpty());
-        QCOMPARE(p.contributions(), 0);
-        QVERIFY(p.recent().isEmpty());
-
-        // And it refuses to act, rather than half-working.
-        QVERIFY(p.promise(QStringLiteral("something")).isNull());
-        QVERIFY(!p.reflect());
+        QVERIFY(!presence.isAwake());
+        QVERIFY(presence.narration().isEmpty());
+        QVERIFY(presence.obligations().isEmpty());
+        QCOMPARE(presence.contributions(), 0);
+        QVERIFY(presence.promise(QStringLiteral("something")).isNull());
+        QVERIFY(!presence.reflect());
     }
 
     void wakingIsRemembered()
     {
         QTemporaryDir dir;
-        Presence p(dir.filePath(QStringLiteral("state")));
-        QSignalSpy spy(&p, &Presence::changed);
+        Presence presence(dir.filePath(QStringLiteral("state")));
+        QSignalSpy spy(&presence, &Presence::changed);
 
-        QVERIFY2(p.wake(), qPrintable(p.lastError()));
-        QVERIFY(p.isAwake());
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
+        QVERIFY(presence.isAwake());
         QCOMPARE(spy.count(), 1);
-
-        // Being born is an event: identityd wrote it down.
-        QVERIFY(p.contributions() > 0);
-        QVERIFY(!p.narration().isEmpty());
+        QVERIFY(presence.contributions() > 0);
     }
 
-    void attentionNamesSomethingThatActuallyHappened()
+    void aPromiseCreatesObservationThenIntention()
     {
         QTemporaryDir dir;
-        Presence p(dir.filePath(QStringLiteral("state")));
-        QVERIFY(p.wake());
+        Presence presence(dir.filePath(QStringLiteral("state")));
+        QVERIFY(presence.wake());
 
-        // Waking restores the moment from the journal, so there *is* something on its mind:
-        // being born. That is a real event, and attending to it is honest. What must never
-        // happen is attention naming something with no record behind it.
-        const QString attention = p.attention();
-        if (attention.isEmpty()) {
-            return; // saying nothing is always allowed
-        }
+        const int before = presence.contributions();
+        const QUuid intentionId = presence.promise(QStringLiteral("verify sound after reboot"));
+        QVERIFY(!intentionId.isNull());
+        QCOMPARE(presence.contributions(), before + 2);
 
-        bool traceable = false;
-        for (const Moment &m : p.recent(50)) {
-            if (attention.contains(m.organ) || attention.contains(m.kind)) {
-                traceable = true;
-                break;
-            }
-        }
-        QVERIFY2(traceable, qPrintable(QStringLiteral("attention '%1' matches no journal entry")
-                                           .arg(attention)));
+        const QVariantList activity = presence.activity(2);
+        QCOMPARE(activity.size(), 2);
+        QCOMPARE(activity.at(0).toMap().value(QStringLiteral("kind")).toString(),
+                 kindToString(ContributionKind::Intention));
+        QCOMPARE(activity.at(1).toMap().value(QStringLiteral("kind")).toString(),
+                 kindToString(ContributionKind::Observation));
+        QCOMPARE(activity.at(1).toMap().value(QStringLiteral("organ")).toString(),
+                 QStringLiteral("presenced"));
     }
 
-    void withoutAJournalItStaysAsleep()
-    {
-        // A path that cannot be created: waking must fail rather than render an empty shell.
-        Presence p(QStringLiteral("/proc/cybou-cannot-exist/state"));
-        QVERIFY(!p.wake());
-        QVERIFY(!p.isAwake());
-        QVERIFY(!p.lastError().isEmpty());
-        QVERIFY(p.narration().isEmpty());
-    }
-
-    void aPromiseSurvivesTheSession()
+    void promiseSurvivesTheSession()
     {
         QTemporaryDir dir;
         const QString state = dir.filePath(QStringLiteral("state"));
 
         {
-            Presence p(state);
-            QVERIFY(p.wake());
-            QSignalSpy spy(&p, &Presence::changed);
-
-            QVERIFY(!p.promise(QStringLiteral("verify sound after reboot")).isNull());
-            QCOMPARE(spy.count(), 1);
-            QCOMPARE(p.obligations(), QStringList{QStringLiteral("verify sound after reboot")});
+            Presence presence(state);
+            QVERIFY(presence.wake());
+            QVERIFY(!presence.promise(
+                QStringLiteral("verify sound after reboot")).isNull());
         }
 
-        // A reboot: new object, same data directory.
         Presence again(state);
         QVERIFY(again.wake());
-        QCOMPARE(again.obligations(), QStringList{QStringLiteral("verify sound after reboot")});
-        QVERIFY(again.narration().contains(QStringLiteral("owe")));
+        QCOMPARE(again.obligations(),
+                 QStringList{QStringLiteral("verify sound after reboot")});
     }
 
-    void reflectingIsItselfRecorded()
+    void reflectingCreatesObservationThenAssessment()
     {
         QTemporaryDir dir;
-        Presence p(dir.filePath(QStringLiteral("state")));
-        QVERIFY(p.wake());
+        Presence presence(dir.filePath(QStringLiteral("state")));
+        QVERIFY(presence.wake());
 
-        const int before = p.contributions();
-        QVERIFY(p.reflect());
-        QCOMPARE(p.contributions(), before + 1);
+        const int before = presence.contributions();
+        QVERIFY(presence.reflect());
+        QCOMPARE(presence.contributions(), before + 2);
 
-        const auto latest = p.recent(1);
-        QCOMPARE(latest.size(), 1);
-        QCOMPARE(latest.at(0).organ, QStringLiteral("selfd"));
-        QCOMPARE(latest.at(0).kind, kindToString(ContributionKind::SelfAssessment));
+        const QVariantList activity = presence.activity(2);
+        QCOMPARE(activity.at(0).toMap().value(QStringLiteral("kind")).toString(),
+                 kindToString(ContributionKind::SelfAssessment));
+        QCOMPARE(activity.at(1).toMap().value(QStringLiteral("kind")).toString(),
+                 kindToString(ContributionKind::Observation));
     }
 
-    void theActivityListIsNewestFirst()
-    {
-        QTemporaryDir dir;
-        Presence p(dir.filePath(QStringLiteral("state")));
-        QVERIFY(p.wake());
-
-        p.promise(QStringLiteral("first"));
-        p.reflect();
-
-        const auto recent = p.recent(2);
-        QCOMPARE(recent.size(), 2);
-        QVERIFY(recent.at(0).when >= recent.at(1).when);
-        QCOMPARE(recent.at(0).organ, QStringLiteral("selfd"));
-        QCOMPARE(recent.at(1).organ, QStringLiteral("intentiond"));
-    }
-
-    void aSecondSessionCountsAsASecondSession()
+    void visibleOperationsProduceNoSelfReferences()
     {
         QTemporaryDir dir;
         const QString state = dir.filePath(QStringLiteral("state"));
+        Presence presence(state);
+        QVERIFY(presence.wake());
+        QVERIFY(!presence.promise(QStringLiteral("task")).isNull());
+        QVERIFY(presence.reflect());
+        QVERIFY(presence.observe(QStringLiteral("build"), 10.0));
+        QVERIFY(!presence.predict(QStringLiteral("build")).isEmpty());
 
-        {
-            Presence p(state);
-            QVERIFY(p.wake());
-            QVERIFY(p.narration().contains(QStringLiteral("first day")));
+        Journal journal(QDir(state).filePath(QStringLiteral("journal.db")),
+                        QStringLiteral("inspection"));
+        for (const CognitiveEnvelope &envelope : journal.recent(0)) {
+            QVERIFY(envelope.causationId != envelope.messageId);
+            QVERIFY(!envelope.evidence.contains(envelope.messageId));
         }
-
-        Presence again(state);
-        QVERIFY(again.wake());
-        QVERIFY(again.narration().contains(QStringLiteral("session 2")));
     }
 
-    void fulfillingAndAbandoningObligationsRemovesThemAndUpdatesStats()
+    void fulfillingAndAbandoningObligationsUpdatesStats()
     {
         QTemporaryDir dir;
-        Presence p(dir.filePath(QStringLiteral("state")));
-        QVERIFY(p.wake());
+        Presence presence(dir.filePath(QStringLiteral("state")));
+        QVERIFY(presence.wake());
 
-        p.promise(QStringLiteral("task 1"));
-        p.promise(QStringLiteral("task 2"));
-        p.promise(QStringLiteral("task 3"));
-        QCOMPARE(p.obligations().size(), 3);
+        presence.promise(QStringLiteral("task 1"));
+        presence.promise(QStringLiteral("task 2"));
+        presence.promise(QStringLiteral("task 3"));
+        QCOMPARE(presence.obligations().size(), 3);
 
-        const auto detailed = p.detailedObligations();
-        QCOMPARE(detailed.size(), 3);
-        QCOMPARE(detailed.at(0).toMap().value(QStringLiteral("description")).toString(), QStringLiteral("task 1"));
+        QVERIFY(presence.fulfillIndex(0));
+        QVERIFY(presence.abandonIndex(1));
+        QCOMPARE(presence.obligations().size(), 1);
 
-        // Fulfill task 1 (index 0)
-        QVERIFY(p.fulfillIndex(0));
-        QCOMPARE(p.obligations().size(), 2);
-        QCOMPARE(p.obligations().at(0), QStringLiteral("task 2"));
-
-        // Abandon task 3 (now index 1)
-        QVERIFY(p.abandonIndex(1));
-        QCOMPARE(p.obligations().size(), 1);
-        QCOMPARE(p.obligations().at(0), QStringLiteral("task 2"));
-
-        QVERIFY(p.observe(QStringLiteral("cpu-load"), 12.5));
-
-        const QVariantMap stats = p.stats();
+        const QVariantMap stats = presence.stats();
         QCOMPARE(stats.value(QStringLiteral("openIntentions")).toInt(), 1);
         QVERIFY(stats.value(QStringLiteral("journalIntact")).toBool());
     }

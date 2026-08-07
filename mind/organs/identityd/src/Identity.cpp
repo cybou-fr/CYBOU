@@ -178,7 +178,7 @@ bool Identity::beginSession()
         // continuity ritual; recording it is the part that makes the claim checkable later.
         // РУС: Ветка 3 — миграция архитектуры: ритуал непрерывности.
         // РУС: Запись SelfAssessment делает утверждение проверяемым позже.
-        record(ContributionKind::SelfAssessment,
+        record(ContributionKind::Observation,
                QStringLiteral("architecture changed from %1 to %2, identity preserved")
                    .arg(previousArchitecture, m_state.architectureVersion));
     } else {

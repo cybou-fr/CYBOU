@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+// SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
 #include "cybou/presence/Presence.h"
@@ -45,7 +45,6 @@ bool Presence::wake()
     auto identity = std::make_unique<Identity>(
         QDir(m_dataDir).filePath(QStringLiteral("identity.json")), journal.get());
     if (!identity->beginSession()) {
-        // Without continuity there is no one for the panel to be a presence *of*.
         m_lastError = identity->lastError();
         return false;
     }
@@ -54,12 +53,11 @@ bool Presence::wake()
     m_identity = std::move(identity);
     m_intentions = std::make_unique<Intentions>(m_journal.get());
     m_predictor = std::make_unique<Predictor>(m_journal.get());
-    m_self = std::make_unique<SelfModel>(m_journal.get(), m_identity.get(), m_intentions.get(),
-                                         m_predictor.get());
+    m_self = std::make_unique<SelfModel>(
+        m_journal.get(), m_identity.get(), m_intentions.get(), m_predictor.get());
     m_workspace = std::make_unique<Workspace>(m_journal.get());
     m_workspace->rehydrate();
 
-    // A shift of attention is the one thing the panel should react to without being asked.
     connect(m_workspace.get(), &Workspace::focusChanged, this, &Presence::changed);
 
     m_awake = true;
@@ -69,10 +67,7 @@ bool Presence::wake()
 
 QString Presence::narration() const
 {
-    if (!m_awake) {
-        return {};
-    }
-    return m_self->narrate(m_self->measure());
+    return m_awake ? m_self->narrate(m_self->measure()) : QString();
 }
 
 QStringList Presence::obligations() const
@@ -81,10 +76,11 @@ QStringList Presence::obligations() const
     if (!m_awake) {
         return result;
     }
-    const auto open = m_intentions->open(); // oldest first
+
+    const auto open = m_intentions->open();
     result.reserve(open.size());
-    for (const Intention &i : open) {
-        result.append(i.description);
+    for (const Intention &intention : open) {
+        result.append(intention.description);
     }
     return result;
 }
@@ -95,14 +91,13 @@ QString Presence::attention() const
         return {};
     }
 
-    const Coalition f = m_workspace->focus();
-    if (!f.isValid()) {
-        // Nothing is going on. Saying so is better than filling the space with a generality.
+    const Coalition focus = m_workspace->focus();
+    if (!focus.isValid()) {
         return {};
     }
 
-    const CognitiveEnvelope &latest = f.members.last();
-    const QStringList voices = f.organs();
+    const CognitiveEnvelope &latest = focus.members.last();
+    const QStringList voices = focus.organs();
     if (voices.size() > 1) {
         return QObject::tr("%1, with %n organ(s) involved", nullptr, voices.size())
             .arg(kindToString(latest.kind));
@@ -122,15 +117,15 @@ QList<Moment> Presence::recent(int limit) const
         return result;
     }
 
-    const auto envelopes = m_journal->recent(limit); // newest first
+    const auto envelopes = m_journal->recent(limit);
     result.reserve(envelopes.size());
-    for (const auto &e : envelopes) {
-        Moment m;
-        m.when = e.wallTime;
-        m.organ = e.originOrgan;
-        m.kind = kindToString(e.kind);
-        m.thread = e.correlationId;
-        result.append(m);
+    for (const auto &envelope : envelopes) {
+        Moment moment;
+        moment.when = envelope.wallTime;
+        moment.organ = envelope.originOrgan;
+        moment.kind = kindToString(envelope.kind);
+        moment.thread = envelope.correlationId;
+        result.append(moment);
     }
     return result;
 }
@@ -138,27 +133,74 @@ QList<Moment> Presence::recent(int limit) const
 QVariantList Presence::activity(int limit) const
 {
     QVariantList result;
-    for (const Moment &m : recent(limit)) {
+    for (const Moment &moment : recent(limit)) {
         QVariantMap entry;
-        entry[QStringLiteral("when")] = m.when.toLocalTime();
-        entry[QStringLiteral("organ")] = m.organ;
-        entry[QStringLiteral("kind")] = m.kind;
-        entry[QStringLiteral("thread")] = m.thread.toString(QUuid::WithoutBraces);
+        entry[QStringLiteral("when")] = moment.when.toLocalTime();
+        entry[QStringLiteral("organ")] = moment.organ;
+        entry[QStringLiteral("kind")] = moment.kind;
+        entry[QStringLiteral("thread")] = moment.thread.toString(QUuid::WithoutBraces);
         result.append(entry);
     }
     return result;
 }
 
+bool Presence::appendUserObservation(
+    const QString &event, const QCborMap &details, QUuid *messageId)
+{
+    if (!m_awake || !m_journal) {
+        return false;
+    }
+
+    CognitiveEnvelope observation;
+    observation.messageId = QUuid::createUuid();
+    observation.correlationId = observation.messageId;
+    observation.originOrgan = QStringLiteral("presenced");
+    observation.kind = ContributionKind::Observation;
+    observation.wallTime = QDateTime::currentDateTimeUtc();
+    observation.confidence = 1.0;
+    observation.privacy = PrivacyClass::Node;
+
+    QCborMap payload = details;
+    payload[QStringLiteral("event")] = event;
+    observation.payloadCbor = payload.toCborValue().toCbor();
+
+    if (m_journal->append(observation) == 0) {
+        m_lastError = m_journal->lastError();
+        return false;
+    }
+
+    if (messageId) {
+        *messageId = observation.messageId;
+    }
+    return true;
+}
+
 QUuid Presence::promise(const QString &description)
 {
-    if (!m_awake) {
+    if (!m_awake || description.trimmed().isEmpty()) {
         return {};
     }
-    const QUuid id = m_intentions->form(description, QStringLiteral("asked by the user"));
-    if (!id.isNull()) {
-        Q_EMIT changed();
+
+    QCborMap details;
+    details[QStringLiteral("description")] = description.trimmed();
+
+    QUuid requestId;
+    if (!appendUserObservation(
+            QStringLiteral("user-requested-intention"), details, &requestId)) {
+        return {};
     }
-    return id;
+
+    const QUuid intentionId = m_intentions->form(
+        description,
+        QStringLiteral("asked by the user"),
+        requestId);
+    if (intentionId.isNull()) {
+        m_lastError = m_intentions->lastError();
+        return {};
+    }
+
+    Q_EMIT changed();
+    return intentionId;
 }
 
 bool Presence::reflect()
@@ -166,11 +208,19 @@ bool Presence::reflect()
     if (!m_awake) {
         return false;
     }
-    const SelfReport r = m_self->assess();
-    if (!r.isValid()) {
+
+    QUuid requestId;
+    if (!appendUserObservation(
+            QStringLiteral("self-inspection-requested"), QCborMap(), &requestId)) {
+        return false;
+    }
+
+    const SelfReport report = m_self->assess(requestId);
+    if (!report.isValid()) {
         m_lastError = m_self->lastError();
         return false;
     }
+
     Q_EMIT changed();
     return true;
 }
@@ -180,13 +230,17 @@ bool Presence::fulfillIndex(int index)
     if (!m_awake || !m_intentions) {
         return false;
     }
+
     const auto open = m_intentions->open();
     if (index < 0 || index >= open.size()) {
         return false;
     }
-    bool ok = m_intentions->close(open.at(index).id, Resolution::Fulfilled);
+
+    const bool ok = m_intentions->close(open.at(index).id, Resolution::Fulfilled);
     if (ok) {
         Q_EMIT changed();
+    } else {
+        m_lastError = m_intentions->lastError();
     }
     return ok;
 }
@@ -196,13 +250,17 @@ bool Presence::abandonIndex(int index)
     if (!m_awake || !m_intentions) {
         return false;
     }
+
     const auto open = m_intentions->open();
     if (index < 0 || index >= open.size()) {
         return false;
     }
-    bool ok = m_intentions->close(open.at(index).id, Resolution::Abandoned);
+
+    const bool ok = m_intentions->close(open.at(index).id, Resolution::Abandoned);
     if (ok) {
         Q_EMIT changed();
+    } else {
+        m_lastError = m_intentions->lastError();
     }
     return ok;
 }
@@ -213,12 +271,14 @@ QVariantList Presence::detailedObligations() const
     if (!m_awake || !m_intentions) {
         return list;
     }
-    for (const Intention &i : m_intentions->open()) {
+
+    for (const Intention &intention : m_intentions->open()) {
         QVariantMap map;
-        map[QStringLiteral("correlationId")] = i.id.toString(QUuid::WithoutBraces);
-        map[QStringLiteral("description")] = i.description;
-        map[QStringLiteral("trigger")] = i.trigger;
-        map[QStringLiteral("formed")] = i.formed.toLocalTime();
+        map[QStringLiteral("correlationId")] =
+            intention.id.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("description")] = intention.description;
+        map[QStringLiteral("trigger")] = intention.trigger;
+        map[QStringLiteral("formed")] = intention.formed.toLocalTime();
         list.append(map);
     }
     return list;
@@ -229,9 +289,12 @@ bool Presence::observe(const QString &subject, double value)
     if (!m_awake || !m_predictor) {
         return false;
     }
-    bool ok = m_predictor->observe(subject, value);
+
+    const bool ok = m_predictor->observe(subject, value);
     if (ok) {
         Q_EMIT changed();
+    } else {
+        m_lastError = m_predictor->lastError();
     }
     return ok;
 }
@@ -242,15 +305,16 @@ QVariantMap Presence::stats() const
     if (!m_awake || !m_self) {
         return map;
     }
-    const SelfReport r = m_self->measure();
-    map[QStringLiteral("ageInDays")] = r.ageInDays;
-    map[QStringLiteral("sessions")] = r.sessions;
-    map[QStringLiteral("openIntentions")] = r.openIntentions;
-    map[QStringLiteral("oldestObligationDays")] = r.oldestObligationDays;
-    map[QStringLiteral("settledPredictions")] = r.settledPredictions;
-    map[QStringLiteral("contributions")] = r.contributions;
-    map[QStringLiteral("journalIntact")] = r.journalIntact;
-    map[QStringLiteral("firstBrokenAt")] = r.firstBrokenAt;
+
+    const SelfReport report = m_self->measure();
+    map[QStringLiteral("ageInDays")] = report.ageInDays;
+    map[QStringLiteral("sessions")] = report.sessions;
+    map[QStringLiteral("openIntentions")] = report.openIntentions;
+    map[QStringLiteral("oldestObligationDays")] = report.oldestObligationDays;
+    map[QStringLiteral("settledPredictions")] = report.settledPredictions;
+    map[QStringLiteral("contributions")] = report.contributions;
+    map[QStringLiteral("journalIntact")] = report.journalIntact;
+    map[QStringLiteral("firstBrokenAt")] = report.firstBrokenAt;
     return map;
 }
 
@@ -260,6 +324,7 @@ QVariantMap Presence::identityState() const
     if (!m_awake || !m_identity) {
         return map;
     }
+
     const IdentityState state = m_identity->state();
     map[QStringLiteral("uuid")] = state.identityId.toString(QUuid::WithoutBraces);
     map[QStringLiteral("origin")] = state.origin.toString();
@@ -275,30 +340,37 @@ QVariantList Presence::calibrations() const
     if (!m_awake || !m_predictor) {
         return list;
     }
-    const auto calibrations = m_predictor->allCalibrations();
-    for (const auto &cal : calibrations) {
+
+    for (const Calibration &calibration : m_predictor->allCalibrations()) {
         QVariantMap map;
-        map[QStringLiteral("subject")] = cal.subject;
-        map[QStringLiteral("settled")] = cal.settled;
-        map[QStringLiteral("meanError")] = cal.meanError;
-        map[QStringLiteral("bias")] = cal.bias;
+        map[QStringLiteral("subject")] = calibration.subject;
+        map[QStringLiteral("settled")] = calibration.settled;
+        map[QStringLiteral("meanError")] = calibration.meanError;
+        map[QStringLiteral("bias")] = calibration.bias;
         list.append(map);
     }
     return list;
 }
 
-QVariantMap Presence::predict(const QString &subject) const
+QVariantMap Presence::predict(const QString &subject)
 {
     QVariantMap map;
     if (!m_awake || !m_predictor) {
         return map;
     }
+
     const Forecast forecast = m_predictor->predict(subject);
+    if (forecast.id.isNull()) {
+        m_lastError = m_predictor->lastError();
+        return map;
+    }
+
     map[QStringLiteral("subject")] = forecast.subject;
     map[QStringLiteral("estimate")] = forecast.estimate;
     map[QStringLiteral("margin")] = forecast.margin;
     map[QStringLiteral("confidence")] = forecast.confidence;
     map[QStringLiteral("samples")] = forecast.samples;
+    Q_EMIT changed();
     return map;
 }
 
@@ -308,10 +380,11 @@ QVariantList Presence::coalitions() const
     if (!m_awake || !m_workspace) {
         return list;
     }
-    const auto coalitions = m_workspace->coalitions();
-    for (const auto &coalition : coalitions) {
+
+    for (const Coalition &coalition : m_workspace->coalitions()) {
         QVariantMap map;
-        map[QStringLiteral("correlationId")] = coalition.correlationId.toString(QUuid::WithoutBraces);
+        map[QStringLiteral("correlationId")] =
+            coalition.correlationId.toString(QUuid::WithoutBraces);
         map[QStringLiteral("salience")] = coalition.salience;
         map[QStringLiteral("organs")] = coalition.organs();
         map[QStringLiteral("threads")] = coalition.threadCount();
@@ -326,10 +399,11 @@ QVariantMap Presence::moment() const
     if (!m_awake || !m_workspace) {
         return map;
     }
-    const MomentState moment = m_workspace->momentState();
-    map[QStringLiteral("focus")] = moment.focus.toString(QUuid::WithoutBraces);
-    map[QStringLiteral("salience")] = moment.salience;
-    map[QStringLiteral("organs")] = moment.organs;
+
+    const MomentState state = m_workspace->momentState();
+    map[QStringLiteral("focus")] = state.focus.toString(QUuid::WithoutBraces);
+    map[QStringLiteral("salience")] = state.salience;
+    map[QStringLiteral("organs")] = state.organs;
     return map;
 }
 

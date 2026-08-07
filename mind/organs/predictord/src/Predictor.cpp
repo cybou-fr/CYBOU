@@ -1,10 +1,11 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+// SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
 #include "cybou/predictor/Predictor.h"
 
 #include <QCborMap>
 #include <QCborValue>
+#include <QSet>
 
 #include <algorithm>
 #include <cmath>
@@ -20,9 +21,9 @@ QCborMap payloadOf(const CognitiveEnvelope &e)
     return QCborValue::fromCbor(e.payloadCbor).toMap();
 }
 
-QString subjectOf(const QCborMap &p)
+QString subjectOf(const QCborMap &payload)
 {
-    return p[QStringLiteral("subject")].toString();
+    return payload[QStringLiteral("subject")].toString();
 }
 
 } // namespace
@@ -32,9 +33,9 @@ Predictor::Predictor(Journal *journal)
 {
 }
 
-QList<double> Predictor::history(const QString &subject) const
+QList<Predictor::PredictionSample> Predictor::history(const QString &subject) const
 {
-    QList<double> values;
+    QList<PredictionSample> values;
     if (!m_journal) {
         return values;
     }
@@ -46,24 +47,29 @@ QList<double> Predictor::history(const QString &subject) const
         if (!measured || e.originOrgan != QLatin1String(kOrgan)) {
             continue;
         }
-        const QCborMap p = payloadOf(e);
-        if (subjectOf(p) != subject || !p.contains(QStringLiteral("actual"))) {
+
+        const QCborMap payload = payloadOf(e);
+        if (subjectOf(payload) != subject || !payload.contains(QStringLiteral("actual"))) {
             continue;
         }
-        // Both count as lived experience: one was foreseen, one merely happened. For learning
-        // what a build usually costs, that distinction does not matter.
-        values.append(p[QStringLiteral("actual")].toDouble());
+
+        values.append(PredictionSample{
+            e.messageId,
+            payload[QStringLiteral("actual")].toDouble(),
+            e.privacy,
+        });
     }
 
-    // recent() is newest first; history reads naturally oldest first.
     std::reverse(values.begin(), values.end());
     return values;
 }
 
 bool Predictor::observe(const QString &subject, double value)
 {
-    if (!m_journal || subject.isEmpty()) {
-        m_lastError = QStringLiteral("an observation needs a journal and a subject");
+    m_lastError.clear();
+
+    if (!m_journal || subject.trimmed().isEmpty() || !std::isfinite(value)) {
+        m_lastError = QStringLiteral("an observation needs a journal, a subject, and a value");
         return false;
     }
 
@@ -71,15 +77,13 @@ bool Predictor::observe(const QString &subject, double value)
     e.messageId = QUuid::createUuid();
     e.correlationId = e.messageId;
     e.originOrgan = QString::fromLatin1(kOrgan);
-    // An Observation needs no cause - it is the one kind of contribution that may stand alone,
-    // because it is the point where the world enters the journal.
     e.kind = ContributionKind::Observation;
     e.wallTime = QDateTime::currentDateTimeUtc();
     e.confidence = 1.0;
     e.privacy = PrivacyClass::Node;
 
     QCborMap payload;
-    payload[QStringLiteral("subject")] = subject;
+    payload[QStringLiteral("subject")] = subject.trimmed();
     payload[QStringLiteral("actual")] = value;
     e.payloadCbor = payload.toCborValue().toCbor();
 
@@ -92,104 +96,100 @@ bool Predictor::observe(const QString &subject, double value)
 
 Forecast Predictor::predict(const QString &subject, const QUuid &correlationId)
 {
-    Forecast f;
-    f.subject = subject;
+    m_lastError.clear();
 
-    if (!m_journal || subject.isEmpty()) {
+    Forecast forecast;
+    forecast.subject = subject.trimmed();
+
+    if (!m_journal || forecast.subject.isEmpty()) {
         m_lastError = QStringLiteral("a forecast needs a journal and a subject");
-        return f;
+        return forecast;
     }
 
-    const QList<double> past = history(subject);
-    f.samples = static_cast<int>(past.size());
+    const QList<PredictionSample> past = history(forecast.subject);
+    forecast.samples = static_cast<int>(past.size());
 
     if (past.isEmpty()) {
-        // Nothing to go on. The honest answer is silence, not a number with no basis - and
-        // nothing is written to the journal, because a guess is not an observation.
-        m_lastError = QStringLiteral("no history for '%1' yet").arg(subject);
-        return f;
+        m_lastError = QStringLiteral("no history for '%1' yet").arg(forecast.subject);
+        return forecast;
     }
 
     double sum = 0.0;
-    for (double v : past) {
-        sum += v;
+    for (const PredictionSample &sample : past) {
+        sum += sample.value;
     }
-    f.estimate = sum / past.size();
+    forecast.estimate = sum / past.size();
 
-    // Mean absolute deviation rather than standard deviation: it degrades gracefully at two
-    // or three samples, which is where this organ will spend its early life.
     double spread = 0.0;
-    for (double v : past) {
-        spread += std::fabs(v - f.estimate);
+    for (const PredictionSample &sample : past) {
+        spread += std::fabs(sample.value - forecast.estimate);
     }
-    f.margin = spread / past.size();
-
-    // Confidence grows with evidence and never reaches certainty. Three samples give 0.5,
-    // which is roughly the point where a number is worth showing at all.
-    f.confidence = past.size() / static_cast<double>(past.size() + 3);
+    forecast.margin = spread / past.size();
+    forecast.confidence = past.size() / static_cast<double>(past.size() + 3);
 
     CognitiveEnvelope e;
     e.messageId = QUuid::createUuid();
     e.correlationId = correlationId.isNull() ? e.messageId : correlationId;
-    e.causationId = e.messageId; // a forecast is a root: it is formed, not derived
     e.originOrgan = QString::fromLatin1(kOrgan);
     e.kind = ContributionKind::Prediction;
     e.wallTime = QDateTime::currentDateTimeUtc();
-    e.confidence = f.confidence;
-    e.privacy = PrivacyClass::Node;
+    e.confidence = forecast.confidence;
+    e.privacy = PrivacyClass::Public;
+
+    for (const PredictionSample &sample : past) {
+        e.evidence.append(sample.contributionId);
+        e.privacy = mostRestrictive(e.privacy, sample.privacy);
+    }
 
     QCborMap payload;
-    payload[QStringLiteral("subject")] = subject;
-    payload[QStringLiteral("estimate")] = f.estimate;
-    payload[QStringLiteral("margin")] = f.margin;
-    payload[QStringLiteral("samples")] = f.samples;
+    payload[QStringLiteral("subject")] = forecast.subject;
+    payload[QStringLiteral("estimate")] = forecast.estimate;
+    payload[QStringLiteral("margin")] = forecast.margin;
+    payload[QStringLiteral("samples")] = forecast.samples;
     e.payloadCbor = payload.toCborValue().toCbor();
 
     if (m_journal->append(e) == 0) {
         m_lastError = m_journal->lastError();
-        return Forecast{{}, subject, 0.0, 0.0, 0.0, f.samples};
+        return Forecast{{}, forecast.subject, 0.0, 0.0, 0.0, forecast.samples};
     }
 
-    f.id = e.messageId;
-    return f;
+    forecast.id = e.messageId;
+    return forecast;
 }
 
 bool Predictor::settle(const QUuid &forecastId, double actual)
 {
-    if (!m_journal || forecastId.isNull()) {
-        m_lastError = QStringLiteral("settling needs a journal and a forecast");
+    m_lastError.clear();
+
+    if (!m_journal || forecastId.isNull() || !std::isfinite(actual)) {
+        m_lastError = QStringLiteral("settling needs a journal, a forecast, and an actual value");
         return false;
     }
 
-    // Find what was actually claimed. Re-reading it rather than trusting a caller-supplied
-    // estimate is what keeps the error measurement honest.
-    CognitiveEnvelope forecast;
-    bool found = false;
-    for (const auto &e : m_journal->recent(0)) {
-        if (e.messageId == forecastId && e.kind == ContributionKind::Prediction) {
-            forecast = e;
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
+    const auto forecast = m_journal->contribution(forecastId);
+    if (!forecast || forecast->kind != ContributionKind::Prediction
+        || forecast->originOrgan != QLatin1String(kOrgan)) {
         m_lastError = QStringLiteral("no such forecast in the journal");
         return false;
     }
+    if (m_journal->hasOutcomeFor(forecastId, QString::fromLatin1(kOrgan))) {
+        m_lastError = QStringLiteral("the forecast is already settled");
+        return false;
+    }
 
-    const QCborMap claimed = payloadOf(forecast);
+    const QCborMap claimed = payloadOf(*forecast);
     const double estimate = claimed[QStringLiteral("estimate")].toDouble();
 
     CognitiveEnvelope e;
     e.messageId = QUuid::createUuid();
-    e.correlationId = forecast.correlationId; // stays inside the forecast's episode
-    e.causationId = forecastId;               // the join that makes error measurable
+    e.correlationId = forecast->correlationId;
+    e.causationId = forecastId;
     e.originOrgan = QString::fromLatin1(kOrgan);
+    e.originNode = forecast->originNode;
     e.kind = ContributionKind::Outcome;
     e.wallTime = QDateTime::currentDateTimeUtc();
     e.confidence = 1.0;
-    e.privacy = PrivacyClass::Node;
-    e.evidence = {forecastId};
+    e.privacy = forecast->privacy;
 
     QCborMap payload;
     payload[QStringLiteral("subject")] = subjectOf(claimed);
@@ -207,10 +207,10 @@ bool Predictor::settle(const QUuid &forecastId, double actual)
 
 Calibration Predictor::calibration(const QString &subject) const
 {
-    Calibration c;
-    c.subject = subject;
+    Calibration calibration;
+    calibration.subject = subject;
     if (!m_journal) {
-        return c;
+        return calibration;
     }
 
     double absolute = 0.0;
@@ -220,23 +220,22 @@ Calibration Predictor::calibration(const QString &subject) const
         if (e.kind != ContributionKind::Outcome || e.originOrgan != QLatin1String(kOrgan)) {
             continue;
         }
-        const QCborMap p = payloadOf(e);
-        if (subjectOf(p) != subject || !p.contains(QStringLiteral("error"))) {
+        const QCborMap payload = payloadOf(e);
+        if (subjectOf(payload) != subject || !payload.contains(QStringLiteral("error"))) {
             continue;
         }
-        // Sign convention: error = actual - estimate, so a positive mean bias means reality
-        // ran longer than predicted, i.e. the system is optimistic.
-        const double err = p[QStringLiteral("error")].toDouble();
-        absolute += std::fabs(err);
-        signedSum += err;
-        ++c.settled;
+
+        const double error = payload[QStringLiteral("error")].toDouble();
+        absolute += std::fabs(error);
+        signedSum += error;
+        ++calibration.settled;
     }
 
-    if (c.settled > 0) {
-        c.meanError = absolute / c.settled;
-        c.bias = signedSum / c.settled;
+    if (calibration.settled > 0) {
+        calibration.meanError = absolute / calibration.settled;
+        calibration.bias = signedSum / calibration.settled;
     }
-    return c;
+    return calibration;
 }
 
 QList<Calibration> Predictor::allCalibrations() const
@@ -246,22 +245,19 @@ QList<Calibration> Predictor::allCalibrations() const
         return result;
     }
 
-    // Collect all unique subjects with outcomes
     QSet<QString> subjects;
     for (const auto &e : m_journal->recent(0)) {
         if (e.kind == ContributionKind::Outcome && e.originOrgan == QLatin1String(kOrgan)) {
-            const QCborMap p = payloadOf(e);
-            if (p.contains(QStringLiteral("subject"))) {
-                subjects.insert(subjectOf(p));
+            const QString subject = subjectOf(payloadOf(e));
+            if (!subject.isEmpty()) {
+                subjects.insert(subject);
             }
         }
     }
 
-    // Get calibration for each subject
     for (const QString &subject : subjects) {
         result.append(calibration(subject));
     }
-
     return result;
 }
 

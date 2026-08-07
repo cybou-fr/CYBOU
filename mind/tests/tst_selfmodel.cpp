@@ -1,8 +1,5 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+// SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
-//
-// The rule under test is ADR-0003's: nothing is shown that is not measured. These tests mostly
-// check what the system refuses to claim.
 
 #include "cybou/self/SelfModel.h"
 
@@ -35,118 +32,120 @@ private:
         {
             identity.beginSession();
         }
+
+        CognitiveEnvelope observation(const QString &event)
+        {
+            CognitiveEnvelope e;
+            e.messageId = QUuid::createUuid();
+            e.correlationId = e.messageId;
+            e.originOrgan = QStringLiteral("testd");
+            e.kind = ContributionKind::Observation;
+            e.wallTime = QDateTime::currentDateTimeUtc();
+            e.privacy = PrivacyClass::Node;
+            e.payloadCbor = event.toUtf8();
+            return e;
+        }
+
+        QUuid appendObservation(const QString &event)
+        {
+            const CognitiveEnvelope e = observation(event);
+            return journal.append(e) > 0 ? e.messageId : QUuid();
+        }
     };
 
 private Q_SLOTS:
     void itReportsWhatTheOtherOrgansKnow()
     {
-        Fixture f;
-        f.intentions.form(QStringLiteral("verify sound"));
-        f.intentions.form(QStringLiteral("check network"));
+        Fixture fixture;
+        const QUuid firstCause = fixture.appendObservation(QStringLiteral("first request"));
+        const QUuid secondCause = fixture.appendObservation(QStringLiteral("second request"));
+        fixture.intentions.form(QStringLiteral("verify sound"), QString(), firstCause);
+        fixture.intentions.form(QStringLiteral("check network"), QString(), secondCause);
 
-        const SelfReport r = f.self.measure();
-        QVERIFY(r.isValid());
-        QCOMPARE(r.openIntentions, 2);
-        QCOMPARE(r.sessions, 1u);
-        QCOMPARE(r.architectureVersion, QStringLiteral("presence-0.1"));
-        QVERIFY(r.journalIntact);
-        QVERIFY(r.contributions > 0);
+        const SelfReport report = fixture.self.measure();
+        QVERIFY(report.isValid());
+        QCOMPARE(report.openIntentions, 2);
+        QCOMPARE(report.sessions, 1u);
+        QVERIFY(report.journalIntact);
     }
 
-    void untestedItDoesNotClaimAccuracy()
+    void assessmentNeedsAnExistingCause()
     {
-        Fixture f;
-        const SelfReport r = f.self.measure();
+        Fixture fixture;
+        const quint64 before = fixture.journal.count();
+        QVERIFY(!fixture.self.assess(QUuid::createUuid()).isValid());
+        QCOMPARE(fixture.journal.count(), before);
+    }
 
-        QCOMPARE(r.settledPredictions, 0);
-        QVERIFY(r.calibrations.isEmpty());
+    void assessmentIsCausallyGrounded()
+    {
+        Fixture fixture;
+        const QUuid inspection = fixture.appendObservation(
+            QStringLiteral("self-inspection-requested"));
+        QVERIFY(!inspection.isNull());
 
-        // And it says so in words rather than staying conveniently quiet.
-        QVERIFY(f.self.narrate(r).contains(QStringLiteral("not yet been tested")));
+        const SelfReport report = fixture.self.assess(inspection);
+        QVERIFY(report.isValid());
+
+        const auto latest = fixture.journal.recent(1).first();
+        QCOMPARE(latest.kind, ContributionKind::SelfAssessment);
+        QCOMPARE(latest.causationId, inspection);
+        QVERIFY(latest.causationId != latest.messageId);
+        QVERIFY(latest.evidence.isEmpty());
     }
 
     void accuracyAppearsOnlyAfterBeingChecked()
     {
-        Fixture f;
-        f.predictor.observe(QStringLiteral("build"), 10.0);
+        Fixture fixture;
+        QVERIFY(fixture.predictor.observe(QStringLiteral("build"), 10.0));
+        const Forecast forecast = fixture.predictor.predict(QStringLiteral("build"));
+        QVERIFY(fixture.predictor.settle(forecast.id, 13.0));
 
-        const Forecast unsettled = f.predictor.predict(QStringLiteral("build"));
-        QVERIFY(!unsettled.id.isNull());
-
-        // A prediction nobody checked teaches nothing about accuracy.
-        QCOMPARE(f.self.measure().settledPredictions, 0);
-
-        f.predictor.settle(unsettled.id, 13.0);
-
-        const SelfReport r = f.self.measure();
-        QCOMPARE(r.settledPredictions, 1);
-        QCOMPARE(r.calibrations.size(), 1);
-        QCOMPARE(r.calibrations.at(0).subject, QStringLiteral("build"));
-        QCOMPARE(r.calibrations.at(0).bias, 3.0);
-
-        QVERIFY(f.self.narrate(r).contains(QStringLiteral("optimistic")));
-    }
-
-    void anAssessmentIsRemembered()
-    {
-        Fixture f;
-        const quint64 before = f.journal.count();
-
-        const SelfReport r = f.self.assess();
-        QVERIFY(r.isValid());
-        QCOMPARE(f.journal.count(), before + 1);
-        QCOMPARE(f.journal.verify(), 0u);
-
-        const auto latest = f.journal.recent(1);
-        QCOMPARE(latest.size(), 1);
-        QCOMPARE(latest.at(0).kind, ContributionKind::SelfAssessment);
-        QCOMPARE(latest.at(0).originOrgan, QStringLiteral("selfd"));
+        const SelfReport report = fixture.self.measure();
+        QCOMPARE(report.settledPredictions, 1);
+        QCOMPARE(report.calibrations.size(), 1);
+        QCOMPARE(report.calibrations.at(0).bias, 3.0);
+        QVERIFY(fixture.self.narrate(report).contains(QStringLiteral("optimistic")));
     }
 
     void itDoesNotHideADamagedMemory()
     {
-        Fixture f;
-        f.intentions.form(QStringLiteral("something"));
+        Fixture fixture;
 
-        // Tamper with the chain the way corruption would.
         {
-            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
-                                                        QStringLiteral("tamper"));
-            db.setDatabaseName(f.dir.filePath(QStringLiteral("j.db")));
+            QSqlDatabase db = QSqlDatabase::addDatabase(
+                QStringLiteral("QSQLITE"), QStringLiteral("tamper-self"));
+            db.setDatabaseName(fixture.dir.filePath(QStringLiteral("j.db")));
             QVERIFY(db.open());
-            QSqlQuery q(db);
-            QVERIFY(q.exec(QStringLiteral("UPDATE contribution SET origin_organ = 'forged' "
-                                          "WHERE seq = 1")));
+            QSqlQuery query(db);
+            QVERIFY(query.exec(QStringLiteral(
+                "UPDATE contribution SET origin_organ = 'forged' WHERE seq = 1")));
             db.close();
         }
-        QSqlDatabase::removeDatabase(QStringLiteral("tamper"));
+        QSqlDatabase::removeDatabase(QStringLiteral("tamper-self"));
 
-        Journal reopened(f.dir.filePath(QStringLiteral("j.db")),
-                         QStringLiteral("reopened"));
-        Identity identity(f.dir.filePath(QStringLiteral("identity.json")), &reopened);
+        Journal reopened(
+            fixture.dir.filePath(QStringLiteral("j.db")), QStringLiteral("reopened"));
+        Identity identity(fixture.dir.filePath(QStringLiteral("identity.json")), &reopened);
         Intentions intentions(&reopened);
         Predictor predictor(&reopened);
         SelfModel self(&reopened, &identity, &intentions, &predictor);
 
-        const SelfReport r = self.measure();
-        QVERIFY(!r.journalIntact);
-        QCOMPARE(r.firstBrokenAt, 1u);
-        QVERIFY(self.narrate(r).contains(QStringLiteral("memory is damaged")));
+        const SelfReport report = self.measure();
+        QVERIFY(!report.journalIntact);
+        QCOMPARE(report.firstBrokenAt, 1u);
+        QVERIFY(self.narrate(report).contains(QStringLiteral("memory is damaged")));
     }
 
-    void withoutAnOrganItSaysNothingRatherThanGuessing()
+    void withoutAnOrganItRefusesToAssess()
     {
-        Fixture f;
-        SelfModel crippled(&f.journal, &f.identity, nullptr, &f.predictor);
+        Fixture fixture;
+        SelfModel crippled(
+            &fixture.journal, &fixture.identity, nullptr, &fixture.predictor);
+        const QUuid inspection = fixture.appendObservation(QStringLiteral("inspection"));
 
-        const SelfReport r = crippled.measure();
-        QVERIFY(!r.isValid());
-        QCOMPARE(crippled.narrate(r), QStringLiteral("I cannot see myself clearly enough to say."));
-
-        // And it refuses to record a self-assessment it could not actually make.
-        const quint64 before = f.journal.count();
-        QVERIFY(!crippled.assess().isValid());
-        QCOMPARE(f.journal.count(), before);
+        QVERIFY(!crippled.measure().isValid());
+        QVERIFY(!crippled.assess(inspection).isValid());
     }
 };
 

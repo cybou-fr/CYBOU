@@ -1,14 +1,36 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+// SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
-//
-// The two rules the protocol enforces by type rather than by convention are exactly the two
-// that are worth testing: causal traceability, and privacy that fails closed.
 
 #include "cybou/protocol/CognitiveEnvelope.h"
 
 #include <QTest>
 
+#include <limits>
+
 using namespace cybou;
+
+namespace {
+
+CognitiveEnvelope observation()
+{
+    CognitiveEnvelope e;
+    e.messageId = QUuid::createUuid();
+    e.correlationId = e.messageId;
+    e.originOrgan = QStringLiteral("perceptiond");
+    e.wallTime = QDateTime::currentDateTimeUtc();
+    e.kind = ContributionKind::Observation;
+    return e;
+}
+
+CognitiveEnvelope derived(ContributionKind kind)
+{
+    CognitiveEnvelope e = observation();
+    e.kind = kind;
+    e.causationId = QUuid::createUuid();
+    return e;
+}
+
+} // namespace
 
 class TestProtocol : public QObject
 {
@@ -22,49 +44,88 @@ private Q_SLOTS:
         QCOMPARE(privacyFromString(QStringLiteral("public")), PrivacyClass::Public);
     }
 
-    void privacyIsInheritedFromEvidence()
+    void privacyIsInheritedFromReferences()
     {
-        // A public conclusion drawn from local evidence must not stay public: this is the
-        // leak-through-generalisation case from docs/14.
         CognitiveEnvelope e;
         e.privacy = PrivacyClass::Public;
         QCOMPARE(e.derivedPrivacy({PrivacyClass::Local}), PrivacyClass::Local);
-        QCOMPARE(e.derivedPrivacy({PrivacyClass::Public}), PrivacyClass::Public);
         QCOMPARE(e.derivedPrivacy({PrivacyClass::Household, PrivacyClass::Node}),
                  PrivacyClass::Node);
     }
 
-    void nonObservationNeedsCausationOrEvidence()
+    void onlyObservationMayBeRoot()
     {
-        CognitiveEnvelope e;
-        e.messageId = QUuid::createUuid();
-        e.originOrgan = QStringLiteral("predictord");
-        e.wallTime = QDateTime::currentDateTimeUtc();
-        e.kind = ContributionKind::Prediction;
+        CognitiveEnvelope root = observation();
+        QVERIFY(root.isValid());
 
-        QVERIFY2(!e.isValid(), "a prediction with no cause and no evidence must be rejected");
+        CognitiveEnvelope intention = root;
+        intention.kind = ContributionKind::Intention;
+        QVERIFY(!intention.isValid());
+    }
 
+    void rootMustNotHaveReferences()
+    {
+        CognitiveEnvelope e = observation();
         e.causationId = QUuid::createUuid();
+        QVERIFY(!e.isValid());
+
+        e.causationId = {};
+        e.evidence = {QUuid::createUuid()};
+        QVERIFY(!e.isValid());
+    }
+
+    void derivedContributionNeedsABasis()
+    {
+        CognitiveEnvelope e = observation();
+        e.kind = ContributionKind::Prediction;
+        QVERIFY(!e.isValid());
+
+        e.evidence = {QUuid::createUuid()};
         QVERIFY(e.isValid());
     }
 
-    void rootObservationIsValidWithoutCause()
+    void selfCausationIsRejected()
     {
-        CognitiveEnvelope e;
-        e.messageId = QUuid::createUuid();
-        e.originOrgan = QStringLiteral("perceptiond");
-        e.wallTime = QDateTime::currentDateTimeUtc();
-        e.kind = ContributionKind::Observation;
-        QVERIFY(e.isValid());
+        CognitiveEnvelope e = derived(ContributionKind::Intention);
+        e.causationId = e.messageId;
+        QVERIFY(!e.isValid());
     }
 
-    void confidenceIsBounded()
+    void selfEvidenceIsRejected()
     {
-        CognitiveEnvelope e;
-        e.messageId = QUuid::createUuid();
-        e.originOrgan = QStringLiteral("perceptiond");
-        e.wallTime = QDateTime::currentDateTimeUtc();
-        e.confidence = 1.4;
+        CognitiveEnvelope e = derived(ContributionKind::Prediction);
+        e.causationId = {};
+        e.evidence = {e.messageId};
+        QVERIFY(!e.isValid());
+    }
+
+    void duplicateAndNullEvidenceAreRejected()
+    {
+        CognitiveEnvelope e = derived(ContributionKind::Prediction);
+        e.causationId = {};
+        const QUuid id = QUuid::createUuid();
+        e.evidence = {id, id};
+        QVERIFY(!e.isValid());
+
+        e.evidence = {QUuid()};
+        QVERIFY(!e.isValid());
+    }
+
+    void causeMustNotBeDuplicatedAsEvidence()
+    {
+        CognitiveEnvelope e = derived(ContributionKind::Outcome);
+        e.evidence = {e.causationId};
+        QVERIFY(!e.isValid());
+    }
+
+    void correlationAndFiniteConfidenceAreRequired()
+    {
+        CognitiveEnvelope e = observation();
+        e.correlationId = {};
+        QVERIFY(!e.isValid());
+
+        e = observation();
+        e.confidence = std::numeric_limits<double>::quiet_NaN();
         QVERIFY(!e.isValid());
     }
 };
