@@ -5,9 +5,6 @@ find_package(Qt6 REQUIRED COMPONENTS Test)
 
 qt_add_executable(test-protocol tst_protocol.cpp)
 target_link_libraries(test-protocol PRIVATE cybou-protocol Qt6::Test)
-
-# offscreen: the sandbox has no display, and a Qt test without a platform aborts. Same
-# failure that core-dumped plasma-apply-desktoptheme during Phase 3.
 add_test(NAME protocol COMMAND test-protocol)
 set_tests_properties(protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
@@ -50,3 +47,16 @@ qt_add_executable(test-presence-extended tst_presence_extended.cpp)
 target_link_libraries(test-presence-extended PRIVATE cybou-presence Qt6::Test)
 add_test(NAME presence-extended COMMAND test-presence-extended)
 set_tests_properties(presence-extended PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-m1-runtime tst_m1_runtime.cpp)
+target_link_libraries(
+    test-m1-runtime
+    PRIVATE
+        cybou-presence
+        cybou-runtime
+        cybou-workspace
+        cybou-storage
+        Qt6::Test
+)
+add_test(NAME m1-runtime COMMAND test-m1-runtime)
+set_tests_properties(m1-runtime PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

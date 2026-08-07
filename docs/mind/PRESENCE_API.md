@@ -5,13 +5,24 @@ SPDX-License-Identifier: MIT
 
 # Presence API
 
-Presence is the only normal UI interface to the current Mind object graph.
+Presence is the normal UI interface to Mind.
 
-This document separates the **Current C++/QML surface** from the **Target process API**.
+## Current runtime lifecycle
+
+A `Presence` QObject is now a presentation wrapper. Wrappers using the same canonical data root
+share one process-local `PresenceRuntime`.
+
+Consequences:
+
+- a second Plasma/QML Presence object does not increment the Identity session;
+- surfaces see the same Journal, obligations, predictions, and Workspace;
+- accepted Journal events notify every subscribed wrapper;
+- after the final wrapper is destroyed, a later runtime starts a normal new Identity session.
+
+This is M1's in-process solution. Future surfaces connect to `presenced` instead of sharing a C++
+object directly.
 
 ## Current properties
-
-`Presence.h` currently exposes these Qt properties:
 
 ```text
 awake
@@ -26,12 +37,9 @@ coalitions
 moment
 ```
 
-They notify through the shared `changed` signal.
-
-## Current read/projection methods
+## Current projections
 
 ```text
-recent(limit)                 # C++ helper
 activity(limit)
 detailedObligations()
 stats()
@@ -41,7 +49,7 @@ coalitions()
 moment()
 ```
 
-## Current commands with side effects
+## Current commands
 
 ```text
 promise(description)
@@ -52,52 +60,12 @@ observe(subject, value)
 predict(subject)
 ```
 
-Important semantics:
-
-- `promise()` first records a user-request Observation and then forms an Intention;
-- `reflect()` records an inspection-request Observation and then creates SelfAssessment;
-- `observe()` writes a Predictor Observation;
-- `predict()` writes a Prediction when enough persisted history exists;
-- `fulfillIndex()` / `abandonIndex()` resolve the currently indexed open intention.
-
-A method that writes biography must not be documented as read-only merely because it returns a
-projection.
-
-## Current lifecycle
-
-Presence has C++ lifecycle/state methods including:
-
-```text
-wake()
-isAwake()
-lastError()
-```
-
-The current Plasma applet constructs Presence in-process. There is no independent `presenced`
-service or reconnectable D-Bus API yet.
+Successful biography-changing commands no longer need ad-hoc `changed()` emissions to force a
+Workspace refresh. Their durable Journal contributions generate accepted events, Workspace updates
+first, and Presence wrappers are then notified.
 
 ## Target API direction
 
-The Target Presence process should expose stable read snapshots plus commands whose names make
-side effects explicit, for example:
-
-```text
-status
-organHealth
-refreshSnapshot()
-
-promise(description)
-fulfill(intentionId)
-abandon(intentionId)
-requestPrediction(subject)
-requestSelfAssessment()
-```
-
-Target rules:
-
-- `refreshSnapshot()` must not write biography;
-- opening a panel or switching a tab must not create SelfAssessment or a new session;
-- command identity should use stable IDs rather than UI list indexes;
-- Presence must survive/reconnect across UI lifecycle without becoming the owner of cognition.
-
-Names in this Target section are design direction, not claims about the current `Presence.h`.
+`presenced` should retain stable snapshot/command semantics across D-Bus. Command IDs should move
+from UI list indexes to stable contribution IDs. Refresh/read operations must never write
+biography.

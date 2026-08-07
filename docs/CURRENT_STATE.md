@@ -7,50 +7,115 @@ SPDX-License-Identifier: MIT
 
 Status date: 2026-08-07.
 
-Repository snapshot:
-`0ce6074e8b4b24ded982cfccec1572db0e8f397a`.
-
-This file describes implemented behavior only. Target architecture belongs in
-`ARCHITECTURE.md`, `ROADMAP.md`, and ADRs and must be labeled **Target** or **Proposed**.
+This file describes implemented behavior only. Target architecture belongs in the architecture,
+roadmap, and ADR documents and must be labeled accordingly.
 
 ## Implemented
 
 ### Body and desktop
 
-- NixOS 26.05 configuration;
-- KDE Plasma 6 / Wayland desktop foundation;
+- NixOS 26.05 / KDE Plasma 6 / Wayland foundation;
 - Cybou Horizon branding;
-- development targets for VM, live ISO, and Hyper-V;
+- VM, ISO, and Hyper-V development targets;
 - first-login layout versioning;
-- a dedicated right-side Mind Dock loaded as a Plasma layout template;
-- static KDE package validation and QML API validation.
+- right-side Mind Dock;
+- static KDE package and QML API validation.
 
-### Mind
+### Mind runtime
 
-- an in-process C++ Mind object graph hosted by Presence inside `plasmashell`;
-- Identity, Intentions, Predictor, SelfModel, Workspace, and Presence components;
-- typed `CognitiveEnvelope` contributions;
-- Observation as the only v2 root kind;
-- rejection of self-causation, self-evidence, duplicate/null evidence, and direct-cause duplication;
-- existence validation for cause and evidence references;
-- restrictive privacy inheritance across references.
+- in-process Identity, Intentions, Predictor, SelfModel, Workspace, Journal, and Presence;
+- multiple Presence QObject/QML surfaces for one canonical data root share one in-process runtime;
+- a second surface does not create a second Journal or increment the current Identity session;
+- the shared runtime remains alive while at least one Presence wrapper still references it;
+- after all wrappers are gone, a later runtime begins a new Identity session normally.
+
+### Live accepted-contribution path
+
+`Journal::append()` now emits:
+
+```text
+accepted(envelope, sequence)
+```
+
+only after a successful COMMIT.
+
+Workspace subscribes to that event and admits the contribution idempotently. Therefore direct
+writes from Identity, Intentions, Predictor, SelfModel, or Presence update the live Workspace
+without rereading recent Journal history after each action.
+
+Startup/recovery still uses `Workspace::rehydrate()`.
+
+### Persistent state root
+
+On Unix, the default Mind root is:
+
+```text
+$XDG_STATE_HOME/cybou
+```
+
+with `~/.local/state/cybou` as the XDG fallback.
+
+Before opening the canonical Journal, Presence checks the previous host-derived AppDataLocation
+root. Legacy entries are migrated into the canonical root without overwriting existing target
+entries. A collision fails closed. Existing entries such as `desktop-layout-version` are
+preserved.
+
+Explicit data directories passed by tests/tools remain supported.
 
 ### Journal v2
 
-- SQLite `PRAGMA user_version = 2`;
-- explicit envelope schema and row hash versions;
-- canonical v2 hashing of all semantic envelope fields;
-- normalized evidence relations in `contribution_evidence`;
-- `BEGIN IMMEDIATE` before write-side validation and tail selection;
-- database-level uniqueness of one terminal `Outcome` per cause;
-- v1 → v2 migration with retained `journal.db.v1.bak`;
-- v1 hash preservation rather than historical rehashing;
-- fail-closed migration for malformed legacy evidence, duplicate legacy terminal Outcomes,
-  broken v1 history, partial schemas, and unsupported newer schemas.
+- SQLite database schema v2;
+- canonical hash v2;
+- v1 hash preservation;
+- v1→v2 backup/migration;
+- normalized evidence;
+- cause/evidence existence validation;
+- privacy inheritance;
+- `BEGIN IMMEDIATE` writer serialization;
+- terminal Outcome uniqueness.
 
-### Automated validation
+## Current process topology
 
-The `cybou-mind` package currently runs nine QtTest/CTest suites:
+```text
+plasmashell
+├── Presence surface A ─┐
+├── Presence surface B ─┼── shared PresenceRuntime
+└── Presence surface N ─┘        ├── Journal v2
+                                 ├── Identity
+                                 ├── Intentions
+                                 ├── Predictor
+                                 ├── SelfModel
+                                 └── Workspace
+```
+
+The shared runtime is process-local. There is still no `presenced` or `eventd` daemon.
+
+## Current event ordering
+
+```text
+organ / Presence
+       │
+       ▼
+ Journal::append
+       │
+ validate + BEGIN IMMEDIATE
+       │
+      COMMIT
+       │
+       ▼
+ Journal::accepted
+       │
+       ├──► Workspace::accept
+       │
+       └──► Presence wrappers changed()
+```
+
+Workspace installs its Journal subscription when it is created, before Presence wrappers
+subscribe, so a surface handling the accepted event sees the updated Workspace.
+
+## Automated tests
+
+The Mind package now has ten CTest suites:
 
 ```text
 protocol
@@ -62,78 +127,40 @@ selfmodel
 workspace
 presence
 presence-extended
+m1-runtime
 ```
 
-The fast GitHub Actions job on this snapshot passes formatting, REUSE, package metadata,
-`cybou-mind`, `cybou-presence-applet`, and the post-format diff check.
+The M1 suite specifically covers:
 
-The full `nix flake check` / VM job is tag-only and is not executed by an ordinary push.
-
-## Current process topology
-
-```text
-plasmashell
-└── Presence
-    ├── Journal
-    ├── Identity
-    ├── Intentions
-    ├── Predictor
-    ├── SelfModel
-    └── Workspace
-```
-
-Daemon-like source-directory names do **not** mean independent services yet.
-
-## Current persistence ownership
-
-Presence constructs the current object graph and opens the Journal and identity state below a
-path derived from Qt `QStandardPaths::AppDataLocation`, with a `cybou` child directory.
-
-This is intentionally documented as a current limitation. The target persistent Mind location is
-`$XDG_STATE_HOME/cybou`, but ADR-0017 has not yet been implemented for Mind persistence.
-
-The desktop first-login marker already uses `$XDG_STATE_HOME/cybou`; that does not mean the Mind
-Journal has moved there.
-
-## Current write and Workspace behavior
-
-Identity, Intentions, Predictor, SelfModel, and Presence can write through the shared in-process
-Journal. SQLite serializes concurrent local connections, but there is no single owning `eventd`
-process.
-
-Workspace has a correct bounded `publish()` path and can rehydrate from recent Journal history.
-However, current organ writes normally call `Journal::append()` directly rather than publishing
-through Workspace. Therefore Workspace is **not yet guaranteed to reflect every newly accepted
-contribution live**; a rehydrate reconstructs the recent state.
-
-This is the open part of M1.
+- accepted events only after successful durable append;
+- direct Journal writes becoming visible to Workspace immediately;
+- idempotent Workspace admission;
+- two Presence surfaces sharing one Identity session/runtime;
+- runtime lifetime across multiple surfaces;
+- XDG state-root selection;
+- legacy state merge and collision fail-closed behavior.
 
 ## Not implemented
 
-- one Presence backend enforced per user session;
-- a single accepted-contribution stream feeding Workspace and Presence;
-- stable Mind persistence under `$XDG_STATE_HOME/cybou`;
 - `cybou-eventd`;
-- exclusive single-process Journal ownership;
+- an exclusive process-level Journal owner;
 - stable local D-Bus contracts;
 - process-isolated organs;
-- process-level health and degraded-mode reporting;
-- survival of Mind across `plasmashell` restart;
-- inter-node distribution and reconciliation;
+- cross-process `presenced`;
+- Mind survival across `plasmashell` restart;
+- process-level health/degraded-mode reporting;
+- inter-node distribution;
 - language-model faculties;
 - authorized autonomous operating-system mutation.
 
 ## Milestone position
 
-- **M0 — Green Build:** fast gates are green; heavy full/VM validation remains a separate gate.
-- **M1 — One Presence, One Journal:** open.
-- **M2 — Journal v2:** complete.
-- **M3 — eventd:** not implemented.
-
-Milestones are architectural dependencies, not a claim that implementation work always landed in
-numeric order.
+- **M0:** fast gate green; heavy full/VM validation remains a separate gate.
+- **M1:** complete for the current in-process architecture.
+- **M2:** complete.
+- **M3:** next — extract exclusive Journal ownership into `eventd`.
 
 ## Documentation rule
 
-A current-behavior claim must be supported by code and/or a passing test. A future requirement
-must be labeled **Target**, **Proposed**, or **Pending**.
+Current claims require code/tests. Future behavior must be labeled Target, Proposed, Planned, or
+Pending.

@@ -5,9 +5,9 @@ SPDX-License-Identifier: MIT
 
 # Testing Strategy
 
-## Current automated layers
+## Current CTest suites
 
-The current C++ Mind package runs these CTest suites during the Nix build:
+The current Mind package runs ten suites:
 
 ```text
 protocol
@@ -19,95 +19,60 @@ selfmodel
 workspace
 presence
 presence-extended
+m1-runtime
 ```
 
-Together they cover the implemented in-process protocol, Journal, domain components, Workspace,
-and Presence projections.
+## M1 runtime invariants
 
-The repository also has:
-
-- Nix formatting validation;
-- REUSE validation;
-- static KDE package validation;
-- static QML API/source validation for the Presence applet;
-- Nix package builds;
-- a VM smoke check exposed through `nix flake check`.
-
-## Current Journal/protocol invariants
-
-Current automated tests are expected to protect at least:
+`m1-runtime` specifically proves:
 
 ```text
-reject self-causation
-reject self-evidence
-reject null/duplicate evidence
-reject missing cause
-reject missing evidence
-reject weaker derived privacy
-reject duplicate terminal outcome
-preserve v1 Journal hashes during migration
-retain a v1 migration backup
-fail closed on malformed legacy evidence
-detect mutation of v2 hashed fields
-serialize concurrent writers
-roll back failed appends
-recover persisted domain state after reopening
+Journal accepted event appears only after successful COMMIT
+failed append never reaches the accepted stream
+direct Journal append updates Workspace immediately
+Workspace accepted admission is idempotent
+two Presence surfaces for one state root share one runtime/session
+commands from one Presence surface are visible to another
+a new runtime session starts only after all old wrappers are gone
+persistent root follows XDG_STATE_HOME/cybou on Unix
+legacy state migrates while preserving an existing desktop marker
+legacy/canonical collisions fail closed without overwriting either side
 ```
+
+## Existing Journal/protocol invariants
+
+The other suites continue to protect protocol structure, cause/evidence integrity, privacy,
+Journal migration/hash integrity, domain lifecycles, Workspace behavior, and Presence projections.
 
 ## Pending runtime invariants
 
-These are architectural requirements, not claims about current behavior:
+These belong to M3/M4 and later:
 
 ```text
-one Presence backend per user session
-Workspace receives every accepted contribution live
-stable Mind state is independent of plasmashell application identity
-eventd is the only durable Journal writer
-keep Mind alive after plasmashell restart
-reconnect Presence after plasmashell restart
-report organ/process capability deficits
-recover/reconcile after isolated process failure
+eventd is the only process allowed to write journal.db
+accepted events cross typed IPC without reordering
+Mind remains alive after plasmashell restart
+Presence reconnects to presenced
+individual organ failure produces a capability deficit
+process restart reconstructs owned projections
 ```
-
-They require process/runtime or NixOS VM coverage when the corresponding architecture exists.
-
-## CI split
-
-### Fast job — every push / pull request
-
-Current fast workflow builds:
-
-```text
-checks.x86_64-linux.formatting
-checks.x86_64-linux.reuse
-checks.x86_64-linux.package-metadata
-packages.x86_64-linux.cybou-mind
-packages.x86_64-linux.cybou-presence-applet
-```
-
-and then runs:
-
-```bash
-nix fmt
-git diff --exit-code
-```
-
-A green ordinary push proves those gates only.
-
-### Full job — tags
-
-The full workflow is configured to run:
-
-```bash
-nix flake check --print-build-logs
-nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
-```
-
-Because it is tag-only, it is normally skipped on a regular push.
 
 ## Local validation
 
-Fast package-level validation:
+```bash
+nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
+```
+
+For a direct CMake build:
+
+```bash
+nix develop
+cmake -S mind -B build/dev -G Ninja -DBUILD_TESTING=ON
+cmake --build build/dev
+ctest --test-dir build/dev --output-on-failure
+```
+
+Repository validation:
 
 ```bash
 nix build --print-build-logs \
@@ -121,31 +86,13 @@ nix fmt
 git diff --exit-code
 ```
 
-Additional desktop packages should also be built when they are changed:
-
-```bash
-nix build .#packages.x86_64-linux.cybou-tools
-nix build .#packages.x86_64-linux.cybou-layout-templates
-```
-
-Full local validation:
+Full/tag validation remains:
 
 ```bash
 nix flake check --print-build-logs
 ```
 
-The full check includes the VM smoke derivation and therefore has heavier runtime requirements.
-
 ## Definition of Done
 
-A change is complete only when:
-
-- implementation claims have focused tests where practical;
-- configure and compilation pass;
-- relevant QtTest suites pass;
-- affected Nix packages build;
-- required CI gates are green;
-- migration/rollback behavior is tested when persistent state changes;
-- `CURRENT_STATE.md` and related documentation describe the same behavior as the code.
-
-Target requirements must not be marked implemented merely because an ADR exists.
+A runtime milestone is complete when the behavior is represented by code, focused tests, relevant
+Nix package builds, and documentation that distinguishes Current from Target.

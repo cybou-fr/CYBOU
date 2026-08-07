@@ -11,10 +11,10 @@ The Journal is Cybou's append-only biography.
 
 ## Ownership
 
-**Current:** opened through the Presence-owned object graph. Multiple local connections are
-serialized with `BEGIN IMMEDIATE`.
+**Current:** one Journal object is shared by the current in-process Presence runtime. New Presence
+surface wrappers for the same state root reuse that runtime.
 
-**Target:** only `cybou-eventd` writes `journal.db`.
+**Target:** only `cybou-eventd` opens the durable Journal for writes.
 
 ## Current versions
 
@@ -33,43 +33,41 @@ structural validation
 → reject an existing terminal Outcome
 → read tail and determine sequence
 → calculate canonical v2 hash
-→ insert contribution
-→ insert evidence relations
+→ insert contribution/evidence
 → COMMIT
+→ emit accepted(envelope, sequence)
 ```
 
-Any failure rolls back.
+Any failure before COMMIT rolls back and emits no accepted event.
+
+## Accepted contribution event
+
+`Journal::accepted` is the current local runtime boundary between durability and live cognition.
+
+It exists so consumers never infer acceptance from an attempted proposal:
+
+```text
+append returned 0
+→ no accepted signal
+→ no Workspace admission
+```
+
+Workspace consumes this event today. M3 should preserve the semantics while moving the durable
+append behind `eventd`/IPC.
 
 ## Hash v2
 
-The hash binds sequence, previous hash, and canonical envelope bytes. Canonical encoding covers:
-
-- envelope schema version;
-- message, correlation, and causation UUIDs;
-- organ and node;
-- contribution kind;
-- UTC wall time in milliseconds;
-- monotonic and logical clocks;
-- IEEE-754 confidence bits;
-- evidence as a sorted semantic set;
-- exact payload bytes;
-- privacy;
-- capability scope.
-
-Evidence keeps its original ordinal in SQLite for round trips, while hashing sorts UUID bytes so
-semantically equivalent evidence sets hash identically.
+The hash binds sequence, previous hash, and canonical envelope bytes including schema, IDs,
+origin, kind, wall/monotonic/logical time, confidence, evidence, payload, privacy, and capability
+scope.
 
 ## Migration
 
-Opening a v1 database creates `journal.db.v1.bak` with `VACUUM INTO`, then migrates in one
-transaction. V1 hashes are never rewritten. Migration fails closed when:
-
-- evidence contains an invalid, duplicate, or missing UUID;
-- more than one historical Outcome targets the same cause;
-- the old hash chain is already damaged;
-- the database declares a newer unsupported schema.
+Opening v1 creates `journal.db.v1.bak`, then migrates transactionally. V1 hashes are never
+rewritten. Migration fails closed for malformed legacy evidence, duplicate terminal Outcomes,
+damaged legacy history, partial schemas, or unsupported newer schema versions.
 
 ## Remaining architecture step
 
-ADR-0011 will replace multiple in-process writers with a single `cybou-eventd` owner. Journal v2
-makes the current implementation safe enough to reach that boundary; it does not replace it.
+M3 replaces the in-process Journal owner with `cybou-eventd`; the accepted-event contract is
+intended to survive that extraction.

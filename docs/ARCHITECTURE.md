@@ -18,34 +18,49 @@ attention, and future faculties.
 
 The presentation boundary: Plasma UI, explanations, inspection, and user commands.
 
-Presence is the only normal surface boundary, but the current implementation still constructs and
-owns the in-process Mind object graph. The Target architecture removes that lifecycle ownership
-from the Plasma process.
-
 ## Current
 
 ```text
 plasmashell
-    │
-    ▼
-Presence QObject
-    ├── Journal v2
-    ├── Identity
-    ├── Intentions
-    ├── Predictor
-    ├── SelfModel
-    └── Workspace
+├── Presence wrapper ─┐
+├── Presence wrapper ─┼── one shared in-process PresenceRuntime per canonical state root
+└── Presence wrapper ─┘        │
+                               ├── Journal v2
+                               ├── Identity
+                               ├── Intentions
+                               ├── Predictor
+                               ├── SelfModel
+                               └── Workspace
 ```
 
 Current properties:
 
-- the Presence QML type is loaded in `plasmashell`;
-- the components above are C++ objects/libraries, not independent daemons;
-- new Journal writes use schema/hash v2 and are transactionally serialized;
-- multiple components currently write through the shared Journal abstraction;
-- Workspace can rehydrate bounded recent history;
-- direct organ Journal writes do not yet form one live accepted-contribution stream;
-- persistent Mind state is still derived from the hosting Qt application-data location.
+- QML may instantiate more than one Presence wrapper without creating more than one current Mind
+  backend for the same data root;
+- the shared runtime is process-local and dies when its last wrapper is destroyed;
+- new default state is stable under `$XDG_STATE_HOME/cybou` on Unix;
+- Journal emits `accepted` only after successful COMMIT;
+- Workspace follows that accepted stream live;
+- `rehydrate()` is a startup/recovery mechanism rather than the normal update loop;
+- organs remain in-process C++ components and share one Journal object in the Presence runtime.
+
+## Current local cognitive flow
+
+```text
+proposal / organ action
+        ↓
+Journal v2 validation
+        ↓
+BEGIN IMMEDIATE
+        ↓
+COMMIT
+        ↓
+accepted(envelope, seq)
+        ↓
+Workspace admission + Presence notification
+```
+
+This ordering is the local precursor of the M3 eventd contract.
 
 ## Target
 
@@ -67,36 +82,34 @@ Typed cognitive fabric
 
 Target properties:
 
-- `cybou-eventd` exclusively owns durable Journal writes;
-- organs communicate through typed, versioned local IPC;
-- Presence projects state but does not own cognition;
-- Mind survives a Plasma restart;
-- each persistent resource has one authoritative owner;
-- persistent Mind state uses stable XDG locations rather than a UI host-derived path;
+- `eventd` exclusively owns the durable Journal;
+- accepted-contribution semantics survive the move across IPC;
+- Presence projects state rather than owning cognitive lifecycle;
+- Mind survives Plasma restart;
+- persistent resources have one process-level owner;
 - failures become explicit capability deficits.
 
-## Current migration position
+## Migration position
 
 Completed:
 
 1. typed protocol and in-process Mind baseline;
-2. causal/reference/privacy invariants for v2 contributions;
-3. Journal v2 schema, canonical hashing, migration, atomic writer serialization, and terminal
-   Outcome uniqueness;
-4. Presence Mind Dock surface and read projections.
+2. causal/reference/privacy invariants;
+3. Journal v2;
+4. right-side Presence/Mind Dock;
+5. M1 shared in-process Presence runtime;
+6. stable canonical state root with legacy migration;
+7. live Workspace admission from post-COMMIT accepted events.
 
-Open before process extraction is considered mature:
+Next:
 
-1. complete M1 with one Presence backend, live accepted-contribution admission, and stable state
-   ownership;
-2. extract `eventd`;
-3. move Presence lifecycle outside `plasmashell`;
-4. extract remaining organs;
-5. add health and degraded modes;
-6. add network transport only after local ownership and recovery are proven.
+1. extract Journal ownership into `eventd`;
+2. expose the accepted stream through typed IPC;
+3. extract Presence lifecycle from `plasmashell`;
+4. isolate remaining organs;
+5. add health/degraded-mode semantics.
 
 ## Naming rule
 
-A directory named `eventd`, `identityd`, `presenced`, and so on does not prove a daemon exists.
-Process topology is determined by built executables/services and runtime tests, not by source
-directory names.
+A source directory ending in `d` does not prove a daemon exists. Process topology is determined by
+built executables/services and runtime tests.

@@ -7,75 +7,59 @@ SPDX-License-Identifier: MIT
 
 Workspace owns bounded active context, not biography.
 
-## Current implementation
+## Current live admission
 
-Workspace keeps a bounded in-memory moment and can reconstruct it from recent Journal history.
-
-Current methods include:
+Workspace subscribes to the current Journal's post-COMMIT accepted stream:
 
 ```text
-publish(envelope)
-rehydrate()
-coalitions()
-focus()
-momentState()
+any current organ / Presence
+→ Journal::append
+→ durable COMMIT
+→ Journal::accepted
+→ Workspace::accept
+→ contributed / focus reevaluation
 ```
 
-`publish()` currently:
+This includes direct `Journal::append()` calls. They no longer bypass live attention.
+
+`Workspace::accept()` is idempotent by `messageId`.
+
+## Publish
+
+`Workspace::publish(envelope)` remains available as a convenience submission method, but it no
+longer has a second private admission path:
 
 ```text
-Journal append
-→ prepend contribution to bounded moment
-→ emit contributed
-→ reevaluate focus
+publish
+→ Journal::append
+→ Journal::accepted
+→ accept
 ```
 
-`rehydrate()` replaces the bounded moment with recent Journal contributions and reevaluates focus.
+Therefore a contribution cannot be admitted before it is durable or admitted twice simply because
+it entered through `publish()`.
 
-## Current coalition model
+## Bounded moment
 
-Contributions are grouped by `correlationId`; if a correlation ID is null, `messageId` is used as
-the fallback key.
+The moment is newest-first and capped by the configured capacity. Contributions leaving the
+moment remain in the Journal.
 
-Members are ordered as a story from older to newer contributions.
+## Coalitions
 
-## Current salience
+Contributions sharing a correlation episode form a coalition. Members are presented oldest-first
+inside each coalition.
 
-The implemented score is deterministic and combines:
+## Salience
 
-- contribution-kind weight;
-- confidence;
-- recency with a 120-second half-life;
-- square-root corroboration from distinct contributing organs.
-
-Current kind weights prioritize `NeedSignal` and `Objection`, then `Decision` and `Intention`.
-
-## Current limitation
-
-Not every current write flows through `Workspace::publish()`.
-
-Presence and several organ objects write directly with `Journal::append()`. Therefore Workspace
-can be correct after `rehydrate()` while still becoming stale relative to new Journal writes during
-the same live session.
-
-This is an explicit open M1 issue, not an implemented global-attention guarantee.
-
-## Target admission
-
-```text
-organ proposal
-→ eventd validation and durable append
-→ accepted-contribution signal
-→ workspaced admission
-→ focus change / Presence projection
-```
-
-The Target Workspace must update on every accepted contribution without polling SQLite and without
-becoming the durable owner of biography.
+The current deterministic score combines contribution kind, confidence, recency, and independent
+organ corroboration.
 
 ## Recovery
 
-Current: bounded recent state can be reconstructed from Journal on rehydrate.
+`rehydrate()` reconstructs the bounded recent state at startup/recovery. It is no longer required
+after every normal runtime action.
 
-Target: the isolated `workspaced` process reconstructs bounded state after restart and then follows
-the accepted-contribution stream live.
+## Target
+
+M3/M4 replace the in-process Journal signal with eventd/workspaced IPC while preserving the same
+semantic order: only accepted durable contributions enter attention.

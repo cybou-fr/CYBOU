@@ -5,6 +5,7 @@
 
 qt_add_library(cybou-storage STATIC
     src/Journal.cpp
+    include/cybou/storage/Journal.h
 )
 
 target_include_directories(cybou-storage

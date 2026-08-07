@@ -7,65 +7,59 @@ SPDX-License-Identifier: MIT
 
 Status snapshot: 2026-08-07.
 
-Milestone numbers describe the intended architectural sequence. Implementation work can land out
-of order; Journal v2 (M2) is already complete while M1 still has open runtime obligations.
+Milestone numbers describe architectural dependencies. Implementation can land out of numeric
+order.
 
 ## M0 — Green Build
 
 **Status: In progress / fast gate green.**
 
-Goal: CMake, C++, QML, QtTest, REUSE, package validation, and Nix checks pass.
-
-Current:
-
-- `cybou-mind` builds and runs all nine CTest suites;
-- `cybou-presence-applet` builds and passes package/QML validation;
-- formatting, REUSE, and built-theme package metadata pass in fast CI;
-- the ordinary push workflow is green on the current snapshot.
-
-Still required before calling the complete validation matrix permanently closed:
-
-- keep the tag-only full `nix flake check` / VM gate healthy;
-- expand fast package coverage when runtime-relevant packages become mandatory gates.
+Core C++/QML/package gates are green. The tag-only full `nix flake check` / VM gate remains the
+heavy validation path.
 
 ## M1 — One Presence, One Journal
 
-**Status: In progress.**
+**Status: Complete for the current in-process runtime.**
 
-Goal: one Presentation backend per user session; Workspace reflects new accepted contributions.
+Implemented:
 
-Remaining:
+- multiple Presence surface objects for the same state root share one in-process Mind runtime;
+- one shared Journal/Identity/organ/Workspace object graph exists for those surfaces;
+- opening another Presence surface does not increment the Identity session;
+- Journal emits an accepted-contribution event only after successful COMMIT;
+- Workspace consumes every accepted contribution live, including direct organ `Journal::append()`;
+- Workspace no longer requires a full rehydrate after each normal action;
+- the default persistent Mind root is stable at `$XDG_STATE_HOME/cybou` on Unix;
+- legacy host-derived Presence state is migrated fail-closed without overwriting canonical state;
+- focused M1 runtime tests cover shared Presence, live Workspace, accepted-after-commit, and state
+  migration.
 
-- enforce or extract one Presence backend per session;
-- introduce one accepted-contribution path instead of unrelated direct Journal writes;
-- update Workspace live after every accepted contribution;
-- move persistent Mind state to a stable owner-independent location;
-- prove session/Plasma lifecycle behavior with runtime or VM tests.
+Scope note: this is one backend inside the current `plasmashell` process. Session-wide
+cross-process ownership belongs to `presenced`/M4.
 
 ## M2 — Journal v2
 
 **Status: Complete.**
 
-Implemented:
-
-- database, envelope, and hash versions;
-- canonical full-envelope encoding;
-- v1 → v2 migration with retained backup;
-- reference existence validation;
-- privacy inheritance validation;
-- normalized evidence storage;
-- serialized writers with `BEGIN IMMEDIATE`;
-- terminal-Outcome uniqueness backed by SQLite;
-- version-aware history verification preserving v1 hashes.
+Schema/hash versions, canonical encoding, v1→v2 migration, reference/privacy validation,
+serialized writes, normalized evidence, and terminal-Outcome uniqueness are implemented.
 
 ## M3 — eventd
 
-**Status: Planned.**
+**Status: Next.**
 
-Exclusive Journal owner with IPC and accepted-contribution signals.
+Make `cybou-eventd` the exclusive Journal owner.
 
-The M1 accepted-contribution abstraction should be designed so it can move behind `eventd`
-without changing organ semantics.
+The M1 semantic boundary is intentionally reusable:
+
+```text
+proposal
+→ durable validation/COMMIT
+→ accepted contribution
+→ Workspace / Presence projections
+```
+
+M3 changes ownership and transport; it should not change that ordering.
 
 ## M4 — Process-Isolated Organs
 
@@ -77,8 +71,7 @@ without changing organ semantics.
 
 **Status: Planned.**
 
-Reboot-surviving intention, stable state locations, verified identity migration, and architecture
-transition records.
+Reboot-surviving intention and verified identity/architecture transitions.
 
 ## M6 — Degraded Modes
 

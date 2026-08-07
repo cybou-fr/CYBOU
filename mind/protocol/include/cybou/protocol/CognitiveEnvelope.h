@@ -6,6 +6,7 @@
 #include <QByteArray>
 #include <QDateTime>
 #include <QList>
+#include <QMetaType>
 #include <QString>
 #include <QUuid>
 
@@ -43,7 +44,6 @@ constexpr PrivacyClass mostRestrictive(PrivacyClass a, PrivacyClass b) noexcept
     return static_cast<quint8>(a) < static_cast<quint8>(b) ? a : b;
 }
 
-/// Only a direct Observation may enter the biography without a prior basis.
 constexpr bool isRootKind(ContributionKind kind) noexcept
 {
     return kind == ContributionKind::Observation;
@@ -85,3 +85,8 @@ struct CognitiveEnvelope {
 };
 
 } // namespace cybou
+
+// Journal::accepted and Workspace::contributed are typed runtime signals. Registration here keeps
+// the envelope usable by QSignalSpy and future queued transports without making protocol depend
+// on any presentation type.
+Q_DECLARE_METATYPE(cybou::CognitiveEnvelope)

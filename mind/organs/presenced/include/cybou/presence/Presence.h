@@ -21,6 +21,13 @@ struct Moment {
     QUuid thread;
 };
 
+class PresenceRuntime;
+
+/// A presentation wrapper over one shared in-process Mind runtime.
+///
+/// Multiple Plasma/QML Presence objects pointing at the same canonical data directory share the
+/// same Journal, Identity session, organs, and Workspace. The wrappers only provide QObject/QML
+/// lifetime and notifications. M4 will replace this in-process sharing with presenced IPC.
 class Presence : public QObject
 {
     Q_OBJECT
@@ -42,7 +49,7 @@ public:
     ~Presence() override;
 
     bool wake();
-    bool isAwake() const { return m_awake; }
+    bool isAwake() const;
 
     QString narration() const;
     QStringList obligations() const;
@@ -72,18 +79,15 @@ Q_SIGNALS:
     void changed();
 
 private:
-    bool appendUserObservation(const QString &event, const QCborMap &details, QUuid *messageId);
+    void subscribeToRuntime();
+    bool appendUserObservation(
+        const QString &event,
+        const QCborMap &details,
+        QUuid *messageId);
 
-    QString m_dataDir;
+    std::shared_ptr<PresenceRuntime> m_runtime;
     QString m_lastError;
-    bool m_awake{false};
-
-    std::unique_ptr<Journal> m_journal;
-    std::unique_ptr<Identity> m_identity;
-    std::unique_ptr<Intentions> m_intentions;
-    std::unique_ptr<Predictor> m_predictor;
-    std::unique_ptr<SelfModel> m_self;
-    std::unique_ptr<Workspace> m_workspace;
+    bool m_subscribed{false};
 };
 
 } // namespace cybou

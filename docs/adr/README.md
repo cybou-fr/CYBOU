@@ -17,7 +17,7 @@ Status snapshot: 2026-08-07.
 | [0006](ADR-0006-state-version-pinning.md) | State Version Pinning | Accepted |
 | [0007](ADR-0007-reuse-3.x-compliance.md) | REUSE 3.x Compliance | Accepted |
 | [0008](ADR-0008-mind-dock-with-tabs.md) | Mind Dock with Organ Tabs | Accepted |
-| [0009](ADR-0009-one-presence-per-user-session.md) | One Presence per Session | Proposed |
+| [0009](ADR-0009-one-presence-per-user-session.md) | One Presence per Session | Accepted |
 | [0010](ADR-0010-journal-v2-schema-and-canonical-hashing.md) | Journal v2 | Accepted |
 | [0011](ADR-0011-single-writer-event-journal.md) | Single-Writer Journal | Proposed |
 | [0012](ADR-0012-organ-process-isolation-and-lifecycle.md) | Organ Process Isolation | Proposed |
@@ -32,7 +32,5 @@ Status snapshot: 2026-08-07.
 | [0021](ADR-0021-language-models-are-optional-faculties.md) | Optional Language Faculties | Proposed |
 | [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary | Proposed |
 
-Use statuses `Proposed`, `Accepted`, `Rejected`, `Deprecated`, or `Superseded`.
-
-The index must match the status written inside each ADR. An ADR becoming Accepted records a
-decision; it does not by itself prove that every Target consequence has been implemented.
+An ADR status records the decision. It does not imply that every later Target process consequence
+has already been implemented.

@@ -5,6 +5,7 @@
 
 #include "cybou/protocol/CognitiveEnvelope.h"
 
+#include <QObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QString>
@@ -17,11 +18,16 @@ inline constexpr int kCurrentDatabaseSchemaVersion = 2;
 inline constexpr int kLegacyJournalHashVersion = 1;
 inline constexpr int kCurrentJournalHashVersion = 2;
 
-class Journal
+class Journal : public QObject
 {
+    Q_OBJECT
+
 public:
-    explicit Journal(const QString &path, const QString &connectionName = QString());
-    ~Journal();
+    explicit Journal(
+        const QString &path,
+        const QString &connectionName = QString(),
+        QObject *parent = nullptr);
+    ~Journal() override;
 
     Journal(const Journal &) = delete;
     Journal &operator=(const Journal &) = delete;
@@ -30,6 +36,7 @@ public:
     QString lastError() const;
     int databaseSchemaVersion() const;
 
+    /// Persist one contribution. A non-zero sequence means the transaction committed.
     quint64 append(const CognitiveEnvelope &envelope);
 
     quint64 count() const;
@@ -43,6 +50,13 @@ public:
     std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const;
     QList<QUuid> evidenceFor(const QUuid &messageId) const;
     bool hasOutcomeFor(const QUuid &causeId, const QString &originOrgan = QString()) const;
+
+Q_SIGNALS:
+    /// The local in-process precursor of eventd's accepted-contribution stream.
+    ///
+    /// Emitted synchronously only after COMMIT succeeds. Validation failures and rolled-back
+    /// writes never appear on this stream.
+    void accepted(const CognitiveEnvelope &envelope, quint64 sequence);
 
 private:
     bool ensureSchema();

@@ -10,7 +10,6 @@ project(cybou-mind VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# clangd reads this; without it the editor cannot resolve Qt headers.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Sql Qml)
@@ -18,6 +17,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Sql Qml)
 qt_standard_project_setup()
 
 add_subdirectory(protocol)
+add_subdirectory(foundation/runtime)
 add_subdirectory(foundation/storage)
 add_subdirectory(organs/identityd)
 add_subdirectory(organs/intentiond)

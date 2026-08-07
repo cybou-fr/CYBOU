@@ -13,5 +13,5 @@ target_include_directories(cybou-presence
 )
 
 target_link_libraries(cybou-presence
-    PUBLIC Qt6::Core cybou-self cybou-workspace
+    PUBLIC Qt6::Core cybou-runtime cybou-self cybou-workspace
 )
