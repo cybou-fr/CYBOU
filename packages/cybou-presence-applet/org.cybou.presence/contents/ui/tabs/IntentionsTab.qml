@@ -4,12 +4,27 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import org.cybou.presence 1.0
+import "../utils"
 
-MindTab {
+Item {
     id: intentionsTab
-    title: "Intentions"
-    icon: "task-complete"
+
+    required property var mind
+    readonly property string title: "Intentions"
+    readonly property string icon: "task-complete"
+
+    property var intentionModel: []
+
+    function refreshIntentions() {
+        intentionModel = mind.detailedObligations()
+    }
+
+    Component.onCompleted: refreshIntentions()
+
+    Connections {
+        target: mind
+        function onChanged() { intentionsTab.refreshIntentions() }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -23,32 +38,36 @@ MindTab {
             font.bold: true
         }
 
-        // Stats
         RowLayout {
             Layout.fillWidth: true
             spacing: 11
 
             StatCard {
+                Layout.fillWidth: true
                 title: "Total"
-                value: mind.detailedObligations.length
+                value: intentionsTab.intentionModel.length
                 icon: "list"
             }
 
             StatCard {
+                Layout.fillWidth: true
                 title: "Oldest"
                 value: mind.stats.oldestObligationDays
                 icon: "calendar"
             }
         }
 
-        // List of intentions
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: mind.detailedObligations
+            clip: true
+            model: intentionsTab.intentionModel
+
             delegate: ItemDelegate {
+                required property var modelData
+                width: ListView.view.width
                 text: modelData.description
-                onClicked: console.log("Intention clicked:", modelData.description)
+                Accessible.description: modelData.trigger
             }
         }
     }

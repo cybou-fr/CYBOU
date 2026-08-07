@@ -16,26 +16,15 @@ PlasmoidItem {
     property bool ready: false
 
     Presence {
-        id: mind
+        id: presenceBackend
         Component.onCompleted: root.ready = wake()
-    }
-
-    // Being looked at is an event worth remembering, and it refreshes what the panel reads.
-    onExpandedChanged: if (expanded && root.ready) mind.reflect()
-
-    // The mind is not busy every second; a slow tick is enough and costs nothing noticeable.
-    Timer {
-        interval: 20000
-        running: root.expanded && root.ready
-        repeat: true
-        onTriggered: mind.changed()
     }
 
     Plasmoid.status: root.ready ? PlasmaCore.Types.ActiveStatus
                                 : PlasmaCore.Types.PassiveStatus
 
     toolTipMainText: i18n("Cybou")
-    toolTipSubText: root.ready ? mind.narration : i18n("Not awake.")
+    toolTipSubText: root.ready ? presenceBackend.narration : i18n("Not awake.")
 
     compactRepresentation: Item {
         Layout.minimumWidth: Kirigami.Units.iconSizes.small
@@ -47,11 +36,8 @@ PlasmoidItem {
             width: Math.min(parent.width, parent.height)
             height: width
             source: "cybou"
-            // Dimmed while asleep: the icon must never look alive when nothing is behind it.
             opacity: root.ready ? 1.0 : 0.4
 
-            // A slow breath, driven by nothing but time. It signals "running", not "thinking" -
-            // an animation tied to activity the system is not doing would be a lie.
             SequentialAnimation on scale {
                 running: root.ready
                 loops: Animation.Infinite
@@ -66,16 +52,12 @@ PlasmoidItem {
         }
     }
 
-    // Main dock representation - MindDock with organ tabs
-    // Using Component to load MindDock.qml from the same directory
     fullRepresentation: Component {
         MindDock {
-            width: 460
-            height: childrenRect.height
+            mind: presenceBackend
         }
     }
 
-    // Nothing behind the panel: say so plainly instead of showing an empty frame.
     PlasmaExtras.PlaceholderMessage {
         anchors.centerIn: parent
         width: parent.width - Kirigami.Units.gridUnit * 4

@@ -3,101 +3,113 @@
 
 #include "cybou/presence/Presence.h"
 
+#include <QTemporaryDir>
 #include <QTest>
 
 namespace cybou {
+
+namespace {
+
+QString statePath(QTemporaryDir &dir)
+{
+    return dir.filePath(QStringLiteral("state"));
+}
+
+} // namespace
 
 class TestPresenceExtended : public QObject
 {
     Q_OBJECT
 
 private Q_SLOTS:
-    void initTestCase()
+    void identityStateMatchesPresentationContract()
     {
-        // Create a temporary directory for testing
-        m_tempDir = QDir::tempPath() + "/cybou-test-" + QUuid::createUuid().toString();
-        QVERIFY(QDir().mkpath(m_tempDir));
-    }
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
 
-    void cleanupTestCase()
-    {
-        // Clean up temporary directory
-        QDir(m_tempDir).removeRecursively();
-    }
+        Presence presence(statePath(dir));
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
 
-    void testIdentityState()
-    {
-        Presence presence(m_tempDir);
-        QVERIFY(presence.wake());
-
-        QVariantMap state = presence.identityState();
+        const QVariantMap state = presence.identityState();
         QVERIFY(!state.isEmpty());
-        QVERIFY(state.contains("uuid"));
-        QVERIFY(state.contains("origin"));
-        QVERIFY(state.contains("sessionCount"));
-        QVERIFY(state.contains("archVersion"));
-        QVERIFY(state.contains("wasBorn"));
+        QVERIFY(state.contains(QStringLiteral("uuid")));
+        QVERIFY(state.contains(QStringLiteral("origin")));
+        QVERIFY(state.contains(QStringLiteral("sessionCount")));
+        QVERIFY(state.contains(QStringLiteral("architectureVersion")));
+        QVERIFY(state.contains(QStringLiteral("wasBorn")));
+        QVERIFY(!state.value(QStringLiteral("uuid")).toString().isEmpty());
     }
 
-    void testCalibrations()
+    void calibrationsRemainEmptyUntilAForecastIsSettled()
     {
-        Presence presence(m_tempDir);
-        QVERIFY(presence.wake());
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
 
-        // Initially empty
-        QVariantList calibrations = presence.calibrations();
-        QVERIFY(calibrations.isEmpty());
+        Presence presence(statePath(dir));
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
 
-        // Add some observations and predictions
-        QVERIFY(presence.observe("test-subject", 10.0));
-        QVERIFY(presence.observe("test-subject", 12.0));
-        QVERIFY(presence.observe("test-subject", 8.0));
-
-        // Still empty until we have outcomes
-        calibrations = presence.calibrations();
-        QVERIFY(calibrations.isEmpty());
+        QVERIFY(presence.calibrations().isEmpty());
+        QVERIFY(presence.observe(QStringLiteral("test-subject"), 10.0));
+        QVERIFY(presence.observe(QStringLiteral("test-subject"), 12.0));
+        QVERIFY(presence.observe(QStringLiteral("test-subject"), 8.0));
+        QVERIFY(presence.calibrations().isEmpty());
     }
 
-    void testPredict()
+    void predictionMatchesPresentationContract()
     {
-        Presence presence(m_tempDir);
-        QVERIFY(presence.wake());
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
 
-        // Add observations
-        QVERIFY(presence.observe("test-subject", 10.0));
-        QVERIFY(presence.observe("test-subject", 12.0));
+        Presence presence(statePath(dir));
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
 
-        // Predict
-        QVariantMap prediction = presence.predict("test-subject");
+        QVERIFY(presence.observe(QStringLiteral("test-subject"), 10.0));
+        QVERIFY(presence.observe(QStringLiteral("test-subject"), 12.0));
+
+        const QVariantMap prediction = presence.predict(QStringLiteral("test-subject"));
         QVERIFY(!prediction.isEmpty());
-        QVERIFY(prediction.contains("subject"));
-        QVERIFY(prediction.contains("value"));
-        QVERIFY(prediction.contains("confidence"));
-        QVERIFY(prediction["subject"].toString() == "test-subject");
+        QCOMPARE(prediction.value(QStringLiteral("subject")).toString(),
+                 QStringLiteral("test-subject"));
+        QVERIFY(prediction.contains(QStringLiteral("estimate")));
+        QVERIFY(prediction.contains(QStringLiteral("margin")));
+        QVERIFY(prediction.contains(QStringLiteral("confidence")));
+        QVERIFY(prediction.contains(QStringLiteral("samples")));
+        QCOMPARE(prediction.value(QStringLiteral("samples")).toInt(), 2);
     }
 
-    void testCoalitions()
+    void wakeProducesATraceableWorkspaceCoalition()
     {
-        Presence presence(m_tempDir);
-        QVERIFY(presence.wake());
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
 
-        // Initially empty
-        QVariantList coalitions = presence.coalitions();
-        QVERIFY(coalitions.isEmpty());
+        Presence presence(statePath(dir));
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
+
+        const QVariantList coalitions = presence.coalitions();
+        QVERIFY(!coalitions.isEmpty());
+
+        const QVariantMap first = coalitions.first().toMap();
+        QVERIFY(first.contains(QStringLiteral("correlationId")));
+        QVERIFY(first.contains(QStringLiteral("salience")));
+        QVERIFY(first.contains(QStringLiteral("organs")));
+        QVERIFY(first.contains(QStringLiteral("threads")));
+        QVERIFY(!first.value(QStringLiteral("correlationId")).toString().isEmpty());
     }
 
-    void testMoment()
+    void momentMatchesFocusedCoalition()
     {
-        Presence presence(m_tempDir);
-        QVERIFY(presence.wake());
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
 
-        // Initially empty focus
-        QVariantMap moment = presence.moment();
-        QVERIFY(moment.isEmpty() || !moment["focus"].toString().isEmpty());
+        Presence presence(statePath(dir));
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
+
+        const QVariantMap moment = presence.moment();
+        QVERIFY(!moment.isEmpty());
+        QVERIFY(!moment.value(QStringLiteral("focus")).toString().isEmpty());
+        QVERIFY(moment.value(QStringLiteral("salience")).toDouble() >= 0.0);
+        QVERIFY(!moment.value(QStringLiteral("organs")).toStringList().isEmpty());
     }
-
-private:
-    QString m_tempDir;
 };
 
 } // namespace cybou

@@ -4,12 +4,27 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import org.cybou.presence 1.0
+import "../utils"
 
-MindTab {
+Item {
     id: activityTab
-    title: "Activity"
-    icon: "history"
+
+    required property var mind
+    readonly property string title: "Activity"
+    readonly property string icon: "history"
+
+    property var activityModel: []
+
+    function refreshActivity() {
+        activityModel = mind.activity(20)
+    }
+
+    Component.onCompleted: refreshActivity()
+
+    Connections {
+        target: mind
+        function onChanged() { activityTab.refreshActivity() }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -23,7 +38,6 @@ MindTab {
             font.bold: true
         }
 
-        // Stats
         StatCard {
             title: "Total Contributions"
             value: mind.contributions
@@ -31,16 +45,19 @@ MindTab {
             Layout.alignment: Qt.AlignHCenter
         }
 
-        // Activity list
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: mind.activity(20)
+            clip: true
+            model: activityTab.activityModel
+
             delegate: ItemDelegate {
-                text: "[%1] %2: %3".arg(modelData.when.toLocaleTime().toString("HH:mm"))
-                                      .arg(modelData.organ)
-                                      .arg(modelData.kind)
-                onClicked: console.log("Activity clicked:", modelData)
+                required property var modelData
+                width: ListView.view.width
+                text: "[%1] %2: %3"
+                    .arg(Qt.formatTime(modelData.when, "HH:mm"))
+                    .arg(modelData.organ)
+                    .arg(modelData.kind)
             }
         }
     }

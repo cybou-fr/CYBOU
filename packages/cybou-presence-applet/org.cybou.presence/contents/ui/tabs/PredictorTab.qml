@@ -4,12 +4,36 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import org.cybou.presence 1.0
+import "../utils"
 
-MindTab {
+Item {
     id: predictorTab
-    title: "Predictor"
-    icon: "predictive-text"
+
+    required property var mind
+    readonly property string title: "Predictor"
+    readonly property string icon: "predictive-text"
+
+    property string predictionSubject: ""
+    property string predictionResult: ""
+
+    function requestPrediction() {
+        const subject = predictionSubject.trim()
+        if (!subject)
+            return
+
+        const result = mind.predict(subject)
+        if (!result || !result.subject) {
+            predictionResult = "No prediction available."
+            return
+        }
+
+        predictionResult = "Subject: %1, Estimate: %2, Margin: %3, Confidence: %4, Samples: %5"
+            .arg(result.subject)
+            .arg(Number(result.estimate).toFixed(2))
+            .arg(Number(result.margin).toFixed(2))
+            .arg(Number(result.confidence).toFixed(2))
+            .arg(result.samples)
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -23,21 +47,23 @@ MindTab {
             font.bold: true
         }
 
-        // Calibrations list
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            clip: true
             model: mind.calibrations
+
             delegate: ItemDelegate {
-                text: "%1: %2 settled, error: %3, bias: %4".arg(modelData.subject)
-                                                                 .arg(modelData.settled)
-                                                                 .arg(modelData.meanError.toFixed(2))
-                                                                 .arg(modelData.bias.toFixed(2))
-                onClicked: console.log("Calibration clicked:", modelData)
+                required property var modelData
+                width: ListView.view.width
+                text: "%1: %2 settled, error: %3, bias: %4"
+                    .arg(modelData.subject)
+                    .arg(modelData.settled)
+                    .arg(Number(modelData.meanError).toFixed(2))
+                    .arg(Number(modelData.bias).toFixed(2))
             }
         }
 
-        // Prediction input
         RowLayout {
             Layout.fillWidth: true
             spacing: 11
@@ -45,36 +71,25 @@ MindTab {
             TextField {
                 Layout.fillWidth: true
                 placeholderText: "Enter subject to predict..."
-                text: predictionSubject
-                onTextChanged: predictionSubject = text
+                text: predictorTab.predictionSubject
+                onTextChanged: predictorTab.predictionSubject = text
+                onAccepted: predictorTab.requestPrediction()
             }
 
             Button {
                 text: "Predict"
-                onClicked: predict()
+                enabled: predictorTab.predictionSubject.trim().length > 0
+                onClicked: predictorTab.requestPrediction()
             }
         }
 
-        // Prediction result
         Label {
+            Layout.fillWidth: true
             Layout.alignment: Qt.AlignHCenter
-            text: predictionResult
+            text: predictorTab.predictionResult
             font.pixelSize: 14
             wrapMode: Text.WordWrap
-        }
-    }
-
-    property string predictionSubject: ""
-    property string predictionResult: ""
-
-    function predict() {
-        if (predictionSubject) {
-            const result = mind.predict(predictionSubject)
-            predictionResult = "Subject: %1, Estimate: %2, Margin: %3, Confidence: %4, Samples: %5".arg(result.subject)
-                                                                     .arg(result.estimate.toFixed(2))
-                                                                     .arg(result.margin.toFixed(2))
-                                                                     .arg(result.confidence.toFixed(2))
-                                                                     .arg(result.samples)
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 }

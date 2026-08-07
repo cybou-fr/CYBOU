@@ -4,12 +4,14 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import org.cybou.presence 1.0
+import "../utils"
 
-MindTab {
+Item {
     id: identityTab
-    title: "Identity"
-    icon: "user-identity"
+
+    required property var mind
+    readonly property string title: "Identity"
+    readonly property string icon: "user-identity"
 
     ColumnLayout {
         anchors.fill: parent
@@ -23,17 +25,18 @@ MindTab {
             font.bold: true
         }
 
-        // Identity state
         GridLayout {
             Layout.fillWidth: true
             columns: 1
             spacing: 11
 
-            StatCard { title: "UUID"; value: mind.identityState.uuid; icon: "fingerprint" }
-            StatCard { title: "Origin"; value: mind.identityState.origin; icon: "calendar" }
-            StatCard { title: "Sessions"; value: mind.identityState.sessionCount; icon: "history" }
-            StatCard { title: "Architecture Version"; value: mind.identityState.architectureVersion; icon: "code" }
-            StatCard { title: "Was Born"; value: mind.identityState.wasBorn ? "Yes" : "No"; icon: "heart" }
+            StatCard { Layout.fillWidth: true; title: "UUID"; value: mind.identityState.uuid; icon: "fingerprint" }
+            StatCard { Layout.fillWidth: true; title: "Origin"; value: mind.identityState.origin; icon: "calendar" }
+            StatCard { Layout.fillWidth: true; title: "Sessions"; value: mind.identityState.sessionCount; icon: "history" }
+            StatCard { Layout.fillWidth: true; title: "Architecture Version"; value: mind.identityState.architectureVersion; icon: "code" }
+            StatCard { Layout.fillWidth: true; title: "Was Born"; value: mind.identityState.wasBorn ? "Yes" : "No"; icon: "heart" }
         }
+
+        Item { Layout.fillHeight: true }
     }
 }

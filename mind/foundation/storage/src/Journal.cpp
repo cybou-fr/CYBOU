@@ -173,12 +173,6 @@ quint64 Journal::append(const CognitiveEnvelope &e)
         // РУС: вклад стал бы ВЕЧНЫМ и сломал бы целостность хеш-цепочки.
         m_lastError = QStringLiteral("refusing to append an invalid envelope");
         return 0;
-
-    // ADR-0002: causationId must not equal messageId (self-causation is forbidden)
-    if (e.causationId == e.messageId) {
-        m_lastError = QStringLiteral("refusing to append: causationId equals messageId (self-causation)");
-        return 0;
-    }
     }
 
     // РУС: Берём хеш последней строки — «голову» цепочки.
@@ -221,18 +215,8 @@ quint64 Journal::append(const CognitiveEnvelope &e)
     q.addBindValue(prev);
     q.addBindValue(rowHash(seq, e, prev));
 
-    // ADR-0002: Use BEGIN IMMEDIATE to prevent writer races
-    if (!m_db.exec("BEGIN IMMEDIATE")) {
-        m_lastError = m_db.lastError().text();
-        return 0;
-    }
     if (!q.exec()) {
         m_lastError = q.lastError().text();
-        m_db.exec("ROLLBACK");
-        return 0;
-    }
-    if (!m_db.exec("COMMIT")) {
-        m_lastError = m_db.lastError().text();
         return 0;
     }
     // РУС: Возвращаем порядковый номер записи — подтверждение успешного дописывания.

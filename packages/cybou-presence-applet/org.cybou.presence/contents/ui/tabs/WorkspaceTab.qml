@@ -4,21 +4,16 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import org.cybou.presence 1.0
+import "../utils"
 
-MindTab {
+Item {
     id: workspaceTab
-    title: "Workspace"
-    icon: "folder-workspace"
 
-    // Update data when mind changes
-    Connections {
-        target: mind
-        function onChanged() {
-            coalitions = mind.coalitions()
-            moment = mind.moment()
-        }
-    }
+    required property var mind
+    readonly property string title: "Workspace"
+    readonly property string icon: "folder-workspace"
+
+    readonly property var currentMoment: mind.moment
 
     ColumnLayout {
         anchors.fill: parent
@@ -32,24 +27,27 @@ MindTab {
             font.bold: true
         }
 
-        // Current focus
         StatCard {
             title: "Focus Coalition"
-            value: moment.focus ? moment.focus.toString().left(8) : "None"
+            value: currentMoment.focus && currentMoment.focus.length > 0
+                ? currentMoment.focus.slice(0, 8)
+                : "None"
             icon: "target"
             Layout.alignment: Qt.AlignHCenter
         }
 
         StatCard {
             title: "Salience"
-            value: moment.salience ? moment.salience.toFixed(2) : "0.00"
+            value: currentMoment.salience ? Number(currentMoment.salience).toFixed(2) : "0.00"
             icon: "chart-line"
             Layout.alignment: Qt.AlignHCenter
         }
 
         StatCard {
             title: "Organs Involved"
-            value: moment.organs ? moment.organs.join(", ") : "None"
+            value: currentMoment.organs && currentMoment.organs.length > 0
+                ? currentMoment.organs.join(", ")
+                : "None"
             icon: "nodes"
             Layout.alignment: Qt.AlignHCenter
         }
@@ -61,20 +59,20 @@ MindTab {
             font.bold: true
         }
 
-        // Coalitions list
         ListView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: coalitions
+            clip: true
+            model: mind.coalitions
+
             delegate: ItemDelegate {
-                text: "%1: %2 organs, salience: %3".arg(modelData.correlationId.toString().left(8))
-                                                     .arg(modelData.organs.length)
-                                                     .arg(modelData.salience.toFixed(2))
-                onClicked: console.log("Coalition clicked:", modelData)
+                required property var modelData
+                width: ListView.view.width
+                text: "%1: %2 organs, salience: %3"
+                    .arg(String(modelData.correlationId).slice(0, 8))
+                    .arg(modelData.organs.length)
+                    .arg(Number(modelData.salience).toFixed(2))
             }
         }
     }
-
-    property QVariantList coalitions: mind.coalitions()
-    property QVariantMap moment: mind.moment()
 }
