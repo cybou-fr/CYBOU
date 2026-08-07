@@ -286,6 +286,8 @@ bool Journal::createMigrationBackup()
         return false;
     }
 
+    checkpoint.finish();
+
     const QString backup = m_path + QStringLiteral(".v1.bak");
     if (QFile::exists(backup) && !QFile::remove(backup)) {
         m_lastError = QStringLiteral("cannot replace migration backup %1").arg(backup);
