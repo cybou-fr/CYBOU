@@ -5,7 +5,6 @@
 #include "cybou/ipc/EventClient.h"
 #include "cybou/presence/Presence.h"
 
-#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QProcess>
@@ -87,19 +86,28 @@ private:
 private Q_SLOTS:
     void initTestCase()
     {
-        const QStringList args =
-            QCoreApplication::arguments();
-        QVERIFY2(
-            args.size() >= 8,
-            "M4 test requires seven daemon executable paths");
+        m_eventdPath =
+            qEnvironmentVariable("CYBOU_EVENTD_PATH");
+        m_identitydPath =
+            qEnvironmentVariable("CYBOU_IDENTITYD_PATH");
+        m_intentiondPath =
+            qEnvironmentVariable("CYBOU_INTENTIOND_PATH");
+        m_predictordPath =
+            qEnvironmentVariable("CYBOU_PREDICTORD_PATH");
+        m_selfdPath =
+            qEnvironmentVariable("CYBOU_SELFD_PATH");
+        m_workspacedPath =
+            qEnvironmentVariable("CYBOU_WORKSPACED_PATH");
+        m_presencedPath =
+            qEnvironmentVariable("CYBOU_PRESENCED_PATH");
 
-        m_eventdPath = args.at(1);
-        m_identitydPath = args.at(2);
-        m_intentiondPath = args.at(3);
-        m_predictordPath = args.at(4);
-        m_selfdPath = args.at(5);
-        m_workspacedPath = args.at(6);
-        m_presencedPath = args.at(7);
+        QVERIFY2(!m_eventdPath.isEmpty(), "CYBOU_EVENTD_PATH is not set");
+        QVERIFY2(!m_identitydPath.isEmpty(), "CYBOU_IDENTITYD_PATH is not set");
+        QVERIFY2(!m_intentiondPath.isEmpty(), "CYBOU_INTENTIOND_PATH is not set");
+        QVERIFY2(!m_predictordPath.isEmpty(), "CYBOU_PREDICTORD_PATH is not set");
+        QVERIFY2(!m_selfdPath.isEmpty(), "CYBOU_SELFD_PATH is not set");
+        QVERIFY2(!m_workspacedPath.isEmpty(), "CYBOU_WORKSPACED_PATH is not set");
+        QVERIFY2(!m_presencedPath.isEmpty(), "CYBOU_PRESENCED_PATH is not set");
 
         m_root = std::make_unique<QTemporaryDir>();
         QVERIFY(m_root->isValid());

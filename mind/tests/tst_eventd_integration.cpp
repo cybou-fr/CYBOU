@@ -4,7 +4,6 @@
 #include "cybou/events/EventStore.h"
 #include "cybou/ipc/EventClient.h"
 
-#include <QCoreApplication>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSignalSpy>
@@ -44,11 +43,11 @@ private:
 private Q_SLOTS:
     void initTestCase()
     {
-        const QStringList arguments =
-            QCoreApplication::arguments();
-        QVERIFY(arguments.size() >= 2);
-
-        m_daemonPath = arguments.at(1);
+        m_daemonPath =
+            qEnvironmentVariable("CYBOU_EVENTD_PATH");
+        QVERIFY2(
+            !m_daemonPath.isEmpty(),
+            "CYBOU_EVENTD_PATH is not set");
         m_state = std::make_unique<QTemporaryDir>();
         QVERIFY(m_state->isValid());
 

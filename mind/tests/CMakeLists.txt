@@ -114,8 +114,9 @@ add_test(
     NAME eventd-integration
     COMMAND
         ${CYBOU_DBUS_TEST_RUNNER}
+        ${CMAKE_COMMAND} -E env
+        CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
         $<TARGET_FILE:test-eventd-integration>
-        $<TARGET_FILE:cybou-eventd>
 )
 set_tests_properties(
     eventd-integration
@@ -135,14 +136,15 @@ add_test(
     NAME m4-process-integration
     COMMAND
         ${CYBOU_DBUS_TEST_RUNNER}
+        ${CMAKE_COMMAND} -E env
+        CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
+        CYBOU_IDENTITYD_PATH=$<TARGET_FILE:cybou-identityd>
+        CYBOU_INTENTIOND_PATH=$<TARGET_FILE:cybou-intentiond>
+        CYBOU_PREDICTORD_PATH=$<TARGET_FILE:cybou-predictord>
+        CYBOU_SELFD_PATH=$<TARGET_FILE:cybou-selfd>
+        CYBOU_WORKSPACED_PATH=$<TARGET_FILE:cybou-workspaced>
+        CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
         $<TARGET_FILE:test-m4-process-integration>
-        $<TARGET_FILE:cybou-eventd>
-        $<TARGET_FILE:cybou-identityd>
-        $<TARGET_FILE:cybou-intentiond>
-        $<TARGET_FILE:cybou-predictord>
-        $<TARGET_FILE:cybou-selfd>
-        $<TARGET_FILE:cybou-workspaced>
-        $<TARGET_FILE:cybou-presenced>
 )
 set_tests_properties(
     m4-process-integration
