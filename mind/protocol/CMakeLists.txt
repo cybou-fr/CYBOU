@@ -4,6 +4,7 @@
 # The shared language. Every organ links this and nothing else to talk to another organ.
 
 qt_add_library(cybou-protocol STATIC
+    src/CanonicalEnvelope.cpp
     src/CognitiveEnvelope.cpp
 )
 

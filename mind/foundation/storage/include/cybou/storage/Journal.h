@@ -13,6 +13,10 @@
 
 namespace cybou {
 
+inline constexpr int kCurrentDatabaseSchemaVersion = 2;
+inline constexpr int kLegacyJournalHashVersion = 1;
+inline constexpr int kCurrentJournalHashVersion = 2;
+
 class Journal
 {
 public:
@@ -24,6 +28,7 @@ public:
 
     bool isOpen() const;
     QString lastError() const;
+    int databaseSchemaVersion() const;
 
     quint64 append(const CognitiveEnvelope &envelope);
 
@@ -36,16 +41,38 @@ public:
 
     bool contains(const QUuid &messageId) const;
     std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const;
+    QList<QUuid> evidenceFor(const QUuid &messageId) const;
     bool hasOutcomeFor(const QUuid &causeId, const QString &originOrgan = QString()) const;
 
 private:
-    QByteArray rowHash(quint64 seq, const CognitiveEnvelope &e, const QByteArray &prev) const;
     bool ensureSchema();
+    bool createSchemaV2();
+    bool migrateV1ToV2();
+    bool ensureV2Indexes();
+    bool createMigrationBackup();
+
+    bool beginImmediate();
+    bool commitTransaction();
+    void rollbackTransaction();
+    bool execSql(const QString &sql);
+
+    int userVersion() const;
+    bool tableExists(const QString &table) const;
+    bool columnExists(const QString &table, const QString &column) const;
+
+    QByteArray rowHashV1(
+        quint64 seq, const CognitiveEnvelope &envelope, const QByteArray &previousHash) const;
+    QByteArray rowHashV2(
+        quint64 seq, const CognitiveEnvelope &envelope, const QByteArray &previousHash) const;
+
+    CognitiveEnvelope envelopeFromQuery(const QSqlQuery &query, int offset) const;
     std::optional<CognitiveEnvelope> readOne(QSqlQuery &query) const;
 
     QSqlDatabase m_db;
     QString m_connectionName;
+    QString m_path;
     QString m_lastError;
+    bool m_ready{false};
 };
 
 } // namespace cybou

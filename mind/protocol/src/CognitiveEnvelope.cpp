@@ -57,6 +57,11 @@ PrivacyClass privacyFromString(const QString &text)
 
 bool CognitiveEnvelope::isValid() const
 {
+    if (schemaVersion != kLegacyEnvelopeSchemaVersion
+        && schemaVersion != kCurrentEnvelopeSchemaVersion) {
+        return false;
+    }
+
     if (messageId.isNull() || correlationId.isNull() || originOrgan.trimmed().isEmpty()
         || !wallTime.isValid()) {
         return false;

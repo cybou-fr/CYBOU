@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
+#include "cybou/protocol/CanonicalEnvelope.h"
 #include "cybou/protocol/CognitiveEnvelope.h"
 
 #include <QTest>
@@ -127,6 +128,46 @@ private Q_SLOTS:
         e = observation();
         e.confidence = std::numeric_limits<double>::quiet_NaN();
         QVERIFY(!e.isValid());
+    }
+
+    void supportedSchemaVersionsAreExplicit()
+    {
+        CognitiveEnvelope e = observation();
+        QCOMPARE(e.schemaVersion, kCurrentEnvelopeSchemaVersion);
+
+        e.schemaVersion = kLegacyEnvelopeSchemaVersion;
+        QVERIFY(e.isValid());
+
+        e.schemaVersion = 99;
+        QVERIFY(!e.isValid());
+    }
+
+    void canonicalEvidenceIsOrderIndependent()
+    {
+        CognitiveEnvelope e = observation();
+        e.kind = ContributionKind::Prediction;
+        e.causationId = {};
+        const QUuid first = QUuid::createUuid();
+        const QUuid second = QUuid::createUuid();
+        e.evidence = {first, second};
+
+        CognitiveEnvelope reordered = e;
+        reordered.evidence = {second, first};
+        QCOMPARE(canonicalEnvelopeV2(e), canonicalEnvelopeV2(reordered));
+    }
+
+    void canonicalEncodingCoversSemanticFields()
+    {
+        CognitiveEnvelope e = observation();
+        const QByteArray original = canonicalEnvelopeV2(e);
+
+        e.privacy = PrivacyClass::Public;
+        QVERIFY(canonicalEnvelopeV2(e) != original);
+
+        e = observation();
+        const QByteArray beforeCapability = canonicalEnvelopeV2(e);
+        e.capabilityScope = QStringLiteral("system.observe");
+        QVERIFY(canonicalEnvelopeV2(e) != beforeCapability);
     }
 };
 

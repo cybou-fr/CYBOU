@@ -11,6 +11,9 @@
 
 namespace cybou {
 
+inline constexpr quint16 kLegacyEnvelopeSchemaVersion = 1;
+inline constexpr quint16 kCurrentEnvelopeSchemaVersion = 2;
+
 enum class ContributionKind : quint16 {
     Observation = 1,
     BeliefRevision,
@@ -40,7 +43,7 @@ constexpr PrivacyClass mostRestrictive(PrivacyClass a, PrivacyClass b) noexcept
     return static_cast<quint8>(a) < static_cast<quint8>(b) ? a : b;
 }
 
-/// In protocol v1 only a direct Observation may enter the biography without a prior basis.
+/// Only a direct Observation may enter the biography without a prior basis.
 constexpr bool isRootKind(ContributionKind kind) noexcept
 {
     return kind == ContributionKind::Observation;
@@ -51,7 +54,7 @@ QString privacyToString(PrivacyClass privacy);
 PrivacyClass privacyFromString(const QString &text);
 
 struct CognitiveEnvelope {
-    quint16 schemaVersion{1};
+    quint16 schemaVersion{kCurrentEnvelopeSchemaVersion};
 
     QUuid messageId;
     QUuid correlationId;
