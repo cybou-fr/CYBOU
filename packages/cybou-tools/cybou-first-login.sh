@@ -25,9 +25,11 @@ fi
 
 log "applying Cybou Horizon layout version $VERSION"
 if command -v plasma-apply-lookandfeel >/dev/null 2>&1; then
-  plasma-apply-lookandfeel --apply org.cybou.horizon.desktop \
-    && log "look-and-feel applied" \
-    || log "could not apply the look-and-feel; leaving the session as it is"
+  if plasma-apply-lookandfeel --apply org.cybou.horizon.desktop; then
+        log "look-and-feel applied"
+    else
+        log "could not apply the look-and-feel; leaving the session as it is"
+    fi
 else
   log "plasma-apply-lookandfeel not found; nothing applied"
 fi
