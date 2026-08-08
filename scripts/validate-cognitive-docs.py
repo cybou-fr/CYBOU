@@ -86,6 +86,7 @@ def main(argv: list[str]) -> int:
         "adr22": repo / "docs/adr/ADR-0022-authorized-action-boundary.md",
         "adr24": repo / "docs/adr/ADR-0024-cognitive-lifecycle-and-consolidation.md",
         "adr25": repo / "docs/adr/ADR-0025-grounding-epistemics-and-cognitive-governance.md",
+        "adr26": repo / "docs/adr/ADR-0026-lifecycle-owner-and-wire-contract.md",
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
@@ -273,6 +274,14 @@ def main(argv: list[str]) -> int:
         ("value constraints", "Executive attention and value constraints"),
     ):
         require(paths["adr25"], label, needle)
+
+    for label, needle in (
+        ("lifecycle owner", "`cybou-lifecycled`"),
+        ("lifecycle state root", "$XDG_STATE_HOME/cybou/lifecycle"),
+        ("single active run", "One active mutating run"),
+        ("wire schema", "Wire schema version 1"),
+    ):
+        require(paths["adr26"], label, needle)
 
     for label, needle in (
         ("lifecycle modes", "## Modes"),

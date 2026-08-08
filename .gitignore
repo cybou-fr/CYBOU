@@ -25,6 +25,10 @@ build.ninja
 *.exe
 *.dll
 
+# Python bytecode
+__pycache__/
+*.py[cod]
+
 # Qt
 *.moc
 moc_*

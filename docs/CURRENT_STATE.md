@@ -5,9 +5,19 @@ SPDX-License-Identifier: MIT
 
 # Current State
 
-Status date: 2026-08-08.
+Status date: 2026-08-09.
 
 This document is intentionally limited to implemented behavior and current limitations.
+
+## Repository gate status
+
+The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
+access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
+The Mind package runs twelve CTest suites, including Event1 and seven-process M4 integration.
+
+The P1 contract is also present: lifecycle schema v1, legal mode transitions, validated CBOR
+round-trip, and ADR-0026 define the future `cybou-lifecycled` owner. No lifecycle daemon, D-Bus
+service, or persistence implementation exists yet; those remain P2/P3 work.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet

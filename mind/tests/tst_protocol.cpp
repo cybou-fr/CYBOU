@@ -3,6 +3,7 @@
 
 #include "cybou/protocol/CanonicalEnvelope.h"
 #include "cybou/protocol/CognitiveEnvelope.h"
+#include "cybou/protocol/Lifecycle.h"
 
 #include <QTest>
 
@@ -168,6 +169,54 @@ private Q_SLOTS:
         const QByteArray beforeCapability = canonicalEnvelopeV2(e);
         e.capabilityScope = QStringLiteral("system.observe");
         QVERIFY(canonicalEnvelopeV2(e) != beforeCapability);
+    }
+
+    void lifecycleTransitionsAreExplicit()
+    {
+        QVERIFY(canTransition(LifecycleMode::Awake, LifecycleMode::Idle));
+        QVERIFY(canTransition(LifecycleMode::Idle, LifecycleMode::Consolidating));
+        QVERIFY(canTransition(LifecycleMode::Consolidating, LifecycleMode::Awake));
+        QVERIFY(!canTransition(LifecycleMode::Awake, LifecycleMode::Consolidating));
+        QVERIFY(!canTransition(LifecycleMode::Awake, LifecycleMode::Awake));
+        QVERIFY(canTransition(LifecycleMode::Suspended, LifecycleMode::Recovering));
+    }
+
+    void lifecycleRunRoundTrips()
+    {
+        LifecycleRun run;
+        run.runId = QUuid::createUuid();
+        run.kind = QStringLiteral("consolidation");
+        run.policyId = QStringLiteral("explicit-user-request");
+        run.requestedAt = QDateTime::currentDateTimeUtc();
+        run.inputHighWaterMark = 42;
+        run.requiredCapabilities = {QStringLiteral("journal")};
+        run.optionalCapabilities = {QStringLiteral("prediction")};
+        run.status = LifecycleRunStatus::Completed;
+        run.completedWork = {QStringLiteral("journal.verify")};
+        run.terminalCause = QStringLiteral("completed");
+        QVERIFY(run.isValid());
+
+        QString error;
+        const LifecycleRun decoded = decodeLifecycleRun(encodeLifecycleRun(run), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(decoded.runId, run.runId);
+        QCOMPARE(decoded.inputHighWaterMark, 42u);
+        QCOMPARE(decoded.status, LifecycleRunStatus::Completed);
+    }
+
+    void lifecycleRunFailsClosed()
+    {
+        LifecycleRun run;
+        run.runId = QUuid::createUuid();
+        run.kind = QStringLiteral("consolidation");
+        run.policyId = QStringLiteral("idle");
+        run.requestedAt = QDateTime::currentDateTimeUtc();
+        run.status = LifecycleRunStatus::Completed;
+        QVERIFY(!run.isValid());
+
+        QString error;
+        decodeLifecycleRun(QByteArrayLiteral("not-cbor"), &error);
+        QVERIFY(!error.isEmpty());
     }
 };
 

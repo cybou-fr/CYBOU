@@ -6,6 +6,7 @@
 qt_add_library(cybou-protocol STATIC
     src/CanonicalEnvelope.cpp
     src/CognitiveEnvelope.cpp
+    src/Lifecycle.cpp
 )
 
 target_include_directories(cybou-protocol

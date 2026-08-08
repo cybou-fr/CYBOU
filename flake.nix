@@ -184,6 +184,32 @@
                 ${self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-theme}/share
               touch $out
             '';
+
+        cognitive-docs = pkgs.runCommand "check-cognitive-docs" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          python3 ${src}/scripts/validate-cognitive-docs.py ${src}
+          touch $out
+        '';
+
+        mind-access = pkgs.runCommand "check-mind-access" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          python3 ${src}/scripts/validate-mind-access.py \
+            ${src}/packages/cybou-presence-applet/org.cybou.presence \
+            ${src}/packages/cybou-presence-applet/org.cybou.mindhandle \
+            ${src}/packages/cybou-layout-templates/org.cybou.plasma.minddock/contents/layout.js
+          touch $out
+        '';
+
+        qml-api = pkgs.runCommand "check-qml-api" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          python3 ${src}/scripts/validate-qml-api.py \
+            ${src}/packages/cybou-presence-applet/org.cybou.presence
+          touch $out
+        '';
+
+        ui-polish = pkgs.runCommand "check-ui-polish" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          python3 ${src}/scripts/validate-ui-polish.py \
+            ${src}/packages/cybou-presence-applet/org.cybou.presence \
+            ${src}/packages/cybou-presence-applet/org.cybou.mindhandle
+          touch $out
+        '';
       });
     };
 }

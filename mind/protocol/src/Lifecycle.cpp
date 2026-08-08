@@ -1,0 +1,89 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+#include "cybou/protocol/Lifecycle.h"
+
+#include <QCborArray>
+#include <QCborMap>
+#include <QCborValue>
+#include <QSet>
+
+namespace cybou {
+namespace {
+void setError(QString *error, const QString &text) { if (error) *error = text; }
+bool uniqueNonEmpty(const QStringList &items) {
+    QSet<QString> seen;
+    for (const QString &item : items) {
+        const QString value = item.trimmed();
+        if (value.isEmpty() || seen.contains(value)) return false;
+        seen.insert(value);
+    }
+    return true;
+}
+QCborArray strings(const QStringList &items) { QCborArray out; for (const auto &v : items) out.append(v); return out; }
+QStringList stringList(const QCborValue &value) { QStringList out; for (const auto &v : value.toArray()) out.append(v.toString()); return out; }
+}
+
+QString lifecycleModeToString(LifecycleMode mode) {
+    switch (mode) { case LifecycleMode::Awake: return "awake"; case LifecycleMode::Idle: return "idle";
+    case LifecycleMode::Consolidating: return "consolidating"; case LifecycleMode::Maintenance: return "maintenance";
+    case LifecycleMode::Recovering: return "recovering"; case LifecycleMode::Degraded: return "degraded";
+    case LifecycleMode::Suspended: return "suspended"; } return "unknown";
+}
+QString lifecycleRunStatusToString(LifecycleRunStatus status) {
+    switch (status) { case LifecycleRunStatus::Requested: return "requested"; case LifecycleRunStatus::Active: return "active";
+    case LifecycleRunStatus::Completed: return "completed"; case LifecycleRunStatus::Interrupted: return "interrupted";
+    case LifecycleRunStatus::Failed: return "failed"; } return "unknown";
+}
+
+bool canTransition(LifecycleMode from, LifecycleMode to) noexcept {
+    if (from == to) return false;
+    if (to == LifecycleMode::Degraded || to == LifecycleMode::Recovering) return true;
+    switch (from) {
+    case LifecycleMode::Awake: return to == LifecycleMode::Idle || to == LifecycleMode::Maintenance || to == LifecycleMode::Suspended;
+    case LifecycleMode::Idle: return to == LifecycleMode::Awake || to == LifecycleMode::Consolidating || to == LifecycleMode::Maintenance || to == LifecycleMode::Suspended;
+    case LifecycleMode::Consolidating: return to == LifecycleMode::Awake || to == LifecycleMode::Idle;
+    case LifecycleMode::Maintenance: return to == LifecycleMode::Awake || to == LifecycleMode::Suspended;
+    case LifecycleMode::Recovering: return to == LifecycleMode::Awake || to == LifecycleMode::Suspended;
+    case LifecycleMode::Degraded: return to == LifecycleMode::Recovering || to == LifecycleMode::Awake || to == LifecycleMode::Suspended;
+    case LifecycleMode::Suspended: return to == LifecycleMode::Recovering || to == LifecycleMode::Awake;
+    } return false;
+}
+
+bool LifecycleRun::isTerminal() const noexcept { return status == LifecycleRunStatus::Completed || status == LifecycleRunStatus::Interrupted || status == LifecycleRunStatus::Failed; }
+bool LifecycleRun::isValid() const {
+    if (schemaVersion != kLifecycleSchemaVersion || runId.isNull() || kind.trimmed().isEmpty() || policyId.trimmed().isEmpty() || !requestedAt.isValid()) return false;
+    if (!uniqueNonEmpty(requiredCapabilities) || !uniqueNonEmpty(optionalCapabilities) || !uniqueNonEmpty(completedWork) || !uniqueNonEmpty(missingWork)) return false;
+    QSet<QString> required(requiredCapabilities.begin(), requiredCapabilities.end());
+    for (const auto &v : optionalCapabilities) if (required.contains(v)) return false;
+    if (isTerminal() != !terminalCause.trimmed().isEmpty()) return false;
+    return status != LifecycleRunStatus::Completed || missingWork.isEmpty();
+}
+
+QByteArray encodeLifecycleRun(const LifecycleRun &run) {
+    QCborMap m;
+    m.insert(QStringLiteral("schemaVersion"), run.schemaVersion);
+    m.insert(QStringLiteral("runId"), run.runId.toString(QUuid::WithoutBraces));
+    m.insert(QStringLiteral("kind"), run.kind);
+    m.insert(QStringLiteral("policyId"), run.policyId);
+    m.insert(QStringLiteral("requestedAt"), run.requestedAt.toUTC().toString(Qt::ISODateWithMs));
+    m.insert(QStringLiteral("inputHighWaterMark"), static_cast<qint64>(run.inputHighWaterMark));
+    m.insert(QStringLiteral("requiredCapabilities"), strings(run.requiredCapabilities));
+    m.insert(QStringLiteral("optionalCapabilities"), strings(run.optionalCapabilities));
+    m.insert(QStringLiteral("status"), static_cast<qint64>(run.status));
+    m.insert(QStringLiteral("completedWork"), strings(run.completedWork));
+    m.insert(QStringLiteral("missingWork"), strings(run.missingWork));
+    m.insert(QStringLiteral("terminalCause"), run.terminalCause);
+    return m.toCborValue().toCbor();
+}
+
+LifecycleRun decodeLifecycleRun(const QByteArray &encoded, QString *error) {
+    if (error) error->clear(); LifecycleRun run; const QCborValue value = QCborValue::fromCbor(encoded);
+    if (!value.isMap()) { setError(error, "lifecycle payload is not a CBOR map"); return {}; }
+    const QCborMap m = value.toMap(); run.schemaVersion = m.value("schemaVersion").toInteger(); run.runId = QUuid(m.value("runId").toString());
+    run.kind = m.value("kind").toString(); run.policyId = m.value("policyId").toString(); run.requestedAt = QDateTime::fromString(m.value("requestedAt").toString(), Qt::ISODateWithMs);
+    run.inputHighWaterMark = m.value("inputHighWaterMark").toInteger(); run.requiredCapabilities = stringList(m.value("requiredCapabilities"));
+    run.optionalCapabilities = stringList(m.value("optionalCapabilities")); run.status = static_cast<LifecycleRunStatus>(m.value("status").toInteger());
+    run.completedWork = stringList(m.value("completedWork")); run.missingWork = stringList(m.value("missingWork")); run.terminalCause = m.value("terminalCause").toString();
+    if (!run.isValid()) { setError(error, "invalid lifecycle run"); return {}; } return run;
+}
+} // namespace cybou

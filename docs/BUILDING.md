@@ -50,6 +50,10 @@ nix build --print-build-logs \
   .#checks.x86_64-linux.formatting \
   .#checks.x86_64-linux.reuse \
   .#checks.x86_64-linux.package-metadata \
+  .#checks.x86_64-linux.cognitive-docs \
+  .#checks.x86_64-linux.mind-access \
+  .#checks.x86_64-linux.qml-api \
+  .#checks.x86_64-linux.ui-polish \
   .#packages.x86_64-linux.cybou-mind \
   .#packages.x86_64-linux.cybou-presence-applet
 

@@ -32,3 +32,4 @@ SPDX-License-Identifier: MIT
 | [0023](ADR-0023-mind-dock-discoverability-and-access.md) | Mind Dock Discoverability and Access | Accepted |
 | [0024](ADR-0024-cognitive-lifecycle-and-consolidation.md) | Cognitive Lifecycle and Consolidation | Proposed |
 | [0025](ADR-0025-grounding-epistemics-and-cognitive-governance.md) | Grounding, Epistemics, and Cognitive Governance | Proposed |
+| [0026](ADR-0026-lifecycle-owner-and-wire-contract.md) | Lifecycle Owner and Wire Contract | Accepted |

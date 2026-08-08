@@ -1,8 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 
-{ stdenv, lib }:
-
+{
+  stdenv,
+  lib,
+}:
 stdenv.mkDerivation {
   pname = "cybou-layout-templates";
   version = "0.1.0";

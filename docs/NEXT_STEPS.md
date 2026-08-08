@@ -26,6 +26,9 @@ The immediate objective is not language or autonomous action. It is:
 
 ## P0 — Restore a trustworthy green baseline
 
+**Status: complete.** The fast Nix gate, all four repository-specific validators, REUSE 3.3, both
+primary packages, and the twelve Mind CTest suites pass from the complete working tree.
+
 ### Work
 
 - remove the tracked Python bytecode cache and ignore `__pycache__/` and `*.pyc`;
@@ -43,6 +46,10 @@ nix build --print-build-logs \
   .#checks.x86_64-linux.formatting \
   .#checks.x86_64-linux.reuse \
   .#checks.x86_64-linux.package-metadata \
+  .#checks.x86_64-linux.cognitive-docs \
+  .#checks.x86_64-linux.mind-access \
+  .#checks.x86_64-linux.qml-api \
+  .#checks.x86_64-linux.ui-polish \
   .#packages.x86_64-linux.cybou-mind \
   .#packages.x86_64-linux.cybou-presence-applet
 
@@ -54,6 +61,9 @@ All repository-specific validators also run from a flake check and pass. No M5 i
 starts from a knowingly red main branch.
 
 ## P1 — Freeze the M5 lifecycle contract
+
+**Status: complete.** ADR-0026 selects the lifecycle owner and state roots; lifecycle schema v1,
+transition legality, CBOR encoding, fail-closed validation, and focused protocol tests are present.
 
 ### Work
 
@@ -230,4 +240,3 @@ vertical slice.
 - unit plus process/VM test proportional to the boundary;
 - updated contracts and `CURRENT_STATE.md` when behavior is implemented;
 - reproducible Nix gate from a clean tree.
-
