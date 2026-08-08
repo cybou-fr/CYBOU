@@ -89,6 +89,7 @@ def main(argv: list[str]) -> int:
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
+        "next_steps": repo / "docs/NEXT_STEPS.md",
     }
 
     for path in paths.values():
@@ -119,6 +120,11 @@ def main(argv: list[str]) -> int:
         paths["docs_index"],
         "epistemic documentation entry",
         "[Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md)",
+    )
+    require(
+        paths["docs_index"],
+        "executable next-steps entry",
+        "[Next Engineering Steps](NEXT_STEPS.md)",
     )
 
     for label in (
@@ -283,6 +289,18 @@ def main(argv: list[str]) -> int:
         ("M7 vertical slice", "## M7 minimal vertical slice"),
     ):
         require(paths["epistemic"], label, needle)
+
+    for label in (
+        "## P0 — Restore a trustworthy green baseline",
+        "## P1 — Freeze the M5 lifecycle contract",
+        "## P2 — Prove continuity before consolidation",
+        "## P3 — Implement the consolidation MVP",
+        "## P4 — Make lifecycle visible without moving ownership into UI",
+        "## P5 — Close M5 and publish evidence",
+        "## P6 — Begin M6 only after M5",
+        "## Suggested PR decomposition",
+    ):
+        require(paths["next_steps"], label, label)
 
     require(
         paths["glossary"],

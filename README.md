@@ -179,7 +179,8 @@ Choose a route:
 - **Verify what exists:** [Current State](docs/CURRENT_STATE.md) →
   [Testing](docs/TESTING.md) → [Failure Modes](docs/mind/FAILURE_MODES.md)
 - **Build or contribute:** [Building](docs/BUILDING.md) →
-  [Development Workflow](docs/DEVELOPMENT_WORKFLOW.md) → [Release](docs/RELEASE.md)
+  [Development Workflow](docs/DEVELOPMENT_WORKFLOW.md) →
+  [Next Engineering Steps](docs/NEXT_STEPS.md) → [Release](docs/RELEASE.md)
 - **Review Mind contracts:** [Mind documentation](docs/mind/README.md)
 - **Review trust boundaries:** [Security documentation](docs/security/README.md)
 - **Review decisions:** [ADR index](docs/adr/README.md)

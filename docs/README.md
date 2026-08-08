@@ -12,6 +12,7 @@ SPDX-License-Identifier: MIT
 - [Repository overview](../README.md)
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
+- [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
 - [Installation](INSTALLATION.md) — development artifacts and safety constraints
 
 ### Architecture
@@ -26,6 +27,7 @@ SPDX-License-Identifier: MIT
 - [Building](BUILDING.md)
 - [Testing](TESTING.md)
 - [Development Workflow](DEVELOPMENT_WORKFLOW.md)
+- [Next Engineering Steps](NEXT_STEPS.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
 - [Upgrading](UPGRADING.md)
 - [Release Process](RELEASE.md)
