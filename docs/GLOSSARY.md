@@ -70,6 +70,41 @@ attention, not a second biography.
 **Continuity** — verified persistence of identity, biography, commitments, and supported transition
 state across lifecycle boundaries.
 
+**Cognitive lifecycle** — explicit software modes governing availability, consolidation,
+maintenance, recovery, degradation, and suspension. It is not a claim of biological sleep.
+
+**Consolidation** — a bounded, recoverable maintenance run that asks existing owners to derive,
+calibrate, reconcile, expire, or rebuild state from an accepted Journal high-water mark. It does
+not rewrite accepted history.
+
+**Lifecycle coordinator** — future orchestration capability for lifecycle transitions and typed
+maintenance requests. It owns run state, not the state of every organ.
+
+**Provenance** — source, acquisition, transformation, and trust context attached to an observation
+or derived claim.
+
+**Epistemic projection** — current derived view of claims and their status: observed, reported,
+inferred, assumed, disputed, superseded, stale, or unknown. It is not canonical biography.
+
+**Reconciliation** — causally recorded handling of conflicting or stale state without silently
+discarding the conflicting evidence.
+
+**Retention** — explicit policy for active storage, archive, expiry, erasure, and propagation of
+those decisions into derived or replicated material.
+
+**Homeostasis** — typed regulation signals for internal pressure such as storage growth, backlog,
+latency, stale projections, unresolved contradiction, or calibration drift.
+
+**Metacognition** — structured projection of what Mind knows about its own uncertainty, freshness,
+assumptions, evidence, and capability deficits.
+
+**Executive attention** — bounded policy for interruption, deferral, return, and competition among
+active concerns; an extension of Workspace admission, not authorization to act.
+
+**Value constraint** — typed consideration such as user authority, safety, privacy, reversibility,
+cost, urgency, evidence quality, or resource budget used to criticize and prioritize proposals.
+It does not grant execution permission.
+
 **Degraded mode** — future state in which Mind remains partially available while one or more
 capabilities are explicitly unavailable or uncertain.
 

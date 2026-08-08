@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
-# User-facing desktop tools. Neither is a convenience: spec/acceptance.yaml requires
+# User-facing desktop tools. Neither is a convenience: docs/INSTALLATION.md requires
 # reset_to_breeze, configuration_backup and first_login_idempotent.
 #
 # Both are writeShellApplication, so shellcheck runs at build time. That is currently the

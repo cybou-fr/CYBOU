@@ -17,7 +17,7 @@
     auto-optimise-store = true;
   };
 
-  # Also decides the VM runner's name: docs/06-nixos-build.md documents
+  # Also decides the VM runner's name: docs/BUILDING.md documents
   # ./result/bin/run-cybou-vm, and that script is named after the host.
   networking.hostName = "cybou";
   networking.networkmanager.enable = true;
@@ -39,7 +39,7 @@
   fonts = {
     enableDefaultPackages = true;
     packages = with pkgs; [
-      # docs/03-design-system.md names Inter and JetBrains Mono, with Noto as fallback.
+      # spec/design-tokens.json is visual authority; Inter/JetBrains Mono use Noto fallback.
       # Package names verified against the locked nixpkgs revision, not assumed.
       inter
       jetbrains-mono
@@ -63,6 +63,6 @@
     vim
   ];
 
-  # No telemetry, no cloud dependency (docs/11-security-licensing.md).
+  # No telemetry and no required cloud dependency (README.md and docs/security/README.md).
   # Nothing here may phone home.
 }

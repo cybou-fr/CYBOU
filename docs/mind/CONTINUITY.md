@@ -19,3 +19,23 @@ validate → backup → migrate → verify Journal → restore intentions
 ```
 
 If verification or reconstruction fails, Cybou reports degraded continuity instead of silently claiming success.
+
+## Lifecycle integration — M5 target
+
+Continuity is not only persistence of files. It includes the ability to explain a transition and
+reconcile partial work:
+
+```text
+Awake
+→ checkpoint/high-water mark
+→ Consolidating | Maintenance | Suspended
+→ completed terminal record or Recovering
+→ verified projections
+→ Awake | Degraded
+```
+
+Every consolidation/migration run has a stable identity. Restart reads accepted partial and
+terminal events before repeating work. A missing terminal record is not interpreted as success.
+
+See [Cognitive Lifecycle and Consolidation](LIFECYCLE.md) and
+[ADR-0024](../adr/ADR-0024-cognitive-lifecycle-and-consolidation.md).

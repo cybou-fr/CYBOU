@@ -7,7 +7,7 @@
 #
 # What NOT to do here, learned by doing it: a blanket "replace nixos with cybou" across
 # branding.desc rewrites `componentName`, which Calamares uses to select the branding at all,
-# and turns every upstream URL into an invented one - `docs/11-security-licensing.md` forbids
+# and turns every upstream URL into an invented one - docs/security/README.md forbids
 # inventing a website. A blanket "copy our SVG over every image" writes XML into .png files,
 # which render as nothing.
 #

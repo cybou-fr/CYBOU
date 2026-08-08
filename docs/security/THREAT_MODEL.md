@@ -7,7 +7,18 @@ SPDX-License-Identifier: MIT
 
 ## Assets
 
-Identity, Journal, intentions, private observations, Nix configuration, credentials, D-Bus interfaces, migration backups, and future inter-node messages.
+Identity, Journal, intentions, private observations, provenance, epistemic state, retention/erasure
+obligations, lifecycle records, Nix configuration, credentials, D-Bus interfaces, migration
+backups, and future inter-node messages.
+
+## Trust boundaries
+
+- Body/perception adapter to accepted Observation;
+- one user-session process to another over D-Bus;
+- organ owner to lifecycle coordinator;
+- Journal history to derived epistemic projection;
+- local node to future trusted peer;
+- cognition/planning to M9 authorization and executor.
 
 ## Threats
 
@@ -19,6 +30,11 @@ Identity, Journal, intentions, private observations, Nix configuration, credenti
 - migration rewriting or partial completion;
 - QML authority confusion and duplicate Presence instances;
 - action escalation from uncertain cognition to privileged mutation.
+- forged provenance or stale input presented as current observation;
+- consolidation rewriting history or reporting false completion;
+- sensitive content surviving through summaries, backups, or replicas after claimed erasure;
+- value/priority scoring being mistaken for execution permission;
+- resource exhaustion through event, contradiction, or consolidation backlog.
 
 ## Controls
 
@@ -32,3 +48,10 @@ Identity, Journal, intentions, private observations, Nix configuration, credenti
 - process sandboxing;
 - typed action boundary;
 - security and concurrency tests.
+
+## Current limitations
+
+- same-user D-Bus callers do not yet have capability tokens or method-level authorization;
+- Journal hashing detects inconsistency but is not an external signature/trust anchor;
+- retention and replica erasure are design targets, not implemented controls;
+- lifecycle and action boundaries are proposed, not active enforcement paths.

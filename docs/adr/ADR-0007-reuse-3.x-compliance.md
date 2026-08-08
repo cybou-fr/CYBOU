@@ -72,7 +72,8 @@ This runs `reuse lint` to verify all files have proper SPDX headers.
 The `nix flake check` command includes REUSE validation. Any file without proper SPDX headers will cause the check to fail.
 
 ### Gate A
-REUSE compliance is a Gate A requirement (docs/04-gates.md). No file can be merged without proper license headers.
+REUSE compliance is a repository gate documented in `../TESTING.md`. No file can be merged without
+proper license metadata.
 
 ### Developer Guidelines
 - Always add SPDX headers to new files

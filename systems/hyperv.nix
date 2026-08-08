@@ -26,7 +26,7 @@
       "networkmanager"
     ];
     # Development image only. The ISO must not embed credentials
-    # (spec/acceptance.yaml: no_embedded_credentials).
+    # Development-only credential; release images follow docs/RELEASE.md and embed none.
     initialPassword = "cybou";
   };
 

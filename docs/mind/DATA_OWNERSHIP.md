@@ -42,3 +42,19 @@ The runtime identity marker prevents a daemon restart from being confused with a
 - only workspaced owns live bounded attention;
 - opening another UI surface does not create another Mind;
 - process isolation does not introduce duplicate authoritative copies.
+
+## Proposed M5–M7 ownership
+
+| Resource | Target owner/boundary |
+|---|---|
+| lifecycle mode and consolidation run state | lifecycle coordinator; no organ state ownership |
+| perception acquisition state | replaceable adapter/faculty |
+| provenance-bearing accepted observation | `cybou-eventd` Journal history |
+| current epistemic claim projection | dedicated owner to be selected by an implementation ADR |
+| retention policy and outstanding erasure obligations | dedicated policy owner to be selected before M7 |
+| homeostatic pressure projection | typed aggregation over owner metrics, not direct owner mutation |
+| executive focus/deferral state | evolution of `cybou-workspaced` unless a later ADR separates it |
+| authorization decision | future M9 policy boundary, never the value or language faculty |
+
+ADR-0024 and ADR-0025 deliberately do not assign new daemon names before persistence, failure, and
+privacy contracts justify process boundaries.

@@ -61,7 +61,7 @@ Implemented:
 System meaning: cognitive responsibilities now have explicit process/state ownership and independent
 failure domains. This creates the substrate required for continuity and degraded cognition.
 
-## M5 — Continuity
+## M5 — Continuity and Cognitive Lifecycle
 
 **Next.**
 
@@ -72,11 +72,20 @@ Engineering scope:
 - architecture-transition records;
 - explicit reconciliation rules;
 - verification that durable identity/commitments survive supported transitions.
+- explicit `Awake`, `Idle`, `Consolidating`, `Maintenance`, `Recovering`, and `Suspended` modes;
+- bounded, interruptible consolidation runs with durable terminal records;
+- checkpoints/high-water marks and idempotent recovery after partial consolidation;
+- owner-specific calibration, intention review, integrity, and attention-maintenance requests;
+- temporal freshness/expiry semantics for maintained projections.
 
 System meaning:
 
 > Cybou can survive supported component and system transitions without falsely claiming a new
 > identity or silently inventing seamless continuity.
+
+It can also maintain accumulated experience without creating a central `sleepd` that owns every
+organ. A lifecycle coordinator requests typed work; existing organs retain ownership and all
+durable results cross Event1.
 
 A stable UUID alone is not enough. Continuity must be supported by verified state/history and
 explicit transitions.
@@ -90,6 +99,9 @@ Engineering scope:
 - partial availability policy;
 - recovery/reconciliation behavior;
 - degraded continuity representation where needed.
+- homeostatic signals for storage, backlog, latency, freshness, and calibration drift;
+- capability-aware consolidation scheduling and interruption;
+- metacognitive projection of unknown, stale, assumed, unsupported, and degraded state.
 
 System meaning:
 
@@ -107,10 +119,18 @@ identity + biography + intentions + workspace remain usable
 
 The exact capability matrix must be explicit and testable.
 
-## M7 — Distributed Node Prototype
+## M7 — Grounded and Distributed Mind Prototype
 
 Engineering scope:
 
+- typed perception adapters with source, freshness, privacy, and provenance;
+- an epistemic projection distinguishing observed, reported, inferred, assumed, disputed,
+  superseded, and unknown state;
+- explicit contradiction detection and reconciliation records;
+- retention/forgetting policy, including propagation to derived and replicated material;
+- bounded executive attention for interruption, deferral, and competing intentions;
+- typed value constraints covering user authority, safety, privacy, reversibility, cost, urgency,
+  evidence quality, and resource budget;
 - inter-node transport;
 - selective replication;
 - privacy-aware state movement;
@@ -119,10 +139,15 @@ Engineering scope:
 
 System meaning:
 
-> One verified identity may be represented across multiple nodes without treating blind file sync as
+> Cybou can ground knowledge in provenance, represent disagreement and uncertainty, govern what is
+> retained, and then carry one verified identity across nodes without treating blind file sync as
 > continuity.
 
 Replication must preserve causal, privacy, and ownership rules.
+
+M7 is intentionally a minimal vertical slice, not a claim to solve general knowledge
+representation. Grounding/retention semantics precede replication so the system knows what a state
+means and whether it is allowed to move before transporting it.
 
 ## M8 — Optional Language Faculty
 
@@ -139,6 +164,9 @@ System meaning:
 
 > Language becomes an optional capability attached to Mind, not the owner of identity, biography,
 > intentions, authorization, or execution.
+
+Selected context carries provenance, epistemic status, freshness, privacy, and capability deficits;
+language fluency must not erase those qualifications.
 
 A model may be replaced or disabled without creating a new Cybou identity.
 
@@ -185,16 +213,20 @@ M3  biography gets one canonical writer
  │
 M4  cognitive responsibilities become isolated owners
  │
-M5  identity/commitments gain stronger continuity
+M5  continuity gains lifecycle, consolidation, and recovery
  │
-M6  partial failure becomes explicit degraded cognition
+M6  partial failure and internal pressure become explicit degraded cognition
  │
-M7  continuity/privacy are tested across nodes
+M7  perception, knowledge, retention, values, and replication become governed
  │
 M8  replaceable language attaches as a faculty
  │
 M9  external agency crosses authorization + observation
 ```
 
-The milestone order is intentional: agency is added after memory, ownership, continuity, degraded
-behavior, and model replaceability have explicit boundaries.
+The milestone order is intentional: agency is added after memory, ownership, continuity,
+consolidation, degraded behavior, provenance, retention, cognitive governance, distribution, and
+model replaceability have explicit boundaries.
+
+ADR-0024 defines lifecycle/consolidation. ADR-0025 defines grounding, epistemics, retention,
+homeostasis, executive attention, and value constraints.

@@ -4,7 +4,7 @@
 # The build expression is code (MIT); the mark it installs is a design asset
 # (CC-BY-SA-4.0), recorded in meta.license.
 #
-# Installation paths follow docs/05-plasma-packaging.md "Shared assets".
+# Installation paths follow the KDE package boundaries described in docs/ARCHITECTURE.md.
 {
   lib,
   runCommand,

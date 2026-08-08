@@ -50,3 +50,12 @@ durable
 
 No Workspace copy is owned by presenced or the QML proxy. Tests may still construct a local
 Workspace against a temporary EventStore as a unit-test seam.
+
+## M5–M7 direction
+
+During consolidation, workspaced may rebuild a bounded moment, decay salience, or close an episode,
+but only from an accepted input high-water mark and without becoming biography owner.
+
+Executive attention extends current admission/focus with interruption, deferral, return, competing
+intentions, and resource budgets. Typed value constraints may influence priority; they do not grant
+external execution authority. See [Epistemic Governance](EPISTEMIC_GOVERNANCE.md).

@@ -1,9 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
-# Cybou CI — template, per docs/adr/0005..0007 and CYB-004.
-#
-# Copy to .github/workflows/checks.yml in the implementation repository.
+# Cybou CI — repository workflow; see docs/TESTING.md and docs/adr/ADR-0004-ci-workflow.md.
 # GitHub Actions is assumed but not required; the split below is what matters:
 #
 #   every push  -> cheap checks only, minutes, always green or genuinely broken
@@ -12,9 +10,8 @@
 #
 # Why the ISO is not here: hosted runners give roughly 14 GB of free disk. A NixOS
 # Plasma ISO sits at or past that line, so it fails for reasons unrelated to the change
-# and trains everyone to ignore red CI. docs/09-development-on-windows.md makes WSL the
-# build environment; release ISO + SHA256 is a documented manual step in
-# prompts/release-agent.md.
+# and trains everyone to ignore red CI. docs/BUILDING.md documents WSL/Linux development;
+# docs/RELEASE.md defines the manual release ISO + SHA256 step.
 #
 # Note there is almost nothing here. That is the point: `nix flake check` already runs
 # formatting, REUSE compliance and package-metadata validation, each pinned by flake.lock,
@@ -75,4 +72,4 @@ jobs:
 # Not in CI, by decision:
 #   nix build .#nixosConfigurations.cybou-iso.config.system.build.isoImage
 #   sha256sum result/iso/*.iso
-# Run both in WSL for a release and publish the hash per spec/acceptance.yaml:iso_sha256_published.
+# Run both in WSL/Linux for a release and publish the hash per docs/RELEASE.md.

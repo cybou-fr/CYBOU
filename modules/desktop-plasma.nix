@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # KDE Plasma 6 on Wayland with SDDM. Phase 1 is deliberately unbranded: Gate A must pass
-# on a plain Plasma session before any Cybou theme is introduced (AGENTS.md).
+# on a plain Plasma session before any Cybou theme is introduced (docs/TESTING.md).
 { pkgs, ... }:
 {
   services.displayManager.sddm = {
@@ -18,7 +18,7 @@
   xdg.portal.enable = true;
 
   environment.systemPackages = with pkgs; [
-    # Curated set from docs/01-product-scope.md. Kept small on purpose:
+    # Curated desktop set. Kept small on purpose; product scope is summarized in README.md.
     # the ISO is not a software collection.
     kdePackages.dolphin
     kdePackages.konsole

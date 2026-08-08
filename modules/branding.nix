@@ -25,7 +25,7 @@
   # System-wide defaults only. KDE reads /etc/xdg/kdeglobals as a fallback beneath the user's
   # own ~/.config/kdeglobals, so a fresh account starts on Cybou Horizon while anyone who has
   # already chosen something keeps it. This is the "provide system defaults where KDE supports
-  # them" step from docs/02-architecture.md - not the first-login initializer, which is
+  # theming step from docs/ARCHITECTURE.md - not the first-login initializer, which is
   # CYB-023 and may only run once, against a clean profile.
   # First login, once per profile (CYB-023). Deliberately not ordered Before= anything in the
   # session: docs/04 requires that a failed initializer must not block login, so it runs
@@ -42,10 +42,10 @@
     };
   };
 
-  # Four virtual desktops (docs/04). Not settable from the layout script: KWin owns this,
+  # Four virtual desktops. Not settable from the layout script: KWin owns this,
   # and the layout script owns the panel.
-  # Switching shortcuts for those desktops (CYB-021). Meta+1..4 and nothing else invented:
-  # docs/04 forbids a large custom scheme in v0.1, so every other binding stays at the KDE
+  # Switching shortcuts for those desktops (CYB-021). Meta+1..4 and nothing else invented;
+  # every other binding stays at the KDE
   # default. These are system defaults, so a user who rebinds them keeps their choice.
   environment.etc."xdg/kglobalshortcutsrc".text = ''
     [kwin]

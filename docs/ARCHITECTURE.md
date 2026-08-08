@@ -172,6 +172,63 @@ A model is replaceable. Mind state is not model hidden context.
 
 The normative direction is ADR-0021.
 
+## Future lifecycle and consolidation boundary
+
+Cybou requires a maintenance cycle analogous in purpose to sleep, but not a biological simulation
+and not a central owner of cognition.
+
+Target relationship:
+
+```text
+lifecycle policy / trigger
+        │
+        ▼
+coordinator selects accepted high-water mark
+        │
+        ├── typed maintenance requests to current owners
+        │
+        ▼
+derived Event1 contributions
+        │
+        ▼
+accepted terminal lifecycle record
+```
+
+The coordinator owns run orchestration only. It does not write organ storage or Journal. Accepted
+history is never rewritten into a more convenient past; summaries, calibration, contradiction, and
+expiry decisions remain derived records with evidence.
+
+Lifecycle modes and basic consolidation belong to M5. Resource/capability-aware operation belongs
+to M6. ADR-0024 is normative.
+
+## Future grounding and cognitive-governance boundary
+
+Journal answers what was accepted into causal history. A future epistemic projection separately
+answers what is currently observed, reported, inferred, assumed, disputed, superseded, stale, or
+unknown.
+
+```text
+Body / user / sensor
+        │
+        ▼
+perception adapter + provenance
+        │
+        ▼
+candidate Observation → Event1 → Journal
+                              │
+                              ▼
+                  epistemic reconciliation
+                              │
+              governed retention and context
+```
+
+Perception is not truth. Confidence is not authorization. Retention is explicit policy, including
+derived and replicated material. Executive attention and value constraints guide selection and
+criticism but do not grant permission to execute.
+
+ADR-0025 defines this direction. Concrete new processes are deferred until ownership, persistence,
+failure, and privacy contracts are precise.
+
 ## Future action boundary
 
 M9 is intentionally outside the current M4 organ topology.
@@ -208,11 +265,11 @@ The normative direction is ADR-0022.
 
 ## Next
 
-M5 strengthens continuity/recovery.
+M5 strengthens continuity/recovery and introduces lifecycle/consolidation.
 
-M6 turns process health into explicit capability deficits.
+M6 turns process health and internal pressure into explicit capability deficits and homeostasis.
 
-M7 tests continuity/privacy across nodes.
+M7 adds grounded perception, epistemic/retention governance, then tests them across nodes.
 
 M8 adds replaceable language faculties.
 

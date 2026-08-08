@@ -5,12 +5,12 @@
 #
 # SDDM is not the Plasma lock screen and does not follow the Global Theme; it has its own theme
 # directory, which is why the login background stayed Breeze while the desktop was already
-# Cybou (docs/05-plasma-packaging.md says as much).
+# Cybou while preserving upstream package boundaries (docs/ARCHITECTURE.md).
 #
 # Deriving from Breeze rather than writing QML from scratch is deliberate: a broken greeter QML
 # is a blocking release defect (docs/08), and Breeze's greeter is already correct. Cybou changes
 # the background and the identity, nothing structural. This is a KDE-derived modification and
-# keeps a licence compatible with its source, per docs/11-security-licensing.md.
+# keeps a licence compatible with its source, per docs/adr/ADR-0007-reuse-3.x-compliance.md.
 {
   lib,
   runCommand,

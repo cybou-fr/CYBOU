@@ -48,7 +48,7 @@
     squashfsCompression = "zstd -Xcompression-level 6";
   };
 
-  # No embedded credentials: spec/acceptance.yaml treats that as blocking. The live user comes
+  # No embedded credentials: docs/RELEASE.md treats that as blocking. The live user comes
   # from the upstream profile with no password; nothing is added here.
 
   # Same software-rendering workaround as the VM and Hyper-V images, and for the same reason:

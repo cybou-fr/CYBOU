@@ -21,6 +21,12 @@ Then read the implementation documents in this order:
 8. [Presence API](PRESENCE_API.md)
 9. [Continuity](CONTINUITY.md)
 10. [Failure Modes](FAILURE_MODES.md)
+11. [Cognitive Lifecycle and Consolidation](LIFECYCLE.md) — M5 target
+12. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — M6/M7 target
+
+Documents 1–10 primarily specify or explain the current substrate and immediate continuity
+boundary. Documents 11–12 are future-target contracts and must not be read as current
+implementation claims.
 
 For current implementation status, see [Current State](../CURRENT_STATE.md).
 For milestone semantics, see [Roadmap](../ROADMAP.md).

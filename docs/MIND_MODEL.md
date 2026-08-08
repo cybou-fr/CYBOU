@@ -227,6 +227,45 @@ Observed consequence
 
 M9 owns the authorization/execution boundary. It is not implemented by the current M4 substrate.
 
+### 7. Consolidation derives; it does not rewrite
+
+Mind needs a maintenance cycle analogous in purpose to sleep: accumulated experience must be
+checked, calibrated, reconciled, summarized, expired, and made recoverable. This is a software
+lifecycle, not a claim of biological sleep.
+
+Consolidation is bounded by an accepted Journal high-water mark. Existing organs perform work for
+the state they own, and durable results return through Event1 with causes/evidence. A lifecycle
+coordinator owns orchestration only.
+
+```text
+summary ≠ source evidence
+consolidation ≠ history rewrite
+expiry ≠ silent deletion
+coordinator ≠ owner of every organ
+```
+
+Every run ends as completed, interrupted, or failed. Recovery reconciles accepted partial results
+and does not duplicate them.
+
+### 8. Perception is not truth
+
+A candidate observation carries source, acquisition time, freshness, privacy, and available trust
+evidence. Acceptance records that the observation entered causal history; it does not prove the
+world claim is true.
+
+Future epistemic state distinguishes observed, reported, inferred, assumed, disputed, superseded,
+stale, and unknown claims. Contradictions remain explicit until a causally justified reconciliation
+changes the projection.
+
+### 9. Forgetting and values are governed
+
+Retention, archive, expiry, user erasure, and propagation into derived/replicated material require
+explicit policy. Unlimited retention is not a neutral default.
+
+Safety, privacy, user authority, reversibility, cost, urgency, evidence quality, and resource budget
+are typed constraints for attention, criticism, and planning. A value/priority score does not itself
+authorize external action.
+
 ## The current substrate
 
 The current M4 design establishes the process and ownership boundaries required for the larger
@@ -264,6 +303,9 @@ This substrate currently provides the foundations for:
 
 It does **not** yet provide the full future agent:
 
+- no cognitive lifecycle state machine or consolidation coordinator;
+- no governed perception, epistemic projection, retention/forgetting, or value model;
+- no homeostatic pressure or metacognitive uncertainty projection;
 - no M6 capability-deficit model;
 - no inter-node transport/replication;
 - no optional language faculty implementation;
@@ -352,6 +394,28 @@ The same rule applies to future surfaces: CLI, mobile, voice, remote console, or
 observe/command Mind through explicit boundaries rather than reimplementing cognition inside the
 surface.
 
+## Future lifecycle and consolidation — M5
+
+M5 adds explicit modes:
+
+```text
+Awake → Idle → Consolidating → Awake
+           └→ Maintenance
+failure   → Recovering
+partial capability → Degraded
+session boundary   → Suspended
+```
+
+Transitions are policy decisions with typed reasons and terminal records, not incidental booleans
+inside Presence. `awake` in the current UI is not yet this state machine.
+
+Consolidation may verify integrity, calibrate predictions, review intentions, detect
+contradictions, close episodes, decay salience, prepare recovery, and apply retention policy. Each
+operation is delegated to its state owner. Ordinary work is interruptible; narrow migrations and
+transactions define explicit interruption boundaries.
+
+ADR-0024 contains the normative lifecycle direction.
+
 ## Future degraded cognition — M6
 
 Process isolation by itself is not degraded cognition.
@@ -383,9 +447,23 @@ all presentation.
 
 The exact policy belongs to the M6 design and ADR-0019.
 
-## Future distributed continuity — M7
+M6 also adds homeostatic and metacognitive signals. Storage growth, event backlog, latency, stale
+projections, unresolved contradictions, and calibration drift become explicit pressures. Mind can
+then report not just whether an organ responds, but which knowledge is stale, which assumptions are
+unsupported, and which maintenance work cannot currently complete.
 
-M7 introduces a distributed-node prototype.
+## Future grounded and distributed cognition — M7
+
+Before transporting state, M7 introduces a minimal grounded-cognition slice:
+
+- replaceable perception adapters with provenance;
+- an epistemic projection over accepted history;
+- explicit contradiction/reconciliation state;
+- retention, expiry, erasure, and derived-data policy;
+- executive attention for interruption, deferral, and return;
+- typed value constraints that guide but do not authorize.
+
+M7 then introduces a distributed-node prototype.
 
 The target is not blind synchronization of every local file. Replication must respect:
 
@@ -394,6 +472,7 @@ The target is not blind synchronization of every local file. Replication must re
 - causal history;
 - conflict/partition behavior;
 - node-local versus identity-level state.
+- epistemic status, freshness, retention, and erasure obligations.
 
 A future one-identity/multiple-node topology may look like:
 
@@ -408,6 +487,7 @@ A future one-identity/multiple-node topology may look like:
 This is a target architecture, not a current implementation.
 
 ADR-0018 and ADR-0016 define the relevant privacy and continuity direction.
+ADR-0025 defines grounding and cognitive governance.
 
 ## Future language faculty — M8
 
@@ -443,7 +523,8 @@ human-readable explanation
 ```
 
 The language model should receive selected typed context rather than unrestricted ownership of the
-Journal database.
+Journal database. Context includes provenance, epistemic status, freshness, privacy, retention
+constraints, and known capability deficits.
 
 ADR-0021 contains the normative model boundary.
 
@@ -529,9 +610,9 @@ The roadmap can be read as progressive cognitive capability:
 | M2 | biography has stricter causal and hash semantics |
 | M3 | Journal has one canonical writer |
 | M4 | cognitive responsibilities have process-level ownership and failure isolation |
-| M5 | continuity/recovery becomes stronger across restarts, reboots, and transitions |
-| M6 | organ failure becomes an explicit capability deficit instead of whole-Mind collapse |
-| M7 | continuity/privacy are tested across multiple nodes |
+| M5 | continuity gains explicit lifecycle, consolidation, and recovery semantics |
+| M6 | organ failure and internal pressure become explicit capability/homeostatic state |
+| M7 | perception, epistemics, retention, values, and distributed movement become governed |
 | M8 | replaceable language faculty attaches without becoming identity, memory, or executor |
 | M9 | external action crosses an explicit authorization and observation boundary |
 
@@ -549,6 +630,9 @@ When a new AI, UI, planner, sensor, or executor is proposed, ask:
 8. If it acts externally, where is authorization decided?
 9. How is the real result observed and returned to Mind?
 10. Does the design preserve the difference between transient attention and durable biography?
+11. What is its provenance, freshness, epistemic status, and retention policy?
+12. Can consolidation be interrupted/retried without rewriting history or duplicating effects?
+13. Which typed values guide priority, and why do they not become execution authority?
 
 If these questions have no clear answers, the feature is probably crossing an architectural
 boundary.
@@ -571,3 +655,5 @@ boundary.
 - `adr/ADR-0019-degraded-modes-and-capability-deficits.md` — degraded cognition direction.
 - `adr/ADR-0021-language-models-are-optional-faculties.md` — language-model boundary.
 - `adr/ADR-0022-authorized-action-boundary.md` — future action boundary.
+- `adr/ADR-0024-cognitive-lifecycle-and-consolidation.md` — lifecycle/consolidation boundary.
+- `adr/ADR-0025-grounding-epistemics-and-cognitive-governance.md` — grounding and governance.

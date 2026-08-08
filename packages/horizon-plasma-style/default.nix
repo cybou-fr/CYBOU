@@ -5,7 +5,7 @@
 #
 # Ships a `colors` file and nothing else on purpose. Plasma tints its own widget SVGs from
 # that file, so the panel, menus and applets follow the tokens without Cybou overriding a
-# single SVG - and docs/05-plasma-packaging.md says to override only what is intentional and
+# single SVG; the package overrides only what is intentional and
 # to let Plasma fall back for the rest. Overridden SVGs come with CYB-013's later passes,
 # once there is a reason for each one.
 #

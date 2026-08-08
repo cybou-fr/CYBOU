@@ -4,7 +4,7 @@
   description = "Cybou - a calm, reproducible KDE Plasma desktop on NixOS";
 
   inputs = {
-    # Frozen base: NixOS 26.05 stable (AGENTS.md). Do not move to unstable without
+    # Frozen base: NixOS 26.05 stable (ADR-0006). Do not move to unstable without
     # an ADR recording the blocker.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
   };
@@ -35,8 +35,8 @@
         }
       );
 
-      # Phase 0 ships empty derivations on purpose: the build interface exists and is
-      # checked before any visual work starts (docs/07-implementation-plan.md).
+      # Package boundaries remain explicit so each visual/runtime output can be validated
+      # independently (docs/ARCHITECTURE.md and docs/TESTING.md).
       packages = forAllSystems (pkgs: rec {
         horizon-colors = pkgs.callPackage ./packages/horizon-colors { };
         horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
@@ -112,7 +112,7 @@
             pkgs.nixfmt
             pkgs.reuse
 
-            # C++ toolchain for mind/ (ADR-0008, docs/13-cpp-development.md).
+            # C++ toolchain for mind/ (ADR-0008, docs/BUILDING.md).
             pkgs.clang-tools
             pkgs.cmake
             pkgs.ninja

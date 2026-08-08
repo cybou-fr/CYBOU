@@ -116,8 +116,12 @@ These components are intentionally useful without any language model.
 The current tree does **not** yet implement:
 
 - full M5 restart/reboot/upgrade continuity proof and reconciliation;
+- explicit cognitive lifecycle modes or a consolidation coordinator;
+- background consolidation, retention, forgetting, or temporal freshness policy;
 - M6 explicit degraded-Mind capability-deficit policy;
+- homeostatic pressure signals or metacognitive uncertainty/freshness projection;
 - M7 inter-node transport, replication, or partition handling;
+- typed perception adapters, epistemic claims, contradiction reconciliation, or value constraints;
 - M8 optional language faculty;
 - M9 planning/authorization/executor pipeline for privileged external actions.
 
@@ -130,6 +134,10 @@ the corresponding milestone is implemented and gated.
 - most local RPC is synchronous;
 - same-user IPC authorization is not yet a capability security boundary;
 - stronger restart/reconciliation guarantees belong to M5/M6;
+- `awake` is currently a presentation/runtime property, not the lifecycle state machine proposed by
+  ADR-0024;
+- Journal history is not yet consolidated into a governed epistemic projection;
+- privacy classification exists, but retention and erasure propagation are not implemented;
 - no inter-node transport exists;
 - no model-selection/context policy for M8 exists;
 - no authorization policy or typed privileged executor for M9 exists.
@@ -140,6 +148,6 @@ the corresponding milestone is implemented and gated.
 - M2: complete.
 - M3: complete after the M3 compile repair included by M4.
 - M4: implementation present; repository gates remain the acceptance authority.
-- M5: next.
+- M5: next; now includes continuity, lifecycle modes, and consolidation foundations.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

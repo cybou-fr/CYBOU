@@ -84,6 +84,11 @@ def main(argv: list[str]) -> int:
         "mind_index": repo / "docs/mind/README.md",
         "adr21": repo / "docs/adr/ADR-0021-language-models-are-optional-faculties.md",
         "adr22": repo / "docs/adr/ADR-0022-authorized-action-boundary.md",
+        "adr24": repo / "docs/adr/ADR-0024-cognitive-lifecycle-and-consolidation.md",
+        "adr25": repo / "docs/adr/ADR-0025-grounding-epistemics-and-cognitive-governance.md",
+        "lifecycle": repo / "docs/mind/LIFECYCLE.md",
+        "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
+        "security_index": repo / "docs/security/README.md",
     }
 
     for path in paths.values():
@@ -105,6 +110,16 @@ def main(argv: list[str]) -> int:
         "conceptual model entry",
         "[Mind Model](../MIND_MODEL.md)",
     )
+    require(
+        paths["docs_index"],
+        "lifecycle documentation entry",
+        "[Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md)",
+    )
+    require(
+        paths["docs_index"],
+        "epistemic documentation entry",
+        "[Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md)",
+    )
 
     for label in (
         "## Terminology and scope",
@@ -117,8 +132,12 @@ def main(argv: list[str]) -> int:
         "### 4. Attention is not biography",
         "### 5. Models are faculties",
         "### 6. External actions return as observations",
+        "### 7. Consolidation derives; it does not rewrite",
+        "### 8. Perception is not truth",
+        "### 9. Forgetting and values are governed",
+        "## Future lifecycle and consolidation — M5",
         "## Future degraded cognition — M6",
-        "## Future distributed continuity — M7",
+        "## Future grounded and distributed cognition — M7",
         "## Future language faculty — M8",
         "## Future authorized agency — M9",
         "## Design test for future features",
@@ -232,6 +251,39 @@ def main(argv: list[str]) -> int:
         "represent outcome as",
     )
 
+    for label, needle in (
+        ("lifecycle modes", "Awake"),
+        ("coordinator non-owner", "The coordinator MUST NOT"),
+        ("bounded consolidation input", "high-water mark"),
+        ("interruptible consolidation", "ConsolidationInterrupted"),
+    ):
+        require(paths["adr24"], label, needle)
+
+    for label, needle in (
+        ("perception provenance", "Perception and provenance"),
+        ("epistemic reconciliation", "Epistemic projection and reconciliation"),
+        ("retention policy", "Retention and forgetting"),
+        ("homeostasis", "Homeostasis and metacognition"),
+        ("value constraints", "Executive attention and value constraints"),
+    ):
+        require(paths["adr25"], label, needle)
+
+    for label, needle in (
+        ("lifecycle modes", "## Modes"),
+        ("run contract", "## Run contract"),
+        ("owner-specific work", "## Owner-specific work"),
+        ("M5 acceptance", "## M5 acceptance direction"),
+    ):
+        require(paths["lifecycle"], label, needle)
+
+    for label, needle in (
+        ("epistemic statuses", "## Epistemic projection"),
+        ("contradiction handling", "## Contradiction and reconciliation"),
+        ("retention lifecycle", "## Retention and forgetting"),
+        ("M7 vertical slice", "## M7 minimal vertical slice"),
+    ):
+        require(paths["epistemic"], label, needle)
+
     require(
         paths["glossary"],
         "language faculty term",
@@ -242,13 +294,25 @@ def main(argv: list[str]) -> int:
         "authorized action boundary term",
         "**Authorized Action Boundary**",
     )
+    for term in (
+        "**Cognitive lifecycle**",
+        "**Consolidation**",
+        "**Provenance**",
+        "**Epistemic projection**",
+        "**Retention**",
+        "**Homeostasis**",
+        "**Metacognition**",
+        "**Value constraint**",
+    ):
+        require(paths["glossary"], f"glossary term {term}", term)
     require(
         paths["glossary"],
         "terminology disclaimer",
         "They do not assert sentience or biological equivalence.",
     )
 
-    for path in paths.values():
+    link_documents = {repo / "README.md", *repo.glob("docs/**/*.md")}
+    for path in link_documents:
         check_relative_markdown_links(repo, path)
 
     for line in errors:
