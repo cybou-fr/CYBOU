@@ -13,9 +13,24 @@ SPDX-License-Identifier: MIT
 
 </div>
 
+## What Cybou Mind is
+
+Cybou is built around a persistent cognitive runtime rather than around a language model.
+
+Mind maintains typed durable biography, identity, commitments, prediction/calibration state,
+self-projection, and bounded attention. Language models are planned as optional, replaceable
+faculties: they may interpret or formulate information, but they do not become identity, canonical
+memory, authorization authority, or privileged executor.
+
+The Plasma Presence UI is only a projection into that runtime. Restarting or replacing a UI or
+future language model must not, by itself, create a new identity or erase accepted biography.
+
+The engineering model, its invariants, and the planned perception → cognition → authorized action
+loop are described in [`docs/MIND_MODEL.md`](docs/MIND_MODEL.md).
+
 ## Current implementation position
 
-After Package 06 passes its gates, M1 through M4 are implemented.
+The current tree contains the M1–M4 architecture:
 
 ```text
 Plasma/QML
@@ -35,6 +50,8 @@ cybou-presenced
 
 The QML module no longer owns hidden mutable cognition. `plasmashell` contains only a Presence
 proxy and visual state.
+
+`docs/CURRENT_STATE.md` is authoritative for implemented behavior and current limitations.
 
 ## Status
 
@@ -62,4 +79,9 @@ nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
 nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
 ```
 
-See `docs/CURRENT_STATE.md`, `docs/ARCHITECTURE.md`, and `docs/ROADMAP.md`.
+Start with:
+
+- [`docs/MIND_MODEL.md`](docs/MIND_MODEL.md) — what the cognitive architecture means;
+- [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) — what exists now;
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the current system is structured;
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — how capabilities are intended to evolve.

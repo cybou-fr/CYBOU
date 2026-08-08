@@ -5,7 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Cybou Architecture
 
-## Current M4 topology
+`MIND_MODEL.md` describes what the cognitive architecture means. This document describes the
+current process topology, ownership boundaries, failure domains, and ordering.
+
+## Current M4 process topology
 
 ```text
                           ┌───────────────────────┐
@@ -33,6 +36,35 @@ SPDX-License-Identifier: MIT
 
 Each daemon is a separate executable, D-Bus name, and `systemd --user` service.
 
+## Cognitive topology
+
+The same processes have different semantic responsibilities:
+
+```text
+                       accepted durable history
+                               │
+       ┌──────────────┬────────┼──────────┬──────────────┐
+       ▼              ▼        ▼          ▼              ▼
+    identity       intention prediction   self        workspace
+    continuity     state     calibration projection   attention
+       │              │        │          │              │
+       └──────────────┴────────┴──────────┴───────┬──────┘
+                                                 ▼
+                                             Presence
+```
+
+| Process | Semantic responsibility |
+|---|---|
+| `cybou-eventd` | canonical durable event history |
+| `cybou-identityd` | identity and logical-session continuity |
+| `cybou-intentiond` | unresolved commitments and terminal intention state |
+| `cybou-predictord` | prediction and calibration state |
+| `cybou-selfd` | structured self projection and assessment |
+| `cybou-workspaced` | bounded transient attention and current moment |
+| `cybou-presenced` | outward aggregation of organ projections |
+
+This split is a state-ownership boundary, not an analogy to biological brain anatomy.
+
 ## Shared libraries
 
 Shared libraries contain protocol/domain code and IPC utilities. They do not create a hidden
@@ -40,6 +72,10 @@ second Mind behind the QML surface.
 
 The QML Presence library links only fabric/runtime client code; it no longer owns domain organ
 objects.
+
+Future faculties must follow the same rule: shared code may implement protocols and algorithms,
+but it must not accidentally create a second owner for biography, identity, intentions, attention,
+or authorization state.
 
 ## Failure domains
 
@@ -50,17 +86,136 @@ objects.
 
 Full capability-deficit policy is M6, but M4 creates the isolation required for it.
 
-## Presentation ordering
+Process isolation means that a capability can fail independently. It does not yet mean the rest of
+Mind can always continue usefully; M6 defines that policy.
+
+## Durable-to-visible ordering
 
 Presence listens to Workspace1 `Changed`, not directly to raw Event1 `Accepted`:
 
 ```text
-durable COMMIT
-→ accepted event
-→ Workspace admission
-→ presentation notification
+command
+→ owning organ process
+→ Event1
+→ eventd
+→ Journal COMMIT
+→ Event1 Accepted
+→ workspaced admission
+→ Workspace1 Changed
+→ presenced Changed
+→ QML proxy refresh
 ```
+
+This ordering implements the **durable before visible** invariant described in `MIND_MODEL.md`.
+
+Workspace is allowed to forget bounded transient context. Journal is not.
+
+## Identity versus process lifetime
+
+The architecture deliberately separates:
+
+```text
+process lifetime
+logical login session
+persistent identity
+durable biography
+```
+
+These are not interchangeable.
+
+A service restart should not create a new identity. A future continuity failure should be
+represented explicitly rather than silently inventing seamless continuity.
+
+Current restart semantics are documented in `CURRENT_STATE.md`; stronger continuity is M5/M6.
+
+## Presentation boundary
+
+`cybou-presenced` is an aggregator, not a hidden monolith.
+
+It may combine organ projections into a snapshot for Presence, but ownership remains with the
+organ process that defines the state.
+
+The Plasma Presence QObject is a remote proxy/cache only.
+
+Therefore:
+
+```text
+Plasma restart         ≠ identity restart
+QML object recreation  ≠ biography reset
+Presence refresh       ≠ cognitive event
+```
+
+Future presentation surfaces must preserve the same boundary.
+
+## Future faculty boundary
+
+M8 adds optional language capability without moving identity or memory authority into a model.
+
+Target relationship:
+
+```text
+typed Mind context
+      │
+      ▼
+language faculty
+      │
+interpretation / explanation / proposal
+      │
+      ▼
+typed protocol
+      │
+      ▼
+Mind
+```
+
+A model is replaceable. Mind state is not model hidden context.
+
+The normative direction is ADR-0021.
+
+## Future action boundary
+
+M9 is intentionally outside the current M4 organ topology.
+
+No language model or UI component should become a privileged executor.
+
+Target relationship:
+
+```text
+Mind / planning
+      │
+      ▼
+proposal + criticism
+      │
+      ▼
+authorization
+      │
+      ▼
+typed capability / executor
+      │
+      ▼
+Body / external environment
+      │
+      ▼
+observation + outcome
+      │
+      └──────────────► Mind
+```
+
+The return path matters: action outcome must re-enter cognition as observed state rather than being
+treated as a fire-and-forget shell side effect.
+
+The normative direction is ADR-0022.
 
 ## Next
 
-M5 strengthens continuity/recovery. M6 turns process health into explicit capability deficits.
+M5 strengthens continuity/recovery.
+
+M6 turns process health into explicit capability deficits.
+
+M7 tests continuity/privacy across nodes.
+
+M8 adds replaceable language faculties.
+
+M9 adds policy-controlled external agency.
+
+See `MIND_MODEL.md` for the conceptual model and `ROADMAP.md` for milestone semantics.

@@ -7,12 +7,23 @@ SPDX-License-Identifier: MIT
 
 ## Start here
 
-- [Current State](CURRENT_STATE.md)
-- [Architecture](ARCHITECTURE.md)
-- [Roadmap](ROADMAP.md)
+- [Mind Model](MIND_MODEL.md) — conceptual cognitive model, invariants, and future agency boundary
+- [Current State](CURRENT_STATE.md) — implemented behavior and limitations
+- [Architecture](ARCHITECTURE.md) — process topology, ownership, failure domains, ordering
+- [Roadmap](ROADMAP.md) — milestone progression and capability meaning
 - [Building](BUILDING.md)
 - [Testing](TESTING.md)
 - [Glossary](GLOSSARY.md)
+
+The documentation deliberately separates:
+
+```text
+MIND_MODEL.md     = what the architecture means and what it is intended to become
+CURRENT_STATE.md  = what the repository implements now
+ARCHITECTURE.md   = how current components and ownership boundaries are arranged
+ROADMAP.md        = which new capability each milestone is expected to add
+adr/*             = normative architectural decisions and invariants
+```
 
 ## Mind
 

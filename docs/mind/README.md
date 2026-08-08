@@ -5,7 +5,11 @@ SPDX-License-Identifier: MIT
 
 # Cybou Mind Documentation
 
-Read in this order:
+Before reading the implementation contracts, read the repository-level
+[Mind Model](../MIND_MODEL.md). It explains how biography, identity, commitments, prediction,
+self-model, attention, optional faculties, and future authorized action fit together.
+
+Then read the implementation documents in this order:
 
 1. [Cognitive Protocol](COGNITIVE_PROTOCOL.md)
 2. [Journal](JOURNAL.md)
@@ -17,3 +21,6 @@ Read in this order:
 8. [Presence API](PRESENCE_API.md)
 9. [Continuity](CONTINUITY.md)
 10. [Failure Modes](FAILURE_MODES.md)
+
+For current implementation status, see [Current State](../CURRENT_STATE.md).
+For milestone semantics, see [Roadmap](../ROADMAP.md).
