@@ -7,6 +7,7 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSet>
@@ -325,6 +326,78 @@ private Q_SLOTS:
                 .toULongLong(),
             before.value(QStringLiteral("sessionCount"))
                 .toULongLong());
+    }
+
+    void simulatedLoginBoundaryPreservesIdentityAndIntentions()
+    {
+        Presence beforeSurface;
+        QVERIFY(beforeSurface.wake());
+        const QString commitment = QStringLiteral("survive a logical login boundary");
+        QVERIFY(!beforeSurface.promise(commitment).isNull());
+
+        IdentityClient identity;
+        const QVariantMap before = identity.state();
+
+        stop(m_presenced);
+        stop(m_workspaced);
+        stop(m_selfd);
+        stop(m_predictord);
+        stop(m_intentiond);
+        stop(m_identityd);
+        stop(m_eventd);
+
+        const QString sessionMarker = m_root->filePath(
+            QStringLiteral("runtime/cybou/identity-session"));
+        QVERIFY(QFile::remove(sessionMarker));
+
+        m_eventd = start(m_eventdPath);
+        QVERIFY(m_eventd);
+        EventClient events;
+        QTRY_VERIFY_WITH_TIMEOUT(events.isOpen(), 5000);
+
+        m_identityd = start(m_identitydPath);
+        QVERIFY(m_identityd);
+        IdentityClient restartedIdentity;
+        QTRY_VERIFY_WITH_TIMEOUT(restartedIdentity.ready(), 5000);
+
+        m_intentiond = start(m_intentiondPath);
+        QVERIFY(m_intentiond);
+        IntentionClient restartedIntentions;
+        QTRY_VERIFY_WITH_TIMEOUT(restartedIntentions.ready(), 5000);
+
+        m_predictord = start(m_predictordPath);
+        QVERIFY(m_predictord);
+        PredictorClient restartedPredictor;
+        QTRY_VERIFY_WITH_TIMEOUT(restartedPredictor.ready(), 5000);
+
+        m_workspaced = start(m_workspacedPath);
+        QVERIFY(m_workspaced);
+        WorkspaceClient restartedWorkspace;
+        QTRY_VERIFY_WITH_TIMEOUT(restartedWorkspace.ready(), 5000);
+
+        m_selfd = start(m_selfdPath);
+        QVERIFY(m_selfd);
+        SelfClient restartedSelf;
+        QTRY_VERIFY_WITH_TIMEOUT(restartedSelf.ready(), 5000);
+
+        m_presenced = start(m_presencedPath);
+        QVERIFY(m_presenced);
+        PresenceClient restartedPresence;
+        QTRY_VERIFY_WITH_TIMEOUT(restartedPresence.ready(), 5000);
+
+        IdentityClient afterIdentity;
+        QTRY_VERIFY_WITH_TIMEOUT(afterIdentity.ready(), 5000);
+        const QVariantMap after = afterIdentity.state();
+        QCOMPARE(
+            after.value(QStringLiteral("uuid")).toString(),
+            before.value(QStringLiteral("uuid")).toString());
+        QCOMPARE(
+            after.value(QStringLiteral("sessionCount")).toULongLong(),
+            before.value(QStringLiteral("sessionCount")).toULongLong() + 1);
+
+        Presence afterSurface;
+        QTRY_VERIFY_WITH_TIMEOUT(afterSurface.wake(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(afterSurface.obligations().contains(commitment), 5000);
     }
 
     void oneOrganFailureDoesNotKillTheOthers()

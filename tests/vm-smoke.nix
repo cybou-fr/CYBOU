@@ -185,6 +185,35 @@ pkgs.testers.runNixOSTest {
             mind_pids.append(pid)
         assert len(set(mind_pids)) == 8, mind_pids
 
+    with subtest("identity survives a booted system transition"):
+        identity_before = session.succeed(
+            "grep '\"uuid\"' /home/cybou/.local/state/cybou/identity.json "
+            "| sed 's/.*: *\"//;s/\".*//'"
+        ).strip()
+        count_before = int(session.succeed(
+            "grep '\"sessionCount\"' /home/cybou/.local/state/cybou/identity.json "
+            "| sed 's/[^0-9]//g'"
+        ).strip())
+
+        session.reboot()
+        session.wait_for_unit("display-manager.service")
+        session.wait_until_succeeds("test -e /run/user/1000/wayland-0")
+        session.succeed("systemctl --user -M cybou@ start cybou-presenced.service")
+        session.wait_until_succeeds(
+            "systemctl --user -M cybou@ is-active cybou-identityd.service"
+        )
+
+        identity_after = session.succeed(
+            "grep '\"uuid\"' /home/cybou/.local/state/cybou/identity.json "
+            "| sed 's/.*: *\"//;s/\".*//'"
+        ).strip()
+        count_after = int(session.succeed(
+            "grep '\"sessionCount\"' /home/cybou/.local/state/cybou/identity.json "
+            "| sed 's/[^0-9]//g'"
+        ).strip())
+        assert identity_after == identity_before
+        assert count_after == count_before + 1
+
     with subtest("PipeWire is active"):
         session.wait_until_succeeds(
             "systemctl --user -M cybou@ is-active pipewire.service"

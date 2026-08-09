@@ -127,9 +127,9 @@ M5 should prove:
 | daemon process restart | D-Bus restart preserves run identity and enters `Recovering` | none for P2 scope |
 | duplicate daemon | second Lifecycle1 owner exits non-zero | none |
 | corrupt lifecycle state | startup fails closed | backup/operator recovery policy |
-| identity continuity | existing same-login restart guard | coordinated logout/reboot proof |
-| open intentions | state remains separate from lifecycled | reconstruction proof across reboot |
-| system reboot | persistent path and VM unit are defined | booted transition test |
+| identity continuity | simulated login preserves UUID and increments logical session | booted reboot proof |
+| open intentions | simulated login reconstructs accepted commitment | booted reboot proof |
+| system reboot | VM smoke reboots and verifies UUID continuity/session increment | lifecycle active-run reboot |
 | architecture upgrade | unsupported schema fails closed | migration/rollback implementation |
 
 ## Related documents
