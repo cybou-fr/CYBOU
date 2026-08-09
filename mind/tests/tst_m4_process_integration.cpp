@@ -304,7 +304,9 @@ private Q_SLOTS:
         QCOMPARE(evaluation.value(QStringLiteral("decision")).toString(),
                  QStringLiteral("defer"));
         QVERIFY(evaluation.value(QStringLiteral("reason")).toString().contains(
-            QStringLiteral("consumer-offset contract")));
+            QStringLiteral("observation-only"))
+            || evaluation.value(QStringLiteral("reason")).toString().contains(
+                QStringLiteral("below scheduling hysteresis")));
         QCOMPARE(lifecycle.callBytes(QStringLiteral("State")), before);
 
         Presence surface;
@@ -557,6 +559,9 @@ private Q_SLOTS:
         QVERIFY(m_presenced);
         PresenceClient restartedPresence;
         QTRY_VERIFY_WITH_TIMEOUT(restartedPresence.ready(), 5000);
+        RpcClient health(kHealthEndpoint);
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
 
         IdentityClient afterIdentity;
         QTRY_VERIFY_WITH_TIMEOUT(afterIdentity.ready(), 5000);

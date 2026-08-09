@@ -6,6 +6,7 @@
 #include "cybou/storage/Journal.h"
 
 #include <QObject>
+#include <QMap>
 
 namespace cybou {
 
@@ -18,8 +19,8 @@ class EventService : public QObject
 public:
     explicit EventService(const QString &journalPath, QObject *parent = nullptr);
 
-    bool isReady() const { return m_journal.isOpen(); }
-    QString startupError() const { return m_journal.lastError(); }
+    bool isReady() const { return m_journal.isOpen() && m_offsetsReady; }
+    QString startupError() const;
 
 public Q_SLOTS:
     bool Ready() const;
@@ -30,6 +31,9 @@ public Q_SLOTS:
     qulonglong Count() const;
     QByteArray Head() const;
     qulonglong Verify() const;
+    bool EnsureConsumer(const QString &consumerId, qulonglong initialOffset);
+    bool AdvanceConsumer(const QString &consumerId, qulonglong offset);
+    QByteArray ConsumerBacklog(const QString &consumerId) const;
 
     QByteArray Recent(int limit) const;
     QByteArray Episode(const QString &correlationId) const;
@@ -46,7 +50,14 @@ Q_SIGNALS:
     void Accepted(const QByteArray &encodedEnvelope, qulonglong sequence);
 
 private:
+    bool loadOffsets();
+    bool saveOffsets(const QMap<QString, quint64> &offsets);
+
     Journal m_journal;
+    QString m_offsetsPath;
+    QMap<QString, quint64> m_offsets;
+    bool m_offsetsReady{false};
+    QString m_offsetsError;
 };
 
 } // namespace cybou

@@ -45,17 +45,18 @@ until the next refresh.
 | `rpc.probe-failure.count` | healthd | counter / `{probe}` | yes |
 | `event.accepted.count` | eventd | counter / `{event}` | yes, otherwise `Unknown` |
 | `lifecycle.active-run.count` | lifecycled | counter / `{run}` | yes, otherwise `Unknown` |
-| `event.backlog.count` | eventd | counter | `Unsupported`: no consumer-offset contract |
+| `event.backlog.count` | eventd | counter / `{event}` | yes for registered consumer, otherwise `Unknown` |
 | `journal.storage.bytes` | eventd | bytes | `Unsupported`: no public owner metric |
 | `prediction.calibration-pressure` | predictord | gauge | `Unsupported`: policy is undefined |
 
-Backlog and calibration pressure are not represented as zero. Adding them requires a typed owner
-contract. Thresholds, hysteresis, scheduling authorization, and Presence presentation belong to
-P6.5 and must consume this protocol without weakening its freshness rules.
+Event backlog is derived from Event1's durable `lifecycle.consolidation` consumer offset; events in
+that same capability scope are excluded to prevent self-triggering. Unsupported storage and
+calibration pressure are not represented as zero. Scheduling authorization still requires a
+versioned protocol change and must not weaken freshness rules.
 
 ## Evidence
 
 Protocol tests cover round-trip and malformed input rejection. Service tests prove unsupported
 signals have no value and measurements are not recovered as current after restart. Process
-integration proves the Event1 count is observed without appending an event and that the published
-snapshot cannot authorize scheduling.
+integration proves Event1 count and consumer backlog are observed without appending an event and
+that the published snapshot cannot authorize scheduling.

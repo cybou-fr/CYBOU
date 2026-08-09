@@ -383,9 +383,16 @@ backlog hysteresis at 32/8. Schema v1 still forbids scheduling authority and rep
 unsupported, so production evaluation currently returns an explained `Defer` without changing
 lifecycle mode or creating a run.
 
+**Slice 3: implemented.** Event1 now owns atomically persisted, monotonic consumer offsets and an
+exact backlog projection. Lifecycled registers `lifecycle.consolidation`, advances it only after a
+durable completed run, and reconciles the same offset after restart. Consolidation-scoped owner and
+terminal contributions do not count toward their own backlog. Health1 consequently exposes a
+current Event1 backlog measurement instead of `Unsupported`; scheduling remains read-only because
+schema v1 still denies authority.
+
 ### Work
 
-- add an owner-backed Event1 consumer-offset/backlog signal and explicitly authorize its policy;
+- version the homeostasis authorization contract and explicitly authorize the reviewed backlog policy;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
 - refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;

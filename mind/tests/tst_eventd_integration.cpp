@@ -124,6 +124,35 @@ private Q_SLOTS:
         QCOMPARE(client.verify(), 0u);
     }
 
+    void consumerOffsetIsMonotonicAndSurvivesOwnerRestart()
+    {
+        EventClient client;
+        const quint64 initialHead = client.count();
+        QVERIFY(client.ensureConsumer(QStringLiteral("integration.consumer"), initialHead));
+        QCOMPARE(client.consumerBacklog(QStringLiteral("integration.consumer")).value(), 0u);
+
+        QVERIFY(client.append(observation(QStringLiteral("consumer-test"))) > initialHead);
+        QCOMPARE(client.consumerBacklog(QStringLiteral("integration.consumer")).value(), 1u);
+        const quint64 head = client.count();
+        QVERIFY(client.advanceConsumer(QStringLiteral("integration.consumer"), head));
+        QVERIFY(client.advanceConsumer(QStringLiteral("integration.consumer"), head));
+        QVERIFY(!client.advanceConsumer(QStringLiteral("integration.consumer"), head - 1));
+        QVERIFY(!client.advanceConsumer(QStringLiteral("integration.consumer"), head + 1));
+
+        m_daemon->terminate();
+        QVERIFY(m_daemon->waitForFinished(3000));
+        m_daemon = std::make_unique<QProcess>();
+        m_daemon->setProgram(m_daemonPath);
+        m_daemon->setProcessEnvironment(QProcessEnvironment::systemEnvironment());
+        m_daemon->start();
+        QVERIFY(m_daemon->waitForStarted(3000));
+        EventClient recovered;
+        QTRY_VERIFY_WITH_TIMEOUT(recovered.isOpen(), 5000);
+        QCOMPARE(recovered.consumerBacklog(QStringLiteral("integration.consumer")).value(), 0u);
+        QVERIFY(recovered.ensureConsumer(QStringLiteral("integration.consumer"), 0));
+        QVERIFY(!recovered.ensureConsumer(QStringLiteral("Invalid Consumer"), 0));
+    }
+
     void secondOwnerIsRejected()
     {
         QProcess second;

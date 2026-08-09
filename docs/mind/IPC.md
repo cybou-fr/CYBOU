@@ -50,6 +50,12 @@ input. Health1 exposes
 The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.
 P6.4 `Measurements` uses the separate schema-v1 homeostasis encoding and cannot authorize work.
 
+Event1 owns durable consumer progress outside the immutable Journal schema:
+`EnsureConsumer(id, initialOffset)`, `AdvanceConsumer(id, offset)`, and `ConsumerBacklog(id)`.
+Consumer IDs are bounded stable identifiers; offsets are monotonic, may not exceed Journal head,
+and are atomically persisted. The `lifecycle.consolidation` backlog excludes contributions in its
+own capability scope, preventing consolidation output from scheduling itself again.
+
 Lifecycle1 additionally exposes `EvaluateScheduling`. It returns a fabric-CBOR dry-run decision:
 `run`, `defer`, or `block`; policy/reason; observation time; hysteresis state; eligible workers;
 and typed causes for missing optional workers. Evaluation reads Health1 but does not mutate the

@@ -118,8 +118,17 @@ accepted-biography availability, optional predictor/workspace
 eligibility, measurement freshness, and a bounded Event1-backlog hysteresis (enter at 32, exit at
 8). It returns `Run`, `Defer`, or `Block` with a stable policy ID and causal explanation, and is
 projected through Presence1/QML as `lifecycleScheduling`. Evaluation cannot mutate lifecycle state.
-Because homeostasis schema v1 marks Event1 backlog unsupported and forbids scheduling authority,
-the current real projection honestly defers instead of manufacturing pressure or starting work.
+Homeostasis schema v1 forbids scheduling authority, so the real projection honestly defers instead
+of starting work.
+
+P6.5 slice 3 makes Event1 the durable owner of consumer progress. Event1 stores versioned consumer
+offsets separately from canonical Journal rows, rejects invalid/backward/ahead-of-head movement,
+and derives exact backlog from Journal sequence plus the consumer offset. Lifecycled registers the
+stable `lifecycle.consolidation` consumer and advances it to the accepted input high-water mark only
+after terminal lifecycle state is durable; restart reconciles an already-completed run. Events in
+the `lifecycle.consolidation` capability scope are excluded from that consumer's pressure, avoiding
+a self-triggering output loop. Health1 now reports `event.backlog.count` as a current typed value
+when the consumer is registered. Homeostasis schema v1 still forbids scheduling authority.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is

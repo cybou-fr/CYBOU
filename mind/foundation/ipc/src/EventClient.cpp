@@ -160,6 +160,45 @@ quint64 EventClient::verify() const
     return reply.arguments().first().toULongLong();
 }
 
+bool EventClient::ensureConsumer(const QString &consumerId, quint64 initialOffset) const
+{
+    m_lastError.clear();
+    const QDBusMessage reply = call(
+        QStringLiteral("EnsureConsumer"),
+        {consumerId, QVariant::fromValue<qulonglong>(initialOffset)});
+    return reply.type() != QDBusMessage::ErrorMessage && !reply.arguments().isEmpty()
+        && reply.arguments().first().toBool();
+}
+
+bool EventClient::advanceConsumer(const QString &consumerId, quint64 offset) const
+{
+    m_lastError.clear();
+    const QDBusMessage reply = call(
+        QStringLiteral("AdvanceConsumer"),
+        {consumerId, QVariant::fromValue<qulonglong>(offset)});
+    return reply.type() != QDBusMessage::ErrorMessage && !reply.arguments().isEmpty()
+        && reply.arguments().first().toBool();
+}
+
+std::optional<quint64> EventClient::consumerBacklog(const QString &consumerId) const
+{
+    m_lastError.clear();
+    const QByteArray encoded = callBytes(QStringLiteral("ConsumerBacklog"), {consumerId});
+    const QCborValue value = QCborValue::fromCbor(encoded);
+    if (!value.isMap() || !value.toMap().value(QStringLiteral("registered")).toBool()) {
+        m_lastError = QStringLiteral("Event1 consumer is not registered");
+        return std::nullopt;
+    }
+    bool ok = false;
+    const quint64 backlog = value.toMap().value(QStringLiteral("backlog"))
+                                .toString().toULongLong(&ok);
+    if (!ok) {
+        m_lastError = QStringLiteral("Event1 returned an invalid consumer backlog");
+        return std::nullopt;
+    }
+    return backlog;
+}
+
 QList<CognitiveEnvelope> EventClient::recent(int limit) const
 {
     m_lastError.clear();

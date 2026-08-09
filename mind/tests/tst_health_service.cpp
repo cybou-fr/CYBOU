@@ -141,7 +141,7 @@ private Q_SLOTS:
                     return measurement.metricId == QStringLiteral("event.backlog.count");
                 });
             QVERIFY(backlog != homeostasis.measurements.cend());
-            QCOMPARE(backlog->status, MeasurementStatus::Unsupported);
+            QCOMPARE(backlog->status, MeasurementStatus::Unknown);
             QVERIFY(!backlog->hasValue);
         }
         {

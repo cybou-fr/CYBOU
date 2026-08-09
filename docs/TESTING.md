@@ -69,6 +69,12 @@ optional capability loss, supported/unsupported trigger handling, and the 32/8 h
 Process integration calls `EvaluateScheduling` through real D-Bus, verifies its reason reaches the
 QML Presence proxy, and byte-compares Lifecycle1 state before and after the dry run.
 
+`eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
+rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
+eventd restart. Lifecycle process integration proves a completed run advances its consumer while
+its own owner/terminal contributions produce zero follow-up backlog. Health integration verifies
+the backlog is a current typed measurement.
+
 `p4-plasma-lifecycle` is the focused single-node VM gate for shell recreation. It restarts the
 shipped Plasma user service around one active lifecycle run, requires a replacement PID and restored
 D-Bus surface, and compares the exact run blob and Event1 count across the UI-only transition.

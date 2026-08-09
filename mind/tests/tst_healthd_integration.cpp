@@ -184,6 +184,14 @@ private Q_SLOTS:
         QVERIFY(accepted != initialMeasurements.measurements.cend());
         QCOMPARE(accepted->status, MeasurementStatus::Current);
         QCOMPARE(accepted->value, static_cast<double>(beforeRefresh));
+        const auto backlog = std::find_if(
+            initialMeasurements.measurements.cbegin(), initialMeasurements.measurements.cend(),
+            [](const HomeostaticMeasurement &measurement) {
+                return measurement.metricId == QStringLiteral("event.backlog.count");
+            });
+        QVERIFY(backlog != initialMeasurements.measurements.cend());
+        QCOMPARE(backlog->status, MeasurementStatus::Current);
+        QVERIFY(backlog->hasValue);
 
         stopProcess(m_predictord);
         QVERIFY(waitForInterface(kPredictorEndpoint, false));

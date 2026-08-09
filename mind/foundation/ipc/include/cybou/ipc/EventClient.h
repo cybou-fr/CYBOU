@@ -31,6 +31,9 @@ public:
     quint64 count() const override;
     QByteArray head() const override;
     quint64 verify() const override;
+    bool ensureConsumer(const QString &consumerId, quint64 initialOffset = 0) const;
+    bool advanceConsumer(const QString &consumerId, quint64 offset) const;
+    std::optional<quint64> consumerBacklog(const QString &consumerId) const;
 
     QList<CognitiveEnvelope> recent(int limit = 50) const override;
     QList<CognitiveEnvelope> episode(const QUuid &correlationId) const override;

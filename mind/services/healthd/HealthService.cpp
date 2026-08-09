@@ -16,6 +16,8 @@
 #include <QSaveFile>
 #include <QScopedValueRollback>
 #include <QTimer>
+#include <QCborMap>
+#include <QCborValue>
 
 #include <memory>
 #include <vector>
@@ -162,13 +164,16 @@ bool HealthService::Refresh()
     qulonglong acceptedCount = 0;
     bool hasAcceptedCount = false;
     QString countFailure;
+    qulonglong eventBacklog = 0;
+    bool hasEventBacklog = false;
+    QString backlogFailure;
     RpcRetryPolicy probePolicy;
     probePolicy.maximumAttempts = 1;
     probePolicy.circuitFailureThreshold = 1;
     QEventLoop loop;
     QElapsedTimer elapsed;
     elapsed.start();
-    int pending = endpoints().size() + 2;
+    int pending = endpoints().size() + 3;
     auto finish = [&pending, &loop]() {
         if (--pending == 0) loop.quit();
     };
@@ -223,6 +228,29 @@ bool HealthService::Refresh()
             finish();
         }, 750);
     clients.push_back(std::move(eventClient));
+
+    auto backlogClient = std::make_unique<AsyncRpcClient>(kEventEndpoint, probePolicy);
+    backlogClient->call(QStringLiteral("ConsumerBacklog"),
+        {QStringLiteral("lifecycle.consolidation")}, RpcOperationSemantics::ReadOnly,
+        [&](const RpcResult &result) {
+            if (result.succeeded() && !result.reply.arguments().isEmpty()) {
+                const QCborValue encoded = QCborValue::fromCbor(
+                    result.reply.arguments().first().toByteArray());
+                if (encoded.isMap()
+                    && encoded.toMap().value(QStringLiteral("registered")).toBool()) {
+                    bool converted = false;
+                    eventBacklog = encoded.toMap().value(QStringLiteral("backlog"))
+                                       .toString().toULongLong(&converted);
+                    hasEventBacklog = converted;
+                }
+            }
+            if (!hasEventBacklog) backlogFailure = result.succeeded()
+                ? QStringLiteral("lifecycle consolidation consumer is not registered")
+                : rpcOutcomeToString(result.outcome) + QStringLiteral(": ")
+                    + result.errorMessage;
+            finish();
+        }, 750);
+    clients.push_back(std::move(backlogClient));
 
     auto lifecycleClient = std::make_unique<AsyncRpcClient>(kLifecycleEndpoint, probePolicy);
     lifecycleClient->call(QStringLiteral("State"), {}, RpcOperationSemantics::ReadOnly,
@@ -319,10 +347,17 @@ bool HealthService::Refresh()
             lifecycleError.isEmpty() ? lifecycleFailure : lifecycleError, now));
     }
 
-    homeostasis.measurements.append(unavailableMeasurement(
-        QStringLiteral("event.backlog.count"), QStringLiteral("eventd"),
-        MeasurementKind::Counter, MeasurementStatus::Unsupported,
-        QStringLiteral("Event1 has no consumer-offset contract"), now));
+    if (hasEventBacklog) {
+        homeostasis.measurements.append(currentMeasurement(
+            QStringLiteral("event.backlog.count"), QStringLiteral("eventd"),
+            MeasurementKind::Counter, static_cast<double>(eventBacklog),
+            QStringLiteral("{event}"), now));
+    } else {
+        homeostasis.measurements.append(unavailableMeasurement(
+            QStringLiteral("event.backlog.count"), QStringLiteral("eventd"),
+            MeasurementKind::Counter, MeasurementStatus::Unknown,
+            backlogFailure, now));
+    }
     homeostasis.measurements.append(unavailableMeasurement(
         QStringLiteral("journal.storage.bytes"), QStringLiteral("eventd"),
         MeasurementKind::Bytes, MeasurementStatus::Unsupported,

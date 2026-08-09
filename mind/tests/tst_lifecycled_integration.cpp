@@ -250,6 +250,12 @@ private Q_SLOTS:
             QStringLiteral("FinishRun"), QStringLiteral("completed"),
             QStringLiteral("accepted owner receipts"));
         QVERIFY(finished.isValid() && finished.value());
+        QDBusReply<QByteArray> backlogReply = events.call(
+            QStringLiteral("ConsumerBacklog"), QStringLiteral("lifecycle.consolidation"));
+        QVERIFY(backlogReply.isValid());
+        const QCborMap backlog = QCborValue::fromCbor(backlogReply.value()).toMap();
+        QVERIFY(backlog.value(QStringLiteral("registered")).toBool());
+        QCOMPARE(backlog.value(QStringLiteral("backlog")).toString(), QStringLiteral("0"));
         QDBusReply<qulonglong> afterTerminal = events.call(QStringLiteral("Count"));
         QVERIFY(afterTerminal.isValid());
         QCOMPARE(afterTerminal.value(), afterFirst.value() + 1);
@@ -358,6 +364,43 @@ private Q_SLOTS:
         QDBusReply<qulonglong> afterReplay = events.call(QStringLiteral("Count"));
         QVERIFY(afterReplay.isValid());
         QCOMPARE(afterReplay.value(), afterCrash.value());
+    }
+
+    void completedStateCrashReconcilesConsumerOffset()
+    {
+        stopDaemon();
+        startDaemon(QStringLiteral("after-terminal-state-commit"));
+        QDBusReply<bool> idle = interface().call(
+            QStringLiteral("Transition"), QStringLiteral("idle"));
+        QVERIFY(idle.isValid() && idle.value());
+        QDBusReply<QString> requested = interface().call(
+            QStringLiteral("RequestRunAtCurrentHead"), QStringLiteral("consolidation"),
+            QStringLiteral("offset-reconciliation"),
+            QStringList{QStringLiteral("predictor")}, QStringList{});
+        QVERIFY(requested.isValid() && !requested.value().isEmpty());
+        QString error;
+        QDBusReply<QByteArray> activeReply = interface().call(QStringLiteral("State"));
+        const QVariantMap active = FabricCodec::decodeMap(activeReply.value(), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const qulonglong inputMark = active.value(QStringLiteral("inputHighWaterMark")).toULongLong();
+        QDBusReply<bool> dispatched = interface().call(QStringLiteral("Dispatch"));
+        QVERIFY(dispatched.isValid() && dispatched.value());
+        QDBusReply<bool> crashed = interface().call(
+            QStringLiteral("FinishRun"), QStringLiteral("completed"),
+            QStringLiteral("offset reconciliation"));
+        QVERIFY(!crashed.isValid());
+        QTRY_COMPARE_WITH_TIMEOUT(m_daemon->state(), QProcess::NotRunning, 3000);
+
+        startDaemon();
+        QDBusInterface events(
+            QStringLiteral("org.cybou.Mind.Event1"), QStringLiteral("/org/cybou/Mind/Event1"),
+            QStringLiteral("org.cybou.Mind.Event1"), QDBusConnection::sessionBus());
+        QDBusReply<QByteArray> backlogReply = events.call(
+            QStringLiteral("ConsumerBacklog"), QStringLiteral("lifecycle.consolidation"));
+        QVERIFY(backlogReply.isValid());
+        const QCborMap backlog = QCborValue::fromCbor(backlogReply.value()).toMap();
+        QCOMPARE(backlog.value(QStringLiteral("offset")).toString(), QString::number(inputMark));
+        QCOMPARE(backlog.value(QStringLiteral("backlog")).toString(), QStringLiteral("0"));
     }
 };
 
