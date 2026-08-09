@@ -186,7 +186,7 @@ def main(argv: list[str]) -> int:
     require_regex(
         paths["current"],
         "current/future boundary",
-        r"it does not yet\s+contain the planned M8 language faculty or M9 authorized executor",
+        r"tree does not yet contain the planned M8 language faculty\s+or M9 authorized executor",
     )
     require(
         paths["current"],
@@ -287,7 +287,7 @@ def main(argv: list[str]) -> int:
         ("lifecycle modes", "## Modes"),
         ("run contract", "## Run contract"),
         ("owner-specific work", "## Owner-specific work"),
-        ("M5 acceptance", "## M5 acceptance direction"),
+        ("M5 acceptance", "## M5 acceptance evidence"),
     ):
         require(paths["lifecycle"], label, needle)
 
@@ -306,7 +306,7 @@ def main(argv: list[str]) -> int:
         "## P3 — Implement the consolidation MVP",
         "## P4 — Make lifecycle visible without moving ownership into UI",
         "## P5 — Close M5 and publish evidence",
-        "## P6 — Begin M6 only after M5",
+        "## P6.1 — Freeze the capability and health contract",
         "## Suggested PR decomposition",
     ):
         require(paths["next_steps"], label, label)

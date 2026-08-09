@@ -5,11 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Data Ownership
 
-## Current M4 owners
+## Current M5 owners
 
 | Resource | Owner |
 |---|---|
 | canonical `journal.db` | `cybou-eventd` |
+| lifecycle mode and consolidation run state | `cybou-lifecycled` |
 | `identity.json` | `cybou-identityd` |
 | volatile identity login marker | `cybou-identityd` |
 | bounded Workspace | `cybou-workspaced` |
@@ -43,11 +44,12 @@ The runtime identity marker prevents a daemon restart from being confused with a
 - opening another UI surface does not create another Mind;
 - process isolation does not introduce duplicate authoritative copies.
 
-## Proposed M5–M7 ownership
+## Current extension and proposed M6–M7 ownership
 
 | Resource | Target owner/boundary |
 |---|---|
-| lifecycle mode and consolidation run state | lifecycle coordinator; no organ state ownership |
+| lifecycle mode and consolidation run state | current `cybou-lifecycled`; no organ state ownership |
+| capability graph and health policy | dedicated M6 health owner; Presence remains read-only |
 | perception acquisition state | replaceable adapter/faculty |
 | provenance-bearing accepted observation | `cybou-eventd` Journal history |
 | current epistemic claim projection | dedicated owner to be selected by an implementation ADR |

@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 ## Scope
 
-This document refines the M6/M7 target from ADR-0025. It does not claim that current M4 implements
+This document refines the M6/M7 target from ADR-0025. It does not claim that current M5 implements
 perception adapters, an epistemic owner, retention propagation, or a value model.
 
 ## From environment to accepted observation

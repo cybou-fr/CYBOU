@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
-- [M5 Evaluation Evidence](M5_EVALUATION.md) — supported transitions, limitations, and release gates
+- [M5 Evaluation Evidence](M5_EVALUATION.md) — completed evaluation boundary, artifacts, and limitations
 - [Installation](INSTALLATION.md) — development artifacts and safety constraints
 
 ### Architecture
@@ -59,7 +59,7 @@ Read the [Mind index](mind/README.md), or open a specific contract:
 - [Presence API](mind/PRESENCE_API.md)
 - [Continuity](mind/CONTINUITY.md)
 - [Failure Modes](mind/FAILURE_MODES.md)
-- [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — future M5 contract
+- [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — implemented M5 contract and future policy
 - [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M6/M7 contract
 
 ## Security
@@ -87,6 +87,6 @@ when repository gates and focused acceptance tests demonstrate it.
 - Update `CURRENT_STATE.md` in the same change that alters implemented capability.
 - Update the relevant contract before or with protocol/schema changes.
 - Record cross-owner or security-boundary changes in an ADR.
-- Label examples as current or future; do not present M5–M9 behavior as implemented.
+- Label examples as current or future; do not present unfinished M6–M9 behavior as implemented.
 - Add new canonical documents to `scripts/validate-cognitive-docs.py`.
 - Keep relative Markdown links valid and SPDX metadata present.

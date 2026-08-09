@@ -5,9 +5,9 @@ SPDX-License-Identifier: MIT
 
 # Failure Modes
 
-## M4 isolation guarantees
+## Current M5 isolation and continuity guarantees
 
-| Failure | Current M4 behavior |
+| Failure | Current behavior |
 |---|---|
 | QML Presence destroyed | cognitive services remain independent |
 | presenced restarts | organ processes and identity session remain |
@@ -16,6 +16,8 @@ SPDX-License-Identifier: MIT
 | predictord fails | other organ processes remain alive; prediction calls fail |
 | eventd write rejected | no accepted event enters Workspace |
 | duplicate D-Bus owner | second daemon instance fails service-name acquisition |
+| lifecycled split commit | deterministic Event1 effect is reused after process restart or reboot |
+| Plasma recreation | lifecycle run and Event1 count remain unchanged |
 
 ## Not yet M6
 

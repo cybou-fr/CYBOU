@@ -18,12 +18,12 @@ Lifecycle1 process restart, and seven-process M4 integration. The process suite 
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count.
 
-The P2 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
+The M5 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
 run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, D-Bus run requests, and restart
 recovery of an active run into `Recovering`. Legacy v0 state is backed up and migrated to v1;
 unknown future versions fail closed. The focused headless NixOS gate proves that a real reboot
 preserves the exact persisted run and identity ID, enters `Recovering`, and increments the logical
-session count. P2 is complete; owner-work dispatch and real consolidation remain P3.
+session count.
 
 The P3 transaction substrate now includes deterministic per-capability operation keys,
 high-water-mark-bound idempotent acknowledgements, optional capability deficits, required-work
@@ -62,9 +62,9 @@ run, observes a replacement PID and restored Plasma D-Bus surface, and proves th
 exact persisted lifecycle run nor Event1 count changes across UI recreation.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
-The current M1–M4 plus partial M5 implementation is the process-isolated substrate of that model;
-it does not yet
-contain the planned M8 language faculty or M9 authorized executor.
+M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
+the current engineering milestone; the tree does not yet contain the planned M8 language faculty
+or M9 authorized executor.
 
 ## Process topology
 
@@ -134,9 +134,10 @@ Identity uses a volatile runtime-session marker. Restarting `identityd` inside t
 reloads the current identity without incrementing `sessionCount`.
 
 The process integration suite additionally simulates a new login by removing only the volatile
-session marker and restarting the seven M4 processes. A focused booted NixOS VM gate already proves
-identity and exact active-run continuity across a real reboot. Upgrade reconciliation and the full
-lifecycle fault-injection matrix remain for the broader M5/M6 continuity proof.
+session marker and restarting the seven M4 processes. Focused booted NixOS gates prove identity,
+exact active-run continuity, both split-commit recovery windows, and Plasma recreation across real
+system transitions. In-place upgrade reconciliation remains an explicit hardening track. The next
+fault-injection matrix belongs to M6 and tests capability-specific partial availability.
 
 ## Durable-to-visible ordering
 
@@ -174,7 +175,7 @@ These components are intentionally useful without any language model.
 
 The current tree does **not** yet implement:
 
-- full M5 upgrade reconciliation;
+- in-place upgrade reconciliation beyond the tested schema-v0-to-v1 migration;
 - background consolidation, retention, forgetting, or temporal freshness policy;
 - M6 explicit degraded-Mind capability-deficit policy;
 - homeostatic pressure signals or general metacognitive uncertainty/evidence-freshness projection
@@ -192,7 +193,7 @@ the corresponding milestone is implemented and gated.
 - health is a minimal `Ready()/Health()` contract, not the full M6 degraded-mode model;
 - most local RPC is synchronous;
 - same-user IPC authorization is not yet a capability security boundary;
-- stronger upgrade/reconciliation guarantees belong to M5/M6;
+- stronger in-place upgrade/reconciliation guarantees remain a hardening track;
 - Journal history is not yet consolidated into a governed epistemic projection;
 - privacy classification exists, but retention and erasure propagation are not implemented;
 - no inter-node transport exists;
@@ -205,7 +206,8 @@ the corresponding milestone is implemented and gated.
 - M2: complete.
 - M3: complete after the M3 compile repair included by M4.
 - M4: implementation present; repository gates remain the acceptance authority.
-- M5: P1–P3 lifecycle, continuity, consolidation transaction, Presence projection, and reboot
-  fault-injection gates are implemented; upgrade reconciliation remains a separate hardening track.
+- M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
+  projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
+- M6: current milestone; capability contracts and degraded-mode policy are not implemented yet.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

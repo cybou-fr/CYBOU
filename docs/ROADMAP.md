@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 capability each milestone adds.
 
 For the ordered implementation packages, test matrices, and exit gates beginning from the current
-M4 tree, see [Next Engineering Steps](NEXT_STEPS.md).
+M5 evaluation baseline, see [Next Engineering Steps](NEXT_STEPS.md).
 
 ## M0 — Green Build
 
@@ -66,7 +66,7 @@ failure domains. This creates the substrate required for continuity and degraded
 
 ## M5 — Continuity and Cognitive Lifecycle
 
-**Next.**
+**Evaluation milestone complete.**
 
 Engineering scope:
 
@@ -93,7 +93,13 @@ durable results cross Event1.
 A stable UUID alone is not enough. Continuity must be supported by verified state/history and
 explicit transitions.
 
+The implemented evaluation boundary and unsupported transition paths are recorded in
+[M5 Evaluation Evidence](M5_EVALUATION.md). In-place upgrade reconciliation remains an explicit
+hardening track rather than an unverified M5 claim.
+
 ## M6 — Degraded Modes
+
+**Current engineering milestone.**
 
 Engineering scope:
 

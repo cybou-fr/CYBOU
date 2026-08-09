@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 ## Purpose
 
-This is the executable plan after the M4 substrate and the M5–M9 architecture update. It translates
+This is the executable plan after the completed M5 evaluation milestone. It translates
 the capability roadmap into reviewable work packages. [Roadmap](ROADMAP.md) remains the milestone
 definition; [Current State](CURRENT_STATE.md) remains the implementation authority.
 
@@ -16,13 +16,44 @@ The immediate objective is not language or autonomous action. It is:
 > establish a green baseline, then prove that one identity and its commitments survive lifecycle
 > transitions while bounded consolidation remains interruptible, evidence-linked, and owner-safe.
 
+That objective is now demonstrated by M5. The current architectural bottleneck is no longer
+lifecycle durability; it is capability honesty under partial failure.
+
+## Current architecture assessment
+
+### Strengths to preserve
+
+- one canonical Event1/Journal acceptance boundary;
+- explicit process and state owners;
+- durable-before-visible ordering;
+- lifecycle run persistence, high-water marks, deterministic operation keys, and split-commit recovery;
+- Presence and Plasma as replaceable projections rather than cognitive owners;
+- layered unit, process-integration, focused KVM, and full Plasma gates.
+
+### Immediate gaps
+
+- Presence readiness is effectively the conjunction of almost every organ `Ready()` value;
+- health strings identify components but do not define which user-visible capabilities remain;
+- most internal RPC is synchronous and has no shared retry/backoff/circuit-breaker contract;
+- timeout, rejection, unavailability, and unknown mutation outcome are not a common typed vocabulary;
+- lifecycle request age is projected, but general measurement/evidence freshness is not;
+- no owner currently maintains a capability dependency graph or homeostatic pressure projection;
+- M7 retention/epistemic, M8 language, and M9 action boundaries must remain deferred.
+
+### Architectural direction
+
+M6 introduces a dedicated capability/health owner, not a second cognitive monolith. It observes
+typed service health and dependency policy, exposes an immutable projection, and records only
+significant transitions through Event1. Existing organs retain their state and domain ownership;
+Presence remains read-only; lifecycle mode remains orthogonal to capability health.
+
 ## Sequencing rules
 
 1. A package starts only when its prerequisite gate is green.
 2. Protocol/schema changes land before dependent UI behavior.
 3. Every persistent change includes migration, interruption, and recovery tests.
 4. `CURRENT_STATE.md` advances only with demonstrated implementation.
-5. M8 language and M9 action work do not begin before the M5/M6 exit gates.
+5. M8 language and M9 action work do not begin before the M6 exit gate.
 
 ## P0 — Restore a trustworthy green baseline
 
@@ -195,10 +226,11 @@ the shipped-Plasma restart assertion from the two-node Gate A smoke and passes u
 
 ## P5 — Close M5 and publish evidence
 
-**Status: in progress.** The M5 evidence matrix, focused lifecycle/Plasma gates, corrected two-node
-`vm-smoke`, and aggregate flake check pass. VM and ISO compose from the working tree and their local
-evaluation outputs are recorded. A clean revision and publishable artifact hashes remain; no
-release hash is claimed yet.
+**Status: complete for the unversioned evaluation milestone.** The M5 evidence matrix, focused
+lifecycle/Plasma gates, corrected two-node `vm-smoke`, and aggregate flake check pass. VM and ISO
+were built from clean revision `ddd6c83`; immutable Nix outputs, size, SHA-256, environment, and
+compatibility boundary are recorded in `M5_EVALUATION.md`. This is evaluation evidence, not a
+stable tagged release.
 
 ### Work
 
@@ -217,19 +249,134 @@ release hash is claimed yet.
 - lifecycle capability can degrade without erasing identity/biography;
 - docs, tests, and shipped UI describe the same behavior.
 
-## P6 — Begin M6 only after M5
+## P5.1 — Close documentation and isolate the hardening track
 
-Order M6 work as:
+**Status: complete in documentation; implementation gates remain authoritative.** M5 is the clean
+evaluation baseline for M6. In-place upgrade reconciliation beyond the tested lifecycle schema
+v0-to-v1 migration is a separate hardening track and must not be described as supported.
 
-1. explicit capability matrix and dependency graph;
-2. asynchronous RPC plus retry/backoff/circuit-breaker policy;
-3. typed health, freshness, backlog, latency, storage, and calibration-pressure metrics;
-4. homeostatic scheduling rules;
-5. metacognitive projection of unknown/stale/assumed/unsupported state;
-6. degraded-mode UI and process/VM fault-injection tests.
+### Exit gate
 
-M6 exits when loss of every optional organ has an explicit capability deficit, useful remaining
-behavior, recovery rule, and test.
+- `ROADMAP.md`, `CURRENT_STATE.md`, release evidence, and this plan agree that M5 evaluation is complete;
+- unsupported upgrade paths remain explicit;
+- M6 work cannot weaken the existing lifecycle continuity and idempotency gates.
+
+## P6.1 — Freeze the capability and health contract
+
+**Status: next.** Protocol and ownership decisions land before daemon or UI behavior.
+
+### Work
+
+- define versioned `ComponentHealth`, `CapabilityState`, `CapabilityDeficit`, dependency, freshness,
+  and recovery-policy wire types;
+- keep component health separate from capability availability;
+- distinguish `Unavailable`, `TimedOut`, `Rejected`, and `UnknownOutcome`;
+- define significant transitions that cross Event1 without recording routine probe noise;
+- define aggregate Mind health without reducing it to the conjunction of organ `Ready()` values;
+- update IPC, ownership, failure, security, and migration contracts together.
+
+### Exit gate
+
+Codecs and transition tests prove fail-closed handling of unknown versions/states. A deficit names
+the affected capability, dependency, cause, detection time, last verified success, impact, recovery
+policy, and evidence/error reference where available.
+
+## P6.2 — Implement the dependency graph and health owner
+
+### Work
+
+- classify identity continuity and accepted biography/commitments as required capabilities;
+- classify prediction, self-assessment, attention maintenance, and consolidation owners according
+  to the operation that needs them;
+- implement a dedicated `cybou-healthd` with versioned `Health1` rather than making Presence the
+  durable health owner;
+- observe D-Bus ownership and typed organ health without opening organ storage;
+- persist only policy state that must survive process recreation;
+- project an immutable capability snapshot to Presence1.
+
+### Initial capability matrix
+
+| Capability | Required dependencies | Expected partial-failure behavior |
+|---|---|---|
+| identity continuity | `identityd`, accepted Event1 history | fail closed; never invent identity |
+| commitment access | `intentiond`, accepted Event1 history | preserve accepted commitments or report unavailable |
+| prediction | `predictord` | prediction unavailable; independent capabilities remain usable |
+| self-assessment | `selfd` | assessment unavailable; identity and commitments remain usable |
+| attention/workspace | `workspaced` | attention limited; durable biography remains usable |
+| consolidation | `lifecycled` plus run-specific owners | run limited/failed/degraded by typed policy |
+| Presence presentation | `presenced` | UI unavailable; cognitive owners remain unchanged |
+
+### Exit gate
+
+Stopping an optional organ removes only dependent capabilities. Restart produces an explicit
+`Recovering` transition and verified return to `Available`; Presence recreation changes neither.
+
+## P6.3 — Add bounded asynchronous RPC resilience
+
+### Work
+
+- add common bounded async calls for paths that must not block an owner or shell;
+- define per-method timeout and idempotency metadata;
+- retry only when the operation contract permits replay;
+- add exponential backoff with jitter and a bounded circuit breaker;
+- preserve `UnknownOutcome` when a mutation may have committed but its response was lost;
+- reuse M5 operation keys for retryable durable work.
+
+### Exit gate
+
+Timeout cannot freeze Presence, exhaust the session bus, duplicate an Event1 effect, or turn an
+unknown mutation result into success. Unit tests use a deterministic clock/backoff source.
+
+## P6.4 — Introduce homeostatic signals without autonomous policy
+
+### Work
+
+- measure Event1 backlog, Journal/storage growth, RPC latency/error pressure, lifecycle backlog,
+  projection age, and calibration pressure;
+- attach units, observation time, freshness, source, and supported/unsupported status;
+- expose measurements before allowing them to schedule work;
+- define bounded thresholds and hysteresis separately from raw measurements.
+
+### Exit gate
+
+Every signal is typed, source-bearing, testable, and cannot silently trigger consolidation. Stale
+or unavailable measurements remain explicit instead of falling back to fabricated zero values.
+
+## P6.5 — Add capability-aware scheduling and metacognitive projection
+
+### Work
+
+- let lifecycle policy consume typed pressure and capability state;
+- keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
+- project available, limited, unavailable, stale, unknown, and recovering capabilities;
+- show causes, operational impact, last verification, and recovery progress in Presence;
+- preserve useful independent commands when optional capabilities are absent.
+
+### Exit gate
+
+The UI explains what is unavailable and what still works without interpreting owner storage or
+durable schemas. Language, confidence, and general epistemic claims remain outside M6.
+
+## P6.6 — Prove partial availability and recovery
+
+### Fault-injection matrix
+
+- stop/restart each optional organ independently;
+- remove `presenced` and recreate the QML proxy;
+- make a process own D-Bus but exceed its RPC deadline;
+- crash during retry and circuit-breaker transitions;
+- make Event1 unavailable and prove no mutation is reported accepted;
+- recover every case and prove no duplicate accepted effect.
+
+Use process integration for the complete matrix and one focused KVM gate for D-Bus/systemd
+activation, timeout, recovery, and Plasma projection. Do not multiply the expensive two-node smoke
+test for cases already proven below the system boundary.
+
+### M6 exit gate
+
+Loss of every optional organ has an explicit capability deficit, useful remaining behavior,
+bounded retry/recovery rule, Presence projection, and test. Required-owner loss fails closed without
+identity replacement, commitment loss, false acceptance, or duplicate durable effects.
 
 ## Deferred behind gates
 
@@ -253,18 +400,18 @@ typed capability, observation, outcome, and rollback boundaries are independentl
 
 | PR | Scope |
 |---|---|
-| 1 | P0 repository hygiene and green gates |
-| 2 | lifecycle implementation ADR and transition protocol |
-| 3 | lifecycle codec/state-machine unit tests |
-| 4 | transition/run owner and IPC service |
-| 5 | continuity reconstruction and integration matrix |
-| 6 | consolidation MVP owner requests |
-| 7 | interruption/idempotency/fault-injection tests |
-| 8 | asynchronous Presence lifecycle projection |
-| 9 | VM smoke, docs, and M5 evaluation release |
+| 1 | P6 capability/health protocol, codec, transition tests, and accepted ownership ADR |
+| 2 | explicit dependency graph and aggregate-health policy |
+| 3 | `cybou-healthd`, `Health1`, systemd activation, and persistence/migration tests |
+| 4 | Presence1 capability projection without UI policy ownership |
+| 5 | bounded async RPC, idempotency metadata, backoff, and circuit breaker |
+| 6 | typed homeostatic measurements and freshness semantics |
+| 7 | capability-aware scheduling and degraded-mode UI |
+| 8 | process fault-injection matrix and focused M6 KVM gate |
+| 9 | synchronized docs and M6 evaluation evidence |
 
-Keep migrations separate from UI polish and avoid combining M6 capability policy with the first M5
-vertical slice.
+Keep protocol/schema work separate from UI polish. Do not combine raw measurement collection with
+automatic scheduling policy, and do not begin M7 retention or epistemic ownership inside M6.
 
 ## Definition of done for every package
 

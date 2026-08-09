@@ -25,7 +25,7 @@ SPDX-License-Identifier: MIT
 | [0016](ADR-0016-identity-continuity.md) | Identity Continuity | Proposed |
 | [0017](ADR-0017-cognitive-state-locations.md) | State Locations | Proposed |
 | [0018](ADR-0018-privacy-classification-and-replication.md) | Privacy and Replication | Proposed |
-| [0019](ADR-0019-degraded-modes-and-capability-deficits.md) | Degraded Modes | Proposed |
+| [0019](ADR-0019-degraded-modes-and-capability-deficits.md) | Degraded Modes | Accepted |
 | [0020](ADR-0020-presence-surface-for-v0.1.md) | Presence Surface for v0.1 | Proposed |
 | [0021](ADR-0021-language-models-are-optional-faculties.md) | Optional Language Faculties | Proposed |
 | [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary | Proposed |

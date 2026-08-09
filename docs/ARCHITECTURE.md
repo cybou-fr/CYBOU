@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 `MIND_MODEL.md` describes what the cognitive architecture means. This document describes the
 current process topology, ownership boundaries, failure domains, and ordering.
 
-## Current M4 process topology
+## Current M5 process topology
 
 ```text
                           ┌───────────────────────┐
@@ -56,6 +56,7 @@ The same processes have different semantic responsibilities:
 | Process | Semantic responsibility |
 |---|---|
 | `cybou-eventd` | canonical durable event history |
+| `cybou-lifecycled` | lifecycle/run orchestration and recovery metadata |
 | `cybou-identityd` | identity and logical-session continuity |
 | `cybou-intentiond` | unresolved commitments and terminal intention state |
 | `cybou-predictord` | prediction and calibration state |
@@ -84,7 +85,8 @@ or authorization state.
 - restarting identityd in the same login resumes the current identity through its runtime marker;
 - restarting workspaced reconstructs bounded attention from Event1 history.
 
-Full capability-deficit policy is M6, but M4 creates the isolation required for it.
+Full capability-deficit policy is M6, while the current M5 topology provides the isolation and
+continuity required for it.
 
 Process isolation means that a capability can fail independently. It does not yet mean the rest of
 Mind can always continue usefully; M6 defines that policy.
@@ -126,7 +128,8 @@ These are not interchangeable.
 A service restart should not create a new identity. A future continuity failure should be
 represented explicitly rather than silently inventing seamless continuity.
 
-Current restart semantics are documented in `CURRENT_STATE.md`; stronger continuity is M5/M6.
+Current restart/reboot semantics are documented in `CURRENT_STATE.md`; in-place upgrade
+reconciliation remains a separate hardening track and capability-specific recovery belongs to M6.
 
 ## Presentation boundary
 
@@ -198,10 +201,10 @@ The coordinator owns run orchestration only. It does not write organ storage or 
 history is never rewritten into a more convenient past; summaries, calibration, contradiction, and
 expiry decisions remain derived records with evidence.
 
-Lifecycle1, persistent run state, recovery, owner dispatch, durable owner results, and accepted
-terminal outcomes are implemented as the M5 P1–P3 core. Presence projection and the full reboot
-fault-injection gate remain. Resource/capability-aware operation belongs to M6. ADR-0024 is
-normative.
+Lifecycle1, persistent run state, recovery, owner dispatch, durable owner results, accepted
+terminal outcomes, Presence projection, and process/Plasma/reboot fault-injection gates form the
+implemented M5 evaluation boundary. Resource/capability-aware operation belongs to M6. ADR-0024
+and ADR-0026 are normative.
 
 ## Future grounding and cognitive-governance boundary
 
@@ -233,7 +236,7 @@ failure, and privacy contracts are precise.
 
 ## Future action boundary
 
-M9 is intentionally outside the current M4 organ topology.
+M9 is intentionally outside the current M5 organ topology.
 
 No language model or UI component should become a privileged executor.
 

@@ -30,7 +30,7 @@ sentient, or biologically equivalent to a human mind.
 
 This document mixes two scopes, which are always labeled:
 
-- **Current substrate** — behavior implemented by M1–M4 plus the current partial M5 lifecycle APIs.
+- **Current substrate** — behavior implemented and evaluated by M1–M5.
 - **Future target** — capabilities planned by M5–M9 and proposed ADRs.
 
 `CURRENT_STATE.md` remains authoritative for what is implemented today.
@@ -225,7 +225,7 @@ Observed consequence
         └──────────────► Observation / Outcome
 ```
 
-M9 owns the authorization/execution boundary. It is not implemented by the current M4 substrate.
+M9 owns the authorization/execution boundary. It is not implemented by the current M5 substrate.
 
 ### 7. Consolidation derives; it does not rewrite
 
@@ -268,7 +268,7 @@ authorize external action.
 
 ## The current substrate
 
-The current M1–M4 plus partial M5 design establishes the process, ownership, and lifecycle
+The current M1–M5 implementation establishes the process, ownership, and lifecycle
 boundaries required for the larger model:
 
 ```text
@@ -571,7 +571,7 @@ ADR-0022 contains the normative action-boundary direction.
 
 ## Example future loop
 
-The following is an **illustrative M8/M9 scenario**, not current M4 behavior.
+The following is an **illustrative M8/M9 scenario**, not current M5 behavior.
 
 User intent:
 

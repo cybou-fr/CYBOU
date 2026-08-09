@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 Workspace owns bounded active context, not biography.
 
-## Current M4 process
+## Current M5 process
 
 The authoritative live Workspace now runs in `cybou-workspaced`.
 
