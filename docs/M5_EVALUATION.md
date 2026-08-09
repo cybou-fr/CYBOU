@@ -54,19 +54,21 @@ nix flake check --print-build-logs path:.
 ```
 
 `path:.` is appropriate for evaluating a complete local candidate including untracked files. A
-published release must instead use a clean tagged Git revision.
+published stable release must instead use a clean tagged Git revision. The evaluation candidate
+below was built from a clean commit but is intentionally untagged.
 
 ## Artifact record
 
-Fill these fields only from the clean revision used to publish artifacts:
-
 ```text
-version: pending
-git revision: pending
-Nix flake revision: pending
-VM output: pending
-ISO filename: pending
-ISO SHA-256: pending
+version: M5 evaluation candidate (unversioned)
+git revision: ddd6c8390334213896591ed6b88ad48f40900c6b
+Nix flake revision: ddd6c8390334213896591ed6b88ad48f40900c6b
+VM output: /nix/store/5gpzv3wsqmpgzd4wi8w7wlgcs5wfaf6i-nixos-vm
+VM closure size: 8.9 GiB
+ISO filename: cybou.iso
+ISO output: /nix/store/qmkj3vclwhk9r35r06111sykpb4yl491-cybou.iso/iso/cybou.iso
+ISO size: 3,379,068,928 bytes
+ISO SHA-256: e7e84489c1ffeccf70cca7c0e69b21a019feb704be2ea3c1c8f68626c3b7e56e
 test environment: NixOS under WSL2/KVM
 state compatibility: pre-release; schema v1 migration is tested, cross-release upgrade is not
 ```
@@ -78,20 +80,14 @@ state compatibility: pre-release; schema v1 migration is tested, cross-release u
 - Aggregate `nix flake check --print-build-logs path:.` passes.
 - The graphical reboot path uses direct systemd reboot because test-driver Ctrl+Alt+Delete opens
   Plasma's interactive logout UI; the corrected two-node gate completes under nested KVM.
-- VM/ISO publication hashes remain pending until artifacts are built from a clean revision.
+- VM/ISO evaluation artifacts were built from clean revision `ddd6c83`; their paths, size, and
+  SHA-256 are recorded above.
 
-## Local dirty-tree artifact evidence
+## Artifact provenance note
 
-These outputs prove that the candidate composes; they are not publishable release artifacts:
-
-```text
-source HEAD: 416d3c01a9afe89cba178745277d72be1d6272f0 + uncommitted changes
-VM output: /nix/store/5gpzv3wsqmpgzd4wi8w7wlgcs5wfaf6i-nixos-vm
-VM closure size: 8.9 GiB
-ISO output: /nix/store/qmkj3vclwhk9r35r06111sykpb4yl491-cybou.iso/iso/cybou.iso
-ISO size: 3,379,068,928 bytes
-ISO SHA-256: e7e84489c1ffeccf70cca7c0e69b21a019feb704be2ea3c1c8f68626c3b7e56e
-```
+The evidence-record commit follows the artifact-source commit, so it can name that immutable
+revision without a self-reference. This is an evaluation artifact record, not a stable release or
+compatibility promise; stable publication still requires an explicit version and Git tag.
 
 ## Known limitations
 
