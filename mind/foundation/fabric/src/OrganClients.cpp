@@ -57,6 +57,32 @@ bool connectChanged(
 
 } // namespace
 
+HealthClient::HealthClient(QObject *parent)
+    : QObject(parent)
+    , m_rpc(kHealthEndpoint)
+{
+    if (!connectChanged(kHealthEndpoint, this, SLOT(onChanged())))
+        m_codecError = QStringLiteral("cannot subscribe to Health1 Changed");
+}
+
+CapabilitySnapshot HealthClient::snapshot() const
+{
+    m_codecError.clear();
+    const QByteArray encoded = m_rpc.callBytes(QStringLiteral("Snapshot"));
+    if (encoded.isEmpty()) return {};
+    return decodeCapabilitySnapshot(encoded, &m_codecError);
+}
+
+QString HealthClient::lastError() const
+{
+    return bestError(m_codecError, m_rpc);
+}
+
+void HealthClient::onChanged()
+{
+    Q_EMIT changed();
+}
+
 IdentityClient::IdentityClient()
     : m_rpc(kIdentityEndpoint)
 {

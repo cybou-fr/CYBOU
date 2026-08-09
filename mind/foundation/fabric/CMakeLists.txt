@@ -20,5 +20,5 @@ target_include_directories(cybou-fabric
 )
 
 target_link_libraries(cybou-fabric
-    PUBLIC Qt6::Core Qt6::DBus
+    PUBLIC Qt6::Core Qt6::DBus cybou-protocol
 )

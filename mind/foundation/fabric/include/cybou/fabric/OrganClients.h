@@ -4,11 +4,35 @@
 #pragma once
 
 #include "cybou/fabric/RpcClient.h"
+#include "cybou/protocol/Health.h"
 
 #include <QObject>
 #include <QVariant>
 
 namespace cybou {
+
+class HealthClient : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit HealthClient(QObject *parent = nullptr);
+
+    bool ready() const { return m_rpc.ready(); }
+    QString health() const { return m_rpc.health(); }
+    CapabilitySnapshot snapshot() const;
+    QString lastError() const;
+
+Q_SIGNALS:
+    void changed();
+
+private Q_SLOTS:
+    void onChanged();
+
+private:
+    mutable QString m_codecError;
+    RpcClient m_rpc;
+};
 
 class IdentityClient
 {

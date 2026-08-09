@@ -94,10 +94,15 @@ or authorization state.
 - restarting workspaced reconstructs bounded attention from Event1 history.
 
 The P6.1–P6.4 capability-deficit owner, bounded observation, and typed homeostatic projection are
-implemented. Capability-aware Presence behavior and scheduling remain P6.5.
+implemented. The first P6.5 slice projects Health1 state through Presence1 and gates each command
+by its actual capability dependencies. Capability-aware lifecycle scheduling remains future P6.5
+work.
 
-Process isolation and Health1 identify independent capability failure. Presence still uses a broad
-runtime readiness gate, so partial user-visible operation remains the next M6 semantic transition.
+Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
+not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form
+a cycle. Aggregate capability state, per-capability state, deficits, and observation time are a
+separate projection. Consequently loss of predictord disables Observe/Predict while identity,
+commitments, biography, attention, lifecycle control, and the Presence endpoint remain usable.
 
 ## Durable-to-visible ordering
 

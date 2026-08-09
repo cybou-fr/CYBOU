@@ -47,10 +47,12 @@ private:
 
     QVariantMap healthMap() const;
     QVariantMap snapshotMap() const;
+    bool capabilityAvailable(const QString &capabilityId) const;
 
     mutable QString m_lastError;
 
     EventClient m_events;
+    HealthClient m_health;
     IdentityClient m_identity;
     IntentionClient m_intentions;
     PredictorClient m_predictor;

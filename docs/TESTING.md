@@ -51,7 +51,7 @@ The graphical `vm-smoke` asks systemd directly for a non-blocking reboot because
 implementation of `reboot()` sends Ctrl+Alt+Delete, which Plasma treats as an interactive logout.
 This keeps shutdown non-interactive while preserving the normal state-flush path.
 
-`m4-process-integration` now launches all eight Mind daemons. It changes Lifecycle1 from `awake` to
+`m4-process-integration` now launches all nine Mind daemons. It changes Lifecycle1 from `awake` to
 `idle` and back, then proves the signal-driven update reaches Presence1 and the QML-facing Presence
 proxy, including lifecycled health, without turning lifecycle mode into runtime availability.
 It also recreates the proxy three times around one active run and verifies unchanged run identity,
@@ -59,17 +59,22 @@ status, and Event1 count. `CYBOU_PRESENCE_INTERRUPT_DELAY_MS` is test-only fault
 presenced delays and rejects an interruption without touching Lifecycle1. A client heartbeat proves
 the QML event loop remains responsive until the async transport timeout completes.
 
+The same process test stops predictord, refreshes Health1, and verifies that Presence reports a
+limited aggregate with only prediction unavailable. Identity, commitments, biography, attention,
+and endpoint reachability remain usable; restarting predictord and refreshing Health1 restores the
+prediction capability.
+
 `p4-plasma-lifecycle` is the focused single-node VM gate for shell recreation. It restarts the
 shipped Plasma user service around one active lifecycle run, requires a replacement PID and restored
 D-Bus surface, and compares the exact run blob and Event1 count across the UI-only transition.
 
 ## Process integration
 
-`m4-process-integration` runs inside an isolated `dbus-run-session`, launches eight executables,
+`m4-process-integration` runs inside an isolated `dbus-run-session`, launches nine executables,
 and verifies:
 
 ```text
-eight distinct process IDs
+nine distinct process IDs
 all organ D-Bus services become ready
 two QML Presence proxies do not create another identity session
 Promise crosses presenced -> intentiond -> eventd
@@ -77,7 +82,7 @@ Observe/Predict crosses presenced -> predictord -> eventd
 Workspace receives accepted events
 restarting identityd does not increment the same login session
 restarting presenced leaves the cognitive organs alive
-one organ failure does not kill the remaining processes
+predictor loss limits only prediction and recovery restores it
 ```
 
 ## VM gate

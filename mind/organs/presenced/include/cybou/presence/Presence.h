@@ -29,6 +29,11 @@ class Presence : public QObject
     Q_OBJECT
 
     Q_PROPERTY(bool awake READ isAwake NOTIFY changed)
+    Q_PROPERTY(bool runtimeReachable READ runtimeReachable NOTIFY changed)
+    Q_PROPERTY(QString aggregateCapabilityState READ aggregateCapabilityState NOTIFY changed)
+    Q_PROPERTY(QVariantMap capabilityStates READ capabilityStates NOTIFY changed)
+    Q_PROPERTY(QVariantList capabilityDeficits READ capabilityDeficits NOTIFY changed)
+    Q_PROPERTY(QDateTime capabilityObservedAt READ capabilityObservedAt NOTIFY changed)
     Q_PROPERTY(QString lastError READ lastError NOTIFY changed)
     Q_PROPERTY(QString narration READ narration NOTIFY changed)
     Q_PROPERTY(QStringList obligations READ obligations NOTIFY changed)
@@ -52,6 +57,12 @@ public:
 
     Q_INVOKABLE bool wake();
     bool isAwake() const { return m_awake; }
+    bool runtimeReachable() const;
+    QString aggregateCapabilityState() const;
+    QVariantMap capabilityStates() const;
+    QVariantList capabilityDeficits() const;
+    QDateTime capabilityObservedAt() const;
+    Q_INVOKABLE bool hasCapability(const QString &capabilityId) const;
 
     QString narration() const;
     QStringList obligations() const;

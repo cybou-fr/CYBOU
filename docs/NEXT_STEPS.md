@@ -370,11 +370,17 @@ Outcome evidence preserves completed and missing work. CapabilitySnapshot schema
 each unhealthy `(capability, dependency)` pair and migrates persisted schema v1, completing the
 protocol prerequisite for detailed P6.5 recovery causes.
 
+**Slice 1: implemented.** Presence1 and its QML proxy now expose aggregate capability state,
+per-capability states, typed deficits, and observation time. Commands use explicit capability gates
+instead of one broad `awake` gate. Process integration proves predictor loss leaves identity,
+commitments, biography, and attention usable, then restores prediction after Health1 recovery.
+Presence readiness remains independent of Health1 to avoid the healthd→presenced probe cycle.
+
 ### Work
 
 - let lifecycle policy consume typed pressure and capability state;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
-- project available, limited, unavailable, stale, unknown, and recovering capabilities;
+- refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;
 - preserve useful independent commands when optional capabilities are absent.
 

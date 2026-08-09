@@ -99,6 +99,36 @@ void Presence::remoteChanged()
     }
 }
 
+bool Presence::runtimeReachable() const
+{
+    return m_snapshot.value(QStringLiteral("runtimeReachable")).toBool();
+}
+
+QString Presence::aggregateCapabilityState() const
+{
+    return m_snapshot.value(QStringLiteral("aggregateCapabilityState")).toString();
+}
+
+QVariantMap Presence::capabilityStates() const
+{
+    return m_snapshot.value(QStringLiteral("capabilityStates")).toMap();
+}
+
+QVariantList Presence::capabilityDeficits() const
+{
+    return m_snapshot.value(QStringLiteral("capabilityDeficits")).toList();
+}
+
+QDateTime Presence::capabilityObservedAt() const
+{
+    return m_snapshot.value(QStringLiteral("capabilityObservedAt")).toDateTime();
+}
+
+bool Presence::hasCapability(const QString &capabilityId) const
+{
+    return capabilityStates().value(capabilityId).toString() == QStringLiteral("available");
+}
+
 QString Presence::narration() const
 {
     return m_snapshot
@@ -149,7 +179,7 @@ QList<Moment> Presence::recent(int limit) const
 
 QVariantList Presence::activity(int limit) const
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("accepted-biography"))) {
         return {};
     }
     return m_client->activity(limit);
@@ -157,7 +187,8 @@ QVariantList Presence::activity(int limit) const
 
 QUuid Presence::promise(const QString &description)
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("accepted-biography"))
+        || !hasCapability(QStringLiteral("commitment-access"))) {
         return {};
     }
 
@@ -173,7 +204,8 @@ QUuid Presence::promise(const QString &description)
 
 bool Presence::reflect()
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("accepted-biography"))
+        || !hasCapability(QStringLiteral("self-assessment"))) {
         return false;
     }
 
@@ -188,7 +220,7 @@ bool Presence::reflect()
 
 bool Presence::fulfillIndex(int index)
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("commitment-access"))) {
         return false;
     }
 
@@ -203,7 +235,7 @@ bool Presence::fulfillIndex(int index)
 
 bool Presence::abandonIndex(int index)
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("commitment-access"))) {
         return false;
     }
 
@@ -218,7 +250,7 @@ bool Presence::abandonIndex(int index)
 
 QVariantList Presence::detailedObligations() const
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("commitment-access"))) {
         return {};
     }
     return m_client->detailedObligations();
@@ -228,7 +260,7 @@ bool Presence::observe(
     const QString &subject,
     double value)
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("prediction"))) {
         return false;
     }
 
@@ -264,7 +296,7 @@ QVariantList Presence::calibrations() const
 
 QVariantMap Presence::predict(const QString &subject)
 {
-    if (!m_awake) {
+    if (!hasCapability(QStringLiteral("prediction"))) {
         return {};
     }
 
@@ -321,7 +353,7 @@ QVariantMap Presence::lifecycleProjection() const
 
 void Presence::interruptLifecycle(const QString &cause)
 {
-    if (!m_awake || m_lifecycleCommandPending) {
+    if (!runtimeReachable() || m_lifecycleCommandPending) {
         return;
     }
 

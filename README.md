@@ -26,9 +26,10 @@ Mind is deliberately not a chatbot or a single AI agent. Language models are pla
 replaceable faculties. They do not own identity, canonical memory, authorization, or privileged
 execution.
 
-The current repository implements the evaluated M1–M5 substrate and P6.1–P6.4 capability health,
-RPC resilience, and typed homeostatic observation. It does **not** yet implement a language model,
-distributed Mind, capability-aware scheduling/UI, or authorized external agency. See
+The current repository implements the evaluated M1–M5 substrate, P6.1–P6.4 capability health,
+RPC resilience and typed homeostatic observation, plus the first P6.5 capability-aware Presence
+slice. It does **not** yet implement automatic capability-aware scheduling, a complete degraded UI,
+a language model, distributed Mind, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -87,7 +88,8 @@ become a second cognitive owner.
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
 | Restart/reboot continuity and lifecycle/consolidation core | Evaluation complete — M5 |
 | Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 P6.1–P6.4 |
-| Capability-aware scheduling and degraded UI | Next — M6 P6.5 |
+| Capability-aware Presence projection and command isolation | Implemented — M6 P6.5 slice 1 |
+| Capability-aware scheduling and complete degraded UI | Next — M6 P6.5 |
 | Grounded perception, epistemics, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |

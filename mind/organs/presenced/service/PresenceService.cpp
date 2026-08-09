@@ -10,9 +10,67 @@
 #include <QDateTime>
 #include <QThread>
 
+#include <algorithm>
+
 namespace cybou {
 
 namespace {
+
+const QStringList kProjectedCapabilities = {
+    QStringLiteral("accepted-biography"), QStringLiteral("identity-continuity"),
+    QStringLiteral("commitment-access"), QStringLiteral("prediction"),
+    QStringLiteral("self-assessment"), QStringLiteral("attention-workspace"),
+    QStringLiteral("consolidation"), QStringLiteral("presence-presentation"),
+};
+
+bool isAvailable(const CapabilitySnapshot &snapshot, const QString &capabilityId)
+{
+    if (!snapshot.isValid()) return false;
+    return std::none_of(
+        snapshot.deficits.cbegin(), snapshot.deficits.cend(),
+        [&capabilityId](const CapabilityDeficit &deficit) {
+            return deficit.capabilityId == capabilityId;
+        });
+}
+
+QVariantMap capabilityProjection(const CapabilitySnapshot &snapshot)
+{
+    QVariantMap projection;
+    projection[QStringLiteral("aggregateState")] = snapshot.isValid()
+        ? capabilityStateToString(snapshot.aggregateState) : QStringLiteral("unknown");
+    projection[QStringLiteral("observedAt")] = snapshot.observedAt;
+    QVariantMap states;
+    for (const QString &capabilityId : kProjectedCapabilities)
+        states[capabilityId] = snapshot.isValid()
+            ? QStringLiteral("available") : QStringLiteral("unknown");
+    QVariantList deficits;
+    for (const CapabilityDeficit &source : snapshot.deficits) {
+        QVariantMap deficit;
+        deficit[QStringLiteral("capabilityId")] = source.capabilityId;
+        deficit[QStringLiteral("dependencyId")] = source.dependencyId;
+        deficit[QStringLiteral("state")] = capabilityStateToString(source.state);
+        deficit[QStringLiteral("cause")] = deficitCauseToString(source.cause);
+        deficit[QStringLiteral("impact")] = source.impact;
+        deficit[QStringLiteral("lastVerifiedAt")] = source.lastVerifiedAt;
+        deficit[QStringLiteral("recoveryPolicy")] = recoveryPolicyToString(source.recoveryPolicy);
+        deficit[QStringLiteral("errorReference")] = source.errorReference;
+        deficits.append(deficit);
+        const QString current = states.value(source.capabilityId).toString();
+        const auto rank = [](const QString &state) {
+            if (state == QStringLiteral("available")) return 0;
+            if (state == QStringLiteral("recovering")) return 1;
+            if (state == QStringLiteral("limited")) return 2;
+            if (state == QStringLiteral("stale")) return 3;
+            if (state == QStringLiteral("unknown")) return 4;
+            return 5;
+        };
+        const QString candidate = capabilityStateToString(source.state);
+        if (rank(candidate) > rank(current)) states[source.capabilityId] = candidate;
+    }
+    projection[QStringLiteral("states")] = states;
+    projection[QStringLiteral("deficits")] = deficits;
+    return projection;
+}
 
 QVariantMap lifecycleProjection(const QVariantMap &state)
 {
@@ -78,24 +136,17 @@ PresenceService::PresenceService(QObject *parent)
             Q_EMIT Changed();
         });
     connect(&m_lifecycle, &LifecycleClient::changed, this, [this]() { Q_EMIT Changed(); });
+    connect(&m_health, &HealthClient::changed, this, [this]() { Q_EMIT Changed(); });
 }
 
 bool PresenceService::Ready() const
 {
-    return m_events.isOpen()
-        && m_identity.ready()
-        && m_intentions.ready()
-        && m_predictor.ready()
-        && m_self.ready()
-        && m_workspace.ready()
-        && m_lifecycle.ready();
+    return true;
 }
 
 QString PresenceService::Health() const
 {
-    return Ready()
-        ? QStringLiteral("healthy")
-        : QStringLiteral("degraded");
+    return QStringLiteral("healthy");
 }
 
 QString PresenceService::LastError() const
@@ -107,6 +158,7 @@ QString PresenceService::LastError() const
     if (!m_events.lastError().isEmpty()) {
         return m_events.lastError();
     }
+    if (!m_health.lastError().isEmpty()) return m_health.lastError();
     if (!m_identity.lastError().isEmpty()) {
         return m_identity.lastError();
     }
@@ -146,16 +198,26 @@ QVariantMap PresenceService::healthMap() const
         m_lifecycle.health();
     map[QStringLiteral("presenced")] =
         Health();
+    map[QStringLiteral("healthd")] = m_health.health();
     return map;
+}
+
+bool PresenceService::capabilityAvailable(const QString &capabilityId) const
+{
+    return isAvailable(m_health.snapshot(), capabilityId);
 }
 
 QVariantMap PresenceService::snapshotMap() const
 {
     QVariantMap map;
 
-    const QVariantMap self = m_self.measure();
-    const QVariantMap lifecycle = m_lifecycle.state();
-    const QVariantList intentions = m_intentions.open();
+    const CapabilitySnapshot health = m_health.snapshot();
+    const QVariantMap capability = capabilityProjection(health);
+    const QVariantMap self = isAvailable(health, QStringLiteral("self-assessment"))
+        ? m_self.measure() : QVariantMap{};
+    const QVariantMap lifecycle = m_lifecycle.ready() ? m_lifecycle.state() : QVariantMap{};
+    const QVariantList intentions = isAvailable(health, QStringLiteral("commitment-access"))
+        ? m_intentions.open() : QVariantList{};
 
     QStringList obligations;
     for (const QVariant &entry : intentions) {
@@ -165,7 +227,13 @@ QVariantMap PresenceService::snapshotMap() const
                 .toString());
     }
 
-    map[QStringLiteral("awake")] = Ready();
+    map[QStringLiteral("runtimeReachable")] = true;
+    map[QStringLiteral("awake")] = true;
+    map[QStringLiteral("aggregateCapabilityState")] =
+        capability.value(QStringLiteral("aggregateState"));
+    map[QStringLiteral("capabilityStates")] = capability.value(QStringLiteral("states"));
+    map[QStringLiteral("capabilityDeficits")] = capability.value(QStringLiteral("deficits"));
+    map[QStringLiteral("capabilityObservedAt")] = capability.value(QStringLiteral("observedAt"));
     map[QStringLiteral("lifecycleState")] = lifecycle;
     map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
     map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
@@ -174,18 +242,24 @@ QVariantMap PresenceService::snapshotMap() const
         self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;
     map[QStringLiteral("attention")] =
-        m_workspace.attention();
+        isAvailable(health, QStringLiteral("attention-workspace"))
+            ? m_workspace.attention() : QString();
     map[QStringLiteral("contributions")] =
-        static_cast<qulonglong>(m_events.count());
+        isAvailable(health, QStringLiteral("accepted-biography"))
+            ? static_cast<qulonglong>(m_events.count()) : 0;
     map[QStringLiteral("stats")] = self;
     map[QStringLiteral("identityState")] =
-        m_identity.state();
+        isAvailable(health, QStringLiteral("identity-continuity"))
+            ? m_identity.state() : QVariantMap{};
     map[QStringLiteral("calibrations")] =
-        m_predictor.calibrations();
+        isAvailable(health, QStringLiteral("prediction"))
+            ? m_predictor.calibrations() : QVariantList{};
     map[QStringLiteral("coalitions")] =
-        m_workspace.coalitions();
+        isAvailable(health, QStringLiteral("attention-workspace"))
+            ? m_workspace.coalitions() : QVariantList{};
     map[QStringLiteral("moment")] =
-        m_workspace.moment();
+        isAvailable(health, QStringLiteral("attention-workspace"))
+            ? m_workspace.moment() : QVariantMap{};
     map[QStringLiteral("organHealth")] =
         healthMap();
 
@@ -201,7 +275,7 @@ QByteArray PresenceService::Activity(int limit) const
 {
     QVariantList result;
 
-    if (limit <= 0) {
+    if (limit <= 0 || !capabilityAvailable(QStringLiteral("accepted-biography"))) {
         return FabricCodec::encodeList(result);
     }
 
@@ -224,6 +298,8 @@ QByteArray PresenceService::Activity(int limit) const
 
 QByteArray PresenceService::DetailedObligations() const
 {
+    if (!capabilityAvailable(QStringLiteral("commitment-access")))
+        return FabricCodec::encodeList(QVariantList{});
     return FabricCodec::encodeList(
         m_intentions.open());
 }
@@ -269,7 +345,9 @@ QString PresenceService::Promise(
 {
     m_lastError.clear();
 
-    if (description.trimmed().isEmpty()) {
+    if (description.trimmed().isEmpty()
+        || !capabilityAvailable(QStringLiteral("accepted-biography"))
+        || !capabilityAvailable(QStringLiteral("commitment-access"))) {
         return {};
     }
 
@@ -300,6 +378,8 @@ QString PresenceService::Promise(
 bool PresenceService::Reflect()
 {
     m_lastError.clear();
+    if (!capabilityAvailable(QStringLiteral("accepted-biography"))
+        || !capabilityAvailable(QStringLiteral("self-assessment"))) return false;
 
     QUuid requestId;
     if (!appendUserObservation(
@@ -323,6 +403,7 @@ bool PresenceService::Reflect()
 bool PresenceService::FulfillIndex(int index)
 {
     m_lastError.clear();
+    if (!capabilityAvailable(QStringLiteral("commitment-access"))) return false;
 
     const QVariantList open = m_intentions.open();
     if (index < 0 || index >= open.size()) {
@@ -348,6 +429,7 @@ bool PresenceService::FulfillIndex(int index)
 bool PresenceService::AbandonIndex(int index)
 {
     m_lastError.clear();
+    if (!capabilityAvailable(QStringLiteral("commitment-access"))) return false;
 
     const QVariantList open = m_intentions.open();
     if (index < 0 || index >= open.size()) {
@@ -375,6 +457,7 @@ bool PresenceService::Observe(
     double value)
 {
     m_lastError.clear();
+    if (!capabilityAvailable(QStringLiteral("prediction"))) return false;
 
     const bool ok = m_predictor.observe(subject, value);
     if (!ok) {
@@ -387,6 +470,8 @@ QByteArray PresenceService::Predict(
     const QString &subject)
 {
     m_lastError.clear();
+    if (!capabilityAvailable(QStringLiteral("prediction")))
+        return FabricCodec::encodeMap(QVariantMap{});
 
     const QVariantMap prediction =
         m_predictor.predict(subject);

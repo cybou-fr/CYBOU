@@ -74,7 +74,7 @@ last snapshot across owner restart, fails closed on corrupt state, and requires 
 `Recovering` snapshot before a formerly unavailable component becomes healthy. Process integration
 proves loss of predictord leaves accepted biography, identity continuity, commitments, and bounded
 workspace available; dependent optional capabilities become explicit deficits and recover without
-replacing the health owner state. Presence projection remains future work.
+replacing the health owner state.
 
 P6.3 adds typed RPC outcomes and explicit read-only, idempotent-mutation, and non-idempotent-mutation
 semantics. The shared async D-Bus client applies bounded deadlines, deterministic exponential
@@ -102,6 +102,15 @@ missing capabilities, and their causes. CapabilitySnapshot schema v2 now emits o
 unhealthy `(capability, dependency)` pair, so simultaneous owner loss remains fully explainable.
 Persisted schema v1 is accepted as a strict compatible subset and normalized to v2; unknown future
 versions fail closed.
+
+P6.5 slice 1 connects presenced to Health1 and exports aggregate state, per-capability states,
+typed deficits, and observation time through Presence1 and the QML proxy. `awake` remains a
+compatibility alias for presentation endpoint reachability; it is no longer the authorization gate
+for every command. Biography, commitments, prediction, self-assessment, and attention operations
+are independently gated by their declared capabilities. This avoids a health probe cycle:
+presenced readiness never depends on healthd readiness, while the capability projection may be
+unknown until Health1 is available. Automatic lifecycle policy and complete degraded-mode visual
+treatment remain P6.5 work.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is

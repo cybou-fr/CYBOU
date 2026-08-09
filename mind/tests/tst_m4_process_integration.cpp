@@ -35,6 +35,7 @@ private:
     QString m_selfdPath;
     QString m_workspacedPath;
     QString m_lifecycledPath;
+    QString m_healthdPath;
     QString m_presencedPath;
 
     std::unique_ptr<QProcess> m_eventd;
@@ -44,6 +45,7 @@ private:
     std::unique_ptr<QProcess> m_selfd;
     std::unique_ptr<QProcess> m_workspaced;
     std::unique_ptr<QProcess> m_lifecycled;
+    std::unique_ptr<QProcess> m_healthd;
     std::unique_ptr<QProcess> m_presenced;
 
     QProcessEnvironment environment() const
@@ -110,6 +112,8 @@ private Q_SLOTS:
             qEnvironmentVariable("CYBOU_WORKSPACED_PATH");
         m_lifecycledPath =
             qEnvironmentVariable("CYBOU_LIFECYCLED_PATH");
+        m_healthdPath =
+            qEnvironmentVariable("CYBOU_HEALTHD_PATH");
         m_presencedPath =
             qEnvironmentVariable("CYBOU_PRESENCED_PATH");
 
@@ -120,6 +124,7 @@ private Q_SLOTS:
         QVERIFY2(!m_selfdPath.isEmpty(), "CYBOU_SELFD_PATH is not set");
         QVERIFY2(!m_workspacedPath.isEmpty(), "CYBOU_WORKSPACED_PATH is not set");
         QVERIFY2(!m_lifecycledPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
+        QVERIFY2(!m_healthdPath.isEmpty(), "CYBOU_HEALTHD_PATH is not set");
         QVERIFY2(!m_presencedPath.isEmpty(), "CYBOU_PRESENCED_PATH is not set");
 
         m_root = std::make_unique<QTemporaryDir>();
@@ -171,15 +176,23 @@ private Q_SLOTS:
         LifecycleClient lifecycle;
         QTRY_VERIFY_WITH_TIMEOUT(lifecycle.ready(), 5000);
 
+        m_healthd = start(m_healthdPath);
+        QVERIFY(m_healthd);
+        HealthClient health;
+        QTRY_VERIFY_WITH_TIMEOUT(health.ready(), 5000);
+
         m_presenced = start(m_presencedPath);
         QVERIFY(m_presenced);
         PresenceClient presence;
         QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+        RpcClient healthRpc(kHealthEndpoint);
+        QVERIFY(healthRpc.callBool(QStringLiteral("Refresh")));
     }
 
     void cleanupTestCase()
     {
         stop(m_presenced);
+        stop(m_healthd);
         stop(m_lifecycled);
         stop(m_selfd);
         stop(m_workspaced);
@@ -189,7 +202,7 @@ private Q_SLOTS:
         stop(m_eventd);
     }
 
-    void eightDistinctProcessesOwnTheRuntime()
+    void nineDistinctProcessesOwnTheRuntime()
     {
         QSet<qint64> pids{
             m_eventd->processId(),
@@ -199,10 +212,11 @@ private Q_SLOTS:
             m_selfd->processId(),
             m_workspaced->processId(),
             m_lifecycled->processId(),
+            m_healthd->processId(),
             m_presenced->processId(),
         };
 
-        QCOMPARE(pids.size(), 8);
+        QCOMPARE(pids.size(), 9);
     }
 
     void qmlProxyDoesNotCreateAnotherIdentitySession()
@@ -542,6 +556,24 @@ private Q_SLOTS:
 
         stop(m_predictord);
 
+        RpcClient health(kHealthEndpoint);
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.aggregateCapabilityState(),
+            QStringLiteral("limited"),
+            5000);
+        QCOMPARE(
+            surface.capabilityStates().value(QStringLiteral("prediction")).toString(),
+            QStringLiteral("unavailable"));
+        QVERIFY(surface.runtimeReachable());
+        QVERIFY(surface.isAwake());
+        QVERIFY(surface.hasCapability(QStringLiteral("identity-continuity")));
+        QVERIFY(surface.hasCapability(QStringLiteral("commitment-access")));
+        QVERIFY(surface.hasCapability(QStringLiteral("attention-workspace")));
+        QVERIFY(!surface.hasCapability(QStringLiteral("prediction")));
+        QVERIFY(!surface.identityState().isEmpty());
+        QVERIFY(!surface.promise(QStringLiteral("continue without prediction")).isNull());
+
         QVERIFY(m_eventd->state() != QProcess::NotRunning);
         QVERIFY(m_identityd->state() != QProcess::NotRunning);
         QVERIFY(m_intentiond->state() != QProcess::NotRunning);
@@ -558,6 +590,10 @@ private Q_SLOTS:
 
         PredictorClient predictor;
         QTRY_VERIFY_WITH_TIMEOUT(predictor.ready(), 5000);
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        QTRY_VERIFY_WITH_TIMEOUT(
+            surface.hasCapability(QStringLiteral("prediction")),
+            5000);
     }
 };
 
