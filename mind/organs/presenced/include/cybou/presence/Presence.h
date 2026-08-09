@@ -39,6 +39,9 @@ class Presence : public QObject
     Q_PROPERTY(QVariantList coalitions READ coalitions NOTIFY changed)
     Q_PROPERTY(QVariantMap moment READ moment NOTIFY changed)
     Q_PROPERTY(QVariantMap organHealth READ organHealth NOTIFY changed)
+    Q_PROPERTY(QString lifecycleMode READ lifecycleMode NOTIFY changed)
+    Q_PROPERTY(QString lifecycleStatus READ lifecycleStatus NOTIFY changed)
+    Q_PROPERTY(QVariantMap lifecycleState READ lifecycleState NOTIFY changed)
 
 public:
     explicit Presence(QObject *parent = nullptr);
@@ -69,6 +72,9 @@ public:
     Q_INVOKABLE QVariantList coalitions() const;
     Q_INVOKABLE QVariantMap moment() const;
     Q_INVOKABLE QVariantMap organHealth() const;
+    QString lifecycleMode() const;
+    QString lifecycleStatus() const;
+    QVariantMap lifecycleState() const;
 
     QString lastError() const { return m_lastError; }
 

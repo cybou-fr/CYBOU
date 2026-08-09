@@ -33,6 +33,8 @@ public Q_SLOTS:
     bool Dispatch();
     bool ResumeRun();
     bool FinishRun(const QString &status, const QString &cause);
+Q_SIGNALS:
+    void Changed();
 private:
     bool load(); bool save();
     bool requestedCapability(const QString &capability) const;

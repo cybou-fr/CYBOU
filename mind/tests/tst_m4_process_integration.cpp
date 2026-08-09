@@ -31,6 +31,7 @@ private:
     QString m_predictordPath;
     QString m_selfdPath;
     QString m_workspacedPath;
+    QString m_lifecycledPath;
     QString m_presencedPath;
 
     std::unique_ptr<QProcess> m_eventd;
@@ -39,6 +40,7 @@ private:
     std::unique_ptr<QProcess> m_predictord;
     std::unique_ptr<QProcess> m_selfd;
     std::unique_ptr<QProcess> m_workspaced;
+    std::unique_ptr<QProcess> m_lifecycled;
     std::unique_ptr<QProcess> m_presenced;
 
     QProcessEnvironment environment() const
@@ -99,6 +101,8 @@ private Q_SLOTS:
             qEnvironmentVariable("CYBOU_SELFD_PATH");
         m_workspacedPath =
             qEnvironmentVariable("CYBOU_WORKSPACED_PATH");
+        m_lifecycledPath =
+            qEnvironmentVariable("CYBOU_LIFECYCLED_PATH");
         m_presencedPath =
             qEnvironmentVariable("CYBOU_PRESENCED_PATH");
 
@@ -108,6 +112,7 @@ private Q_SLOTS:
         QVERIFY2(!m_predictordPath.isEmpty(), "CYBOU_PREDICTORD_PATH is not set");
         QVERIFY2(!m_selfdPath.isEmpty(), "CYBOU_SELFD_PATH is not set");
         QVERIFY2(!m_workspacedPath.isEmpty(), "CYBOU_WORKSPACED_PATH is not set");
+        QVERIFY2(!m_lifecycledPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
         QVERIFY2(!m_presencedPath.isEmpty(), "CYBOU_PRESENCED_PATH is not set");
 
         m_root = std::make_unique<QTemporaryDir>();
@@ -154,6 +159,11 @@ private Q_SLOTS:
         SelfClient self;
         QTRY_VERIFY_WITH_TIMEOUT(self.ready(), 5000);
 
+        m_lifecycled = start(m_lifecycledPath);
+        QVERIFY(m_lifecycled);
+        LifecycleClient lifecycle;
+        QTRY_VERIFY_WITH_TIMEOUT(lifecycle.ready(), 5000);
+
         m_presenced = start(m_presencedPath);
         QVERIFY(m_presenced);
         PresenceClient presence;
@@ -163,6 +173,7 @@ private Q_SLOTS:
     void cleanupTestCase()
     {
         stop(m_presenced);
+        stop(m_lifecycled);
         stop(m_selfd);
         stop(m_workspaced);
         stop(m_predictord);
@@ -171,7 +182,7 @@ private Q_SLOTS:
         stop(m_eventd);
     }
 
-    void sevenDistinctProcessesOwnTheRuntime()
+    void eightDistinctProcessesOwnTheRuntime()
     {
         QSet<qint64> pids{
             m_eventd->processId(),
@@ -180,10 +191,11 @@ private Q_SLOTS:
             m_predictord->processId(),
             m_selfd->processId(),
             m_workspaced->processId(),
+            m_lifecycled->processId(),
             m_presenced->processId(),
         };
 
-        QCOMPARE(pids.size(), 7);
+        QCOMPARE(pids.size(), 8);
     }
 
     void qmlProxyDoesNotCreateAnotherIdentitySession()
@@ -213,6 +225,26 @@ private Q_SLOTS:
             second.identityState()
                 .value(QStringLiteral("uuid"))
                 .toString());
+    }
+
+    void lifecycleStateProjectsThroughPresence()
+    {
+        Presence presence;
+        QVERIFY2(presence.wake(), qPrintable(presence.lastError()));
+        QCOMPARE(presence.lifecycleMode(), QStringLiteral("awake"));
+
+        RpcClient lifecycle(kLifecycleEndpoint);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleMode(), QStringLiteral("idle"), 5000);
+        QCOMPARE(
+            presence.lifecycleState().value(QStringLiteral("mode")).toString(),
+            QStringLiteral("idle"));
+        QCOMPARE(
+            presence.organHealth().value(QStringLiteral("lifecycled")).toString(),
+            QStringLiteral("healthy"));
+
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
+        QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleMode(), QStringLiteral("awake"), 5000);
     }
 
     void commandsCrossRealOrganProcesses()

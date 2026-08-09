@@ -122,8 +122,10 @@ after validating every receipt field and Event1 acceptance, atomically recording
 contribution mapping. Repeating Dispatch skips already persisted work, while direct owner
 redelivery returns the same contribution without another append. Completion commits one
 deterministic Event1 `Outcome` caused by every recorded owner contribution, saves its ID in the run,
-and fails closed if any reference is absent. The remaining P3 work is the fault-injection exit gate
-and Presence projection. The process suite already covers crashes after owner and terminal Event1
+and fails closed if any reference is absent. Lifecycle1 state commits emit `Changed`; presenced
+projects mode, run status/state, and lifecycled health through Presence1, while the QML proxy keeps
+runtime availability (`awake`) separate from lifecycle mode. The remaining P3 work is the VM
+fault-injection exit gate. The process suite already covers crashes after owner and terminal Event1
 commit but before the corresponding lifecycle state commit; deterministic replay creates no second
 contribution. The remaining resilience gate promotes this coverage to the rebooting VM path.
 

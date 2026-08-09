@@ -38,7 +38,7 @@ bool LifecycleService::save() {
     o["version"]=1; o["mode"]=lifecycleModeToString(m_mode);
     o["run"]=m_hasRun?QString::fromLatin1(encodeLifecycleRun(m_run).toBase64()):QString();
     QSaveFile f(m_path); if(!f.open(QIODevice::WriteOnly)){m_error="cannot write lifecycle state";return false;}
-    f.write(QJsonDocument(o).toJson(QJsonDocument::Compact)); if(!f.commit()){m_error="cannot commit lifecycle state";return false;} return true;
+    f.write(QJsonDocument(o).toJson(QJsonDocument::Compact)); if(!f.commit()){m_error="cannot commit lifecycle state";return false;} Q_EMIT Changed(); return true;
 }
 QByteArray LifecycleService::State() const { QVariantMap m; m["mode"]=lifecycleModeToString(m_mode); m["hasRun"]=m_hasRun; if(m_hasRun){m["runId"]=m_run.runId.toString(QUuid::WithoutBraces);m["status"]=lifecycleRunStatusToString(m_run.status);m["inputHighWaterMark"]=m_run.inputHighWaterMark;m["completedWork"]=m_run.completedWork;m["missingWork"]=m_run.missingWork;QVariantMap refs;for(auto it=m_run.workContributions.cbegin();it!=m_run.workContributions.cend();++it)refs[it.key()]=it.value().toString(QUuid::WithoutBraces);m["workContributions"]=refs;QVariantMap causes;for(auto it=m_run.missingCauses.cbegin();it!=m_run.missingCauses.cend();++it)causes[it.key()]=it.value();m["missingCauses"]=causes;m["terminalContributionId"]=m_run.terminalContributionId.toString(QUuid::WithoutBraces);} return FabricCodec::encodeMap(m); }
 bool LifecycleService::Transition(const QString &mode) { auto next=modeFrom(mode); if(static_cast<int>(next)==0||!canTransition(m_mode,next)){m_error="illegal lifecycle transition";return false;} auto old=m_mode;m_mode=next;if(!save()){m_mode=old;return false;}m_error.clear();return true; }

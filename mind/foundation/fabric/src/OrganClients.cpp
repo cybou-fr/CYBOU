@@ -237,6 +237,30 @@ void WorkspaceClient::onChanged()
     Q_EMIT changed();
 }
 
+LifecycleClient::LifecycleClient(QObject *parent)
+    : QObject(parent)
+    , m_rpc(kLifecycleEndpoint)
+{
+    if (!connectChanged(kLifecycleEndpoint, this, SLOT(onChanged()))) {
+        m_codecError = QStringLiteral("cannot subscribe to Lifecycle1 Changed");
+    }
+}
+
+QVariantMap LifecycleClient::state() const
+{
+    return decodeMap(m_rpc.callBytes(QStringLiteral("State")), &m_codecError);
+}
+
+QString LifecycleClient::lastError() const
+{
+    return bestError(m_codecError, m_rpc);
+}
+
+void LifecycleClient::onChanged()
+{
+    Q_EMIT changed();
+}
+
 PresenceClient::PresenceClient(QObject *parent)
     : QObject(parent)
     , m_rpc(kPresenceEndpoint)

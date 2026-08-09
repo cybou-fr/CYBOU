@@ -14,6 +14,8 @@ Item {
     property string icon: "cybou"
 
     readonly property bool awake: Boolean(mind && mind.awake)
+    readonly property string lifecycleMode: mind && mind.lifecycleMode
+        ? String(mind.lifecycleMode) : ""
 
     implicitHeight: 58
 
@@ -45,7 +47,7 @@ Item {
             Label {
                 Layout.fillWidth: true
                 text: root.awake
-                    ? i18n("Cognitive runtime connected")
+                    ? i18n("Cognitive runtime connected · %1", root.lifecycleMode || i18n("unknown"))
                     : i18n("Waiting for cognitive services")
                 font.pixelSize: 10
                 opacity: 0.54
@@ -81,7 +83,9 @@ Item {
                 }
 
                 Label {
-                    text: root.awake ? i18n("Online") : i18n("Offline")
+                    text: root.awake
+                        ? (root.lifecycleMode || i18n("Online"))
+                        : i18n("Offline")
                     font.pixelSize: 10
                     font.bold: true
                 }

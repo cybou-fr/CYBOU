@@ -297,4 +297,19 @@ QVariantMap Presence::organHealth() const
         .toMap();
 }
 
+QString Presence::lifecycleMode() const
+{
+    return m_snapshot.value(QStringLiteral("lifecycleMode")).toString();
+}
+
+QString Presence::lifecycleStatus() const
+{
+    return m_snapshot.value(QStringLiteral("lifecycleStatus")).toString();
+}
+
+QVariantMap Presence::lifecycleState() const
+{
+    return m_snapshot.value(QStringLiteral("lifecycleState")).toMap();
+}
+
 } // namespace cybou

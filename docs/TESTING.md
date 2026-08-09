@@ -42,6 +42,10 @@ split-commit windows: `after-owner-commit` and `after-terminal-commit`. It resta
 resumes the persisted run, repeats the operation, and asserts that Event1 count is unchanged by
 replay. These failpoints are test instrumentation and are unset in the normal service environment.
 
+`m4-process-integration` now launches all eight Mind daemons. It changes Lifecycle1 from `awake` to
+`idle` and back, then proves the signal-driven update reaches Presence1 and the QML-facing Presence
+proxy, including lifecycled health, without turning lifecycle mode into runtime availability.
+
 ## Process integration
 
 `m4-process-integration` runs inside an isolated `dbus-run-session`, launches seven executables,

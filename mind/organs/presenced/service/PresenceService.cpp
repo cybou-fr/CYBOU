@@ -20,6 +20,7 @@ PresenceService::PresenceService(QObject *parent)
         [this]() {
             Q_EMIT Changed();
         });
+    connect(&m_lifecycle, &LifecycleClient::changed, this, [this]() { Q_EMIT Changed(); });
 }
 
 bool PresenceService::Ready() const
@@ -29,7 +30,8 @@ bool PresenceService::Ready() const
         && m_intentions.ready()
         && m_predictor.ready()
         && m_self.ready()
-        && m_workspace.ready();
+        && m_workspace.ready()
+        && m_lifecycle.ready();
 }
 
 QString PresenceService::Health() const
@@ -60,7 +62,10 @@ QString PresenceService::LastError() const
     if (!m_self.lastError().isEmpty()) {
         return m_self.lastError();
     }
-    return m_workspace.lastError();
+    if (!m_workspace.lastError().isEmpty()) {
+        return m_workspace.lastError();
+    }
+    return m_lifecycle.lastError();
 }
 
 QVariantMap PresenceService::healthMap() const
@@ -80,6 +85,8 @@ QVariantMap PresenceService::healthMap() const
         m_self.health();
     map[QStringLiteral("workspaced")] =
         m_workspace.health();
+    map[QStringLiteral("lifecycled")] =
+        m_lifecycle.health();
     map[QStringLiteral("presenced")] =
         Health();
     return map;
@@ -90,6 +97,7 @@ QVariantMap PresenceService::snapshotMap() const
     QVariantMap map;
 
     const QVariantMap self = m_self.measure();
+    const QVariantMap lifecycle = m_lifecycle.state();
     const QVariantList intentions = m_intentions.open();
 
     QStringList obligations;
@@ -101,6 +109,9 @@ QVariantMap PresenceService::snapshotMap() const
     }
 
     map[QStringLiteral("awake")] = Ready();
+    map[QStringLiteral("lifecycleState")] = lifecycle;
+    map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
+    map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
     map[QStringLiteral("narration")] =
         self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;

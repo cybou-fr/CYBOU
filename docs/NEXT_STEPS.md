@@ -132,11 +132,10 @@ dispatches typed work to Predictor1 and Workspace1. Both owners now commit deter
 evidence-linked Event1 `Learning` contributions before returning typed receipts; repeated dispatch
 does not duplicate them. Capability-to-contribution references are persisted atomically with
 acknowledgement. `Completed` now requires a deterministic accepted Event1 terminal `Outcome`
-caused by every owner result. The remaining work is fault injection at every persistence boundary
-and lifecycle status projection through Presence. Process-level coverage now exercises the two
+caused by every owner result. Lifecycle mode/status/state and lifecycled health now project through
+Presence1 to the QML proxy. Process-level coverage exercises the two
 critical split-commit windows—owner Event1 commit before run acknowledgement, and terminal Event1
-commit before terminal run state—and proves idempotent recovery. VM-level interruption and the
-Presence projection remain.
+commit before terminal run state—and proves idempotent recovery. VM-level interruption remains.
 
 ### Vertical slice
 

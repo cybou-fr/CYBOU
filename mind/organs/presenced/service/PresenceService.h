@@ -55,6 +55,7 @@ private:
     PredictorClient m_predictor;
     SelfClient m_self;
     WorkspaceClient m_workspace;
+    LifecycleClient m_lifecycle;
 };
 
 } // namespace cybou

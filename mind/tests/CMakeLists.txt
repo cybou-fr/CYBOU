@@ -169,6 +169,7 @@ add_test(
         CYBOU_PREDICTORD_PATH=$<TARGET_FILE:cybou-predictord>
         CYBOU_SELFD_PATH=$<TARGET_FILE:cybou-selfd>
         CYBOU_WORKSPACED_PATH=$<TARGET_FILE:cybou-workspaced>
+        CYBOU_LIFECYCLED_PATH=$<TARGET_FILE:cybou-lifecycled>
         CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
         $<TARGET_FILE:test-m4-process-integration>
 )

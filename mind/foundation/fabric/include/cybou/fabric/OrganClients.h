@@ -118,6 +118,29 @@ private:
     RpcClient m_rpc;
 };
 
+class LifecycleClient : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit LifecycleClient(QObject *parent = nullptr);
+
+    bool ready() const { return m_rpc.ready(); }
+    QString health() const { return m_rpc.health(); }
+    QVariantMap state() const;
+    QString lastError() const;
+
+Q_SIGNALS:
+    void changed();
+
+private Q_SLOTS:
+    void onChanged();
+
+private:
+    mutable QString m_codecError;
+    RpcClient m_rpc;
+};
+
 class PresenceClient : public QObject
 {
     Q_OBJECT
