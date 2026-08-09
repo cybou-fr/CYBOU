@@ -50,8 +50,14 @@ one organ failure does not kill the remaining processes
 
 ## VM gate
 
-`vm-smoke` starts `cybou-presenced.service` through the user manager and asserts that all seven
-Mind user services become active as separate processes.
+`lifecycle-continuity` boots one headless NixOS node, creates an identity and active lifecycle run
+through the real user D-Bus, reboots the machine, and proves the identity ID and exact persisted
+run survive while the logical session advances and lifecycle enters `Recovering`.
+
+`vm-smoke` boots the full Plasma session and SDDM greeter nodes. It starts
+`cybou-presenced.service` through the user manager and asserts that all eight Mind user services
+become active as separate processes. It repeats the continuity assertions in the desktop system
+composition, but remains primarily the heavy service-graph and renderer gate.
 
 ## Build order
 
@@ -59,6 +65,7 @@ Mind user services become active as separate processes.
 nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
 nix build .#packages.x86_64-linux.cybou-presence-applet --print-build-logs
 nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
+nix build .#checks.x86_64-linux.lifecycle-continuity --print-build-logs
 nix build .#checks.x86_64-linux.vm-smoke --print-build-logs
 ```
 

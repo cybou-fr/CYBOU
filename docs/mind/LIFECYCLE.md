@@ -127,9 +127,9 @@ M5 should prove:
 | daemon process restart | D-Bus restart preserves run identity and enters `Recovering` | none for P2 scope |
 | duplicate daemon | second Lifecycle1 owner exits non-zero | none |
 | corrupt lifecycle state | startup fails closed | backup/operator recovery policy |
-| identity continuity | simulated login preserves UUID and increments logical session | booted reboot proof |
+| identity continuity | simulated login and booted reboot preserve UUID and increment logical session | none for P2 scope |
 | open intentions | simulated login reconstructs accepted commitment | booted reboot proof |
-| system reboot | VM smoke verifies identity and active lifecycle run enters `Recovering` | full gate execution |
+| system reboot | focused NixOS gate preserves identity and exact run blob, then enters `Recovering` | none for P2 scope |
 | architecture upgrade | legacy v0 backup+migration; future schema fails closed | multi-version migrations |
 
 ## Related documents

@@ -69,8 +69,9 @@ reuse lint
 git diff --check
 ```
 
-`nix flake check` includes the heavy VM smoke check. A normal GitHub push does not run that full
-matrix; the workflow reserves it for the tag-only full job.
+`nix flake check` includes the focused headless lifecycle reboot gate and the heavy two-node Plasma
+VM smoke check. A normal GitHub push does not run that full matrix; the workflow reserves it for
+the tag-only full job.
 
 ## Clean local outputs
 

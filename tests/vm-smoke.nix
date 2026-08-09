@@ -64,7 +64,8 @@ pkgs.testers.runNixOSTest {
   };
 
   testScript = ''
-    start_all()
+    session.start(allow_reboot=True)
+    greeter.start()
 
     with subtest("SDDM starts on both nodes"):
         session.wait_for_unit("display-manager.service")
@@ -202,8 +203,13 @@ pkgs.testers.runNixOSTest {
             "| sed 's/^s \"//;s/\"$//'"
         ).strip()
         assert run_id
+        run_blob = session.succeed(
+            "sed -n 's/.*\"run\":\"\\([^\"]*\\)\".*/\\1/p' "
+            "/home/cybou/.local/state/cybou/lifecycle/state.json"
+        ).strip()
+        assert run_blob
         identity_before = session.succeed(
-            "grep '\"uuid\"' /home/cybou/.local/state/cybou/identity.json "
+            "grep '\"identityId\"' /home/cybou/.local/state/cybou/identity.json "
             "| sed 's/.*: *\"//;s/\".*//'"
         ).strip()
         count_before = int(session.succeed(
@@ -223,13 +229,14 @@ pkgs.testers.runNixOSTest {
             "grep -q '\"mode\":\"recovering\"' "
             "/home/cybou/.local/state/cybou/lifecycle/state.json"
         )
-        session.succeed(
-            "grep -q '" + run_id + "' "
+        recovered_blob = session.succeed(
+            "sed -n 's/.*\"run\":\"\\([^\"]*\\)\".*/\\1/p' "
             "/home/cybou/.local/state/cybou/lifecycle/state.json"
-        )
+        ).strip()
+        assert recovered_blob == run_blob
 
         identity_after = session.succeed(
-            "grep '\"uuid\"' /home/cybou/.local/state/cybou/identity.json "
+            "grep '\"identityId\"' /home/cybou/.local/state/cybou/identity.json "
             "| sed 's/.*: *\"//;s/\".*//'"
         ).strip()
         count_after = int(session.succeed(

@@ -91,11 +91,12 @@ degraded runs without relying on UI strings or direct database access.
 
 ## P2 — Prove continuity before consolidation
 
-**Status: implementation substrate present.** `cybou-lifecycled`, atomic run persistence,
+**Status: complete.** `cybou-lifecycled`, atomic run persistence,
 Lifecycle1, systemd activation, and active-run restart recovery are implemented. Process-level
 D-Bus restart, duplicate-owner, simulated-login identity/open-intention continuity, active-run
-reboot recovery, legacy-state backup/migration, and future-schema rejection are covered. The full
-booted VM execution remains the final heavy P2 acceptance gate.
+reboot recovery, legacy-state backup/migration, and future-schema rejection are covered. The
+focused headless NixOS gate proves identity and exact persisted-run continuity across a real booted
+system transition; the two-node Plasma smoke remains a separate system/UI gate.
 
 ### Work
 

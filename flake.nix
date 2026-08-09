@@ -172,6 +172,13 @@
           cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
         };
 
+        # Focused P2 gate: one headless node proves identity and active-run continuity
+        # across a real system reboot without paying the two-Plasma-node smoke-test cost.
+        lifecycle-continuity = import ./tests/lifecycle-continuity.nix {
+          inherit pkgs;
+          cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
+        };
+
         # Static KDE package validation. Catches the Gate B failures - wrong metadata
         # file name, ID/directory mismatch, wrong layout script name, symlinks,
         # malformed SVG, TBD licences - without needing a Plasma session.

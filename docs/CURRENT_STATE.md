@@ -21,9 +21,9 @@ logical session count.
 The P2 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
 run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, D-Bus run requests, and restart
 recovery of an active run into `Recovering`. Legacy v0 state is backed up and migrated to v1;
-unknown future versions fail closed. The booted reboot scenario is encoded in `vm-smoke`, but a
-complete VM execution is still the remaining P2 acceptance gate. Owner-work dispatch and real
-consolidation remain P3.
+unknown future versions fail closed. The focused headless NixOS gate proves that a real reboot
+preserves the exact persisted run and identity ID, enters `Recovering`, and increments the logical
+session count. P2 is complete; owner-work dispatch and real consolidation remain P3.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet

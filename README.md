@@ -142,20 +142,21 @@ nix fmt
 git diff --exit-code
 ```
 
-The full `nix flake check` includes the heavy Plasma VM smoke test. Build details and the direct
-CMake workflow are in [Building](docs/BUILDING.md); test coverage is described in
-[Testing](docs/TESTING.md).
+The full `nix flake check` includes both the focused headless lifecycle reboot gate and the heavy
+two-node Plasma VM smoke test. Build details and the direct CMake workflow are in
+[Building](docs/BUILDING.md); test coverage is described in [Testing](docs/TESTING.md).
 
 ## Flake outputs
 
 | Output | Purpose |
 |---|---|
-| `packages.x86_64-linux.cybou-mind` | Seven daemons plus the Presence QML proxy plugin |
+| `packages.x86_64-linux.cybou-mind` | Eight daemons plus the Presence QML proxy plugin |
 | `packages.x86_64-linux.cybou-presence-applet` | Plasma Presence and access-handle packages |
 | `packages.x86_64-linux.cybou-theme` | Combined Horizon Plasma theme |
 | `nixosConfigurations.cybou-vm` | QEMU/KVM development VM |
 | `nixosConfigurations.cybou-iso` | Live/installer ISO |
 | `nixosConfigurations.cybou-hyperv` | Hyper-V development image |
+| `checks.x86_64-linux.lifecycle-continuity` | Headless P2 identity/run reboot continuity gate |
 | `checks.x86_64-linux.vm-smoke` | Full NixOS/Plasma service-graph smoke test |
 
 Run `nix flake show` for the complete package list.

@@ -37,8 +37,8 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      # Named explicitly rather than `nix flake check`, which would also run vm-smoke:
-      # that boots a full Plasma VM and needs KVM, which hosted runners do not offer.
+      # Named explicitly rather than `nix flake check`, which would also run the headless
+      # lifecycle-continuity VM and the full Plasma vm-smoke; both require KVM.
       - run: |
           nix build --print-build-logs \
             .#checks.x86_64-linux.formatting \
@@ -61,8 +61,8 @@ jobs:
   full:
     name: full check and VM build
     if: startsWith(github.ref, 'refs/tags/')
-    # Needs a KVM-capable runner for checks.vm-smoke. On hosted runners this job will
-    # fail honestly rather than silently skipping the test.
+    # Needs a KVM-capable runner for the lifecycle-continuity and vm-smoke checks. On hosted
+    # runners this job will fail honestly rather than silently skipping them.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
