@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "cybou/ipc/EventClient.h"
 #include "cybou/protocol/Lifecycle.h"
 #include <QObject>
 namespace cybou {
@@ -32,7 +33,11 @@ public Q_SLOTS:
 private:
     bool load(); bool save();
     bool requestedCapability(const QString &capability) const;
+    bool acceptOwnerResult(const QString &capability, const QString &operationKey,
+                           qulonglong inputHighWaterMark, const QUuid &contributionId);
+    bool commitTerminalContribution(const QString &cause);
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
+    EventClient m_events;
 };
 }

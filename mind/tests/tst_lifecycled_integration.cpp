@@ -168,8 +168,10 @@ private Q_SLOTS:
         QVERIFY(duplicate.isValid() && duplicate.value());
         QDBusReply<bool> finished = interface().call(
             QStringLiteral("FinishRun"),
-            QStringLiteral("completed"), QStringLiteral("accepted owner result"));
+            QStringLiteral("interrupted"), QStringLiteral("manual acknowledgement has no Event1 result"));
         QVERIFY(finished.isValid() && finished.value());
+        QDBusReply<bool> awake = interface().call(QStringLiteral("Transition"), QStringLiteral("awake"));
+        QVERIFY(awake.isValid() && awake.value());
     }
 
     void duplicateOwnerIsRejected()
@@ -244,6 +246,13 @@ private Q_SLOTS:
             QStringLiteral("FinishRun"), QStringLiteral("completed"),
             QStringLiteral("accepted owner receipts"));
         QVERIFY(finished.isValid() && finished.value());
+        QDBusReply<qulonglong> afterTerminal = events.call(QStringLiteral("Count"));
+        QVERIFY(afterTerminal.isValid());
+        QCOMPARE(afterTerminal.value(), afterFirst.value() + 1);
+        QDBusReply<QByteArray> terminalStateReply = interface().call(QStringLiteral("State"));
+        const QVariantMap terminalState = FabricCodec::decodeMap(terminalStateReply.value(), &error);
+        QVERIFY(error.isEmpty());
+        QVERIFY(!QUuid(terminalState.value(QStringLiteral("terminalContributionId")).toString()).isNull());
     }
 };
 

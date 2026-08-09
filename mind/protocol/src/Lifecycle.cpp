@@ -59,7 +59,14 @@ bool LifecycleRun::isValid() const {
     QSet<QString> completed(completedWork.begin(),completedWork.end()); QSet<QString> missing(missingWork.begin(),missingWork.end());
     for(const auto &v:completed)if(!requested.contains(v))return false;
     for(const auto &v:missing)if(!requested.contains(v)||completed.contains(v))return false;
+    QSet<QUuid> contributionIds;
+    for (auto it = workContributions.cbegin(); it != workContributions.cend(); ++it) {
+        if (!completed.contains(it.key()) || it.value().isNull()
+            || contributionIds.contains(it.value())) return false;
+        contributionIds.insert(it.value());
+    }
     if (isTerminal() != !terminalCause.trimmed().isEmpty()) return false;
+    if (!terminalContributionId.isNull() && !isTerminal()) return false;
     if(status==LifecycleRunStatus::Completed){for(const auto &v:required)if(!completed.contains(v)||missing.contains(v))return false;for(const auto &v:optionalCapabilities)if(!completed.contains(v)&&!missing.contains(v))return false;}
     return true;
 }
@@ -76,8 +83,13 @@ QByteArray encodeLifecycleRun(const LifecycleRun &run) {
     m.insert(QStringLiteral("optionalCapabilities"), strings(run.optionalCapabilities));
     m.insert(QStringLiteral("status"), static_cast<qint64>(run.status));
     m.insert(QStringLiteral("completedWork"), strings(run.completedWork));
+    QCborMap contributions;
+    for (auto it = run.workContributions.cbegin(); it != run.workContributions.cend(); ++it)
+        contributions.insert(it.key(), it.value().toString(QUuid::WithoutBraces));
+    m.insert(QStringLiteral("workContributions"), contributions);
     m.insert(QStringLiteral("missingWork"), strings(run.missingWork));
     m.insert(QStringLiteral("terminalCause"), run.terminalCause);
+    m.insert(QStringLiteral("terminalContributionId"), run.terminalContributionId.toString(QUuid::WithoutBraces));
     return m.toCborValue().toCbor();
 }
 
@@ -88,7 +100,12 @@ LifecycleRun decodeLifecycleRun(const QByteArray &encoded, QString *error) {
     run.kind = m.value("kind").toString(); run.policyId = m.value("policyId").toString(); run.requestedAt = QDateTime::fromString(m.value("requestedAt").toString(), Qt::ISODateWithMs);
     run.inputHighWaterMark = m.value("inputHighWaterMark").toInteger(); run.requiredCapabilities = stringList(m.value("requiredCapabilities"));
     run.optionalCapabilities = stringList(m.value("optionalCapabilities")); run.status = static_cast<LifecycleRunStatus>(m.value("status").toInteger());
-    run.completedWork = stringList(m.value("completedWork")); run.missingWork = stringList(m.value("missingWork")); run.terminalCause = m.value("terminalCause").toString();
+    run.completedWork = stringList(m.value("completedWork"));
+    const QCborMap contributions = m.value("workContributions").toMap();
+    for (auto it = contributions.cbegin(); it != contributions.cend(); ++it)
+        run.workContributions.insert(it.key().toString(), QUuid(it.value().toString()));
+    run.missingWork = stringList(m.value("missingWork")); run.terminalCause = m.value("terminalCause").toString();
+    run.terminalContributionId = QUuid(m.value("terminalContributionId").toString());
     if (!run.isValid()) { setError(error, "invalid lifecycle run"); return {}; } return run;
 }
 } // namespace cybou

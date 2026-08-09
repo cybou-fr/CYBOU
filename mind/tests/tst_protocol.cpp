@@ -193,8 +193,11 @@ private Q_SLOTS:
         run.optionalCapabilities = {QStringLiteral("prediction")};
         run.status = LifecycleRunStatus::Completed;
         run.completedWork = {QStringLiteral("journal")};
+        const QUuid workContribution = QUuid::createUuid();
+        run.workContributions.insert(QStringLiteral("journal"), workContribution);
         run.missingWork = {QStringLiteral("prediction")};
         run.terminalCause = QStringLiteral("completed");
+        run.terminalContributionId = QUuid::createUuid();
         QVERIFY(run.isValid());
 
         QString error;
@@ -203,6 +206,8 @@ private Q_SLOTS:
         QCOMPARE(decoded.runId, run.runId);
         QCOMPARE(decoded.inputHighWaterMark, 42u);
         QCOMPARE(decoded.status, LifecycleRunStatus::Completed);
+        QCOMPARE(decoded.workContributions.value(QStringLiteral("journal")), workContribution);
+        QCOMPARE(decoded.terminalContributionId, run.terminalContributionId);
     }
 
     void lifecycleRunFailsClosed()

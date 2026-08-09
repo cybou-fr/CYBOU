@@ -7,6 +7,7 @@
 #include <QString>
 #include <QStringList>
 #include <QUuid>
+#include <QMap>
 
 namespace cybou {
 
@@ -30,8 +31,10 @@ struct LifecycleRun {
     QStringList optionalCapabilities;
     LifecycleRunStatus status{LifecycleRunStatus::Requested};
     QStringList completedWork;
+    QMap<QString, QUuid> workContributions;
     QStringList missingWork;
     QString terminalCause;
+    QUuid terminalContributionId;
 
     bool isValid() const;
     bool isTerminal() const noexcept;
@@ -41,4 +44,3 @@ QByteArray encodeLifecycleRun(const LifecycleRun &run);
 LifecycleRun decodeLifecycleRun(const QByteArray &encoded, QString *error = nullptr);
 
 } // namespace cybou
-

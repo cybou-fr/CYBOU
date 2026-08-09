@@ -125,13 +125,15 @@ identity, lose accepted commitments, or report unverified success.
 
 ## P3 — Implement the consolidation MVP
 
-**Status: durable owner dispatch implemented; terminal acceptance remains.** Lifecycle1 persists idempotent capability
+**Status: end-to-end transaction implemented; resilience exit gate remains.** Lifecycle1 persists idempotent capability
 acknowledgements tied to the run and accepted high-water mark, rejects premature completion,
 represents optional deficits, resumes the same operation keys after recovery, and automatically
 dispatches typed work to Predictor1 and Workspace1. Both owners now commit deterministic,
 evidence-linked Event1 `Learning` contributions before returning typed receipts; repeated dispatch
-does not duplicate them. Persistent receipt/contribution references and the accepted Event1
-terminal contribution remain.
+does not duplicate them. Capability-to-contribution references are persisted atomically with
+acknowledgement. `Completed` now requires a deterministic accepted Event1 terminal `Outcome`
+caused by every owner result. The remaining work is fault injection at every persistence boundary
+and lifecycle status projection through Presence.
 
 ### Vertical slice
 

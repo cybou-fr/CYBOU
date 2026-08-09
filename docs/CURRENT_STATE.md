@@ -33,8 +33,11 @@ receipts before persisting acknowledgements. Each owner resolves the exact accep
 at the run high-water mark, commits an evidence-linked `Learning` contribution with a deterministic
 UUIDv5 operation identity, and returns its contribution ID. Redelivery is a durable no-op, and the
 integration suite proves two first-delivery contributions and zero duplicate contributions.
-Persisting those owner contribution IDs in the run and emitting the accepted Event1 terminal
-contribution remain incomplete.
+Lifecycle1 persists the capability-to-contribution mapping in the run, verifies every reference
+against Event1, and refuses `Completed` until it has committed a deterministic terminal `Outcome`
+caused by all owner results. The process integration suite verifies the extra terminal append and
+exposes its ID through Lifecycle1 state. P3 still lacks the full VM fault-injection matrix across
+each owner/terminal persistence boundary and Presence projection of lifecycle status.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet

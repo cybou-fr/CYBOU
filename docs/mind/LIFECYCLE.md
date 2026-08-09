@@ -111,9 +111,12 @@ services. Each owner rejects a high-water mark beyond its accepted Event1 count 
 receipt containing the owner, operation key, mark, acceptance decision, and durable contribution
 ID. The owner resolves the exact Event1 envelope at that mark and commits a deterministic UUIDv5
 `Learning` contribution which cites it as causation. Lifecycle1 persists an acknowledgement only
-after validating every receipt field. Repeating Dispatch skips already persisted work, while direct
-owner redelivery returns the same contribution without another append. P3 still requires persisted
-receipt references and an accepted Event1 terminal contribution.
+after validating every receipt field and Event1 acceptance, atomically recording the capability to
+contribution mapping. Repeating Dispatch skips already persisted work, while direct owner
+redelivery returns the same contribution without another append. Completion commits one
+deterministic Event1 `Outcome` caused by every recorded owner contribution, saves its ID in the run,
+and fails closed if any reference is absent. The remaining P3 work is the fault-injection exit gate
+and Presence projection.
 
 ## Privacy and retention
 
