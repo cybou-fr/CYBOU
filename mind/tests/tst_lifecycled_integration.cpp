@@ -38,6 +38,9 @@ private:
         auto env = QProcessEnvironment::systemEnvironment();
         env.insert(QStringLiteral("XDG_STATE_HOME"), m_root.filePath(QStringLiteral("state")));
         env.insert(QStringLiteral("XDG_RUNTIME_DIR"), m_root.filePath(QStringLiteral("runtime")));
+        env.insert(
+            QStringLiteral("CYBOU_LIFECYCLE_DISABLE_AUTO_SCHEDULING"),
+            QStringLiteral("1"));
         return env;
     }
 

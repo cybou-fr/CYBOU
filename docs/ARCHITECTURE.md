@@ -111,6 +111,11 @@ revalidates them to close the evaluation/execution race, and derives the lifecyc
 that evidence. The same command is therefore idempotent across an unknown D-Bus result, process
 restart, terminal completion, and replacement of the current run projection.
 
+Lifecycled owns the trigger as well as the transaction: a 100 ms Health1-change debounce provides
+reactivity and a 30-second timer provides verification. The cycle is a no-op for blocked/deferred
+decisions. Existing scheduled recovery is resumed before any new evaluation, so a crash between
+run creation and dispatch cannot fork lifecycle work.
+
 Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
 not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form
 a cycle. Aggregate capability state, per-capability state, deficits, and observation time are a

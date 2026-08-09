@@ -70,6 +70,11 @@ deterministic from policy plus both evidence IDs. Retrying after a timeout retur
 or completed run ID, including after a later run replaced the in-memory projection; the durable
 terminal Event1 contribution closes that idempotency window.
 
+`RunSchedulingCycle()` is the bounded orchestration entry point. It returns `blocked`, `deferred`,
+`failed`, or `completed` with a run ID and reason. For a new authorized decision it executes,
+dispatches, and completes the existing transaction. If lifecycled restarts with an active scheduled
+run in `Recovering`, the same method resumes and continues it rather than evaluating a second run.
+
 ## Resilient asynchronous calls
 
 Calls that must not block a shell or owner event loop use the typed policy in

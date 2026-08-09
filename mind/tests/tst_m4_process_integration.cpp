@@ -59,6 +59,9 @@ private:
         env.insert(
             QStringLiteral("XDG_RUNTIME_DIR"),
             m_root->filePath(QStringLiteral("runtime")));
+        env.insert(
+            QStringLiteral("CYBOU_LIFECYCLE_DISABLE_AUTO_SCHEDULING"),
+            QStringLiteral("1"));
         return env;
     }
 
@@ -372,6 +375,69 @@ private Q_SLOTS:
             {QStringLiteral("interrupted"), QStringLiteral("idempotency window cleanup")}));
         QCOMPARE(lifecycle.callString(QStringLiteral("ExecuteSchedulingDecision"), evidence), runId);
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
+
+        while (eventClient.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value_or(0)
+               < 32) {
+            CognitiveEnvelope pressure;
+            pressure.messageId = QUuid::createUuid();
+            pressure.correlationId = pressure.messageId;
+            pressure.originOrgan = QStringLiteral("scheduler-cycle-test");
+            pressure.originNode = QStringLiteral("local");
+            pressure.kind = ContributionKind::Observation;
+            pressure.wallTime = QDateTime::currentDateTimeUtc();
+            pressure.confidence = 1.0;
+            pressure.privacy = PrivacyClass::Local;
+            QVERIFY(eventClient.append(pressure) > 0);
+        }
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QVariantMap cycle = FabricCodec::decodeMap(
+            lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(cycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("completed"));
+        QCOMPARE(LifecycleClient().state().value(QStringLiteral("status")).toString(),
+                 QStringLiteral("completed"));
+        QCOMPARE(eventClient.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value(), 0u);
+        const QVariantMap quietCycle = FabricCodec::decodeMap(
+            lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+        QCOMPARE(quietCycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("deferred"));
+
+        while (eventClient.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value_or(0)
+               < 32) {
+            CognitiveEnvelope pressure;
+            pressure.messageId = QUuid::createUuid();
+            pressure.correlationId = pressure.messageId;
+            pressure.originOrgan = QStringLiteral("scheduler-recovery-test");
+            pressure.originNode = QStringLiteral("local");
+            pressure.kind = ContributionKind::Observation;
+            pressure.wallTime = QDateTime::currentDateTimeUtc();
+            pressure.confidence = 1.0;
+            pressure.privacy = PrivacyClass::Local;
+            QVERIFY(eventClient.append(pressure) > 0);
+        }
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        stop(m_lifecycled);
+        m_lifecycled = start(
+            m_lifecycledPath,
+            {{QStringLiteral("CYBOU_LIFECYCLE_FAILPOINT"),
+              QStringLiteral("after-scheduled-execute")}});
+        QVERIFY(m_lifecycled);
+        LifecycleClient crashingLifecycle;
+        QTRY_VERIFY_WITH_TIMEOUT(crashingLifecycle.ready(), 5000);
+        lifecycle.callBytes(QStringLiteral("RunSchedulingCycle"));
+        QTRY_COMPARE_WITH_TIMEOUT(m_lifecycled->state(), QProcess::NotRunning, 5000);
+
+        m_lifecycled = start(m_lifecycledPath);
+        QVERIFY(m_lifecycled);
+        LifecycleClient recoveredLifecycle;
+        QTRY_VERIFY_WITH_TIMEOUT(recoveredLifecycle.ready(), 5000);
+        const QVariantMap recoveredCycle = FabricCodec::decodeMap(
+            RpcClient(kLifecycleEndpoint).callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(recoveredCycle.value(QStringLiteral("outcome")).toString(),
+                 QStringLiteral("completed"));
+        QCOMPARE(eventClient.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value(), 0u);
     }
 
     void proxyRecreationDoesNotMutateOrDuplicateLifecycleRun()

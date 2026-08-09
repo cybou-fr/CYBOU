@@ -78,6 +78,11 @@ evidence fails without changing Lifecycle1 bytes. A current decision creates one
 run; retries while active, after completion, and after a later run all return the same ID. Real
 predictor/workspace dispatch and terminal completion close the path through Event1.
 
+The production `RunSchedulingCycle` is exercised directly for both completed and quiet/deferred
+outcomes. A failpoint crashes lifecycled after durable scheduled-run creation but before dispatch;
+restart enters `Recovering`, resumes the same run, completes both owners, and leaves consumer
+backlog at zero. Test environments disable timers/signals only to keep triggering deterministic.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

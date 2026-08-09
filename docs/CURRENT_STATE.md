@@ -145,6 +145,14 @@ run. After a newer run replaces the lifecycle projection, the deterministic term
 still prevents recreation of the old run. Process integration proves stale-evidence rejection,
 active/terminal retry, later-run retry, owner dispatch, completion, and consumer-offset advancement.
 
+P6.5 slice 6 adds the bounded production scheduler trigger inside lifecycled. Health1 `Changed` is
+debounced by 100 ms and a 30-second timer supplies slow verification. Each trigger returns without
+mutation for `Block`/`Defer`; an authorized `Run` executes, dispatches, and completes through the
+existing idempotent transaction. An active scheduled run takes precedence over new evaluation:
+after restart it resumes from `Recovering` and continues the same run. Fault injection immediately
+after durable scheduled-run creation proves restart recovery, owner dispatch, terminal completion,
+and zero residual consumer backlog without a duplicate run.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

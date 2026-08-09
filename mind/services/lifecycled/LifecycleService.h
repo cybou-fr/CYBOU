@@ -5,6 +5,7 @@
 #include "cybou/fabric/OrganClients.h"
 #include "cybou/protocol/Lifecycle.h"
 #include <QObject>
+#include <QTimer>
 namespace cybou {
 class LifecycleService : public QObject {
     Q_OBJECT
@@ -22,6 +23,7 @@ public Q_SLOTS:
     QString ExecuteSchedulingDecision(
         const QString &capabilitySnapshotId,
         const QString &homeostasisSnapshotId);
+    QByteArray RunSchedulingCycle();
     bool Transition(const QString &mode);
     bool BeginRun(const QByteArray &encoded);
     QString RequestRun(const QString &kind, const QString &policyId,
@@ -46,9 +48,12 @@ private:
     bool acceptOwnerResult(const QString &capability, const QString &operationKey,
                            qulonglong inputHighWaterMark, const QUuid &contributionId);
     bool commitTerminalContribution(const QString &cause);
+    QByteArray continueScheduledRun();
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
     EventClient m_events;
     HealthClient m_health;
+    QTimer m_schedulerTimer;
+    QTimer m_schedulerDebounce;
 };
 }

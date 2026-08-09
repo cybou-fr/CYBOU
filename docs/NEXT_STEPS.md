@@ -401,9 +401,16 @@ after timeout, completion, and even after a later run replaces the current proje
 evidence fails without changing lifecycle state. The accepted execution creates the existing
 bounded consolidation transaction; dispatch and terminal completion remain explicit owner steps.
 
+**Slice 6: implemented.** Lifecycled now runs the bounded orchestration cycle after a 100 ms
+Health1-change debounce and on a 30-second verification timer. `Block` and `Defer` are no-ops;
+`Run` invokes the evidence-bound idempotent command, dispatches owners, and commits completion.
+Recovery always continues an existing scheduled run before considering new evidence. A crash after
+durable run creation but before dispatch resumes and completes the same run with zero residual
+backlog. Tests can disable automatic triggers while invoking the identical production method.
+
 ### Work
 
-- add a bounded scheduler trigger that invokes the idempotent command and dispatches accepted work;
+- add user-activity interruption and explicit scheduler cooldown policy;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
 - refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;

@@ -36,6 +36,17 @@ QUuid terminalContributionId(const QUuid &runId)
         QStringLiteral("lifecycle:%1:completed")
             .arg(runId.toString(QUuid::WithoutBraces)).toUtf8());
 }
+QByteArray schedulerReply(
+    const QString &outcome,
+    const QString &runId,
+    const QString &reason)
+{
+    return FabricCodec::encodeMap({
+        {QStringLiteral("outcome"), outcome},
+        {QStringLiteral("runId"), runId},
+        {QStringLiteral("reason"), reason},
+    });
+}
 LifecycleMode modeFrom(const QString &s) { for (int i=1;i<=7;++i) { auto m=static_cast<LifecycleMode>(i); if (lifecycleModeToString(m)==s) return m; } return static_cast<LifecycleMode>(0); }
 LifecycleRunStatus statusFrom(const QString &s) { for (int i=1;i<=5;++i) { auto v=static_cast<LifecycleRunStatus>(i); if (lifecycleRunStatusToString(v)==s) return v; } return static_cast<LifecycleRunStatus>(0); }
 void failpoint(const char *name) { if (qEnvironmentVariable("CYBOU_LIFECYCLE_FAILPOINT") == QLatin1String(name)) qFatal("lifecycled fault injection: %s", name); }
@@ -47,6 +58,18 @@ LifecycleService::LifecycleService(const QString &path, QObject *parent):QObject
         || !m_events.ensureConsumer(kConsolidationConsumer, 0)) return;
     if (m_hasRun && m_run.status == LifecycleRunStatus::Completed)
         m_events.advanceConsumer(kConsolidationConsumer, m_run.inputHighWaterMark);
+    if (!qEnvironmentVariableIsSet("CYBOU_LIFECYCLE_DISABLE_AUTO_SCHEDULING")) {
+        m_schedulerDebounce.setSingleShot(true);
+        m_schedulerDebounce.setInterval(100);
+        connect(&m_health, &HealthClient::changed, &m_schedulerDebounce,
+                qOverload<>(&QTimer::start));
+        connect(&m_schedulerDebounce, &QTimer::timeout, this,
+                [this]() { RunSchedulingCycle(); });
+        m_schedulerTimer.setInterval(30000);
+        connect(&m_schedulerTimer, &QTimer::timeout, this,
+                [this]() { RunSchedulingCycle(); });
+        m_schedulerTimer.start();
+    }
 }
 bool LifecycleService::load() {
     QFile f(m_path); if (!f.exists()) return save();
@@ -122,6 +145,45 @@ QString LifecycleService::ExecuteSchedulingDecision(
     if (!BeginRun(encodeLifecycleRun(run))) return {};
     m_error.clear();
     return runId.toString(QUuid::WithoutBraces);
+}
+QByteArray LifecycleService::continueScheduledRun()
+{
+    const QString runId = m_run.runId.toString(QUuid::WithoutBraces);
+    if (m_mode == LifecycleMode::Recovering && !ResumeRun())
+        return schedulerReply(QStringLiteral("failed"), runId, m_error);
+    if (m_mode != LifecycleMode::Consolidating)
+        return schedulerReply(
+            QStringLiteral("deferred"), runId,
+            QStringLiteral("scheduled run is not dispatchable in the current mode"));
+    if (!Dispatch()) return schedulerReply(QStringLiteral("failed"), runId, m_error);
+    if (!FinishRun(QStringLiteral("completed"),
+                   QStringLiteral("event backlog scheduling policy")))
+        return schedulerReply(QStringLiteral("failed"), runId, m_error);
+    return schedulerReply(QStringLiteral("completed"), runId, QString());
+}
+
+QByteArray LifecycleService::RunSchedulingCycle()
+{
+    if (m_hasRun && m_run.status == LifecycleRunStatus::Active
+        && m_run.policyId.startsWith(QStringLiteral("event-backlog-v1:")))
+        return continueScheduledRun();
+
+    const CapabilitySnapshot capabilities = m_health.snapshot();
+    const HomeostasisSnapshot homeostasis = m_health.measurements();
+    const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
+        m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis);
+    if (evaluation.decision != SchedulingDecision::Run)
+        return schedulerReply(
+            evaluation.decision == SchedulingDecision::Block
+                ? QStringLiteral("blocked") : QStringLiteral("deferred"),
+            QString(), evaluation.reason);
+
+    const QString runId = ExecuteSchedulingDecision(
+        capabilities.snapshotId.toString(QUuid::WithoutBraces),
+        homeostasis.snapshotId.toString(QUuid::WithoutBraces));
+    if (runId.isEmpty()) return schedulerReply(QStringLiteral("failed"), QString(), m_error);
+    failpoint("after-scheduled-execute");
+    return continueScheduledRun();
 }
 bool LifecycleService::Transition(const QString &mode) { auto next=modeFrom(mode); if(static_cast<int>(next)==0||!canTransition(m_mode,next)){m_error="illegal lifecycle transition";return false;} auto old=m_mode;m_mode=next;if(!save()){m_mode=old;return false;}m_error.clear();return true; }
 bool LifecycleService::BeginRun(const QByteArray &encoded) { QString e; auto run=decodeLifecycleRun(encoded,&e); if(!e.isEmpty()||run.status!=LifecycleRunStatus::Requested||m_hasRun&&!m_run.isTerminal()||m_mode!=LifecycleMode::Idle){m_error=e.isEmpty()?"cannot begin lifecycle run":e;return false;}const auto oldRun=m_run;const auto oldMode=m_mode;const bool oldHasRun=m_hasRun;m_run=run;m_run.status=LifecycleRunStatus::Active;m_hasRun=true;m_mode=LifecycleMode::Consolidating;if(!save()){m_run=oldRun;m_mode=oldMode;m_hasRun=oldHasRun;return false;}return true; }
