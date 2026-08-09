@@ -43,6 +43,7 @@ private:
     HomeostasisSnapshot m_homeostasis;
     bool m_hasSnapshot{false};
     bool m_hasHomeostasis{false};
+    bool m_refreshing{false};
     bool m_ready{false};
     QString m_error;
 };

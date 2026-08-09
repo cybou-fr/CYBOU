@@ -129,6 +129,13 @@ commit but before the corresponding lifecycle state commit; deterministic replay
 contribution. The headless NixOS gate promotes both split-commit windows to real reboot recovery
 and proves replay leaves Event1 count unchanged; the P3 transaction exit gate is complete.
 
+Owner computation is also bounded by that mark: Predictor and Workspace reconstruct the data used
+for their result only from Event1 sequences at or below it. Later accepted contributions cannot
+change the first result, and replay reads the value from the already accepted owner contribution.
+Every `missingWork` entry must have exactly one non-empty `missingCauses` entry. The terminal
+Outcome carries completed capabilities, missing capabilities, and missing causes so degraded
+completion remains durable evidence rather than only current lifecycle state.
+
 Lifecycle state mutations use rollback-on-save-failure semantics: if atomic file replacement fails,
 the service restores its previous in-memory run/mode instead of exposing state that was never
 persisted. Unknown lifecycle status values also fail schema validation.

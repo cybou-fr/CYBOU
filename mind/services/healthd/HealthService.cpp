@@ -6,13 +6,19 @@
 #include "HealthPolicy.h"
 #include "cybou/fabric/FabricCodec.h"
 #include "cybou/fabric/OrganBus.h"
-#include "cybou/fabric/RpcClient.h"
+#include "cybou/fabric/RpcResilience.h"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QSaveFile>
+#include <QScopedValueRollback>
+#include <QTimer>
+
+#include <memory>
+#include <vector>
 
 namespace cybou {
 namespace {
@@ -143,49 +149,117 @@ bool HealthService::save(const CapabilitySnapshot &snapshot)
 
 bool HealthService::Refresh()
 {
-    if (!m_ready) {
+    if (!m_ready || m_refreshing) {
         return false;
     }
+    QScopedValueRollback<bool> refreshing(m_refreshing, true);
     m_error.clear();
     const QDateTime now = QDateTime::currentDateTimeUtc();
     QMap<QString, ComponentHealthRecord> observations;
     QMap<QString, qint64> probeLatencyMs;
+    QByteArray lifecycleState;
+    QString lifecycleFailure;
+    qulonglong acceptedCount = 0;
+    bool hasAcceptedCount = false;
+    QString countFailure;
+    RpcRetryPolicy probePolicy;
+    probePolicy.maximumAttempts = 1;
+    probePolicy.circuitFailureThreshold = 1;
+    QEventLoop loop;
+    QElapsedTimer elapsed;
+    elapsed.start();
+    int pending = endpoints().size() + 2;
+    auto finish = [&pending, &loop]() {
+        if (--pending == 0) loop.quit();
+    };
+    std::vector<std::unique_ptr<AsyncRpcClient>> clients;
+    clients.reserve(pending + endpoints().size());
     for (const auto &[componentId, endpoint] : endpoints()) {
-        RpcClient client(endpoint);
-        QElapsedTimer timer;
-        timer.start();
-        const bool ready = client.ready();
-        QString health = client.health();
-        probeLatencyMs.insert(componentId, timer.elapsed());
-        if (ready && health.isEmpty() && componentId == QStringLiteral("eventd")) {
-            // Event1 predates the common Health() method; Ready() is its typed health boundary.
-            health = QStringLiteral("healthy");
-        }
-        ComponentHealthRecord record;
-        record.componentId = componentId;
-        record.state = stateFrom(health, ready);
-        record.observedAt = now;
-        ComponentHealth previousState = ComponentHealth::Starting;
-        bool hasPrevious = false;
-        if (m_hasSnapshot) {
-            for (const ComponentHealthRecord &previous : m_snapshot.components) {
-                if (previous.componentId == componentId) {
-                    previousState = previous.state;
-                    hasPrevious = true;
-                    record.lastVerifiedAt = previous.lastVerifiedAt;
-                    break;
+        const qint64 startedAt = elapsed.elapsed();
+        auto client = std::make_unique<AsyncRpcClient>(endpoint, probePolicy);
+        AsyncRpcClient *rpc = client.get();
+        clients.push_back(std::move(client));
+        rpc->call(QStringLiteral("Ready"), {}, RpcOperationSemantics::ReadOnly,
+            [&, componentId, endpoint, startedAt, rpc](const RpcResult &readyResult) {
+                const bool ready = readyResult.succeeded()
+                    && !readyResult.reply.arguments().isEmpty()
+                    && readyResult.reply.arguments().first().toBool();
+                if (!ready || componentId == QStringLiteral("eventd")) {
+                    const QString health = ready ? QStringLiteral("healthy") : QString();
+                    ComponentHealthRecord record{componentId, stateFrom(health, ready), now, {},
+                        ready ? health : rpcOutcomeToString(readyResult.outcome)
+                            + QStringLiteral(": ") + readyResult.errorMessage};
+                    observations.insert(componentId, record);
+                    probeLatencyMs.insert(componentId, elapsed.elapsed() - startedAt);
+                    finish();
+                    return;
                 }
+                rpc->call(QStringLiteral("Health"), {}, RpcOperationSemantics::ReadOnly,
+                    [&, componentId, startedAt](const RpcResult &healthResult) {
+                        const QString health = healthResult.succeeded()
+                            && !healthResult.reply.arguments().isEmpty()
+                            ? healthResult.reply.arguments().first().toString() : QString();
+                        ComponentHealthRecord record{componentId, stateFrom(health, true), now, {},
+                            healthResult.succeeded() ? health
+                                : rpcOutcomeToString(healthResult.outcome)
+                                    + QStringLiteral(": ") + healthResult.errorMessage};
+                        observations.insert(componentId, record);
+                        probeLatencyMs.insert(componentId, elapsed.elapsed() - startedAt);
+                        finish();
+                    }, 750);
+            }, 750);
+    }
+
+    auto eventClient = std::make_unique<AsyncRpcClient>(kEventEndpoint, probePolicy);
+    eventClient->call(QStringLiteral("Count"), {}, RpcOperationSemantics::ReadOnly,
+        [&](const RpcResult &result) {
+            if (result.succeeded() && !result.reply.arguments().isEmpty()) {
+                bool converted = false;
+                acceptedCount = result.reply.arguments().first().toULongLong(&converted);
+                hasAcceptedCount = converted;
+            }
+            if (!hasAcceptedCount) countFailure = rpcOutcomeToString(result.outcome)
+                + QStringLiteral(": ") + result.errorMessage;
+            finish();
+        }, 750);
+    clients.push_back(std::move(eventClient));
+
+    auto lifecycleClient = std::make_unique<AsyncRpcClient>(kLifecycleEndpoint, probePolicy);
+    lifecycleClient->call(QStringLiteral("State"), {}, RpcOperationSemantics::ReadOnly,
+        [&](const RpcResult &result) {
+            if (result.succeeded() && !result.reply.arguments().isEmpty())
+                lifecycleState = result.reply.arguments().first().toByteArray();
+            else lifecycleFailure = rpcOutcomeToString(result.outcome)
+                + QStringLiteral(": ") + result.errorMessage;
+            finish();
+        }, 750);
+    clients.push_back(std::move(lifecycleClient));
+
+    QTimer deadline;
+    deadline.setSingleShot(true);
+    connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
+    deadline.start(2000);
+    loop.exec();
+
+    for (const auto &[componentId, endpoint] : endpoints()) {
+        Q_UNUSED(endpoint)
+        ComponentHealthRecord record = observations.value(componentId);
+        if (record.componentId.isEmpty()) {
+            record = {componentId, ComponentHealth::Unavailable, now, {},
+                      QStringLiteral("timed-out: refresh deadline exceeded")};
+            probeLatencyMs.insert(componentId, elapsed.elapsed());
+        }
+        for (const ComponentHealthRecord &previous : m_snapshot.components) {
+            if (previous.componentId == componentId) {
+                record.lastVerifiedAt = previous.lastVerifiedAt;
+                if (record.state == ComponentHealth::Healthy
+                    && (previous.state == ComponentHealth::Unavailable
+                        || previous.state == ComponentHealth::Conflicted))
+                    record.state = ComponentHealth::Recovering;
+                break;
             }
         }
-        if (record.state == ComponentHealth::Healthy && hasPrevious
-            && (previousState == ComponentHealth::Unavailable
-                || previousState == ComponentHealth::Conflicted)) {
-            record.state = ComponentHealth::Recovering;
-        }
-        if (record.state == ComponentHealth::Healthy) {
-            record.lastVerifiedAt = now;
-        }
-        record.detail = ready ? health : client.lastError();
+        if (record.state == ComponentHealth::Healthy) record.lastVerifiedAt = now;
         observations.insert(componentId, record);
     }
 
@@ -217,29 +291,20 @@ bool HealthService::Refresh()
         QStringLiteral("rpc.probe-failure.count"), QStringLiteral("healthd"),
         MeasurementKind::Counter, failedProbes, QStringLiteral("{probe}"), now));
 
-    RpcClient eventClient(kEventEndpoint);
-    const QDBusMessage countReply = eventClient.call(QStringLiteral("Count"));
-    if (countReply.type() == QDBusMessage::ReplyMessage && !countReply.arguments().isEmpty()) {
-        bool converted = false;
-        const qulonglong count = countReply.arguments().first().toULongLong(&converted);
-        if (converted) {
-            homeostasis.measurements.append(currentMeasurement(
-                QStringLiteral("event.accepted.count"), QStringLiteral("eventd"),
-                MeasurementKind::Counter, static_cast<double>(count), QStringLiteral("{event}"), now));
-        }
-    }
-    if (homeostasis.measurements.size() == endpoints().size() + 2) {
+    if (hasAcceptedCount) {
+        homeostasis.measurements.append(currentMeasurement(
+            QStringLiteral("event.accepted.count"), QStringLiteral("eventd"),
+            MeasurementKind::Counter, static_cast<double>(acceptedCount), QStringLiteral("{event}"), now));
+    } else {
         homeostasis.measurements.append(unavailableMeasurement(
             QStringLiteral("event.accepted.count"), QStringLiteral("eventd"),
             MeasurementKind::Counter, MeasurementStatus::Unknown,
-            eventClient.lastError().isEmpty() ? QStringLiteral("invalid Event1 Count reply")
-                                              : eventClient.lastError(), now));
+            countFailure.isEmpty() ? QStringLiteral("invalid Event1 Count reply") : countFailure, now));
     }
 
-    RpcClient lifecycleClient(kLifecycleEndpoint);
     QString lifecycleError;
     const QVariantMap lifecycle = FabricCodec::decodeMap(
-        lifecycleClient.callBytes(QStringLiteral("State")), &lifecycleError);
+        lifecycleState, &lifecycleError);
     if (lifecycleError.isEmpty() && lifecycle.contains(QStringLiteral("hasRun"))) {
         const QString status = lifecycle.value(QStringLiteral("status")).toString();
         const bool active = lifecycle.value(QStringLiteral("hasRun")).toBool()
@@ -251,7 +316,7 @@ bool HealthService::Refresh()
         homeostasis.measurements.append(unavailableMeasurement(
             QStringLiteral("lifecycle.active-run.count"), QStringLiteral("lifecycled"),
             MeasurementKind::Counter, MeasurementStatus::Unknown,
-            lifecycleError.isEmpty() ? lifecycleClient.lastError() : lifecycleError, now));
+            lifecycleError.isEmpty() ? lifecycleFailure : lifecycleError, now));
     }
 
     homeostasis.measurements.append(unavailableMeasurement(

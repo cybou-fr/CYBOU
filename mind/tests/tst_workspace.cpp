@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/workspace/Workspace.h"
+#include "WorkspaceService.h"
+#include "cybou/fabric/FabricCodec.h"
 #include "cybou/storage/Journal.h"
 
 #include <QSignalSpy>
@@ -164,6 +166,24 @@ private Q_SLOTS:
             urgentRoot,
             now)));
         QVERIFY(spy.count() >= 2);
+    }
+
+    void consolidationUsesStateAsOfHighWaterMark()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        WorkspaceService service(&journal);
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        QVERIFY(journal.append(observation(QStringLiteral("before"), QUuid(), now)) > 0);
+        const quint64 mark = journal.count();
+        QVERIFY(journal.append(observation(QStringLiteral("after"), QUuid(), now.addSecs(1))) > 0);
+
+        QString error;
+        const QVariantMap receipt = FabricCodec::decodeMap(service.Consolidate(
+            QUuid::createUuid().toString(QUuid::WithoutBraces),
+            QStringLiteral("bounded-workspace"), mark), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(receipt.value(QStringLiteral("coalitionCount")).toInt(), 1);
     }
 };
 

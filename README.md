@@ -26,9 +26,9 @@ Mind is deliberately not a chatbot or a single AI agent. Language models are pla
 replaceable faculties. They do not own identity, canonical memory, authorization, or privileged
 execution.
 
-The current repository implements the M1–M4 substrate plus the P1–P3 core of M5 lifecycle and
-consolidation. It does **not** yet implement a language model, distributed Mind, full lifecycle
-Presence projection, or authorized external agency. See
+The current repository implements the evaluated M1–M5 substrate and P6.1–P6.4 capability health,
+RPC resilience, and typed homeostatic observation. It does **not** yet implement a language model,
+distributed Mind, capability-aware scheduling/UI, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -63,6 +63,7 @@ Plasma/QML Presence proxy
      │    │    ├── cybou-selfd
      │    │    └── cybou-workspaced
      │    ├─────── cybou-lifecycled ── Lifecycle1
+     │    ├─────── cybou-healthd ───── Health1
      │    │              │
      └────┴──────────────┤ Event1
                          ▼
@@ -72,7 +73,7 @@ Plasma/QML Presence proxy
                  SQLite Journal v2
 ```
 
-All eight Mind services are separate `systemd --user` D-Bus processes. `cybou-eventd` is the only
+All nine Mind services are separate `systemd --user` D-Bus processes. `cybou-eventd` is the only
 canonical Journal writer. The Plasma component is a remote projection/cache and cannot silently
 become a second cognitive owner.
 
@@ -84,8 +85,9 @@ become a second cognitive owner.
 | Journal v2 causal, privacy, hashing, and migration semantics | Implemented — M2 |
 | Single canonical Journal writer (`cybou-eventd`) | Implemented — M3 |
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
-| Restart/reboot continuity and lifecycle/consolidation core | In progress — M5 |
-| Degraded modes, homeostasis, metacognition | Planned — M6 |
+| Restart/reboot continuity and lifecycle/consolidation core | Evaluation complete — M5 |
+| Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 P6.1–P6.4 |
+| Capability-aware scheduling and degraded UI | Next — M6 P6.5 |
 | Grounded perception, epistemics, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |
@@ -106,8 +108,9 @@ session   → Suspended
 
 `cybou-lifecycled` orchestrates bounded, interruptible runs while existing organs retain state
 ownership. Predictor and Workspace create evidence-linked, idempotent Event1 results, and completed
-runs require an accepted terminal Outcome. Presence projection and the full reboot fault-injection
-matrix remain. See [ADR-0024](docs/adr/ADR-0024-cognitive-lifecycle-and-consolidation.md).
+runs require an accepted terminal Outcome. Lifecycle projection and the reboot/split-commit
+fault-injection matrix are implemented. See
+[ADR-0024](docs/adr/ADR-0024-cognitive-lifecycle-and-consolidation.md).
 
 ## Build and test
 
@@ -153,7 +156,7 @@ two-node Plasma VM smoke test. Build details and the direct CMake workflow are i
 
 | Output | Purpose |
 |---|---|
-| `packages.x86_64-linux.cybou-mind` | Eight daemons plus the Presence QML proxy plugin |
+| `packages.x86_64-linux.cybou-mind` | Nine daemons plus the Presence QML proxy plugin |
 | `packages.x86_64-linux.cybou-presence-applet` | Plasma Presence and access-handle packages |
 | `packages.x86_64-linux.cybou-theme` | Combined Horizon Plasma theme |
 | `nixosConfigurations.cybou-vm` | QEMU/KVM development VM |

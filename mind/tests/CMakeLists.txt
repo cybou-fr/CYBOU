@@ -118,7 +118,9 @@ add_test(NAME intentions COMMAND test-intentions)
 set_tests_properties(intentions PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 qt_add_executable(test-predictor tst_predictor.cpp)
-target_link_libraries(test-predictor PRIVATE cybou-predictor cybou-storage Qt6::Test)
+target_link_libraries(
+    test-predictor PRIVATE cybou-predictor-service cybou-fabric cybou-storage Qt6::Test
+)
 add_test(NAME predictor COMMAND test-predictor)
 set_tests_properties(predictor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
@@ -133,7 +135,7 @@ set_tests_properties(selfmodel PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen
 qt_add_executable(test-workspace tst_workspace.cpp)
 target_link_libraries(
     test-workspace
-    PRIVATE cybou-workspace cybou-storage Qt6::Test
+    PRIVATE cybou-workspace-service cybou-fabric cybou-storage Qt6::Test
 )
 add_test(NAME workspace COMMAND test-workspace)
 set_tests_properties(workspace PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

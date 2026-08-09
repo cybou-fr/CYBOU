@@ -362,6 +362,13 @@ or unavailable measurements remain explicit instead of falling back to fabricate
 
 ## P6.5 — Add capability-aware scheduling and metacognitive projection
 
+**Prerequisite hardening: implemented.** Health1 probes now use parallel, bounded read-only async
+RPC with a common deadline, D-Bus owner-change debounce, slow verification, and typed timeout
+mapping. Consolidation owners reconstruct their computed values only through the accepted
+high-water mark; lifecycle validation requires a cause for every missing capability; terminal
+Outcome evidence preserves completed and missing work. A multi-dependency deficit schema remains a
+deliberate versioned protocol change to design before exposing detailed P6.5 recovery causes.
+
 ### Work
 
 - let lifecycle policy consume typed pressure and capability state;

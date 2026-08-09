@@ -227,6 +227,12 @@ private Q_SLOTS:
         run.terminalCause = QStringLiteral("cannot complete");
         QVERIFY(!run.isValid());
 
+        run.requiredCapabilities.clear();
+        run.optionalCapabilities = {QStringLiteral("prediction")};
+        run.missingWork = {QStringLiteral("prediction")};
+        run.missingCauses.clear();
+        QVERIFY(!run.isValid());
+
         QString error;
         decodeLifecycleRun(QByteArrayLiteral("not-cbor"), &error);
         QVERIFY(!error.isEmpty());

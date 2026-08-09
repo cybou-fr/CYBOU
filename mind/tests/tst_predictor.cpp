@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/predictor/Predictor.h"
+#include "PredictorService.h"
+#include "cybou/fabric/FabricCodec.h"
 #include "cybou/storage/Journal.h"
 
 #include <QTemporaryDir>
@@ -102,6 +104,30 @@ private Q_SLOTS:
         const Forecast forecast = predictor.predict(QStringLiteral("boot"));
         QCOMPARE(forecast.samples, 2);
         QCOMPARE(forecast.estimate, 5.0);
+    }
+
+    void consolidationUsesStateAsOfHighWaterMark()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        PredictorService service(&journal);
+        QVERIFY(service.Observe(QStringLiteral("before"), 1.0));
+        QString error;
+        QVariantMap forecast = FabricCodec::decodeMap(
+            service.Predict(QStringLiteral("before"), {}), &error);
+        QVERIFY(error.isEmpty());
+        QVERIFY(service.Settle(forecast.value(QStringLiteral("id")).toString(), 2.0));
+        const quint64 mark = journal.count();
+
+        QVERIFY(service.Observe(QStringLiteral("after"), 3.0));
+        forecast = FabricCodec::decodeMap(service.Predict(QStringLiteral("after"), {}), &error);
+        QVERIFY(service.Settle(forecast.value(QStringLiteral("id")).toString(), 4.0));
+
+        const QVariantMap receipt = FabricCodec::decodeMap(service.Consolidate(
+            QUuid::createUuid().toString(QUuid::WithoutBraces),
+            QStringLiteral("bounded-predictor"), mark), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(receipt.value(QStringLiteral("calibrationCount")).toInt(), 1);
     }
 };
 

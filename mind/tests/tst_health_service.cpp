@@ -73,6 +73,23 @@ private Q_SLOTS:
         QCOMPARE(identity->dependencyId, QStringLiteral("identityd"));
     }
 
+    void mapsBoundedProbeTimeoutToTypedCause()
+    {
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        auto observations = healthyObservations(now);
+        observations[QStringLiteral("predictord")].state = ComponentHealth::Unavailable;
+        observations[QStringLiteral("predictord")].detail =
+            QStringLiteral("timed-out: org.freedesktop.DBus.Error.NoReply");
+        const CapabilitySnapshot snapshot = HealthPolicy::evaluate(observations, now);
+        const auto prediction = std::find_if(
+            snapshot.deficits.cbegin(), snapshot.deficits.cend(),
+            [](const CapabilityDeficit &deficit) {
+                return deficit.capabilityId == QStringLiteral("prediction");
+            });
+        QVERIFY(prediction != snapshot.deficits.cend());
+        QCOMPARE(prediction->cause, DeficitCause::TimedOut);
+    }
+
     void persistsAndReloadsExactSnapshot()
     {
         QTemporaryDir root;

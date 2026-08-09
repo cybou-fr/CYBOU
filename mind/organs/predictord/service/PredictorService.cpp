@@ -7,6 +7,7 @@
 
 #include <QCborMap>
 #include <QDateTime>
+#include <QSet>
 
 namespace cybou {
 
@@ -14,6 +15,31 @@ namespace {
 
 const QUuid kConsolidationNamespace(
     QStringLiteral("8fcbaf7c-b31a-5c7d-b15e-a09b7b816ca7"));
+
+int calibrationCountAt(EventStore *events, quint64 mark)
+{
+    QSet<QString> subjects;
+    for (quint64 sequence = 1; sequence <= mark; ++sequence) {
+        const auto envelope = events->atSequence(sequence);
+        if (!envelope) return -1;
+        if (envelope->kind != ContributionKind::Outcome
+            || envelope->originOrgan != QStringLiteral("predictord")) continue;
+        const QCborMap payload = QCborValue::fromCbor(envelope->payloadCbor).toMap();
+        if (payload.contains(QStringLiteral("error"))) {
+            const QString subject = payload.value(QStringLiteral("subject")).toString();
+            if (!subject.isEmpty()) subjects.insert(subject);
+        }
+    }
+    return subjects.size();
+}
+
+int storedCalibrationCount(EventStore *events, const QUuid &contributionId)
+{
+    const auto contribution = events->contribution(contributionId);
+    if (!contribution) return -1;
+    const QCborMap payload = QCborValue::fromCbor(contribution->payloadCbor).toMap();
+    return static_cast<int>(payload.value(QStringLiteral("calibrationCount")).toInteger(-1));
+}
 
 QVariantMap forecastMap(const Forecast &forecast)
 {
@@ -126,6 +152,8 @@ QByteArray PredictorService::Consolidate(const QString &runId,const QString &ope
         || mark == 0 || mark > m_events->count()) return {};
     const auto input = m_events->atSequence(mark);
     if (!input) return {};
+    int calibrationCount = calibrationCountAt(m_events, mark);
+    if (calibrationCount < 0) return {};
 
     const QUuid contributionId = QUuid::createUuidV5(
         kConsolidationNamespace,
@@ -144,17 +172,18 @@ QByteArray PredictorService::Consolidate(const QString &runId,const QString &ope
         QCborMap payload;
         payload[QStringLiteral("operationKey")] = operationKey;
         payload[QStringLiteral("inputHighWaterMark")] = static_cast<qint64>(mark);
-        payload[QStringLiteral("calibrationCount")] = m_predictor.allCalibrations().size();
+        payload[QStringLiteral("calibrationCount")] = calibrationCount;
         contribution.payloadCbor = payload.toCborValue().toCbor();
         if (m_events->append(contribution) == 0) return {};
-    }
+    } else calibrationCount = storedCalibrationCount(m_events, contributionId);
+    if (calibrationCount < 0) return {};
     QVariantMap receipt;
     receipt[QStringLiteral("accepted")]=true;
     receipt[QStringLiteral("owner")]=QStringLiteral("predictor");
     receipt[QStringLiteral("operationKey")]=operationKey;
     receipt[QStringLiteral("inputHighWaterMark")]=mark;
     receipt[QStringLiteral("contributionId")]=contributionId.toString(QUuid::WithoutBraces);
-    receipt[QStringLiteral("calibrationCount")]=m_predictor.allCalibrations().size();
+    receipt[QStringLiteral("calibrationCount")]=calibrationCount;
     return FabricCodec::encodeMap(receipt);
 }
 

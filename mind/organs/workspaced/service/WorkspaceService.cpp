@@ -13,6 +13,27 @@ namespace cybou {
 namespace {
 const QUuid kConsolidationNamespace(
     QStringLiteral("8fcbaf7c-b31a-5c7d-b15e-a09b7b816ca7"));
+
+int coalitionCountAt(EventStore *events, quint64 mark, const QDateTime &asOf)
+{
+    Workspace bounded(nullptr);
+    const quint64 first = mark > static_cast<quint64>(bounded.capacity())
+        ? mark - static_cast<quint64>(bounded.capacity()) + 1 : 1;
+    for (quint64 sequence = first; sequence <= mark; ++sequence) {
+        const auto envelope = events->atSequence(sequence);
+        if (!envelope) return -1;
+        bounded.accept(*envelope);
+    }
+    return bounded.coalitions(asOf).size();
+}
+
+int storedCoalitionCount(EventStore *events, const QUuid &contributionId)
+{
+    const auto contribution = events->contribution(contributionId);
+    if (!contribution) return -1;
+    const QCborMap payload = QCborValue::fromCbor(contribution->payloadCbor).toMap();
+    return static_cast<int>(payload.value(QStringLiteral("coalitionCount")).toInteger(-1));
+}
 }
 
 WorkspaceService::WorkspaceService(
@@ -119,6 +140,8 @@ QByteArray WorkspaceService::Consolidate(const QString &runId,const QString &ope
         || mark == 0 || mark > m_events->count()) return {};
     const auto input = m_events->atSequence(mark);
     if (!input) return {};
+    int coalitionCount = coalitionCountAt(m_events, mark, input->wallTime);
+    if (coalitionCount < 0) return {};
 
     const QUuid contributionId = QUuid::createUuidV5(
         kConsolidationNamespace,
@@ -137,17 +160,18 @@ QByteArray WorkspaceService::Consolidate(const QString &runId,const QString &ope
         QCborMap payload;
         payload[QStringLiteral("operationKey")] = operationKey;
         payload[QStringLiteral("inputHighWaterMark")] = static_cast<qint64>(mark);
-        payload[QStringLiteral("coalitionCount")] = m_workspace.coalitions().size();
+        payload[QStringLiteral("coalitionCount")] = coalitionCount;
         contribution.payloadCbor = payload.toCborValue().toCbor();
         if (m_events->append(contribution) == 0) return {};
-    }
+    } else coalitionCount = storedCoalitionCount(m_events, contributionId);
+    if (coalitionCount < 0) return {};
     QVariantMap receipt;
     receipt[QStringLiteral("accepted")]=true;
     receipt[QStringLiteral("owner")]=QStringLiteral("workspace");
     receipt[QStringLiteral("operationKey")]=operationKey;
     receipt[QStringLiteral("inputHighWaterMark")]=mark;
     receipt[QStringLiteral("contributionId")]=contributionId.toString(QUuid::WithoutBraces);
-    receipt[QStringLiteral("coalitionCount")]=m_workspace.coalitions().size();
+    receipt[QStringLiteral("coalitionCount")]=coalitionCount;
     return FabricCodec::encodeMap(receipt);
 }
 

@@ -21,8 +21,11 @@ CapabilityState stateFor(ComponentHealth health)
     return CapabilityState::Unknown;
 }
 
-DeficitCause causeFor(ComponentHealth health)
+DeficitCause causeFor(ComponentHealth health, const QString &detail)
 {
+    if (detail.startsWith(QStringLiteral("timed-out"))) return DeficitCause::TimedOut;
+    if (detail.startsWith(QStringLiteral("rejected"))) return DeficitCause::Rejected;
+    if (detail.startsWith(QStringLiteral("unknown-outcome"))) return DeficitCause::UnknownOutcome;
     switch (health) {
     case ComponentHealth::Degraded: return DeficitCause::DependencyDegraded;
     case ComponentHealth::Conflicted: return DeficitCause::ConflictingState;
@@ -133,9 +136,9 @@ CapabilitySnapshot HealthPolicy::evaluate(
         deficit.capabilityId = definition.capabilityId;
         deficit.dependencyId = worstDependency;
         deficit.state = worstState;
-        deficit.cause = causeFor(worstHealth);
-        deficit.detectedAt = snapshot.observedAt;
         const ComponentHealthRecord dependency = observations.value(worstDependency);
+        deficit.cause = causeFor(worstHealth, dependency.detail);
+        deficit.detectedAt = snapshot.observedAt;
         deficit.lastVerifiedAt = dependency.lastVerifiedAt;
         deficit.impact = definition.unavailableImpact;
         deficit.recoveryPolicy = worstState == CapabilityState::Recovering

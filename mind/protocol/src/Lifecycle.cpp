@@ -69,6 +69,7 @@ bool LifecycleRun::isValid() const {
     QSet<QString> completed(completedWork.begin(),completedWork.end()); QSet<QString> missing(missingWork.begin(),missingWork.end());
     for(const auto &v:completed)if(!requested.contains(v))return false;
     for(const auto &v:missing)if(!requested.contains(v)||completed.contains(v))return false;
+    if (missingCauses.size() != missing.size()) return false;
     for (auto it = missingCauses.cbegin(); it != missingCauses.cend(); ++it)
         if (!missing.contains(it.key()) || it.value().trimmed().isEmpty()) return false;
     QSet<QUuid> contributionIds;

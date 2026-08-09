@@ -268,8 +268,8 @@ authorize external action.
 
 ## The current substrate
 
-The current M1–M5 implementation establishes the process, ownership, and lifecycle
-boundaries required for the larger model:
+The current M1–M5 plus P6.1–P6.4 implementation establishes the process, ownership, lifecycle,
+capability-health, and observation boundaries required for the larger model:
 
 ```text
 Plasma/QML
@@ -285,6 +285,7 @@ cybou-presenced
     ├── Self1       ─► cybou-selfd
     ├── Workspace1  ─► cybou-workspaced
     ├── Lifecycle1  ─► cybou-lifecycled
+    ├── Health1     ─► cybou-healthd
     └── Event1      ─► cybou-eventd ─► Journal v2
 ```
 
@@ -300,15 +301,14 @@ This substrate currently provides the foundations for:
 - self projection;
 - bounded Workspace attention;
 - one presentation aggregator;
-- process-level failure isolation.
+- process-level failure isolation;
 - persistent lifecycle modes, bounded consolidation dispatch, and recovery.
+- typed capability deficits and observation-only homeostatic measurements.
 
 It does **not** yet provide the full future agent:
 
-- no lifecycle Presence projection or complete reboot fault-injection matrix;
 - no governed perception, epistemic projection, retention/forgetting, or value model;
-- no homeostatic pressure or metacognitive uncertainty projection;
-- no M6 capability-deficit model;
+- no capability-aware scheduling, degraded Presence behavior, or general metacognitive uncertainty projection;
 - no inter-node transport/replication;
 - no optional language faculty implementation;
 - no authorized action executor boundary.
@@ -396,10 +396,10 @@ The same rule applies to future surfaces: CLI, mobile, voice, remote console, or
 observe/command Mind through explicit boundaries rather than reimplementing cognition inside the
 surface.
 
-## Lifecycle and consolidation — M5 in progress
+## Lifecycle and consolidation — M5 evaluated
 
-M5 defines explicit modes; the state machine, owner, persistence, recovery, and P3 transaction core
-are implemented:
+M5 defines explicit modes; its state machine, owner, persistence, recovery, transaction core,
+Presence projection, and focused reboot evidence are implemented:
 
 ```text
 Awake → Idle → Consolidating → Awake
@@ -410,7 +410,7 @@ session boundary   → Suspended
 ```
 
 Transitions are policy decisions with typed reasons and terminal records, not incidental booleans
-inside Presence. The current UI does not yet project this state machine.
+inside Presence. The current UI projects lifecycle state without owning it.
 
 Consolidation may verify integrity, calibrate predictions, review intentions, detect
 contradictions, close episodes, decay salience, prepare recovery, and apply retention policy. Each
@@ -419,12 +419,13 @@ transactions define explicit interruption boundaries.
 
 ADR-0024 contains the normative lifecycle direction.
 
-## Future degraded cognition — M6
+## Degraded cognition — M6 in progress
 
 Process isolation by itself is not degraded cognition.
 
-The current health contract can identify whether an organ is reachable, but a missing organ can
-still make the aggregated readiness state fail.
+Health1 maps component observations to capability deficits, and P6.4 publishes typed raw
+homeostatic measurements without scheduling authority. Presence still treats broad runtime
+readiness as an all-or-nothing gate.
 
 M6 should turn component health into explicit capability deficits.
 

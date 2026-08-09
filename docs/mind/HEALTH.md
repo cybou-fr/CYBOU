@@ -101,6 +101,12 @@ Event1 predates the common `Health()` method, so its successful typed `Ready()` 
 health boundary. A component returning from `Unavailable` or `Conflicted` enters `Recovering` for a
 verified snapshot before it may become `Healthy`/`Available`.
 
+Refresh fans out through parallel read-only `AsyncRpcClient` probes. Each probe has a
+750-millisecond deadline and no retry inside one sample; the collection has a two-second common
+deadline. Timeout maps to a typed deficit instead of blocking the observer. D-Bus owner changes
+trigger a debounced refresh, a slow verification timer runs every 30 seconds, explicit `Refresh`
+remains available, and overlapping collection is rejected.
+
 ## Automated evidence
 
 `health-protocol` covers schema-v1 round trip and validation. `health-service` covers graph policy,

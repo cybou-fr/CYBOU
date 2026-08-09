@@ -91,6 +91,16 @@ prediction calibration pressure are `Unsupported`, not fabricated zeroes. Measur
 ephemeral across healthd restart and schema v1 rejects scheduling authority; thresholds,
 hysteresis, automatic lifecycle policy, and Presence projection remain P6.5 work.
 
+The P6.4.1/M5-hardening bridge removes three pre-P6.5 ambiguity windows. Health1 now probes owners
+in parallel through bounded read-only async RPC, maps timeout into typed deficit cause, rejects
+overlapping collection, reacts to D-Bus owner changes with debounce, and performs slow periodic
+verification. Predictor and Workspace consolidation derive their computed values only from Event1
+sequences at or below the captured high-water mark; replay returns values from the accepted owner
+contribution rather than live state. Lifecycle validation requires one non-empty cause for every
+missing capability, and completed terminal Outcome payloads durably record completed capabilities,
+missing capabilities, and their causes. Multi-dependency deficit representation remains a planned
+versioned protocol change rather than an incompatible schema-v1 mutation.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

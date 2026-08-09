@@ -9,6 +9,8 @@
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusReply>
+#include <QCborMap>
+#include <QCborValue>
 #include <QDir>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -254,7 +256,20 @@ private Q_SLOTS:
         QDBusReply<QByteArray> terminalStateReply = interface().call(QStringLiteral("State"));
         const QVariantMap terminalState = FabricCodec::decodeMap(terminalStateReply.value(), &error);
         QVERIFY(error.isEmpty());
-        QVERIFY(!QUuid(terminalState.value(QStringLiteral("terminalContributionId")).toString()).isNull());
+        const QUuid terminalId(
+            terminalState.value(QStringLiteral("terminalContributionId")).toString());
+        QVERIFY(!terminalId.isNull());
+        QDBusReply<QByteArray> terminalReply = events.call(
+            QStringLiteral("Contribution"), terminalId.toString(QUuid::WithoutBraces));
+        QVERIFY(terminalReply.isValid());
+        const auto terminal = EnvelopeCodec::decode(terminalReply.value(), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QVERIFY(terminal.has_value());
+        const QCborMap terminalPayload = QCborValue::fromCbor(terminal->payloadCbor).toMap();
+        QCOMPARE(
+            terminalPayload.value(QStringLiteral("completedCapabilities")).toArray().size(), 2);
+        QVERIFY(terminalPayload.value(QStringLiteral("missingCapabilities")).toArray().isEmpty());
+        QVERIFY(terminalPayload.value(QStringLiteral("missingCauses")).toMap().isEmpty());
     }
 
     void ownerCommitCrashReplaysWithoutDuplicate()

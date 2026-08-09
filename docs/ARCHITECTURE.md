@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 `MIND_MODEL.md` describes what the cognitive architecture means. This document describes the
 current process topology, ownership boundaries, failure domains, and ordering.
 
-## Current M5 process topology
+## Current M6 process topology
 
 ```text
                           ┌───────────────────────┐
@@ -35,6 +35,13 @@ current process topology, ownership boundaries, failure domains, and ordering.
 ```
 
 Each daemon is a separate executable, D-Bus name, and `systemd --user` service.
+
+The presentation fan-out is complemented by two coordination owners:
+
+```text
+cybou-healthd     -- Health1 ----> typed capability and homeostasis projections
+cybou-lifecycled  -- Lifecycle1 -> persistent bounded lifecycle runs
+```
 
 ## Cognitive topology
 
@@ -86,11 +93,11 @@ or authorization state.
 - restarting identityd in the same login resumes the current identity through its runtime marker;
 - restarting workspaced reconstructs bounded attention from Event1 history.
 
-Full capability-deficit policy is M6, while the current M5 topology provides the isolation and
-continuity required for it.
+The P6.1–P6.4 capability-deficit owner, bounded observation, and typed homeostatic projection are
+implemented. Capability-aware Presence behavior and scheduling remain P6.5.
 
-Process isolation means that a capability can fail independently. It does not yet mean the rest of
-Mind can always continue usefully; M6 defines that policy.
+Process isolation and Health1 identify independent capability failure. Presence still uses a broad
+runtime readiness gate, so partial user-visible operation remains the next M6 semantic transition.
 
 ## Durable-to-visible ordering
 

@@ -7,6 +7,8 @@
 #include "cybou/runtime/StatePaths.h"
 
 #include <QCoreApplication>
+#include <QDBusConnection>
+#include <QDBusServiceWatcher>
 #include <QDir>
 #include <QTextStream>
 #include <QTimer>
@@ -29,7 +31,32 @@ int main(int argc, char **argv)
         return 3;
     }
     if (!qEnvironmentVariableIsSet("CYBOU_HEALTH_DISABLE_AUTO_REFRESH")) {
+        QTimer refreshTimer;
+        refreshTimer.setInterval(30000);
+        QObject::connect(&refreshTimer, &QTimer::timeout, &service, [&service]() {
+            service.Refresh();
+        });
+        refreshTimer.start();
+
+        QTimer ownerChangeDebounce;
+        ownerChangeDebounce.setSingleShot(true);
+        ownerChangeDebounce.setInterval(100);
+        QObject::connect(&ownerChangeDebounce, &QTimer::timeout, &service, [&service]() {
+            service.Refresh();
+        });
+        QDBusServiceWatcher watcher(
+            {}, QDBusConnection::sessionBus(), QDBusServiceWatcher::WatchForOwnerChange);
+        for (const cybou::BusEndpoint &endpoint : {
+                 cybou::kEventEndpoint, cybou::kLifecycleEndpoint, cybou::kIdentityEndpoint,
+                 cybou::kIntentionEndpoint, cybou::kPredictorEndpoint, cybou::kSelfEndpoint,
+                 cybou::kWorkspaceEndpoint, cybou::kPresenceEndpoint}) {
+            watcher.addWatchedService(QString::fromLatin1(endpoint.service));
+        }
+        QObject::connect(
+            &watcher, &QDBusServiceWatcher::serviceOwnerChanged,
+            &ownerChangeDebounce, [&ownerChangeDebounce]() { ownerChangeDebounce.start(); });
         QTimer::singleShot(0, &service, [&service]() { service.Refresh(); });
+        return app.exec();
     }
     return app.exec();
 }
