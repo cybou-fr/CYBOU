@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "cybou/ipc/EventClient.h"
+#include "cybou/fabric/OrganClients.h"
 #include "cybou/protocol/Lifecycle.h"
 #include <QObject>
 namespace cybou {
@@ -17,6 +18,7 @@ public Q_SLOTS:
     QString Health() const { return m_ready ? QStringLiteral("healthy") : QStringLiteral("unavailable"); }
     QString LastError() const { return m_error; }
     QByteArray State() const;
+    QByteArray EvaluateScheduling() const;
     bool Transition(const QString &mode);
     bool BeginRun(const QByteArray &encoded);
     QString RequestRun(const QString &kind, const QString &policyId,
@@ -44,5 +46,6 @@ private:
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
     EventClient m_events;
+    HealthClient m_health;
 };
 }

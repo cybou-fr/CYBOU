@@ -19,6 +19,11 @@ The C++ `Presence` type exported to QML is only a proxy/cache.
 
 ```text
 awake
+runtimeReachable
+aggregateCapabilityState
+capabilityStates
+capabilityDeficits
+capabilityObservedAt
 lastError
 narration
 obligations
@@ -30,7 +35,17 @@ calibrations
 coalitions
 moment
 organHealth
+lifecycleMode
+lifecycleStatus
+lifecycleState
+lifecycleProjection
+lifecycleScheduling
+lifecycleCommandPending
 ```
+
+`awake` is a compatibility alias for presentation reachability, not a global capability grant.
+`hasCapability(id)` is the QML command gate. `lifecycleScheduling` is the read-only Lifecycle1
+policy evaluation and explains why automatic work is blocked or deferred.
 
 `lastError` is presentation diagnostics for connection/retry UX. It does not make QML the owner of
 the failing organ or storage resource.
@@ -45,6 +60,8 @@ fulfillIndex(index)
 abandonIndex(index)
 observe(subject, value)
 predict(subject)
+hasCapability(id)
+interruptLifecycle(cause)
 ```
 
 `wake()` is explicitly invokable so the unavailable-state UI can retry the Presence1 connection.

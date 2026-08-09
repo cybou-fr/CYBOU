@@ -50,6 +50,12 @@ input. Health1 exposes
 The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.
 P6.4 `Measurements` uses the separate schema-v1 homeostasis encoding and cannot authorize work.
 
+Lifecycle1 additionally exposes `EvaluateScheduling`. It returns a fabric-CBOR dry-run decision:
+`run`, `defer`, or `block`; policy/reason; observation time; hysteresis state; eligible workers;
+and typed causes for missing optional workers. Evaluation reads Health1 but does not mutate the
+Lifecycle1 run or mode. Under homeostasis schema v1 the decision cannot be `run`, because that
+schema explicitly denies scheduling authority.
+
 ## Resilient asynchronous calls
 
 Calls that must not block a shell or owner event loop use the typed policy in

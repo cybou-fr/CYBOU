@@ -376,9 +376,16 @@ instead of one broad `awake` gate. Process integration proves predictor loss lea
 commitments, biography, and attention usable, then restores prediction after Health1 recovery.
 Presence readiness remains independent of Health1 to avoid the healthd→presenced probe cycle.
 
+**Slice 2: implemented.** Lifecycle1 owns a deterministic read-only scheduling evaluator and
+Presence projects its decision. It validates current capability/homeostasis evidence, blocks loss
+of accepted biography, preserves remaining optional consolidation workers, and computes Event1
+backlog hysteresis at 32/8. Schema v1 still forbids scheduling authority and reports backlog as
+unsupported, so production evaluation currently returns an explained `Defer` without changing
+lifecycle mode or creating a run.
+
 ### Work
 
-- let lifecycle policy consume typed pressure and capability state;
+- add an owner-backed Event1 consumer-offset/backlog signal and explicitly authorize its policy;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
 - refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;

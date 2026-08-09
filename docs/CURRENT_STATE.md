@@ -112,6 +112,15 @@ presenced readiness never depends on healthd readiness, while the capability pro
 unknown until Health1 is available. Automatic lifecycle policy and complete degraded-mode visual
 treatment remain P6.5 work.
 
+P6.5 slice 2 adds an owner-correct scheduling dry run to Lifecycle1. The policy checks lifecycle
+idleness, active-run exclusion, a 60-second capability freshness window,
+accepted-biography availability, optional predictor/workspace
+eligibility, measurement freshness, and a bounded Event1-backlog hysteresis (enter at 32, exit at
+8). It returns `Run`, `Defer`, or `Block` with a stable policy ID and causal explanation, and is
+projected through Presence1/QML as `lifecycleScheduling`. Evaluation cannot mutate lifecycle state.
+Because homeostasis schema v1 marks Event1 backlog unsupported and forbids scheduling authority,
+the current real projection honestly defers instead of manufacturing pressure or starting work.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty
@@ -264,6 +273,8 @@ the corresponding milestone is implemented and gated.
   projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
 - M6: P6.1–P6.4 protocol, dependency graph, health owner, persistent Health1 snapshot, recovery,
   process fault injection, bounded async transport, and observation-only homeostatic measurements
-  are implemented; scheduling, Presence health projection, broader RPC migration, UI, and KVM gates remain.
+  are implemented. P6.5 capability-aware Presence behavior and read-only scheduling policy are
+  implemented; authorized automatic scheduling, broader RPC migration, complete degraded UI, and
+  KVM gates remain.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

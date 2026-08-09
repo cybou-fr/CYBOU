@@ -5,6 +5,7 @@
 
 #include "cybou/fabric/RpcClient.h"
 #include "cybou/protocol/Health.h"
+#include "cybou/protocol/Homeostasis.h"
 
 #include <QObject>
 #include <QVariant>
@@ -21,6 +22,7 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
     CapabilitySnapshot snapshot() const;
+    HomeostasisSnapshot measurements() const;
     QString lastError() const;
 
 Q_SIGNALS:
@@ -152,6 +154,7 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
     QVariantMap state() const;
+    QVariantMap schedulingEvaluation() const;
     bool finishRun(const QString &status, const QString &cause) const;
     QString lastError() const;
 

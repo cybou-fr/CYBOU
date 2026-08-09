@@ -238,6 +238,8 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
     map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
     map[QStringLiteral("lifecycleProjection")] = lifecycleProjection(lifecycle);
+    map[QStringLiteral("lifecycleScheduling")] = m_lifecycle.ready()
+        ? m_lifecycle.schedulingEvaluation() : QVariantMap{};
     map[QStringLiteral("narration")] =
         self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;

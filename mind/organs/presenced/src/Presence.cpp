@@ -351,6 +351,11 @@ QVariantMap Presence::lifecycleProjection() const
     return m_snapshot.value(QStringLiteral("lifecycleProjection")).toMap();
 }
 
+QVariantMap Presence::lifecycleScheduling() const
+{
+    return m_snapshot.value(QStringLiteral("lifecycleScheduling")).toMap();
+}
+
 void Presence::interruptLifecycle(const QString &cause)
 {
     if (!runtimeReachable() || m_lifecycleCommandPending) {

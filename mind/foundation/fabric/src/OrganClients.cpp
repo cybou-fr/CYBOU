@@ -73,6 +73,14 @@ CapabilitySnapshot HealthClient::snapshot() const
     return decodeCapabilitySnapshot(encoded, &m_codecError);
 }
 
+HomeostasisSnapshot HealthClient::measurements() const
+{
+    m_codecError.clear();
+    const QByteArray encoded = m_rpc.callBytes(QStringLiteral("Measurements"));
+    if (encoded.isEmpty()) return {};
+    return decodeHomeostasisSnapshot(encoded, &m_codecError);
+}
+
 QString HealthClient::lastError() const
 {
     return bestError(m_codecError, m_rpc);
@@ -275,6 +283,12 @@ LifecycleClient::LifecycleClient(QObject *parent)
 QVariantMap LifecycleClient::state() const
 {
     return decodeMap(m_rpc.callBytes(QStringLiteral("State")), &m_codecError);
+}
+
+QVariantMap LifecycleClient::schedulingEvaluation() const
+{
+    return decodeMap(
+        m_rpc.callBytes(QStringLiteral("EvaluateScheduling")), &m_codecError);
 }
 
 bool LifecycleClient::finishRun(const QString &status, const QString &cause) const

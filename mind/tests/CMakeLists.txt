@@ -81,6 +81,15 @@ target_link_libraries(test-lifecycle PRIVATE cybou-lifecycle-service cybou-fabri
 add_test(NAME lifecycle COMMAND test-lifecycle)
 set_tests_properties(lifecycle PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-lifecycle-scheduling-policy tst_lifecycle_scheduling_policy.cpp)
+target_link_libraries(
+    test-lifecycle-scheduling-policy PRIVATE cybou-lifecycle-service cybou-protocol Qt6::Test
+)
+add_test(NAME lifecycle-scheduling-policy COMMAND test-lifecycle-scheduling-policy)
+set_tests_properties(
+    lifecycle-scheduling-policy PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-lifecycled-integration tst_lifecycled_integration.cpp)
 target_link_libraries(
     test-lifecycled-integration

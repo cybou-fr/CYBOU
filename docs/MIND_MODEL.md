@@ -308,7 +308,8 @@ This substrate currently provides the foundations for:
 It does **not** yet provide the full future agent:
 
 - no governed perception, epistemic projection, retention/forgetting, or value model;
-- no capability-aware scheduling, degraded Presence behavior, or general metacognitive uncertainty projection;
+- no authorized automatic scheduling, complete degraded Presence UI, or general metacognitive
+  uncertainty projection; capability-aware command gates and scheduling dry run are implemented;
 - no inter-node transport/replication;
 - no optional language faculty implementation;
 - no authorized action executor boundary.

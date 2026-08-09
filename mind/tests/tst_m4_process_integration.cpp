@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "cybou/fabric/OrganClients.h"
+#include "cybou/fabric/FabricCodec.h"
 #include "cybou/ipc/EventClient.h"
 #include "cybou/presence/Presence.h"
 
@@ -288,6 +289,29 @@ private Q_SLOTS:
         QVERIFY(lifecycle.callBool(QStringLiteral("ResumeRun")) == false);
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
         QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleMode(), QStringLiteral("awake"), 5000);
+    }
+
+    void schedulingDryRunExplainsDeferralWithoutMutatingLifecycle()
+    {
+        RpcClient lifecycle(kLifecycleEndpoint);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QByteArray before = lifecycle.callBytes(QStringLiteral("State"));
+
+        QString error;
+        const QVariantMap evaluation = FabricCodec::decodeMap(
+            lifecycle.callBytes(QStringLiteral("EvaluateScheduling")), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(evaluation.value(QStringLiteral("decision")).toString(),
+                 QStringLiteral("defer"));
+        QVERIFY(evaluation.value(QStringLiteral("reason")).toString().contains(
+            QStringLiteral("consumer-offset contract")));
+        QCOMPARE(lifecycle.callBytes(QStringLiteral("State")), before);
+
+        Presence surface;
+        QVERIFY2(surface.wake(), qPrintable(surface.lastError()));
+        QCOMPARE(surface.lifecycleScheduling().value(QStringLiteral("decision")).toString(),
+                 QStringLiteral("defer"));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
     }
 
     void proxyRecreationDoesNotMutateOrDuplicateLifecycleRun()

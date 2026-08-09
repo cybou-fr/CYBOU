@@ -49,6 +49,7 @@ class Presence : public QObject
     Q_PROPERTY(QString lifecycleStatus READ lifecycleStatus NOTIFY changed)
     Q_PROPERTY(QVariantMap lifecycleState READ lifecycleState NOTIFY changed)
     Q_PROPERTY(QVariantMap lifecycleProjection READ lifecycleProjection NOTIFY changed)
+    Q_PROPERTY(QVariantMap lifecycleScheduling READ lifecycleScheduling NOTIFY changed)
     Q_PROPERTY(bool lifecycleCommandPending READ lifecycleCommandPending NOTIFY changed)
 
 public:
@@ -90,6 +91,7 @@ public:
     QString lifecycleStatus() const;
     QVariantMap lifecycleState() const;
     QVariantMap lifecycleProjection() const;
+    QVariantMap lifecycleScheduling() const;
     bool lifecycleCommandPending() const { return m_lifecycleCommandPending; }
     Q_INVOKABLE void interruptLifecycle(const QString &cause = QString());
 

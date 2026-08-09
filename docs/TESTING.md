@@ -64,6 +64,11 @@ limited aggregate with only prediction unavailable. Identity, commitments, biogr
 and endpoint reachability remain usable; restarting predictord and refreshing Health1 restores the
 prediction capability.
 
+`lifecycle-scheduling-policy` covers invalid-evidence blocking, lifecycle deferral, required versus
+optional capability loss, supported/unsupported trigger handling, and the 32/8 hysteresis boundary.
+Process integration calls `EvaluateScheduling` through real D-Bus, verifies its reason reaches the
+QML Presence proxy, and byte-compares Lifecycle1 state before and after the dry run.
+
 `p4-plasma-lifecycle` is the focused single-node VM gate for shell recreation. It restarts the
 shipped Plasma user service around one active lifecycle run, requires a replacement PID and restored
 D-Bus surface, and compares the exact run blob and Event1 count across the UI-only transition.

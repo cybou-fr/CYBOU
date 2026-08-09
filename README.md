@@ -88,7 +88,7 @@ become a second cognitive owner.
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
 | Restart/reboot continuity and lifecycle/consolidation core | Evaluation complete — M5 |
 | Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 P6.1–P6.4 |
-| Capability-aware Presence projection and command isolation | Implemented — M6 P6.5 slice 1 |
+| Capability-aware Presence and lifecycle scheduling dry run | Implemented — M6 P6.5 slices 1–2 |
 | Capability-aware scheduling and complete degraded UI | Next — M6 P6.5 |
 | Grounded perception, epistemics, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
