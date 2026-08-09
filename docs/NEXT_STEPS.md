@@ -320,7 +320,11 @@ Stopping an optional organ removes only dependent capabilities. Restart produces
 
 ## P6.3 — Add bounded asynchronous RPC resilience
 
-**Status: next.**
+**Status: complete for the shared transport and first required consumer.** Typed outcomes,
+operation semantics, bounded deterministic backoff, retry eligibility, circuit breaking, and a
+common async D-Bus client are implemented. Plasma lifecycle interruption is migrated as a
+non-idempotent mutation: timeout becomes `UnknownOutcome` and is never retried. Legacy synchronous
+read paths remain for deliberate future migration.
 
 ### Work
 
@@ -337,6 +341,8 @@ Timeout cannot freeze Presence, exhaust the session bus, duplicate an Event1 eff
 unknown mutation result into success. Unit tests use a deterministic clock/backoff source.
 
 ## P6.4 — Introduce homeostatic signals without autonomous policy
+
+**Status: next.**
 
 ### Work
 

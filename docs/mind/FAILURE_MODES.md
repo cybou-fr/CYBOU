@@ -39,3 +39,6 @@ state machine.
 
 Recovery policy must distinguish unavailable capability, uncertain result, and verified failure.
 See [Lifecycle](LIFECYCLE.md) and [Epistemic Governance](EPISTEMIC_GOVERNANCE.md).
+
+P6.3 implements this distinction at the resilient transport boundary. Timeout of a non-idempotent
+mutation is `UnknownOutcome`, while explicit refusal is `Rejected`; only safe operations may retry.

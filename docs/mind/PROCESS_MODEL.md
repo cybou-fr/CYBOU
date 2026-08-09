@@ -54,5 +54,6 @@ destroy cognitive organ processes.
 
 M5 retains the minimal `Ready()` and `Health()` organ interfaces and adds lifecycle-level deficits.
 P6.1/P6.2 add separate component-health and capability-availability contracts, an explicit
-dependency graph, persistent Health1 ownership, and verified recovery. Bounded RPC resilience and
-the read-only Presence projection remain P6.3 and later work.
+dependency graph, persistent Health1 ownership, and verified recovery. P6.3 adds bounded async RPC
+for required non-blocking paths; broader migration and the read-only Health1 Presence projection
+remain later work.

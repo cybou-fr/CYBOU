@@ -89,6 +89,7 @@ def main(argv: list[str]) -> int:
         "adr26": repo / "docs/adr/ADR-0026-lifecycle-owner-and-wire-contract.md",
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
         "health": repo / "docs/mind/HEALTH.md",
+        "rpc_resilience": repo / "docs/mind/RPC_RESILIENCE.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
@@ -299,6 +300,14 @@ def main(argv: list[str]) -> int:
         ("health ownership", "## Ownership boundary"),
     ):
         require(paths["health"], label, needle)
+
+    for label, needle in (
+        ("RPC semantics", "## Operation semantics"),
+        ("RPC outcomes", "## Typed outcomes"),
+        ("RPC retry", "## Retry and backoff"),
+        ("RPC circuit", "## Circuit breaker"),
+    ):
+        require(paths["rpc_resilience"], label, needle)
 
     for label, needle in (
         ("epistemic statuses", "## Epistemic projection"),

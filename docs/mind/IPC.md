@@ -47,6 +47,12 @@ P6.1 defines schema-v1 `CapabilitySnapshot` CBOR and P6.2 serves it from Health1
 `Ready`, aggregate `Health`, `LastError`, `HasSnapshot`, `Snapshot`, `Refresh`, and `Changed`.
 The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.
 
+## Resilient asynchronous calls
+
+Calls that must not block a shell or owner event loop use the typed policy in
+[RPC Resilience](RPC_RESILIENCE.md). Retry requires explicit read-only or idempotent semantics;
+non-idempotent timeout remains `UnknownOutcome` and is never automatically replayed.
+
 ## Presentation signal ordering
 
 workspaced emits `Workspace1.Changed` after it admits an Event1 accepted contribution.

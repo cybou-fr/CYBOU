@@ -61,6 +61,7 @@ Read the [Mind index](mind/README.md), or open a specific contract:
 - [Failure Modes](mind/FAILURE_MODES.md)
 - [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — implemented M5 contract and future policy
 - [Capability and Health Contract](mind/HEALTH.md) — P6.1/P6.2 protocol, owner, graph, and recovery
+- [RPC Resilience](mind/RPC_RESILIENCE.md) — P6.3 outcomes, retry safety, backoff, and circuit breaker
 - [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M6/M7 contract
 
 ## Security

@@ -164,6 +164,14 @@ target_link_libraries(
 add_test(NAME fabric-codec COMMAND test-fabric-codec)
 set_tests_properties(fabric-codec PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-rpc-resilience tst_rpc_resilience.cpp)
+target_link_libraries(test-rpc-resilience PRIVATE cybou-fabric Qt6::DBus Qt6::Test)
+add_test(
+    NAME rpc-resilience
+    COMMAND ${CYBOU_DBUS_TEST_RUNNER} $<TARGET_FILE:test-rpc-resilience>
+)
+set_tests_properties(rpc-resilience PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(test-eventd-integration tst_eventd_integration.cpp)
 target_link_libraries(
     test-eventd-integration

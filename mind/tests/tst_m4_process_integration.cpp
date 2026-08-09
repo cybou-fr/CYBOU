@@ -335,6 +335,7 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(heartbeat, 1000);
         QTRY_VERIFY_WITH_TIMEOUT(!proxy.lifecycleCommandPending(), 6500);
         QVERIFY(!proxy.lastError().isEmpty());
+        QVERIFY(proxy.lastError().contains(QStringLiteral("unknown-outcome")));
         QCOMPARE(LifecycleClient().state().value(QStringLiteral("runId")).toString(), runId);
         QCOMPARE(LifecycleClient().state().value(QStringLiteral("status")).toString(), QStringLiteral("active"));
 

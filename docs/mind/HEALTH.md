@@ -9,7 +9,8 @@ SPDX-License-Identifier: MIT
 
 P6.1 defines a versioned wire contract for component observations and capability deficits. P6.2
 implements the initial dependency graph, `cybou-healthd`, persistent snapshot ownership, and
-`Health1`. Bounded retry policy and Presence projection remain P6.3 and later work.
+`Health1`. P6.3 provides the shared bounded async transport, but Health1 probing is not migrated to
+it yet; Presence projection remains later work.
 
 Component health and capability availability are deliberately separate. A stopped optional organ
 can remove one capability without making identity, biography, or commitments unavailable.

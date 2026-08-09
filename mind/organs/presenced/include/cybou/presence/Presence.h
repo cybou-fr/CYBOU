@@ -14,6 +14,7 @@
 namespace cybou {
 
 class PresenceClient;
+class AsyncRpcClient;
 
 struct Moment {
     QDateTime when;
@@ -91,6 +92,7 @@ private:
     void remoteChanged();
 
     std::unique_ptr<PresenceClient> m_client;
+    std::unique_ptr<AsyncRpcClient> m_resilientClient;
     QVariantMap m_snapshot;
     QString m_lastError;
     bool m_awake{false};

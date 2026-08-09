@@ -4,11 +4,8 @@
 #include "cybou/presence/Presence.h"
 
 #include "cybou/fabric/OrganClients.h"
+#include "cybou/fabric/RpcResilience.h"
 #include "cybou/runtime/StatePaths.h"
-
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusPendingCallWatcher>
 
 namespace cybou {
 
@@ -35,6 +32,7 @@ QStringList toStringList(const QVariant &value)
 Presence::Presence(QObject *parent)
     : QObject(parent)
     , m_client(std::make_unique<PresenceClient>())
+    , m_resilientClient(std::make_unique<AsyncRpcClient>(kPresenceEndpoint, RpcRetryPolicy{}, this))
 {
     connect(
         m_client.get(),
@@ -327,38 +325,30 @@ void Presence::interruptLifecycle(const QString &cause)
         return;
     }
 
-    QDBusConnection bus = QDBusConnection::sessionBus();
-    if (!bus.isConnected()) {
-        m_lastError = QStringLiteral("the user D-Bus session is unavailable");
-        Q_EMIT changed();
-        return;
-    }
-
-    QDBusMessage message = QDBusMessage::createMethodCall(
-        QString::fromLatin1(kPresenceEndpoint.service),
-        QString::fromLatin1(kPresenceEndpoint.objectPath),
-        QString::fromLatin1(kPresenceEndpoint.interfaceName),
-        QStringLiteral("InterruptLifecycle"));
-    message << cause;
-
     m_lifecycleCommandPending = true;
     m_lastError.clear();
     Q_EMIT changed();
 
-    auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message, 5000), this);
-    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher]() {
-        const QDBusMessage reply = watcher->reply();
-        m_lifecycleCommandPending = false;
-        if (reply.type() == QDBusMessage::ErrorMessage) {
-            m_lastError = QStringLiteral("%1: %2").arg(reply.errorName(), reply.errorMessage());
-        } else if (reply.arguments().isEmpty() || !reply.arguments().first().toBool()) {
-            m_lastError = QStringLiteral("lifecycle interruption was rejected");
-        } else {
-            refresh();
-        }
-        watcher->deleteLater();
-        Q_EMIT changed();
-    });
+    m_resilientClient->call(
+        QStringLiteral("InterruptLifecycle"),
+        {cause},
+        RpcOperationSemantics::NonIdempotentMutation,
+        [this](const RpcResult &result) {
+            m_lifecycleCommandPending = false;
+            if (!result.succeeded()) {
+                m_lastError = QStringLiteral("%1: %2")
+                                  .arg(
+                                      rpcOutcomeToString(result.outcome),
+                                      result.errorMessage.isEmpty()
+                                          ? QStringLiteral("lifecycle interruption was not accepted")
+                                          : result.errorMessage);
+            } else {
+                refresh();
+            }
+            Q_EMIT changed();
+        },
+        5000,
+        true);
 }
 
 } // namespace cybou
