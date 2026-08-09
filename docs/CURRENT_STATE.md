@@ -37,7 +37,10 @@ Lifecycle1 persists the capability-to-contribution mapping in the run, verifies 
 against Event1, and refuses `Completed` until it has committed a deterministic terminal `Outcome`
 caused by all owner results. The process integration suite verifies the extra terminal append and
 exposes its ID through Lifecycle1 state. P3 still lacks the full VM fault-injection matrix across
-each owner/terminal persistence boundary and Presence projection of lifecycle status.
+each owner/terminal persistence boundary and Presence projection of lifecycle status. Process-level
+fault injection now kills lifecycled immediately after an owner Event1 commit and immediately after
+the terminal Event1 commit. In both cases restart enters `Recovering`, replay reuses deterministic
+contributions, and Event1 count proves that no duplicate durable effect was created.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet

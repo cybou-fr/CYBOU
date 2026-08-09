@@ -35,6 +35,11 @@ event count is unchanged, and completes only after both typed receipts
 are persisted. Completion adds exactly one terminal Event1 `Outcome`; its ID is retained in the
 persistent Lifecycle1 run state.
 
+The same process test uses `CYBOU_LIFECYCLE_FAILPOINT` to terminate lifecycled in the two
+split-commit windows: `after-owner-commit` and `after-terminal-commit`. It restarts the daemon,
+resumes the persisted run, repeats the operation, and asserts that Event1 count is unchanged by
+replay. These failpoints are test instrumentation and are unset in the normal service environment.
+
 ## Process integration
 
 `m4-process-integration` runs inside an isolated `dbus-run-session`, launches seven executables,

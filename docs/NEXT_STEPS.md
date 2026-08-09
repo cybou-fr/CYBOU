@@ -133,7 +133,10 @@ evidence-linked Event1 `Learning` contributions before returning typed receipts;
 does not duplicate them. Capability-to-contribution references are persisted atomically with
 acknowledgement. `Completed` now requires a deterministic accepted Event1 terminal `Outcome`
 caused by every owner result. The remaining work is fault injection at every persistence boundary
-and lifecycle status projection through Presence.
+and lifecycle status projection through Presence. Process-level coverage now exercises the two
+critical split-commit windows—owner Event1 commit before run acknowledgement, and terminal Event1
+commit before terminal run state—and proves idempotent recovery. VM-level interruption and the
+Presence projection remain.
 
 ### Vertical slice
 

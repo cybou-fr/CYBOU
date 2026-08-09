@@ -116,7 +116,9 @@ contribution mapping. Repeating Dispatch skips already persisted work, while dir
 redelivery returns the same contribution without another append. Completion commits one
 deterministic Event1 `Outcome` caused by every recorded owner contribution, saves its ID in the run,
 and fails closed if any reference is absent. The remaining P3 work is the fault-injection exit gate
-and Presence projection.
+and Presence projection. The process suite already covers crashes after owner and terminal Event1
+commit but before the corresponding lifecycle state commit; deterministic replay creates no second
+contribution. The remaining resilience gate promotes this coverage to the rebooting VM path.
 
 ## Privacy and retention
 

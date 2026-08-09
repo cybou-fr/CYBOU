@@ -39,11 +39,13 @@ private:
         return env;
     }
 
-    void startDaemon()
+    void startDaemon(const QString &failpoint = QString())
     {
         m_daemon = std::make_unique<QProcess>();
         m_daemon->setProgram(m_daemonPath);
-        m_daemon->setProcessEnvironment(environment());
+        auto env = environment();
+        if (!failpoint.isEmpty()) env.insert(QStringLiteral("CYBOU_LIFECYCLE_FAILPOINT"), failpoint);
+        m_daemon->setProcessEnvironment(env);
         m_daemon->start();
         QVERIFY2(m_daemon->waitForStarted(3000), qPrintable(m_daemon->errorString()));
         QTRY_VERIFY_WITH_TIMEOUT(interface().isValid(), 5000);
@@ -253,6 +255,94 @@ private Q_SLOTS:
         const QVariantMap terminalState = FabricCodec::decodeMap(terminalStateReply.value(), &error);
         QVERIFY(error.isEmpty());
         QVERIFY(!QUuid(terminalState.value(QStringLiteral("terminalContributionId")).toString()).isNull());
+    }
+
+    void ownerCommitCrashReplaysWithoutDuplicate()
+    {
+        stopDaemon();
+        startDaemon(QStringLiteral("after-owner-commit"));
+        QDBusReply<bool> idle = interface().call(QStringLiteral("Transition"), QStringLiteral("idle"));
+        QVERIFY(idle.isValid() && idle.value());
+        QDBusInterface events(
+            QStringLiteral("org.cybou.Mind.Event1"), QStringLiteral("/org/cybou/Mind/Event1"),
+            QStringLiteral("org.cybou.Mind.Event1"), QDBusConnection::sessionBus());
+        CognitiveEnvelope input;
+        input.messageId = QUuid::createUuid(); input.correlationId = input.messageId;
+        input.originOrgan = QStringLiteral("fault-test"); input.originNode = QStringLiteral("local");
+        input.wallTime = QDateTime::currentDateTimeUtc(); input.privacy = PrivacyClass::Local;
+        QDBusReply<QByteArray> submitted = events.call(QStringLiteral("Submit"), EnvelopeCodec::encode(input));
+        QVERIFY(submitted.isValid() && !submitted.value().isEmpty());
+        QDBusReply<qulonglong> before = events.call(QStringLiteral("Count"));
+        QVERIFY(before.isValid());
+        QDBusReply<QString> requested = interface().call(
+            QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
+            QStringLiteral("owner-crash"), before.value(),
+            QStringList{QStringLiteral("predictor")}, QStringList{});
+        QVERIFY(requested.isValid() && !requested.value().isEmpty());
+        QDBusReply<bool> crashed = interface().call(QStringLiteral("Dispatch"));
+        QVERIFY(!crashed.isValid());
+        QTRY_COMPARE_WITH_TIMEOUT(m_daemon->state(), QProcess::NotRunning, 3000);
+        QDBusReply<qulonglong> afterCrash = events.call(QStringLiteral("Count"));
+        QVERIFY(afterCrash.isValid());
+        QCOMPARE(afterCrash.value(), before.value() + 1);
+
+        startDaemon();
+        QDBusReply<bool> resumed = interface().call(QStringLiteral("ResumeRun"));
+        QVERIFY(resumed.isValid() && resumed.value());
+        QDBusReply<bool> replayed = interface().call(QStringLiteral("Dispatch"));
+        QVERIFY(replayed.isValid() && replayed.value());
+        QDBusReply<qulonglong> afterReplay = events.call(QStringLiteral("Count"));
+        QVERIFY(afterReplay.isValid());
+        QCOMPARE(afterReplay.value(), afterCrash.value());
+        QDBusReply<bool> finished = interface().call(
+            QStringLiteral("FinishRun"), QStringLiteral("completed"),
+            QStringLiteral("owner crash recovered"));
+        QVERIFY(finished.isValid() && finished.value());
+    }
+
+    void terminalCommitCrashReplaysWithoutDuplicate()
+    {
+        stopDaemon();
+        startDaemon(QStringLiteral("after-terminal-commit"));
+        QDBusReply<bool> idle = interface().call(QStringLiteral("Transition"), QStringLiteral("idle"));
+        QVERIFY(idle.isValid() && idle.value());
+        QDBusInterface events(
+            QStringLiteral("org.cybou.Mind.Event1"), QStringLiteral("/org/cybou/Mind/Event1"),
+            QStringLiteral("org.cybou.Mind.Event1"), QDBusConnection::sessionBus());
+        CognitiveEnvelope input;
+        input.messageId = QUuid::createUuid(); input.correlationId = input.messageId;
+        input.originOrgan = QStringLiteral("fault-test"); input.originNode = QStringLiteral("local");
+        input.wallTime = QDateTime::currentDateTimeUtc(); input.privacy = PrivacyClass::Local;
+        QDBusReply<QByteArray> submitted = events.call(QStringLiteral("Submit"), EnvelopeCodec::encode(input));
+        QVERIFY(submitted.isValid() && !submitted.value().isEmpty());
+        QDBusReply<qulonglong> before = events.call(QStringLiteral("Count"));
+        QVERIFY(before.isValid());
+        QDBusReply<QString> requested = interface().call(
+            QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
+            QStringLiteral("terminal-crash"), before.value(),
+            QStringList{QStringLiteral("predictor")}, QStringList{});
+        QVERIFY(requested.isValid() && !requested.value().isEmpty());
+        QDBusReply<bool> dispatched = interface().call(QStringLiteral("Dispatch"));
+        QVERIFY(dispatched.isValid() && dispatched.value());
+        QDBusReply<bool> crashed = interface().call(
+            QStringLiteral("FinishRun"), QStringLiteral("completed"),
+            QStringLiteral("terminal crash recovered"));
+        QVERIFY(!crashed.isValid());
+        QTRY_COMPARE_WITH_TIMEOUT(m_daemon->state(), QProcess::NotRunning, 3000);
+        QDBusReply<qulonglong> afterCrash = events.call(QStringLiteral("Count"));
+        QVERIFY(afterCrash.isValid());
+        QCOMPARE(afterCrash.value(), before.value() + 2);
+
+        startDaemon();
+        QDBusReply<bool> resumed = interface().call(QStringLiteral("ResumeRun"));
+        QVERIFY(resumed.isValid() && resumed.value());
+        QDBusReply<bool> finished = interface().call(
+            QStringLiteral("FinishRun"), QStringLiteral("completed"),
+            QStringLiteral("terminal crash recovered"));
+        QVERIFY(finished.isValid() && finished.value());
+        QDBusReply<qulonglong> afterReplay = events.call(QStringLiteral("Count"));
+        QVERIFY(afterReplay.isValid());
+        QCOMPARE(afterReplay.value(), afterCrash.value());
     }
 };
 
