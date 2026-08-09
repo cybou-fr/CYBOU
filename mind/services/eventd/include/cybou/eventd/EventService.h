@@ -33,6 +33,7 @@ public Q_SLOTS:
 
     QByteArray Recent(int limit) const;
     QByteArray Episode(const QString &correlationId) const;
+    QByteArray AtSequence(qulonglong sequence) const;
 
     bool Contains(const QString &messageId) const;
     QByteArray Contribution(const QString &messageId) const;

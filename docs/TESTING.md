@@ -30,7 +30,8 @@ m4-process-integration
 `lifecycled-integration` runs a real daemon in an isolated D-Bus session, starts an active run,
 restarts the process, verifies recovery with the same run identity, and rejects a duplicate D-Bus
 owner. It also launches Event1, Predictor1, and Workspace1, dispatches a bounded consolidation run
-to both owners, repeats dispatch to prove idempotency, and completes only after both typed receipts
+to both owners, verifies two evidence-linked durable Event1 effects, repeats dispatch to prove the
+event count is unchanged, and completes only after both typed receipts
 are persisted.
 
 ## Process integration

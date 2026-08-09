@@ -199,6 +199,19 @@ QList<CognitiveEnvelope> EventClient::episode(const QUuid &correlationId) const
     return result;
 }
 
+std::optional<CognitiveEnvelope> EventClient::atSequence(quint64 sequence) const
+{
+    m_lastError.clear();
+    if (sequence == 0) return std::nullopt;
+    const QByteArray encoded = callBytes(
+        QStringLiteral("AtSequence"), {QVariant::fromValue<qulonglong>(sequence)});
+    if (encoded.isEmpty()) return std::nullopt;
+    QString error;
+    const auto result = EnvelopeCodec::decode(encoded, &error);
+    if (!result) m_lastError = error;
+    return result;
+}
+
 bool EventClient::contains(const QUuid &messageId) const
 {
     m_lastError.clear();

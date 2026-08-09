@@ -43,7 +43,7 @@ set_tests_properties(lifecycle PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen
 qt_add_executable(test-lifecycled-integration tst_lifecycled_integration.cpp)
 target_link_libraries(
     test-lifecycled-integration
-    PRIVATE cybou-protocol cybou-fabric Qt6::DBus Qt6::Test
+    PRIVATE cybou-events cybou-fabric Qt6::DBus Qt6::Test
 )
 add_test(
     NAME lifecycled-integration

@@ -90,6 +90,12 @@ QByteArray EventService::Episode(const QString &correlationId) const
         m_journal.episode(QUuid::fromString(correlationId)));
 }
 
+QByteArray EventService::AtSequence(qulonglong sequence) const
+{
+    const auto envelope = m_journal.atSequence(sequence);
+    return envelope ? EnvelopeCodec::encode(*envelope) : QByteArray();
+}
+
 bool EventService::Contains(const QString &messageId) const
 {
     return m_journal.contains(QUuid::fromString(messageId));

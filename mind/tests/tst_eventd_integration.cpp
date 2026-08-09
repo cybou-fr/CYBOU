@@ -118,6 +118,9 @@ private Q_SLOTS:
             client.contribution(root.messageId);
         QVERIFY(persisted.has_value());
         QCOMPARE(persisted->messageId, root.messageId);
+        const auto bySequence = client.atSequence(client.count());
+        QVERIFY(bySequence.has_value());
+        QCOMPARE(bySequence->messageId, root.messageId);
         QCOMPARE(client.verify(), 0u);
     }
 

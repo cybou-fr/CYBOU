@@ -34,6 +34,7 @@ public:
 
     QList<CognitiveEnvelope> recent(int limit = 50) const override;
     QList<CognitiveEnvelope> episode(const QUuid &correlationId) const override;
+    std::optional<CognitiveEnvelope> atSequence(quint64 sequence) const override;
 
     bool contains(const QUuid &messageId) const override;
     std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const override;

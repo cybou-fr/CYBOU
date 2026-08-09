@@ -43,6 +43,7 @@ public:
 
     virtual QList<CognitiveEnvelope> recent(int limit = 50) const = 0;
     virtual QList<CognitiveEnvelope> episode(const QUuid &correlationId) const = 0;
+    virtual std::optional<CognitiveEnvelope> atSequence(quint64 sequence) const = 0;
 
     virtual bool contains(const QUuid &messageId) const = 0;
     virtual std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const = 0;

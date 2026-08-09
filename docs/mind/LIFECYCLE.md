@@ -108,10 +108,12 @@ resumes the existing active run and therefore derives the same keys rather than 
 
 `Dispatch` currently routes the `predictor` and `workspace` capabilities to their owning D-Bus
 services. Each owner rejects a high-water mark beyond its accepted Event1 count and returns a typed
-receipt containing the owner, operation key, mark, and acceptance decision. Lifecycle1 persists an
-acknowledgement only after validating every receipt field. Repeating Dispatch skips already
-persisted work. The current handlers perform bounded projection verification/recomputation; P3
-still requires durable owner effects and accepted Event1 work/terminal contributions.
+receipt containing the owner, operation key, mark, acceptance decision, and durable contribution
+ID. The owner resolves the exact Event1 envelope at that mark and commits a deterministic UUIDv5
+`Learning` contribution which cites it as causation. Lifecycle1 persists an acknowledgement only
+after validating every receipt field. Repeating Dispatch skips already persisted work, while direct
+owner redelivery returns the same contribution without another append. P3 still requires persisted
+receipt references and an accepted Event1 terminal contribution.
 
 ## Privacy and retention
 

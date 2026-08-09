@@ -5,7 +5,15 @@
 
 #include "cybou/fabric/FabricCodec.h"
 
+#include <QCborMap>
+#include <QDateTime>
+
 namespace cybou {
+
+namespace {
+const QUuid kConsolidationNamespace(
+    QStringLiteral("8fcbaf7c-b31a-5c7d-b15e-a09b7b816ca7"));
+}
 
 WorkspaceService::WorkspaceService(
     EventStore *events,
@@ -108,12 +116,37 @@ QString WorkspaceService::Attention() const
 QByteArray WorkspaceService::Consolidate(const QString &runId,const QString &operationKey,qulonglong mark) const
 {
     if (!Ready() || QUuid(runId).isNull() || operationKey.trimmed().isEmpty()
-        || mark > m_events->count()) return {};
+        || mark == 0 || mark > m_events->count()) return {};
+    const auto input = m_events->atSequence(mark);
+    if (!input) return {};
+
+    const QUuid contributionId = QUuid::createUuidV5(
+        kConsolidationNamespace,
+        QStringLiteral("workspace:%1").arg(operationKey).toUtf8());
+    if (!m_events->contains(contributionId)) {
+        CognitiveEnvelope contribution;
+        contribution.messageId = contributionId;
+        contribution.correlationId = QUuid(runId);
+        contribution.causationId = input->messageId;
+        contribution.originOrgan = QStringLiteral("workspaced");
+        contribution.originNode = QStringLiteral("local");
+        contribution.kind = ContributionKind::Learning;
+        contribution.wallTime = QDateTime::currentDateTimeUtc();
+        contribution.privacy = input->privacy;
+        contribution.capabilityScope = QStringLiteral("lifecycle.consolidation");
+        QCborMap payload;
+        payload[QStringLiteral("operationKey")] = operationKey;
+        payload[QStringLiteral("inputHighWaterMark")] = static_cast<qint64>(mark);
+        payload[QStringLiteral("coalitionCount")] = m_workspace.coalitions().size();
+        contribution.payloadCbor = payload.toCborValue().toCbor();
+        if (m_events->append(contribution) == 0) return {};
+    }
     QVariantMap receipt;
     receipt[QStringLiteral("accepted")]=true;
     receipt[QStringLiteral("owner")]=QStringLiteral("workspace");
     receipt[QStringLiteral("operationKey")]=operationKey;
     receipt[QStringLiteral("inputHighWaterMark")]=mark;
+    receipt[QStringLiteral("contributionId")]=contributionId.toString(QUuid::WithoutBraces);
     receipt[QStringLiteral("coalitionCount")]=m_workspace.coalitions().size();
     return FabricCodec::encodeMap(receipt);
 }

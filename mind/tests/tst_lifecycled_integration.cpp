@@ -3,6 +3,7 @@
 
 #include "cybou/fabric/FabricCodec.h"
 #include "cybou/fabric/OrganBus.h"
+#include "cybou/events/EnvelopeCodec.h"
 #include "cybou/protocol/Lifecycle.h"
 
 #include <QDBusConnection>
@@ -193,8 +194,21 @@ private Q_SLOTS:
             QStringLiteral("org.cybou.Mind.Event1"),
             QDBusConnection::sessionBus());
         QTRY_VERIFY_WITH_TIMEOUT(events.isValid(), 5000);
+
+        CognitiveEnvelope input;
+        input.messageId = QUuid::createUuid();
+        input.correlationId = input.messageId;
+        input.originOrgan = QStringLiteral("integration-test");
+        input.originNode = QStringLiteral("local");
+        input.kind = ContributionKind::Observation;
+        input.wallTime = QDateTime::currentDateTimeUtc();
+        input.privacy = PrivacyClass::Local;
+        QDBusReply<QByteArray> submitted = events.call(
+            QStringLiteral("Submit"), EnvelopeCodec::encode(input));
+        QVERIFY(submitted.isValid() && !submitted.value().isEmpty());
+
         QDBusReply<qulonglong> count = events.call(QStringLiteral("Count"));
-        QVERIFY(count.isValid());
+        QVERIFY(count.isValid() && count.value() > 0);
 
         QDBusReply<QString> requested = interface().call(
             QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
@@ -208,8 +222,14 @@ private Q_SLOTS:
         QVERIFY2(
             first.isValid() && first.value(),
             qPrintable(dispatchError.isValid() ? dispatchError.value() : first.error().message()));
+        QDBusReply<qulonglong> afterFirst = events.call(QStringLiteral("Count"));
+        QVERIFY(afterFirst.isValid());
+        QCOMPARE(afterFirst.value(), count.value() + 2);
         QDBusReply<bool> duplicate = interface().call(QStringLiteral("Dispatch"));
         QVERIFY(duplicate.isValid() && duplicate.value());
+        QDBusReply<qulonglong> afterDuplicate = events.call(QStringLiteral("Count"));
+        QVERIFY(afterDuplicate.isValid());
+        QCOMPARE(afterDuplicate.value(), afterFirst.value());
 
         QDBusReply<QByteArray> stateReply = interface().call(QStringLiteral("State"));
         QString error;

@@ -29,8 +29,12 @@ The P3 transaction substrate now includes deterministic per-capability operation
 high-water-mark-bound idempotent acknowledgements, optional capability deficits, required-work
 completion gates, and explicit resume of the same run after recovery. Lifecycle1 automatically
 dispatches bounded `Consolidate` requests to Predictor1 and Workspace1 and validates their typed
-receipts before persisting acknowledgements. These handlers currently verify/recompute projections;
-durable owner effects and Event1 terminal contributions remain incomplete.
+receipts before persisting acknowledgements. Each owner resolves the exact accepted Event1 envelope
+at the run high-water mark, commits an evidence-linked `Learning` contribution with a deterministic
+UUIDv5 operation identity, and returns its contribution ID. Redelivery is a durable no-op, and the
+integration suite proves two first-delivery contributions and zero duplicate contributions.
+Persisting those owner contribution IDs in the run and emitting the accepted Event1 terminal
+contribution remain incomplete.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet

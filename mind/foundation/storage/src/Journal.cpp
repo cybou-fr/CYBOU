@@ -591,6 +591,16 @@ QByteArray Journal::head() const
     return {};
 }
 
+std::optional<CognitiveEnvelope> Journal::atSequence(quint64 sequence) const
+{
+    if (sequence == 0) return std::nullopt;
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT %1 FROM contribution WHERE seq = ?").arg(envelopeColumns()));
+    query.addBindValue(static_cast<qulonglong>(sequence));
+    if (!query.exec()) return std::nullopt;
+    return readOne(query);
+}
+
 CognitiveEnvelope Journal::envelopeFromQuery(const QSqlQuery &query, int offset) const
 {
     CognitiveEnvelope e;

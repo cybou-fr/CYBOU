@@ -46,7 +46,63 @@ bool LifecycleService::requestedCapability(const QString &capability) const { re
 QString LifecycleService::WorkOperationKey(const QString &capability) const { if(!m_hasRun||m_run.status!=LifecycleRunStatus::Active||!requestedCapability(capability))return {};return QStringLiteral("%1:%2:%3").arg(m_run.runId.toString(QUuid::WithoutBraces),capability,QString::number(m_run.inputHighWaterMark)); }
 bool LifecycleService::AcknowledgeWork(const QString &capability,const QString &operationKey,qulonglong mark){if(!m_hasRun||m_run.status!=LifecycleRunStatus::Active||!requestedCapability(capability)||mark!=m_run.inputHighWaterMark||operationKey!=WorkOperationKey(capability)){m_error="invalid lifecycle work acknowledgement";return false;}if(m_run.missingWork.contains(capability)){m_error="capability already marked missing";return false;}if(m_run.completedWork.contains(capability)){m_error.clear();return true;}m_run.completedWork.append(capability);if(!save())return false;m_error.clear();return true;}
 bool LifecycleService::MarkMissing(const QString &capability,const QString &cause){if(!m_hasRun||m_run.status!=LifecycleRunStatus::Active||!m_run.optionalCapabilities.contains(capability)||cause.trimmed().isEmpty()||m_run.completedWork.contains(capability)){m_error="invalid missing capability";return false;}if(m_run.missingWork.contains(capability)){m_error.clear();return true;}m_run.missingWork.append(capability);if(!save())return false;m_error.clear();return true;}
-bool LifecycleService::Dispatch(){if(!m_hasRun||m_run.status!=LifecycleRunStatus::Active||m_mode!=LifecycleMode::Consolidating){m_error="no dispatchable lifecycle run";return false;}const QStringList requested=m_run.requiredCapabilities+m_run.optionalCapabilities;for(const auto &capability:requested){if(m_run.completedWork.contains(capability)||m_run.missingWork.contains(capability))continue;const BusEndpoint *endpoint=nullptr;if(capability==QStringLiteral("predictor"))endpoint=&kPredictorEndpoint;else if(capability==QStringLiteral("workspace"))endpoint=&kWorkspaceEndpoint;if(!endpoint){if(m_run.optionalCapabilities.contains(capability)){if(!MarkMissing(capability,QStringLiteral("unsupported optional capability")))return false;continue;}m_error=QStringLiteral("unsupported required capability: %1").arg(capability);return false;}const QString key=WorkOperationKey(capability);RpcClient owner(*endpoint);const QByteArray encoded=owner.callBytes(QStringLiteral("Consolidate"),{m_run.runId.toString(QUuid::WithoutBraces),key,QVariant::fromValue<qulonglong>(m_run.inputHighWaterMark)});QString codecError;const QVariantMap receipt=FabricCodec::decodeMap(encoded,&codecError);const bool valid=codecError.isEmpty()&&receipt.value(QStringLiteral("accepted")).toBool()&&receipt.value(QStringLiteral("owner")).toString()==capability&&receipt.value(QStringLiteral("operationKey")).toString()==key&&receipt.value(QStringLiteral("inputHighWaterMark")).toULongLong()==m_run.inputHighWaterMark;if(!valid){if(m_run.optionalCapabilities.contains(capability)){if(!MarkMissing(capability,owner.lastError().isEmpty()?QStringLiteral("optional owner rejected work"):owner.lastError()))return false;continue;}m_error=owner.lastError().isEmpty()?QStringLiteral("required owner rejected work: %1").arg(capability):owner.lastError();return false;}if(!AcknowledgeWork(capability,key,m_run.inputHighWaterMark))return false;}m_error.clear();return true;}
+bool LifecycleService::Dispatch()
+{
+    if (!m_hasRun || m_run.status != LifecycleRunStatus::Active
+        || m_mode != LifecycleMode::Consolidating) {
+        m_error = "no dispatchable lifecycle run";
+        return false;
+    }
+    const QStringList requested = m_run.requiredCapabilities + m_run.optionalCapabilities;
+    for (const auto &capability : requested) {
+        if (m_run.completedWork.contains(capability)
+            || m_run.missingWork.contains(capability)) continue;
+        const BusEndpoint *endpoint = nullptr;
+        if (capability == QStringLiteral("predictor")) endpoint = &kPredictorEndpoint;
+        else if (capability == QStringLiteral("workspace")) endpoint = &kWorkspaceEndpoint;
+        if (!endpoint) {
+            if (m_run.optionalCapabilities.contains(capability)) {
+                if (!MarkMissing(capability, QStringLiteral("unsupported optional capability"))) return false;
+                continue;
+            }
+            m_error = QStringLiteral("unsupported required capability: %1").arg(capability);
+            return false;
+        }
+        const QString key = WorkOperationKey(capability);
+        RpcClient owner(*endpoint);
+        const QByteArray encoded = owner.callBytes(
+            QStringLiteral("Consolidate"),
+            {m_run.runId.toString(QUuid::WithoutBraces), key,
+             QVariant::fromValue<qulonglong>(m_run.inputHighWaterMark)});
+        QString codecError;
+        const QVariantMap receipt = FabricCodec::decodeMap(encoded, &codecError);
+        const QUuid contributionId(receipt.value(QStringLiteral("contributionId")).toString());
+        const bool valid = codecError.isEmpty()
+            && receipt.value(QStringLiteral("accepted")).toBool()
+            && receipt.value(QStringLiteral("owner")).toString() == capability
+            && receipt.value(QStringLiteral("operationKey")).toString() == key
+            && receipt.value(QStringLiteral("inputHighWaterMark")).toULongLong()
+                == m_run.inputHighWaterMark
+            && !contributionId.isNull();
+        if (!valid) {
+            if (m_run.optionalCapabilities.contains(capability)) {
+                if (!MarkMissing(
+                        capability,
+                        owner.lastError().isEmpty()
+                            ? QStringLiteral("optional owner rejected work")
+                            : owner.lastError())) return false;
+                continue;
+            }
+            m_error = owner.lastError().isEmpty()
+                ? QStringLiteral("required owner rejected work: %1").arg(capability)
+                : owner.lastError();
+            return false;
+        }
+        if (!AcknowledgeWork(capability, key, m_run.inputHighWaterMark)) return false;
+    }
+    m_error.clear();
+    return true;
+}
 bool LifecycleService::ResumeRun(){if(!m_hasRun||m_run.status!=LifecycleRunStatus::Active||m_mode!=LifecycleMode::Recovering){m_error="no recoverable lifecycle run";return false;}m_mode=LifecycleMode::Consolidating;if(!save())return false;m_error.clear();return true;}
 bool LifecycleService::FinishRun(const QString &status,const QString &cause){auto s=statusFrom(status);if(!m_hasRun||m_run.status!=LifecycleRunStatus::Active||(s!=LifecycleRunStatus::Completed&&s!=LifecycleRunStatus::Interrupted&&s!=LifecycleRunStatus::Failed)||cause.trimmed().isEmpty()){m_error="invalid lifecycle terminal transition";return false;}if(s==LifecycleRunStatus::Completed){for(const auto &capability:m_run.requiredCapabilities)if(!m_run.completedWork.contains(capability)){m_error="required lifecycle work is incomplete";return false;}for(const auto &capability:m_run.optionalCapabilities)if(!m_run.completedWork.contains(capability)&&!m_run.missingWork.contains(capability)){m_error="optional lifecycle work is unresolved";return false;}}m_run.status=s;m_run.terminalCause=cause;m_mode=(s==LifecycleRunStatus::Completed?(m_run.missingWork.isEmpty()?LifecycleMode::Awake:LifecycleMode::Degraded):LifecycleMode::Recovering);return save();}
 }

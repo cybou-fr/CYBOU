@@ -196,6 +196,11 @@ private Q_SLOTS:
         const auto stored = journal.contribution(root.messageId);
         QVERIFY(stored.has_value());
         QCOMPARE(stored->schemaVersion, kCurrentEnvelopeSchemaVersion);
+        const auto bySequence = journal.atSequence(1);
+        QVERIFY(bySequence.has_value());
+        QCOMPARE(bySequence->messageId, root.messageId);
+        QVERIFY(!journal.atSequence(0).has_value());
+        QVERIFY(!journal.atSequence(2).has_value());
         QCOMPARE(journal.verify(), 0u);
     }
 
