@@ -15,9 +15,9 @@ The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive doc
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs twelve CTest suites, including Event1 and seven-process M4 integration.
 
-The P1 contract is also present: lifecycle schema v1, legal mode transitions, validated CBOR
-round-trip, and ADR-0026 define the future `cybou-lifecycled` owner. No lifecycle daemon, D-Bus
-service, or persistence implementation exists yet; those remain P2/P3 work.
+The P2 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
+run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, and restart recovery of an active
+run into `Recovering`. Owner-work dispatch and real consolidation remain P3.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet
@@ -25,10 +25,11 @@ contain the planned M8 language faculty or M9 authorized executor.
 
 ## Process topology
 
-After M4, Mind has seven real user-session processes:
+Mind now has eight real user-session processes (the seven M4 processes plus the P2 lifecycle owner):
 
 ```text
 cybou-eventd
+cybou-lifecycled
 cybou-identityd
 cybou-intentiond
 cybou-predictord
@@ -46,6 +47,7 @@ QML property caching.
 | Resource / responsibility | Owner |
 |---|---|
 | `journal.db` | `cybou-eventd` |
+| lifecycle mode and run state | `cybou-lifecycled` under `$XDG_STATE_HOME/cybou/lifecycle` |
 | `identity.json` | `cybou-identityd` |
 | identity login marker | `cybou-identityd` under `$XDG_RUNTIME_DIR/cybou` |
 | intention commands/projection | `cybou-intentiond` |
@@ -64,6 +66,7 @@ Versioned Qt D-Bus interfaces:
 
 ```text
 org.cybou.Mind.Event1
+org.cybou.Mind.Lifecycle1
 org.cybou.Mind.Identity1
 org.cybou.Mind.Intention1
 org.cybou.Mind.Predictor1

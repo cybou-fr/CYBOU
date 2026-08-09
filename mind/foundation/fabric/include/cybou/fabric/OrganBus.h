@@ -56,4 +56,9 @@ inline constexpr BusEndpoint kPresenceEndpoint{
     "cybou-presenced.service",
 };
 
+inline constexpr BusEndpoint kLifecycleEndpoint{
+    "org.cybou.Mind.Lifecycle1", "/org/cybou/Mind/Lifecycle1",
+    "org.cybou.Mind.Lifecycle1", "cybou-lifecycled.service",
+};
+
 } // namespace cybou

@@ -91,6 +91,10 @@ degraded runs without relying on UI strings or direct database access.
 
 ## P2 — Prove continuity before consolidation
 
+**Status: implementation substrate present.** `cybou-lifecycled`, atomic run persistence,
+Lifecycle1, systemd activation, and active-run restart recovery are implemented. The full
+logout/reboot/upgrade matrix remains open before the P2 exit gate can be called complete.
+
 ### Work
 
 - build a restart/reboot/logout/upgrade transition test matrix;

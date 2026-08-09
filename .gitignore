@@ -1,16 +1,33 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 
-result
-result-*
-artifacts/
-.direnv/
+# Nix outputs and local environments
+/result
+/result-*
+/artifacts/
+/.direnv/
+/.envrc
+/.devenv/
+/.devbox/
+*.drv
+
+# Build output (at any depth)
 build/
+Build/
+out/
+dist/
+target/
+cmake-build-*/
 
 # CMake
 *.cmake
 CMakeCache.txt
 CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+install_manifest.txt
+Testing/
 
 # Ninja
 *.ninja
@@ -24,6 +41,11 @@ build.ninja
 *.so
 *.exe
 *.dll
+*.dylib
+*.obj
+*.lib
+*.pdb
+*.dSYM/
 
 # Python bytecode
 __pycache__/
@@ -33,13 +55,84 @@ __pycache__/
 *.moc
 moc_*
 *.qm
+.qmlcache/
+*.qmlc
+*.jsc
 
-# IDE
+# IDE and editor-local state
 .idea/
+.vscode/
 .vs/
+.fleet/
+.kdev4/
+*.kdev4
+*.pro.user
+*.pro.user.*
+*.creator.user
+*.creator.user.*
+*.user
+*.suo
+*.code-workspace
+Session.vim
+tags
+TAGS
 *.swp
 *.swo
+*~
+
+# AI coding agents and local assistant state
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.aider*/
+.continue/
+.roo/
+.gemini/
+.amazonq/
+.qodo/
+.copilot/
+AGENTS.md
+CLAUDE.md
+.cursorrules
+.windsurfrules
+.aider.conf.yml
+copilot-instructions.md
+
+# Local environment, credentials, and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+*.secrets
+secrets/
+credentials/
+
+# Tests, profiling, coverage, logs, and temporary files
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage/
+coverage.xml
+htmlcov/
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

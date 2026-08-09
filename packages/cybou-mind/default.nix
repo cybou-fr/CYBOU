@@ -53,6 +53,7 @@ stdenv.mkDerivation {
 
     for daemon in \
       cybou-eventd \
+      cybou-lifecycled \
       cybou-identityd \
       cybou-intentiond \
       cybou-predictord \
@@ -81,6 +82,7 @@ stdenv.mkDerivation {
     }
 
     install_dbus_service org.cybou.Mind.Event1 cybou-eventd cybou-eventd.service
+    install_dbus_service org.cybou.Mind.Lifecycle1 cybou-lifecycled cybou-lifecycled.service
     install_dbus_service org.cybou.Mind.Identity1 cybou-identityd cybou-identityd.service
     install_dbus_service org.cybou.Mind.Intention1 cybou-intentiond cybou-intentiond.service
     install_dbus_service org.cybou.Mind.Predictor1 cybou-predictord cybou-predictord.service

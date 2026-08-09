@@ -39,6 +39,13 @@ in
       binary = "cybou-eventd";
       busName = "org.cybou.Mind.Event1";
     };
+    cybou-lifecycled = mkService {
+      description = "Cybou cognitive lifecycle coordinator";
+      binary = "cybou-lifecycled";
+      busName = "org.cybou.Mind.Lifecycle1";
+      after = [ "cybou-eventd.service" ];
+      wants = [ "cybou-eventd.service" ];
+    };
 
     cybou-identityd = mkService {
       description = "Cybou identity continuity organ";

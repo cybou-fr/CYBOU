@@ -155,6 +155,7 @@ pkgs.testers.runNixOSTest {
 
         for unit in (
             "cybou-eventd.service",
+            "cybou-lifecycled.service",
             "cybou-identityd.service",
             "cybou-intentiond.service",
             "cybou-predictord.service",
@@ -169,6 +170,7 @@ pkgs.testers.runNixOSTest {
         mind_pids = []
         for unit in (
             "cybou-eventd.service",
+            "cybou-lifecycled.service",
             "cybou-identityd.service",
             "cybou-intentiond.service",
             "cybou-predictord.service",
@@ -181,7 +183,7 @@ pkgs.testers.runNixOSTest {
             ).strip()
             assert int(pid) > 0, f"{unit} has no MainPID"
             mind_pids.append(pid)
-        assert len(set(mind_pids)) == 7, mind_pids
+        assert len(set(mind_pids)) == 8, mind_pids
 
     with subtest("PipeWire is active"):
         session.wait_until_succeeds(

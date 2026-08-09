@@ -9,6 +9,7 @@ SPDX-License-Identifier: MIT
 
 ```text
 cybou-eventd
+cybou-lifecycled
 cybou-identityd
 cybou-intentiond
 cybou-predictord
@@ -17,7 +18,8 @@ cybou-workspaced
 cybou-presenced
 ```
 
-Each is a real executable and D-Bus service managed by `systemd --user`.
+Each is a real executable and D-Bus service managed by `systemd --user`. `lifecycled` owns only
+lifecycle/run orchestration state; it does not own organ projections or Journal.
 
 ## Dependencies
 
