@@ -40,6 +40,11 @@ target_link_libraries(test-health-protocol PRIVATE cybou-protocol Qt6::Test)
 add_test(NAME health-protocol COMMAND test-health-protocol)
 set_tests_properties(health-protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-homeostasis-protocol tst_homeostasis_protocol.cpp)
+target_link_libraries(test-homeostasis-protocol PRIVATE cybou-protocol Qt6::Test)
+add_test(NAME homeostasis-protocol COMMAND test-homeostasis-protocol)
+set_tests_properties(homeostasis-protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(test-health-service tst_health_service.cpp)
 target_link_libraries(
     test-health-service PRIVATE cybou-health-service cybou-protocol Qt6::Test

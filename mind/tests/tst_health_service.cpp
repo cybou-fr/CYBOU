@@ -4,6 +4,7 @@
 #include "HealthPolicy.h"
 #include "HealthService.h"
 #include "cybou/protocol/Health.h"
+#include "cybou/protocol/Homeostasis.h"
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -84,16 +85,31 @@ private Q_SLOTS:
             QVERIFY(!service.HasSnapshot());
             QVERIFY(service.Refresh());
             QVERIFY(service.HasSnapshot());
+            QVERIFY(service.HasMeasurements());
             QString error;
             const CapabilitySnapshot snapshot = decodeCapabilitySnapshot(service.Snapshot(), &error);
             QVERIFY2(error.isEmpty(), qPrintable(error));
             snapshotId = snapshot.snapshotId;
             QVERIFY(!snapshotId.isNull());
+            const HomeostasisSnapshot homeostasis = decodeHomeostasisSnapshot(
+                service.Measurements(), &error);
+            QVERIFY2(error.isEmpty(), qPrintable(error));
+            QVERIFY(homeostasis.isValid());
+            QVERIFY(!homeostasis.schedulingAuthorized);
+            const auto backlog = std::find_if(
+                homeostasis.measurements.cbegin(), homeostasis.measurements.cend(),
+                [](const HomeostaticMeasurement &measurement) {
+                    return measurement.metricId == QStringLiteral("event.backlog.count");
+                });
+            QVERIFY(backlog != homeostasis.measurements.cend());
+            QCOMPARE(backlog->status, MeasurementStatus::Unsupported);
+            QVERIFY(!backlog->hasValue);
         }
         {
             HealthService recovered(path);
             QVERIFY(recovered.isReady());
             QVERIFY(recovered.HasSnapshot());
+            QVERIFY(!recovered.HasMeasurements());
             QString error;
             const CapabilitySnapshot snapshot = decodeCapabilitySnapshot(recovered.Snapshot(), &error);
             QVERIFY2(error.isEmpty(), qPrintable(error));

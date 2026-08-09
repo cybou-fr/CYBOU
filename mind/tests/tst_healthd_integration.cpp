@@ -3,6 +3,7 @@
 
 #include "cybou/fabric/OrganBus.h"
 #include "cybou/protocol/Health.h"
+#include "cybou/protocol/Homeostasis.h"
 
 #include <QDBusConnection>
 #include <QDBusInterface>
@@ -15,6 +16,7 @@
 #include <QTest>
 
 #include <memory>
+#include <algorithm>
 #include <vector>
 
 using namespace cybou;
@@ -116,6 +118,23 @@ private:
         return reply.isValid() && reply.value();
     }
 
+    HomeostasisSnapshot measurements() const
+    {
+        QDBusReply<QByteArray> reply = interfaceFor(kHealthEndpoint).call(
+            QStringLiteral("Measurements"));
+        if (!reply.isValid()) {
+            return {};
+        }
+        QString error;
+        return decodeHomeostasisSnapshot(reply.value(), &error);
+    }
+
+    qulonglong eventCount() const
+    {
+        QDBusReply<qulonglong> reply = interfaceFor(kEventEndpoint).call(QStringLiteral("Count"));
+        return reply.isValid() ? reply.value() : 0;
+    }
+
 private Q_SLOTS:
     void initTestCase()
     {
@@ -144,11 +163,24 @@ private Q_SLOTS:
 
     void optionalOwnerLossIsCapabilitySpecificAndPersistent()
     {
+        const qulonglong beforeRefresh = eventCount();
         QVERIFY(refresh());
+        QCOMPARE(eventCount(), beforeRefresh);
         CapabilitySnapshot healthy = snapshot();
         QVERIFY(healthy.isValid());
         QCOMPARE(healthy.aggregateState, CapabilityState::Available);
         QVERIFY(healthy.deficits.isEmpty());
+        const HomeostasisSnapshot initialMeasurements = measurements();
+        QVERIFY(initialMeasurements.isValid());
+        QVERIFY(!initialMeasurements.schedulingAuthorized);
+        const auto accepted = std::find_if(
+            initialMeasurements.measurements.cbegin(), initialMeasurements.measurements.cend(),
+            [](const HomeostaticMeasurement &measurement) {
+                return measurement.metricId == QStringLiteral("event.accepted.count");
+            });
+        QVERIFY(accepted != initialMeasurements.measurements.cend());
+        QCOMPARE(accepted->status, MeasurementStatus::Current);
+        QCOMPARE(accepted->value, static_cast<double>(beforeRefresh));
 
         stopProcess(m_predictord);
         QVERIFY(waitForInterface(kPredictorEndpoint, false));
