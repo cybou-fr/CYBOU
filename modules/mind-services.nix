@@ -108,6 +108,7 @@ in
         "cybou-predictord.service"
         "cybou-selfd.service"
         "cybou-workspaced.service"
+        "cybou-lifecycled.service"
       ];
       wants = [
         "cybou-eventd.service"
@@ -116,6 +117,7 @@ in
         "cybou-predictord.service"
         "cybou-selfd.service"
         "cybou-workspaced.service"
+        "cybou-lifecycled.service"
       ];
     };
   };

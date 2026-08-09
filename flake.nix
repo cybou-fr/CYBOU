@@ -172,8 +172,8 @@
           cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
         };
 
-        # Focused P2 gate: one headless node proves identity and active-run continuity
-        # across a real system reboot without paying the two-Plasma-node smoke-test cost.
+        # Focused P2/P3 gate: one headless node proves identity/run continuity and
+        # split-commit idempotency across real reboots without the Plasma smoke-test cost.
         lifecycle-continuity = import ./tests/lifecycle-continuity.nix {
           inherit pkgs;
           cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};

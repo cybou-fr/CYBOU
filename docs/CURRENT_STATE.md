@@ -36,8 +36,7 @@ integration suite proves two first-delivery contributions and zero duplicate con
 Lifecycle1 persists the capability-to-contribution mapping in the run, verifies every reference
 against Event1, and refuses `Completed` until it has committed a deterministic terminal `Outcome`
 caused by all owner results. The process integration suite verifies the extra terminal append and
-exposes its ID through Lifecycle1 state. P3 still lacks the full VM fault-injection matrix across
-each owner/terminal persistence boundary at VM level. Process-level
+exposes its ID through Lifecycle1 state. Process-level
 fault injection now kills lifecycled immediately after an owner Event1 commit and immediately after
 the terminal Event1 commit. In both cases restart enters `Recovering`, replay reuses deterministic
 contributions, and Event1 count proves that no duplicate durable effect was created.
@@ -49,6 +48,12 @@ Lifecycle1 emits `Changed` after each accepted state commit. Presenced subscribe
 LifecycleClient and projects `lifecycleMode`, `lifecycleStatus`, the full lifecycle state, and
 lifecycled health through Presence1. The QML proxy exposes these as read-only properties; the Mind
 header displays the current mode while runtime availability remains a separate `awake` dimension.
+
+The focused headless NixOS gate now covers three boot cycles: baseline active-run/identity
+continuity, reboot after an owner Event1 commit but before coordinator acknowledgement, and reboot
+after terminal Event1 commit but before terminal run-state persistence. Both split-commit replays
+reuse their deterministic contributions and leave Event1 count unchanged. This closes the P3
+consolidation transaction exit gate.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M1–M4 plus partial M5 implementation is the process-isolated substrate of that model;
@@ -163,7 +168,7 @@ These components are intentionally useful without any language model.
 
 The current tree does **not** yet implement:
 
-- full M5 upgrade reconciliation and lifecycle reboot fault-injection matrix;
+- full M5 upgrade reconciliation;
 - background consolidation, retention, forgetting, or temporal freshness policy;
 - M6 explicit degraded-Mind capability-deficit policy;
 - homeostatic pressure signals or metacognitive uncertainty/freshness projection;
@@ -193,7 +198,7 @@ the corresponding milestone is implemented and gated.
 - M2: complete.
 - M3: complete after the M3 compile repair included by M4.
 - M4: implementation present; repository gates remain the acceptance authority.
-- M5: in progress; P1/P2 and the P3 transaction/Presence core are implemented, with the reboot
-  fault-injection exit gate remaining.
+- M5: P1–P3 lifecycle, continuity, consolidation transaction, Presence projection, and reboot
+  fault-injection gates are implemented; upgrade reconciliation remains a separate hardening track.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

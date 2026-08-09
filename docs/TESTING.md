@@ -42,6 +42,11 @@ split-commit windows: `after-owner-commit` and `after-terminal-commit`. It resta
 resumes the persisted run, repeats the operation, and asserts that Event1 count is unchanged by
 replay. These failpoints are test instrumentation and are unset in the normal service environment.
 
+`lifecycle-continuity` promotes both split-commit scenarios to KVM: it reboots after the owner
+commit window and again after the terminal commit window, resumes the same persistent run, and
+asserts that replay adds no Event1 contribution. The same test retains its original identity ID,
+exact run blob, `Recovering`, and logical-session continuity proof.
+
 `m4-process-integration` now launches all eight Mind daemons. It changes Lifecycle1 from `awake` to
 `idle` and back, then proves the signal-driven update reaches Presence1 and the QML-facing Presence
 proxy, including lifecycled health, without turning lifecycle mode into runtime availability.

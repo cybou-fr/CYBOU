@@ -124,10 +124,10 @@ redelivery returns the same contribution without another append. Completion comm
 deterministic Event1 `Outcome` caused by every recorded owner contribution, saves its ID in the run,
 and fails closed if any reference is absent. Lifecycle1 state commits emit `Changed`; presenced
 projects mode, run status/state, and lifecycled health through Presence1, while the QML proxy keeps
-runtime availability (`awake`) separate from lifecycle mode. The remaining P3 work is the VM
-fault-injection exit gate. The process suite already covers crashes after owner and terminal Event1
+runtime availability (`awake`) separate from lifecycle mode. The process suite covers crashes after owner and terminal Event1
 commit but before the corresponding lifecycle state commit; deterministic replay creates no second
-contribution. The remaining resilience gate promotes this coverage to the rebooting VM path.
+contribution. The headless NixOS gate promotes both split-commit windows to real reboot recovery
+and proves replay leaves Event1 count unchanged; the P3 transaction exit gate is complete.
 
 Lifecycle state mutations use rollback-on-save-failure semantics: if atomic file replacement fails,
 the service restores its previous in-memory run/mode instead of exposing state that was never

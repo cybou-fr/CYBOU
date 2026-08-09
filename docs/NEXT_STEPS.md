@@ -125,7 +125,7 @@ identity, lose accepted commitments, or report unverified success.
 
 ## P3 — Implement the consolidation MVP
 
-**Status: end-to-end transaction implemented; resilience exit gate remains.** Lifecycle1 persists idempotent capability
+**Status: complete.** Lifecycle1 persists idempotent capability
 acknowledgements tied to the run and accepted high-water mark, rejects premature completion,
 represents optional deficits, resumes the same operation keys after recovery, and automatically
 dispatches typed work to Predictor1 and Workspace1. Both owners now commit deterministic,
@@ -135,7 +135,8 @@ acknowledgement. `Completed` now requires a deterministic accepted Event1 termin
 caused by every owner result. Lifecycle mode/status/state and lifecycled health now project through
 Presence1 to the QML proxy. Process-level coverage exercises the two
 critical split-commit windows—owner Event1 commit before run acknowledgement, and terminal Event1
-commit before terminal run state—and proves idempotent recovery. VM-level interruption remains.
+commit before terminal run state—and proves idempotent recovery. The headless NixOS gate repeats
+both scenarios across real reboots and proves Event1 count is unchanged by replay.
 
 ### Vertical slice
 
@@ -163,16 +164,21 @@ Idle policy or explicit request
 
 ### Exit gate
 
-The VM test interrupts the run at every persistence boundary, restarts the affected process, and
-observes one correct terminal result with intact identity and biography.
+The VM test interrupts both distributed split-commit boundaries, reboots the machine, and observes
+one correct terminal result with intact identity and biography and no duplicate Event1 effect.
 
 ## P4 — Make lifecycle visible without moving ownership into UI
 
+**Status: in progress.** Presence1 and the QML proxy now expose lifecycle mode, status, full state,
+and lifecycled health through a signal-driven path. Runtime availability remains orthogonal to
+lifecycle mode.
+
 ### Work
 
-- extend Presence1 with lifecycle mode, run status, progress class, freshness, and deficits;
+- add explicit progress class, freshness, and deficit presentation to the existing lifecycle state;
 - replace blocking lifecycle interactions with asynchronous calls;
-- show `Idle`, `Consolidating`, `Recovering`, and `Degraded` distinctly;
+- refine the current mode label into distinct `Idle`, `Consolidating`, `Recovering`, and `Degraded`
+  visual treatments;
 - provide user interruption where policy permits;
 - keep the existing shell usable when lifecycle services are absent;
 - add QML static validation and VM interaction assertions.
