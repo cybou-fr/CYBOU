@@ -215,8 +215,8 @@ private Q_SLOTS:
         QVERIFY(count.isValid() && count.value() > 0);
 
         QDBusReply<QString> requested = interface().call(
-            QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
-            QStringLiteral("dispatch-test"), count.value(),
+            QStringLiteral("RequestRunAtCurrentHead"), QStringLiteral("consolidation"),
+            QStringLiteral("dispatch-test"),
             QStringList{QStringLiteral("predictor")},
             QStringList{QStringLiteral("workspace")});
         QVERIFY(requested.isValid() && !requested.value().isEmpty());
@@ -275,8 +275,8 @@ private Q_SLOTS:
         QDBusReply<qulonglong> before = events.call(QStringLiteral("Count"));
         QVERIFY(before.isValid());
         QDBusReply<QString> requested = interface().call(
-            QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
-            QStringLiteral("owner-crash"), before.value(),
+            QStringLiteral("RequestRunAtCurrentHead"), QStringLiteral("consolidation"),
+            QStringLiteral("owner-crash"),
             QStringList{QStringLiteral("predictor")}, QStringList{});
         QVERIFY(requested.isValid() && !requested.value().isEmpty());
         QDBusReply<bool> crashed = interface().call(QStringLiteral("Dispatch"));
@@ -318,8 +318,8 @@ private Q_SLOTS:
         QDBusReply<qulonglong> before = events.call(QStringLiteral("Count"));
         QVERIFY(before.isValid());
         QDBusReply<QString> requested = interface().call(
-            QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
-            QStringLiteral("terminal-crash"), before.value(),
+            QStringLiteral("RequestRunAtCurrentHead"), QStringLiteral("consolidation"),
+            QStringLiteral("terminal-crash"),
             QStringList{QStringLiteral("predictor")}, QStringList{});
         QVERIFY(requested.isValid() && !requested.value().isEmpty());
         QDBusReply<bool> dispatched = interface().call(QStringLiteral("Dispatch"));

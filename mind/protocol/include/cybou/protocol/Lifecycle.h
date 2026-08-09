@@ -33,6 +33,7 @@ struct LifecycleRun {
     QStringList completedWork;
     QMap<QString, QUuid> workContributions;
     QStringList missingWork;
+    QMap<QString, QString> missingCauses;
     QString terminalCause;
     QUuid terminalContributionId;
 

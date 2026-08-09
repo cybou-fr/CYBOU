@@ -23,6 +23,9 @@ public Q_SLOTS:
                        qulonglong inputHighWaterMark,
                        const QStringList &requiredCapabilities,
                        const QStringList &optionalCapabilities);
+    QString RequestRunAtCurrentHead(const QString &kind, const QString &policyId,
+                                    const QStringList &requiredCapabilities,
+                                    const QStringList &optionalCapabilities);
     QString WorkOperationKey(const QString &capability) const;
     bool AcknowledgeWork(const QString &capability, const QString &operationKey,
                          qulonglong inputHighWaterMark);

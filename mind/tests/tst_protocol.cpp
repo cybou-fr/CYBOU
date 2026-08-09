@@ -196,6 +196,7 @@ private Q_SLOTS:
         const QUuid workContribution = QUuid::createUuid();
         run.workContributions.insert(QStringLiteral("journal"), workContribution);
         run.missingWork = {QStringLiteral("prediction")};
+        run.missingCauses.insert(QStringLiteral("prediction"), QStringLiteral("optional owner unavailable"));
         run.terminalCause = QStringLiteral("completed");
         run.terminalContributionId = QUuid::createUuid();
         QVERIFY(run.isValid());
@@ -208,6 +209,7 @@ private Q_SLOTS:
         QCOMPARE(decoded.status, LifecycleRunStatus::Completed);
         QCOMPARE(decoded.workContributions.value(QStringLiteral("journal")), workContribution);
         QCOMPARE(decoded.terminalContributionId, run.terminalContributionId);
+        QCOMPARE(decoded.missingCauses, run.missingCauses);
     }
 
     void lifecycleRunFailsClosed()
@@ -227,6 +229,16 @@ private Q_SLOTS:
 
         QString error;
         decodeLifecycleRun(QByteArrayLiteral("not-cbor"), &error);
+        QVERIFY(!error.isEmpty());
+
+        run = {};
+        run.runId = QUuid::createUuid();
+        run.kind = QStringLiteral("consolidation");
+        run.policyId = QStringLiteral("invalid-status");
+        run.requestedAt = QDateTime::currentDateTimeUtc();
+        run.status = static_cast<LifecycleRunStatus>(99);
+        QVERIFY(!run.isValid());
+        decodeLifecycleRun(encodeLifecycleRun(run), &error);
         QVERIFY(!error.isEmpty());
     }
 };

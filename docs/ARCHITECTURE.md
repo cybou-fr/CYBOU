@@ -172,12 +172,12 @@ A model is replaceable. Mind state is not model hidden context.
 
 The normative direction is ADR-0021.
 
-## Future lifecycle and consolidation boundary
+## Lifecycle and consolidation boundary
 
 Cybou requires a maintenance cycle analogous in purpose to sleep, but not a biological simulation
 and not a central owner of cognition.
 
-Target relationship:
+Implemented core relationship:
 
 ```text
 lifecycle policy / trigger
@@ -198,8 +198,10 @@ The coordinator owns run orchestration only. It does not write organ storage or 
 history is never rewritten into a more convenient past; summaries, calibration, contradiction, and
 expiry decisions remain derived records with evidence.
 
-Lifecycle modes and basic consolidation belong to M5. Resource/capability-aware operation belongs
-to M6. ADR-0024 is normative.
+Lifecycle1, persistent run state, recovery, owner dispatch, durable owner results, and accepted
+terminal outcomes are implemented as the M5 P1–P3 core. Presence projection and the full reboot
+fault-injection gate remain. Resource/capability-aware operation belongs to M6. ADR-0024 is
+normative.
 
 ## Future grounding and cognitive-governance boundary
 

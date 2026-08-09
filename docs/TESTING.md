@@ -26,7 +26,9 @@ eventd-integration
 m4-process-integration
 ```
 
-`lifecycle` verifies atomic persistence and fail-closed recovery at the service-object boundary.
+`lifecycle` verifies atomic persistence, in-memory rollback after a failed save, persistent deficit
+causes, and fail-closed recovery at the service-object boundary. `protocol` rejects unknown
+lifecycle status values and round-trips the expanded run metadata.
 `lifecycled-integration` runs a real daemon in an isolated D-Bus session, starts an active run,
 restarts the process, verifies recovery with the same run identity, and rejects a duplicate D-Bus
 owner. It also launches Event1, Predictor1, and Workspace1, dispatches a bounded consolidation run

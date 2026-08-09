@@ -41,9 +41,13 @@ each owner/terminal persistence boundary and Presence projection of lifecycle st
 fault injection now kills lifecycled immediately after an owner Event1 commit and immediately after
 the terminal Event1 commit. In both cases restart enters `Recovering`, replay reuses deterministic
 contributions, and Event1 count proves that no duplicate durable effect was created.
+Lifecycle mutations roll back their in-memory candidate when persistence fails; unknown status
+values fail protocol validation; optional deficit causes persist in the run; and the preferred
+`RequestRunAtCurrentHead` API captures its accepted boundary directly from Event1.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
-The current M4 implementation is the process-isolated substrate of that model; it does not yet
+The current M1–M4 plus partial M5 implementation is the process-isolated substrate of that model;
+it does not yet
 contain the planned M8 language faculty or M9 authorized executor.
 
 ## Process topology
@@ -114,8 +118,9 @@ Identity uses a volatile runtime-session marker. Restarting `identityd` inside t
 reloads the current identity without incrementing `sessionCount`.
 
 The process integration suite additionally simulates a new login by removing only the volatile
-session marker and restarting the seven M4 processes. A booted VM reboot proof remains required
-before this becomes the full M5/M6 continuity proof.
+session marker and restarting the seven M4 processes. A focused booted NixOS VM gate already proves
+identity and exact active-run continuity across a real reboot. Upgrade reconciliation and the full
+lifecycle fault-injection matrix remain for the broader M5/M6 continuity proof.
 
 ## Durable-to-visible ordering
 
@@ -153,8 +158,8 @@ These components are intentionally useful without any language model.
 
 The current tree does **not** yet implement:
 
-- full M5 restart/reboot/upgrade continuity proof and reconciliation;
-- explicit cognitive lifecycle modes or a consolidation coordinator;
+- full M5 upgrade reconciliation and lifecycle reboot fault-injection matrix;
+- lifecycle status projection through Presence;
 - background consolidation, retention, forgetting, or temporal freshness policy;
 - M6 explicit degraded-Mind capability-deficit policy;
 - homeostatic pressure signals or metacognitive uncertainty/freshness projection;
@@ -171,9 +176,7 @@ the corresponding milestone is implemented and gated.
 - health is a minimal `Ready()/Health()` contract, not the full M6 degraded-mode model;
 - most local RPC is synchronous;
 - same-user IPC authorization is not yet a capability security boundary;
-- stronger restart/reconciliation guarantees belong to M5/M6;
-- `awake` is currently a presentation/runtime property, not the lifecycle state machine proposed by
-  ADR-0024;
+- stronger upgrade/reconciliation guarantees belong to M5/M6;
 - Journal history is not yet consolidated into a governed epistemic projection;
 - privacy classification exists, but retention and erasure propagation are not implemented;
 - no inter-node transport exists;
@@ -186,6 +189,7 @@ the corresponding milestone is implemented and gated.
 - M2: complete.
 - M3: complete after the M3 compile repair included by M4.
 - M4: implementation present; repository gates remain the acceptance authority.
-- M5: next; now includes continuity, lifecycle modes, and consolidation foundations.
+- M5: in progress; P1/P2 are complete and the P3 transaction core is implemented, with Presence
+  projection and the reboot fault-injection exit gate remaining.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

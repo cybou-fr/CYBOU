@@ -52,6 +52,16 @@ bool canTransition(LifecycleMode from, LifecycleMode to) noexcept {
 bool LifecycleRun::isTerminal() const noexcept { return status == LifecycleRunStatus::Completed || status == LifecycleRunStatus::Interrupted || status == LifecycleRunStatus::Failed; }
 bool LifecycleRun::isValid() const {
     if (schemaVersion != kLifecycleSchemaVersion || runId.isNull() || kind.trimmed().isEmpty() || policyId.trimmed().isEmpty() || !requestedAt.isValid()) return false;
+    switch (status) {
+    case LifecycleRunStatus::Requested:
+    case LifecycleRunStatus::Active:
+    case LifecycleRunStatus::Completed:
+    case LifecycleRunStatus::Interrupted:
+    case LifecycleRunStatus::Failed:
+        break;
+    default:
+        return false;
+    }
     if (!uniqueNonEmpty(requiredCapabilities) || !uniqueNonEmpty(optionalCapabilities) || !uniqueNonEmpty(completedWork) || !uniqueNonEmpty(missingWork)) return false;
     QSet<QString> required(requiredCapabilities.begin(), requiredCapabilities.end());
     for (const auto &v : optionalCapabilities) if (required.contains(v)) return false;
@@ -59,6 +69,8 @@ bool LifecycleRun::isValid() const {
     QSet<QString> completed(completedWork.begin(),completedWork.end()); QSet<QString> missing(missingWork.begin(),missingWork.end());
     for(const auto &v:completed)if(!requested.contains(v))return false;
     for(const auto &v:missing)if(!requested.contains(v)||completed.contains(v))return false;
+    for (auto it = missingCauses.cbegin(); it != missingCauses.cend(); ++it)
+        if (!missing.contains(it.key()) || it.value().trimmed().isEmpty()) return false;
     QSet<QUuid> contributionIds;
     for (auto it = workContributions.cbegin(); it != workContributions.cend(); ++it) {
         if (!completed.contains(it.key()) || it.value().isNull()
@@ -88,6 +100,10 @@ QByteArray encodeLifecycleRun(const LifecycleRun &run) {
         contributions.insert(it.key(), it.value().toString(QUuid::WithoutBraces));
     m.insert(QStringLiteral("workContributions"), contributions);
     m.insert(QStringLiteral("missingWork"), strings(run.missingWork));
+    QCborMap missingCauses;
+    for (auto it = run.missingCauses.cbegin(); it != run.missingCauses.cend(); ++it)
+        missingCauses.insert(it.key(), it.value());
+    m.insert(QStringLiteral("missingCauses"), missingCauses);
     m.insert(QStringLiteral("terminalCause"), run.terminalCause);
     m.insert(QStringLiteral("terminalContributionId"), run.terminalContributionId.toString(QUuid::WithoutBraces));
     return m.toCborValue().toCbor();
@@ -104,7 +120,11 @@ LifecycleRun decodeLifecycleRun(const QByteArray &encoded, QString *error) {
     const QCborMap contributions = m.value("workContributions").toMap();
     for (auto it = contributions.cbegin(); it != contributions.cend(); ++it)
         run.workContributions.insert(it.key().toString(), QUuid(it.value().toString()));
-    run.missingWork = stringList(m.value("missingWork")); run.terminalCause = m.value("terminalCause").toString();
+    run.missingWork = stringList(m.value("missingWork"));
+    const QCborMap missingCauses = m.value("missingCauses").toMap();
+    for (auto it = missingCauses.cbegin(); it != missingCauses.cend(); ++it)
+        run.missingCauses.insert(it.key().toString(), it.value().toString());
+    run.terminalCause = m.value("terminalCause").toString();
     run.terminalContributionId = QUuid(m.value("terminalContributionId").toString());
     if (!run.isValid()) { setError(error, "invalid lifecycle run"); return {}; } return run;
 }

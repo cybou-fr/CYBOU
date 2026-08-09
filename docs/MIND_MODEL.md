@@ -30,7 +30,7 @@ sentient, or biologically equivalent to a human mind.
 
 This document mixes two scopes, which are always labeled:
 
-- **Current substrate** — behavior implemented by the M1–M4 architecture and its current APIs.
+- **Current substrate** — behavior implemented by M1–M4 plus the current partial M5 lifecycle APIs.
 - **Future target** — capabilities planned by M5–M9 and proposed ADRs.
 
 `CURRENT_STATE.md` remains authoritative for what is implemented today.
@@ -268,8 +268,8 @@ authorize external action.
 
 ## The current substrate
 
-The current M4 design establishes the process and ownership boundaries required for the larger
-model:
+The current M1–M4 plus partial M5 design establishes the process, ownership, and lifecycle
+boundaries required for the larger model:
 
 ```text
 Plasma/QML
@@ -284,6 +284,7 @@ cybou-presenced
     ├── Predictor1  ─► cybou-predictord
     ├── Self1       ─► cybou-selfd
     ├── Workspace1  ─► cybou-workspaced
+    ├── Lifecycle1  ─► cybou-lifecycled
     └── Event1      ─► cybou-eventd ─► Journal v2
 ```
 
@@ -300,10 +301,11 @@ This substrate currently provides the foundations for:
 - bounded Workspace attention;
 - one presentation aggregator;
 - process-level failure isolation.
+- persistent lifecycle modes, bounded consolidation dispatch, and recovery.
 
 It does **not** yet provide the full future agent:
 
-- no cognitive lifecycle state machine or consolidation coordinator;
+- no lifecycle Presence projection or complete reboot fault-injection matrix;
 - no governed perception, epistemic projection, retention/forgetting, or value model;
 - no homeostatic pressure or metacognitive uncertainty projection;
 - no M6 capability-deficit model;
@@ -394,9 +396,10 @@ The same rule applies to future surfaces: CLI, mobile, voice, remote console, or
 observe/command Mind through explicit boundaries rather than reimplementing cognition inside the
 surface.
 
-## Future lifecycle and consolidation — M5
+## Lifecycle and consolidation — M5 in progress
 
-M5 adds explicit modes:
+M5 defines explicit modes; the state machine, owner, persistence, recovery, and P3 transaction core
+are implemented:
 
 ```text
 Awake → Idle → Consolidating → Awake
@@ -407,7 +410,7 @@ session boundary   → Suspended
 ```
 
 Transitions are policy decisions with typed reasons and terminal records, not incidental booleans
-inside Presence. `awake` in the current UI is not yet this state machine.
+inside Presence. The current UI does not yet project this state machine.
 
 Consolidation may verify integrity, calibrate predictions, review intentions, detect
 contradictions, close episodes, decay salience, prepare recovery, and apply retention policy. Each

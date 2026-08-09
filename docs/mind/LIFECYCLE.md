@@ -45,12 +45,18 @@ requiredCapabilities[]
 optionalCapabilities[]
 status
 completedWork[]
+workContributions{capability: contributionId}
 missingWork[]
+missingCauses{capability: cause}
 terminalCause
+terminalContributionId
 ```
 
-The high-water mark makes input deterministic. Contributions accepted later remain valid but are
-not silently pulled into the active run.
+The high-water mark makes input deterministic. Production requests use
+`RequestRunAtCurrentHead`, so Lifecycle1 captures Event1's accepted count rather than trusting a
+caller-supplied boundary. The explicit-mark `RequestRun` remains for compatibility and controlled
+recovery/testing. Contributions accepted later remain valid but are not silently pulled into the
+active run.
 
 ## Candidate typed events
 
@@ -95,6 +101,7 @@ ordinary consolidation. Narrow non-interruptible regions are limited to explicit
 migrations and expose their reason.
 
 - A missing optional capability yields a degraded report when policy permits.
+- Its non-empty cause is persisted and a conflicting replay cause fails closed.
 - A missing required capability prevents successful completion.
 - An interrupted run records accepted partial work.
 - Recovery reads partial/terminal records before retrying.
@@ -119,6 +126,10 @@ and fails closed if any reference is absent. The remaining P3 work is the fault-
 and Presence projection. The process suite already covers crashes after owner and terminal Event1
 commit but before the corresponding lifecycle state commit; deterministic replay creates no second
 contribution. The remaining resilience gate promotes this coverage to the rebooting VM path.
+
+Lifecycle state mutations use rollback-on-save-failure semantics: if atomic file replacement fails,
+the service restores its previous in-memory run/mode instead of exposing state that was never
+persisted. Unknown lifecycle status values also fail schema validation.
 
 ## Privacy and retention
 
