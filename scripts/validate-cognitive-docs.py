@@ -88,6 +88,7 @@ def main(argv: list[str]) -> int:
         "adr25": repo / "docs/adr/ADR-0025-grounding-epistemics-and-cognitive-governance.md",
         "adr26": repo / "docs/adr/ADR-0026-lifecycle-owner-and-wire-contract.md",
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
+        "health": repo / "docs/mind/HEALTH.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
@@ -290,6 +291,14 @@ def main(argv: list[str]) -> int:
         ("M5 acceptance", "## M5 acceptance evidence"),
     ):
         require(paths["lifecycle"], label, needle)
+
+    for label, needle in (
+        ("health schema", "## Schema v1"),
+        ("health states", "## State vocabularies"),
+        ("health validation", "## Validation invariants"),
+        ("health ownership", "## Ownership boundary"),
+    ):
+        require(paths["health"], label, needle)
 
     for label, needle in (
         ("epistemic statuses", "## Epistemic projection"),

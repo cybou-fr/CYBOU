@@ -23,10 +23,11 @@ Then read the implementation documents in this order:
 10. [Failure Modes](FAILURE_MODES.md)
 11. [Cognitive Lifecycle and Consolidation](LIFECYCLE.md) — implemented M5 contract
 12. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — M6/M7 target
+13. [Capability and Health Contract](HEALTH.md) — implemented P6.1 protocol boundary
 
-Documents 1–10 primarily specify or explain the current substrate and immediate continuity
-boundary. Documents 11–12 are future-target contracts and must not be read as current
-implementation claims.
+Documents 1–11 primarily specify or explain the current substrate and continuity boundary.
+Document 12 is a future-target contract. Document 13 separates the implemented P6.1 wire contract
+from the still-planned M6 owner, dependency policy, and UI behavior.
 
 For current implementation status, see [Current State](../CURRENT_STATE.md).
 For milestone semantics, see [Roadmap](../ROADMAP.md).

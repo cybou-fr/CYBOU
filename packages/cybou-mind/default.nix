@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
-# M4: seven real process boundaries plus the QML Presence proxy.
+# M5: eight real process boundaries plus the QML Presence proxy.
 {
   lib,
   stdenv,

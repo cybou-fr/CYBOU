@@ -263,7 +263,9 @@ v0-to-v1 migration is a separate hardening track and must not be described as su
 
 ## P6.1 — Freeze the capability and health contract
 
-**Status: next.** Protocol and ownership decisions land before daemon or UI behavior.
+**Status: complete.** Schema-v1 component health, capability state, typed deficit cause, recovery
+policy, snapshot CBOR, fail-closed validation, component transitions, and focused tests are present.
+The protocol deliberately contains no dependency graph, daemon, D-Bus service, or UI policy.
 
 ### Work
 
@@ -282,6 +284,8 @@ the affected capability, dependency, cause, detection time, last verified succes
 policy, and evidence/error reference where available.
 
 ## P6.2 — Implement the dependency graph and health owner
+
+**Status: next.**
 
 ### Work
 

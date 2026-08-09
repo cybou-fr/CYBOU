@@ -13,7 +13,7 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs fourteen CTest suites, including Event1, lifecycle persistence/recovery,
+The Mind package runs fifteen CTest suites, including Event1, lifecycle persistence/recovery,
 Lifecycle1 process restart, and seven-process M4 integration. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count.
@@ -60,6 +60,12 @@ consolidation transaction exit gate.
 The focused P4 Plasma VM gate restarts the shipped `plasma-plasmashell.service` around an active
 run, observes a replacement PID and restored Plasma D-Bus surface, and proves that neither the
 exact persisted lifecycle run nor Event1 count changes across UI recreation.
+
+P6.1 adds schema-v1 `CapabilitySnapshot` protocol types. Component health, capability state, typed
+deficit cause, recovery policy, observation/verification time, impact, and evidence/error reference
+are encoded separately and validated fail closed. Focused tests cover round trip, unknown schema and
+enum rejection, malformed/inconsistent state, dependency/uniqueness invariants, and component
+transition legality. No dependency graph, health owner, Health1 service, or UI claim is implemented yet.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
@@ -177,7 +183,7 @@ The current tree does **not** yet implement:
 
 - in-place upgrade reconciliation beyond the tested schema-v0-to-v1 migration;
 - background consolidation, retention, forgetting, or temporal freshness policy;
-- M6 explicit degraded-Mind capability-deficit policy;
+- M6 dependency graph, health owner, and degraded-Mind capability policy beyond the P6.1 wire contract;
 - homeostatic pressure signals or general metacognitive uncertainty/evidence-freshness projection
   (only lifecycle-request freshness is currently projected);
 - M7 inter-node transport, replication, or partition handling;
@@ -190,7 +196,7 @@ the corresponding milestone is implemented and gated.
 
 ## Current limitations
 
-- health is a minimal `Ready()/Health()` contract, not the full M6 degraded-mode model;
+- runtime health is still a minimal `Ready()/Health()` contract; P6.1 types are not yet served by a health owner;
 - most local RPC is synchronous;
 - same-user IPC authorization is not yet a capability security boundary;
 - stronger in-place upgrade/reconciliation guarantees remain a hardening track;
@@ -208,6 +214,7 @@ the corresponding milestone is implemented and gated.
 - M4: implementation present; repository gates remain the acceptance authority.
 - M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
   projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
-- M6: current milestone; capability contracts and degraded-mode policy are not implemented yet.
+- M6: P6.1 capability/health wire contract and focused tests are implemented; ownership,
+  dependency policy, runtime projection, resilience, and fault-injection gates remain.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

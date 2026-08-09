@@ -60,6 +60,7 @@ Read the [Mind index](mind/README.md), or open a specific contract:
 - [Continuity](mind/CONTINUITY.md)
 - [Failure Modes](mind/FAILURE_MODES.md)
 - [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — implemented M5 contract and future policy
+- [Capability and Health Contract](mind/HEALTH.md) — implemented P6.1 wire types and invariants
 - [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M6/M7 contract
 
 ## Security

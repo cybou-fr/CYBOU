@@ -35,6 +35,11 @@ target_link_libraries(test-protocol PRIVATE cybou-protocol Qt6::Test)
 add_test(NAME protocol COMMAND test-protocol)
 set_tests_properties(protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-health-protocol tst_health_protocol.cpp)
+target_link_libraries(test-health-protocol PRIVATE cybou-protocol Qt6::Test)
+add_test(NAME health-protocol COMMAND test-health-protocol)
+set_tests_properties(health-protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(test-lifecycle tst_lifecycle.cpp)
 target_link_libraries(test-lifecycle PRIVATE cybou-lifecycle-service cybou-fabric Qt6::Test)
 add_test(NAME lifecycle COMMAND test-lifecycle)

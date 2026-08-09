@@ -9,6 +9,7 @@ SPDX-License-Identifier: MIT
 
 ```text
 org.cybou.Mind.Event1
+org.cybou.Mind.Lifecycle1
 org.cybou.Mind.Identity1
 org.cybou.Mind.Intention1
 org.cybou.Mind.Predictor1
@@ -32,7 +33,7 @@ Other organ projections use fabric CBOR version 1:
 
 This representation is not canonical Journal hashing.
 
-## Lifecycle contract
+## Baseline service contract
 
 Every organ exposes at least:
 
@@ -40,6 +41,10 @@ Every organ exposes at least:
 Ready() -> bool
 Health() -> string
 ```
+
+P6.1 additionally defines schema-v1 `CapabilitySnapshot` CBOR in
+[Capability and Health Contract](HEALTH.md). It is not yet served by D-Bus; `Health1` and its owner
+belong to P6.2.
 
 ## Presentation signal ordering
 
