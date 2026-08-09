@@ -95,6 +95,17 @@ Item {
                 icon: "view-refresh"
             }
 
+            Button {
+                Layout.fillWidth: true
+                visible: mind.lifecycleStatus === "active"
+                enabled: !mind.lifecycleCommandPending
+                text: mind.lifecycleCommandPending
+                    ? i18n("Interrupting lifecycle run…")
+                    : i18n("Interrupt lifecycle run")
+                icon.name: "process-stop"
+                onClicked: mind.interruptLifecycle(i18n("interrupted by user"))
+            }
+
             GridLayout {
                 Layout.fillWidth: true
                 columns: width >= 280 ? 2 : 1

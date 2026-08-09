@@ -177,17 +177,21 @@ interpreting the durable run schema. Runtime availability remains orthogonal to 
 ### Work
 
 - [done] add explicit progress class, freshness, and deficit presentation to the lifecycle projection;
-- replace blocking lifecycle interactions with asynchronous calls;
-- refine the current mode label into distinct `Idle`, `Consolidating`, `Recovering`, and `Degraded`
+- [done] route user lifecycle interruption through a non-blocking QML D-Bus call with pending and
+  timeout-safe completion state;
+- [done] refine the current mode label into distinct `Idle`, `Consolidating`, `Recovering`, and `Degraded`
   visual treatments;
-- provide user interruption where policy permits;
-- keep the existing shell usable when lifecycle services are absent;
+- [done] provide user interruption for active runs while lifecycled retains terminal-state ownership;
+- [done] keep the existing shell usable when lifecycle services are absent;
 - add QML static validation and VM interaction assertions.
 
 ### Exit gate
 
 Destroying/recreating Plasma or the Presence proxy neither changes lifecycle state nor duplicates a
 run. A timeout cannot freeze the shell for the current five-second blocking RPC window.
+
+Both invariants now pass at process level; the remaining P4 exit work is the VM interaction
+assertion for the shipped Plasma surface.
 
 ## P5 — Close M5 and publish evidence
 

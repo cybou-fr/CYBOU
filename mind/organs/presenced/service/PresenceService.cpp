@@ -8,6 +8,7 @@
 #include <QCborMap>
 #include <QCborValue>
 #include <QDateTime>
+#include <QThread>
 
 namespace cybou {
 
@@ -395,6 +396,32 @@ QByteArray PresenceService::Predict(
     }
 
     return FabricCodec::encodeMap(prediction);
+}
+
+bool PresenceService::InterruptLifecycle(const QString &cause)
+{
+    m_lastError.clear();
+    bool delayOk = false;
+    const int delayMs = qEnvironmentVariableIntValue(
+        "CYBOU_PRESENCE_INTERRUPT_DELAY_MS", &delayOk);
+    if (delayOk && delayMs > 0) {
+        QThread::msleep(static_cast<unsigned long>(delayMs));
+        m_lastError = QStringLiteral("injected lifecycle interruption timeout");
+        return false;
+    }
+    const QString reason = cause.trimmed().isEmpty()
+        ? QStringLiteral("interrupted by user")
+        : cause.trimmed();
+    const QVariantMap state = m_lifecycle.state();
+    if (state.value(QStringLiteral("status")).toString() != QStringLiteral("active")) {
+        m_lastError = QStringLiteral("no active lifecycle run to interrupt");
+        return false;
+    }
+    if (!m_lifecycle.finishRun(QStringLiteral("interrupted"), reason)) {
+        m_lastError = m_lifecycle.lastError();
+        return false;
+    }
+    return true;
 }
 
 } // namespace cybou

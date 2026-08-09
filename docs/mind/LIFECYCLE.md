@@ -157,6 +157,11 @@ Freshness is `current` below five minutes, `aging` below one hour, `stale` there
 when no run timestamp exists. These thresholds describe projection age, not evidence validity.
 `awake` continues to mean runtime availability and is never inferred from lifecycle mode.
 
+The QML proxy sends user interruption asynchronously to Presence1 and exposes a read-only pending
+flag. Presence1 validates that a run is active and asks Lifecycle1 to persist `Interrupted`; neither
+the applet nor presenced writes lifecycle state. The five-second transport timeout completes as an
+error without blocking the Plasma event loop.
+
 ## P2 continuity matrix
 
 | Boundary | Current automated evidence | Remaining evidence |

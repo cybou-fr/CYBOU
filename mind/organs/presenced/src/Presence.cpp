@@ -6,6 +6,10 @@
 #include "cybou/fabric/OrganClients.h"
 #include "cybou/runtime/StatePaths.h"
 
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
+
 namespace cybou {
 
 namespace {
@@ -315,6 +319,46 @@ QVariantMap Presence::lifecycleState() const
 QVariantMap Presence::lifecycleProjection() const
 {
     return m_snapshot.value(QStringLiteral("lifecycleProjection")).toMap();
+}
+
+void Presence::interruptLifecycle(const QString &cause)
+{
+    if (!m_awake || m_lifecycleCommandPending) {
+        return;
+    }
+
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected()) {
+        m_lastError = QStringLiteral("the user D-Bus session is unavailable");
+        Q_EMIT changed();
+        return;
+    }
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
+        QString::fromLatin1(kPresenceEndpoint.service),
+        QString::fromLatin1(kPresenceEndpoint.objectPath),
+        QString::fromLatin1(kPresenceEndpoint.interfaceName),
+        QStringLiteral("InterruptLifecycle"));
+    message << cause;
+
+    m_lifecycleCommandPending = true;
+    m_lastError.clear();
+    Q_EMIT changed();
+
+    auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message, 5000), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher]() {
+        const QDBusMessage reply = watcher->reply();
+        m_lifecycleCommandPending = false;
+        if (reply.type() == QDBusMessage::ErrorMessage) {
+            m_lastError = QStringLiteral("%1: %2").arg(reply.errorName(), reply.errorMessage());
+        } else if (reply.arguments().isEmpty() || !reply.arguments().first().toBool()) {
+            m_lastError = QStringLiteral("lifecycle interruption was rejected");
+        } else {
+            refresh();
+        }
+        watcher->deleteLater();
+        Q_EMIT changed();
+    });
 }
 
 } // namespace cybou

@@ -251,6 +251,12 @@ QVariantMap LifecycleClient::state() const
     return decodeMap(m_rpc.callBytes(QStringLiteral("State")), &m_codecError);
 }
 
+bool LifecycleClient::finishRun(const QString &status, const QString &cause) const
+{
+    m_codecError.clear();
+    return m_rpc.callBool(QStringLiteral("FinishRun"), {status, cause});
+}
+
 QString LifecycleClient::lastError() const
 {
     return bestError(m_codecError, m_rpc);

@@ -43,6 +43,7 @@ class Presence : public QObject
     Q_PROPERTY(QString lifecycleStatus READ lifecycleStatus NOTIFY changed)
     Q_PROPERTY(QVariantMap lifecycleState READ lifecycleState NOTIFY changed)
     Q_PROPERTY(QVariantMap lifecycleProjection READ lifecycleProjection NOTIFY changed)
+    Q_PROPERTY(bool lifecycleCommandPending READ lifecycleCommandPending NOTIFY changed)
 
 public:
     explicit Presence(QObject *parent = nullptr);
@@ -77,6 +78,8 @@ public:
     QString lifecycleStatus() const;
     QVariantMap lifecycleState() const;
     QVariantMap lifecycleProjection() const;
+    bool lifecycleCommandPending() const { return m_lifecycleCommandPending; }
+    Q_INVOKABLE void interruptLifecycle(const QString &cause = QString());
 
     QString lastError() const { return m_lastError; }
 
@@ -91,6 +94,7 @@ private:
     QVariantMap m_snapshot;
     QString m_lastError;
     bool m_awake{false};
+    bool m_lifecycleCommandPending{false};
 };
 
 } // namespace cybou

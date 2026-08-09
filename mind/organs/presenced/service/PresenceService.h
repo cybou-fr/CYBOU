@@ -34,6 +34,7 @@ public Q_SLOTS:
     bool AbandonIndex(int index);
     bool Observe(const QString &subject, double value);
     QByteArray Predict(const QString &subject);
+    bool InterruptLifecycle(const QString &cause);
 
 Q_SIGNALS:
     void Changed();

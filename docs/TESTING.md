@@ -50,14 +50,18 @@ exact run blob, `Recovering`, and logical-session continuity proof.
 `m4-process-integration` now launches all eight Mind daemons. It changes Lifecycle1 from `awake` to
 `idle` and back, then proves the signal-driven update reaches Presence1 and the QML-facing Presence
 proxy, including lifecycled health, without turning lifecycle mode into runtime availability.
+It also recreates the proxy three times around one active run and verifies unchanged run identity,
+status, and Event1 count. `CYBOU_PRESENCE_INTERRUPT_DELAY_MS` is test-only fault injection:
+presenced delays and rejects an interruption without touching Lifecycle1. A client heartbeat proves
+the QML event loop remains responsive until the async transport timeout completes.
 
 ## Process integration
 
-`m4-process-integration` runs inside an isolated `dbus-run-session`, launches seven executables,
+`m4-process-integration` runs inside an isolated `dbus-run-session`, launches eight executables,
 and verifies:
 
 ```text
-seven distinct process IDs
+eight distinct process IDs
 all organ D-Bus services become ready
 two QML Presence proxies do not create another identity session
 Promise crosses presenced -> intentiond -> eventd

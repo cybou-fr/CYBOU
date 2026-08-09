@@ -128,6 +128,7 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
     QVariantMap state() const;
+    bool finishRun(const QString &status, const QString &cause) const;
     QString lastError() const;
 
 Q_SIGNALS:

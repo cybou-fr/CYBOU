@@ -8,11 +8,14 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QElapsedTimer>
+#include <QMap>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSet>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 
 #include <memory>
 
@@ -57,11 +60,15 @@ private:
     }
 
     std::unique_ptr<QProcess> start(
-        const QString &path)
+        const QString &path,
+        const QMap<QString, QString> &overrides = {})
     {
         auto process = std::make_unique<QProcess>();
         process->setProgram(path);
-        process->setProcessEnvironment(environment());
+        QProcessEnvironment env = environment();
+        for (auto it = overrides.cbegin(); it != overrides.cend(); ++it)
+            env.insert(it.key(), it.value());
+        process->setProcessEnvironment(env);
         process->start();
 
         if (!process->waitForStarted(3000)) {
@@ -252,8 +259,94 @@ private Q_SLOTS:
             presence.organHealth().value(QStringLiteral("lifecycled")).toString(),
             QStringLiteral("healthy"));
 
+        const QString runId = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("consolidation"), QStringLiteral("ui-interruption-test"),
+             QVariant::fromValue<qulonglong>(1), QStringList{}, QStringList{}});
+        QVERIFY(!runId.isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleStatus(), QStringLiteral("active"), 5000);
+        presence.interruptLifecycle(QStringLiteral("process integration test"));
+        QTRY_VERIFY_WITH_TIMEOUT(!presence.lifecycleCommandPending(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleStatus(), QStringLiteral("interrupted"), 5000);
+        QCOMPARE(presence.lifecycleMode(), QStringLiteral("recovering"));
+        QVERIFY2(presence.lastError().isEmpty(), qPrintable(presence.lastError()));
+
+        QVERIFY(lifecycle.callBool(QStringLiteral("ResumeRun")) == false);
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
         QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleMode(), QStringLiteral("awake"), 5000);
+    }
+
+    void proxyRecreationDoesNotMutateOrDuplicateLifecycleRun()
+    {
+        RpcClient lifecycle(kLifecycleEndpoint);
+        EventClient events;
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const qulonglong contributionsBefore = events.count();
+        const QString runId = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("consolidation"), QStringLiteral("proxy-recreation-test"),
+             QVariant::fromValue<qulonglong>(contributionsBefore),
+             QStringList{}, QStringList{}});
+        QVERIFY(!runId.isEmpty());
+
+        for (int i = 0; i < 3; ++i) {
+            Presence proxy;
+            QVERIFY2(proxy.wake(), qPrintable(proxy.lastError()));
+            QCOMPARE(proxy.lifecycleState().value(QStringLiteral("runId")).toString(), runId);
+            QCOMPARE(proxy.lifecycleStatus(), QStringLiteral("active"));
+        }
+
+        QCOMPARE(events.count(), contributionsBefore);
+        const QVariantMap state = LifecycleClient().state();
+        QCOMPARE(state.value(QStringLiteral("runId")).toString(), runId);
+        QCOMPARE(state.value(QStringLiteral("status")).toString(), QStringLiteral("active"));
+        QVERIFY(lifecycle.callBool(
+            QStringLiteral("FinishRun"),
+            {QStringLiteral("interrupted"), QStringLiteral("proxy recreation test cleanup")}));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
+    }
+
+    void lifecycleTimeoutDoesNotBlockProxyEventLoopOrMutateRun()
+    {
+        RpcClient lifecycle(kLifecycleEndpoint);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QString runId = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("consolidation"), QStringLiteral("async-timeout-test"),
+             QVariant::fromValue<qulonglong>(1), QStringList{}, QStringList{}});
+        QVERIFY(!runId.isEmpty());
+
+        stop(m_presenced);
+        m_presenced = start(
+            m_presencedPath,
+            {{QStringLiteral("CYBOU_PRESENCE_INTERRUPT_DELAY_MS"), QStringLiteral("6000")}});
+        QVERIFY(m_presenced);
+        PresenceClient delayedPresence;
+        QTRY_VERIFY_WITH_TIMEOUT(delayedPresence.ready(), 5000);
+        Presence proxy;
+        QVERIFY2(proxy.wake(), qPrintable(proxy.lastError()));
+
+        bool heartbeat = false;
+        QTimer::singleShot(100, this, [&heartbeat]() { heartbeat = true; });
+        QElapsedTimer elapsed;
+        elapsed.start();
+        proxy.interruptLifecycle(QStringLiteral("timeout test"));
+        QVERIFY2(elapsed.elapsed() < 100, "async lifecycle command blocked its caller");
+        QTRY_VERIFY_WITH_TIMEOUT(heartbeat, 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!proxy.lifecycleCommandPending(), 6500);
+        QVERIFY(!proxy.lastError().isEmpty());
+        QCOMPARE(LifecycleClient().state().value(QStringLiteral("runId")).toString(), runId);
+        QCOMPARE(LifecycleClient().state().value(QStringLiteral("status")).toString(), QStringLiteral("active"));
+
+        stop(m_presenced);
+        m_presenced = start(m_presencedPath);
+        QVERIFY(m_presenced);
+        PresenceClient presence;
+        QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+        QVERIFY(lifecycle.callBool(
+            QStringLiteral("FinishRun"),
+            {QStringLiteral("interrupted"), QStringLiteral("timeout test cleanup")}));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
     }
 
     void commandsCrossRealOrganProcesses()
