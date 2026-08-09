@@ -169,13 +169,14 @@ one correct terminal result with intact identity and biography and no duplicate 
 
 ## P4 — Make lifecycle visible without moving ownership into UI
 
-**Status: in progress.** Presence1 and the QML proxy now expose lifecycle mode, status, full state,
-and lifecycled health through a signal-driven path. Runtime availability remains orthogonal to
-lifecycle mode.
+**Status: in progress.** Presence1 and the QML proxy expose lifecycle mode, status, full state,
+lifecycled health, and a read-only projection with progress class/percentage, request freshness,
+and causal capability deficits. Mind Header and Dashboard render distinct lifecycle modes without
+interpreting the durable run schema. Runtime availability remains orthogonal to lifecycle mode.
 
 ### Work
 
-- add explicit progress class, freshness, and deficit presentation to the existing lifecycle state;
+- [done] add explicit progress class, freshness, and deficit presentation to the lifecycle projection;
 - replace blocking lifecycle interactions with asynchronous calls;
 - refine the current mode label into distinct `Idle`, `Consolidating`, `Recovering`, and `Degraded`
   visual treatments;

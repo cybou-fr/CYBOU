@@ -312,4 +312,9 @@ QVariantMap Presence::lifecycleState() const
     return m_snapshot.value(QStringLiteral("lifecycleState")).toMap();
 }
 
+QVariantMap Presence::lifecycleProjection() const
+{
+    return m_snapshot.value(QStringLiteral("lifecycleProjection")).toMap();
+}
+
 } // namespace cybou

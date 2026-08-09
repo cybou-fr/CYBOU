@@ -142,7 +142,7 @@ def main(argv: list[str]) -> int:
         "### 7. Consolidation derives; it does not rewrite",
         "### 8. Perception is not truth",
         "### 9. Forgetting and values are governed",
-        "## Future lifecycle and consolidation — M5",
+        "## Lifecycle and consolidation — M5 in progress",
         "## Future degraded cognition — M6",
         "## Future grounded and distributed cognition — M7",
         "## Future language faculty — M8",

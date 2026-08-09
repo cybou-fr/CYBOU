@@ -7,8 +7,64 @@
 
 #include <QCborMap>
 #include <QCborValue>
+#include <QDateTime>
 
 namespace cybou {
+
+namespace {
+
+QVariantMap lifecycleProjection(const QVariantMap &state)
+{
+    QVariantMap projection;
+    const QString mode = state.value(QStringLiteral("mode")).toString();
+    const QString status = state.value(QStringLiteral("status")).toString();
+    const QStringList required = state.value(QStringLiteral("requiredCapabilities")).toStringList();
+    const QStringList optional = state.value(QStringLiteral("optionalCapabilities")).toStringList();
+    const QStringList completed = state.value(QStringLiteral("completedWork")).toStringList();
+    const QStringList missing = state.value(QStringLiteral("missingWork")).toStringList();
+    const int total = required.size() + optional.size();
+    const int resolved = completed.size() + missing.size();
+
+    QString progressClass = QStringLiteral("inactive");
+    if (mode == QStringLiteral("recovering")) progressClass = QStringLiteral("recovering");
+    else if (mode == QStringLiteral("degraded")) progressClass = QStringLiteral("degraded");
+    else if (status == QStringLiteral("active")) progressClass = QStringLiteral("running");
+    else if (status == QStringLiteral("completed")) progressClass = QStringLiteral("complete");
+    else if (status == QStringLiteral("failed") || status == QStringLiteral("interrupted"))
+        progressClass = QStringLiteral("failed");
+
+    QVariantList deficits;
+    const QVariantMap causes = state.value(QStringLiteral("missingCauses")).toMap();
+    for (const QString &capability : missing) {
+        QVariantMap deficit;
+        deficit[QStringLiteral("capability")] = capability;
+        deficit[QStringLiteral("cause")] = causes.value(capability).toString();
+        deficits.append(deficit);
+    }
+
+    const QDateTime requestedAt = state.value(QStringLiteral("requestedAt")).toDateTime();
+    const qint64 ageSeconds = requestedAt.isValid()
+        ? qMax<qint64>(0, requestedAt.secsTo(QDateTime::currentDateTimeUtc()))
+        : -1;
+    QString freshnessClass = QStringLiteral("unknown");
+    if (ageSeconds >= 0 && ageSeconds < 300) freshnessClass = QStringLiteral("current");
+    else if (ageSeconds >= 0 && ageSeconds < 3600) freshnessClass = QStringLiteral("aging");
+    else if (ageSeconds >= 0) freshnessClass = QStringLiteral("stale");
+
+    projection[QStringLiteral("mode")] = mode;
+    projection[QStringLiteral("status")] = status;
+    projection[QStringLiteral("progressClass")] = progressClass;
+    projection[QStringLiteral("progressPercent")] = total > 0 ? (resolved * 100) / total : 0;
+    projection[QStringLiteral("resolvedWork")] = resolved;
+    projection[QStringLiteral("totalWork")] = total;
+    projection[QStringLiteral("deficits")] = deficits;
+    projection[QStringLiteral("freshnessClass")] = freshnessClass;
+    projection[QStringLiteral("ageSeconds")] = ageSeconds;
+    projection[QStringLiteral("requestedAt")] = requestedAt;
+    return projection;
+}
+
+} // namespace
 
 PresenceService::PresenceService(QObject *parent)
     : QObject(parent)
@@ -112,6 +168,7 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("lifecycleState")] = lifecycle;
     map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
     map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
+    map[QStringLiteral("lifecycleProjection")] = lifecycleProjection(lifecycle);
     map[QStringLiteral("narration")] =
         self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;

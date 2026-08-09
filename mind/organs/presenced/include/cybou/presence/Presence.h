@@ -42,6 +42,7 @@ class Presence : public QObject
     Q_PROPERTY(QString lifecycleMode READ lifecycleMode NOTIFY changed)
     Q_PROPERTY(QString lifecycleStatus READ lifecycleStatus NOTIFY changed)
     Q_PROPERTY(QVariantMap lifecycleState READ lifecycleState NOTIFY changed)
+    Q_PROPERTY(QVariantMap lifecycleProjection READ lifecycleProjection NOTIFY changed)
 
 public:
     explicit Presence(QObject *parent = nullptr);
@@ -75,6 +76,7 @@ public:
     QString lifecycleMode() const;
     QString lifecycleStatus() const;
     QVariantMap lifecycleState() const;
+    QVariantMap lifecycleProjection() const;
 
     QString lastError() const { return m_lastError; }
 

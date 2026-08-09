@@ -151,6 +151,12 @@ M5 should prove:
 - logout/reboot recovery preserves identity and open commitments;
 - lifecycle and freshness are visible without making Presence an owner.
 
+Presence derives a read-only lifecycle projection from `Lifecycle1.State`: resolved/total work and
+percentage, a semantic progress class, explicit `{ capability, cause }` deficits, and request age.
+Freshness is `current` below five minutes, `aging` below one hour, `stale` thereafter, and `unknown`
+when no run timestamp exists. These thresholds describe projection age, not evidence validity.
+`awake` continues to mean runtime availability and is never inferred from lifecycle mode.
+
 ## P2 continuity matrix
 
 | Boundary | Current automated evidence | Remaining evidence |

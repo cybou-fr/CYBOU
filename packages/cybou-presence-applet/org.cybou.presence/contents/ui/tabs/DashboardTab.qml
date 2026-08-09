@@ -22,6 +22,7 @@ Item {
             "predictord",
             "selfd",
             "workspaced",
+            "lifecycled",
             "presenced"
         ]
         const unhealthy = []
@@ -35,6 +36,22 @@ Item {
         return unhealthy.length === 0
             ? i18n("All cognitive services report healthy.")
             : i18n("Attention required: %1", unhealthy.join(", "))
+    }
+
+    function lifecycleSummary() {
+        const lifecycle = mind.lifecycleProjection || {}
+        const deficits = lifecycle.deficits || []
+        let text = i18n("%1 · %2% resolved · freshness: %3",
+                        String(lifecycle.mode || i18n("unknown")),
+                        Number(lifecycle.progressPercent || 0),
+                        String(lifecycle.freshnessClass || i18n("unknown")))
+        if (deficits.length > 0) {
+            const names = []
+            for (let i = 0; i < deficits.length; ++i)
+                names.push(String(deficits[i].capability))
+            text += i18n(" · deficits: %1", names.join(", "))
+        }
+        return text
     }
 
     Flickable {
@@ -69,6 +86,13 @@ Item {
                 title: i18n("Runtime")
                 text: dashboardTab.runtimeSummary()
                 icon: "system-run"
+            }
+
+            InfoCard {
+                Layout.fillWidth: true
+                title: i18n("Lifecycle")
+                text: dashboardTab.lifecycleSummary()
+                icon: "view-refresh"
             }
 
             GridLayout {

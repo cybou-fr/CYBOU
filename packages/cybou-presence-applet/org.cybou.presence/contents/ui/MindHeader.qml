@@ -16,6 +16,38 @@ Item {
     readonly property bool awake: Boolean(mind && mind.awake)
     readonly property string lifecycleMode: mind && mind.lifecycleMode
         ? String(mind.lifecycleMode) : ""
+    readonly property var lifecycle: mind && mind.lifecycleProjection
+        ? mind.lifecycleProjection : ({})
+
+    function modeLabel(mode) {
+        const labels = {
+            "awake": i18n("Awake"), "idle": i18n("Idle"),
+            "consolidating": i18n("Consolidating"), "recovering": i18n("Recovering"),
+            "degraded": i18n("Degraded"), "maintenance": i18n("Maintenance"),
+            "suspended": i18n("Suspended")
+        }
+        return labels[mode] || i18n("Unknown")
+    }
+
+    function modeColor(mode) {
+        if (mode === "degraded") return Kirigami.Theme.negativeTextColor
+        if (mode === "recovering" || mode === "maintenance") return Kirigami.Theme.neutralTextColor
+        if (mode === "awake" || mode === "idle") return Kirigami.Theme.positiveTextColor
+        return Kirigami.Theme.highlightColor
+    }
+
+    function lifecycleSummary() {
+        if (!root.awake) return i18n("Waiting for cognitive services")
+        const label = root.modeLabel(root.lifecycleMode)
+        if (root.lifecycle.progressClass === "running"
+                || root.lifecycle.progressClass === "recovering")
+            return i18n("Cognitive runtime connected · %1 · %2%", label,
+                        Number(root.lifecycle.progressPercent || 0))
+        if (root.lifecycle.freshnessClass && root.lifecycle.freshnessClass !== "unknown")
+            return i18n("Cognitive runtime connected · %1 · %2", label,
+                        String(root.lifecycle.freshnessClass))
+        return i18n("Cognitive runtime connected · %1", label)
+    }
 
     implicitHeight: 58
 
@@ -46,9 +78,7 @@ Item {
 
             Label {
                 Layout.fillWidth: true
-                text: root.awake
-                    ? i18n("Cognitive runtime connected · %1", root.lifecycleMode || i18n("unknown"))
-                    : i18n("Waiting for cognitive services")
+                text: root.lifecycleSummary()
                 font.pixelSize: 10
                 opacity: 0.54
                 elide: Text.ElideRight
@@ -63,7 +93,7 @@ Item {
                 anchors.fill: parent
                 radius: 12
                 color: root.awake
-                    ? Kirigami.Theme.highlightColor
+                    ? root.modeColor(root.lifecycleMode)
                     : Kirigami.Theme.disabledTextColor
                 opacity: root.awake ? 0.12 : 0.08
             }
@@ -78,13 +108,13 @@ Item {
                     Layout.preferredHeight: 6
                     radius: width / 2
                     color: root.awake
-                        ? Kirigami.Theme.highlightColor
+                        ? root.modeColor(root.lifecycleMode)
                         : Kirigami.Theme.disabledTextColor
                 }
 
                 Label {
                     text: root.awake
-                        ? (root.lifecycleMode || i18n("Online"))
+                        ? root.modeLabel(root.lifecycleMode)
                         : i18n("Offline")
                     font.pixelSize: 10
                     font.bold: true

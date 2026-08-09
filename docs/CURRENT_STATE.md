@@ -45,9 +45,11 @@ values fail protocol validation; optional deficit causes persist in the run; and
 `RequestRunAtCurrentHead` API captures its accepted boundary directly from Event1.
 
 Lifecycle1 emits `Changed` after each accepted state commit. Presenced subscribes through a typed
-LifecycleClient and projects `lifecycleMode`, `lifecycleStatus`, the full lifecycle state, and
-lifecycled health through Presence1. The QML proxy exposes these as read-only properties; the Mind
-header displays the current mode while runtime availability remains a separate `awake` dimension.
+LifecycleClient and projects `lifecycleMode`, `lifecycleStatus`, the full lifecycle state,
+lifecycled health, and a derived progress/freshness/deficit view through Presence1. The QML proxy
+exposes these as read-only properties; Mind Header and Dashboard give lifecycle modes distinct
+visual treatment while runtime availability remains a separate `awake` dimension. Projection age
+does not claim that underlying evidence is epistemically fresh.
 
 The focused headless NixOS gate now covers three boot cycles: baseline active-run/identity
 continuity, reboot after an owner Event1 commit but before coordinator acknowledgement, and reboot
@@ -171,7 +173,8 @@ The current tree does **not** yet implement:
 - full M5 upgrade reconciliation;
 - background consolidation, retention, forgetting, or temporal freshness policy;
 - M6 explicit degraded-Mind capability-deficit policy;
-- homeostatic pressure signals or metacognitive uncertainty/freshness projection;
+- homeostatic pressure signals or general metacognitive uncertainty/evidence-freshness projection
+  (only lifecycle-request freshness is currently projected);
 - M7 inter-node transport, replication, or partition handling;
 - typed perception adapters, epistemic claims, contradiction reconciliation, or value constraints;
 - M8 optional language faculty;

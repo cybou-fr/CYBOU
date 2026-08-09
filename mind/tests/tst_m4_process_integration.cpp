@@ -240,6 +240,15 @@ private Q_SLOTS:
             presence.lifecycleState().value(QStringLiteral("mode")).toString(),
             QStringLiteral("idle"));
         QCOMPARE(
+            presence.lifecycleProjection().value(QStringLiteral("progressClass")).toString(),
+            QStringLiteral("inactive"));
+        QCOMPARE(
+            presence.lifecycleProjection().value(QStringLiteral("freshnessClass")).toString(),
+            QStringLiteral("unknown"));
+        QCOMPARE(
+            presence.lifecycleProjection().value(QStringLiteral("progressPercent")).toInt(),
+            0);
+        QCOMPARE(
             presence.organHealth().value(QStringLiteral("lifecycled")).toString(),
             QStringLiteral("healthy"));
 
