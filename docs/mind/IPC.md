@@ -43,7 +43,8 @@ Ready() -> bool
 Health() -> string
 ```
 
-P6.1 defines schema-v1 `CapabilitySnapshot` CBOR and P6.2 serves it from Health1. Health1 exposes
+Health1 serves schema-v2 `CapabilitySnapshot` CBOR and accepts persisted schema v1 as a migration
+input. Health1 exposes
 `Ready`, aggregate `Health`, `LastError`, `HasSnapshot`, `Snapshot`, `HasMeasurements`,
 `Measurements`, `Refresh`, and `Changed`.
 The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.

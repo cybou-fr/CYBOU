@@ -7,6 +7,11 @@
 #include "cybou/protocol/Homeostasis.h"
 
 #include <QFile>
+#include <QDir>
+#include <QFileInfo>
+#include <QCborMap>
+#include <QCborValue>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -90,6 +95,23 @@ private Q_SLOTS:
         QCOMPARE(prediction->cause, DeficitCause::TimedOut);
     }
 
+    void reportsEveryUnavailableDependency()
+    {
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        auto observations = healthyObservations(now);
+        observations[QStringLiteral("predictord")].state = ComponentHealth::Unavailable;
+        observations[QStringLiteral("workspaced")].state = ComponentHealth::Unavailable;
+        const CapabilitySnapshot snapshot = HealthPolicy::evaluate(observations, now);
+        QStringList consolidationDependencies;
+        for (const CapabilityDeficit &deficit : snapshot.deficits) {
+            if (deficit.capabilityId == QStringLiteral("consolidation"))
+                consolidationDependencies.append(deficit.dependencyId);
+        }
+        QCOMPARE(
+            QSet<QString>(consolidationDependencies.begin(), consolidationDependencies.end()),
+            QSet<QString>({QStringLiteral("predictord"), QStringLiteral("workspaced")}));
+    }
+
     void persistsAndReloadsExactSnapshot()
     {
         QTemporaryDir root;
@@ -145,6 +167,31 @@ private Q_SLOTS:
         HealthService service(path);
         QVERIFY(!service.isReady());
         QVERIFY(!service.startupError().isEmpty());
+    }
+
+    void loadsPersistedSchemaV1AsV2()
+    {
+        QTemporaryDir root;
+        const QString path = root.filePath(QStringLiteral("health/snapshot.cbor"));
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        auto observations = healthyObservations(now);
+        observations[QStringLiteral("predictord")].state = ComponentHealth::Unavailable;
+        const CapabilitySnapshot source = HealthPolicy::evaluate(observations, now);
+        QCborMap legacy = QCborValue::fromCbor(encodeCapabilitySnapshot(source)).toMap();
+        legacy.insert(QStringLiteral("schemaVersion"), 1);
+        QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath()));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(file.write(legacy.toCborValue().toCbor()) > 0, true);
+        file.close();
+
+        HealthService recovered(path);
+        QVERIFY(recovered.isReady());
+        QString error;
+        const CapabilitySnapshot migrated = decodeCapabilitySnapshot(
+            recovered.Snapshot(), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(migrated.schemaVersion, kHealthSchemaVersion);
     }
 };
 

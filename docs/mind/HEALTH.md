@@ -9,14 +9,14 @@ SPDX-License-Identifier: MIT
 
 P6.1 defines a versioned wire contract for component observations and capability deficits. P6.2
 implements the initial dependency graph, `cybou-healthd`, persistent snapshot ownership, and
-`Health1`. P6.3 provides the shared bounded async transport, but Health1 probing is not migrated to
-it yet; Presence projection remains later work.
+`Health1`. P6.4.1 migrates Health1 probing to bounded async transport. Schema v2 preserves every
+unhealthy dependency of a capability; Presence projection remains later work.
 
 Component health and capability availability are deliberately separate. A stopped optional organ
 can remove one capability without making identity, biography, or commitments unavailable.
 Lifecycle mode is also orthogonal: a Mind may be `Awake` while a capability is `Limited`.
 
-## Schema v1
+## Schema v2
 
 `CapabilitySnapshot` contains:
 
@@ -33,6 +33,12 @@ A component record contains its stable ID, component-health state, observation t
 verified time, and diagnostic detail. A deficit contains the capability, dependency, capability
 state, typed cause, detection time, optional last verified time, operational impact, recovery
 policy, and optional Event1 evidence ID or error reference.
+
+Schema v2 changes deficit identity from `capabilityId` to the pair
+`(capabilityId, dependencyId)`. One capability may therefore report several simultaneous causes.
+The decoder accepts persisted schema v1 as the compatible one-deficit-per-capability subset,
+normalizes it to v2 in memory, and the next successful refresh atomically rewrites v2. Unknown
+future versions fail closed.
 
 ## State vocabularies
 
@@ -67,7 +73,8 @@ reply was lost. Only operations with an explicit idempotency contract may use `R
 ## Validation invariants
 
 - unknown schema versions and enum values fail closed;
-- snapshot, component, and capability identifiers are non-empty and unique in their scope;
+- snapshot, component, and capability identifiers are non-empty; components are unique by ID and
+  deficits are unique by `(capabilityId, dependencyId)`;
 - deficit dependencies name a component present in the same snapshot;
 - observation and verification times cannot claim knowledge from the future;
 - `Available` has no deficit; a snapshot with deficits cannot aggregate to `Available`;
@@ -109,7 +116,8 @@ remains available, and overlapping collection is rejected.
 
 ## Automated evidence
 
-`health-protocol` covers schema-v1 round trip and validation. `health-service` covers graph policy,
+`health-protocol` covers schema-v2 round trip, v1 migration, pair uniqueness, and validation.
+`health-service` covers graph policy,
 required/optional aggregation, atomic persistence/reload, and corrupt-state rejection.
 `healthd-integration` exercises Health1 ownership, optional-owner loss, preserved independent core
 capabilities, exact snapshot recovery after healthd restart, explicit recovery, and duplicate-owner

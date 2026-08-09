@@ -61,7 +61,7 @@ The focused P4 Plasma VM gate restarts the shipped `plasma-plasmashell.service` 
 run, observes a replacement PID and restored Plasma D-Bus surface, and proves that neither the
 exact persisted lifecycle run nor Event1 count changes across UI recreation.
 
-P6.1 adds schema-v1 `CapabilitySnapshot` protocol types. Component health, capability state, typed
+P6.1 introduced `CapabilitySnapshot`; the current schema v2 keeps component health, capability state, typed
 deficit cause, recovery policy, observation/verification time, impact, and evidence/error reference
 are encoded separately and validated fail closed. Focused tests cover round trip, unknown schema and
 enum rejection, malformed/inconsistent state, dependency/uniqueness invariants, and component
@@ -98,8 +98,10 @@ verification. Predictor and Workspace consolidation derive their computed values
 sequences at or below the captured high-water mark; replay returns values from the accepted owner
 contribution rather than live state. Lifecycle validation requires one non-empty cause for every
 missing capability, and completed terminal Outcome payloads durably record completed capabilities,
-missing capabilities, and their causes. Multi-dependency deficit representation remains a planned
-versioned protocol change rather than an incompatible schema-v1 mutation.
+missing capabilities, and their causes. CapabilitySnapshot schema v2 now emits one record per
+unhealthy `(capability, dependency)` pair, so simultaneous owner loss remains fully explainable.
+Persisted schema v1 is accepted as a strict compatible subset and normalized to v2; unknown future
+versions fail closed.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is

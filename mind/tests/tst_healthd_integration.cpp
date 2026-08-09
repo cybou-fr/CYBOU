@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -30,6 +31,7 @@ private:
     std::vector<std::unique_ptr<QProcess>> m_dependencies;
     std::unique_ptr<QProcess> m_healthd;
     QProcess *m_predictord{nullptr};
+    QProcess *m_workspaced{nullptr};
 
     QProcessEnvironment environment() const
     {
@@ -148,7 +150,8 @@ private Q_SLOTS:
         m_predictord = startDependency("CYBOU_PREDICTORD_PATH", kPredictorEndpoint);
         QVERIFY(m_predictord);
         QVERIFY(startDependency("CYBOU_SELFD_PATH", kSelfEndpoint));
-        QVERIFY(startDependency("CYBOU_WORKSPACED_PATH", kWorkspaceEndpoint));
+        m_workspaced = startDependency("CYBOU_WORKSPACED_PATH", kWorkspaceEndpoint);
+        QVERIFY(m_workspaced);
         QVERIFY(startDependency("CYBOU_PRESENCED_PATH", kPresenceEndpoint));
         startHealthd();
     }
@@ -236,6 +239,33 @@ private Q_SLOTS:
         QVERIFY(duplicate.waitForStarted(3000));
         QVERIFY(duplicate.waitForFinished(5000));
         QVERIFY(duplicate.exitCode() != 0);
+    }
+
+    void simultaneousOwnerLossPreservesEveryCause()
+    {
+        stopProcess(m_predictord);
+        stopProcess(m_workspaced);
+        QVERIFY(waitForInterface(kPredictorEndpoint, false));
+        QVERIFY(waitForInterface(kWorkspaceEndpoint, false));
+        QVERIFY(refresh());
+        const CapabilitySnapshot degraded = snapshot();
+        QVERIFY(degraded.isValid());
+        QStringList dependencies;
+        for (const CapabilityDeficit &deficit : degraded.deficits) {
+            if (deficit.capabilityId == QStringLiteral("consolidation"))
+                dependencies.append(deficit.dependencyId);
+        }
+        QCOMPARE(
+            QSet<QString>(dependencies.begin(), dependencies.end()),
+            QSet<QString>({QStringLiteral("predictord"), QStringLiteral("workspaced")}));
+
+        m_predictord = startDependency("CYBOU_PREDICTORD_PATH", kPredictorEndpoint);
+        m_workspaced = startDependency("CYBOU_WORKSPACED_PATH", kWorkspaceEndpoint);
+        QVERIFY(m_predictord);
+        QVERIFY(m_workspaced);
+        QVERIFY(refresh());
+        QVERIFY(refresh());
+        QCOMPARE(snapshot().aggregateState, CapabilityState::Available);
     }
 };
 

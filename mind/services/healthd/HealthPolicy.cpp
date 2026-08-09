@@ -114,40 +114,30 @@ CapabilitySnapshot HealthPolicy::evaluate(
     bool requiredDeficit = false;
     int aggregateSeverity = 0;
     for (const CapabilityDefinition &definition : definitions()) {
-        QString worstDependency;
-        ComponentHealth worstHealth = ComponentHealth::Healthy;
-        CapabilityState worstState = CapabilityState::Available;
         for (const QString &dependency : definition.dependencies) {
             const ComponentHealth health = observations.contains(dependency)
                 ? observations.value(dependency).state
                 : ComponentHealth::Unavailable;
             const CapabilityState state = stateFor(health);
-            if (severity(state) > severity(worstState)) {
-                worstDependency = dependency;
-                worstHealth = health;
-                worstState = state;
-            }
-        }
-        if (worstState == CapabilityState::Available) {
-            continue;
-        }
+            if (state == CapabilityState::Available) continue;
 
-        CapabilityDeficit deficit;
-        deficit.capabilityId = definition.capabilityId;
-        deficit.dependencyId = worstDependency;
-        deficit.state = worstState;
-        const ComponentHealthRecord dependency = observations.value(worstDependency);
-        deficit.cause = causeFor(worstHealth, dependency.detail);
-        deficit.detectedAt = snapshot.observedAt;
-        deficit.lastVerifiedAt = dependency.lastVerifiedAt;
-        deficit.impact = definition.unavailableImpact;
-        deficit.recoveryPolicy = worstState == CapabilityState::Recovering
-            ? RecoveryPolicy::Reconcile
-            : RecoveryPolicy::Observe;
-        deficit.errorReference = dependency.detail;
-        snapshot.deficits.append(deficit);
-        requiredDeficit = requiredDeficit || definition.required;
-        aggregateSeverity = std::max(aggregateSeverity, severity(worstState));
+            CapabilityDeficit deficit;
+            deficit.capabilityId = definition.capabilityId;
+            deficit.dependencyId = dependency;
+            deficit.state = state;
+            const ComponentHealthRecord record = observations.value(dependency);
+            deficit.cause = causeFor(health, record.detail);
+            deficit.detectedAt = snapshot.observedAt;
+            deficit.lastVerifiedAt = record.lastVerifiedAt;
+            deficit.impact = definition.unavailableImpact;
+            deficit.recoveryPolicy = state == CapabilityState::Recovering
+                ? RecoveryPolicy::Reconcile
+                : RecoveryPolicy::Observe;
+            deficit.errorReference = record.detail;
+            snapshot.deficits.append(deficit);
+            requiredDeficit = requiredDeficit || definition.required;
+            aggregateSeverity = std::max(aggregateSeverity, severity(state));
+        }
     }
 
     if (snapshot.deficits.isEmpty()) {

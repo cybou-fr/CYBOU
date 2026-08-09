@@ -366,8 +366,9 @@ or unavailable measurements remain explicit instead of falling back to fabricate
 RPC with a common deadline, D-Bus owner-change debounce, slow verification, and typed timeout
 mapping. Consolidation owners reconstruct their computed values only through the accepted
 high-water mark; lifecycle validation requires a cause for every missing capability; terminal
-Outcome evidence preserves completed and missing work. A multi-dependency deficit schema remains a
-deliberate versioned protocol change to design before exposing detailed P6.5 recovery causes.
+Outcome evidence preserves completed and missing work. CapabilitySnapshot schema v2 now preserves
+each unhealthy `(capability, dependency)` pair and migrates persisted schema v1, completing the
+protocol prerequisite for detailed P6.5 recovery causes.
 
 ### Work
 

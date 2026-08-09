@@ -218,15 +218,16 @@ bool CapabilitySnapshot::isValid() const
         componentIds.insert(id);
     }
 
-    QSet<QString> capabilityIds;
+    QSet<QPair<QString, QString>> deficitKeys;
     for (const CapabilityDeficit &deficit : deficits) {
-        const QString id = deficit.capabilityId.trimmed();
+        const QPair<QString, QString> key{
+            deficit.capabilityId.trimmed(), deficit.dependencyId.trimmed()};
         if (!deficit.isValid() || deficit.detectedAt > observedAt
             || !componentIds.contains(deficit.dependencyId.trimmed())
-            || capabilityIds.contains(id)) {
+            || deficitKeys.contains(key)) {
             return false;
         }
-        capabilityIds.insert(id);
+        deficitKeys.insert(key);
     }
 
     return deficits.isEmpty() == (aggregateState == CapabilityState::Available);
@@ -293,13 +294,16 @@ CapabilitySnapshot decodeCapabilitySnapshot(const QByteArray &encoded, QString *
         return {};
     }
 
-    if (!integerInRange(root.value(QStringLiteral("schemaVersion")), 1, 1)
+    if (!integerInRange(root.value(QStringLiteral("schemaVersion")), 1, 2)
         || !integerInRange(root.value(QStringLiteral("aggregateState")), 1, 6)) {
         setError(error, QStringLiteral("unsupported health schema or aggregate state"));
         return {};
     }
 
+    const qint64 wireSchemaVersion = root.value(QStringLiteral("schemaVersion")).toInteger();
     CapabilitySnapshot snapshot;
+    // Schema v1 used the same fields but allowed at most one deficit per capability.
+    // A successfully decoded v1 snapshot is normalized in memory and rewritten as v2 on refresh.
     snapshot.schemaVersion = kHealthSchemaVersion;
     snapshot.snapshotId = QUuid(root.value(QStringLiteral("snapshotId")).toString());
     snapshot.observedAt = parseTimestamp(root.value(QStringLiteral("observedAt")));
@@ -374,6 +378,17 @@ CapabilitySnapshot decodeCapabilitySnapshot(const QByteArray &encoded, QString *
         deficit.evidenceId = QUuid(item.value(QStringLiteral("evidenceId")).toString());
         deficit.errorReference = item.value(QStringLiteral("errorReference")).toString();
         snapshot.deficits.append(deficit);
+    }
+
+    if (wireSchemaVersion == 1) {
+        QSet<QString> legacyCapabilityIds;
+        for (const CapabilityDeficit &deficit : snapshot.deficits) {
+            if (legacyCapabilityIds.contains(deficit.capabilityId)) {
+                setError(error, QStringLiteral("schema-v1 health snapshot has duplicate capability deficit"));
+                return {};
+            }
+            legacyCapabilityIds.insert(deficit.capabilityId);
+        }
     }
 
     if (!snapshot.isValid()) {

@@ -295,7 +295,7 @@ def main(argv: list[str]) -> int:
         require(paths["lifecycle"], label, needle)
 
     for label, needle in (
-        ("health schema", "## Schema v1"),
+        ("health schema", "## Schema v2"),
         ("health states", "## State vocabularies"),
         ("health validation", "## Validation invariants"),
         ("health ownership", "## Ownership boundary"),

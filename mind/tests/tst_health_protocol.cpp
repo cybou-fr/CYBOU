@@ -96,6 +96,35 @@ private Q_SLOTS:
         QVERIFY(!error.isEmpty());
     }
 
+    void migratesSchemaV1AndAllowsDistinctDependencyDeficits()
+    {
+        CapabilitySnapshot source = degradedSnapshot();
+        QCborMap legacy = QCborValue::fromCbor(encodeCapabilitySnapshot(source)).toMap();
+        legacy.insert(QStringLiteral("schemaVersion"), 1);
+        QString error;
+        const CapabilitySnapshot migrated = decodeCapabilitySnapshot(
+            legacy.toCborValue().toCbor(), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(migrated.schemaVersion, kHealthSchemaVersion);
+
+        source.components.append(
+            {QStringLiteral("workspaced"), ComponentHealth::Unavailable,
+             source.observedAt, {}, QStringLiteral("owner absent")});
+        CapabilityDeficit second = source.deficits.first();
+        second.capabilityId = QStringLiteral("consolidation");
+        source.deficits.first().capabilityId = QStringLiteral("consolidation");
+        second.dependencyId = QStringLiteral("workspaced");
+        source.deficits.append(second);
+        QVERIFY(source.isValid());
+        legacy = QCborValue::fromCbor(encodeCapabilitySnapshot(source)).toMap();
+        legacy.insert(QStringLiteral("schemaVersion"), 1);
+        error.clear();
+        decodeCapabilitySnapshot(legacy.toCborValue().toCbor(), &error);
+        QVERIFY(!error.isEmpty());
+        source.deficits.append(second);
+        QVERIFY(!source.isValid());
+    }
+
     void rejectsMalformedAndInconsistentState()
     {
         QString error;

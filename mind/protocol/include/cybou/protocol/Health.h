@@ -11,7 +11,7 @@
 
 namespace cybou {
 
-inline constexpr quint16 kHealthSchemaVersion = 1;
+inline constexpr quint16 kHealthSchemaVersion = 2;
 
 enum class ComponentHealth : quint8 {
     Starting = 1,
