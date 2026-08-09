@@ -26,6 +26,9 @@ private:
     QTemporaryDir m_root;
     QString m_daemonPath;
     std::unique_ptr<QProcess> m_daemon;
+    std::unique_ptr<QProcess> m_eventd;
+    std::unique_ptr<QProcess> m_predictord;
+    std::unique_ptr<QProcess> m_workspaced;
 
     QProcessEnvironment environment() const
     {
@@ -43,6 +46,16 @@ private:
         m_daemon->start();
         QVERIFY2(m_daemon->waitForStarted(3000), qPrintable(m_daemon->errorString()));
         QTRY_VERIFY_WITH_TIMEOUT(interface().isValid(), 5000);
+    }
+
+    std::unique_ptr<QProcess> startAuxiliary(const char *variable)
+    {
+        auto process = std::make_unique<QProcess>();
+        process->setProgram(qEnvironmentVariable(variable));
+        process->setProcessEnvironment(environment());
+        process->start();
+        if (!process->waitForStarted(3000)) return {};
+        return process;
     }
 
     void stopDaemon()
@@ -72,10 +85,41 @@ private Q_SLOTS:
         m_daemonPath = qEnvironmentVariable("CYBOU_LIFECYCLED_PATH");
         QVERIFY2(!m_daemonPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
         QVERIFY(QDir().mkpath(m_root.filePath(QStringLiteral("runtime"))));
+        m_eventd = startAuxiliary("CYBOU_EVENTD_PATH");
+        QVERIFY(m_eventd);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            QDBusInterface(
+                QStringLiteral("org.cybou.Mind.Event1"),
+                QStringLiteral("/org/cybou/Mind/Event1"),
+                QStringLiteral("org.cybou.Mind.Event1"),
+                QDBusConnection::sessionBus()).isValid(),
+            5000);
+        m_predictord = startAuxiliary("CYBOU_PREDICTORD_PATH");
+        QVERIFY(m_predictord);
+        m_workspaced = startAuxiliary("CYBOU_WORKSPACED_PATH");
+        QVERIFY(m_workspaced);
+        for (const auto &endpoint : {kPredictorEndpoint, kWorkspaceEndpoint}) {
+            QTRY_VERIFY_WITH_TIMEOUT(
+                QDBusInterface(
+                    QString::fromLatin1(endpoint.service),
+                    QString::fromLatin1(endpoint.objectPath),
+                    QString::fromLatin1(endpoint.interfaceName),
+                    QDBusConnection::sessionBus()).isValid(),
+                5000);
+        }
         startDaemon();
     }
 
-    void cleanupTestCase() { stopDaemon(); }
+    void cleanupTestCase()
+    {
+        stopDaemon();
+        for (auto *process : {m_workspaced.get(), m_predictord.get(), m_eventd.get()}) {
+            if (process && process->state() != QProcess::NotRunning) {
+                process->terminate();
+                process->waitForFinished(2000);
+            }
+        }
+    }
 
     void activeRunRecoversAcrossProcessRestart()
     {
@@ -136,6 +180,50 @@ private Q_SLOTS:
         QVERIFY(duplicate.waitForStarted(3000));
         QVERIFY(duplicate.waitForFinished(5000));
         QVERIFY(duplicate.exitCode() != 0);
+    }
+
+    void dispatchesPredictorAndWorkspaceIdempotently()
+    {
+        QDBusReply<bool> idle = interface().call(QStringLiteral("Transition"), QStringLiteral("idle"));
+        QVERIFY(idle.isValid() && idle.value());
+
+        QDBusInterface events(
+            QStringLiteral("org.cybou.Mind.Event1"),
+            QStringLiteral("/org/cybou/Mind/Event1"),
+            QStringLiteral("org.cybou.Mind.Event1"),
+            QDBusConnection::sessionBus());
+        QTRY_VERIFY_WITH_TIMEOUT(events.isValid(), 5000);
+        QDBusReply<qulonglong> count = events.call(QStringLiteral("Count"));
+        QVERIFY(count.isValid());
+
+        QDBusReply<QString> requested = interface().call(
+            QStringLiteral("RequestRun"), QStringLiteral("consolidation"),
+            QStringLiteral("dispatch-test"), count.value(),
+            QStringList{QStringLiteral("predictor")},
+            QStringList{QStringLiteral("workspace")});
+        QVERIFY(requested.isValid() && !requested.value().isEmpty());
+        QDBusReply<bool> first = interface().call(QStringLiteral("Dispatch"));
+        QDBusReply<QString> dispatchError =
+            interface().call(QStringLiteral("LastError"));
+        QVERIFY2(
+            first.isValid() && first.value(),
+            qPrintable(dispatchError.isValid() ? dispatchError.value() : first.error().message()));
+        QDBusReply<bool> duplicate = interface().call(QStringLiteral("Dispatch"));
+        QVERIFY(duplicate.isValid() && duplicate.value());
+
+        QDBusReply<QByteArray> stateReply = interface().call(QStringLiteral("State"));
+        QString error;
+        const QVariantMap state = FabricCodec::decodeMap(stateReply.value(), &error);
+        QVERIFY(error.isEmpty());
+        const QStringList completed =
+            state.value(QStringLiteral("completedWork")).toStringList();
+        QCOMPARE(
+            QSet<QString>(completed.begin(), completed.end()),
+            QSet<QString>({QStringLiteral("predictor"), QStringLiteral("workspace")}));
+        QDBusReply<bool> finished = interface().call(
+            QStringLiteral("FinishRun"), QStringLiteral("completed"),
+            QStringLiteral("accepted owner receipts"));
+        QVERIFY(finished.isValid() && finished.value());
     }
 };
 

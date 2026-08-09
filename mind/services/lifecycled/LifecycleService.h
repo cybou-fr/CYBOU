@@ -26,6 +26,7 @@ public Q_SLOTS:
     bool AcknowledgeWork(const QString &capability, const QString &operationKey,
                          qulonglong inputHighWaterMark);
     bool MarkMissing(const QString &capability, const QString &cause);
+    bool Dispatch();
     bool ResumeRun();
     bool FinishRun(const QString &status, const QString &cause);
 private:

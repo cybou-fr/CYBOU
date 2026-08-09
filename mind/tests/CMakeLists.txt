@@ -51,6 +51,9 @@ add_test(
         ${CYBOU_DBUS_TEST_RUNNER}
         ${CMAKE_COMMAND} -E env
         CYBOU_LIFECYCLED_PATH=$<TARGET_FILE:cybou-lifecycled>
+        CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
+        CYBOU_PREDICTORD_PATH=$<TARGET_FILE:cybou-predictord>
+        CYBOU_WORKSPACED_PATH=$<TARGET_FILE:cybou-workspaced>
         $<TARGET_FILE:test-lifecycled-integration>
 )
 set_tests_properties(

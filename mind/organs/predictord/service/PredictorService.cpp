@@ -114,4 +114,17 @@ QByteArray PredictorService::Calibrations() const
     return FabricCodec::encodeList(result);
 }
 
+QByteArray PredictorService::Consolidate(const QString &runId,const QString &operationKey,qulonglong mark) const
+{
+    if (!Ready() || QUuid(runId).isNull() || operationKey.trimmed().isEmpty()
+        || mark > m_events->count()) return {};
+    QVariantMap receipt;
+    receipt[QStringLiteral("accepted")]=true;
+    receipt[QStringLiteral("owner")]=QStringLiteral("predictor");
+    receipt[QStringLiteral("operationKey")]=operationKey;
+    receipt[QStringLiteral("inputHighWaterMark")]=mark;
+    receipt[QStringLiteral("calibrationCount")]=m_predictor.allCalibrations().size();
+    return FabricCodec::encodeMap(receipt);
+}
+
 } // namespace cybou

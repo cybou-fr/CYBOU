@@ -106,6 +106,13 @@ acknowledgements must return that key and the accepted high-water mark. Repeatin
 persisted acknowledgement is a successful no-op; a mismatched key or mark fails closed. Recovery
 resumes the existing active run and therefore derives the same keys rather than creating new work.
 
+`Dispatch` currently routes the `predictor` and `workspace` capabilities to their owning D-Bus
+services. Each owner rejects a high-water mark beyond its accepted Event1 count and returns a typed
+receipt containing the owner, operation key, mark, and acceptance decision. Lifecycle1 persists an
+acknowledgement only after validating every receipt field. Repeating Dispatch skips already
+persisted work. The current handlers perform bounded projection verification/recomputation; P3
+still requires durable owner effects and accepted Event1 work/terminal contributions.
+
 ## Privacy and retention
 
 Summaries inherit the most restrictive privacy of their causes/evidence. A summary does not allow

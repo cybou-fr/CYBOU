@@ -27,6 +27,8 @@ public Q_SLOTS:
     QByteArray Coalitions() const;
     QByteArray Moment() const;
     QString Attention() const;
+    QByteArray Consolidate(const QString &runId, const QString &operationKey,
+                           qulonglong inputHighWaterMark) const;
 
 Q_SIGNALS:
     void Changed();

@@ -29,7 +29,9 @@ m4-process-integration
 `lifecycle` verifies atomic persistence and fail-closed recovery at the service-object boundary.
 `lifecycled-integration` runs a real daemon in an isolated D-Bus session, starts an active run,
 restarts the process, verifies recovery with the same run identity, and rejects a duplicate D-Bus
-owner.
+owner. It also launches Event1, Predictor1, and Workspace1, dispatches a bounded consolidation run
+to both owners, repeats dispatch to prove idempotency, and completes only after both typed receipts
+are persisted.
 
 ## Process integration
 

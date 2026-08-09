@@ -35,6 +35,8 @@ public Q_SLOTS:
         double actual);
 
     QByteArray Calibrations() const;
+    QByteArray Consolidate(const QString &runId, const QString &operationKey,
+                           qulonglong inputHighWaterMark) const;
 
 private:
     EventStore *m_events;
