@@ -101,10 +101,10 @@ policy; an owner-backed pressure signal and automatic scheduling remain future P
 Lifecycle scheduling policy lives in lifecycled. Healthd supplies immutable capability and
 homeostatic observations; it never transitions lifecycle mode or creates a run. The current
 `EvaluateScheduling` path is deliberately dry-run: it computes worker eligibility and 32/8 backlog
-hysteresis from Event1's durable `lifecycle.consolidation` consumer offset, then defers because
-schema-v1 homeostasis cannot authorize scheduling. Event1 excludes consolidation-scoped outputs
+hysteresis from Event1's durable `lifecycle.consolidation` consumer offset. Homeostasis v2
+authorizes only the reviewed `event-backlog-v1` policy when that measurement is current. Event1 excludes consolidation-scoped outputs
 from their own pressure, so a completed run cannot schedule itself again. Presence merely projects
-the decision and its reason.
+the decision and its reason; even an authorized `Run` evaluation is not an automatic mutation.
 
 Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
 not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form

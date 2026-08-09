@@ -47,19 +47,25 @@ private Q_SLOTS:
             encodeHomeostasisSnapshot(source), &error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(decoded.snapshotId, source.snapshotId);
-        QVERIFY(!decoded.schedulingAuthorized);
+        QVERIFY(decoded.authorizedPolicyIds.isEmpty());
         QCOMPARE(decoded.measurements.size(), 2);
         QCOMPARE(decoded.measurements.at(0).value, 12.0);
         QVERIFY(!decoded.measurements.at(1).hasValue);
         QCOMPARE(decoded.measurements.at(1).status, MeasurementStatus::Unsupported);
     }
 
-    void rejectsSchedulingAndFreshnessViolations()
+    void validatesPolicyScopedAuthorizationAndFreshness()
     {
         auto snapshot = validSnapshot();
-        snapshot.schedulingAuthorized = true;
+        snapshot.authorizedPolicyIds = {QStringLiteral("event-backlog-v1")};
+        QVERIFY(snapshot.isValid());
+        QVERIFY(snapshot.authorizes(QStringLiteral("event-backlog-v1")));
+        QVERIFY(!snapshot.authorizes(QStringLiteral("another-policy")));
+        snapshot.authorizedPolicyIds.append(QStringLiteral("event-backlog-v1"));
         QVERIFY(!snapshot.isValid());
-        snapshot.schedulingAuthorized = false;
+        snapshot.authorizedPolicyIds = {QStringLiteral("Invalid Policy")};
+        QVERIFY(!snapshot.isValid());
+        snapshot.authorizedPolicyIds.clear();
         snapshot.measurements[0].validUntil = snapshot.observedAt.addMSecs(-1);
         QVERIFY(!snapshot.isValid());
         snapshot.measurements[0].status = MeasurementStatus::Stale;
@@ -81,7 +87,7 @@ private Q_SLOTS:
     {
         const QByteArray encoded = encodeHomeostasisSnapshot(validSnapshot());
         QCborMap root = QCborValue::fromCbor(encoded).toMap();
-        root.insert(QStringLiteral("schemaVersion"), 2);
+        root.insert(QStringLiteral("schemaVersion"), 3);
         QString error;
         decodeHomeostasisSnapshot(root.toCborValue().toCbor(), &error);
         QVERIFY(!error.isEmpty());
@@ -97,9 +103,28 @@ private Q_SLOTS:
         QVERIFY(!error.isEmpty());
 
         root = QCborValue::fromCbor(encoded).toMap();
-        root.insert(QStringLiteral("schedulingAuthorized"), QStringLiteral("false"));
+        root.insert(QStringLiteral("authorizedPolicyIds"), QStringLiteral("event-backlog-v1"));
         error.clear();
         decodeHomeostasisSnapshot(root.toCborValue().toCbor(), &error);
+        QVERIFY(!error.isEmpty());
+    }
+
+    void migratesObservationOnlySchemaV1()
+    {
+        QCborMap legacy = QCborValue::fromCbor(
+            encodeHomeostasisSnapshot(validSnapshot())).toMap();
+        legacy.insert(QStringLiteral("schemaVersion"), 1);
+        legacy.remove(QStringLiteral("authorizedPolicyIds"));
+        legacy.insert(QStringLiteral("schedulingAuthorized"), false);
+        QString error;
+        const HomeostasisSnapshot migrated = decodeHomeostasisSnapshot(
+            legacy.toCborValue().toCbor(), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(migrated.schemaVersion, kHomeostasisSchemaVersion);
+        QVERIFY(migrated.authorizedPolicyIds.isEmpty());
+
+        legacy.insert(QStringLiteral("schedulingAuthorized"), true);
+        decodeHomeostasisSnapshot(legacy.toCborValue().toCbor(), &error);
         QVERIFY(!error.isEmpty());
     }
 };

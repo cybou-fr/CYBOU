@@ -48,7 +48,8 @@ input. Health1 exposes
 `Ready`, aggregate `Health`, `LastError`, `HasSnapshot`, `Snapshot`, `HasMeasurements`,
 `Measurements`, `Refresh`, and `Changed`.
 The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.
-P6.4 `Measurements` uses the separate schema-v1 homeostasis encoding and cannot authorize work.
+`Measurements` uses the separate schema-v2 homeostasis encoding. It carries policy-scoped
+authorization and accepts schema v1 only as an observation-only migration input.
 
 Event1 owns durable consumer progress outside the immutable Journal schema:
 `EnsureConsumer(id, initialOffset)`, `AdvanceConsumer(id, offset)`, and `ConsumerBacklog(id)`.
@@ -59,8 +60,8 @@ own capability scope, preventing consolidation output from scheduling itself aga
 Lifecycle1 additionally exposes `EvaluateScheduling`. It returns a fabric-CBOR dry-run decision:
 `run`, `defer`, or `block`; policy/reason; observation time; hysteresis state; eligible workers;
 and typed causes for missing optional workers. Evaluation reads Health1 but does not mutate the
-Lifecycle1 run or mode. Under homeostasis schema v1 the decision cannot be `run`, because that
-schema explicitly denies scheduling authority.
+Lifecycle1 run or mode. A `run` decision means the named policy is authorized and its typed gates
+passed; it still does not create a lifecycle run.
 
 ## Resilient asynchronous calls
 

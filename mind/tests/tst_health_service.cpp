@@ -134,7 +134,7 @@ private Q_SLOTS:
                 service.Measurements(), &error);
             QVERIFY2(error.isEmpty(), qPrintable(error));
             QVERIFY(homeostasis.isValid());
-            QVERIFY(!homeostasis.schedulingAuthorized);
+            QVERIFY(!homeostasis.authorizes(QStringLiteral("event-backlog-v1")));
             const auto backlog = std::find_if(
                 homeostasis.measurements.cbegin(), homeostasis.measurements.cend(),
                 [](const HomeostaticMeasurement &measurement) {

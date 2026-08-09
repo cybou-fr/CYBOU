@@ -303,7 +303,7 @@ This substrate currently provides the foundations for:
 - one presentation aggregator;
 - process-level failure isolation;
 - persistent lifecycle modes, bounded consolidation dispatch, and recovery.
-- typed capability deficits and observation-only homeostatic measurements.
+- typed capability deficits and policy-scoped homeostatic measurements.
 
 It does **not** yet provide the full future agent:
 

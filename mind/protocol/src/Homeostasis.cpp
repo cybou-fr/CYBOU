@@ -7,6 +7,7 @@
 #include <QCborMap>
 #include <QCborValue>
 #include <QSet>
+#include <QRegularExpression>
 
 #include <cmath>
 
@@ -91,8 +92,15 @@ bool HomeostaticMeasurement::isValid() const
 bool HomeostasisSnapshot::isValid() const
 {
     if (schemaVersion != kHomeostasisSchemaVersion || snapshotId.isNull()
-        || !observedAt.isValid() || schedulingAuthorized) {
+        || !observedAt.isValid()) {
         return false;
+    }
+    static const QRegularExpression policyPattern(
+        QStringLiteral("^[a-z0-9][a-z0-9.-]{0,63}$"));
+    QSet<QString> policies;
+    for (const QString &policyId : authorizedPolicyIds) {
+        if (!policyPattern.match(policyId).hasMatch() || policies.contains(policyId)) return false;
+        policies.insert(policyId);
     }
     QSet<QString> ids;
     for (const HomeostaticMeasurement &measurement : measurements) {
@@ -113,13 +121,20 @@ bool HomeostasisSnapshot::isValid() const
     return !measurements.isEmpty();
 }
 
+bool HomeostasisSnapshot::authorizes(const QString &policyId) const
+{
+    return isValid() && authorizedPolicyIds.contains(policyId);
+}
+
 QByteArray encodeHomeostasisSnapshot(const HomeostasisSnapshot &snapshot)
 {
     QCborMap root;
     root.insert(QStringLiteral("schemaVersion"), snapshot.schemaVersion);
     root.insert(QStringLiteral("snapshotId"), snapshot.snapshotId.toString(QUuid::WithoutBraces));
     root.insert(QStringLiteral("observedAt"), timestamp(snapshot.observedAt));
-    root.insert(QStringLiteral("schedulingAuthorized"), snapshot.schedulingAuthorized);
+    root.insert(
+        QStringLiteral("authorizedPolicyIds"),
+        QCborArray::fromStringList(snapshot.authorizedPolicyIds));
     QCborArray measurements;
     for (const HomeostaticMeasurement &measurement : snapshot.measurements) {
         QCborMap item;
@@ -151,26 +166,44 @@ HomeostasisSnapshot decodeHomeostasisSnapshot(const QByteArray &encoded, QString
     }
     const QCborMap root = value.toMap();
     for (const QString &field : {QStringLiteral("schemaVersion"), QStringLiteral("snapshotId"),
-                                 QStringLiteral("observedAt"), QStringLiteral("schedulingAuthorized"),
-                                 QStringLiteral("measurements")}) {
+                                 QStringLiteral("observedAt"), QStringLiteral("measurements")}) {
         if (!root.contains(field)) {
             setError(error, QStringLiteral("homeostasis snapshot missing field: ") + field);
             return {};
         }
     }
-    if (!integerInRange(root.value(QStringLiteral("schemaVersion")), 1, 1)
+    if (!integerInRange(root.value(QStringLiteral("schemaVersion")), 1, 2)
         || !root.value(QStringLiteral("snapshotId")).isString()
         || !root.value(QStringLiteral("observedAt")).isString()
-        || !root.value(QStringLiteral("schedulingAuthorized")).isBool()
         || !root.value(QStringLiteral("measurements")).isArray()) {
         setError(error, QStringLiteral("unsupported homeostasis schema or measurements"));
+        return {};
+    }
+
+    const qint64 wireVersion = root.value(QStringLiteral("schemaVersion")).toInteger();
+    if (wireVersion == 1) {
+        if (!root.value(QStringLiteral("schedulingAuthorized")).isBool()
+            || root.value(QStringLiteral("schedulingAuthorized")).toBool()) {
+            setError(error, QStringLiteral("invalid legacy scheduling authorization"));
+            return {};
+        }
+    } else if (!root.value(QStringLiteral("authorizedPolicyIds")).isArray()) {
+        setError(error, QStringLiteral("homeostasis snapshot missing policy authorization"));
         return {};
     }
 
     HomeostasisSnapshot snapshot;
     snapshot.snapshotId = QUuid(root.value(QStringLiteral("snapshotId")).toString());
     snapshot.observedAt = parseTimestamp(root.value(QStringLiteral("observedAt")));
-    snapshot.schedulingAuthorized = root.value(QStringLiteral("schedulingAuthorized")).toBool();
+    if (wireVersion == 2) {
+        for (const QCborValue &policy : root.value(QStringLiteral("authorizedPolicyIds")).toArray()) {
+            if (!policy.isString()) {
+                setError(error, QStringLiteral("authorized policy ID is not a string"));
+                return {};
+            }
+            snapshot.authorizedPolicyIds.append(policy.toString());
+        }
+    }
     for (const QCborValue &value : root.value(QStringLiteral("measurements")).toArray()) {
         if (!value.isMap()) {
             setError(error, QStringLiteral("homeostatic measurement is not a map"));

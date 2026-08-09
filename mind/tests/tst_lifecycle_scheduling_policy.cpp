@@ -99,7 +99,16 @@ private Q_SLOTS:
             LifecycleMode::Idle, false, capabilities, backlogSnapshot(now, 32), false, now);
         QVERIFY(entered.pressureLatched);
         QCOMPARE(entered.decision, SchedulingDecision::Defer);
-        QCOMPARE(entered.reason, QStringLiteral("homeostasis schema is observation-only"));
+        QCOMPARE(
+            entered.reason,
+            QStringLiteral("homeostasis snapshot does not authorize this policy"));
+
+        HomeostasisSnapshot authorized = backlogSnapshot(now, 32);
+        authorized.authorizedPolicyIds.append(QStringLiteral("event-backlog-v1"));
+        const SchedulingEvaluation runnable = LifecycleSchedulingPolicy::evaluate(
+            LifecycleMode::Idle, false, capabilities, authorized, false, now);
+        QCOMPARE(runnable.decision, SchedulingDecision::Run);
+        QVERIFY(runnable.pressureLatched);
 
         const SchedulingEvaluation held = LifecycleSchedulingPolicy::evaluate(
             LifecycleMode::Idle, false, capabilities, backlogSnapshot(now, 9), true, now);

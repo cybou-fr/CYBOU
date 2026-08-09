@@ -293,6 +293,29 @@ private Q_SLOTS:
 
     void schedulingDryRunExplainsDeferralWithoutMutatingLifecycle()
     {
+        EventClient eventClient;
+        QVERIFY(eventClient.ensureConsumer(QStringLiteral("lifecycle.consolidation"), 0));
+        while (eventClient.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value_or(0)
+               < 32) {
+            CognitiveEnvelope pressure;
+            pressure.messageId = QUuid::createUuid();
+            pressure.correlationId = pressure.messageId;
+            pressure.originOrgan = QStringLiteral("scheduling-test");
+            pressure.originNode = QStringLiteral("local");
+            pressure.kind = ContributionKind::Observation;
+            pressure.wallTime = QDateTime::currentDateTimeUtc();
+            pressure.confidence = 1.0;
+            pressure.privacy = PrivacyClass::Local;
+            QVERIFY(eventClient.append(pressure) > 0);
+        }
+        RpcClient health(kHealthEndpoint);
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        HealthClient healthClient;
+        const HomeostasisSnapshot homeostasis = healthClient.measurements();
+        QVERIFY(homeostasis.isValid());
+        QCOMPARE(homeostasis.authorizedPolicyIds,
+                 QStringList({QStringLiteral("event-backlog-v1")}));
+
         RpcClient lifecycle(kLifecycleEndpoint);
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
         const QByteArray before = lifecycle.callBytes(QStringLiteral("State"));
@@ -302,17 +325,13 @@ private Q_SLOTS:
             lifecycle.callBytes(QStringLiteral("EvaluateScheduling")), &error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(evaluation.value(QStringLiteral("decision")).toString(),
-                 QStringLiteral("defer"));
-        QVERIFY(evaluation.value(QStringLiteral("reason")).toString().contains(
-            QStringLiteral("observation-only"))
-            || evaluation.value(QStringLiteral("reason")).toString().contains(
-                QStringLiteral("below scheduling hysteresis")));
+                 QStringLiteral("run"));
         QCOMPARE(lifecycle.callBytes(QStringLiteral("State")), before);
 
         Presence surface;
         QVERIFY2(surface.wake(), qPrintable(surface.lastError()));
         QCOMPARE(surface.lifecycleScheduling().value(QStringLiteral("decision")).toString(),
-                 QStringLiteral("defer"));
+                 QStringLiteral("run"));
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
     }
 

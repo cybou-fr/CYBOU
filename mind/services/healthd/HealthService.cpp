@@ -366,6 +366,8 @@ bool HealthService::Refresh()
         QStringLiteral("prediction.calibration-pressure"), QStringLiteral("predictord"),
         MeasurementKind::Gauge, MeasurementStatus::Unsupported,
         QStringLiteral("calibration-pressure policy is not defined"), now));
+    if (hasEventBacklog)
+        homeostasis.authorizedPolicyIds.append(QStringLiteral("event-backlog-v1"));
     if (!homeostasis.isValid()) {
         m_error = QStringLiteral("health collector produced an invalid homeostasis snapshot");
         return false;

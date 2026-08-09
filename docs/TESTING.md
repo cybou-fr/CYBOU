@@ -68,6 +68,10 @@ prediction capability.
 optional capability loss, supported/unsupported trigger handling, and the 32/8 hysteresis boundary.
 Process integration calls `EvaluateScheduling` through real D-Bus, verifies its reason reaches the
 QML Presence proxy, and byte-compares Lifecycle1 state before and after the dry run.
+It creates exactly enough external pressure to cross the 32-event threshold, verifies Health1
+authorizes only `event-backlog-v1`, and observes `Run` through Lifecycle1 and Presence without a
+state mutation. Protocol tests cover schema-v1 observation-only migration, invalid legacy true,
+duplicate/invalid policy IDs, and future-schema rejection.
 
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an

@@ -175,7 +175,7 @@ private Q_SLOTS:
         QVERIFY(healthy.deficits.isEmpty());
         const HomeostasisSnapshot initialMeasurements = measurements();
         QVERIFY(initialMeasurements.isValid());
-        QVERIFY(!initialMeasurements.schedulingAuthorized);
+        QVERIFY(initialMeasurements.authorizes(QStringLiteral("event-backlog-v1")));
         const auto accepted = std::find_if(
             initialMeasurements.measurements.cbegin(), initialMeasurements.measurements.cend(),
             [](const HomeostaticMeasurement &measurement) {

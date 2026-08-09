@@ -379,20 +379,24 @@ Presence readiness remains independent of Health1 to avoid the healthd→presenc
 **Slice 2: implemented.** Lifecycle1 owns a deterministic read-only scheduling evaluator and
 Presence projects its decision. It validates current capability/homeostasis evidence, blocks loss
 of accepted biography, preserves remaining optional consolidation workers, and computes Event1
-backlog hysteresis at 32/8. Schema v1 still forbids scheduling authority and reports backlog as
-unsupported, so production evaluation currently returns an explained `Defer` without changing
-lifecycle mode or creating a run.
+backlog hysteresis at 32/8. At that slice's boundary schema v1 still forbade scheduling authority,
+so evaluation deferred without changing lifecycle mode or creating a run.
 
 **Slice 3: implemented.** Event1 now owns atomically persisted, monotonic consumer offsets and an
 exact backlog projection. Lifecycled registers `lifecycle.consolidation`, advances it only after a
 durable completed run, and reconciles the same offset after restart. Consolidation-scoped owner and
 terminal contributions do not count toward their own backlog. Health1 consequently exposes a
-current Event1 backlog measurement instead of `Unsupported`; scheduling remains read-only because
-schema v1 still denies authority.
+current Event1 backlog measurement instead of `Unsupported`.
+
+**Slice 4: implemented.** Homeostasis schema v2 replaces the global boolean guard with unique,
+bounded authorized policy IDs and migrates schema v1 strictly as observation-only. Health1 grants
+`event-backlog-v1` only with a current owner-backed backlog. Lifecycle1 still owns all capability,
+freshness, idleness, worker, and hysteresis gates. Process integration drives backlog to 32 and
+proves Lifecycle1 and Presence return `Run` without creating or mutating a lifecycle run.
 
 ### Work
 
-- version the homeostasis authorization contract and explicitly authorize the reviewed backlog policy;
+- add an explicit idempotent command that executes an authorized `Run` decision;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
 - refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;

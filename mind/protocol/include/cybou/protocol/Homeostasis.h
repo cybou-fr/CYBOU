@@ -7,11 +7,12 @@
 #include <QDateTime>
 #include <QList>
 #include <QString>
+#include <QStringList>
 #include <QUuid>
 
 namespace cybou {
 
-inline constexpr quint16 kHomeostasisSchemaVersion = 1;
+inline constexpr quint16 kHomeostasisSchemaVersion = 2;
 
 enum class MeasurementKind : quint8 {
     Gauge = 1,
@@ -49,10 +50,11 @@ struct HomeostasisSnapshot {
     quint16 schemaVersion{kHomeostasisSchemaVersion};
     QUuid snapshotId;
     QDateTime observedAt;
-    bool schedulingAuthorized{false};
+    QStringList authorizedPolicyIds;
     QList<HomeostaticMeasurement> measurements;
 
     bool isValid() const;
+    bool authorizes(const QString &policyId) const;
 };
 
 QByteArray encodeHomeostasisSnapshot(const HomeostasisSnapshot &snapshot);

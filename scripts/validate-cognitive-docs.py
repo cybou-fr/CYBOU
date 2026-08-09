@@ -312,7 +312,7 @@ def main(argv: list[str]) -> int:
 
     for label, needle in (
         ("homeostasis boundary", "## Boundary"),
-        ("homeostasis schema", "## Schema v1"),
+        ("homeostasis schema", "## Schema v2"),
         ("homeostasis projection", "## Health1 projection"),
         ("homeostasis evidence", "## Evidence"),
     ):

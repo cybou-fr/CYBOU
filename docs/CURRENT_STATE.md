@@ -118,8 +118,8 @@ accepted-biography availability, optional predictor/workspace
 eligibility, measurement freshness, and a bounded Event1-backlog hysteresis (enter at 32, exit at
 8). It returns `Run`, `Defer`, or `Block` with a stable policy ID and causal explanation, and is
 projected through Presence1/QML as `lifecycleScheduling`. Evaluation cannot mutate lifecycle state.
-Homeostasis schema v1 forbids scheduling authority, so the real projection honestly defers instead
-of starting work.
+At the slice-2 boundary homeostasis schema v1 forbade scheduling authority, so evaluation honestly
+deferred instead of starting work.
 
 P6.5 slice 3 makes Event1 the durable owner of consumer progress. Event1 stores versioned consumer
 offsets separately from canonical Journal rows, rejects invalid/backward/ahead-of-head movement,
@@ -128,7 +128,14 @@ stable `lifecycle.consolidation` consumer and advances it to the accepted input 
 after terminal lifecycle state is durable; restart reconciles an already-completed run. Events in
 the `lifecycle.consolidation` capability scope are excluded from that consumer's pressure, avoiding
 a self-triggering output loop. Health1 now reports `event.backlog.count` as a current typed value
-when the consumer is registered. Homeostasis schema v1 still forbids scheduling authority.
+when the consumer is registered.
+
+P6.5 slice 4 introduces Homeostasis schema v2 policy-scoped authorization. The codec accepts schema
+v1 only when its legacy boolean is false and normalizes it to no authorized policies. Health1 adds
+`event-backlog-v1` only when the durable consumer backlog is current. Lifecycle1 can consequently
+return an authorized `Run` decision after its independent capability, freshness, idle-state,
+worker, and 32/8 hysteresis checks. Evaluation remains read-only and process integration proves its
+state bytes are unchanged.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
@@ -281,7 +288,7 @@ the corresponding milestone is implemented and gated.
 - M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
   projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
 - M6: P6.1–P6.4 protocol, dependency graph, health owner, persistent Health1 snapshot, recovery,
-  process fault injection, bounded async transport, and observation-only homeostatic measurements
+  process fault injection, bounded async transport, and policy-scoped homeostatic measurements
   are implemented. P6.5 capability-aware Presence behavior and read-only scheduling policy are
   implemented; authorized automatic scheduling, broader RPC migration, complete degraded UI, and
   KVM gates remain.

@@ -124,9 +124,9 @@ SchedulingEvaluation LifecycleSchedulingPolicy::evaluate(
         result.reason = QStringLiteral("event backlog is below scheduling hysteresis");
         return result;
     }
-    if (!homeostasis.schedulingAuthorized) {
+    if (!homeostasis.authorizes(result.policyId)) {
         result.decision = SchedulingDecision::Defer;
-        result.reason = QStringLiteral("homeostasis schema is observation-only");
+        result.reason = QStringLiteral("homeostasis snapshot does not authorize this policy");
         return result;
     }
 
