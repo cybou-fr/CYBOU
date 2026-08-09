@@ -14,6 +14,20 @@ struct BusEndpoint {
 
 inline constexpr int kFabricIpcVersion = 1;
 
+inline constexpr BusEndpoint kEventEndpoint{
+    "org.cybou.Mind.Event1",
+    "/org/cybou/Mind/Event1",
+    "org.cybou.Mind.Event1",
+    "cybou-eventd.service",
+};
+
+inline constexpr BusEndpoint kHealthEndpoint{
+    "org.cybou.Mind.Health1",
+    "/org/cybou/Mind/Health1",
+    "org.cybou.Mind.Health1",
+    "cybou-healthd.service",
+};
+
 inline constexpr BusEndpoint kIdentityEndpoint{
     "org.cybou.Mind.Identity1",
     "/org/cybou/Mind/Identity1",

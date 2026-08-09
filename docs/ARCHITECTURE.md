@@ -56,6 +56,7 @@ The same processes have different semantic responsibilities:
 | Process | Semantic responsibility |
 |---|---|
 | `cybou-eventd` | canonical durable event history |
+| `cybou-healthd` | capability dependency graph and current health snapshot |
 | `cybou-lifecycled` | lifecycle/run orchestration and recovery metadata |
 | `cybou-identityd` | identity and logical-session continuity |
 | `cybou-intentiond` | unresolved commitments and terminal intention state |

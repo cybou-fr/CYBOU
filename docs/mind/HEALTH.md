@@ -7,9 +7,9 @@ SPDX-License-Identifier: MIT
 
 ## Scope
 
-P6.1 defines a versioned wire contract for component observations and capability deficits. It does
-not yet implement the dependency graph, `cybou-healthd`, `Health1`, retry policy, or Presence UI.
-Those remain P6.2 and later work.
+P6.1 defines a versioned wire contract for component observations and capability deficits. P6.2
+implements the initial dependency graph, `cybou-healthd`, persistent snapshot ownership, and
+`Health1`. Bounded retry policy and Presence projection remain P6.3 and later work.
 
 Component health and capability availability are deliberately separate. A stopped optional organ
 can remove one capability without making identity, biography, or commitments unavailable.
@@ -82,12 +82,28 @@ transition and should not create an Event1 record.
 
 ## Ownership boundary
 
-The protocol library owns encoding and validation only. The planned M6 health owner will own the
-dependency graph and current capability projection. Organs retain domain state, lifecycle retains
-run state, Event1 retains accepted history, and Presence remains a read-only aggregator.
+The protocol library owns encoding and validation only. `cybou-healthd` owns the dependency graph
+and current capability projection at `$XDG_STATE_HOME/cybou/health/snapshot.cbor`. Organs retain
+domain state, lifecycle retains run state, Event1 retains accepted history, and Presence remains a
+read-only aggregator. Corrupt persisted health state fails closed; atomic replacement prevents a
+partially written snapshot from becoming current.
+
+## Initial dependency policy
+
+The graph defines required identity-continuity, accepted-biography, and commitment-access
+capabilities, plus optional prediction, self-assessment, attention/workspace, consolidation, and
+Presence presentation. Aggregate state is `Unavailable` or `Unknown` when a required capability
+cannot be supported and `Limited` when only optional capability deficits remain.
+
+`Health1.Refresh` observes public D-Bus `Ready/Health` boundaries and never opens owner storage.
+Event1 predates the common `Health()` method, so its successful typed `Ready()` is the compatibility
+health boundary. A component returning from `Unavailable` or `Conflicted` enters `Recovering` for a
+verified snapshot before it may become `Healthy`/`Available`.
 
 ## Automated evidence
 
-`health-protocol` covers schema-v1 round trip, typed causes and recovery policy, unknown schema and
-enum rejection, malformed/inconsistent payload rejection, uniqueness/dependency invariants, and
-component transition legality.
+`health-protocol` covers schema-v1 round trip and validation. `health-service` covers graph policy,
+required/optional aggregation, atomic persistence/reload, and corrupt-state rejection.
+`healthd-integration` exercises Health1 ownership, optional-owner loss, preserved independent core
+capabilities, exact snapshot recovery after healthd restart, explicit recovery, and duplicate-owner
+rejection under a real D-Bus session.

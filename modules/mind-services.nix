@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# D-Bus-activated M4 services. They are not eagerly WantedBy the graphical target: the QML
+# D-Bus-activated Mind services. They are not eagerly WantedBy the graphical target: the QML
 # Presence proxy performs the one-time legacy state migration before Presence1 activation.
 #
 # Dependencies use Wants+After rather than Requires. A crashed optional organ must not make
-# systemd tear down the rest of Mind; M6 will turn that missing process into an explicit
+# systemd tear down the rest of Mind; healthd turns that missing process into an explicit
 # capability deficit.
 { cybouPackages, ... }:
 let
@@ -45,6 +45,32 @@ in
       busName = "org.cybou.Mind.Lifecycle1";
       after = [ "cybou-eventd.service" ];
       wants = [ "cybou-eventd.service" ];
+    };
+
+    cybou-healthd = mkService {
+      description = "Cybou capability and health owner";
+      binary = "cybou-healthd";
+      busName = "org.cybou.Mind.Health1";
+      after = [
+        "cybou-eventd.service"
+        "cybou-lifecycled.service"
+        "cybou-identityd.service"
+        "cybou-intentiond.service"
+        "cybou-predictord.service"
+        "cybou-selfd.service"
+        "cybou-workspaced.service"
+        "cybou-presenced.service"
+      ];
+      wants = [
+        "cybou-eventd.service"
+        "cybou-lifecycled.service"
+        "cybou-identityd.service"
+        "cybou-intentiond.service"
+        "cybou-predictord.service"
+        "cybou-selfd.service"
+        "cybou-workspaced.service"
+        "cybou-presenced.service"
+      ];
     };
 
     cybou-identityd = mkService {

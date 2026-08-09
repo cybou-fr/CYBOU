@@ -13,7 +13,7 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs fifteen CTest suites, including Event1, lifecycle persistence/recovery,
+The Mind package runs seventeen CTest suites, including Event1, lifecycle persistence/recovery,
 Lifecycle1 process restart, and seven-process M4 integration. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count.
@@ -65,7 +65,16 @@ P6.1 adds schema-v1 `CapabilitySnapshot` protocol types. Component health, capab
 deficit cause, recovery policy, observation/verification time, impact, and evidence/error reference
 are encoded separately and validated fail closed. Focused tests cover round trip, unknown schema and
 enum rejection, malformed/inconsistent state, dependency/uniqueness invariants, and component
-transition legality. No dependency graph, health owner, Health1 service, or UI claim is implemented yet.
+transition legality. At the P6.1 boundary these types had no dependency graph, owner, or D-Bus service.
+
+P6.2 adds `cybou-healthd` as the sole owner of the initial capability dependency graph and the
+atomic persistent snapshot under `$XDG_STATE_HOME/cybou/health`. Health1 refreshes public organ
+health boundaries, separates required core deficits from optional limitations, preserves the exact
+last snapshot across owner restart, fails closed on corrupt state, and requires an explicit
+`Recovering` snapshot before a formerly unavailable component becomes healthy. Process integration
+proves loss of predictord leaves accepted biography, identity continuity, commitments, and bounded
+workspace available; dependent optional capabilities become explicit deficits and recover without
+replacing the health owner state. Presence projection remains future work.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
@@ -74,10 +83,11 @@ or M9 authorized executor.
 
 ## Process topology
 
-Mind now has eight real user-session processes (the seven M4 processes plus the P2 lifecycle owner):
+Mind now has nine real user-session processes:
 
 ```text
 cybou-eventd
+cybou-healthd
 cybou-lifecycled
 cybou-identityd
 cybou-intentiond
@@ -96,6 +106,7 @@ QML property caching.
 | Resource / responsibility | Owner |
 |---|---|
 | `journal.db` | `cybou-eventd` |
+| capability dependency graph and current health snapshot | `cybou-healthd` |
 | lifecycle mode and run state | `cybou-lifecycled` under `$XDG_STATE_HOME/cybou/lifecycle` |
 | `identity.json` | `cybou-identityd` |
 | identity login marker | `cybou-identityd` under `$XDG_RUNTIME_DIR/cybou` |
@@ -115,6 +126,7 @@ Versioned Qt D-Bus interfaces:
 
 ```text
 org.cybou.Mind.Event1
+org.cybou.Mind.Health1
 org.cybou.Mind.Lifecycle1
 org.cybou.Mind.Identity1
 org.cybou.Mind.Intention1
@@ -183,7 +195,7 @@ The current tree does **not** yet implement:
 
 - in-place upgrade reconciliation beyond the tested schema-v0-to-v1 migration;
 - background consolidation, retention, forgetting, or temporal freshness policy;
-- M6 dependency graph, health owner, and degraded-Mind capability policy beyond the P6.1 wire contract;
+- M6 Presence projection and resilience/homeostatic policy beyond the P6.1/P6.2 health substrate;
 - homeostatic pressure signals or general metacognitive uncertainty/evidence-freshness projection
   (only lifecycle-request freshness is currently projected);
 - M7 inter-node transport, replication, or partition handling;
@@ -196,7 +208,7 @@ the corresponding milestone is implemented and gated.
 
 ## Current limitations
 
-- runtime health is still a minimal `Ready()/Health()` contract; P6.1 types are not yet served by a health owner;
+- organ probes remain synchronous and Health1 is not yet projected through Presence;
 - most local RPC is synchronous;
 - same-user IPC authorization is not yet a capability security boundary;
 - stronger in-place upgrade/reconciliation guarantees remain a hardening track;
@@ -214,7 +226,8 @@ the corresponding milestone is implemented and gated.
 - M4: implementation present; repository gates remain the acceptance authority.
 - M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
   projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
-- M6: P6.1 capability/health wire contract and focused tests are implemented; ownership,
-  dependency policy, runtime projection, resilience, and fault-injection gates remain.
+- M6: P6.1/P6.2 protocol, dependency graph, health owner, persistent Health1 snapshot, recovery,
+  and process fault injection are implemented; Presence projection, RPC resilience, homeostasis,
+  UI, and KVM gates remain.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

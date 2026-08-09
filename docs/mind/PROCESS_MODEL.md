@@ -9,6 +9,7 @@ SPDX-License-Identifier: MIT
 
 ```text
 cybou-eventd
+cybou-healthd
 cybou-lifecycled
 cybou-identityd
 cybou-intentiond
@@ -18,7 +19,8 @@ cybou-workspaced
 cybou-presenced
 ```
 
-Each is a real executable and D-Bus service managed by `systemd --user`. `lifecycled` owns only
+Each is a real executable and D-Bus service managed by `systemd --user`. `healthd` owns only the
+capability dependency graph and current persistent health snapshot. `lifecycled` owns only
 lifecycle/run orchestration state; it does not own organ projections or Journal.
 
 ## Dependencies
@@ -51,5 +53,6 @@ destroy cognitive organ processes.
 ## Health
 
 M5 retains the minimal `Ready()` and `Health()` organ interfaces and adds lifecycle-level deficits.
-M6 replaces boolean aggregation with separate component-health and capability-availability
-contracts, an explicit dependency graph, bounded recovery policy, and a read-only Presence projection.
+P6.1/P6.2 add separate component-health and capability-availability contracts, an explicit
+dependency graph, persistent Health1 ownership, and verified recovery. Bounded RPC resilience and
+the read-only Presence projection remain P6.3 and later work.

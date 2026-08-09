@@ -9,6 +9,7 @@ SPDX-License-Identifier: MIT
 
 ```text
 org.cybou.Mind.Event1
+org.cybou.Mind.Health1
 org.cybou.Mind.Lifecycle1
 org.cybou.Mind.Identity1
 org.cybou.Mind.Intention1
@@ -42,9 +43,9 @@ Ready() -> bool
 Health() -> string
 ```
 
-P6.1 additionally defines schema-v1 `CapabilitySnapshot` CBOR in
-[Capability and Health Contract](HEALTH.md). It is not yet served by D-Bus; `Health1` and its owner
-belong to P6.2.
+P6.1 defines schema-v1 `CapabilitySnapshot` CBOR and P6.2 serves it from Health1. Health1 exposes
+`Ready`, aggregate `Health`, `LastError`, `HasSnapshot`, `Snapshot`, `Refresh`, and `Changed`.
+The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.
 
 ## Presentation signal ordering
 

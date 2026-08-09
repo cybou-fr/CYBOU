@@ -285,7 +285,10 @@ policy, and evidence/error reference where available.
 
 ## P6.2 — Implement the dependency graph and health owner
 
-**Status: next.**
+**Status: complete.** The initial dependency graph, aggregate policy, `cybou-healthd`, persistent
+snapshot owner, `Health1`, D-Bus/systemd activation, corrupt-state failure, exact restart recovery,
+explicit component recovery, and process-level optional-owner fault injection are implemented.
+Presence does not consume Health1 yet.
 
 ### Work
 
@@ -316,6 +319,8 @@ Stopping an optional organ removes only dependent capabilities. Restart produces
 `Recovering` transition and verified return to `Available`; Presence recreation changes neither.
 
 ## P6.3 — Add bounded asynchronous RPC resilience
+
+**Status: next.**
 
 ### Work
 

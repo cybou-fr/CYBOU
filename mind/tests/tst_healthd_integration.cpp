@@ -1,0 +1,211 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+#include "cybou/fabric/OrganBus.h"
+#include "cybou/protocol/Health.h"
+
+#include <QDBusConnection>
+#include <QDBusInterface>
+#include <QDBusReply>
+#include <QDir>
+#include <QElapsedTimer>
+#include <QProcess>
+#include <QProcessEnvironment>
+#include <QTemporaryDir>
+#include <QTest>
+
+#include <memory>
+#include <vector>
+
+using namespace cybou;
+
+class TestHealthdIntegration : public QObject
+{
+    Q_OBJECT
+
+private:
+    QTemporaryDir m_root;
+    std::vector<std::unique_ptr<QProcess>> m_dependencies;
+    std::unique_ptr<QProcess> m_healthd;
+    QProcess *m_predictord{nullptr};
+
+    QProcessEnvironment environment() const
+    {
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.insert(QStringLiteral("XDG_STATE_HOME"), m_root.filePath(QStringLiteral("state")));
+        environment.insert(QStringLiteral("XDG_RUNTIME_DIR"), m_root.filePath(QStringLiteral("runtime")));
+        environment.insert(QStringLiteral("CYBOU_HEALTH_DISABLE_AUTO_REFRESH"), QStringLiteral("1"));
+        return environment;
+    }
+
+    QDBusInterface interfaceFor(const BusEndpoint &endpoint) const
+    {
+        return QDBusInterface(
+            QString::fromLatin1(endpoint.service),
+            QString::fromLatin1(endpoint.objectPath),
+            QString::fromLatin1(endpoint.interfaceName),
+            QDBusConnection::sessionBus());
+    }
+
+    bool waitForInterface(const BusEndpoint &endpoint, bool expected = true) const
+    {
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < 5000) {
+            if (interfaceFor(endpoint).isValid() == expected) {
+                return true;
+            }
+            QTest::qWait(25);
+        }
+        return false;
+    }
+
+    QProcess *startDependency(const char *variable, const BusEndpoint &endpoint)
+    {
+        auto process = std::make_unique<QProcess>();
+        process->setProgram(qEnvironmentVariable(variable));
+        process->setProcessEnvironment(environment());
+        process->start();
+        if (!process->waitForStarted(3000)) {
+            return nullptr;
+        }
+        QProcess *result = process.get();
+        m_dependencies.push_back(std::move(process));
+        return waitForInterface(endpoint) ? result : nullptr;
+    }
+
+    void startHealthd()
+    {
+        m_healthd = std::make_unique<QProcess>();
+        m_healthd->setProgram(qEnvironmentVariable("CYBOU_HEALTHD_PATH"));
+        m_healthd->setProcessEnvironment(environment());
+        m_healthd->start();
+        QVERIFY2(m_healthd->waitForStarted(3000), qPrintable(m_healthd->errorString()));
+        QVERIFY(waitForInterface(kHealthEndpoint));
+    }
+
+    void stopProcess(QProcess *process)
+    {
+        if (!process || process->state() == QProcess::NotRunning) {
+            return;
+        }
+        process->terminate();
+        if (!process->waitForFinished(2000)) {
+            process->kill();
+            process->waitForFinished(2000);
+        }
+    }
+
+    CapabilitySnapshot snapshot() const
+    {
+        QDBusReply<QByteArray> reply = interfaceFor(kHealthEndpoint).call(QStringLiteral("Snapshot"));
+        if (!reply.isValid()) {
+            return {};
+        }
+        QString error;
+        const CapabilitySnapshot result = decodeCapabilitySnapshot(reply.value(), &error);
+        if (!error.isEmpty()) {
+            return {};
+        }
+        return result;
+    }
+
+    bool refresh() const
+    {
+        QDBusReply<bool> reply = interfaceFor(kHealthEndpoint).call(QStringLiteral("Refresh"));
+        return reply.isValid() && reply.value();
+    }
+
+private Q_SLOTS:
+    void initTestCase()
+    {
+        QVERIFY(m_root.isValid());
+        QVERIFY(QDir().mkpath(m_root.filePath(QStringLiteral("runtime"))));
+
+        QVERIFY(startDependency("CYBOU_EVENTD_PATH", kEventEndpoint));
+        QVERIFY(startDependency("CYBOU_LIFECYCLED_PATH", kLifecycleEndpoint));
+        QVERIFY(startDependency("CYBOU_IDENTITYD_PATH", kIdentityEndpoint));
+        QVERIFY(startDependency("CYBOU_INTENTIOND_PATH", kIntentionEndpoint));
+        m_predictord = startDependency("CYBOU_PREDICTORD_PATH", kPredictorEndpoint);
+        QVERIFY(m_predictord);
+        QVERIFY(startDependency("CYBOU_SELFD_PATH", kSelfEndpoint));
+        QVERIFY(startDependency("CYBOU_WORKSPACED_PATH", kWorkspaceEndpoint));
+        QVERIFY(startDependency("CYBOU_PRESENCED_PATH", kPresenceEndpoint));
+        startHealthd();
+    }
+
+    void cleanupTestCase()
+    {
+        stopProcess(m_healthd.get());
+        for (const auto &process : m_dependencies) {
+            stopProcess(process.get());
+        }
+    }
+
+    void optionalOwnerLossIsCapabilitySpecificAndPersistent()
+    {
+        QVERIFY(refresh());
+        CapabilitySnapshot healthy = snapshot();
+        QVERIFY(healthy.isValid());
+        QCOMPARE(healthy.aggregateState, CapabilityState::Available);
+        QVERIFY(healthy.deficits.isEmpty());
+
+        stopProcess(m_predictord);
+        QVERIFY(waitForInterface(kPredictorEndpoint, false));
+        QVERIFY(refresh());
+        const CapabilitySnapshot degraded = snapshot();
+        QVERIFY(degraded.isValid());
+        QCOMPARE(degraded.aggregateState, CapabilityState::Limited);
+        QStringList affected;
+        for (const CapabilityDeficit &deficit : degraded.deficits) {
+            affected.append(deficit.capabilityId);
+        }
+        QVERIFY(affected.contains(QStringLiteral("prediction")));
+        QVERIFY(affected.contains(QStringLiteral("consolidation")));
+        QVERIFY(!affected.contains(QStringLiteral("accepted-biography")));
+        QVERIFY(!affected.contains(QStringLiteral("identity-continuity")));
+        QVERIFY(!affected.contains(QStringLiteral("commitment-access")));
+        QVERIFY(!affected.contains(QStringLiteral("attention-workspace")));
+
+        stopProcess(m_healthd.get());
+        startHealthd();
+        const CapabilitySnapshot recoveredOwner = snapshot();
+        QVERIFY(recoveredOwner.isValid());
+        QCOMPARE(recoveredOwner.snapshotId, degraded.snapshotId);
+        QCOMPARE(recoveredOwner.deficits.size(), degraded.deficits.size());
+
+        m_predictord = startDependency("CYBOU_PREDICTORD_PATH", kPredictorEndpoint);
+        QVERIFY(m_predictord);
+        QVERIFY(refresh());
+        const CapabilitySnapshot recovering = snapshot();
+        QVERIFY(recovering.isValid());
+        QCOMPARE(recovering.aggregateState, CapabilityState::Recovering);
+        QVERIFY(!recovering.deficits.isEmpty());
+        for (const CapabilityDeficit &deficit : recovering.deficits) {
+            if (deficit.dependencyId == QStringLiteral("predictord")) {
+                QCOMPARE(deficit.state, CapabilityState::Recovering);
+                QCOMPARE(deficit.recoveryPolicy, RecoveryPolicy::Reconcile);
+            }
+        }
+
+        QVERIFY(refresh());
+        const CapabilitySnapshot restored = snapshot();
+        QVERIFY(restored.isValid());
+        QCOMPARE(restored.aggregateState, CapabilityState::Available);
+        QVERIFY(restored.deficits.isEmpty());
+    }
+
+    void duplicateOwnerIsRejected()
+    {
+        QProcess duplicate;
+        duplicate.setProgram(qEnvironmentVariable("CYBOU_HEALTHD_PATH"));
+        duplicate.setProcessEnvironment(environment());
+        duplicate.start();
+        QVERIFY(duplicate.waitForStarted(3000));
+        QVERIFY(duplicate.waitForFinished(5000));
+        QVERIFY(duplicate.exitCode() != 0);
+    }
+};
+
+QTEST_MAIN(TestHealthdIntegration)
+#include "tst_healthd_integration.moc"

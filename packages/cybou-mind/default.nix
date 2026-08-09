@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
-# M5: eight real process boundaries plus the QML Presence proxy.
+# P6.2: nine real process boundaries plus the QML Presence proxy.
 {
   lib,
   stdenv,
@@ -53,6 +53,7 @@ stdenv.mkDerivation {
 
     for daemon in \
       cybou-eventd \
+      cybou-healthd \
       cybou-lifecycled \
       cybou-identityd \
       cybou-intentiond \
@@ -82,6 +83,7 @@ stdenv.mkDerivation {
     }
 
     install_dbus_service org.cybou.Mind.Event1 cybou-eventd cybou-eventd.service
+    install_dbus_service org.cybou.Mind.Health1 cybou-healthd cybou-healthd.service
     install_dbus_service org.cybou.Mind.Lifecycle1 cybou-lifecycled cybou-lifecycled.service
     install_dbus_service org.cybou.Mind.Identity1 cybou-identityd cybou-identityd.service
     install_dbus_service org.cybou.Mind.Intention1 cybou-intentiond cybou-intentiond.service
@@ -92,6 +94,7 @@ stdenv.mkDerivation {
 
     for name in \
       org.cybou.Mind.Event1 \
+      org.cybou.Mind.Health1 \
       org.cybou.Mind.Identity1 \
       org.cybou.Mind.Intention1 \
       org.cybou.Mind.Predictor1 \

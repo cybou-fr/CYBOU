@@ -40,6 +40,37 @@ target_link_libraries(test-health-protocol PRIVATE cybou-protocol Qt6::Test)
 add_test(NAME health-protocol COMMAND test-health-protocol)
 set_tests_properties(health-protocol PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-health-service tst_health_service.cpp)
+target_link_libraries(
+    test-health-service PRIVATE cybou-health-service cybou-protocol Qt6::Test
+)
+add_test(NAME health-service COMMAND test-health-service)
+set_tests_properties(health-service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(test-healthd-integration tst_healthd_integration.cpp)
+target_link_libraries(
+    test-healthd-integration PRIVATE cybou-protocol cybou-fabric Qt6::DBus Qt6::Test
+)
+add_test(
+    NAME healthd-integration
+    COMMAND
+        ${CYBOU_DBUS_TEST_RUNNER}
+        ${CMAKE_COMMAND} -E env
+        CYBOU_HEALTHD_PATH=$<TARGET_FILE:cybou-healthd>
+        CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
+        CYBOU_LIFECYCLED_PATH=$<TARGET_FILE:cybou-lifecycled>
+        CYBOU_IDENTITYD_PATH=$<TARGET_FILE:cybou-identityd>
+        CYBOU_INTENTIOND_PATH=$<TARGET_FILE:cybou-intentiond>
+        CYBOU_PREDICTORD_PATH=$<TARGET_FILE:cybou-predictord>
+        CYBOU_SELFD_PATH=$<TARGET_FILE:cybou-selfd>
+        CYBOU_WORKSPACED_PATH=$<TARGET_FILE:cybou-workspaced>
+        CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
+        $<TARGET_FILE:test-healthd-integration>
+)
+set_tests_properties(
+    healthd-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-lifecycle tst_lifecycle.cpp)
 target_link_libraries(test-lifecycle PRIVATE cybou-lifecycle-service cybou-fabric Qt6::Test)
 add_test(NAME lifecycle COMMAND test-lifecycle)

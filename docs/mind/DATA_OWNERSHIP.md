@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT
 | Resource | Owner |
 |---|---|
 | canonical `journal.db` | `cybou-eventd` |
+| capability dependency graph and current health snapshot | `cybou-healthd` |
 | lifecycle mode and consolidation run state | `cybou-lifecycled` |
 | `identity.json` | `cybou-identityd` |
 | volatile identity login marker | `cybou-identityd` |
@@ -49,7 +50,7 @@ The runtime identity marker prevents a daemon restart from being confused with a
 | Resource | Target owner/boundary |
 |---|---|
 | lifecycle mode and consolidation run state | current `cybou-lifecycled`; no organ state ownership |
-| capability graph and health policy | dedicated M6 health owner; Presence remains read-only |
+| capability graph and health policy | current `cybou-healthd`; Presence remains read-only |
 | perception acquisition state | replaceable adapter/faculty |
 | provenance-bearing accepted observation | `cybou-eventd` Journal history |
 | current epistemic claim projection | dedicated owner to be selected by an implementation ADR |
