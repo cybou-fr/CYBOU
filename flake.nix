@@ -172,6 +172,13 @@
           cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
         };
 
+        # Focused P4 gate: one Plasma node proves shell recreation cannot mutate an
+        # active lifecycle run or append a duplicate Event1 contribution.
+        p4-plasma-lifecycle = import ./tests/p4-plasma-lifecycle.nix {
+          inherit pkgs;
+          cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
+        };
+
         # Focused P2/P3 gate: one headless node proves identity/run continuity and
         # split-commit idempotency across real reboots without the Plasma smoke-test cost.
         lifecycle-continuity = import ./tests/lifecycle-continuity.nix {

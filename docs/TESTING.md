@@ -55,6 +55,10 @@ status, and Event1 count. `CYBOU_PRESENCE_INTERRUPT_DELAY_MS` is test-only fault
 presenced delays and rejects an interruption without touching Lifecycle1. A client heartbeat proves
 the QML event loop remains responsive until the async transport timeout completes.
 
+`p4-plasma-lifecycle` is the focused single-node VM gate for shell recreation. It restarts the
+shipped Plasma user service around one active lifecycle run, requires a replacement PID and restored
+D-Bus surface, and compares the exact run blob and Event1 count across the UI-only transition.
+
 ## Process integration
 
 `m4-process-integration` runs inside an isolated `dbus-run-session`, launches eight executables,

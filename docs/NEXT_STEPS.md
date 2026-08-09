@@ -183,15 +183,16 @@ interpreting the durable run schema. Runtime availability remains orthogonal to 
   visual treatments;
 - [done] provide user interruption for active runs while lifecycled retains terminal-state ownership;
 - [done] keep the existing shell usable when lifecycle services are absent;
-- add QML static validation and VM interaction assertions.
+- add VM interaction assertions (QML static validation is complete).
 
 ### Exit gate
 
 Destroying/recreating Plasma or the Presence proxy neither changes lifecycle state nor duplicates a
 run. A timeout cannot freeze the shell for the current five-second blocking RPC window.
 
-Both invariants now pass at process level; the remaining P4 exit work is the VM interaction
-assertion for the shipped Plasma surface.
+Both invariants pass at process level. A focused single-node `p4-plasma-lifecycle` gate isolates
+the shipped-Plasma restart assertion from the two-node Gate A smoke; its clean KVM execution is the
+last P4 exit item.
 
 ## P5 — Close M5 and publish evidence
 
