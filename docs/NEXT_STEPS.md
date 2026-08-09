@@ -169,7 +169,7 @@ one correct terminal result with intact identity and biography and no duplicate 
 
 ## P4 — Make lifecycle visible without moving ownership into UI
 
-**Status: in progress.** Presence1 and the QML proxy expose lifecycle mode, status, full state,
+**Status: complete.** Presence1 and the QML proxy expose lifecycle mode, status, full state,
 lifecycled health, and a read-only projection with progress class/percentage, request freshness,
 and causal capability deficits. Mind Header and Dashboard render distinct lifecycle modes without
 interpreting the durable run schema. Runtime availability remains orthogonal to lifecycle mode.
@@ -190,11 +190,15 @@ interpreting the durable run schema. Runtime availability remains orthogonal to 
 Destroying/recreating Plasma or the Presence proxy neither changes lifecycle state nor duplicates a
 run. A timeout cannot freeze the shell for the current five-second blocking RPC window.
 
-Both invariants pass at process level. A focused single-node `p4-plasma-lifecycle` gate isolates
-the shipped-Plasma restart assertion from the two-node Gate A smoke; its clean KVM execution is the
-last P4 exit item.
+Both invariants pass at process level. The focused single-node `p4-plasma-lifecycle` gate isolates
+the shipped-Plasma restart assertion from the two-node Gate A smoke and passes under KVM.
 
 ## P5 — Close M5 and publish evidence
+
+**Status: in progress.** The M5 evidence matrix, focused lifecycle/Plasma gates, corrected two-node
+`vm-smoke`, and aggregate flake check pass. VM and ISO compose from the working tree and their local
+evaluation outputs are recorded. A clean revision and publishable artifact hashes remain; no
+release hash is claimed yet.
 
 ### Work
 

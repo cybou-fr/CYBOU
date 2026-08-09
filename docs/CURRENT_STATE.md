@@ -57,6 +57,10 @@ after terminal Event1 commit but before terminal run-state persistence. Both spl
 reuse their deterministic contributions and leave Event1 count unchanged. This closes the P3
 consolidation transaction exit gate.
 
+The focused P4 Plasma VM gate restarts the shipped `plasma-plasmashell.service` around an active
+run, observes a replacement PID and restored Plasma D-Bus surface, and proves that neither the
+exact persisted lifecycle run nor Event1 count changes across UI recreation.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M1–M4 plus partial M5 implementation is the process-isolated substrate of that model;
 it does not yet

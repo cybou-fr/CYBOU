@@ -47,6 +47,10 @@ commit window and again after the terminal commit window, resumes the same persi
 asserts that replay adds no Event1 contribution. The same test retains its original identity ID,
 exact run blob, `Recovering`, and logical-session continuity proof.
 
+The graphical `vm-smoke` asks systemd directly for a non-blocking reboot because the test-driver
+implementation of `reboot()` sends Ctrl+Alt+Delete, which Plasma treats as an interactive logout.
+This keeps shutdown non-interactive while preserving the normal state-flush path.
+
 `m4-process-integration` now launches all eight Mind daemons. It changes Lifecycle1 from `awake` to
 `idle` and back, then proves the signal-driven update reaches Presence1 and the QML-facing Presence
 proxy, including lifecycled health, without turning lifecycle mode into runtime availability.

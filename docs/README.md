@@ -13,6 +13,7 @@ SPDX-License-Identifier: MIT
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
+- [M5 Evaluation Evidence](M5_EVALUATION.md) — supported transitions, limitations, and release gates
 - [Installation](INSTALLATION.md) — development artifacts and safety constraints
 
 ### Architecture

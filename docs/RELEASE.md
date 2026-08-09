@@ -62,6 +62,8 @@ sha256sum result/iso/*.iso > SHA256SUMS
 
 Run release commands from the clean tagged tree. Record the flake revision, artifact hashes, test
 environment, known limitations, and whether persistent state can be upgraded or must be reset.
+Use [M5 Evaluation Evidence](M5_EVALUATION.md) as the evidence template for the current candidate;
+do not replace its pending artifact fields with values produced from a dirty tree.
 
 ## Release notes must distinguish
 

@@ -217,7 +217,11 @@ pkgs.testers.runNixOSTest {
             "| sed 's/[^0-9]//g'"
         ).strip())
 
-        session.reboot()
+        # The test driver's reboot() sends Ctrl+Alt+Delete, which Plasma intercepts as an
+        # interactive logout. Ask systemd directly so state is flushed and shutdown remains
+        # non-interactive, then let the driver reconnect to the new boot.
+        session.execute("systemctl reboot --no-block")
+        session.connected = False
         session.wait_for_unit("display-manager.service")
         session.wait_until_succeeds("test -e /run/user/1000/wayland-0")
         session.succeed("systemctl --user -M cybou@ start cybou-presenced.service")
