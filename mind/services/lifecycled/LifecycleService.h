@@ -22,9 +22,15 @@ public Q_SLOTS:
                        qulonglong inputHighWaterMark,
                        const QStringList &requiredCapabilities,
                        const QStringList &optionalCapabilities);
+    QString WorkOperationKey(const QString &capability) const;
+    bool AcknowledgeWork(const QString &capability, const QString &operationKey,
+                         qulonglong inputHighWaterMark);
+    bool MarkMissing(const QString &capability, const QString &cause);
+    bool ResumeRun();
     bool FinishRun(const QString &status, const QString &cause);
 private:
     bool load(); bool save();
+    bool requestedCapability(const QString &capability) const;
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
 };

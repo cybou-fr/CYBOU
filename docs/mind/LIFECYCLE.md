@@ -101,6 +101,11 @@ migrations and expose their reason.
 - Repeated work uses stable operation keys or equivalent idempotency protection.
 - Presence says `completed` only after the terminal contribution is accepted.
 
+Lifecycle1 derives each current operation key as `runId:capability:inputHighWaterMark`. Owner
+acknowledgements must return that key and the accepted high-water mark. Repeating an already
+persisted acknowledgement is a successful no-op; a mismatched key or mark fails closed. Recovery
+resumes the existing active run and therefore derives the same keys rather than creating new work.
+
 ## Privacy and retention
 
 Summaries inherit the most restrictive privacy of their causes/evidence. A summary does not allow

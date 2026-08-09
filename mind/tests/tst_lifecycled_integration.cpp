@@ -107,6 +107,24 @@ private Q_SLOTS:
         QCOMPARE(
             state.value(QStringLiteral("runId")).toString(),
             run.runId.toString(QUuid::WithoutBraces));
+
+        QDBusReply<bool> resumed = interface().call(QStringLiteral("ResumeRun"));
+        QVERIFY(resumed.isValid() && resumed.value());
+        QDBusReply<QString> operationKey = interface().call(
+            QStringLiteral("WorkOperationKey"), QStringLiteral("journal"));
+        QVERIFY(operationKey.isValid() && !operationKey.value().isEmpty());
+        QDBusReply<bool> acknowledged = interface().call(
+            QStringLiteral("AcknowledgeWork"),
+            QStringLiteral("journal"), operationKey.value(), qulonglong(17));
+        QVERIFY(acknowledged.isValid() && acknowledged.value());
+        QDBusReply<bool> duplicate = interface().call(
+            QStringLiteral("AcknowledgeWork"),
+            QStringLiteral("journal"), operationKey.value(), qulonglong(17));
+        QVERIFY(duplicate.isValid() && duplicate.value());
+        QDBusReply<bool> finished = interface().call(
+            QStringLiteral("FinishRun"),
+            QStringLiteral("completed"), QStringLiteral("accepted owner result"));
+        QVERIFY(finished.isValid() && finished.value());
     }
 
     void duplicateOwnerIsRejected()

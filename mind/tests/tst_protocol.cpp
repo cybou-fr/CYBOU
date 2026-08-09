@@ -192,7 +192,8 @@ private Q_SLOTS:
         run.requiredCapabilities = {QStringLiteral("journal")};
         run.optionalCapabilities = {QStringLiteral("prediction")};
         run.status = LifecycleRunStatus::Completed;
-        run.completedWork = {QStringLiteral("journal.verify")};
+        run.completedWork = {QStringLiteral("journal")};
+        run.missingWork = {QStringLiteral("prediction")};
         run.terminalCause = QStringLiteral("completed");
         QVERIFY(run.isValid());
 
@@ -212,6 +213,11 @@ private Q_SLOTS:
         run.policyId = QStringLiteral("idle");
         run.requestedAt = QDateTime::currentDateTimeUtc();
         run.status = LifecycleRunStatus::Completed;
+        QVERIFY(!run.isValid());
+
+        run.requiredCapabilities = {QStringLiteral("journal")};
+        run.missingWork = {QStringLiteral("journal")};
+        run.terminalCause = QStringLiteral("cannot complete");
         QVERIFY(!run.isValid());
 
         QString error;

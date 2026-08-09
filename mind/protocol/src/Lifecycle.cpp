@@ -55,8 +55,13 @@ bool LifecycleRun::isValid() const {
     if (!uniqueNonEmpty(requiredCapabilities) || !uniqueNonEmpty(optionalCapabilities) || !uniqueNonEmpty(completedWork) || !uniqueNonEmpty(missingWork)) return false;
     QSet<QString> required(requiredCapabilities.begin(), requiredCapabilities.end());
     for (const auto &v : optionalCapabilities) if (required.contains(v)) return false;
+    QSet<QString> requested=required; requested.unite(QSet<QString>(optionalCapabilities.begin(),optionalCapabilities.end()));
+    QSet<QString> completed(completedWork.begin(),completedWork.end()); QSet<QString> missing(missingWork.begin(),missingWork.end());
+    for(const auto &v:completed)if(!requested.contains(v))return false;
+    for(const auto &v:missing)if(!requested.contains(v)||completed.contains(v))return false;
     if (isTerminal() != !terminalCause.trimmed().isEmpty()) return false;
-    return status != LifecycleRunStatus::Completed || missingWork.isEmpty();
+    if(status==LifecycleRunStatus::Completed){for(const auto &v:required)if(!completed.contains(v)||missing.contains(v))return false;for(const auto &v:optionalCapabilities)if(!completed.contains(v)&&!missing.contains(v))return false;}
+    return true;
 }
 
 QByteArray encodeLifecycleRun(const LifecycleRun &run) {

@@ -25,6 +25,12 @@ unknown future versions fail closed. The focused headless NixOS gate proves that
 preserves the exact persisted run and identity ID, enters `Recovering`, and increments the logical
 session count. P2 is complete; owner-work dispatch and real consolidation remain P3.
 
+The first P3 transaction substrate is implemented in Lifecycle1: deterministic per-capability
+operation keys, high-water-mark-bound idempotent acknowledgements, optional capability deficits,
+required-work completion gates, and explicit resume of the same run after recovery. Predictor and
+Workspace owner-side consolidation handlers and automatic coordinator dispatch are not yet
+implemented.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet
 contain the planned M8 language faculty or M9 authorized executor.

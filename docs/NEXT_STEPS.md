@@ -125,6 +125,11 @@ identity, lose accepted commitments, or report unverified success.
 
 ## P3 — Implement the consolidation MVP
 
+**Status: transaction substrate in progress.** Lifecycle1 now persists idempotent capability
+acknowledgements tied to the run and accepted high-water mark, rejects premature completion,
+represents optional deficits, and resumes the same operation keys after recovery. Automatic
+dispatch and owner-side Predictor/Workspace consolidation effects remain.
+
 ### Vertical slice
 
 Implement one small end-to-end run:
