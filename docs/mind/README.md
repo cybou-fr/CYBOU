@@ -25,10 +25,11 @@ Then read the implementation documents in this order:
 12. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — M6/M7 target
 13. [Capability and Health Contract](HEALTH.md) — implemented P6.1/P6.2 protocol and owner boundary
 14. [RPC Resilience](RPC_RESILIENCE.md) — implemented P6.3 async transport policy
+15. [Homeostatic Measurements](HOMEOSTASIS.md) — implemented P6.4 observation-only protocol
 
 Documents 1–11 primarily specify or explain the current substrate and continuity boundary.
-Document 12 is a future-target contract. Documents 13–14 describe implemented M6 health and
-transport foundations while keeping future homeostasis and UI claims explicit.
+Document 12 is a future-target contract. Documents 13–15 describe implemented M6 health,
+transport, and measurement foundations while keeping scheduling and UI claims explicit.
 
 For current implementation status, see [Current State](../CURRENT_STATE.md).
 For milestone semantics, see [Roadmap](../ROADMAP.md).

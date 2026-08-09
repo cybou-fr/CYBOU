@@ -90,6 +90,7 @@ def main(argv: list[str]) -> int:
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
         "health": repo / "docs/mind/HEALTH.md",
         "rpc_resilience": repo / "docs/mind/RPC_RESILIENCE.md",
+        "homeostasis": repo / "docs/mind/HOMEOSTASIS.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
@@ -308,6 +309,14 @@ def main(argv: list[str]) -> int:
         ("RPC circuit", "## Circuit breaker"),
     ):
         require(paths["rpc_resilience"], label, needle)
+
+    for label, needle in (
+        ("homeostasis boundary", "## Boundary"),
+        ("homeostasis schema", "## Schema v1"),
+        ("homeostasis projection", "## Health1 projection"),
+        ("homeostasis evidence", "## Evidence"),
+    ):
+        require(paths["homeostasis"], label, needle)
 
     for label, needle in (
         ("epistemic statuses", "## Epistemic projection"),

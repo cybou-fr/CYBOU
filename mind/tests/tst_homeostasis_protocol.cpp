@@ -63,6 +63,7 @@ private Q_SLOTS:
         snapshot.measurements[0].validUntil = snapshot.observedAt.addMSecs(-1);
         QVERIFY(!snapshot.isValid());
         snapshot.measurements[0].status = MeasurementStatus::Stale;
+        snapshot.measurements[0].observedAt = snapshot.observedAt.addSecs(-1);
         QVERIFY(snapshot.isValid());
     }
 

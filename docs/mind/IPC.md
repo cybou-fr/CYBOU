@@ -44,8 +44,10 @@ Health() -> string
 ```
 
 P6.1 defines schema-v1 `CapabilitySnapshot` CBOR and P6.2 serves it from Health1. Health1 exposes
-`Ready`, aggregate `Health`, `LastError`, `HasSnapshot`, `Snapshot`, `Refresh`, and `Changed`.
+`Ready`, aggregate `Health`, `LastError`, `HasSnapshot`, `Snapshot`, `HasMeasurements`,
+`Measurements`, `Refresh`, and `Changed`.
 The snapshot uses its own versioned protocol encoding rather than the generic fabric wrapper.
+P6.4 `Measurements` uses the separate schema-v1 homeostasis encoding and cannot authorize work.
 
 ## Resilient asynchronous calls
 

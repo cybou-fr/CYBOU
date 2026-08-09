@@ -13,7 +13,7 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs eighteen CTest suites, including Event1, lifecycle persistence/recovery,
+The Mind package runs nineteen CTest suites, including Event1, lifecycle persistence/recovery,
 Lifecycle1 process restart, and seven-process M4 integration. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count.
@@ -82,6 +82,14 @@ backoff, retry eligibility, and a closed/open/half-open circuit breaker. Plasma 
 interruption is the first production consumer: its timeout is reported as `UnknownOutcome`, is not
 retried, does not block the shell event loop, and does not move terminal ownership out of
 lifecycled. Other legacy RPC paths remain synchronous until migrated explicitly.
+
+P6.4 adds schema-v1 homeostatic measurements and an observation-only Health1 projection. Each
+signal carries its source, kind, unit, observation and validity time, and explicit freshness or
+availability status. Healthd collects capability-deficit count, per-owner probe latency, probe
+failures, accepted Event1 count, and active lifecycle-run count. Event backlog, Journal size, and
+prediction calibration pressure are `Unsupported`, not fabricated zeroes. Measurements are
+ephemeral across healthd restart and schema v1 rejects scheduling authority; thresholds,
+hysteresis, automatic lifecycle policy, and Presence projection remain P6.5 work.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
@@ -202,9 +210,9 @@ The current tree does **not** yet implement:
 
 - in-place upgrade reconciliation beyond the tested schema-v0-to-v1 migration;
 - background consolidation, retention, forgetting, or temporal freshness policy;
-- M6 Presence health projection and homeostatic policy beyond the P6.1–P6.3 substrate;
-- homeostatic pressure signals or general metacognitive uncertainty/evidence-freshness projection
-  (only lifecycle-request freshness is currently projected);
+- M6 Presence health projection and homeostatic scheduling policy beyond the P6.1–P6.4 substrate;
+- owner contracts for Event1 backlog, Journal growth, and calibration pressure, and general
+  metacognitive uncertainty/evidence-freshness projection;
 - M7 inter-node transport, replication, or partition handling;
 - typed perception adapters, epistemic claims, contradiction reconciliation, or value constraints;
 - M8 optional language faculty;
@@ -233,8 +241,8 @@ the corresponding milestone is implemented and gated.
 - M4: implementation present; repository gates remain the acceptance authority.
 - M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
   projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
-- M6: P6.1–P6.3 protocol, dependency graph, health owner, persistent Health1 snapshot, recovery,
-  process fault injection, and bounded async transport are implemented; Presence health projection,
-  homeostasis, broader RPC migration, UI, and KVM gates remain.
+- M6: P6.1–P6.4 protocol, dependency graph, health owner, persistent Health1 snapshot, recovery,
+  process fault injection, bounded async transport, and observation-only homeostatic measurements
+  are implemented; scheduling, Presence health projection, broader RPC migration, UI, and KVM gates remain.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

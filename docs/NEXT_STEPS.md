@@ -342,7 +342,10 @@ unknown mutation result into success. Unit tests use a deterministic clock/backo
 
 ## P6.4 — Introduce homeostatic signals without autonomous policy
 
-**Status: next.**
+**Status: complete for typed observation.** Health1 now publishes schema-v1 measurements with
+source, units, observation/validity time, and explicit current, stale, unknown, or unsupported
+status. Schema v1 forbids scheduling authority. Backlog, storage growth, and calibration pressure
+remain explicitly unsupported until their owners expose typed contracts; no zero is fabricated.
 
 ### Work
 

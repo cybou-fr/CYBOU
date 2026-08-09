@@ -1,0 +1,61 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: MIT
+-->
+
+# Homeostatic Measurements
+
+## Boundary
+
+P6.4 introduces observation, not autonomous policy. `cybou-healthd` owns an immutable in-memory
+`HomeostasisSnapshot` refreshed together with its capability snapshot. It reads public D-Bus
+contracts and never opens Journal or another organ's storage. Measurements cannot request or
+interrupt a lifecycle run: schema v1 requires `schedulingAuthorized == false`.
+
+Homeostatic snapshots are intentionally not persisted. A recreated health owner must collect new
+evidence; it must not present an old runtime measurement as current.
+
+## Schema v1
+
+Each snapshot carries a schema version, UUID, UTC observation time, the scheduling guard, and a
+non-empty unique list of measurements. Each measurement carries:
+
+- stable metric and source identifiers;
+- kind (`Gauge`, `Counter`, `Duration`, or `Bytes`) and unit;
+- status (`Current`, `Stale`, `Unknown`, or `Unsupported`);
+- observation and validity times for value-bearing states;
+- a finite numeric value only when a value is known;
+- a reason instead of a fabricated value for `Unknown` and `Unsupported`.
+
+`Current` expires at `validUntil`. `Stale` retains its last observed value but its validity time is
+before the snapshot observation. Unknown schema versions, enum values, duplicate identifiers,
+wrong CBOR types, non-finite values, and inconsistent freshness fail closed.
+
+## Health1 projection
+
+Health1 exposes `HasMeasurements()` and `Measurements()`. `Refresh()` collects a new measurement
+snapshot only after the durable capability snapshot can be committed. `Changed` then announces
+both projections. Restart reloads the durable capability snapshot but reports no measurements
+until the next refresh.
+
+| Metric | Source | Kind/unit | Current support |
+|---|---|---|---|
+| `health.capability-deficit.count` | healthd | counter / `{deficit}` | yes |
+| `rpc.probe.latency.<component>.ms` | healthd | duration / `ms` | yes |
+| `rpc.probe-failure.count` | healthd | counter / `{probe}` | yes |
+| `event.accepted.count` | eventd | counter / `{event}` | yes, otherwise `Unknown` |
+| `lifecycle.active-run.count` | lifecycled | counter / `{run}` | yes, otherwise `Unknown` |
+| `event.backlog.count` | eventd | counter | `Unsupported`: no consumer-offset contract |
+| `journal.storage.bytes` | eventd | bytes | `Unsupported`: no public owner metric |
+| `prediction.calibration-pressure` | predictord | gauge | `Unsupported`: policy is undefined |
+
+Backlog and calibration pressure are not represented as zero. Adding them requires a typed owner
+contract. Thresholds, hysteresis, scheduling authorization, and Presence presentation belong to
+P6.5 and must consume this protocol without weakening its freshness rules.
+
+## Evidence
+
+Protocol tests cover round-trip and malformed input rejection. Service tests prove unsupported
+signals have no value and measurements are not recovered as current after restart. Process
+integration proves the Event1 count is observed without appending an event and that the published
+snapshot cannot authorize scheduling.
