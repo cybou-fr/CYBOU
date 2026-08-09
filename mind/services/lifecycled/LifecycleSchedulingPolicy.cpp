@@ -45,6 +45,10 @@ QVariantMap SchedulingEvaluation::toMap() const
         {QStringLiteral("policyId"), policyId},
         {QStringLiteral("reason"), reason},
         {QStringLiteral("observedAt"), observedAt},
+        {QStringLiteral("capabilitySnapshotId"),
+         capabilitySnapshotId.toString(QUuid::WithoutBraces)},
+        {QStringLiteral("homeostasisSnapshotId"),
+         homeostasisSnapshotId.toString(QUuid::WithoutBraces)},
         {QStringLiteral("pressureLatched"), pressureLatched},
         {QStringLiteral("eligibleWorkers"), eligibleWorkers},
         {QStringLiteral("missingWorkers"), missingWorkers},
@@ -61,6 +65,8 @@ SchedulingEvaluation LifecycleSchedulingPolicy::evaluate(
 {
     SchedulingEvaluation result;
     result.observedAt = now.toUTC();
+    result.capabilitySnapshotId = capabilities.snapshotId;
+    result.homeostasisSnapshotId = homeostasis.snapshotId;
     result.pressureLatched = pressureLatched;
 
     if (!capabilities.isValid()) {

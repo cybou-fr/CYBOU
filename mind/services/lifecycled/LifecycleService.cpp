@@ -16,6 +16,26 @@
 namespace cybou {
 namespace {
 const QString kConsolidationConsumer = QStringLiteral("lifecycle.consolidation");
+const QUuid kScheduledRunNamespace(
+    QStringLiteral("ea65af07-61cc-5d75-9178-e849fddc9238"));
+const QUuid kLifecycleTerminalNamespace(
+    QStringLiteral("156fb70e-a26c-56f1-9540-ad81cc3a3629"));
+QUuid scheduledRunId(const QUuid &capabilitySnapshotId, const QUuid &homeostasisSnapshotId)
+{
+    return QUuid::createUuidV5(
+        kScheduledRunNamespace,
+        QStringLiteral("event-backlog-v1:%1:%2")
+            .arg(capabilitySnapshotId.toString(QUuid::WithoutBraces),
+                 homeostasisSnapshotId.toString(QUuid::WithoutBraces))
+            .toUtf8());
+}
+QUuid terminalContributionId(const QUuid &runId)
+{
+    return QUuid::createUuidV5(
+        kLifecycleTerminalNamespace,
+        QStringLiteral("lifecycle:%1:completed")
+            .arg(runId.toString(QUuid::WithoutBraces)).toUtf8());
+}
 LifecycleMode modeFrom(const QString &s) { for (int i=1;i<=7;++i) { auto m=static_cast<LifecycleMode>(i); if (lifecycleModeToString(m)==s) return m; } return static_cast<LifecycleMode>(0); }
 LifecycleRunStatus statusFrom(const QString &s) { for (int i=1;i<=5;++i) { auto v=static_cast<LifecycleRunStatus>(i); if (lifecycleRunStatusToString(v)==s) return v; } return static_cast<LifecycleRunStatus>(0); }
 void failpoint(const char *name) { if (qEnvironmentVariable("CYBOU_LIFECYCLE_FAILPOINT") == QLatin1String(name)) qFatal("lifecycled fault injection: %s", name); }
@@ -56,6 +76,52 @@ QByteArray LifecycleService::EvaluateScheduling() const
     const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
         m_mode, m_hasRun && !m_run.isTerminal(), m_health.snapshot(), m_health.measurements());
     return FabricCodec::encodeMap(evaluation.toMap());
+}
+QString LifecycleService::ExecuteSchedulingDecision(
+    const QString &capabilitySnapshotId,
+    const QString &homeostasisSnapshotId)
+{
+    const QUuid capabilityId(capabilitySnapshotId);
+    const QUuid homeostasisId(homeostasisSnapshotId);
+    if (capabilityId.isNull() || homeostasisId.isNull()) {
+        m_error = QStringLiteral("invalid scheduling evidence identity");
+        return {};
+    }
+    const QUuid runId = scheduledRunId(capabilityId, homeostasisId);
+    if (m_hasRun && m_run.runId == runId)
+        return runId.toString(QUuid::WithoutBraces);
+    if (m_events.contains(terminalContributionId(runId)))
+        return runId.toString(QUuid::WithoutBraces);
+
+    const CapabilitySnapshot capabilities = m_health.snapshot();
+    const HomeostasisSnapshot homeostasis = m_health.measurements();
+    if (capabilities.snapshotId != capabilityId || homeostasis.snapshotId != homeostasisId) {
+        m_error = QStringLiteral("scheduling evidence was superseded");
+        return {};
+    }
+    const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
+        m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis);
+    if (evaluation.decision != SchedulingDecision::Run) {
+        m_error = evaluation.reason;
+        return {};
+    }
+    if (!m_events.isOpen() || m_events.count() == 0) {
+        m_error = QStringLiteral("Event1 is unavailable or empty");
+        return {};
+    }
+
+    LifecycleRun run;
+    run.runId = runId;
+    run.kind = QStringLiteral("consolidation");
+    run.policyId = QStringLiteral("event-backlog-v1:%1")
+                       .arg(homeostasisId.toString(QUuid::WithoutBraces));
+    run.requestedAt = QDateTime::currentDateTimeUtc();
+    run.inputHighWaterMark = m_events.count();
+    run.requiredCapabilities = evaluation.eligibleWorkers;
+    run.optionalCapabilities = evaluation.missingWorkers.keys();
+    if (!BeginRun(encodeLifecycleRun(run))) return {};
+    m_error.clear();
+    return runId.toString(QUuid::WithoutBraces);
 }
 bool LifecycleService::Transition(const QString &mode) { auto next=modeFrom(mode); if(static_cast<int>(next)==0||!canTransition(m_mode,next)){m_error="illegal lifecycle transition";return false;} auto old=m_mode;m_mode=next;if(!save()){m_mode=old;return false;}m_error.clear();return true; }
 bool LifecycleService::BeginRun(const QByteArray &encoded) { QString e; auto run=decodeLifecycleRun(encoded,&e); if(!e.isEmpty()||run.status!=LifecycleRunStatus::Requested||m_hasRun&&!m_run.isTerminal()||m_mode!=LifecycleMode::Idle){m_error=e.isEmpty()?"cannot begin lifecycle run":e;return false;}const auto oldRun=m_run;const auto oldMode=m_mode;const bool oldHasRun=m_hasRun;m_run=run;m_run.status=LifecycleRunStatus::Active;m_hasRun=true;m_mode=LifecycleMode::Consolidating;if(!save()){m_run=oldRun;m_mode=oldMode;m_hasRun=oldHasRun;return false;}return true; }

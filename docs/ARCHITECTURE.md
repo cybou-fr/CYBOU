@@ -106,6 +106,11 @@ authorizes only the reviewed `event-backlog-v1` policy when that measurement is 
 from their own pressure, so a completed run cannot schedule itself again. Presence merely projects
 the decision and its reason; even an authorized `Run` evaluation is not an automatic mutation.
 
+Execution is a separate Lifecycle1 command. It binds the decision to both Health1 snapshot UUIDs,
+revalidates them to close the evaluation/execution race, and derives the lifecycle run UUID from
+that evidence. The same command is therefore idempotent across an unknown D-Bus result, process
+restart, terminal completion, and replacement of the current run projection.
+
 Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
 not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form
 a cycle. Aggregate capability state, per-capability state, deficits, and observation time are a

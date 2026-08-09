@@ -59,9 +59,16 @@ own capability scope, preventing consolidation output from scheduling itself aga
 
 Lifecycle1 additionally exposes `EvaluateScheduling`. It returns a fabric-CBOR dry-run decision:
 `run`, `defer`, or `block`; policy/reason; observation time; hysteresis state; eligible workers;
-and typed causes for missing optional workers. Evaluation reads Health1 but does not mutate the
+typed causes for missing optional workers; and the exact capability/homeostasis snapshot IDs.
+Evaluation reads Health1 but does not mutate the
 Lifecycle1 run or mode. A `run` decision means the named policy is authorized and its typed gates
 passed; it still does not create a lifecycle run.
+
+`ExecuteSchedulingDecision(capabilitySnapshotId, homeostasisSnapshotId)` re-reads Health1 and
+requires both IDs to remain current before it creates a bounded consolidation run. Its run UUID is
+deterministic from policy plus both evidence IDs. Retrying after a timeout returns the same active
+or completed run ID, including after a later run replaced the in-memory projection; the durable
+terminal Event1 contribution closes that idempotency window.
 
 ## Resilient asynchronous calls
 

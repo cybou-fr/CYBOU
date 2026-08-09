@@ -394,9 +394,16 @@ bounded authorized policy IDs and migrates schema v1 strictly as observation-onl
 freshness, idleness, worker, and hysteresis gates. Process integration drives backlog to 32 and
 proves Lifecycle1 and Presence return `Run` without creating or mutating a lifecycle run.
 
+**Slice 5: implemented.** Lifecycle1 now exposes an explicit execution command that requires the
+exact capability/homeostasis snapshot IDs returned by evaluation and revalidates both immediately
+before mutation. It derives a deterministic run UUID from policy and evidence, making retries safe
+after timeout, completion, and even after a later run replaces the current projection. Stale
+evidence fails without changing lifecycle state. The accepted execution creates the existing
+bounded consolidation transaction; dispatch and terminal completion remain explicit owner steps.
+
 ### Work
 
-- add an explicit idempotent command that executes an authorized `Run` decision;
+- add a bounded scheduler trigger that invokes the idempotent command and dispatches accepted work;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
 - refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;

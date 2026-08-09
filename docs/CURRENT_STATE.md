@@ -137,6 +137,14 @@ return an authorized `Run` decision after its independent capability, freshness,
 worker, and 32/8 hysteresis checks. Evaluation remains read-only and process integration proves its
 state bytes are unchanged.
 
+P6.5 slice 5 adds the explicit idempotent `ExecuteSchedulingDecision` mutation to Lifecycle1.
+Evaluation carries exact capability and homeostasis snapshot IDs; execution re-reads Health1 and
+rejects either superseded ID before constructing a run. The run UUID is deterministic from the
+policy and both evidence IDs, so retry after an unknown reply returns the same active or completed
+run. After a newer run replaces the lifecycle projection, the deterministic terminal Event1 ID
+still prevents recreation of the old run. Process integration proves stale-evidence rejection,
+active/terminal retry, later-run retry, owner dispatch, completion, and consumer-offset advancement.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

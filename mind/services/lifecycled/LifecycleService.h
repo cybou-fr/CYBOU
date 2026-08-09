@@ -19,6 +19,9 @@ public Q_SLOTS:
     QString LastError() const { return m_error; }
     QByteArray State() const;
     QByteArray EvaluateScheduling() const;
+    QString ExecuteSchedulingDecision(
+        const QString &capabilitySnapshotId,
+        const QString &homeostasisSnapshotId);
     bool Transition(const QString &mode);
     bool BeginRun(const QByteArray &encoded);
     QString RequestRun(const QString &kind, const QString &policyId,

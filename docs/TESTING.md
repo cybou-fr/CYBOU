@@ -73,6 +73,11 @@ authorizes only `event-backlog-v1`, and observes `Run` through Lifecycle1 and Pr
 state mutation. Protocol tests cover schema-v1 observation-only migration, invalid legacy true,
 duplicate/invalid policy IDs, and future-schema rejection.
 
+The same process scenario refreshes Health1 between evaluation and execution to prove stale
+evidence fails without changing Lifecycle1 bytes. A current decision creates one deterministic
+run; retries while active, after completion, and after a later run all return the same ID. Real
+predictor/workspace dispatch and terminal completion close the path through Event1.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

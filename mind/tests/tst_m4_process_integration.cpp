@@ -291,7 +291,7 @@ private Q_SLOTS:
         QTRY_COMPARE_WITH_TIMEOUT(presence.lifecycleMode(), QStringLiteral("awake"), 5000);
     }
 
-    void schedulingDryRunExplainsDeferralWithoutMutatingLifecycle()
+    void schedulingExecutionRejectsStaleEvidenceAndIsIdempotent()
     {
         EventClient eventClient;
         QVERIFY(eventClient.ensureConsumer(QStringLiteral("lifecycle.consolidation"), 0));
@@ -332,6 +332,45 @@ private Q_SLOTS:
         QVERIFY2(surface.wake(), qPrintable(surface.lastError()));
         QCOMPARE(surface.lifecycleScheduling().value(QStringLiteral("decision")).toString(),
                  QStringLiteral("run"));
+
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        const QString staleResult = lifecycle.callString(
+            QStringLiteral("ExecuteSchedulingDecision"),
+            {evaluation.value(QStringLiteral("capabilitySnapshotId")).toString(),
+             evaluation.value(QStringLiteral("homeostasisSnapshotId")).toString()});
+        QVERIFY(staleResult.isEmpty());
+        QCOMPARE(lifecycle.callBytes(QStringLiteral("State")), before);
+
+        const QVariantMap current = FabricCodec::decodeMap(
+            lifecycle.callBytes(QStringLiteral("EvaluateScheduling")), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(current.value(QStringLiteral("decision")).toString(), QStringLiteral("run"));
+        const QVariantList evidence{
+            current.value(QStringLiteral("capabilitySnapshotId")).toString(),
+            current.value(QStringLiteral("homeostasisSnapshotId")).toString()};
+        const QString runId = lifecycle.callString(
+            QStringLiteral("ExecuteSchedulingDecision"), evidence);
+        QVERIFY(!runId.isEmpty());
+        QCOMPARE(lifecycle.callString(QStringLiteral("ExecuteSchedulingDecision"), evidence), runId);
+        const QVariantMap active = LifecycleClient().state();
+        QCOMPARE(active.value(QStringLiteral("runId")).toString(), runId);
+        QCOMPARE(active.value(QStringLiteral("mode")).toString(), QStringLiteral("consolidating"));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Dispatch")));
+        QVERIFY(lifecycle.callBool(
+            QStringLiteral("FinishRun"),
+            {QStringLiteral("completed"), QStringLiteral("authorized scheduling test")}));
+        QCOMPARE(lifecycle.callString(QStringLiteral("ExecuteSchedulingDecision"), evidence), runId);
+
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QString laterRun = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("maintenance"), QStringLiteral("idempotency-window-test"),
+             QVariant::fromValue<qulonglong>(eventClient.count()), QStringList{}, QStringList{}});
+        QVERIFY(!laterRun.isEmpty());
+        QVERIFY(lifecycle.callBool(
+            QStringLiteral("FinishRun"),
+            {QStringLiteral("interrupted"), QStringLiteral("idempotency window cleanup")}));
+        QCOMPARE(lifecycle.callString(QStringLiteral("ExecuteSchedulingDecision"), evidence), runId);
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
     }
 

@@ -20,6 +20,8 @@ struct SchedulingEvaluation {
     QString policyId{QStringLiteral("event-backlog-v1")};
     QString reason;
     QDateTime observedAt;
+    QUuid capabilitySnapshotId;
+    QUuid homeostasisSnapshotId;
     bool pressureLatched{false};
     QStringList eligibleWorkers;
     QVariantMap missingWorkers;
