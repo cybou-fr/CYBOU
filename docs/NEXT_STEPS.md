@@ -27,7 +27,7 @@ The immediate objective is not language or autonomous action. It is:
 ## P0 — Restore a trustworthy green baseline
 
 **Status: complete.** The fast Nix gate, all four repository-specific validators, REUSE 3.3, both
-primary packages, and the twelve Mind CTest suites pass from the complete working tree.
+primary packages, and the Mind CTest suites pass from the complete working tree.
 
 ### Work
 
@@ -92,8 +92,9 @@ degraded runs without relying on UI strings or direct database access.
 ## P2 — Prove continuity before consolidation
 
 **Status: implementation substrate present.** `cybou-lifecycled`, atomic run persistence,
-Lifecycle1, systemd activation, and active-run restart recovery are implemented. The full
-logout/reboot/upgrade matrix remains open before the P2 exit gate can be called complete.
+Lifecycle1, systemd activation, and active-run restart recovery are implemented. Process-level
+D-Bus restart and duplicate-owner paths are tested. Logout/reboot/upgrade and open-intention
+reconstruction remain open before the P2 exit gate can be called complete.
 
 ### Work
 

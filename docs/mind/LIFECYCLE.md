@@ -119,6 +119,19 @@ M5 should prove:
 - logout/reboot recovery preserves identity and open commitments;
 - lifecycle and freshness are visible without making Presence an owner.
 
+## P2 continuity matrix
+
+| Boundary | Current automated evidence | Remaining evidence |
+|---|---|---|
+| service object reconstruction | atomic reload and active-run recovery | none for P2 scope |
+| daemon process restart | D-Bus restart preserves run identity and enters `Recovering` | none for P2 scope |
+| duplicate daemon | second Lifecycle1 owner exits non-zero | none |
+| corrupt lifecycle state | startup fails closed | backup/operator recovery policy |
+| identity continuity | existing same-login restart guard | coordinated logout/reboot proof |
+| open intentions | state remains separate from lifecycled | reconstruction proof across reboot |
+| system reboot | persistent path and VM unit are defined | booted transition test |
+| architecture upgrade | unsupported schema fails closed | migration/rollback implementation |
+
 ## Related documents
 
 - [Mind Model](../MIND_MODEL.md)
@@ -126,4 +139,3 @@ M5 should prove:
 - [Failure Modes](FAILURE_MODES.md)
 - [Data Ownership](DATA_OWNERSHIP.md)
 - [ADR-0024](../adr/ADR-0024-cognitive-lifecycle-and-consolidation.md)
-

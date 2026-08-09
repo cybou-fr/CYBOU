@@ -40,6 +40,24 @@ target_link_libraries(test-lifecycle PRIVATE cybou-lifecycle-service cybou-fabri
 add_test(NAME lifecycle COMMAND test-lifecycle)
 set_tests_properties(lifecycle PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-lifecycled-integration tst_lifecycled_integration.cpp)
+target_link_libraries(
+    test-lifecycled-integration
+    PRIVATE cybou-protocol cybou-fabric Qt6::DBus Qt6::Test
+)
+add_test(
+    NAME lifecycled-integration
+    COMMAND
+        ${CYBOU_DBUS_TEST_RUNNER}
+        ${CMAKE_COMMAND} -E env
+        CYBOU_LIFECYCLED_PATH=$<TARGET_FILE:cybou-lifecycled>
+        $<TARGET_FILE:test-lifecycled-integration>
+)
+set_tests_properties(
+    lifecycled-integration
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-journal tst_journal.cpp)
 target_link_libraries(test-journal PRIVATE cybou-storage Qt6::Test)
 add_test(NAME journal COMMAND test-journal)

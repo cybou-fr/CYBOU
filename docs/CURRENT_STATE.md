@@ -13,7 +13,8 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs twelve CTest suites, including Event1 and seven-process M4 integration.
+The Mind package runs fourteen CTest suites, including Event1, lifecycle persistence/recovery,
+Lifecycle1 process restart, and seven-process M4 integration.
 
 The P2 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
 run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, and restart recovery of an active
