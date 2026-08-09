@@ -18,6 +18,10 @@ public Q_SLOTS:
     QByteArray State() const;
     bool Transition(const QString &mode);
     bool BeginRun(const QByteArray &encoded);
+    QString RequestRun(const QString &kind, const QString &policyId,
+                       qulonglong inputHighWaterMark,
+                       const QStringList &requiredCapabilities,
+                       const QStringList &optionalCapabilities);
     bool FinishRun(const QString &status, const QString &cause);
 private:
     bool load(); bool save();

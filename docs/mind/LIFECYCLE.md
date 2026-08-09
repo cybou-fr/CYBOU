@@ -129,8 +129,8 @@ M5 should prove:
 | corrupt lifecycle state | startup fails closed | backup/operator recovery policy |
 | identity continuity | simulated login preserves UUID and increments logical session | booted reboot proof |
 | open intentions | simulated login reconstructs accepted commitment | booted reboot proof |
-| system reboot | VM smoke reboots and verifies UUID continuity/session increment | lifecycle active-run reboot |
-| architecture upgrade | unsupported schema fails closed | migration/rollback implementation |
+| system reboot | VM smoke verifies identity and active lifecycle run enters `Recovering` | full gate execution |
+| architecture upgrade | legacy v0 backup+migration; future schema fails closed | multi-version migrations |
 
 ## Related documents
 

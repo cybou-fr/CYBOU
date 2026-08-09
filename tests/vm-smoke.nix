@@ -186,6 +186,22 @@ pkgs.testers.runNixOSTest {
         assert len(set(mind_pids)) == 8, mind_pids
 
     with subtest("identity survives a booted system transition"):
+        user_bus = (
+            "sudo -u cybou XDG_RUNTIME_DIR=/run/user/1000 "
+            "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus busctl --user"
+        )
+        session.succeed(
+            f"{user_bus} call org.cybou.Mind.Lifecycle1 "
+            "/org/cybou/Mind/Lifecycle1 org.cybou.Mind.Lifecycle1 "
+            "Transition s idle | grep -q true"
+        )
+        run_id = session.succeed(
+            f"{user_bus} call org.cybou.Mind.Lifecycle1 "
+            "/org/cybou/Mind/Lifecycle1 org.cybou.Mind.Lifecycle1 "
+            "RequestRun sstasas consolidation vm-reboot 0 1 journal 0 "
+            "| sed 's/^s \"//;s/\"$//'"
+        ).strip()
+        assert run_id
         identity_before = session.succeed(
             "grep '\"uuid\"' /home/cybou/.local/state/cybou/identity.json "
             "| sed 's/.*: *\"//;s/\".*//'"
@@ -201,6 +217,15 @@ pkgs.testers.runNixOSTest {
         session.succeed("systemctl --user -M cybou@ start cybou-presenced.service")
         session.wait_until_succeeds(
             "systemctl --user -M cybou@ is-active cybou-identityd.service"
+        )
+        session.succeed("systemctl --user -M cybou@ start cybou-lifecycled.service")
+        session.wait_until_succeeds(
+            "grep -q '\"mode\":\"recovering\"' "
+            "/home/cybou/.local/state/cybou/lifecycle/state.json"
+        )
+        session.succeed(
+            "grep -q '" + run_id + "' "
+            "/home/cybou/.local/state/cybou/lifecycle/state.json"
         )
 
         identity_after = session.succeed(

@@ -93,9 +93,9 @@ degraded runs without relying on UI strings or direct database access.
 
 **Status: implementation substrate present.** `cybou-lifecycled`, atomic run persistence,
 Lifecycle1, systemd activation, and active-run restart recovery are implemented. Process-level
-D-Bus restart, duplicate-owner, simulated-login identity/open-intention continuity, and booted
-identity reboot paths are specified in automated tests. Lifecycle active-run reboot and
-upgrade/migration remain open before the P2 exit gate can be called complete.
+D-Bus restart, duplicate-owner, simulated-login identity/open-intention continuity, active-run
+reboot recovery, legacy-state backup/migration, and future-schema rejection are covered. The full
+booted VM execution remains the final heavy P2 acceptance gate.
 
 ### Work
 

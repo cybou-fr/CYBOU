@@ -14,11 +14,16 @@ This document is intentionally limited to implemented behavior and current limit
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs fourteen CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and seven-process M4 integration.
+Lifecycle1 process restart, and seven-process M4 integration. The process suite also proves a
+simulated new login preserves identity and an accepted open intention while incrementing the
+logical session count.
 
 The P2 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
-run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, and restart recovery of an active
-run into `Recovering`. Owner-work dispatch and real consolidation remain P3.
+run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, D-Bus run requests, and restart
+recovery of an active run into `Recovering`. Legacy v0 state is backed up and migrated to v1;
+unknown future versions fail closed. The booted reboot scenario is encoded in `vm-smoke`, but a
+complete VM execution is still the remaining P2 acceptance gate. Owner-work dispatch and real
+consolidation remain P3.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 The current M4 implementation is the process-isolated substrate of that model; it does not yet
@@ -91,7 +96,9 @@ activate the Mind graph.
 Identity uses a volatile runtime-session marker. Restarting `identityd` inside the same user login
 reloads the current identity without incrementing `sessionCount`.
 
-This is a restart guard, not the full M5/M6 continuity proof.
+The process integration suite additionally simulates a new login by removing only the volatile
+session marker and restarting the seven M4 processes. A booted VM reboot proof remains required
+before this becomes the full M5/M6 continuity proof.
 
 ## Durable-to-visible ordering
 
