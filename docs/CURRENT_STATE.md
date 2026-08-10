@@ -221,6 +221,15 @@ coverage lowers the server budget to one second, uses a three-second external de
 server-side rejection in about 0.22 seconds, and then proves Journal and Plasma continuity.
 Reflect, prediction, and commitment commands are the remaining rollout surface.
 
+P6.7 slice 3 completes that interactive-command rollout. A small shared deadline helper propagates
+one monotonic remaining budget through Reflect, Observe, Predict, Fulfill, and Abandon. Every path
+uses one Health1 snapshot; durable mutation paths preflight Event1, while read-only Predict remains
+independent of Journal availability. Self1, Predictor1, and Intention1 clients now accept the same
+bounded per-call budget without changing their five-second standalone default. Full process and KVM
+coverage pass with continuity intact. `InterruptLifecycle` is the remaining compound Presence path
+to align server-side with this model; its asynchronous shell caller already retains the explicit
+non-idempotent unknown-outcome policy.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
 that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty

@@ -336,7 +336,8 @@ private Q_SLOTS:
         QCOMPARE(surface.lifecycleScheduling().value(QStringLiteral("decision")).toString(),
                  QStringLiteral("run"));
 
-        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            health.callBool(QStringLiteral("Refresh"), {}, 10000), 10000);
         const QString staleResult = lifecycle.callString(
             QStringLiteral("ExecuteSchedulingDecision"),
             {evaluation.value(QStringLiteral("capabilitySnapshotId")).toString(),

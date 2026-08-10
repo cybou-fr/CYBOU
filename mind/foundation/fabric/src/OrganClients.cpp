@@ -113,10 +113,10 @@ IntentionClient::IntentionClient()
 {
 }
 
-QVariantList IntentionClient::open() const
+QVariantList IntentionClient::open(int timeoutMs) const
 {
     return decodeList(
-        m_rpc.callBytes(QStringLiteral("Open")),
+        m_rpc.callBytes(QStringLiteral("Open"), {}, timeoutMs),
         &m_codecError);
 }
 
@@ -136,12 +136,14 @@ QString IntentionClient::form(
 bool IntentionClient::close(
     const QString &intentionId,
     int resolution,
-    const QString &note) const
+    const QString &note,
+    int timeoutMs) const
 {
     m_codecError.clear();
     return m_rpc.callBool(
         QStringLiteral("Close"),
-        {intentionId, resolution, note});
+        {intentionId, resolution, note},
+        timeoutMs);
 }
 
 QString IntentionClient::lastError() const
@@ -156,22 +158,26 @@ PredictorClient::PredictorClient()
 
 bool PredictorClient::observe(
     const QString &subject,
-    double value) const
+    double value,
+    int timeoutMs) const
 {
     m_codecError.clear();
     return m_rpc.callBool(
         QStringLiteral("Observe"),
-        {subject, value});
+        {subject, value},
+        timeoutMs);
 }
 
 QVariantMap PredictorClient::predict(
     const QString &subject,
-    const QString &correlationId) const
+    const QString &correlationId,
+    int timeoutMs) const
 {
     return decodeMap(
         m_rpc.callBytes(
             QStringLiteral("Predict"),
-            {subject, correlationId}),
+            {subject, correlationId},
+            timeoutMs),
         &m_codecError);
 }
 
@@ -210,12 +216,14 @@ QVariantMap SelfClient::measure() const
 }
 
 QVariantMap SelfClient::assess(
-    const QString &causeId) const
+    const QString &causeId,
+    int timeoutMs) const
 {
     return decodeMap(
         m_rpc.callBytes(
             QStringLiteral("Assess"),
-            {causeId}),
+            {causeId},
+            timeoutMs),
         &m_codecError);
 }
 

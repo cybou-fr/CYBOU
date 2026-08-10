@@ -92,4 +92,8 @@ proves bounded idempotent timeout, late-reply convergence, preserved backlog, an
 evidence-bound run. The focused KVM gate suspends Event1 and proves Promise rejects within an
 explicit one-second server budget and three-second client deadline without Journal growth.
 Required-owner preflight and one monotonic command deadline prevent later compound steps from
-accumulating independent RPC budgets. The same model still needs rollout beyond Promise.
+accumulating independent RPC budgets. Promise, Reflect, Observe, Predict, Fulfill, and Abandon now
+share this model: each reads one Health1 snapshot and passes only the remaining budget to subsequent
+owners. Event-producing commands preflight Event1; read-only Predict does not acquire an artificial
+Journal dependency. `InterruptLifecycle` remains the final compound Presence path to align with the
+same server-side deadline while retaining its non-idempotent shell contract.

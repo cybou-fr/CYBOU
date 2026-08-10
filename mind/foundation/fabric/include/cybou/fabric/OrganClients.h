@@ -59,7 +59,7 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
 
-    QVariantList open() const;
+    QVariantList open(int timeoutMs = -1) const;
     QString form(
         const QString &description,
         const QString &trigger,
@@ -68,7 +68,8 @@ public:
     bool close(
         const QString &intentionId,
         int resolution,
-        const QString &note = QString()) const;
+        const QString &note = QString(),
+        int timeoutMs = -1) const;
 
     QString lastError() const;
 
@@ -85,10 +86,11 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
 
-    bool observe(const QString &subject, double value) const;
+    bool observe(const QString &subject, double value, int timeoutMs = -1) const;
     QVariantMap predict(
         const QString &subject,
-        const QString &correlationId = QString()) const;
+        const QString &correlationId = QString(),
+        int timeoutMs = -1) const;
     bool settle(const QString &forecastId, double actual) const;
     QVariantList calibrations() const;
 
@@ -108,7 +110,7 @@ public:
     QString health() const { return m_rpc.health(); }
 
     QVariantMap measure() const;
-    QVariantMap assess(const QString &causeId) const;
+    QVariantMap assess(const QString &causeId, int timeoutMs = -1) const;
     QString narration() const;
 
     QString lastError() const;

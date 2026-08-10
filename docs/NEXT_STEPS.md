@@ -527,6 +527,18 @@ three-second client deadline, followed by exact Journal and Plasma continuity.
 Next, reuse the same deadline context for Reflect, Observe/Predict, and commitment mutation commands,
 then remove the temporary per-command repetition behind a small shared helper.
 
+**Slice 3: implemented.** A shared `CommandDeadline` helper now supplies the monotonic remaining
+budget for Reflect, Observe, Predict, Fulfill, and Abandon as well as Promise. Each compound command
+reads one Health1 snapshot and forwards only the remaining time to every required Event1,
+Lifecycle1, Self1, Predictor1, and Intention1 call. Mutating paths preflight Event1 before auxiliary
+notifications; read-only Predict avoids an unnecessary Journal dependency. Expiry rejects the
+command before another RPC is sent. Process integration and the focused KVM gate preserve all M6
+continuity and recovery guarantees under the stricter transport behavior.
+
+Next, align the backend `InterruptLifecycle` compound path with the same server-side deadline model
+while preserving its shell-facing non-idempotent `unknown-outcome` contract, then audit remaining
+multi-owner orchestration for independently accumulated budgets.
+
 ## Deferred behind gates
 
 ### M7

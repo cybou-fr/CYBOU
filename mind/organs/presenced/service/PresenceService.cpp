@@ -34,6 +34,23 @@ int presenceCommandTimeoutMs()
     return ok ? std::clamp(configured, 50, 60000) : kPresenceCommandTimeoutMs;
 }
 
+class CommandDeadline
+{
+public:
+    CommandDeadline()
+        : m_deadline(presenceCommandTimeoutMs())
+    {
+    }
+
+    int remaining() const
+    {
+        return static_cast<int>(std::max<qint64>(0, m_deadline.remainingTime()));
+    }
+
+private:
+    QDeadlineTimer m_deadline;
+};
+
 bool isAvailable(const CapabilitySnapshot &snapshot, const QString &capabilityId)
 {
     if (!snapshot.isValid()) return false;
@@ -440,16 +457,13 @@ QString PresenceService::Promise(
 {
     m_lastError.clear();
     const QString normalized = description.trimmed();
-    QDeadlineTimer deadline(presenceCommandTimeoutMs());
-    const auto remaining = [&deadline]() {
-        return static_cast<int>(std::max<qint64>(0, deadline.remainingTime()));
-    };
+    CommandDeadline deadline;
 
     if (normalized.isEmpty()) {
         return {};
     }
 
-    int timeoutMs = remaining();
+    int timeoutMs = deadline.remaining();
     if (timeoutMs == 0) return {};
     const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
     if (!isAvailable(capabilities, QStringLiteral("accepted-biography"))
@@ -459,13 +473,13 @@ QString PresenceService::Promise(
     // Promise. Probe it before notifying auxiliary owners so an unavailable
     // journal consumes one bounded RPC budget instead of accumulating the
     // budgets of every step in this compound command.
-    timeoutMs = remaining();
+    timeoutMs = deadline.remaining();
     if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
         m_lastError = m_events.lastError();
         return {};
     }
 
-    timeoutMs = remaining();
+    timeoutMs = deadline.remaining();
     if (timeoutMs == 0) return {};
     m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"), timeoutMs);
 
@@ -474,7 +488,7 @@ QString PresenceService::Promise(
         normalized;
 
     QUuid requestId;
-    timeoutMs = remaining();
+    timeoutMs = deadline.remaining();
     if (timeoutMs == 0 || !appendUserObservation(
             QStringLiteral("user-requested-intention"),
             details,
@@ -483,7 +497,7 @@ QString PresenceService::Promise(
         return {};
     }
 
-    timeoutMs = remaining();
+    timeoutMs = deadline.remaining();
     if (timeoutMs == 0) return {};
     const QString intentionId = m_intentions.form(
         normalized,
@@ -501,20 +515,38 @@ QString PresenceService::Promise(
 bool PresenceService::Reflect()
 {
     m_lastError.clear();
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.reflect"));
-    if (!capabilityAvailable(QStringLiteral("accepted-biography"))
-        || !capabilityAvailable(QStringLiteral("self-assessment"))) return false;
+    CommandDeadline deadline;
+    int timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
+    if (!isAvailable(capabilities, QStringLiteral("accepted-biography"))
+        || !isAvailable(capabilities, QStringLiteral("self-assessment"))) return false;
 
-    QUuid requestId;
-    if (!appendUserObservation(
-            QStringLiteral("self-inspection-requested"),
-            {},
-            &requestId)) {
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
+        m_lastError = m_events.lastError();
         return false;
     }
 
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.reflect"), timeoutMs);
+
+    QUuid requestId;
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0 || !appendUserObservation(
+            QStringLiteral("self-inspection-requested"),
+            {},
+            &requestId,
+            timeoutMs)) {
+        return false;
+    }
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
     const QVariantMap report = m_self.assess(
-        requestId.toString(QUuid::WithoutBraces));
+        requestId.toString(QUuid::WithoutBraces),
+        timeoutMs);
 
     if (report.isEmpty()) {
         m_lastError = m_self.lastError();
@@ -527,10 +559,25 @@ bool PresenceService::Reflect()
 bool PresenceService::FulfillIndex(int index)
 {
     m_lastError.clear();
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.fulfill"));
-    if (!capabilityAvailable(QStringLiteral("commitment-access"))) return false;
+    CommandDeadline deadline;
+    int timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
+    if (!isAvailable(capabilities, QStringLiteral("commitment-access"))) return false;
 
-    const QVariantList open = m_intentions.open();
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
+        m_lastError = m_events.lastError();
+        return false;
+    }
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.fulfill"), timeoutMs);
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const QVariantList open = m_intentions.open(timeoutMs);
     if (index < 0 || index >= open.size()) {
         return false;
     }
@@ -541,10 +588,13 @@ bool PresenceService::FulfillIndex(int index)
             .value(QStringLiteral("correlationId"))
             .toString();
 
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
     const bool ok = m_intentions.close(
         id,
         0,
-        QString());
+        QString(),
+        timeoutMs);
     if (!ok) {
         m_lastError = m_intentions.lastError();
     }
@@ -554,10 +604,25 @@ bool PresenceService::FulfillIndex(int index)
 bool PresenceService::AbandonIndex(int index)
 {
     m_lastError.clear();
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.abandon"));
-    if (!capabilityAvailable(QStringLiteral("commitment-access"))) return false;
+    CommandDeadline deadline;
+    int timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
+    if (!isAvailable(capabilities, QStringLiteral("commitment-access"))) return false;
 
-    const QVariantList open = m_intentions.open();
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
+        m_lastError = m_events.lastError();
+        return false;
+    }
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.abandon"), timeoutMs);
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const QVariantList open = m_intentions.open(timeoutMs);
     if (index < 0 || index >= open.size()) {
         return false;
     }
@@ -568,10 +633,13 @@ bool PresenceService::AbandonIndex(int index)
             .value(QStringLiteral("correlationId"))
             .toString();
 
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
     const bool ok = m_intentions.close(
         id,
         1,
-        QString());
+        QString(),
+        timeoutMs);
     if (!ok) {
         m_lastError = m_intentions.lastError();
     }
@@ -583,10 +651,25 @@ bool PresenceService::Observe(
     double value)
 {
     m_lastError.clear();
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.observe"));
-    if (!capabilityAvailable(QStringLiteral("prediction"))) return false;
+    CommandDeadline deadline;
+    int timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
+    if (!isAvailable(capabilities, QStringLiteral("prediction"))) return false;
 
-    const bool ok = m_predictor.observe(subject, value);
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
+        m_lastError = m_events.lastError();
+        return false;
+    }
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.observe"), timeoutMs);
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return false;
+    const bool ok = m_predictor.observe(subject, value, timeoutMs);
     if (!ok) {
         m_lastError = m_predictor.lastError();
     }
@@ -597,12 +680,24 @@ QByteArray PresenceService::Predict(
     const QString &subject)
 {
     m_lastError.clear();
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.predict"));
-    if (!capabilityAvailable(QStringLiteral("prediction")))
+    CommandDeadline deadline;
+    int timeoutMs = deadline.remaining();
+    if (timeoutMs == 0)
+        return FabricCodec::encodeMap(QVariantMap{});
+    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
+    if (!isAvailable(capabilities, QStringLiteral("prediction")))
         return FabricCodec::encodeMap(QVariantMap{});
 
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0)
+        return FabricCodec::encodeMap(QVariantMap{});
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.predict"), timeoutMs);
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0)
+        return FabricCodec::encodeMap(QVariantMap{});
     const QVariantMap prediction =
-        m_predictor.predict(subject);
+        m_predictor.predict(subject, {}, timeoutMs);
 
     if (prediction.isEmpty()) {
         m_lastError = m_predictor.lastError();

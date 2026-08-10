@@ -112,6 +112,13 @@ Scheduled timeout coverage keeps predictord registered on D-Bus but delays conso
 retries produce no duplicate deterministic effect, and a post-recovery run completes the backlog.
 Production keeps the five-second deadline.
 
+P6.7 command-budget coverage runs the complete process matrix after RpcClient and EventClient adopt
+strict timed pending calls. Promise, Reflect, Observe, Predict, Fulfill, and Abandon share one
+monotonic budget per command rather than receiving a fresh timeout at every owner boundary. The
+scheduled-owner scenario gives its explicit Health1 refresh orchestration call ten seconds because
+the refresh itself owns a five-second production deadline; this changes only the test caller's
+outer wait, not the production policy.
+
 Two scoped `CYBOU_RPC_FAILPOINT` process cases terminate lifecycled after the first retryable
 failure and after circuit-open. Each restart must project the original run ID in `Recovering`,
 resume it, complete once, and leave zero consumer backlog with a stable Event1 count.
