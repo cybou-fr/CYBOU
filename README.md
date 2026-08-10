@@ -89,7 +89,7 @@ become a second cognitive owner.
 | Restart/reboot continuity and lifecycle/consolidation core | Evaluation complete — M5 |
 | Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 P6.1–P6.4 |
 | Capability-aware Presence and interruptible automatic scheduling | Implemented — M6 P6.5 complete |
-| Partial-availability and recovery fault matrix | In progress — M6 P6.6 slices 1–2 |
+| Partial-availability and recovery fault matrix | In progress — M6 P6.6 slices 1–3 |
 | Grounded perception, epistemics, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |

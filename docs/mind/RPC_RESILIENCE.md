@@ -72,9 +72,17 @@ The Plasma Presence lifecycle interruption command uses `AsyncRpcClient` with
 - leaves terminal lifecycle ownership in lifecycled;
 - requires later state refresh/reconciliation to learn the actual outcome.
 
+Automatic lifecycle owner dispatch uses `IdempotentMutation` because every operation carries a
+durable deterministic `runId:capability:highWaterMark` key. Its production deadline is five
+seconds and may be reduced in fault tests with `CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS` (bounded to
+50–60000 ms). Exhausted retries fail required work closed without advancing Event1 consumer
+progress; callbacks remain fenced by active run identity, including delayed replies.
+
 ## Automated evidence
 
 `rpc-resilience` covers retry eligibility, deterministic bounded backoff, D-Bus outcome
 classification, unknown mutation outcome, and circuit transitions. The process-level lifecycle
 timeout test proves the migrated shell call remains non-blocking and does not mutate or duplicate
-the active run when the server exceeds its deadline.
+the active run when the server exceeds its deadline. Scheduled-owner process coverage additionally
+proves bounded idempotent timeout, late-reply convergence, preserved backlog, and recovery by a new
+evidence-bound run.

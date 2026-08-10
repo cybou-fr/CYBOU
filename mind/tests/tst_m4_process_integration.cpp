@@ -624,6 +624,93 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
     }
 
+    void scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable()
+    {
+        stop(m_lifecycled);
+        m_lifecycled = start(m_lifecycledPath,
+            {{QStringLiteral("CYBOU_LIFECYCLE_ACTIVITY_COOLDOWN_MS"), QStringLiteral("0")},
+             {QStringLiteral("CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS"), QStringLiteral("200")}});
+        QVERIFY(m_lifecycled);
+        LifecycleClient lifecycleClient;
+        QTRY_VERIFY_WITH_TIMEOUT(lifecycleClient.ready(), 5000);
+        QVERIFY(lifecycleClient.notifyUserActivity(QStringLiteral("timeout test reset")));
+
+        stop(m_predictord);
+        m_predictord = start(m_predictordPath,
+            {{QStringLiteral("CYBOU_PREDICTOR_CONSOLIDATE_DELAY_MS"), QStringLiteral("1000")}});
+        QVERIFY(m_predictord);
+        PredictorClient delayedPredictor;
+        QTRY_VERIFY_WITH_TIMEOUT(delayedPredictor.ready(), 5000);
+        EventClient events;
+        auto addPressure = [&events](const QString &origin) {
+            while (events.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value_or(0) < 32) {
+                CognitiveEnvelope pressure;
+                pressure.messageId = QUuid::createUuid();
+                pressure.correlationId = pressure.messageId;
+                pressure.originOrgan = origin;
+                pressure.originNode = QStringLiteral("local");
+                pressure.kind = ContributionKind::Observation;
+                pressure.wallTime = QDateTime::currentDateTimeUtc();
+                pressure.confidence = 1.0;
+                pressure.privacy = PrivacyClass::Local;
+                if (events.append(pressure) == 0) return false;
+            }
+            return true;
+        };
+        QVERIFY(addPressure(QStringLiteral("owner-timeout-test")));
+        RpcClient health(kHealthEndpoint);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        RpcClient lifecycle(kLifecycleEndpoint);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        QString error;
+        const QVariantMap cycle = FabricCodec::decodeMap(
+            lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(cycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+        QTRY_COMPARE_WITH_TIMEOUT(LifecycleClient().state().value(QStringLiteral("status")).toString(),
+                                  QStringLiteral("failed"), 5000);
+        QVariantMap state = LifecycleClient().state();
+        QCOMPARE(state.value(QStringLiteral("mode")).toString(), QStringLiteral("recovering"));
+        QVERIFY(state.value(QStringLiteral("missingWork")).toStringList().isEmpty());
+        QVERIFY(!state.value(QStringLiteral("terminalCause")).toString().isEmpty());
+        QVERIFY(events.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value_or(0) >= 32);
+        QTest::qWait(3500);
+        const qulonglong settledCount = events.count();
+        QTest::qWait(500);
+        QCOMPARE(events.count(), settledCount);
+
+        stop(m_predictord);
+        m_predictord = start(m_predictordPath);
+        QVERIFY(m_predictord);
+        PredictorClient predictor;
+        QTRY_VERIFY_WITH_TIMEOUT(predictor.ready(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(([&health]() {
+            health.callBool(QStringLiteral("Refresh"));
+            return PresenceClient().snapshot().value(QStringLiteral("commandAvailability")).toMap()
+                .value(QStringLiteral("predict")).toMap()
+                .value(QStringLiteral("available")).toBool();
+        })(), 5000);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        QVERIFY(addPressure(QStringLiteral("owner-timeout-recovery-test")));
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        const QVariantMap recoveredCycle = FabricCodec::decodeMap(
+            lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+        QCOMPARE(recoveredCycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+        QTRY_COMPARE_WITH_TIMEOUT(LifecycleClient().state().value(QStringLiteral("status")).toString(),
+                                  QStringLiteral("completed"), 5000);
+        state = LifecycleClient().state();
+        QCOMPARE(state.value(QStringLiteral("mode")).toString(), QStringLiteral("awake"));
+        QVERIFY(state.value(QStringLiteral("missingWork")).toStringList().isEmpty());
+
+        stop(m_lifecycled);
+        m_lifecycled = start(m_lifecycledPath);
+        QVERIFY(m_lifecycled);
+        LifecycleClient restoredLifecycle;
+        QTRY_VERIFY_WITH_TIMEOUT(restoredLifecycle.ready(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+    }
+
     void commandsCrossRealOrganProcesses()
     {
         Presence first;

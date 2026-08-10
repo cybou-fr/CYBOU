@@ -107,6 +107,11 @@ Event1 mutation while identity and commitments remain usable. An already-awake Q
 runtime reachability false when presenced disappears, then reconnects with identical identity,
 session count, Event1 count, and owner PIDs.
 
+Scheduled timeout coverage keeps predictord registered on D-Bus but delays consolidation beyond a
+200 ms test deadline. The required run becomes `Failed/Recovering`, backlog remains pending, late
+retries produce no duplicate deterministic effect, and a post-recovery run completes the backlog.
+Production keeps the five-second deadline.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

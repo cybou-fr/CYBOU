@@ -460,9 +460,16 @@ rejected interruption. Presenced loss makes an existing QML proxy explicitly unr
 retaining its last cached projection; the same proxy reconnects after restart with unchanged
 identity, session count, Event1 count, and all owner PIDs. Lifecycled recovery is owner-verified.
 
+**Slice 3: implemented.** A real scheduled owner now remains on D-Bus while exceeding a bounded
+lifecycled deadline. The idempotent mutation is retried under the shared backoff/circuit policy;
+because the timed-out owner was required by the accepted decision, the run fails closed in
+`Recovering` and its consumer backlog is not advanced. Delayed replies converge on one deterministic
+owner contribution and cannot change the failed run. After owner recovery, a new evidence-bound
+run consumes the preserved backlog exactly once. The production deadline remains five seconds;
+tests use the bounded `CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS` override.
+
 ### Fault-injection matrix
 
-- make a process own D-Bus but exceed its RPC deadline;
 - crash during retry and circuit-breaker transitions;
 - make Event1 unavailable and prove no mutation is reported accepted;
 - recover every case and prove no duplicate accepted effect.

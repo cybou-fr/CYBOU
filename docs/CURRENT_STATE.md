@@ -186,6 +186,11 @@ mapped consolidation/control surface and rejected control creates no Event1 effe
 marks an existing QML proxy unreachable instead of leaving a stale reachable flag; reconnecting
 the same proxy preserves identity/session/Event1 state and every cognitive owner process.
 
+P6.6 slice 3 proves the scheduled-owner timeout boundary with a real delayed predictord. Three
+bounded idempotent attempts fail a required run closed without advancing consumer progress; late
+replies converge on one deterministic contribution and cannot rewrite terminal state. Restoring
+predictord allows a new evidence-bound run to consume the preserved backlog once.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

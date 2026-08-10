@@ -52,6 +52,7 @@ LifecycleMode modeFrom(const QString &s) { for (int i=1;i<=7;++i) { auto m=stati
 LifecycleRunStatus statusFrom(const QString &s) { for (int i=1;i<=5;++i) { auto v=static_cast<LifecycleRunStatus>(i); if (lifecycleRunStatusToString(v)==s) return v; } return static_cast<LifecycleRunStatus>(0); }
 void failpoint(const char *name) { if (qEnvironmentVariable("CYBOU_LIFECYCLE_FAILPOINT") == QLatin1String(name)) qFatal("lifecycled fault injection: %s", name); }
 int activityCooldownMs() { bool ok=false; const int value=qEnvironmentVariableIntValue("CYBOU_LIFECYCLE_ACTIVITY_COOLDOWN_MS",&ok); return ok?qBound(0,value,3600000):60000; }
+int ownerTimeoutMs() { bool ok=false; const int value=qEnvironmentVariableIntValue("CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS",&ok); return ok?qBound(50,value,60000):5000; }
 }
 LifecycleService::LifecycleService(const QString &path, QObject *parent):QObject(parent),m_path(path)
 {
@@ -224,7 +225,8 @@ void LifecycleService::dispatchNextScheduledOwner()
         RpcOperationSemantics::IdempotentMutation,
         [this, runId, capability, key, mark](const RpcResult &result) {
             handleScheduledOwnerResult(runId, capability, key, mark, result);
-        });
+        },
+        ownerTimeoutMs());
 }
 
 void LifecycleService::handleScheduledOwnerResult(
