@@ -3,6 +3,8 @@
 
 #include "cybou/fabric/RpcClient.h"
 
+#include <QDBusPendingCall>
+
 namespace cybou {
 
 namespace {
@@ -28,7 +30,8 @@ RpcClient::RpcClient(const BusEndpoint &endpoint)
 
 QDBusMessage RpcClient::call(
     const QString &method,
-    const QVariantList &arguments) const
+    const QVariantList &arguments,
+    int timeoutMs) const
 {
     if (!m_bus.isConnected()) {
         m_lastError =
@@ -43,8 +46,10 @@ QDBusMessage RpcClient::call(
         method);
     message.setArguments(arguments);
 
-    const QDBusMessage reply =
-        m_bus.call(message, QDBus::Block, kCallTimeoutMs);
+    const int boundedTimeout = timeoutMs > 0 ? timeoutMs : kCallTimeoutMs;
+    QDBusPendingCall pending = m_bus.asyncCall(message, boundedTimeout);
+    pending.waitForFinished();
+    const QDBusMessage reply = pending.reply();
 
     if (reply.type() == QDBusMessage::ErrorMessage) {
         m_lastError = QStringLiteral("%1: %2")
@@ -60,9 +65,10 @@ QDBusMessage RpcClient::call(
 
 QByteArray RpcClient::callBytes(
     const QString &method,
-    const QVariantList &arguments) const
+    const QVariantList &arguments,
+    int timeoutMs) const
 {
-    const QDBusMessage reply = call(method, arguments);
+    const QDBusMessage reply = call(method, arguments, timeoutMs);
     if (reply.type() == QDBusMessage::ErrorMessage
         || reply.arguments().isEmpty()) {
         return {};
@@ -72,9 +78,10 @@ QByteArray RpcClient::callBytes(
 
 bool RpcClient::callBool(
     const QString &method,
-    const QVariantList &arguments) const
+    const QVariantList &arguments,
+    int timeoutMs) const
 {
-    const QDBusMessage reply = call(method, arguments);
+    const QDBusMessage reply = call(method, arguments, timeoutMs);
     if (reply.type() == QDBusMessage::ErrorMessage
         || reply.arguments().isEmpty()) {
         return false;
@@ -84,9 +91,10 @@ bool RpcClient::callBool(
 
 QString RpcClient::callString(
     const QString &method,
-    const QVariantList &arguments) const
+    const QVariantList &arguments,
+    int timeoutMs) const
 {
-    const QDBusMessage reply = call(method, arguments);
+    const QDBusMessage reply = call(method, arguments, timeoutMs);
     if (reply.type() == QDBusMessage::ErrorMessage
         || reply.arguments().isEmpty()) {
         return {};

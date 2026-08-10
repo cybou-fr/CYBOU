@@ -8,6 +8,7 @@
 #include <QCborMap>
 #include <QCborValue>
 #include <QDateTime>
+#include <QDeadlineTimer>
 #include <QThread>
 
 #include <algorithm>
@@ -22,6 +23,16 @@ const QStringList kProjectedCapabilities = {
     QStringLiteral("self-assessment"), QStringLiteral("attention-workspace"),
     QStringLiteral("consolidation"), QStringLiteral("presence-presentation"),
 };
+
+constexpr int kPresenceCommandTimeoutMs = 5000;
+
+int presenceCommandTimeoutMs()
+{
+    bool ok = false;
+    const int configured = qEnvironmentVariableIntValue(
+        "CYBOU_PRESENCE_COMMAND_TIMEOUT_MS", &ok);
+    return ok ? std::clamp(configured, 50, 60000) : kPresenceCommandTimeoutMs;
+}
 
 bool isAvailable(const CapabilitySnapshot &snapshot, const QString &capabilityId)
 {
@@ -390,7 +401,8 @@ QByteArray PresenceService::DetailedObligations() const
 bool PresenceService::appendUserObservation(
     const QString &event,
     const QVariantMap &details,
-    QUuid *messageId)
+    QUuid *messageId,
+    int timeoutMs)
 {
     CognitiveEnvelope observation;
     observation.messageId = QUuid::createUuid();
@@ -411,7 +423,7 @@ bool PresenceService::appendUserObservation(
     observation.payloadCbor =
         payload.toCborValue().toCbor();
 
-    if (m_events.append(observation) == 0) {
+    if (m_events.append(observation, timeoutMs) == 0) {
         m_lastError = m_events.lastError();
         return false;
     }
@@ -428,40 +440,56 @@ QString PresenceService::Promise(
 {
     m_lastError.clear();
     const QString normalized = description.trimmed();
+    QDeadlineTimer deadline(presenceCommandTimeoutMs());
+    const auto remaining = [&deadline]() {
+        return static_cast<int>(std::max<qint64>(0, deadline.remainingTime()));
+    };
 
-    if (normalized.isEmpty()
-        || !capabilityAvailable(QStringLiteral("accepted-biography"))
-        || !capabilityAvailable(QStringLiteral("commitment-access"))) {
+    if (normalized.isEmpty()) {
         return {};
     }
+
+    int timeoutMs = remaining();
+    if (timeoutMs == 0) return {};
+    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
+    if (!isAvailable(capabilities, QStringLiteral("accepted-biography"))
+        || !isAvailable(capabilities, QStringLiteral("commitment-access"))) return {};
 
     // Event1 is the required durability boundary for both records created by
     // Promise. Probe it before notifying auxiliary owners so an unavailable
     // journal consumes one bounded RPC budget instead of accumulating the
     // budgets of every step in this compound command.
-    if (!m_events.isOpen()) {
+    timeoutMs = remaining();
+    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
         m_lastError = m_events.lastError();
         return {};
     }
 
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"));
+    timeoutMs = remaining();
+    if (timeoutMs == 0) return {};
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"), timeoutMs);
 
     QVariantMap details;
     details[QStringLiteral("description")] =
         normalized;
 
     QUuid requestId;
-    if (!appendUserObservation(
+    timeoutMs = remaining();
+    if (timeoutMs == 0 || !appendUserObservation(
             QStringLiteral("user-requested-intention"),
             details,
-            &requestId)) {
+            &requestId,
+            timeoutMs)) {
         return {};
     }
 
+    timeoutMs = remaining();
+    if (timeoutMs == 0) return {};
     const QString intentionId = m_intentions.form(
         normalized,
         QStringLiteral("asked by the user"),
-        requestId.toString(QUuid::WithoutBraces));
+        requestId.toString(QUuid::WithoutBraces),
+        timeoutMs);
 
     if (intentionId.isEmpty()) {
         m_lastError = m_intentions.lastError();

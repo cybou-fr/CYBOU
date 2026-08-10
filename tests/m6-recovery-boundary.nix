@@ -109,6 +109,11 @@ pkgs.testers.runNixOSTest {
             f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
             "org.cybou.Mind.Event1 Count | awk '{print $2}'"
         ).strip())
+        machine.succeed(
+            "systemctl --user -M cybou@ set-environment "
+            "CYBOU_PRESENCE_COMMAND_TIMEOUT_MS=1000; "
+            "systemctl --user -M cybou@ restart cybou-presenced.service"
+        )
         event_pid = int(machine.succeed(
             "systemctl --user -M cybou@ show -p MainPID --value cybou-eventd.service"
         ).strip())
@@ -118,10 +123,15 @@ pkgs.testers.runNixOSTest {
             "org.cybou.Mind.Health1 Refresh | grep -q true"
         )
         machine.succeed(
-            f"{user_bus} --timeout=8s call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 "
+            f"{user_bus} --timeout=3s call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 "
             "org.cybou.Mind.Presence1 Promise s rejected-without-event1 | grep -q '^s \"\"$'"
         )
         machine.succeed(f"kill -CONT {event_pid}")
+        machine.succeed(
+            "systemctl --user -M cybou@ unset-environment "
+            "CYBOU_PRESENCE_COMMAND_TIMEOUT_MS; "
+            "systemctl --user -M cybou@ restart cybou-presenced.service"
+        )
         machine.wait_until_succeeds(
             f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
             "org.cybou.Mind.Event1 Ready | grep -q true"

@@ -65,10 +65,10 @@ HealthClient::HealthClient(QObject *parent)
         m_codecError = QStringLiteral("cannot subscribe to Health1 Changed");
 }
 
-CapabilitySnapshot HealthClient::snapshot() const
+CapabilitySnapshot HealthClient::snapshot(int timeoutMs) const
 {
     m_codecError.clear();
-    const QByteArray encoded = m_rpc.callBytes(QStringLiteral("Snapshot"));
+    const QByteArray encoded = m_rpc.callBytes(QStringLiteral("Snapshot"), {}, timeoutMs);
     if (encoded.isEmpty()) return {};
     return decodeCapabilitySnapshot(encoded, &m_codecError);
 }
@@ -123,12 +123,14 @@ QVariantList IntentionClient::open() const
 QString IntentionClient::form(
     const QString &description,
     const QString &trigger,
-    const QString &causeId) const
+    const QString &causeId,
+    int timeoutMs) const
 {
     m_codecError.clear();
     return m_rpc.callString(
         QStringLiteral("Form"),
-        {description, trigger, causeId});
+        {description, trigger, causeId},
+        timeoutMs);
 }
 
 bool IntentionClient::close(
@@ -291,10 +293,10 @@ QVariantMap LifecycleClient::schedulingEvaluation() const
         m_rpc.callBytes(QStringLiteral("EvaluateScheduling")), &m_codecError);
 }
 
-bool LifecycleClient::notifyUserActivity(const QString &cause) const
+bool LifecycleClient::notifyUserActivity(const QString &cause, int timeoutMs) const
 {
     m_codecError.clear();
-    return m_rpc.callBool(QStringLiteral("NotifyUserActivity"), {cause});
+    return m_rpc.callBool(QStringLiteral("NotifyUserActivity"), {cause}, timeoutMs);
 }
 
 bool LifecycleClient::finishRun(const QString &status, const QString &cause) const

@@ -21,7 +21,7 @@ public:
 
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
-    CapabilitySnapshot snapshot() const;
+    CapabilitySnapshot snapshot(int timeoutMs = -1) const;
     HomeostasisSnapshot measurements() const;
     QString lastError() const;
 
@@ -63,7 +63,8 @@ public:
     QString form(
         const QString &description,
         const QString &trigger,
-        const QString &causeId) const;
+        const QString &causeId,
+        int timeoutMs = -1) const;
     bool close(
         const QString &intentionId,
         int resolution,
@@ -155,7 +156,7 @@ public:
     QString health() const { return m_rpc.health(); }
     QVariantMap state() const;
     QVariantMap schedulingEvaluation() const;
-    bool notifyUserActivity(const QString &cause) const;
+    bool notifyUserActivity(const QString &cause, int timeoutMs = -1) const;
     bool finishRun(const QString &status, const QString &cause) const;
     QString lastError() const;
 

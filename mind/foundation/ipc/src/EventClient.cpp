@@ -47,7 +47,8 @@ EventClient::EventClient(QObject *parent)
 
 QDBusMessage EventClient::call(
     const QString &method,
-    const QVariantList &arguments) const
+    const QVariantList &arguments,
+    int timeoutMs) const
 {
     if (!m_bus.isConnected()) {
         m_lastError = QStringLiteral("the user D-Bus session is unavailable");
@@ -61,7 +62,8 @@ QDBusMessage EventClient::call(
         method);
     message.setArguments(arguments);
 
-    QDBusPendingCall pending = m_bus.asyncCall(message, kCallTimeoutMs);
+    const int boundedTimeout = timeoutMs > 0 ? timeoutMs : kCallTimeoutMs;
+    QDBusPendingCall pending = m_bus.asyncCall(message, boundedTimeout);
     pending.waitForFinished();
     const QDBusMessage reply = pending.reply();
 
@@ -74,9 +76,10 @@ QDBusMessage EventClient::call(
 
 QByteArray EventClient::callBytes(
     const QString &method,
-    const QVariantList &arguments) const
+    const QVariantList &arguments,
+    int timeoutMs) const
 {
-    const QDBusMessage reply = call(method, arguments);
+    const QDBusMessage reply = call(method, arguments, timeoutMs);
     if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
         return {};
     }
@@ -85,8 +88,13 @@ QByteArray EventClient::callBytes(
 
 bool EventClient::isOpen() const
 {
+    return isOpen(-1);
+}
+
+bool EventClient::isOpen(int timeoutMs) const
+{
     m_lastError.clear();
-    const QDBusMessage reply = call(QStringLiteral("Ready"));
+    const QDBusMessage reply = call(QStringLiteral("Ready"), {}, timeoutMs);
     if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
         return false;
     }
@@ -105,10 +113,16 @@ int EventClient::databaseSchemaVersion() const
 
 quint64 EventClient::append(const CognitiveEnvelope &envelope)
 {
+    return append(envelope, -1);
+}
+
+quint64 EventClient::append(const CognitiveEnvelope &envelope, int timeoutMs)
+{
     m_lastError.clear();
     const QByteArray replyBytes = callBytes(
         QStringLiteral("Submit"),
-        {EnvelopeCodec::encode(envelope)});
+        {EnvelopeCodec::encode(envelope)},
+        timeoutMs);
     if (replyBytes.isEmpty()) {
         return 0;
     }

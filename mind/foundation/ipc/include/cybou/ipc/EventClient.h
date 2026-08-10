@@ -23,10 +23,12 @@ public:
     ~EventClient() override = default;
 
     bool isOpen() const override;
+    bool isOpen(int timeoutMs) const;
     QString lastError() const override { return m_lastError; }
     int databaseSchemaVersion() const override;
 
     quint64 append(const CognitiveEnvelope &envelope) override;
+    quint64 append(const CognitiveEnvelope &envelope, int timeoutMs);
 
     quint64 count() const override;
     QByteArray head() const override;
@@ -52,11 +54,13 @@ private Q_SLOTS:
 private:
     QDBusMessage call(
         const QString &method,
-        const QVariantList &arguments = QVariantList()) const;
+        const QVariantList &arguments = QVariantList(),
+        int timeoutMs = -1) const;
 
     QByteArray callBytes(
         const QString &method,
-        const QVariantList &arguments = QVariantList()) const;
+        const QVariantList &arguments = QVariantList(),
+        int timeoutMs = -1) const;
 
     mutable QString m_lastError;
     QDBusConnection m_bus;

@@ -43,7 +43,8 @@ private:
     bool appendUserObservation(
         const QString &event,
         const QVariantMap &details,
-        QUuid *messageId);
+        QUuid *messageId,
+        int timeoutMs = -1);
 
     QVariantMap healthMap() const;
     QVariantMap snapshotMap() const;

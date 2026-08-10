@@ -214,6 +214,13 @@ notifying auxiliary owners. The unresponsive-owner KVM case now rejects in under
 an 8-second client deadline instead of accumulating roughly 24 seconds of internal RPC budgets.
 A shared remaining-budget context across different owners remains the next post-M6 hardening step.
 
+P6.7 slice 2 implements that context for Promise. The command owns one five-second monotonic
+deadline; Health1, Event1, Lifecycle1, and Intention1 receive only its remaining budget, and no
+later call is sent after exhaustion. Existing client APIs retain their five-second default. KVM
+coverage lowers the server budget to one second, uses a three-second external deadline, observes a
+server-side rejection in about 0.22 seconds, and then proves Journal and Plasma continuity.
+Reflect, prediction, and commitment commands are the remaining rollout surface.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
 that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty

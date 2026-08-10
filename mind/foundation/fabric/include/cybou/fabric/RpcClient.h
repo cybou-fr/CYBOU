@@ -21,19 +21,23 @@ public:
 
     QDBusMessage call(
         const QString &method,
-        const QVariantList &arguments = QVariantList()) const;
+        const QVariantList &arguments = QVariantList(),
+        int timeoutMs = -1) const;
 
     QByteArray callBytes(
         const QString &method,
-        const QVariantList &arguments = QVariantList()) const;
+        const QVariantList &arguments = QVariantList(),
+        int timeoutMs = -1) const;
 
     bool callBool(
         const QString &method,
-        const QVariantList &arguments = QVariantList()) const;
+        const QVariantList &arguments = QVariantList(),
+        int timeoutMs = -1) const;
 
     QString callString(
         const QString &method,
-        const QVariantList &arguments = QVariantList()) const;
+        const QVariantList &arguments = QVariantList(),
+        int timeoutMs = -1) const;
 
     QString lastError() const { return m_lastError; }
 

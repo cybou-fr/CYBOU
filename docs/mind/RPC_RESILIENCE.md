@@ -8,9 +8,9 @@ SPDX-License-Identifier: MIT
 ## Scope
 
 P6.3 introduces one bounded asynchronous D-Bus transport policy. It is the required path for shell
-or owner operations that must not block their event loop. P6.7 additionally moves EventClient's
-synchronous API onto explicitly timed asynchronous pending calls; other synchronous read paths are
-not implicitly converted and remain a documented limitation until migrated deliberately.
+or owner operations that must not block their event loop. P6.7 moves both RpcClient and EventClient
+synchronous APIs onto explicitly timed asynchronous pending calls. Their public helpers retain a
+five-second default and accept a shorter remaining budget from compound command coordinators.
 
 ## Operation semantics
 
@@ -90,5 +90,6 @@ timeout test proves the migrated shell call remains non-blocking and does not mu
 the active run when the server exceeds its deadline. Scheduled-owner process coverage additionally
 proves bounded idempotent timeout, late-reply convergence, preserved backlog, and recovery by a new
 evidence-bound run. The focused KVM gate suspends Event1 and proves Promise rejects within an
-8-second client deadline without Journal growth; required-owner preflight prevents later compound
-steps from accumulating their independent RPC budgets.
+explicit one-second server budget and three-second client deadline without Journal growth.
+Required-owner preflight and one monotonic command deadline prevent later compound steps from
+accumulating independent RPC budgets. The same model still needs rollout beyond Promise.

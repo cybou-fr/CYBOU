@@ -124,9 +124,10 @@ absence of the rejected description after restart.
 `m6-recovery-boundary` is the focused P6.6 KVM exit gate. It boots the shipped Plasma session,
 checks D-Bus/systemd activation of presenced without replacing plasmashell, proves a delayed
 interruption cannot invent a lifecycle transition, then verifies successful recovery. Finally it
-suspends eventd, refreshes Health1, requires Promise to fail closed under an explicit 8-second
-client deadline, resumes the same owner, and asserts unchanged Event1 count and Plasma PID. The
-current bounded EventClient/preflight implementation returns in under one second in this gate. Run it
+suspends eventd, refreshes Health1, and restarts presenced with a one-second compound-command
+budget. Promise must fail closed inside a three-second external client deadline; the same owner is
+then resumed and Event1 count and Plasma PID must remain unchanged. The current bounded transport
+and remaining-budget implementation returns in under one second in this gate. Run it
 with `nix build .#checks.x86_64-linux.m6-recovery-boundary --print-build-logs` on a KVM host.
 
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,

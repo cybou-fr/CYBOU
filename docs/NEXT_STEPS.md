@@ -517,6 +517,16 @@ Next, introduce one command deadline context that propagates the remaining budge
 commands involving several independent owners. This is post-M6 latency hardening, not a reason to
 weaken the completed M6 availability and continuity claims.
 
+**Slice 2: implemented for Promise.** RpcClient and EventClient accept a per-call timeout while
+preserving their five-second default. Promise creates one five-second `QDeadlineTimer`, reads one
+Health1 snapshot, and passes only the remaining budget through Event1 preflight, Lifecycle1 activity,
+the durable observation, and Intention1 formation. No later RPC is sent after exhaustion. The KVM
+gate runs presenced with a one-second command budget and requires its server-side rejection inside a
+three-second client deadline, followed by exact Journal and Plasma continuity.
+
+Next, reuse the same deadline context for Reflect, Observe/Predict, and commitment mutation commands,
+then remove the temporary per-command repetition behind a small shared helper.
+
 ## Deferred behind gates
 
 ### M7
