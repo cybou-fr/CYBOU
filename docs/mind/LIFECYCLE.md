@@ -175,6 +175,11 @@ only automatically scheduled backlog work. A manual maintenance run is not impli
 The cooldown is evaluated again immediately before run creation and remains effective after a
 lifecycled restart.
 
+Automatically scheduled owner work is dispatched sequentially with asynchronous idempotent RPC.
+Lifecycle1 stays available for activity while an owner is working. A callback is accepted only if
+its captured run ID still names the active consolidating run; a reply arriving after interruption
+is ignored for lifecycle progress and cannot produce a false successful terminal state.
+
 ## P2 continuity matrix
 
 | Boundary | Current automated evidence | Remaining evidence |

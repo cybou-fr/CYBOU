@@ -412,9 +412,16 @@ backlog. Tests can disable automatic triggers while invoking the identical produ
 Lifecycle1. Lifecycle schema v2 durably stores the last activity time and scheduler cooldown end;
 evaluation and execution defer while the cooldown is active, including after lifecycled restart.
 Activity wakes `Idle` and atomically interrupts an active `event-backlog-v1:*` run, but never
-silently terminates a manually requested maintenance run. The current synchronous owner-dispatch
-transaction yields to activity between bounded cycles; interruption during an in-flight owner RPC
-requires the planned asynchronous dispatch refinement.
+silently terminates a manually requested maintenance run. At this slice, synchronous owner
+dispatch remained the interruption boundary.
+
+**Slice 8: implemented.** Automatic owner dispatch is now a sequential asynchronous state machine
+using the shared idempotent-mutation retry and circuit-breaker policy. `RunSchedulingCycle` returns
+`started` after durable run creation and never blocks Lifecycle1 on an owner call. Every callback
+rechecks the original run identity and active state before accepting its durable contribution, so
+activity can persist `Interrupted` during an in-flight RPC and a late owner reply cannot resurrect
+or complete that run. The explicit synchronous `Dispatch` command remains for administrative
+compatibility; the production scheduler no longer uses it.
 
 ### Work
 

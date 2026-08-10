@@ -119,6 +119,10 @@ run creation and dispatch cannot fork lifecycle work.
 Presence commands report user activity to Lifecycle1. A durable 60-second cooldown defers new
 automatic work across restart, and activity interrupts an active automatic backlog run without
 cancelling manual maintenance.
+Production owner dispatch is sequential and asynchronous. Each idempotent owner operation uses a
+deterministic key, and its callback must still match the active run before Lifecycle1 records the
+result or advances to the next owner. This keeps the Lifecycle1 D-Bus event loop responsive during
+slow owner work and fences late replies after interruption.
 
 Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
 not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form

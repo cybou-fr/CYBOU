@@ -161,11 +161,102 @@ QByteArray LifecycleService::continueScheduledRun()
         return schedulerReply(
             QStringLiteral("deferred"), runId,
             QStringLiteral("scheduled run is not dispatchable in the current mode"));
-    if (!Dispatch()) return schedulerReply(QStringLiteral("failed"), runId, m_error);
-    if (!FinishRun(QStringLiteral("completed"),
-                   QStringLiteral("event backlog scheduling policy")))
+    if (!startScheduledDispatch())
         return schedulerReply(QStringLiteral("failed"), runId, m_error);
-    return schedulerReply(QStringLiteral("completed"), runId, QString());
+    return schedulerReply(QStringLiteral("started"), runId, QString());
+}
+
+bool LifecycleService::startScheduledDispatch()
+{
+    if (!m_hasRun || m_run.status != LifecycleRunStatus::Active
+        || m_mode != LifecycleMode::Consolidating
+        || !m_run.policyId.startsWith(QStringLiteral("event-backlog-v1:"))) {
+        m_error = QStringLiteral("no dispatchable scheduled lifecycle run");
+        return false;
+    }
+    if (m_scheduledDispatchInFlight) return true;
+    dispatchNextScheduledOwner();
+    return true;
+}
+
+void LifecycleService::dispatchNextScheduledOwner()
+{
+    if (!m_hasRun || m_run.status != LifecycleRunStatus::Active
+        || m_mode != LifecycleMode::Consolidating) {
+        m_scheduledDispatchInFlight = false;
+        m_scheduledOwner.reset();
+        return;
+    }
+    const QStringList requested = m_run.requiredCapabilities + m_run.optionalCapabilities;
+    QString capability;
+    for (const QString &candidate : requested) {
+        if (!m_run.completedWork.contains(candidate) && !m_run.missingWork.contains(candidate)) {
+            capability = candidate;
+            break;
+        }
+    }
+    if (capability.isEmpty()) {
+        m_scheduledDispatchInFlight = false;
+        m_scheduledOwner.reset();
+        FinishRun(QStringLiteral("completed"), QStringLiteral("event backlog scheduling policy"));
+        return;
+    }
+    const BusEndpoint *endpoint = capability == QStringLiteral("predictor") ? &kPredictorEndpoint
+        : capability == QStringLiteral("workspace") ? &kWorkspaceEndpoint : nullptr;
+    if (!endpoint) {
+        if (m_run.optionalCapabilities.contains(capability)) {
+            if (MarkMissing(capability, QStringLiteral("unsupported optional capability")))
+                dispatchNextScheduledOwner();
+        } else {
+            FinishRun(QStringLiteral("failed"),
+                      QStringLiteral("unsupported required capability: %1").arg(capability));
+        }
+        return;
+    }
+    const QUuid runId = m_run.runId;
+    const qulonglong mark = m_run.inputHighWaterMark;
+    const QString key = WorkOperationKey(capability);
+    m_scheduledDispatchInFlight = true;
+    m_scheduledOwner = std::make_unique<AsyncRpcClient>(*endpoint, RpcRetryPolicy{}, this);
+    m_scheduledOwner->call(
+        QStringLiteral("Consolidate"),
+        {runId.toString(QUuid::WithoutBraces), key, QVariant::fromValue<qulonglong>(mark)},
+        RpcOperationSemantics::IdempotentMutation,
+        [this, runId, capability, key, mark](const RpcResult &result) {
+            handleScheduledOwnerResult(runId, capability, key, mark, result);
+        });
+}
+
+void LifecycleService::handleScheduledOwnerResult(
+    const QUuid &runId, const QString &capability, const QString &operationKey,
+    qulonglong mark, const RpcResult &result)
+{
+    m_scheduledDispatchInFlight = false;
+    if (auto *owner = m_scheduledOwner.release()) owner->deleteLater();
+    if (!m_hasRun || m_run.runId != runId || m_run.status != LifecycleRunStatus::Active
+        || m_mode != LifecycleMode::Consolidating) return;
+    QString codecError;
+    const QByteArray encoded = result.reply.arguments().value(0).toByteArray();
+    const QVariantMap receipt = result.succeeded()
+        ? FabricCodec::decodeMap(encoded, &codecError) : QVariantMap{};
+    const QUuid contributionId(receipt.value(QStringLiteral("contributionId")).toString());
+    const bool valid = result.succeeded() && codecError.isEmpty()
+        && receipt.value(QStringLiteral("accepted")).toBool()
+        && receipt.value(QStringLiteral("owner")).toString() == capability
+        && receipt.value(QStringLiteral("operationKey")).toString() == operationKey
+        && receipt.value(QStringLiteral("inputHighWaterMark")).toULongLong() == mark
+        && !contributionId.isNull();
+    if (valid && acceptOwnerResult(capability, operationKey, mark, contributionId)) {
+        dispatchNextScheduledOwner();
+        return;
+    }
+    const QString cause = result.errorMessage.isEmpty()
+        ? QStringLiteral("owner rejected scheduled work") : result.errorMessage;
+    if (m_run.optionalCapabilities.contains(capability)) {
+        if (MarkMissing(capability, cause)) dispatchNextScheduledOwner();
+    } else {
+        FinishRun(QStringLiteral("failed"), cause);
+    }
 }
 
 QByteArray LifecycleService::RunSchedulingCycle()

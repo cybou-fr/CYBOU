@@ -8,6 +8,7 @@
 #include <QCborMap>
 #include <QDateTime>
 #include <QSet>
+#include <QThread>
 
 namespace cybou {
 
@@ -154,6 +155,11 @@ QByteArray PredictorService::Consolidate(const QString &runId,const QString &ope
     if (!input) return {};
     int calibrationCount = calibrationCountAt(m_events, mark);
     if (calibrationCount < 0) return {};
+    bool delayOk = false;
+    const int delayMs = qEnvironmentVariableIntValue(
+        "CYBOU_PREDICTOR_CONSOLIDATE_DELAY_MS", &delayOk);
+    if (delayOk && delayMs > 0)
+        QThread::msleep(static_cast<unsigned long>(delayMs));
 
     const QUuid contributionId = QUuid::createUuidV5(
         kConsolidationNamespace,

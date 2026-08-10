@@ -71,9 +71,10 @@ or completed run ID, including after a later run replaced the in-memory projecti
 terminal Event1 contribution closes that idempotency window.
 
 `RunSchedulingCycle()` is the bounded orchestration entry point. It returns `blocked`, `deferred`,
-`failed`, or `completed` with a run ID and reason. For a new authorized decision it executes,
-dispatches, and completes the existing transaction. If lifecycled restarts with an active scheduled
-run in `Recovering`, the same method resumes and continues it rather than evaluating a second run.
+`failed`, or `started` with a run ID and reason. For a new authorized decision it creates the
+transaction and starts sequential asynchronous owner dispatch; terminal completion arrives through
+`Changed`. If lifecycled restarts with an active scheduled run in `Recovering`, the same method
+resumes and continues it rather than evaluating a second run.
 
 `NotifyUserActivity(cause)` is the Presence-to-Lifecycle arbitration command. It durably records
 activity and a scheduler cooldown, wakes `Idle`, and interrupts an active automatically scheduled

@@ -3,9 +3,11 @@
 #pragma once
 #include "cybou/ipc/EventClient.h"
 #include "cybou/fabric/OrganClients.h"
+#include "cybou/fabric/RpcResilience.h"
 #include "cybou/protocol/Lifecycle.h"
 #include <QObject>
 #include <QTimer>
+#include <memory>
 namespace cybou {
 class LifecycleService : public QObject {
     Q_OBJECT
@@ -50,6 +52,11 @@ private:
                            qulonglong inputHighWaterMark, const QUuid &contributionId);
     bool commitTerminalContribution(const QString &cause);
     QByteArray continueScheduledRun();
+    bool startScheduledDispatch();
+    void dispatchNextScheduledOwner();
+    void handleScheduledOwnerResult(const QUuid &runId, const QString &capability,
+                                    const QString &operationKey, qulonglong mark,
+                                    const RpcResult &result);
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
     QDateTime m_lastUserActivityAt;
@@ -58,5 +65,7 @@ private:
     HealthClient m_health;
     QTimer m_schedulerTimer;
     QTimer m_schedulerDebounce;
+    bool m_scheduledDispatchInFlight{false};
+    std::unique_ptr<AsyncRpcClient> m_scheduledOwner;
 };
 }

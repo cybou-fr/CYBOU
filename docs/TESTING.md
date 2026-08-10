@@ -87,6 +87,11 @@ Lifecycle unit and process tests also prove that Presence activity interrupts an
 persists its cooldown across lifecycled restart, and leaves a manual run active. Policy tests prove
 that an otherwise authorized runnable decision defers until the cooldown expires.
 
+The process suite delays predictor consolidation for two seconds after an automatic cycle returns
+`started`. During that in-flight owner RPC, `NotifyUserActivity` must answer within one second and
+persist `Interrupted`; after the delayed owner reply, the same run must remain interrupted and its
+consumer backlog must remain unadvanced.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

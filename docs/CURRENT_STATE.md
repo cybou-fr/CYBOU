@@ -159,6 +159,12 @@ P6.5 slice 7 adds durable user-activity arbitration. Presence commands call
 configured window (60 seconds by default), and interrupts only active automatic backlog runs.
 Cooldown survives restart, while manual maintenance runs retain their active state.
 
+P6.5 slice 8 moves production scheduled owner dispatch onto the shared asynchronous resilient RPC
+client. A cycle returns `started`, processes eligible owners sequentially, and completes through
+callbacks. Callback acceptance is fenced by run identity and active lifecycle state. Process fault
+injection holds predictord inside consolidation while Lifecycle1 accepts activity immediately;
+the late contribution cannot turn the interrupted run into a completed run.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty
