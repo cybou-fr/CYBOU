@@ -21,15 +21,14 @@ Then read the implementation documents in this order:
 8. [Presence API](PRESENCE_API.md)
 9. [Continuity](CONTINUITY.md)
 10. [Failure Modes](FAILURE_MODES.md)
-11. [Cognitive Lifecycle and Consolidation](LIFECYCLE.md) — implemented M5 contract
-12. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — M6/M7 target
-13. [Capability and Health Contract](HEALTH.md) — implemented P6.1/P6.2 protocol and owner boundary
-14. [RPC Resilience](RPC_RESILIENCE.md) — implemented P6.3 async transport policy
-15. [Homeostatic Measurements](HOMEOSTASIS.md) — implemented P6.4 observation-only protocol
+11. [Cognitive Lifecycle and Consolidation](LIFECYCLE.md) — implemented M5/M6 contract
+12. [Capability and Health Contract](HEALTH.md) — implemented P6.1/P6.2 protocol and owner boundary
+13. [RPC Resilience](RPC_RESILIENCE.md) — implemented P6.3/P6.7 transport and compound-budget policy
+14. [Homeostatic Measurements](HOMEOSTASIS.md) — implemented P6.4/P6.5 measurement and scheduling input
+15. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — future M7 contract
 
-Documents 1–11 primarily specify or explain the current substrate and continuity boundary.
-Document 12 is a future-target contract. Documents 13–15 describe implemented M6 health,
-transport, and measurement foundations while keeping scheduling and UI claims explicit.
+Documents 1–14 specify or explain the implemented M1–M6/P6.7 substrate. Document 15 is a
+future-target contract and must not be used as evidence that M7 behavior exists.
 
 For current implementation status, see [Current State](../CURRENT_STATE.md).
 For milestone semantics, see [Roadmap](../ROADMAP.md).

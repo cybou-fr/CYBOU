@@ -79,6 +79,7 @@ def main(argv: list[str]) -> int:
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
         "current": repo / "docs/CURRENT_STATE.md",
+        "installation": repo / "docs/INSTALLATION.md",
         "roadmap": repo / "docs/ROADMAP.md",
         "glossary": repo / "docs/GLOSSARY.md",
         "mind_index": repo / "docs/mind/README.md",
@@ -91,6 +92,10 @@ def main(argv: list[str]) -> int:
         "health": repo / "docs/mind/HEALTH.md",
         "rpc_resilience": repo / "docs/mind/RPC_RESILIENCE.md",
         "homeostasis": repo / "docs/mind/HOMEOSTASIS.md",
+        "organ_contracts": repo / "docs/mind/ORGAN_CONTRACTS.md",
+        "process_model": repo / "docs/mind/PROCESS_MODEL.md",
+        "failure_modes": repo / "docs/mind/FAILURE_MODES.md",
+        "data_ownership": repo / "docs/mind/DATA_OWNERSHIP.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
@@ -146,7 +151,7 @@ def main(argv: list[str]) -> int:
         "### 8. Perception is not truth",
         "### 9. Forgetting and values are governed",
         "## Lifecycle and consolidation — M5 evaluated",
-        "## Degraded cognition — M6 in progress",
+        "## Degraded cognition — M6 implemented",
         "## Future grounded and distributed cognition — M7",
         "## Future language faculty — M8",
         "## Future authorized agency — M9",
@@ -195,6 +200,16 @@ def main(argv: list[str]) -> int:
         paths["current"],
         "no current model owner",
         "There is currently no language-model process and no privileged action-executor process",
+    )
+    require(
+        paths["installation"],
+        "current Mind process count",
+        "nine-process Mind package",
+    )
+    require(
+        paths["installation"],
+        "continuity maturity boundary",
+        "M5 continuity",
     )
 
     for milestone in ("M5", "M6", "M7", "M8", "M9"):
@@ -319,6 +334,36 @@ def main(argv: list[str]) -> int:
         require(paths["homeostasis"], label, needle)
 
     for label, needle in (
+        ("event owner", "## eventd"),
+        ("health owner", "## healthd"),
+        ("lifecycle owner", "## lifecycled"),
+        ("presentation owner", "## presenced"),
+        ("QML non-owner", "## QML Presence proxy"),
+    ):
+        require(paths["organ_contracts"], label, needle)
+
+    for label, needle in (
+        ("nine-process topology", "cybou-healthd"),
+        ("lifecycle process", "cybou-lifecycled"),
+        ("bounded Presence budget", "one monotonic request budget"),
+    ):
+        require(paths["process_model"], label, needle)
+
+    for label, needle in (
+        ("current M6 boundary", "Current M1–M6"),
+        ("required-owner failure", "required eventd unavailable"),
+        ("bounded timeout behavior", "one shared deadline"),
+    ):
+        require(paths["failure_modes"], label, needle)
+
+    for label, needle in (
+        ("current ownership boundary", "## Current M1–M6 owners"),
+        ("health ownership", "`cybou-healthd`"),
+        ("lifecycle ownership", "`cybou-lifecycled`"),
+    ):
+        require(paths["data_ownership"], label, needle)
+
+    for label, needle in (
         ("epistemic statuses", "## Epistemic projection"),
         ("contradiction handling", "## Contradiction and reconciliation"),
         ("retention lifecycle", "## Retention and forgetting"),
@@ -364,6 +409,35 @@ def main(argv: list[str]) -> int:
         "terminology disclaimer",
         "They do not assert sentience or biological equivalence.",
     )
+
+    stale_current_claims = {
+        paths["mind_model"]: (
+            "M6 in progress",
+            "current M5 substrate",
+            "M6 should turn component health",
+        ),
+        paths["architecture"]: (
+            "capability-specific recovery belongs to M6",
+            "Resource/capability-aware operation belongs to M6",
+            "current M5 organ topology",
+        ),
+        paths["glossary"]: (
+            "M6 will model missing abilities",
+            "Lifecycle coordinator — future",
+            "Degraded mode — future",
+        ),
+        paths["failure_modes"]: ("## Not yet M6",),
+        paths["installation"]: (
+            "M5 continuity/migration guarantees are not implemented yet",
+            "seven Mind services",
+        ),
+        paths["health"]: ("Presence projection remains later work",),
+    }
+    for path, forbidden_phrases in stale_current_claims.items():
+        text = path.read_text(encoding="utf-8")
+        for phrase in forbidden_phrases:
+            if phrase in text:
+                error(path, f"stale implementation claim: {phrase!r}")
 
     link_documents = {repo / "README.md", *repo.glob("docs/**/*.md")}
     for path in link_documents:

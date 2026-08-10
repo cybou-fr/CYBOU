@@ -22,6 +22,19 @@ publish Accepted
 answer Journal queries
 ```
 
+## healthd
+
+Owns the capability dependency graph and persistent Health1 snapshot. It probes components,
+derives capability availability and deficits, publishes recovery progress and homeostatic
+measurements, and never transitions lifecycle mode or executes maintenance.
+
+## lifecycled
+
+Owns lifecycle mode, persistent consolidation run state, deterministic owner dispatch, recovery,
+user-activity cooldown, and evidence-bound scheduling. It delegates work to state owners and
+records accepted effects through Event1; it does not own their projections or write Journal
+directly.
+
 ## identityd
 
 Owns `identity.json` and the volatile same-login session marker.
@@ -70,8 +83,9 @@ only after admission.
 
 Owns presentation aggregation and user-facing command routing.
 
-It talks to the organ interfaces and Event1. It does not construct domain organ objects or open
-persistent cognitive stores.
+It talks to the organ interfaces and Event1. It projects Health1 capability state, gates commands
+by dependency, and applies one monotonic deadline to every compound read or mutation. It does not
+construct domain organ objects or open persistent cognitive stores.
 
 ## QML Presence proxy
 

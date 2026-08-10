@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Data Ownership
 
-## Current M5 owners
+## Current M1–M6 owners
 
 | Resource | Owner |
 |---|---|
@@ -45,7 +45,7 @@ The runtime identity marker prevents a daemon restart from being confused with a
 - opening another UI surface does not create another Mind;
 - process isolation does not introduce duplicate authoritative copies.
 
-## Current extension and proposed M6–M7 ownership
+## Current M6 extension and proposed M7–M9 ownership
 
 | Resource | Target owner/boundary |
 |---|---|

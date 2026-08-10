@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Cybou Documentation
 
+This documentation describes the repository at the M6 + P6.7 boundary. M7–M9 sections are target
+architecture unless a document explicitly says otherwise. For any implementation claim, begin
+with [Current State](CURRENT_STATE.md).
+
 ## Choose a reading path
 
 ### Product and status
@@ -44,6 +48,14 @@ mind/*            protocol and component contracts
 security/*        threat, privacy, and trust boundaries
 adr/*             normative decisions; status matters
 ```
+
+| Question | Authoritative source |
+|---|---|
+| What works in the current tree? | [Current State](CURRENT_STATE.md) |
+| What does a wire/state owner promise? | The relevant [Mind contract](mind/README.md) plus accepted ADRs |
+| Why was an architectural boundary chosen? | [ADR index](adr/README.md) |
+| What evidence proves a claim? | [Testing](TESTING.md) and milestone evaluation records |
+| What is next, but not implemented? | [Next Engineering Steps](NEXT_STEPS.md) and [Roadmap](ROADMAP.md) |
 
 ## Mind contracts
 
@@ -91,5 +103,7 @@ when repository gates and focused acceptance tests demonstrate it.
 - Update the relevant contract before or with protocol/schema changes.
 - Record cross-owner or security-boundary changes in an ADR.
 - Label examples as current or future; do not present unfinished M7–M9 behavior as implemented.
+- Replace milestone-relative phrases such as “current M5” when a later milestone implements the
+  behavior; prefer capability names and explicit implementation boundaries.
 - Add new canonical documents to `scripts/validate-cognitive-docs.py`.
 - Keep relative Markdown links valid and SPDX metadata present.

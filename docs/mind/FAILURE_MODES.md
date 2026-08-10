@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Failure Modes
 
-## Current M5 isolation and continuity guarantees
+## Current M1–M6 isolation, continuity, and degradation guarantees
 
 | Failure | Current behavior |
 |---|---|
@@ -18,19 +18,30 @@ SPDX-License-Identifier: MIT
 | duplicate D-Bus owner | second daemon instance fails service-name acquisition |
 | lifecycled split commit | deterministic Event1 effect is reused after process restart or reboot |
 | Plasma recreation | lifecycle run and Event1 count remain unchanged |
+| optional owner unavailable | only dependent capabilities and commands become unavailable |
+| required eventd unavailable | dependent mutations fail before Journal acceptance; other processes remain alive |
+| owner registered but unresponsive | compound Presence operation exhausts one shared deadline and returns bounded partial/typed failure |
+| stale Health1 scheduling evidence | Lifecycle1 refuses execution without creating a run |
+| lifecycled crashes after scheduled-run creation | restart enters `Recovering` and resumes the same deterministic run |
+| late owner reply after interruption | reply is fenced and cannot advance or overwrite the terminal run |
 
-## Not yet M6
+## Current representation
 
-M4 creates failure domains and a minimal Ready/Health contract. It does not yet define the complete
-capability-deficit UI, retry/backoff policy, dependency reconciliation, or user-facing degraded
-state machine.
+Health1 distinguishes component observations, capability availability, deficits, and recovery
+progress. Presence1 exposes that projection and command availability while keeping endpoint
+reachability, aggregate health, and lifecycle mode separate. RPC outcomes distinguish timeout,
+unavailable, rejected, and unknown non-idempotent outcomes; retries are limited to operations whose
+semantics permit them.
+
+The current gates cover optional predictor/self/workspace loss, required eventd loss, lifecycled
+and presenced loss, owner timeouts, recovery, split commits, Plasma recreation, and reboot
+continuity. They do not imply that M7 epistemic, retention, or distributed failure policies exist.
 
 ## Future lifecycle and epistemic failures
 
 | Failure | Required future representation |
 |---|---|
-| consolidation interrupted | accepted partial work plus `Interrupted`, followed by reconciliation |
-| required maintenance owner unavailable | run fails or remains degraded; never reports completion |
+| governed epistemic reconciliation interrupted | accepted partial work plus explicit resumable state |
 | stale perception source | affected claims become `Stale` or `Unknown` |
 | contradictory observations | explicit `Disputed` projection; no silent last-write-wins |
 | erasure cannot reach a replica | incomplete retention obligation and visible deficit |

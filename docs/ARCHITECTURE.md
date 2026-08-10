@@ -170,8 +170,8 @@ These are not interchangeable.
 A service restart should not create a new identity. A future continuity failure should be
 represented explicitly rather than silently inventing seamless continuity.
 
-Current restart/reboot semantics are documented in `CURRENT_STATE.md`; in-place upgrade
-reconciliation remains a separate hardening track and capability-specific recovery belongs to M6.
+Current restart/reboot and capability-specific recovery semantics are documented in
+`CURRENT_STATE.md`; stronger in-place upgrade reconciliation remains a separate hardening track.
 
 ## Presentation boundary
 
@@ -245,8 +245,8 @@ expiry decisions remain derived records with evidence.
 
 Lifecycle1, persistent run state, recovery, owner dispatch, durable owner results, accepted
 terminal outcomes, Presence projection, and process/Plasma/reboot fault-injection gates form the
-implemented M5 evaluation boundary. Resource/capability-aware operation belongs to M6. ADR-0024
-and ADR-0026 are normative.
+implemented M5 evaluation boundary. M6 adds capability-aware scheduling, degraded operation, and
+recovery without moving state ownership into Lifecycle1. ADR-0024 and ADR-0026 are normative.
 
 ## Future grounding and cognitive-governance boundary
 
@@ -278,7 +278,7 @@ failure, and privacy contracts are precise.
 
 ## Future action boundary
 
-M9 is intentionally outside the current M5 organ topology.
+M9 is intentionally outside the current M1–M6 organ topology.
 
 No language model or UI component should become a privileged executor.
 
@@ -312,11 +312,11 @@ The normative direction is ADR-0022.
 
 ## Next
 
-M5 strengthens continuity/recovery and introduces lifecycle/consolidation.
+M1–M6 and P6.7 provide the current accepted substrate: typed memory, isolated owners, lifecycle,
+continuity, degraded operation, recovery, evidence-bound scheduling, and bounded compound IPC.
 
-M6 turns process health and internal pressure into explicit capability deficits and homeostasis.
-
-M7 adds grounded perception, epistemic/retention governance, then tests them across nodes.
+M7 is next: add one local grounded-perception slice with provenance, epistemic/retention
+governance, and fault evidence before attempting inter-node transport.
 
 M8 adds replaceable language faculties.
 

@@ -8,8 +8,9 @@ SPDX-License-Identifier: MIT
 ## Maturity warning
 
 Cybou images are development artifacts unless a release explicitly states otherwise. Do not use a
-development image as the only copy of important data. M5 continuity/migration guarantees are not
-implemented yet.
+development image as the only copy of important data. M5 continuity and the documented v0/v1
+lifecycle-state migration are implemented and tested, but general in-place system-upgrade,
+rollback, installer-migration, and stable-release compatibility guarantees are not.
 
 ## Recommended evaluation path
 
@@ -20,9 +21,10 @@ nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-lo
 ./result/bin/run-cybou-vm
 ```
 
-This evaluates the Plasma surface, D-Bus activation, seven Mind services, and persistent state
-without installing to a physical disk. Development login details are defined in `systems/vm.nix`
-and intentionally not duplicated here.
+This evaluates the Plasma surface, the nine-process Mind package, D-Bus/systemd activation, and
+persistent state without installing to a physical disk. Individual VM gates activate the service
+subgraph required by their scenario; see [Testing](TESTING.md) for exact coverage. Development
+login details are defined in `systems/vm.nix` and intentionally not duplicated here.
 
 ## Available image targets
 
@@ -57,6 +59,8 @@ For service diagnostics:
 ```bash
 systemctl --user status cybou-presenced.service
 systemctl --user status cybou-eventd.service
+systemctl --user status cybou-healthd.service
+systemctl --user status cybou-lifecycled.service
 journalctl --user -u 'cybou-*' --since boot
 ```
 

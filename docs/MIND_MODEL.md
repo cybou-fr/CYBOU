@@ -225,7 +225,8 @@ Observed consequence
         └──────────────► Observation / Outcome
 ```
 
-M9 owns the authorization/execution boundary. It is not implemented by the current M5 substrate.
+M9 owns the authorization/execution boundary. It is not implemented by the current M1–M6
+substrate.
 
 ### 7. Consolidation derives; it does not rewrite
 
@@ -421,17 +422,16 @@ transactions define explicit interruption boundaries.
 
 ADR-0024 contains the normative lifecycle direction.
 
-## Degraded cognition — M6 in progress
+## Degraded cognition — M6 implemented
 
 Process isolation by itself is not degraded cognition.
 
-Health1 maps component observations to capability deficits, and P6.4 publishes typed raw
-homeostatic measurements without scheduling authority. Presence still treats broad runtime
-readiness as an all-or-nothing gate.
+Health1 maps component observations through an explicit dependency graph to capability deficits,
+recovery progress, and typed homeostatic measurements. Presence projects that state, exposes
+command availability, and independently enforces the same dependency gates. Broad runtime
+readiness is no longer an all-or-nothing gate.
 
-M6 should turn component health into explicit capability deficits.
-
-Target example:
+Implemented example:
 
 ```text
 eventd       healthy
@@ -448,15 +448,16 @@ missing capability:
 prediction
 ```
 
-Loss of prediction should not automatically mean loss of identity, durable memory, intentions, or
-all presentation.
+Loss of prediction does not automatically mean loss of identity, durable memory, intentions, or
+all presentation. Optional predictor, self, and workspace loss and required eventd loss have
+process-level fault coverage. Lifecycle mode and aggregate health remain independent, allowing
+states such as `Awake + Limited` and `Recovering + Limited`.
 
-The exact policy belongs to the M6 design and ADR-0019.
-
-M6 also adds homeostatic and metacognitive signals. Storage growth, event backlog, latency, stale
-projections, unresolved contradictions, and calibration drift become explicit pressures. Mind can
-then report not just whether an organ responds, but which knowledge is stale, which assumptions are
-unsupported, and which maintenance work cannot currently complete.
+M6 also implements schema-v2 homeostatic measurements and evidence-bound automatic lifecycle
+scheduling for the reviewed Event1 backlog policy. Healthd publishes observations but has no
+scheduling authority; lifecycled evaluates and revalidates evidence, owns the user-activity
+cooldown, and resumes deterministic work after failure. General contradiction, freshness,
+retention, and calibration-pressure governance remain M7 work.
 
 ## Future grounded and distributed cognition — M7
 

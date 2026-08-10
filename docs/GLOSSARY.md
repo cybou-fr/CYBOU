@@ -20,8 +20,9 @@ proxy/cache rather than a cognitive state owner.
 **Faculty** — optional replaceable capability such as language, perception, or planning. A faculty
 is not identity, canonical memory, or authorization authority.
 
-**Capability** — an explicitly available system ability. M6 will model missing abilities as
-capability deficits instead of treating every organ failure as whole-Mind failure.
+**Capability** — an explicitly available system ability. Health1 derives current availability and
+typed deficits from component observations and the dependency graph, so an optional-organ failure
+does not become a whole-Mind failure.
 
 **Contribution** — a typed cognitive message/envelope that may become part of durable causal
 history.
@@ -77,8 +78,9 @@ maintenance, recovery, degradation, and suspension. It is not a claim of biologi
 calibrate, reconcile, expire, or rebuild state from an accepted Journal high-water mark. It does
 not rewrite accepted history.
 
-**Lifecycle coordinator** — future orchestration capability for lifecycle transitions and typed
-maintenance requests. It owns run state, not the state of every organ.
+**Lifecycle coordinator** — `cybou-lifecycled`, the current owner of lifecycle transitions,
+persistent run state, bounded maintenance dispatch, recovery, and evidence-bound automatic
+scheduling. It owns orchestration, not the state of every organ.
 
 **Provenance** — source, acquisition, transformation, and trust context attached to an observation
 or derived claim.
@@ -105,8 +107,9 @@ active concerns; an extension of Workspace admission, not authorization to act.
 cost, urgency, evidence quality, or resource budget used to criticize and prioritize proposals.
 It does not grant execution permission.
 
-**Degraded mode** — future state in which Mind remains partially available while one or more
-capabilities are explicitly unavailable or uncertain.
+**Degraded mode** — current explicit state in which Mind remains partially available while one or
+more capabilities are unavailable or uncertain. Lifecycle mode and aggregate health are separate
+axes: for example, Mind may be `Awake + Limited` or `Recovering + Limited`.
 
 **Node** — one device/runtime participating in a future distributed continuity topology.
 

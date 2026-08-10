@@ -321,10 +321,10 @@ Identity uses a volatile runtime-session marker. Restarting `identityd` inside t
 reloads the current identity without incrementing `sessionCount`.
 
 The process integration suite additionally simulates a new login by removing only the volatile
-session marker and restarting the seven M4 processes. Focused booted NixOS gates prove identity,
-exact active-run continuity, both split-commit recovery windows, and Plasma recreation across real
-system transitions. In-place upgrade reconciliation remains an explicit hardening track. The next
-fault-injection matrix belongs to M6 and tests capability-specific partial availability.
+session marker and restarting the process graph. Focused booted NixOS gates prove identity, exact
+active-run continuity, both split-commit recovery windows, Plasma recreation, required-owner
+failure, and capability-specific recovery across real system transitions. Stronger in-place
+upgrade reconciliation remains an explicit hardening track.
 
 ## Durable-to-visible ordering
 
@@ -354,7 +354,10 @@ The present tree has implementation boundaries for:
 - self projection/assessment;
 - bounded Workspace attention;
 - presentation aggregation;
-- process-level health/failure isolation.
+- process-level health/failure isolation;
+- persistent capability health and typed deficits;
+- persistent lifecycle runs, consolidation, recovery, and evidence-bound scheduling;
+- capability-aware Presence projection and bounded compound RPC.
 
 These components are intentionally useful without any language model.
 

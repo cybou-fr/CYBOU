@@ -52,8 +52,11 @@ destroy cognitive organ processes.
 
 ## Health
 
-M5 retains the minimal `Ready()` and `Health()` organ interfaces and adds lifecycle-level deficits.
-P6.1/P6.2 add separate component-health and capability-availability contracts, an explicit
-dependency graph, persistent Health1 ownership, and verified recovery. P6.3 adds bounded async RPC
-for required non-blocking paths; broader migration and the read-only Health1 Presence projection
-remain later work.
+The narrow organs retain minimal `Ready()` and `Health()` probes. Health1 owns the component graph,
+persistent health snapshot, capability availability, typed deficits, recovery progress, and raw
+homeostatic measurements. Presence1 projects that state without owning it and gates each command
+by its declared capability dependencies.
+
+All compound Presence reads and mutations use one monotonic request budget. Optional-owner loss
+therefore yields bounded partial data and capability-specific unavailability; required-owner loss
+fails dependent mutations closed. Lifecycle mode and aggregate health remain independent axes.

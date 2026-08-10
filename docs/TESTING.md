@@ -5,13 +5,18 @@ SPDX-License-Identifier: MIT
 
 # Testing Strategy
 
-## M4 suite
+## Mind CTest suite
 
-The Mind package builds fourteen CTest suites:
+The Mind package builds twenty CTest suites:
 
 ```text
 protocol
+health-protocol
+homeostasis-protocol
+health-service
+healthd-integration
 lifecycle
+lifecycle-scheduling-policy
 lifecycled-integration
 journal
 identity
@@ -22,6 +27,7 @@ workspace
 presence-proxy
 m1-runtime
 fabric-codec
+rpc-resilience
 eventd-integration
 m4-process-integration
 ```
@@ -179,9 +185,11 @@ through the real user D-Bus, reboots the machine, and proves the identity ID and
 run survive while the logical session advances and lifecycle enters `Recovering`.
 
 `vm-smoke` boots the full Plasma session and SDDM greeter nodes. It starts
-`cybou-presenced.service` through the user manager and asserts that all eight Mind user services
-become active as separate processes. It repeats the continuity assertions in the desktop system
-composition, but remains primarily the heavy service-graph and renderer gate.
+`cybou-presenced.service` through the user manager and asserts that the eight services in its
+activation graph (`eventd`, `lifecycled`, the five domain organs, and `presenced`) become active as
+separate processes. Healthd behavior has its own process integration and focused M6 KVM coverage.
+The gate repeats the continuity assertions in the desktop system composition, but remains
+primarily the heavy service-graph and renderer gate.
 
 ## Build order
 
@@ -193,4 +201,6 @@ nix build .#checks.x86_64-linux.lifecycle-continuity --print-build-logs
 nix build .#checks.x86_64-linux.vm-smoke --print-build-logs
 ```
 
-Do not mark M4 complete from compilation alone.
+Do not mark a milestone complete from compilation alone. `CURRENT_STATE.md` and `ROADMAP.md` may
+claim completion only when the corresponding unit, process, VM/KVM, and documentation gates are
+recorded and green.
