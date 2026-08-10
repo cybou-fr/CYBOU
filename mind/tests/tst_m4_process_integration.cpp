@@ -701,6 +701,10 @@ private Q_SLOTS:
     {
         IdentityClient identity;
         const QVariantMap before = identity.state();
+        EventClient events;
+        const qulonglong contributionsBefore = events.count();
+        Presence surface;
+        QVERIFY(surface.wake());
 
         const qint64 eventPid = m_eventd->processId();
         const qint64 identityPid = m_identityd->processId();
@@ -710,14 +714,20 @@ private Q_SLOTS:
         const qint64 workspacePid = m_workspaced->processId();
 
         stop(m_presenced);
+        QVERIFY(!surface.wake());
+        QVERIFY(!surface.isAwake());
+        QVERIFY(!surface.runtimeReachable());
+        QVERIFY(!surface.lastError().isEmpty());
+        QCOMPARE(events.count(), contributionsBefore);
         m_presenced = start(m_presencedPath);
         QVERIFY(m_presenced);
 
         PresenceClient backend;
         QTRY_VERIFY_WITH_TIMEOUT(backend.ready(), 5000);
 
-        Presence surface;
         QVERIFY2(surface.wake(), qPrintable(surface.lastError()));
+        QVERIFY(surface.runtimeReachable());
+        QCOMPARE(events.count(), contributionsBefore);
 
         QCOMPARE(m_eventd->processId(), eventPid);
         QCOMPARE(m_identityd->processId(), identityPid);
@@ -735,6 +745,45 @@ private Q_SLOTS:
                 .toULongLong(),
             before.value(QStringLiteral("sessionCount"))
                 .toULongLong());
+    }
+
+    void lifecycledFailureDisablesOnlyLifecycleControlAndRecovers()
+    {
+        Presence surface;
+        QVERIFY(surface.wake());
+        EventClient events;
+        RpcClient health(kHealthEndpoint);
+        const qulonglong beforeRejectedControl = events.count();
+
+        stop(m_lifecycled);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityStates().value(QStringLiteral("consolidation")).toString(),
+            QStringLiteral("unavailable"), 5000);
+        QVERIFY(!surface.canCommand(QStringLiteral("interruptLifecycle")));
+        QVERIFY(surface.canCommand(QStringLiteral("promise")));
+        QVERIFY(surface.canCommand(QStringLiteral("identity")));
+        const QVariantMap detail =
+            surface.capabilityDetails().value(QStringLiteral("consolidation")).toMap();
+        QVERIFY(detail.value(QStringLiteral("dependencies")).toStringList().contains(
+            QStringLiteral("lifecycled")));
+        RpcClient presence(kPresenceEndpoint);
+        QVERIFY(!presence.callBool(
+            QStringLiteral("InterruptLifecycle"), {QStringLiteral("unavailable owner test")}));
+        QCOMPARE(events.count(), beforeRejectedControl);
+        QVERIFY(!surface.identityState().isEmpty());
+
+        m_lifecycled = start(m_lifecycledPath);
+        QVERIFY(m_lifecycled);
+        LifecycleClient lifecycle;
+        QTRY_VERIFY_WITH_TIMEOUT(lifecycle.ready(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityDetails().value(QStringLiteral("consolidation")).toMap()
+                .value(QStringLiteral("recoveryProgress")).toString(),
+            QStringLiteral("verifying"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(surface.canCommand(QStringLiteral("interruptLifecycle")), 5000);
+        QCOMPARE(events.count(), beforeRejectedControl);
     }
 
     void simulatedLoginBoundaryPreservesIdentityAndIntentions()

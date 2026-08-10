@@ -181,6 +181,11 @@ P6.6 slice 1 expands optional-organ fault injection across predictord, selfd, an
 Process tests assert exact capability/command loss, zero Event1 mutation for rejected operations,
 continued independent behavior, typed recovery progress, and restored command availability.
 
+P6.6 slice 2 covers the lifecycle and presentation boundaries. Lifecycled loss disables only its
+mapped consolidation/control surface and rejected control creates no Event1 effect. Presenced loss
+marks an existing QML proxy unreachable instead of leaving a stale reachable flag; reconnecting
+the same proxy preserves identity/session/Event1 state and every cognitive owner process.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

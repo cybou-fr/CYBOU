@@ -77,6 +77,8 @@ interruptLifecycle(cause)
 ```
 
 `wake()` is explicitly invokable so the unavailable-state UI can retry the Presence1 connection.
+If retry fails, `awake` and `runtimeReachable` become false while the last cached projection remains
+available for stale-state presentation. A later successful `wake()` replaces it atomically.
 
 presenced routes cognitive operations to the organ that owns them; it does not construct domain
 organ objects itself.

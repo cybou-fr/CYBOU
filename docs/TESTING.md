@@ -102,6 +102,11 @@ P6.6 optional-organ coverage separately stops selfd and workspaced. Reflection a
 before Event1 mutation, only their declared capabilities/commands become unavailable, unrelated
 commands stay enabled, and two owner-backed refreshes prove verifying then ready recovery.
 
+Boundary coverage stops lifecycled and presenced independently. Lifecycle control fails before an
+Event1 mutation while identity and commitments remain usable. An already-awake QML proxy marks
+runtime reachability false when presenced disappears, then reconnects with identical identity,
+session count, Event1 count, and owner PIDs.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

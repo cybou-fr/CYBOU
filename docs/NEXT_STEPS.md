@@ -454,10 +454,14 @@ failed reflection and unavailable attention are rejected before any Event1 mutat
 unrelated identity, commitments, prediction, and presentation remain usable. Recovery is observed
 through `waiting → verifying → ready` rather than inferred from process existence.
 
+**Slice 2: implemented.** Lifecycled loss now proves lifecycle control and consolidation become
+unavailable without disabling identity or commitments and without creating an Event1 effect for a
+rejected interruption. Presenced loss makes an existing QML proxy explicitly unreachable while
+retaining its last cached projection; the same proxy reconnects after restart with unchanged
+identity, session count, Event1 count, and all owner PIDs. Lifecycled recovery is owner-verified.
+
 ### Fault-injection matrix
 
-- stop/restart remaining optional infrastructure independently (lifecycled and presenced boundaries);
-- remove `presenced` and recreate the QML proxy;
 - make a process own D-Bus but exceed its RPC deadline;
 - crash during retry and circuit-breaker transitions;
 - make Event1 unavailable and prove no mutation is reported accepted;
