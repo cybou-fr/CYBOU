@@ -118,7 +118,7 @@ pkgs.testers.runNixOSTest {
             "org.cybou.Mind.Health1 Refresh | grep -q true"
         )
         machine.succeed(
-            f"{user_bus} --timeout=40s call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 "
+            f"{user_bus} --timeout=8s call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 "
             "org.cybou.Mind.Presence1 Promise s rejected-without-event1 | grep -q '^s \"\"$'"
         )
         machine.succeed(f"kill -CONT {event_pid}")

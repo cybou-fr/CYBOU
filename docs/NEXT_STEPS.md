@@ -503,9 +503,19 @@ bounded retry/recovery rule, Presence projection, and test. Required-owner loss 
 identity replacement, commitment loss, false acceptance, or duplicate durable effects.
 
 **Status: satisfied.** The complete process matrix plus `m6-recovery-boundary` provide the M6 exit
-evidence. Before broadening into M7, harden compound Presence commands with one propagated command
-deadline: individual owner calls are bounded, but a multi-owner command can currently accumulate
-those budgets (the Event1-unresponsive KVM case returns fail-closed in about 24 seconds).
+evidence.
+
+## P6.7 — Bound compound Presence commands
+
+**Slice 1: implemented.** EventClient now uses an explicitly timed asynchronous D-Bus pending call
+instead of relying on blocking-call timeout behavior. Promise validates its capability gates and
+required Event1 owner before notifying auxiliary owners, so an unresponsive Journal fails closed
+without accumulating the budgets of later steps. The KVM gate tightens its client deadline from 40
+to 8 seconds and observes rejection in under one second with no Journal growth.
+
+Next, introduce one command deadline context that propagates the remaining budget across compound
+commands involving several independent owners. This is post-M6 latency hardening, not a reason to
+weaken the completed M6 availability and continuity claims.
 
 ## Deferred behind gates
 

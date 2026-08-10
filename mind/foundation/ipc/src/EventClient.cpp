@@ -8,6 +8,7 @@
 
 #include <QCborMap>
 #include <QCborValue>
+#include <QDBusPendingCall>
 
 namespace cybou {
 
@@ -60,8 +61,9 @@ QDBusMessage EventClient::call(
         method);
     message.setArguments(arguments);
 
-    const QDBusMessage reply =
-        m_bus.call(message, QDBus::Block, kCallTimeoutMs);
+    QDBusPendingCall pending = m_bus.asyncCall(message, kCallTimeoutMs);
+    pending.waitForFinished();
+    const QDBusMessage reply = pending.reply();
 
     if (reply.type() == QDBusMessage::ErrorMessage) {
         m_lastError = QStringLiteral("%1: %2")

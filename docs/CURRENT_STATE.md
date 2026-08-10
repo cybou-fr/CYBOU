@@ -206,13 +206,17 @@ P6.6 slice 6 adds the focused KVM exit gate. A real Plasma session proves Presen
 activation without shell replacement, durable lifecycle state remains unchanged across a timed-out
 interruption and changes only after recovery, and an unresponsive Event1 owner rejects Promise
 without Journal growth. Resuming the same owner preserves its PID, count, and the plasmashell PID.
-Together with slices 1–5, this completes P6.6 and satisfies the M6 exit gate. The next hardening
-slice is a propagated deadline for compound Presence commands; per-owner calls are bounded today,
-but their budgets can accumulate across one command.
+Together with slices 1–5, this completes P6.6 and satisfies the M6 exit gate.
+
+P6.7 slice 1 hardens the compound Promise path discovered by that gate. EventClient waits on an
+explicitly timed asynchronous pending call, and Promise probes required Event1 durability before
+notifying auxiliary owners. The unresponsive-owner KVM case now rejects in under one second under
+an 8-second client deadline instead of accumulating roughly 24 seconds of internal RPC budgets.
+A shared remaining-budget context across different owners remains the next post-M6 hardening step.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
-M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
-the current engineering milestone; the tree does not yet contain the planned M8 language faculty
+M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
+that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty
 or M9 authorized executor.
 
 ## Process topology

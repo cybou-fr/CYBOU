@@ -427,17 +427,28 @@ QString PresenceService::Promise(
     const QString &description)
 {
     m_lastError.clear();
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"));
+    const QString normalized = description.trimmed();
 
-    if (description.trimmed().isEmpty()
+    if (normalized.isEmpty()
         || !capabilityAvailable(QStringLiteral("accepted-biography"))
         || !capabilityAvailable(QStringLiteral("commitment-access"))) {
         return {};
     }
 
+    // Event1 is the required durability boundary for both records created by
+    // Promise. Probe it before notifying auxiliary owners so an unavailable
+    // journal consumes one bounded RPC budget instead of accumulating the
+    // budgets of every step in this compound command.
+    if (!m_events.isOpen()) {
+        m_lastError = m_events.lastError();
+        return {};
+    }
+
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"));
+
     QVariantMap details;
     details[QStringLiteral("description")] =
-        description.trimmed();
+        normalized;
 
     QUuid requestId;
     if (!appendUserObservation(
@@ -448,7 +459,7 @@ QString PresenceService::Promise(
     }
 
     const QString intentionId = m_intentions.form(
-        description,
+        normalized,
         QStringLiteral("asked by the user"),
         requestId.toString(QUuid::WithoutBraces));
 
