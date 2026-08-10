@@ -290,9 +290,11 @@ LifecycleClient::LifecycleClient(QObject *parent)
     }
 }
 
-QVariantMap LifecycleClient::state() const
+QVariantMap LifecycleClient::state(int timeoutMs) const
 {
-    return decodeMap(m_rpc.callBytes(QStringLiteral("State")), &m_codecError);
+    return decodeMap(
+        m_rpc.callBytes(QStringLiteral("State"), {}, timeoutMs),
+        &m_codecError);
 }
 
 QVariantMap LifecycleClient::schedulingEvaluation() const
@@ -307,10 +309,16 @@ bool LifecycleClient::notifyUserActivity(const QString &cause, int timeoutMs) co
     return m_rpc.callBool(QStringLiteral("NotifyUserActivity"), {cause}, timeoutMs);
 }
 
-bool LifecycleClient::finishRun(const QString &status, const QString &cause) const
+bool LifecycleClient::finishRun(
+    const QString &status,
+    const QString &cause,
+    int timeoutMs) const
 {
     m_codecError.clear();
-    return m_rpc.callBool(QStringLiteral("FinishRun"), {status, cause});
+    return m_rpc.callBool(
+        QStringLiteral("FinishRun"),
+        {status, cause},
+        timeoutMs);
 }
 
 QString LifecycleClient::lastError() const

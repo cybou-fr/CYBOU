@@ -95,5 +95,7 @@ Required-owner preflight and one monotonic command deadline prevent later compou
 accumulating independent RPC budgets. Promise, Reflect, Observe, Predict, Fulfill, and Abandon now
 share this model: each reads one Health1 snapshot and passes only the remaining budget to subsequent
 owners. Event-producing commands preflight Event1; read-only Predict does not acquire an artificial
-Journal dependency. `InterruptLifecycle` remains the final compound Presence path to align with the
-same server-side deadline while retaining its non-idempotent shell contract.
+Journal dependency. `InterruptLifecycle` also shares one server-side budget across Lifecycle1 state
+validation and terminal mutation; exhaustion before `FinishRun` prevents that mutation from being
+sent. Its shell transport remains asynchronous and non-idempotent, so a lost reply is still
+`UnknownOutcome`. Read-only Presence snapshot aggregation remains to be bounded separately.

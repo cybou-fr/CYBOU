@@ -156,10 +156,13 @@ public:
 
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
-    QVariantMap state() const;
+    QVariantMap state(int timeoutMs = -1) const;
     QVariantMap schedulingEvaluation() const;
     bool notifyUserActivity(const QString &cause, int timeoutMs = -1) const;
-    bool finishRun(const QString &status, const QString &cause) const;
+    bool finishRun(
+        const QString &status,
+        const QString &cause,
+        int timeoutMs = -1) const;
     QString lastError() const;
 
 Q_SIGNALS:

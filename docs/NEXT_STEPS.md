@@ -539,6 +539,17 @@ Next, align the backend `InterruptLifecycle` compound path with the same server-
 while preserving its shell-facing non-idempotent `unknown-outcome` contract, then audit remaining
 multi-owner orchestration for independently accumulated budgets.
 
+**Slice 4: implemented.** `InterruptLifecycle` now creates its server-side `CommandDeadline` before
+validation and passes the remaining budget through Lifecycle1 `State` and `FinishRun`. Expiry after
+validation prevents the terminal mutation from being sent. The test-only delay now exercises this
+deadline directly: Plasma remains responsive, its five-second non-idempotent transport timeout is
+still reported as `unknown-outcome`, and Lifecycle1 state remains byte-identical. Recovery performs
+one successful interruption through the same path.
+
+Next, bound the read-only Presence snapshot aggregation. It currently visits several independent
+owners sequentially and is the remaining visible source of accumulated default RPC budgets; the
+projection must stay structurally valid when its shared budget expires partway through collection.
+
 ## Deferred behind gates
 
 ### M7

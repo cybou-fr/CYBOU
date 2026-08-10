@@ -167,7 +167,9 @@ when no run timestamp exists. These thresholds describe projection age, not evid
 The QML proxy sends user interruption asynchronously to Presence1 and exposes a read-only pending
 flag. Presence1 validates that a run is active and asks Lifecycle1 to persist `Interrupted`; neither
 the applet nor presenced writes lifecycle state. The five-second transport timeout completes as an
-error without blocking the Plasma event loop.
+`UnknownOutcome` error without blocking the Plasma event loop. Inside Presence1, validation and
+`FinishRun` share one monotonic server budget, and expiry before the terminal call prevents the
+mutation from being sent.
 
 Ordinary Presence commands also report user activity before their capability gate. Lifecycle1
 persists the activity timestamp and a 60-second scheduler cooldown, wakes `Idle`, and interrupts

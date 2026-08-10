@@ -56,8 +56,10 @@ This keeps shutdown non-interactive while preserving the normal state-flush path
 proxy, including lifecycled health, without turning lifecycle mode into runtime availability.
 It also recreates the proxy three times around one active run and verifies unchanged run identity,
 status, and Event1 count. `CYBOU_PRESENCE_INTERRUPT_DELAY_MS` is test-only fault injection:
-presenced delays and rejects an interruption without touching Lifecycle1. A client heartbeat proves
-the QML event loop remains responsive until the async transport timeout completes.
+presenced consumes its shared server deadline before Lifecycle1 validation, then rejects without
+touching Lifecycle1. A client heartbeat proves the QML event loop remains responsive until the
+async transport reports `unknown-outcome`; the focused KVM gate also byte-compares persistent
+lifecycle state before and after the delayed command and proves recovery succeeds.
 
 The same process test stops predictord, refreshes Health1, and verifies that Presence reports a
 limited aggregate with only prediction unavailable. Identity, commitments, biography, attention,

@@ -230,6 +230,13 @@ coverage pass with continuity intact. `InterruptLifecycle` is the remaining comp
 to align server-side with this model; its asynchronous shell caller already retains the explicit
 non-idempotent unknown-outcome policy.
 
+P6.7 slice 4 aligns `InterruptLifecycle` as well. Presence validates active Lifecycle1 state and
+submits `FinishRun(interrupted)` under one server-side monotonic budget, refusing to send the
+mutation after expiry. The Plasma caller remains asynchronous and non-idempotent: losing the reply
+still yields `UnknownOutcome` and never triggers a retry. Process and KVM fault coverage preserve
+the active run byte-for-byte after timeout and prove an explicit later interruption succeeds.
+Read-only snapshot aggregation is now the remaining P6.7 sequential multi-owner latency surface.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
 that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty

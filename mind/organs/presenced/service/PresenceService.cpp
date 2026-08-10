@@ -709,23 +709,38 @@ QByteArray PresenceService::Predict(
 bool PresenceService::InterruptLifecycle(const QString &cause)
 {
     m_lastError.clear();
+    CommandDeadline deadline;
     bool delayOk = false;
     const int delayMs = qEnvironmentVariableIntValue(
         "CYBOU_PRESENCE_INTERRUPT_DELAY_MS", &delayOk);
     if (delayOk && delayMs > 0) {
         QThread::msleep(static_cast<unsigned long>(delayMs));
-        m_lastError = QStringLiteral("injected lifecycle interruption timeout");
+    }
+
+    int timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) {
+        m_lastError = QStringLiteral("lifecycle interruption deadline exceeded");
         return false;
     }
     const QString reason = cause.trimmed().isEmpty()
         ? QStringLiteral("interrupted by user")
         : cause.trimmed();
-    const QVariantMap state = m_lifecycle.state();
+    const QVariantMap state = m_lifecycle.state(timeoutMs);
+    if (state.isEmpty() && !m_lifecycle.lastError().isEmpty()) {
+        m_lastError = m_lifecycle.lastError();
+        return false;
+    }
     if (state.value(QStringLiteral("status")).toString() != QStringLiteral("active")) {
         m_lastError = QStringLiteral("no active lifecycle run to interrupt");
         return false;
     }
-    if (!m_lifecycle.finishRun(QStringLiteral("interrupted"), reason)) {
+
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) {
+        m_lastError = QStringLiteral("lifecycle interruption deadline exceeded");
+        return false;
+    }
+    if (!m_lifecycle.finishRun(QStringLiteral("interrupted"), reason, timeoutMs)) {
         m_lastError = m_lifecycle.lastError();
         return false;
     }
