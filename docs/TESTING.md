@@ -116,6 +116,11 @@ Two scoped `CYBOU_RPC_FAILPOINT` process cases terminate lifecycled after the fi
 failure and after circuit-open. Each restart must project the original run ID in `Recovering`,
 resume it, complete once, and leave zero consumer backlog with a stable Event1 count.
 
+Required-owner coverage stops eventd while the other eight processes remain alive. It proves
+Presence reachability with fail-closed biography/identity/commitment gates, rejects Promise before
+acceptance, then verifies identical Journal count, UUID, session count, existing commitments, and
+absence of the rejected description after restart.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

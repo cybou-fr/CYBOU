@@ -196,6 +196,12 @@ the circuit opens. Persistent lifecycle state retains the same active run; resta
 from `Recovering`, reuses deterministic owner effects, commits one terminal outcome, and drains the
 backlog without duplication.
 
+P6.6 slice 5 covers required Event1 loss. Presence remains a responsive presentation boundary but
+projects biography, identity continuity, and commitments as unavailable. Rejected Promise creates
+no Journal effect; restart preserves exact count, identity/session continuity, and existing
+commitments, excludes the rejected description, and restores commands after verification. The
+process fault matrix is complete; focused KVM evidence is still required for the M6 exit gate.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

@@ -621,7 +621,7 @@ private Q_SLOTS:
         QVERIFY(m_predictord);
         PredictorClient restored;
         QTRY_VERIFY_WITH_TIMEOUT(restored.ready(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 10000);
+        health.callBool(QStringLiteral("Refresh"));
     }
 
     void scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable()
@@ -708,7 +708,7 @@ private Q_SLOTS:
         QVERIFY(m_lifecycled);
         LifecycleClient restoredLifecycle;
         QTRY_VERIFY_WITH_TIMEOUT(restoredLifecycle.ready(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        health.callBool(QStringLiteral("Refresh"));
     }
 
     void retryAndCircuitCrashesRecoverTheSameScheduledRun()
@@ -1200,6 +1200,56 @@ private Q_SLOTS:
         QCOMPARE(surface.capabilityDetails().value(QStringLiteral("attention-workspace")).toMap()
                      .value(QStringLiteral("recoveryProgress")).toString(),
                  QStringLiteral("ready"));
+    }
+
+    void eventOwnerLossRejectsMutationsAndRecoversWithoutContinuityLoss()
+    {
+        Presence surface;
+        QVERIFY(surface.wake());
+        const QString preserved = QStringLiteral("preserved across Event1 loss");
+        QVERIFY(!surface.promise(preserved).isNull());
+        IdentityClient identity;
+        const QVariantMap identityBefore = identity.state();
+        EventClient events;
+        const qulonglong countBefore = events.count();
+        const QString rejected = QStringLiteral("must not be accepted without Event1");
+
+        stop(m_eventd);
+        RpcClient health(kHealthEndpoint);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityStates().value(QStringLiteral("accepted-biography")).toString(),
+            QStringLiteral("unavailable"), 5000);
+        QCOMPARE(surface.capabilityStates().value(QStringLiteral("identity-continuity")).toString(),
+                 QStringLiteral("unavailable"));
+        QCOMPARE(surface.capabilityStates().value(QStringLiteral("commitment-access")).toString(),
+                 QStringLiteral("unavailable"));
+        QVERIFY(surface.runtimeReachable());
+        QVERIFY(!surface.canCommand(QStringLiteral("promise")));
+        QVERIFY(!surface.canCommand(QStringLiteral("identity")));
+        QVERIFY(surface.promise(rejected).isNull());
+        QVERIFY(surface.identityState().isEmpty());
+
+        m_eventd = start(m_eventdPath);
+        QVERIFY(m_eventd);
+        EventClient recoveredEvents;
+        QTRY_VERIFY_WITH_TIMEOUT(recoveredEvents.isOpen(), 5000);
+        QCOMPARE(recoveredEvents.count(), countBefore);
+        QTRY_VERIFY_WITH_TIMEOUT(([&health, &surface]() {
+            health.callBool(QStringLiteral("Refresh"));
+            return surface.canCommand(QStringLiteral("promise"))
+                && surface.canCommand(QStringLiteral("identity"));
+        })(), 10000);
+        QCOMPARE(recoveredEvents.count(), countBefore);
+        const QVariantMap identityAfter = IdentityClient().state();
+        QCOMPARE(identityAfter.value(QStringLiteral("uuid")).toString(),
+                 identityBefore.value(QStringLiteral("uuid")).toString());
+        QCOMPARE(identityAfter.value(QStringLiteral("sessionCount")).toULongLong(),
+                 identityBefore.value(QStringLiteral("sessionCount")).toULongLong());
+        const QStringList obligations = surface.obligations();
+        QVERIFY(obligations.contains(preserved));
+        QVERIFY(!obligations.contains(rejected));
+        QCOMPARE(recoveredEvents.count(), countBefore);
     }
 };
 

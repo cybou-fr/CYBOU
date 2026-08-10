@@ -474,10 +474,16 @@ durable scheduled run remains active, restart enters `Recovering`, and `RunSched
 continues the same run ID. Deterministic owner contributions absorb abandoned/late calls, terminal
 completion occurs once, and consumer backlog reaches zero without a replacement run.
 
+**Slice 5: implemented.** Required-owner fault injection stops Event1 while every other process
+remains alive. Presence stays reachable but accepted biography, identity continuity, and commitment
+access fail closed; a Promise attempt creates no accepted contribution. Restart opens the same
+Journal with an unchanged count, UUID, session count, and existing commitment, and the rejected
+description is absent. Owner-verified refresh restores commands. This completes the process-level
+P6.6 matrix; the focused KVM boundary remains.
+
 ### Fault-injection matrix
 
-- make Event1 unavailable and prove no mutation is reported accepted;
-- recover every case and prove no duplicate accepted effect.
+All process-level cases above are implemented with recovery and duplicate-effect assertions.
 
 Use process integration for the complete matrix and one focused KVM gate for D-Bus/systemd
 activation, timeout, recovery, and Plasma projection. Do not multiply the expensive two-node smoke
