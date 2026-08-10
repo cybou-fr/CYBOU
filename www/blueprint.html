@@ -8,9 +8,9 @@ SPDX-License-Identifier: MIT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0D12">
-  <meta name="description" content="Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, reproducibility and zero telemetry.">
+  <meta name="description" content="Current Cybou technical whitepaper: NixOS/Plasma desktop, nine-process Mind architecture, ownership, M1–M6 evidence, P6.7 resilience, and M7–M9 roadmap.">
   <meta property="og:title" content="Cybou — Technical Blueprint & Architecture">
-  <meta property="og:description" content="Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, reproducibility and zero telemetry.">
+  <meta property="og:description" content="Current Cybou technical whitepaper covering the reproducible desktop, typed Mind runtime, verified boundaries, and roadmap.">
   <meta property="og:type" content="article">
   <meta property="og:image" content="assets/cybou-mark.svg">
   <meta name="twitter:card" content="summary">
@@ -31,7 +31,7 @@ SPDX-License-Identifier: MIT
       "@type": "Person",
       "name": "Stanislav Saveliev"
     },
-    "description": "Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, reproducibility and zero telemetry.",
+    "description": "Current Cybou technical whitepaper covering its NixOS and Plasma desktop, nine-process typed Mind runtime, verified M1–M6 substrate, P6.7 resilience, and M7–M9 roadmap.",
     "inLanguage": ["en", "fr", "ru"],
     "url": "https://cybou.fr/blueprint.html"
   }
@@ -275,16 +275,16 @@ SPDX-License-Identifier: MIT
     <header class="bp-header reveal">
       <div class="bp-badge">
         <span class="eyebrow-dot"></span>
-        <span data-i18n="bp_badge">Official Technical Blueprint · v0.1 & Architecture</span>
+        <span data-i18n="bp_badge">Technical Blueprint · Current Architecture & Roadmap</span>
       </div>
-      <h1 class="bp-title" data-i18n="bp_title">Cybou: A Smarter, Reproducible Operating System</h1>
+      <h1 class="bp-title" data-i18n="bp_title">Cybou: A Reproducible Desktop with a Typed Cognitive Runtime</h1>
       <p class="bp-lead" data-i18n="bp_lead">
-        A technical blueprint defining the vision, NixOS architecture, KDE Plasma 6 visual system, staged roadmap and acceptance matrix for Cybou.
+        The current whitepaper for Cybou’s NixOS/Plasma desktop, nine-process Mind runtime, ownership model, verified M1–M6 substrate, P6.7 hardening, and M7–M9 roadmap.
       </p>
       <div class="bp-meta">
         <span><strong>Base:</strong> NixOS 26.05 Stable</span>
         <span><strong>Desktop:</strong> KDE Plasma 6 (Wayland)</span>
-        <span><strong>Status:</strong> Implementation Active</span>
+        <span><strong>Status:</strong> M6 + P6.7 verified</span>
         <span><strong>Updated:</strong> August 2026</span>
       </div>
 
@@ -300,20 +300,19 @@ SPDX-License-Identifier: MIT
     <section class="bp-section reveal" id="summary">
       <h2 data-i18n="bp_sec1_title">1. Executive Summary & Core Vision</h2>
       <p data-i18n="bp_sec1_p1">
-        Cybou is a smarter personal Linux distribution engineered around reproducibility and spatial design. It operates under a strict release principle: build a trustworthy body first, and earn every capability added after it.
-      </strong>
+        Cybou is an experimental personal operating system built around two independently testable layers: a reproducible NixOS/Plasma desktop and Mind, a local typed runtime for durable biography, identity continuity, commitments, prediction, self projection, bounded attention, health, and lifecycle recovery. It is not a chatbot and makes no claim of consciousness.
       </p>
       <div class="bp-grid-2">
         <div class="bp-card">
-          <h3 data-i18n="bp_layer1_title">Layer 1: Visual & Technical Body (v0.1)</h3>
+          <h3 data-i18n="bp_layer1_title">Layer 1: Reproducible Body</h3>
           <p data-i18n="bp_layer1_desc">
-            Declarative NixOS foundation with atomic generation rollbacks, custom KDE Plasma 6 Wayland desktop theme ("Cybou Horizon"), curated default applications, and zero telemetry.
+            NixOS 26.05, locked Flakes, KDE Plasma 6 Wayland, Horizon visual packages, VM/ISO/Hyper-V outputs, atomic generations, and explicit build and recovery gates.
           </p>
         </div>
         <div class="bp-card">
-          <h3 data-i18n="bp_layer2_title">Layer 2: Product foundation (v0.2+)</h3>
+          <h3 data-i18n="bp_layer2_title">Layer 2: Typed Mind Runtime</h3>
           <p data-i18n="bp_layer2_desc">
-        Welcome and About applications, a readable generation viewer, better recovery, hardware profiles and guided application installation. Still no autonomous behaviour.
+        Nine isolated systemd user services communicate through typed Qt/D-Bus contracts. Event1 is the single canonical Journal boundary; Presence is a projection, not a second owner. Language and privileged execution remain absent.
       </p>
         </div>
       </div>
@@ -322,7 +321,7 @@ SPDX-License-Identifier: MIT
     <section class="bp-section reveal" id="architecture">
       <h2 data-i18n="bp_sec2_title">2. Architecture & Technical Stack</h2>
       <p data-i18n="bp_sec2_p1">
-        Cybou combines the immutable, declarative package management of NixOS with modern Wayland desktop infrastructure.
+        Cybou separates Body, Mind, and Presence. Durable state belongs to explicit owners; the shell is a remote cache and presentation boundary. Cross-owner commands are bounded and fail closed.
       </p>
       <div class="bp-card">
         <h3 data-i18n="bp_stack_title">Core System Stack</h3>
@@ -332,20 +331,39 @@ SPDX-License-Identifier: MIT
           <li><strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, custom Aurorae window decorations, and single floating top horizon panel.</li>
           <li><strong>Audio & Networking:</strong> PipeWire audio graph server + NetworkManager for declarative network profiles.</li>
           <li><strong>Build Output:</strong> Bootable NixOS ISO, qemu/KVM virtual machine targets, and Hyper-V development images.</li>
+          <li><strong>Mind Runtime:</strong> Nine C++20/Qt 6 user services activated by systemd and addressed through typed D-Bus interfaces.</li>
+          <li><strong>Canonical Memory:</strong> <code>cybou-eventd</code> is the only Journal v2 writer; accepted Event1 envelopes preserve causality, evidence, privacy, and canonical hashes.</li>
+          <li><strong>Continuity:</strong> Identity, intentions, lifecycle runs, health snapshots, and Event1 consumer progress persist under versioned schemas and atomic writes.</li>
+          <li><strong>Failure Model:</strong> Optional-owner loss degrades only dependent capabilities; required-owner loss fails mutations closed without inventing state.</li>
         </ul>
+      </div>
+      <div class="bp-card" style="margin-top:20px;">
+        <h3>Mind process and ownership topology</h3>
+        <pre style="overflow:auto; white-space:pre; color:var(--ink-1);"><code>Plasma/QML Presence proxy
+            │ Presence1
+            ▼
+      cybou-presenced
+       ├─ Identity1   → cybou-identityd
+       ├─ Intention1  → cybou-intentiond
+       ├─ Predictor1  → cybou-predictord
+       ├─ Self1       → cybou-selfd
+       ├─ Workspace1  → cybou-workspaced
+       ├─ Lifecycle1  → cybou-lifecycled
+       ├─ Health1     → cybou-healthd
+       └─ Event1      → cybou-eventd → SQLite Journal v2</code></pre>
       </div>
     </section>
 
     <section class="bp-section reveal" id="cognitive">
-      <h2 data-i18n="bp_sec3_title">3. Smarter Linux: what comes after v0.1</h2>
+      <h2 data-i18n="bp_sec3_title">3. Cognitive Contracts and Safety Boundaries</h2>
       <p data-i18n="bp_sec3_p1">
-        Cybou earns capability in stages. Nothing below ships in v0.1, and nothing is implemented ahead of the stage that justifies it:
+        The implemented substrate keeps cognition inspectable without turning a model, UI, or coordinator into an unbounded owner. Future capabilities must preserve these contracts:
       </p>
       <ul>
-        <li data-i18n="bp_ai_point1"><strong>Understandable updates:</strong> see what changed between two NixOS generations, and why a build failed, without reading raw logs.</li>
-        <li data-i18n="bp_ai_point2"><strong>Recoverable by default:</strong> every state is a generation you can return to, so an update is never a one-way door.</li>
-        <li data-i18n="bp_ai_point3"><strong>Private by construction:</strong> no telemetry, no account, no runtime downloads — a constraint on every later stage, not a v0.1 detail.</li>
-        <li data-i18n="bp_ai_point4"><strong>Proposals, never surprises:</strong> any future system change is a declarative diff presented for approval, applied only by the user.</li>
+        <li data-i18n="bp_ai_point1"><strong>Ownership before intelligence:</strong> model ≠ identity, UI ≠ Mind, attention ≠ biography, and proposal ≠ authorization.</li>
+        <li data-i18n="bp_ai_point2"><strong>Durability before visibility:</strong> state is projected only after its owner commits it; consolidation adds evidence-linked outcomes and never rewrites history.</li>
+        <li data-i18n="bp_ai_point3"><strong>Bounded degradation:</strong> Health1 publishes typed deficits and recovery progress; compound Presence reads and mutations share one monotonic deadline.</li>
+        <li data-i18n="bp_ai_point4"><strong>No hidden agency:</strong> M8 language is optional and replaceable; M9 planning, authorization, execution, and observed outcomes remain separate boundaries.</li>
       </ul>
     </section>
 
@@ -358,83 +376,69 @@ SPDX-License-Identifier: MIT
         <table class="bp-table">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Milestone</th>
               <th>Status</th>
-              <th>Phase</th>
-              <th>Task Description</th>
-              <th>Verification Criteria</th>
+              <th>Capability</th>
+              <th>Implemented Boundary</th>
+              <th>Primary Evidence</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>CYB-001</td>
+              <td>M0</td>
               <td><span class="status-tag done">DONE</span></td>
-              <td>0</td>
-              <td>Flake & Formatter Skeleton</td>
-              <td><code>nix fmt</code> and <code>nix flake check</code> pass cleanly on NixOS 26.05</td>
+              <td>Green reproducible baseline</td>
+              <td>Locked flake, formatting, licensing, metadata, documentation and UI gates</td>
+              <td><code>nix flake check</code> outputs and focused checks</td>
             </tr>
             <tr>
-              <td>CYB-002</td>
+              <td>M1–M4</td>
               <td><span class="status-tag done">DONE</span></td>
-              <td>1</td>
-              <td>Unbranded Plasma Wayland VM</td>
-              <td>VM builds and boots; SDDM and Wayland verified by <code>checks.vm-smoke</code></td>
+              <td>Accepted memory and isolated organs</td>
+              <td>Journal v2, single Event1 writer, nine real services, remote Presence proxy</td>
+              <td>Protocol, process, Event1, QML API and VM tests</td>
             </tr>
             <tr>
-              <td>CYB-005</td>
+              <td>M5</td>
               <td><span class="status-tag done">DONE</span></td>
-              <td>0</td>
-              <td>Installer & ADR Decisions</td>
-              <td>ADR-0005 (Calamares), ADR-0006 (stateVersion), ADR-0007 (Licensing) accepted</td>
+              <td>Continuity and consolidation lifecycle</td>
+              <td>Persistent run state, Lifecycle1, deterministic owner effects, restart/reboot recovery</td>
+              <td><code>lifecycle-continuity</code> and split-commit fault gates</td>
             </tr>
             <tr>
-              <td>CYB-007</td>
+              <td>M6 / P6.1–P6.6</td>
               <td><span class="status-tag done">DONE</span></td>
-              <td>0</td>
-              <td>REUSE 3.3 Compliance</td>
-              <td>All files lint clean under REUSE 3.3 with SPDX headers</td>
+              <td>Health, scheduling and recovery</td>
+              <td>Capability graph, Health1, homeostasis v2, automatic evidence-bound scheduling, degraded UI contract</td>
+              <td><code>m6-recovery-boundary</code> and process fault matrix</td>
             </tr>
             <tr>
-              <td>CYB-008</td>
+              <td>P6.7</td>
               <td><span class="status-tag done">DONE</span></td>
-              <td>0</td>
-              <td>Static Web System Integration</td>
-              <td>Dependency-free landing page accepted into repository</td>
+              <td>Bounded Presence orchestration</td>
+              <td>One monotonic budget for every compound Presence read and mutation</td>
+              <td>20/20 CTest, suspended-owner process test and KVM continuity</td>
             </tr>
             <tr>
-              <td>CYB-009</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>2</td>
-              <td>Light & Dark Contrast Optimization</td>
-              <td>WCAG AA contrast verified in-browser across 36+ text tokens</td>
+              <td>M7</td>
+              <td><span class="status-tag inprogress">NEXT</span></td>
+              <td>Grounded perception and epistemics</td>
+              <td>Provenance, freshness, retention and contradiction handling; no action authority</td>
+              <td>First local perception vertical slice and fault tests</td>
             </tr>
             <tr>
-              <td>CYB-010</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>2</td>
-              <td>Cybou Asset Package</td>
-              <td>Horizon assets, colors, and wallpaper SVG derivations built</td>
+              <td>M8</td>
+              <td><span class="status-tag todo">PLANNED</span></td>
+              <td>Optional language faculty</td>
+              <td>Replaceable model behind typed context and proposal contracts</td>
+              <td>No model is shipped today</td>
             </tr>
             <tr>
-              <td>CYB-019</td>
-              <td><span class="status-tag inprogress">IN PROGRESS</span></td>
-              <td>2</td>
-              <td>Aperture Brand Mark SVG</td>
-              <td>Geometric opening 42° verified without bitmap embeds</td>
-            </tr>
-            <tr>
-              <td>CYB-003</td>
-              <td><span class="status-tag todo">TODO</span></td>
-              <td>1</td>
-              <td>NixOS ISO Image Build</td>
-              <td>Bootable live ISO image generation via Flake package</td>
-            </tr>
-            <tr>
-              <td>CYB-020</td>
-              <td><span class="status-tag todo">TODO</span></td>
-              <td>4</td>
-              <td>Horizon Floating Top Panel</td>
-              <td>KDE Plasma layout script active on initial login</td>
+              <td>M9</td>
+              <td><span class="status-tag todo">PLANNED</span></td>
+              <td>Authorized external action</td>
+              <td>Planning, policy, consent, executor and observed outcome remain separate</td>
+              <td>No privileged executor exists today</td>
             </tr>
           </tbody>
         </table>
@@ -442,16 +446,28 @@ SPDX-License-Identifier: MIT
     </section>
 
     <section class="bp-section reveal" id="licensing">
-      <h2 data-i18n="bp_sec5_title">5. Security, Licensing & Trademarks</h2>
+      <h2 data-i18n="bp_sec5_title">5. Security, Privacy & Licensing</h2>
       <p data-i18n="bp_sec5_p1">
         Cybou is free software built for sovereignty and privacy:
       </p>
       <ul>
         <li><strong>Code License:</strong> MIT License for all Nix code, build scripts, web assets, and core logic.</li>
         <li><strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0) for logos, wallpapers, and desktop themes.</li>
-        <li><strong>Trademark:</strong> The Cybou name and Aperture mark are protected to prevent unauthorized re-branding (see <code style="color:var(--accent);">TRADEMARK.md</code>).</li>
-        <li><strong>Zero Telemetry Mandate:</strong> `docs/11-security-licensing.md` explicitly forbids remote tracking, analytics, and unauthorized cloud telemetry.</li>
+        <li><strong>Trust Boundaries:</strong> Same-user D-Bus is not treated as a complete capability-security boundary; future privileged action requires a separate authorization layer.</li>
+        <li><strong>Privacy:</strong> Event envelopes carry explicit privacy classes. Governed retention, erasure propagation, and replication remain M7 work and are not claimed as implemented.</li>
+        <li><strong>Current Cloud Boundary:</strong> The desktop and Mind runtime require no hosted AI service or API key, and no language model is shipped today.</li>
+        <li><strong>Security Documents:</strong> The repository maintains explicit threat and privacy models under <code>docs/security/</code>.</li>
       </ul>
+      <div class="bp-card" style="margin-top:20px;">
+        <h3>Canonical sources and claim authority</h3>
+        <p>This web whitepaper is a readable summary. Exact implementation claims are governed by the repository:</p>
+        <ul>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener">Current State</a> — authoritative implemented boundary.</li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a> and <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/MIND_MODEL.md" target="_blank" rel="noopener">Mind Model</a> — topology, ownership, and long-term model.</li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener">Testing</a> — process, reboot, fault, and KVM evidence.</li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/NEXT_STEPS.md" target="_blank" rel="noopener">Next Engineering Steps</a> — completed P6.7 record and next M7 slice.</li>
+        </ul>
+      </div>
     </section>
 
     <section class="bp-section reveal" id="faq">
