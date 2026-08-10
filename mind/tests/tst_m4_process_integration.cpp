@@ -19,6 +19,7 @@
 #include <QTimer>
 
 #include <memory>
+#include <signal.h>
 
 using namespace cybou;
 
@@ -561,6 +562,36 @@ private Q_SLOTS:
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
     }
 
+    void presenceSnapshotHasOneBoundedOwnerBudget()
+    {
+        stop(m_presenced);
+        m_presenced = start(
+            m_presencedPath,
+            {{QStringLiteral("CYBOU_PRESENCE_COMMAND_TIMEOUT_MS"), QStringLiteral("500")}});
+        QVERIFY(m_presenced);
+        PresenceClient presence;
+        QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+
+        QCOMPARE(::kill(static_cast<pid_t>(m_selfd->processId()), SIGSTOP), 0);
+        QElapsedTimer elapsed;
+        elapsed.start();
+        const QVariantMap snapshot = presence.snapshot();
+        const qint64 snapshotElapsedMs = elapsed.elapsed();
+        QCOMPARE(::kill(static_cast<pid_t>(m_selfd->processId()), SIGCONT), 0);
+
+        QVERIFY2(snapshotElapsedMs < 1500, "snapshot accumulated independent owner timeouts");
+        QVERIFY(snapshot.contains(QStringLiteral("runtimeReachable")));
+        QVERIFY(snapshot.contains(QStringLiteral("lifecycleState")));
+        QVERIFY(snapshot.contains(QStringLiteral("organHealth")));
+        QVERIFY(snapshot.value(QStringLiteral("stats")).toMap().isEmpty());
+        QVERIFY(snapshot.value(QStringLiteral("lifecycleState")).toMap().isEmpty());
+
+        stop(m_presenced);
+        m_presenced = start(m_presencedPath);
+        QVERIFY(m_presenced);
+        QTRY_VERIFY_WITH_TIMEOUT(PresenceClient().ready(), 5000);
+    }
+
     void userActivityInterruptsInFlightAutomaticOwnerRpc()
     {
         stop(m_lifecycled);
@@ -594,7 +625,8 @@ private Q_SLOTS:
             QVERIFY(events.append(pressure) > 0);
         }
         RpcClient health(kHealthEndpoint);
-        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            health.callBool(QStringLiteral("Refresh"), {}, 10000), 10000);
         RpcClient lifecycle(kLifecycleEndpoint);
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
         QString error;

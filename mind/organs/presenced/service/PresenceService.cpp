@@ -284,47 +284,37 @@ QString PresenceService::LastError() const
     return m_lifecycle.lastError();
 }
 
-QVariantMap PresenceService::healthMap() const
+QVariantMap PresenceService::healthMap(const CapabilitySnapshot &snapshot) const
 {
     QVariantMap map;
-    map[QStringLiteral("eventd")] =
-        m_events.isOpen()
-            ? QStringLiteral("healthy")
-            : QStringLiteral("unavailable");
-    map[QStringLiteral("identityd")] =
-        m_identity.health();
-    map[QStringLiteral("intentiond")] =
-        m_intentions.health();
-    map[QStringLiteral("predictord")] =
-        m_predictor.health();
-    map[QStringLiteral("selfd")] =
-        m_self.health();
-    map[QStringLiteral("workspaced")] =
-        m_workspace.health();
-    map[QStringLiteral("lifecycled")] =
-        m_lifecycle.health();
-    map[QStringLiteral("presenced")] =
-        Health();
-    map[QStringLiteral("healthd")] = m_health.health();
+    for (const ComponentHealthRecord &component : snapshot.components)
+        map[component.componentId] = componentHealthToString(component.state);
+    map[QStringLiteral("presenced")] = Health();
+    map[QStringLiteral("healthd")] = snapshot.isValid()
+        ? QStringLiteral("healthy") : QStringLiteral("unavailable");
     return map;
-}
-
-bool PresenceService::capabilityAvailable(const QString &capabilityId) const
-{
-    return isAvailable(m_health.snapshot(), capabilityId);
 }
 
 QVariantMap PresenceService::snapshotMap() const
 {
     QVariantMap map;
+    CommandDeadline deadline;
 
-    const CapabilitySnapshot health = m_health.snapshot();
+    int timeoutMs = deadline.remaining();
+    const CapabilitySnapshot health = timeoutMs > 0
+        ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
     const QVariantMap capability = capabilityProjection(health);
-    const QVariantMap self = isAvailable(health, QStringLiteral("self-assessment"))
-        ? m_self.measure() : QVariantMap{};
-    const QVariantMap lifecycle = m_lifecycle.ready() ? m_lifecycle.state() : QVariantMap{};
-    const QVariantList intentions = isAvailable(health, QStringLiteral("commitment-access"))
-        ? m_intentions.open() : QVariantList{};
+    timeoutMs = deadline.remaining();
+    const QVariantMap self = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("self-assessment"))
+        ? m_self.measure(timeoutMs) : QVariantMap{};
+    timeoutMs = deadline.remaining();
+    const QVariantMap lifecycle = timeoutMs > 0
+        ? m_lifecycle.state(timeoutMs) : QVariantMap{};
+    timeoutMs = deadline.remaining();
+    const QVariantList intentions = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("commitment-access"))
+        ? m_intentions.open(timeoutMs) : QVariantList{};
 
     QStringList obligations;
     for (const QVariant &entry : intentions) {
@@ -342,37 +332,43 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("capabilityDetails")] = capability.value(QStringLiteral("details"));
     map[QStringLiteral("capabilityDeficits")] = capability.value(QStringLiteral("deficits"));
     map[QStringLiteral("capabilityObservedAt")] = capability.value(QStringLiteral("observedAt"));
-    map[QStringLiteral("commandAvailability")] = commandProjection(health, m_lifecycle.ready());
+    map[QStringLiteral("commandAvailability")] = commandProjection(health, !lifecycle.isEmpty());
     map[QStringLiteral("lifecycleState")] = lifecycle;
     map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
     map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
     map[QStringLiteral("lifecycleProjection")] = lifecycleProjection(lifecycle);
-    map[QStringLiteral("lifecycleScheduling")] = m_lifecycle.ready()
-        ? m_lifecycle.schedulingEvaluation() : QVariantMap{};
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("lifecycleScheduling")] = timeoutMs > 0
+        ? m_lifecycle.schedulingEvaluation(timeoutMs) : QVariantMap{};
     map[QStringLiteral("narration")] =
         self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;
-    map[QStringLiteral("attention")] =
-        isAvailable(health, QStringLiteral("attention-workspace"))
-            ? m_workspace.attention() : QString();
-    map[QStringLiteral("contributions")] =
-        isAvailable(health, QStringLiteral("accepted-biography"))
-            ? static_cast<qulonglong>(m_events.count()) : 0;
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("attention")] = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("attention-workspace"))
+        ? m_workspace.attention(timeoutMs) : QString();
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("contributions")] = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("accepted-biography"))
+        ? static_cast<qulonglong>(m_events.count(timeoutMs)) : 0;
     map[QStringLiteral("stats")] = self;
-    map[QStringLiteral("identityState")] =
-        isAvailable(health, QStringLiteral("identity-continuity"))
-            ? m_identity.state() : QVariantMap{};
-    map[QStringLiteral("calibrations")] =
-        isAvailable(health, QStringLiteral("prediction"))
-            ? m_predictor.calibrations() : QVariantList{};
-    map[QStringLiteral("coalitions")] =
-        isAvailable(health, QStringLiteral("attention-workspace"))
-            ? m_workspace.coalitions() : QVariantList{};
-    map[QStringLiteral("moment")] =
-        isAvailable(health, QStringLiteral("attention-workspace"))
-            ? m_workspace.moment() : QVariantMap{};
-    map[QStringLiteral("organHealth")] =
-        healthMap();
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("identityState")] = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("identity-continuity"))
+        ? m_identity.state(timeoutMs) : QVariantMap{};
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("calibrations")] = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("prediction"))
+        ? m_predictor.calibrations(timeoutMs) : QVariantList{};
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("coalitions")] = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("attention-workspace"))
+        ? m_workspace.coalitions(timeoutMs) : QVariantList{};
+    timeoutMs = deadline.remaining();
+    map[QStringLiteral("moment")] = timeoutMs > 0
+            && isAvailable(health, QStringLiteral("attention-workspace"))
+        ? m_workspace.moment(timeoutMs) : QVariantMap{};
+    map[QStringLiteral("organHealth")] = healthMap(health);
 
     return map;
 }
@@ -385,13 +381,19 @@ QByteArray PresenceService::Snapshot() const
 QByteArray PresenceService::Activity(int limit) const
 {
     QVariantList result;
+    CommandDeadline deadline;
 
-    if (limit <= 0 || !capabilityAvailable(QStringLiteral("accepted-biography"))) {
+    int timeoutMs = deadline.remaining();
+    const CapabilitySnapshot health = timeoutMs > 0
+        ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
+    if (limit <= 0 || !isAvailable(health, QStringLiteral("accepted-biography"))) {
         return FabricCodec::encodeList(result);
     }
 
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return FabricCodec::encodeList(result);
     for (const CognitiveEnvelope &envelope :
-         m_events.recent(limit)) {
+         m_events.recent(limit, timeoutMs)) {
         QVariantMap map;
         map[QStringLiteral("when")] =
             envelope.wallTime.toLocalTime();
@@ -409,10 +411,16 @@ QByteArray PresenceService::Activity(int limit) const
 
 QByteArray PresenceService::DetailedObligations() const
 {
-    if (!capabilityAvailable(QStringLiteral("commitment-access")))
+    CommandDeadline deadline;
+    int timeoutMs = deadline.remaining();
+    const CapabilitySnapshot health = timeoutMs > 0
+        ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
+    if (!isAvailable(health, QStringLiteral("commitment-access")))
         return FabricCodec::encodeList(QVariantList{});
+    timeoutMs = deadline.remaining();
+    if (timeoutMs == 0) return FabricCodec::encodeList(QVariantList{});
     return FabricCodec::encodeList(
-        m_intentions.open());
+        m_intentions.open(timeoutMs));
 }
 
 bool PresenceService::appendUserObservation(

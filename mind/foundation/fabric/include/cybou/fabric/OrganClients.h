@@ -43,7 +43,7 @@ public:
 
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
-    QVariantMap state() const;
+    QVariantMap state(int timeoutMs = -1) const;
     QString lastError() const;
 
 private:
@@ -92,7 +92,7 @@ public:
         const QString &correlationId = QString(),
         int timeoutMs = -1) const;
     bool settle(const QString &forecastId, double actual) const;
-    QVariantList calibrations() const;
+    QVariantList calibrations(int timeoutMs = -1) const;
 
     QString lastError() const;
 
@@ -109,7 +109,7 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
 
-    QVariantMap measure() const;
+    QVariantMap measure(int timeoutMs = -1) const;
     QVariantMap assess(const QString &causeId, int timeoutMs = -1) const;
     QString narration() const;
 
@@ -130,9 +130,9 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
 
-    QVariantList coalitions() const;
-    QVariantMap moment() const;
-    QString attention() const;
+    QVariantList coalitions(int timeoutMs = -1) const;
+    QVariantMap moment(int timeoutMs = -1) const;
+    QString attention(int timeoutMs = -1) const;
 
     QString lastError() const;
 
@@ -157,7 +157,7 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
     QVariantMap state(int timeoutMs = -1) const;
-    QVariantMap schedulingEvaluation() const;
+    QVariantMap schedulingEvaluation(int timeoutMs = -1) const;
     bool notifyUserActivity(const QString &cause, int timeoutMs = -1) const;
     bool finishRun(
         const QString &status,

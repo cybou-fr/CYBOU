@@ -31,6 +31,7 @@ public:
     quint64 append(const CognitiveEnvelope &envelope, int timeoutMs);
 
     quint64 count() const override;
+    quint64 count(int timeoutMs) const;
     QByteArray head() const override;
     quint64 verify() const override;
     bool ensureConsumer(const QString &consumerId, quint64 initialOffset = 0) const;
@@ -38,6 +39,7 @@ public:
     std::optional<quint64> consumerBacklog(const QString &consumerId) const;
 
     QList<CognitiveEnvelope> recent(int limit = 50) const override;
+    QList<CognitiveEnvelope> recent(int limit, int timeoutMs) const;
     QList<CognitiveEnvelope> episode(const QUuid &correlationId) const override;
     std::optional<CognitiveEnvelope> atSequence(quint64 sequence) const override;
 

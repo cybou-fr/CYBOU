@@ -46,9 +46,8 @@ private:
         QUuid *messageId,
         int timeoutMs = -1);
 
-    QVariantMap healthMap() const;
+    QVariantMap healthMap(const CapabilitySnapshot &snapshot) const;
     QVariantMap snapshotMap() const;
-    bool capabilityAvailable(const QString &capabilityId) const;
 
     mutable QString m_lastError;
 

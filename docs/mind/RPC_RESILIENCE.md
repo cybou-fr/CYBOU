@@ -98,4 +98,7 @@ owners. Event-producing commands preflight Event1; read-only Predict does not ac
 Journal dependency. `InterruptLifecycle` also shares one server-side budget across Lifecycle1 state
 validation and terminal mutation; exhaustion before `FinishRun` prevents that mutation from being
 sent. Its shell transport remains asynchronous and non-idempotent, so a lost reply is still
-`UnknownOutcome`. Read-only Presence snapshot aggregation remains to be bounded separately.
+`UnknownOutcome`. Read-only `Snapshot`, `Activity`, and `DetailedObligations` also own one monotonic
+budget. Snapshot preserves its stable projection schema with typed empty/default values when the
+budget expires and never starts another owner call afterward. This completes the P6.7 compound
+Presence rollout.

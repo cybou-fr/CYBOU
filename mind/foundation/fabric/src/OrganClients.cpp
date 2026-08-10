@@ -96,10 +96,10 @@ IdentityClient::IdentityClient()
 {
 }
 
-QVariantMap IdentityClient::state() const
+QVariantMap IdentityClient::state(int timeoutMs) const
 {
     return decodeMap(
-        m_rpc.callBytes(QStringLiteral("State")),
+        m_rpc.callBytes(QStringLiteral("State"), {}, timeoutMs),
         &m_codecError);
 }
 
@@ -191,10 +191,10 @@ bool PredictorClient::settle(
         {forecastId, actual});
 }
 
-QVariantList PredictorClient::calibrations() const
+QVariantList PredictorClient::calibrations(int timeoutMs) const
 {
     return decodeList(
-        m_rpc.callBytes(QStringLiteral("Calibrations")),
+        m_rpc.callBytes(QStringLiteral("Calibrations"), {}, timeoutMs),
         &m_codecError);
 }
 
@@ -208,10 +208,10 @@ SelfClient::SelfClient()
 {
 }
 
-QVariantMap SelfClient::measure() const
+QVariantMap SelfClient::measure(int timeoutMs) const
 {
     return decodeMap(
-        m_rpc.callBytes(QStringLiteral("Measure")),
+        m_rpc.callBytes(QStringLiteral("Measure"), {}, timeoutMs),
         &m_codecError);
 }
 
@@ -251,24 +251,24 @@ WorkspaceClient::WorkspaceClient(QObject *parent)
     }
 }
 
-QVariantList WorkspaceClient::coalitions() const
+QVariantList WorkspaceClient::coalitions(int timeoutMs) const
 {
     return decodeList(
-        m_rpc.callBytes(QStringLiteral("Coalitions")),
+        m_rpc.callBytes(QStringLiteral("Coalitions"), {}, timeoutMs),
         &m_codecError);
 }
 
-QVariantMap WorkspaceClient::moment() const
+QVariantMap WorkspaceClient::moment(int timeoutMs) const
 {
     return decodeMap(
-        m_rpc.callBytes(QStringLiteral("Moment")),
+        m_rpc.callBytes(QStringLiteral("Moment"), {}, timeoutMs),
         &m_codecError);
 }
 
-QString WorkspaceClient::attention() const
+QString WorkspaceClient::attention(int timeoutMs) const
 {
     m_codecError.clear();
-    return m_rpc.callString(QStringLiteral("Attention"));
+    return m_rpc.callString(QStringLiteral("Attention"), {}, timeoutMs);
 }
 
 QString WorkspaceClient::lastError() const
@@ -297,10 +297,11 @@ QVariantMap LifecycleClient::state(int timeoutMs) const
         &m_codecError);
 }
 
-QVariantMap LifecycleClient::schedulingEvaluation() const
+QVariantMap LifecycleClient::schedulingEvaluation(int timeoutMs) const
 {
     return decodeMap(
-        m_rpc.callBytes(QStringLiteral("EvaluateScheduling")), &m_codecError);
+        m_rpc.callBytes(QStringLiteral("EvaluateScheduling"), {}, timeoutMs),
+        &m_codecError);
 }
 
 bool LifecycleClient::notifyUserActivity(const QString &cause, int timeoutMs) const

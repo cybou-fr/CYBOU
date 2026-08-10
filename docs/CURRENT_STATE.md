@@ -237,6 +237,14 @@ still yields `UnknownOutcome` and never triggers a retry. Process and KVM fault 
 the active run byte-for-byte after timeout and prove an explicit later interruption succeeds.
 Read-only snapshot aggregation is now the remaining P6.7 sequential multi-owner latency surface.
 
+P6.7 slice 5 closes that surface and completes P6.7. Presence `Snapshot`, `Activity`, and
+`DetailedObligations` share one deadline per request. Snapshot returns the complete stable key
+shape even when an owner exhausts the budget; fields not collected are typed empty/default values,
+and no later owner RPC is sent. Its organ-health projection now reuses the canonical Health1
+component records. A real process test suspends selfd while it remains registered, observes the
+bounded partial snapshot, resumes it, and leaves subsequent recovery tests clean. All compound
+Presence reads and mutations are now protected from sequential timeout multiplication.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
 that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty

@@ -152,8 +152,13 @@ quint64 EventClient::append(const CognitiveEnvelope &envelope, int timeoutMs)
 
 quint64 EventClient::count() const
 {
+    return count(-1);
+}
+
+quint64 EventClient::count(int timeoutMs) const
+{
     m_lastError.clear();
-    const QDBusMessage reply = call(QStringLiteral("Count"));
+    const QDBusMessage reply = call(QStringLiteral("Count"), {}, timeoutMs);
     if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
         return 0;
     }
@@ -217,9 +222,14 @@ std::optional<quint64> EventClient::consumerBacklog(const QString &consumerId) c
 
 QList<CognitiveEnvelope> EventClient::recent(int limit) const
 {
+    return recent(limit, -1);
+}
+
+QList<CognitiveEnvelope> EventClient::recent(int limit, int timeoutMs) const
+{
     m_lastError.clear();
     const QByteArray encoded =
-        callBytes(QStringLiteral("Recent"), {limit});
+        callBytes(QStringLiteral("Recent"), {limit}, timeoutMs);
     if (encoded.isEmpty() && !m_lastError.isEmpty()) {
         return {};
     }

@@ -121,6 +121,12 @@ scheduled-owner scenario gives its explicit Health1 refresh orchestration call t
 the refresh itself owns a five-second production deadline; this changes only the test caller's
 outer wait, not the production policy.
 
+P6.7 snapshot coverage keeps selfd registered on D-Bus but suspends its process, restarts presenced
+with a 500 ms command budget, and requests the full projection. The response must arrive in under
+1.5 seconds, retain mandatory projection keys, expose empty self/lifecycle fields after exhaustion,
+and avoid accumulating later owner deadlines. The test resumes selfd and restores normal presenced
+configuration before continuing the fault matrix.
+
 Two scoped `CYBOU_RPC_FAILPOINT` process cases terminate lifecycled after the first retryable
 failure and after circuit-open. Each restart must project the original run ID in `Recovering`,
 resume it, complete once, and leave zero consumer backlog with a stable Event1 count.

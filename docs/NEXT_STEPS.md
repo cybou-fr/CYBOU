@@ -550,6 +550,19 @@ Next, bound the read-only Presence snapshot aggregation. It currently visits sev
 owners sequentially and is the remaining visible source of accumulated default RPC budgets; the
 projection must stay structurally valid when its shared budget expires partway through collection.
 
+**Slice 5: implemented; P6.7 complete.** `Snapshot`, `Activity`, and `DetailedObligations` now each
+own one monotonic deadline. Snapshot forwards only the remaining budget to Self1, Lifecycle1,
+Intention1, Workspace1, Event1, Identity1, and Predictor1, skips later calls after expiry, and keeps
+every projection key present with a typed empty/default value. Organ health is derived from the one
+canonical Health1 snapshot instead of issuing another Ready/Health cascade. Process coverage
+suspends a still-registered selfd under a 500 ms server budget and proves Snapshot returns a valid
+partial projection in under 1.5 seconds without reaching later owners. The same remaining-budget
+contract now covers every compound Presence read and mutation.
+
+Next, begin the first M7 vertical slice: one provenance-bearing local system perception adapter,
+typed freshness/retention policy, an accepted Event1 observation, and a read-only Presence
+projection. Keep contradiction handling explicit and do not add autonomous action authority.
+
 ## Deferred behind gates
 
 ### M7
