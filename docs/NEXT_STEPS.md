@@ -7,17 +7,19 @@ SPDX-License-Identifier: MIT
 
 ## Purpose
 
-This is the executable plan after the completed M5 evaluation milestone. It translates
-the capability roadmap into reviewable work packages. [Roadmap](ROADMAP.md) remains the milestone
-definition; [Current State](CURRENT_STATE.md) remains the implementation authority.
+This document preserves the executable packages that produced the completed M5, M6, and P6.7
+boundaries. [Roadmap](ROADMAP.md) remains the milestone definition; [Current State](CURRENT_STATE.md)
+remains the implementation authority. The current M7 entry sequence and risk priorities are
+recorded in the [2026-08-10 Project Checkpoint](PROJECT_CHECKPOINT_2026-08-10.md).
 
-The immediate objective is not language or autonomous action. It is:
+The immediate objective is still not language or autonomous action. It is:
 
-> establish a green baseline, then prove that one identity and its commitments survive lifecycle
-> transitions while bounded consolidation remains interruptible, evidence-linked, and owner-safe.
+> add one provenance-bearing local perception path with explicit freshness, epistemic status,
+> retention behavior, bounded projection, and fault evidence.
 
-That objective is now demonstrated by M5. The current architectural bottleneck is no longer
-lifecycle durability; it is capability honesty under partial failure.
+M5 continuity, M6 capability honesty, and P6.7 bounded compound IPC are demonstrated. The current
+architectural bottleneck is grounded knowledge governance: source provenance, freshness,
+contradiction, retention, and erasure must become testable before replication or language.
 
 ## Current architecture assessment
 
@@ -581,7 +583,7 @@ freshness, privacy, and deficits. Model absence/replacement must be an acceptanc
 No privileged executor work begins until proposal, criticism, value constraints, authorization,
 typed capability, observation, outcome, and rollback boundaries are independently represented.
 
-## Suggested PR decomposition
+## Historical P6 PR decomposition
 
 | PR | Scope |
 |---|---|

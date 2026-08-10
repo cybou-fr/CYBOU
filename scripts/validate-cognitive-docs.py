@@ -76,6 +76,7 @@ def main(argv: list[str]) -> int:
     paths = {
         "root_readme": repo / "README.md",
         "docs_index": repo / "docs/README.md",
+        "checkpoint": repo / "docs/PROJECT_CHECKPOINT_2026-08-10.md",
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
         "current": repo / "docs/CURRENT_STATE.md",
@@ -98,6 +99,7 @@ def main(argv: list[str]) -> int:
         "data_ownership": repo / "docs/mind/DATA_OWNERSHIP.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
         "security_index": repo / "docs/security/README.md",
+        "threat_model": repo / "docs/security/THREAT_MODEL.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
     }
 
@@ -134,6 +136,29 @@ def main(argv: list[str]) -> int:
         paths["docs_index"],
         "executable next-steps entry",
         "[Next Engineering Steps](NEXT_STEPS.md)",
+    )
+    require(
+        paths["docs_index"],
+        "project checkpoint entry",
+        "[Project Checkpoint — 2026-08-10](PROJECT_CHECKPOINT_2026-08-10.md)",
+    )
+
+    for label in (
+        "## Checkpoint identity",
+        "## Executive assessment",
+        "## Quantitative repository snapshot",
+        "## Evidence and quality assessment",
+        "## Architecture maturity matrix",
+        "## Risk register",
+        "## Recommended M7 sequence",
+        "## Checkpoint acceptance criteria",
+        "## Decision at this checkpoint",
+    ):
+        require(paths["checkpoint"], label, label)
+    require(
+        paths["checkpoint"],
+        "analysed source revision",
+        "8857d32038f10892e718f7095da6b3f4207d6687",
     )
 
     for label in (
@@ -228,6 +253,16 @@ def main(argv: list[str]) -> int:
         paths["roadmap"],
         "agency ordering rationale",
         "agency is added after memory, ownership, continuity",
+    )
+    require(
+        paths["roadmap"],
+        "M6 completion boundary",
+        "Complete through P6.6; P6.7 resilience hardening is also complete.",
+    )
+    require(
+        paths["roadmap"],
+        "M7 current boundary",
+        "Next engineering milestone.",
     )
 
     for forbidden_owner in (
@@ -379,7 +414,7 @@ def main(argv: list[str]) -> int:
         "## P4 — Make lifecycle visible without moving ownership into UI",
         "## P5 — Close M5 and publish evidence",
         "## P6.1 — Freeze the capability and health contract",
-        "## Suggested PR decomposition",
+        "## Historical P6 PR decomposition",
     ):
         require(paths["next_steps"], label, label)
 
@@ -432,6 +467,11 @@ def main(argv: list[str]) -> int:
             "seven Mind services",
         ),
         paths["health"]: ("Presence projection remains later work",),
+        paths["roadmap"]: ("**Current engineering milestone.**",),
+        paths["threat_model"]: (
+            "lifecycle and action boundaries are proposed, not active enforcement paths",
+            "process sandboxing",
+        ),
     }
     for path, forbidden_phrases in stale_current_claims.items():
         text = path.read_text(encoding="utf-8")

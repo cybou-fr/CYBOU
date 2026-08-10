@@ -193,6 +193,7 @@ Choose a route:
 - **Understand the idea:** [Mind Model](docs/MIND_MODEL.md) →
   [Architecture](docs/ARCHITECTURE.md) → [Roadmap](docs/ROADMAP.md)
 - **Verify what exists:** [Current State](docs/CURRENT_STATE.md) →
+  [Project Checkpoint](docs/PROJECT_CHECKPOINT_2026-08-10.md) →
   [Testing](docs/TESTING.md) → [Failure Modes](docs/mind/FAILURE_MODES.md)
 - **Build or contribute:** [Building](docs/BUILDING.md) →
   [Development Workflow](docs/DEVELOPMENT_WORKFLOW.md) →

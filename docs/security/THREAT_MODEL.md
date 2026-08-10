@@ -45,7 +45,7 @@ backups, and future inter-node messages.
 - explicit capabilities;
 - privacy inheritance;
 - transactional migration;
-- process sandboxing;
+- process isolation and explicit state ownership;
 - typed action boundary;
 - security and concurrency tests.
 
@@ -54,4 +54,7 @@ backups, and future inter-node messages.
 - same-user D-Bus callers do not yet have capability tokens or method-level authorization;
 - Journal hashing detects inconsistency but is not an external signature/trust anchor;
 - retention and replica erasure are design targets, not implemented controls;
-- lifecycle and action boundaries are proposed, not active enforcement paths.
+- lifecycle ownership, recovery, scheduling, and bounded transport are active enforcement paths;
+  epistemic governance and the M9 authorized-action boundary remain proposed;
+- user-service hardening does not yet define a least-privilege filesystem/network sandbox for
+  every daemon.

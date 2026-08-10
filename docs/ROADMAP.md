@@ -99,7 +99,7 @@ hardening track rather than an unverified M5 claim.
 
 ## M6 — Degraded Modes
 
-**Current engineering milestone.**
+**Complete through P6.6; P6.7 resilience hardening is also complete.**
 
 Engineering scope:
 
@@ -116,7 +116,7 @@ System meaning:
 
 > Loss of one organ becomes loss of a capability, not automatic death of the whole Mind.
 
-Example target:
+Implemented representative behavior:
 
 ```text
 predictord unavailable
@@ -126,9 +126,14 @@ identity + biography + intentions + workspace remain usable
 → Mind = degraded, not absent
 ```
 
-The exact capability matrix must be explicit and testable.
+The capability matrix, command gates, recovery progression, automatic lifecycle scheduling, and
+representative optional/required-owner failures are explicit and tested. See
+[Current State](CURRENT_STATE.md) for the exact accepted boundary.
 
 ## M7 — Grounded and Distributed Mind Prototype
+
+**Next engineering milestone.** Begin with one local provenance-bearing vertical slice; distributed
+transport remains deferred until local epistemic and retention semantics are testable.
 
 Engineering scope:
 

@@ -14,6 +14,7 @@ with [Current State](CURRENT_STATE.md).
 ### Product and status
 
 - [Repository overview](../README.md)
+- [Project Checkpoint — 2026-08-10](PROJECT_CHECKPOINT_2026-08-10.md) — expanded point-in-time assessment and M7 entry gates
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
@@ -42,6 +43,7 @@ with [Current State](CURRENT_STATE.md).
 ```text
 MIND_MODEL.md     meaning, invariants, and long-term cognitive model
 CURRENT_STATE.md  what the repository actually implements today
+PROJECT_CHECKPOINT_2026-08-10.md  immutable assessment of one named source revision
 ARCHITECTURE.md   current topology plus explicit future boundaries
 ROADMAP.md        sequencing and acceptance meaning of milestones
 mind/*            protocol and component contracts
