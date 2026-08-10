@@ -191,6 +191,11 @@ bounded idempotent attempts fail a required run closed without advancing consume
 replies converge on one deterministic contribution and cannot rewrite terminal state. Restoring
 predictord allows a new evidence-bound run to consume the preserved backlog once.
 
+P6.6 slice 4 crashes lifecycled at two transport boundaries: after a retryable timeout and after
+the circuit opens. Persistent lifecycle state retains the same active run; restart resumes that run
+from `Recovering`, reuses deterministic owner effects, commits one terminal outcome, and drains the
+backlog without duplication.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

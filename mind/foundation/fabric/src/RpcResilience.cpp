@@ -264,7 +264,19 @@ void AsyncRpcClient::dispatch(const std::shared_ptr<Operation> &operation)
         result.attempts = operation->attempts;
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
         m_breaker.record(result.outcome, now);
-        if (shouldRetry(result.outcome, operation->semantics, operation->attempts, m_policy)) {
+        const bool retry = shouldRetry(
+            result.outcome, operation->semantics, operation->attempts, m_policy);
+        const QString failpoint = qEnvironmentVariable("CYBOU_RPC_FAILPOINT");
+        const QString failpointMethod = qEnvironmentVariable("CYBOU_RPC_FAILPOINT_METHOD");
+        const bool failpointApplies = failpointMethod.isEmpty()
+            || failpointMethod == operation->method;
+        if (failpointApplies && retry
+            && failpoint == QStringLiteral("after-retryable-failure"))
+            qFatal("RPC fault injection after retryable failure");
+        if (failpointApplies && m_breaker.state(now) == CircuitState::Open
+            && failpoint == QStringLiteral("after-circuit-open"))
+            qFatal("RPC fault injection after circuit open");
+        if (retry) {
             QTimer::singleShot(
                 retryDelayMs(operation->attempts, operation->seed, m_policy),
                 this,

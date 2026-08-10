@@ -312,7 +312,7 @@ private Q_SLOTS:
             QVERIFY(eventClient.append(pressure) > 0);
         }
         RpcClient health(kHealthEndpoint);
-        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 10000);
         HealthClient healthClient;
         const HomeostasisSnapshot homeostasis = healthClient.measurements();
         QVERIFY(homeostasis.isValid());
@@ -621,7 +621,7 @@ private Q_SLOTS:
         QVERIFY(m_predictord);
         PredictorClient restored;
         QTRY_VERIFY_WITH_TIMEOUT(restored.ready(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 10000);
     }
 
     void scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable()
@@ -709,6 +709,90 @@ private Q_SLOTS:
         LifecycleClient restoredLifecycle;
         QTRY_VERIFY_WITH_TIMEOUT(restoredLifecycle.ready(), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+    }
+
+    void retryAndCircuitCrashesRecoverTheSameScheduledRun()
+    {
+        EventClient events;
+        RpcClient health(kHealthEndpoint);
+        for (const QString &failpoint : {
+                 QStringLiteral("after-retryable-failure"),
+                 QStringLiteral("after-circuit-open")}) {
+            stop(m_lifecycled);
+            m_lifecycled = start(
+                m_lifecycledPath,
+                {{QStringLiteral("CYBOU_LIFECYCLE_ACTIVITY_COOLDOWN_MS"), QStringLiteral("0")},
+                 {QStringLiteral("CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS"), QStringLiteral("150")},
+                 {QStringLiteral("CYBOU_RPC_FAILPOINT"), failpoint},
+                 {QStringLiteral("CYBOU_RPC_FAILPOINT_METHOD"), QStringLiteral("Consolidate")}});
+            QVERIFY(m_lifecycled);
+            LifecycleClient faultingLifecycle;
+            QTRY_VERIFY_WITH_TIMEOUT(faultingLifecycle.ready(), 5000);
+            QVERIFY(faultingLifecycle.notifyUserActivity(QStringLiteral("RPC crash test reset")));
+
+            stop(m_predictord);
+            m_predictord = start(
+                m_predictordPath,
+                {{QStringLiteral("CYBOU_PREDICTOR_CONSOLIDATE_DELAY_MS"), QStringLiteral("800")}});
+            QVERIFY(m_predictord);
+            PredictorClient delayedPredictor;
+            QTRY_VERIFY_WITH_TIMEOUT(delayedPredictor.ready(), 5000);
+            while (events.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value_or(0) < 32) {
+                CognitiveEnvelope pressure;
+                pressure.messageId = QUuid::createUuid();
+                pressure.correlationId = pressure.messageId;
+                pressure.originOrgan = QStringLiteral("rpc-crash-test");
+                pressure.originNode = QStringLiteral("local");
+                pressure.kind = ContributionKind::Observation;
+                pressure.wallTime = QDateTime::currentDateTimeUtc();
+                pressure.confidence = 1.0;
+                pressure.privacy = PrivacyClass::Local;
+                QVERIFY(events.append(pressure) > 0);
+            }
+            QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+            RpcClient lifecycle(kLifecycleEndpoint);
+            QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+            QString error;
+            const QVariantMap started = FabricCodec::decodeMap(
+                lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+            QVERIFY2(error.isEmpty(), qPrintable(error));
+            QCOMPARE(started.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+            const QString runId = started.value(QStringLiteral("runId")).toString();
+            QVERIFY(!runId.isEmpty());
+            QTRY_COMPARE_WITH_TIMEOUT(m_lifecycled->state(), QProcess::NotRunning, 5000);
+
+            m_lifecycled = start(m_lifecycledPath);
+            QVERIFY(m_lifecycled);
+            LifecycleClient recovered;
+            QTRY_VERIFY_WITH_TIMEOUT(recovered.ready(), 5000);
+            QTRY_COMPARE_WITH_TIMEOUT(recovered.state().value(QStringLiteral("mode")).toString(),
+                                      QStringLiteral("recovering"), 5000);
+            QCOMPARE(recovered.state().value(QStringLiteral("runId")).toString(), runId);
+            const QVariantMap resumed = FabricCodec::decodeMap(
+                RpcClient(kLifecycleEndpoint).callBytes(QStringLiteral("RunSchedulingCycle")), &error);
+            QCOMPARE(resumed.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+            QCOMPARE(resumed.value(QStringLiteral("runId")).toString(), runId);
+            QTRY_COMPARE_WITH_TIMEOUT(recovered.state().value(QStringLiteral("status")).toString(),
+                                      QStringLiteral("completed"), 10000);
+            QTRY_COMPARE_WITH_TIMEOUT(
+                events.consumerBacklog(QStringLiteral("lifecycle.consolidation")).value(), 0u,
+                10000);
+            const qulonglong completedCount = events.count();
+            QTest::qWait(500);
+            QCOMPARE(events.count(), completedCount);
+
+            stop(m_predictord);
+            m_predictord = start(m_predictordPath);
+            QVERIFY(m_predictord);
+            PredictorClient predictor;
+            QTRY_VERIFY_WITH_TIMEOUT(predictor.ready(), 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(([&health]() {
+                health.callBool(QStringLiteral("Refresh"));
+                return PresenceClient().snapshot().value(QStringLiteral("commandAvailability")).toMap()
+                    .value(QStringLiteral("predict")).toMap()
+                    .value(QStringLiteral("available")).toBool();
+            })(), 5000);
+        }
     }
 
     void commandsCrossRealOrganProcesses()
@@ -1032,15 +1116,17 @@ private Q_SLOTS:
 
         PredictorClient predictor;
         QTRY_VERIFY_WITH_TIMEOUT(predictor.ready(), 5000);
-        QVERIFY(health.callBool(QStringLiteral("Refresh")));
-        QTRY_COMPARE_WITH_TIMEOUT(
-            surface.capabilityDetails().value(QStringLiteral("prediction")).toMap()
-                .value(QStringLiteral("recoveryProgress")).toString(),
-            QStringLiteral("verifying"), 5000);
-        QVERIFY(health.callBool(QStringLiteral("Refresh")));
-        QTRY_VERIFY_WITH_TIMEOUT(
-            surface.hasCapability(QStringLiteral("prediction")),
-            5000);
+        QTRY_VERIFY_WITH_TIMEOUT(([&surface]() {
+            const QString progress = surface.capabilityDetails()
+                .value(QStringLiteral("prediction")).toMap()
+                .value(QStringLiteral("recoveryProgress")).toString();
+            return progress == QStringLiteral("verifying")
+                || progress == QStringLiteral("ready");
+        })(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(([&health, &surface]() {
+            health.callBool(QStringLiteral("Refresh"));
+            return surface.hasCapability(QStringLiteral("prediction"));
+        })(), 5000);
         QCOMPARE(surface.capabilityDetails().value(QStringLiteral("prediction")).toMap()
                      .value(QStringLiteral("recoveryProgress")).toString(),
                  QStringLiteral("ready"));

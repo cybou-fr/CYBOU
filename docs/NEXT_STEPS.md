@@ -468,9 +468,14 @@ owner contribution and cannot change the failed run. After owner recovery, a new
 run consumes the preserved backlog exactly once. The production deadline remains five seconds;
 tests use the bounded `CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS` override.
 
+**Slice 4: implemented.** Scoped RPC fault injection crashes lifecycled both after the first
+retryable owner failure and after the circuit opens on exhausted failures. In both cases the
+durable scheduled run remains active, restart enters `Recovering`, and `RunSchedulingCycle`
+continues the same run ID. Deterministic owner contributions absorb abandoned/late calls, terminal
+completion occurs once, and consumer backlog reaches zero without a replacement run.
+
 ### Fault-injection matrix
 
-- crash during retry and circuit-breaker transitions;
 - make Event1 unavailable and prove no mutation is reported accepted;
 - recover every case and prove no duplicate accepted effect.
 

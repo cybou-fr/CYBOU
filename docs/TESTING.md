@@ -112,6 +112,10 @@ Scheduled timeout coverage keeps predictord registered on D-Bus but delays conso
 retries produce no duplicate deterministic effect, and a post-recovery run completes the backlog.
 Production keeps the five-second deadline.
 
+Two scoped `CYBOU_RPC_FAILPOINT` process cases terminate lifecycled after the first retryable
+failure and after circuit-open. Each restart must project the original run ID in `Recovering`,
+resume it, complete once, and leave zero consumer backlog with a stable Event1 count.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

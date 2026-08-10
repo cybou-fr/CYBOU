@@ -60,6 +60,9 @@ D-Bus message.
 
 The current breaker is process-local transport protection. It is not durable cognitive state and
 does not replace Health1 capability projection.
+Fault tests may crash a selected method at `after-retryable-failure` or `after-circuit-open` via
+`CYBOU_RPC_FAILPOINT` plus `CYBOU_RPC_FAILPOINT_METHOD`; these controls are inert unless explicitly
+set and do not alter retry classification.
 
 ## First production consumer
 
