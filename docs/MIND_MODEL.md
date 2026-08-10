@@ -30,8 +30,8 @@ sentient, or biologically equivalent to a human mind.
 
 This document mixes two scopes, which are always labeled:
 
-- **Current substrate** — behavior implemented and evaluated by M1–M5.
-- **Future target** — capabilities planned by M5–M9 and proposed ADRs.
+- **Current substrate** — behavior implemented and evaluated by M1–M6 plus P6.7 hardening.
+- **Future target** — capabilities planned by M7–M9 and proposed ADRs.
 
 `CURRENT_STATE.md` remains authoritative for what is implemented today.
 
@@ -268,8 +268,9 @@ authorize external action.
 
 ## The current substrate
 
-The current M1–M5 plus P6.1–P6.4 implementation establishes the process, ownership, lifecycle,
-capability-health, and observation boundaries required for the larger model:
+The current M1–M6 plus P6.7 implementation establishes the process, ownership, lifecycle,
+capability-health, bounded orchestration, degraded-mode, and recovery boundaries required for the
+larger model:
 
 ```text
 Plasma/QML

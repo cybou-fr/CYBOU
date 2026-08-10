@@ -59,11 +59,11 @@ Read the [Mind index](mind/README.md), or open a specific contract:
 - [Presence API](mind/PRESENCE_API.md)
 - [Continuity](mind/CONTINUITY.md)
 - [Failure Modes](mind/FAILURE_MODES.md)
-- [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — implemented M5 contract and future policy
+- [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — implemented M5/M6 lifecycle contract
 - [Capability and Health Contract](mind/HEALTH.md) — P6.1/P6.2 protocol, owner, graph, and recovery
 - [RPC Resilience](mind/RPC_RESILIENCE.md) — P6.3 outcomes, retry safety, backoff, and circuit breaker
-- [Homeostatic Measurements](mind/HOMEOSTASIS.md) — P6.4 typed signals without scheduling authority
-- [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M6/M7 contract
+- [Homeostatic Measurements](mind/HOMEOSTASIS.md) — typed signals and policy-scoped M6 scheduling authority
+- [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M7 contract
 
 ## Security
 
@@ -90,6 +90,6 @@ when repository gates and focused acceptance tests demonstrate it.
 - Update `CURRENT_STATE.md` in the same change that alters implemented capability.
 - Update the relevant contract before or with protocol/schema changes.
 - Record cross-owner or security-boundary changes in an ADR.
-- Label examples as current or future; do not present unfinished M6–M9 behavior as implemented.
+- Label examples as current or future; do not present unfinished M7–M9 behavior as implemented.
 - Add new canonical documents to `scripts/validate-cognitive-docs.py`.
 - Keep relative Markdown links valid and SPDX metadata present.

@@ -8,8 +8,8 @@ SPDX-License-Identifier: MIT
 `MIND_MODEL.md` describes the long-form cognitive model. This roadmap states what new engineering
 capability each milestone adds.
 
-For the ordered implementation packages, test matrices, and exit gates beginning from the current
-M5 evaluation baseline, see [Next Engineering Steps](NEXT_STEPS.md).
+For the ordered implementation packages, test matrices, and exit gates beginning from the completed
+M6/P6.7 baseline, see [Next Engineering Steps](NEXT_STEPS.md).
 
 ## M0 — Green Build
 

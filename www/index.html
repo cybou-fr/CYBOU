@@ -34,7 +34,7 @@ SPDX-License-Identifier: MIT
         "@type": "Person",
         "name": "Stanislav Saveliev"
       },
-      "description": "An intelligent personal Linux desktop built on NixOS and KDE Plasma 6 — designed around clarity, mathematical reproducibility, zero telemetry and on-device AI cognition.",
+      "description": "An experimental personal operating system built on NixOS and KDE Plasma 6, with a reproducible desktop and a local typed cognitive runtime.",
       "license": "https://spdx.org/licenses/MIT.html",
       "url": "https://cybou.fr"
     },
@@ -47,7 +47,7 @@ SPDX-License-Identifier: MIT
           "name": "What is Cybou?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou is an intelligent, personal Linux distribution created by Stanislav Saveliev. Built on NixOS 26.05 and KDE Plasma 6 Wayland, it provides a calm, mathematically reproducible desktop paired with on-device local AI assistance."
+            "text": "Cybou is an experimental personal operating system built on NixOS 26.05 and KDE Plasma 6 Wayland. It combines a reproducible desktop with Mind, a local typed runtime for durable memory, identity, commitments, lifecycle, and bounded attention."
           }
         },
         {
@@ -55,7 +55,7 @@ SPDX-License-Identifier: MIT
           "name": "Why is Cybou called a 'Smarter Linux'?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou integrates local SLMs/LLMs directly into the system layer. It offers natural language introspection of NixOS generation changes, build error diagnostics, and local vector context with 100% privacy and zero cloud telemetry."
+            "text": "Cybou makes memory, identity, health, lifecycle, and recovery explicit system services. Language models are a future optional faculty and are not part of the current runtime."
           }
         },
         {
@@ -63,7 +63,7 @@ SPDX-License-Identifier: MIT
           "name": "Does Cybou require cloud services or send telemetry?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. Cybou strictly enforces 100% Zero Telemetry. No accounts, API keys, or external servers are required. All AI models run locally on your GPU/NPU in sandboxed systemd containers."
+            "text": "The current desktop and Mind runtime require no cloud account, API key, or hosted AI service. Cybou does not yet ship an AI model."
           }
         },
         {
@@ -322,25 +322,25 @@ SPDX-License-Identifier: MIT
       <div class="progress-heading">
         <p class="section-kicker">03 · Live Implementation Progress</p>
         <h2><span data-i18n="prog_h2_1">Measured execution.</span><br><em data-i18n="prog_h2_2">Verified milestones.</em></h2>
-        <p data-i18n="prog_lead">Track the real-time development progress of Cybou v0.1 across NixOS Flakes, Plasma Wayland integration, accessibility contrast, and automated build checks.</p>
+        <p data-i18n="prog_lead">The current repository has completed the M1–M6 runtime substrate and P6.7 latency hardening, with process, continuity, recovery, and Plasma KVM gates.</p>
       </div>
 
       <div class="progress-dashboard">
         <div class="progress-card">
-          <div class="card-metric">Gate A Passed</div>
-          <p class="card-label" data-i18n="metric_gate_a">Phase 0 & 1 Complete (Plasma Wayland VM boots)</p>
+          <div class="card-metric">M6 Gate Passed</div>
+          <p class="card-label" data-i18n="metric_gate_a">M6 recovery boundary passed in a real Plasma KVM session</p>
           <div class="bar-container"><div class="bar-fill" style="width: 100%;"></div></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric">15 / 51 Tasks</div>
-          <p class="card-label" data-i18n="metric_tasks">Completed Tasks (Phase 0 & Phase 1 verified)</p>
-          <div class="bar-container"><div class="bar-fill" style="width: 30%;"></div></div>
+          <div class="card-metric">9 Mind Daemons</div>
+          <p class="card-label" data-i18n="metric_tasks">Nine isolated Mind daemons with typed D-Bus ownership</p>
+          <div class="bar-container"><div class="bar-fill" style="width: 100%;"></div></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric">0 Contrast Failures</div>
-          <p class="card-label" data-i18n="metric_contrast">36 Text Tokens Verified WCAG AA Compliant</p>
+          <div class="card-metric">20 / 20 CTest</div>
+          <p class="card-label" data-i18n="metric_contrast">Twenty CTest suites plus repository policy checks</p>
           <div class="bar-container"><div class="bar-fill" style="width: 100%;"></div></div>
         </div>
       </div>
@@ -393,19 +393,19 @@ SPDX-License-Identifier: MIT
       <div class="roadmap-track reveal reveal-delay-1">
         <article class="roadmap-item active">
           <div class="roadmap-node"><span></span></div>
-          <p>v0.1</p><h3 data-i18n="rm1_title">Visual foundation</h3><span>NixOS · Plasma · Horizon · ISO</span>
+          <p>Complete</p><h3 data-i18n="rm1_title">Desktop foundation</h3><span>NixOS · Plasma · Horizon · ISO</span>
+        </article>
+        <article class="roadmap-item active">
+          <div class="roadmap-node"><span></span></div>
+          <p>Complete</p><h3 data-i18n="rm2_title">Mind substrate</h3><span>M1–M6 · P6.7 · Recovery</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p>v0.2</p><h3 data-i18n="rm2_title">Product foundation</h3><span>Welcome · Updates · Recovery</span>
+          <p>Next · M7</p><h3 data-i18n="rm3_title">Grounded perception</h3><span>Provenance · Freshness · Epistemics</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p>v0.3</p><h3 data-i18n="rm3_title">Read-only intelligence</h3><span>Local explanations · Diagnostics</span>
-        </article>
-        <article class="roadmap-item">
-          <div class="roadmap-node"><span></span></div>
-          <p>Later</p><h3 data-i18n="rm4_title">A living system</h3><span>Memory · Intentions · Faculties</span>
+          <p>M8–M9</p><h3 data-i18n="rm4_title">Optional faculties and action</h3><span>Language · Policy · Authorization</span>
         </article>
       </div>
     </section>
@@ -423,7 +423,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q1">What is Cybou?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a1">Cybou is an intelligent, personal Linux distribution created by Stanislav Saveliev. Built on NixOS 26.05 and KDE Plasma 6 Wayland, it provides a calm, mathematically reproducible desktop paired with on-device local AI assistance.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a1">Cybou is an experimental personal operating system built on NixOS 26.05 and KDE Plasma 6 Wayland. It combines a reproducible desktop with Mind, a local typed runtime for durable memory, identity, commitments, lifecycle, and bounded attention.</p></div>
         </article>
 
         <article class="faq-item">
@@ -431,7 +431,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q2">Why is Cybou called a "Smarter Linux"?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a2">Cybou integrates local SLMs/LLMs directly into the system layer. It offers natural language introspection of NixOS generation changes, build error diagnostics, and local vector context with 100% privacy and zero cloud telemetry.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a2">Cybou makes memory, identity, health, lifecycle, and recovery explicit system services instead of hiding them in one AI model. Language models are a future optional faculty.</p></div>
         </article>
 
         <article class="faq-item">
@@ -439,7 +439,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q3">Does Cybou require cloud services or send telemetry?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a3">No. Cybou strictly enforces 100% Zero Telemetry. No accounts, API keys, or external servers are required. All AI models run locally on your GPU/NPU in sandboxed systemd containers.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a3">The current desktop and Mind runtime require no cloud account, API key, or hosted AI service. Cybou does not yet ship an AI model.</p></div>
         </article>
 
         <article class="faq-item">
@@ -465,7 +465,7 @@ SPDX-License-Identifier: MIT
         <div class="blueprint-mark"><img src="assets/cybou-mark.svg" alt=""></div>
         <p class="section-kicker" data-i18n="bp_banner_kicker">The project starts here</p>
         <h2><span data-i18n="bp_banner_h2_1">A real operating system,</span><br><span data-i18n="bp_banner_h2_2">built one trusted layer at a time.</span></h2>
-        <p data-i18n="bp_banner_desc">The v0.1 blueprint defines the NixOS image, Plasma packages, visual system, implementation gates, acceptance criteria, and local AI cognitive roadmap.</p>
+        <p data-i18n="bp_banner_desc">The v0.1 blueprint defines the NixOS image, Plasma packages, visual system, verified Mind substrate, implementation gates, and cognitive roadmap.</p>
         <div class="blueprint-actions">
           <a class="button button--primary" href="blueprint.html" data-i18n="bp_banner_btn">Read Technical Whitepaper</a>
           <a class="button button--ghost" href="#top" data-i18n="btn_top">Back to top</a>

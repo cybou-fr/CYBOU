@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Current State
 
-Status date: 2026-08-09.
+Status date: 2026-08-10.
 
 This document is intentionally limited to implemented behavior and current limitations.
 
@@ -13,10 +13,10 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs nineteen CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and seven-process M4 integration. The process suite also proves a
+The Mind package runs twenty CTest suites, including Event1, lifecycle persistence/recovery,
+Lifecycle1 process restart, and nine-process integration. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
-logical session count.
+logical session count, and that compound Presence reads and mutations obey one bounded deadline.
 
 The M5 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
 run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, D-Bus run requests, and restart
@@ -363,10 +363,9 @@ These components are intentionally useful without any language model.
 The current tree does **not** yet implement:
 
 - in-place upgrade reconciliation beyond the tested schema-v0-to-v1 migration;
-- background consolidation, retention, forgetting, or temporal freshness policy;
-- M6 Presence health projection and homeostatic scheduling policy beyond the P6.1–P6.4 substrate;
-- owner contracts for Event1 backlog, Journal growth, and calibration pressure, and general
-  metacognitive uncertainty/evidence-freshness projection;
+- governed retention, forgetting, or epistemic temporal-freshness policy;
+- owner contracts for Journal growth and calibration pressure beyond the implemented Event1
+  backlog scheduling input, and general contradiction/evidence-freshness projection;
 - M7 inter-node transport, replication, or partition handling;
 - typed perception adapters, epistemic claims, contradiction reconciliation, or value constraints;
 - M8 optional language faculty;
@@ -377,8 +376,8 @@ the corresponding milestone is implemented and gated.
 
 ## Current limitations
 
-- Health1 probes and most legacy organ RPC remain synchronous; Health1 is not yet projected through Presence;
-- most local RPC is synchronous;
+- owner-internal and standalone legacy reads remain synchronous, but every compound Presence path
+  has one bounded monotonic request budget;
 - same-user IPC authorization is not yet a capability security boundary;
 - stronger in-place upgrade/reconciliation guarantees remain a hardening track;
 - Journal history is not yet consolidated into a governed epistemic projection;
@@ -395,10 +394,10 @@ the corresponding milestone is implemented and gated.
 - M4: implementation present; repository gates remain the acceptance authority.
 - M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
   projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
-- M6: P6.1–P6.4 protocol, dependency graph, health owner, persistent Health1 snapshot, recovery,
-  process fault injection, bounded async transport, and policy-scoped homeostatic measurements
-  are implemented. P6.5 capability-aware Presence behavior and read-only scheduling policy are
-  implemented; authorized automatic scheduling, broader RPC migration, complete degraded UI, and
-  KVM gates remain.
+- M6: complete. P6.1–P6.6 implement the health graph, persistent snapshots, typed homeostasis,
+  capability-aware Presence, authorized evidence-bound automatic scheduling, degraded behavior,
+  recovery fault matrix, and focused KVM gate.
+- P6.7: complete post-M6 latency hardening. Compound Presence mutations and reads share monotonic
+  budgets and cannot multiply per-owner transport deadlines.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

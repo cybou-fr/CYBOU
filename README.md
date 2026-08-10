@@ -26,10 +26,11 @@ Mind is deliberately not a chatbot or a single AI agent. Language models are pla
 replaceable faculties. They do not own identity, canonical memory, authorization, or privileged
 execution.
 
-The current repository implements the evaluated M1–M5 substrate, P6.1–P6.4 capability health,
-RPC resilience and typed homeostatic observation, plus the first P6.5 capability-aware Presence
-slice. It does **not** yet implement automatic capability-aware scheduling, a complete degraded UI,
-a language model, distributed Mind, or authorized external agency. See
+The current repository implements the evaluated M1–M6 substrate through P6.7: capability health,
+typed homeostasis, automatic evidence-bound lifecycle scheduling, partial-availability recovery,
+bounded RPC, and continuity/fault gates across real processes and Plasma. It does **not** yet
+implement grounded perception adapters, a language model, distributed Mind, or authorized external
+agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -90,6 +91,7 @@ become a second cognitive owner.
 | Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 P6.1–P6.4 |
 | Capability-aware Presence and interruptible automatic scheduling | Implemented — M6 P6.5 complete |
 | Partial-availability and recovery fault matrix | Implemented — M6 P6.6 complete, including focused KVM gate |
+| Bounded compound Presence commands and read aggregation | Implemented — post-M6 P6.7 complete |
 | Grounded perception, epistemics, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |
@@ -165,6 +167,7 @@ two-node Plasma VM smoke test. Build details and the direct CMake workflow are i
 | `nixosConfigurations.cybou-iso` | Live/installer ISO |
 | `nixosConfigurations.cybou-hyperv` | Hyper-V development image |
 | `checks.x86_64-linux.lifecycle-continuity` | Headless P2 identity/run reboot continuity gate |
+| `checks.x86_64-linux.m6-recovery-boundary` | Focused Plasma/Presence recovery and deadline gate |
 | `checks.x86_64-linux.vm-smoke` | Full NixOS/Plasma service-graph smoke test |
 
 Run `nix flake show` for the complete package list.
@@ -215,7 +218,23 @@ The complete navigation map is in the [documentation index](docs/README.md).
 
 Cybou is pre-release research and engineering software. Images are development artifacts unless a
 specific release states otherwise. Do not use a development image as the only copy of important
-data, and do not treat planned M5–M9 behavior as implemented.
+data, and do not treat planned M7–M9 behavior as implemented.
+
+## Support and partnerships
+
+Cybou is independently developed. Partnership enquiries and the canonical donation details are
+published on [cybou.fr/partners.html](https://cybou.fr/partners.html). Always verify an address on
+that page before sending funds.
+
+| Network | Address |
+|---|---|
+| Solana (SOL) | `39iqkHNMqncEPp3p52zKwUHnYzk2MJbcaHyY4Hhg2fWC` |
+| Bitcoin (BTC) | `bc1q5a0yq9kflu755jz9a7juveelj3lrnaml6cnjur` |
+| Ethereum / USDT (ERC-20) | `0xf4B7fF998600617785ad7D4d0aad3D2Ea342526B` |
+| TRON / USDT (TRC-20) | `TCWmbxJXwes4GLZkVjpKpY3p34mjg4C6qo` |
+
+For collaboration, hardware enablement, distribution work, or security contact:
+[info@cybou.fr](mailto:info@cybou.fr).
 
 ## License
 

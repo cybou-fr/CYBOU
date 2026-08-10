@@ -93,10 +93,10 @@ or authorization state.
 - restarting identityd in the same login resumes the current identity through its runtime marker;
 - restarting workspaced reconstructs bounded attention from Event1 history.
 
-The P6.1–P6.4 capability-deficit owner, bounded observation, and typed homeostatic projection are
-implemented. P6.5 projects Health1 state through Presence1, gates commands by their actual
-capability dependencies, and adds owner-backed automatic lifecycle scheduling with durable
-user-activity cooldown arbitration.
+M6 is implemented through P6.6, with P6.7 latency hardening complete. Health1 owns capability
+deficits and typed homeostasis; Presence1 projects them, gates commands by actual dependencies, and
+uses one monotonic deadline for each compound read or mutation. Lifecycle1 owns evidence-bound
+automatic scheduling, durable user-activity cooldown arbitration, recovery, and terminal state.
 
 Lifecycle scheduling policy lives in lifecycled. Healthd supplies immutable capability and
 homeostatic observations; it never transitions lifecycle mode or creates a run. The current
