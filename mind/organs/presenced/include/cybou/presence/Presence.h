@@ -32,6 +32,7 @@ class Presence : public QObject
     Q_PROPERTY(bool runtimeReachable READ runtimeReachable NOTIFY changed)
     Q_PROPERTY(QString aggregateCapabilityState READ aggregateCapabilityState NOTIFY changed)
     Q_PROPERTY(QVariantMap capabilityStates READ capabilityStates NOTIFY changed)
+    Q_PROPERTY(QVariantMap capabilityDetails READ capabilityDetails NOTIFY changed)
     Q_PROPERTY(QVariantList capabilityDeficits READ capabilityDeficits NOTIFY changed)
     Q_PROPERTY(QDateTime capabilityObservedAt READ capabilityObservedAt NOTIFY changed)
     Q_PROPERTY(QString lastError READ lastError NOTIFY changed)
@@ -61,6 +62,7 @@ public:
     bool runtimeReachable() const;
     QString aggregateCapabilityState() const;
     QVariantMap capabilityStates() const;
+    QVariantMap capabilityDetails() const;
     QVariantList capabilityDeficits() const;
     QDateTime capabilityObservedAt() const;
     Q_INVOKABLE bool hasCapability(const QString &capabilityId) const;

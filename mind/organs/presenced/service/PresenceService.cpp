@@ -40,9 +40,23 @@ QVariantMap capabilityProjection(const CapabilitySnapshot &snapshot)
         ? capabilityStateToString(snapshot.aggregateState) : QStringLiteral("unknown");
     projection[QStringLiteral("observedAt")] = snapshot.observedAt;
     QVariantMap states;
-    for (const QString &capabilityId : kProjectedCapabilities)
+    QVariantMap details;
+    for (const QString &capabilityId : kProjectedCapabilities) {
         states[capabilityId] = snapshot.isValid()
             ? QStringLiteral("available") : QStringLiteral("unknown");
+        details[capabilityId] = QVariantMap{
+            {QStringLiteral("state"), states.value(capabilityId)},
+            {QStringLiteral("available"), snapshot.isValid()},
+            {QStringLiteral("causes"), QStringList{}},
+            {QStringLiteral("impacts"), QStringList{}},
+            {QStringLiteral("dependencies"), QStringList{}},
+            {QStringLiteral("recoveryPolicies"), QStringList{}},
+            {QStringLiteral("recoveryProgress"), snapshot.isValid()
+                 ? QStringLiteral("ready") : QStringLiteral("unknown")},
+            {QStringLiteral("lastVerifiedAt"), snapshot.isValid()
+                 ? snapshot.observedAt : QDateTime{}},
+        };
+    }
     QVariantList deficits;
     for (const CapabilityDeficit &source : snapshot.deficits) {
         QVariantMap deficit;
@@ -66,8 +80,39 @@ QVariantMap capabilityProjection(const CapabilitySnapshot &snapshot)
         };
         const QString candidate = capabilityStateToString(source.state);
         if (rank(candidate) > rank(current)) states[source.capabilityId] = candidate;
+        QVariantMap detail = details.value(source.capabilityId).toMap();
+        QStringList causes = detail.value(QStringLiteral("causes")).toStringList();
+        QStringList impacts = detail.value(QStringLiteral("impacts")).toStringList();
+        QStringList dependencies = detail.value(QStringLiteral("dependencies")).toStringList();
+        QStringList policies = detail.value(QStringLiteral("recoveryPolicies")).toStringList();
+        const QString cause = deficitCauseToString(source.cause);
+        const QString policy = recoveryPolicyToString(source.recoveryPolicy);
+        if (!causes.contains(cause)) causes.append(cause);
+        if (!source.impact.isEmpty() && !impacts.contains(source.impact)) impacts.append(source.impact);
+        if (!dependencies.contains(source.dependencyId)) dependencies.append(source.dependencyId);
+        if (!policies.contains(policy)) policies.append(policy);
+        const QDateTime previous = detail.value(QStringLiteral("lastVerifiedAt")).toDateTime();
+        if (!previous.isValid() || source.lastVerifiedAt > previous)
+            detail[QStringLiteral("lastVerifiedAt")] = source.lastVerifiedAt;
+        detail[QStringLiteral("causes")] = causes;
+        detail[QStringLiteral("impacts")] = impacts;
+        detail[QStringLiteral("dependencies")] = dependencies;
+        detail[QStringLiteral("recoveryPolicies")] = policies;
+        details[source.capabilityId] = detail;
+    }
+    for (auto it = details.begin(); it != details.end(); ++it) {
+        QVariantMap detail = it.value().toMap();
+        const QString state = states.value(it.key()).toString();
+        detail[QStringLiteral("state")] = state;
+        detail[QStringLiteral("available")] = state == QStringLiteral("available");
+        detail[QStringLiteral("recoveryProgress")] = state == QStringLiteral("available")
+            ? QStringLiteral("ready") : state == QStringLiteral("recovering")
+            ? QStringLiteral("verifying") : state == QStringLiteral("unknown")
+            ? QStringLiteral("unknown") : QStringLiteral("waiting");
+        it.value() = detail;
     }
     projection[QStringLiteral("states")] = states;
+    projection[QStringLiteral("details")] = details;
     projection[QStringLiteral("deficits")] = deficits;
     return projection;
 }
@@ -232,6 +277,7 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("aggregateCapabilityState")] =
         capability.value(QStringLiteral("aggregateState"));
     map[QStringLiteral("capabilityStates")] = capability.value(QStringLiteral("states"));
+    map[QStringLiteral("capabilityDetails")] = capability.value(QStringLiteral("details"));
     map[QStringLiteral("capabilityDeficits")] = capability.value(QStringLiteral("deficits"));
     map[QStringLiteral("capabilityObservedAt")] = capability.value(QStringLiteral("observedAt"));
     map[QStringLiteral("lifecycleState")] = lifecycle;

@@ -828,6 +828,19 @@ private Q_SLOTS:
         QCOMPARE(
             surface.capabilityStates().value(QStringLiteral("prediction")).toString(),
             QStringLiteral("unavailable"));
+        const QVariantMap unavailablePrediction =
+            surface.capabilityDetails().value(QStringLiteral("prediction")).toMap();
+        QCOMPARE(unavailablePrediction.value(QStringLiteral("state")).toString(),
+                 QStringLiteral("unavailable"));
+        QVERIFY(!unavailablePrediction.value(QStringLiteral("available")).toBool());
+        QVERIFY(unavailablePrediction.value(QStringLiteral("causes")).toStringList().contains(
+            QStringLiteral("dependency-unavailable")));
+        QVERIFY(!unavailablePrediction.value(QStringLiteral("impacts")).toStringList().isEmpty());
+        QVERIFY(unavailablePrediction.value(QStringLiteral("dependencies")).toStringList().contains(
+            QStringLiteral("predictord")));
+        QVERIFY(unavailablePrediction.value(QStringLiteral("lastVerifiedAt")).toDateTime().isValid());
+        QCOMPARE(unavailablePrediction.value(QStringLiteral("recoveryProgress")).toString(),
+                 QStringLiteral("waiting"));
         QVERIFY(surface.runtimeReachable());
         QVERIFY(surface.isAwake());
         QVERIFY(surface.hasCapability(QStringLiteral("identity-continuity")));
@@ -854,9 +867,17 @@ private Q_SLOTS:
         PredictorClient predictor;
         QTRY_VERIFY_WITH_TIMEOUT(predictor.ready(), 5000);
         QVERIFY(health.callBool(QStringLiteral("Refresh")));
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityDetails().value(QStringLiteral("prediction")).toMap()
+                .value(QStringLiteral("recoveryProgress")).toString(),
+            QStringLiteral("verifying"), 5000);
+        QVERIFY(health.callBool(QStringLiteral("Refresh")));
         QTRY_VERIFY_WITH_TIMEOUT(
             surface.hasCapability(QStringLiteral("prediction")),
             5000);
+        QCOMPARE(surface.capabilityDetails().value(QStringLiteral("prediction")).toMap()
+                     .value(QStringLiteral("recoveryProgress")).toString(),
+                 QStringLiteral("ready"));
     }
 };
 

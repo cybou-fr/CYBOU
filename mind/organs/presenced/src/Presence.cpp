@@ -114,6 +114,11 @@ QVariantMap Presence::capabilityStates() const
     return m_snapshot.value(QStringLiteral("capabilityStates")).toMap();
 }
 
+QVariantMap Presence::capabilityDetails() const
+{
+    return m_snapshot.value(QStringLiteral("capabilityDetails")).toMap();
+}
+
 QVariantList Presence::capabilityDeficits() const
 {
     return m_snapshot.value(QStringLiteral("capabilityDeficits")).toList();

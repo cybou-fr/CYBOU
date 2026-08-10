@@ -165,6 +165,12 @@ callbacks. Callback acceptance is fenced by run identity and active lifecycle st
 injection holds predictord inside consolidation while Lifecycle1 accepts activity immediately;
 the late contribution cannot turn the interrupted run into a completed run.
 
+P6.5 slice 9 completes the capability explanation boundary in Presence1. Alongside raw deficit
+diagnostics, `capabilityDetails` provides one grouped record per known capability with state,
+availability, causes, impact, dependencies, verification time, recovery policy, and recovery
+progress. Predictor-loss process coverage proves unrelated commands remain usable and the same
+record moves from unavailable/waiting through recovering/verifying to available/ready.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

@@ -423,11 +423,16 @@ activity can persist `Interrupted` during an in-flight RPC and a late owner repl
 or complete that run. The explicit synchronous `Dispatch` command remains for administrative
 compatibility; the production scheduler no longer uses it.
 
+**Slice 9: implemented.** Presence1 now groups Health1 evidence into a presentation-ready
+`capabilityDetails` map. Every known capability exposes its state, availability, typed causes,
+operational impacts, dependencies, last verification, recovery policies, and a compact recovery
+progress (`ready`, `waiting`, `verifying`, or `unknown`). QML no longer needs to interpret raw
+deficit records to explain partial availability. Process integration proves predictor loss keeps
+identity, commitments, attention, and biography useful, then projects verification and recovery.
+
 ### Work
 
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
-- refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
-- show causes, operational impact, last verification, and recovery progress in Presence;
 - preserve useful independent commands when optional capabilities are absent.
 
 ### Exit gate

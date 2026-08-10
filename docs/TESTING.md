@@ -92,6 +92,10 @@ The process suite delays predictor consolidation for two seconds after an automa
 persist `Interrupted`; after the delayed owner reply, the same run must remain interrupted and its
 consumer backlog must remain unadvanced.
 
+Optional-organ process coverage inspects the UI-ready `capabilityDetails` record during predictor
+loss and recovery. It verifies typed cause, operational impact, dependency, verification time, and
+the `waiting → verifying → ready` recovery progression while independent commands remain usable.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

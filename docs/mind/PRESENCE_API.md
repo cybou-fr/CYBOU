@@ -22,6 +22,7 @@ awake
 runtimeReachable
 aggregateCapabilityState
 capabilityStates
+capabilityDetails
 capabilityDeficits
 capabilityObservedAt
 lastError
@@ -46,6 +47,11 @@ lifecycleCommandPending
 `awake` is a compatibility alias for presentation reachability, not a global capability grant.
 `hasCapability(id)` is the QML command gate. `lifecycleScheduling` is the read-only Lifecycle1
 policy evaluation and explains why automatic work is blocked or deferred.
+
+`capabilityDetails[id]` is the UI-ready explanation for one capability. It contains `state`,
+`available`, `causes`, `impacts`, `dependencies`, `lastVerifiedAt`, `recoveryPolicies`, and
+`recoveryProgress`. Raw `capabilityDeficits` remains available for diagnostics, but UI code does
+not need to group or rank those records itself.
 
 `lastError` is presentation diagnostics for connection/retry UX. It does not make QML the owner of
 the failing organ or storage resource.

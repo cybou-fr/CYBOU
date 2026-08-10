@@ -126,8 +126,9 @@ slow owner work and fences late replies after interruption.
 
 Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
 not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form
-a cycle. Aggregate capability state, per-capability state, deficits, and observation time are a
-separate projection. Consequently loss of predictord disables Observe/Predict while identity,
+a cycle. Aggregate/per-capability state and raw deficits remain a separate projection sourced from
+Health1; Presence additionally groups them into UI-ready details with causes, impact, verification
+time, and recovery progress. Consequently loss of predictord disables Observe/Predict while identity,
 commitments, biography, attention, lifecycle control, and the Presence endpoint remain usable.
 
 ## Durable-to-visible ordering

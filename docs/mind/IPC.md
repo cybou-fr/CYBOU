@@ -34,6 +34,10 @@ Other organ projections use fabric CBOR version 1:
 
 This representation is not canonical Journal hashing.
 
+Presence1 `Snapshot` includes both raw Health1-derived capability deficits and a grouped
+`capabilityDetails` map for presentation. Grouping does not transfer health ownership to Presence;
+it prevents QML clients from ranking states or reconstructing recovery explanations themselves.
+
 ## Baseline service contract
 
 Every organ exposes at least:
