@@ -909,6 +909,76 @@ private Q_SLOTS:
                      .value(QStringLiteral("recoveryProgress")).toString(),
                  QStringLiteral("ready"));
     }
+
+    void optionalSelfAndWorkspaceFailuresArePreciselyBoundedAndRecoverable()
+    {
+        Presence surface;
+        QVERIFY(surface.wake());
+        RpcClient health(kHealthEndpoint);
+        EventClient events;
+
+        const qulonglong beforeFailedReflection = events.count();
+        stop(m_selfd);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityStates().value(QStringLiteral("self-assessment")).toString(),
+            QStringLiteral("unavailable"), 5000);
+        const QVariantMap selfDetail =
+            surface.capabilityDetails().value(QStringLiteral("self-assessment")).toMap();
+        QVERIFY(selfDetail.value(QStringLiteral("dependencies")).toStringList().contains(
+            QStringLiteral("selfd")));
+        QVERIFY(!surface.canCommand(QStringLiteral("reflect")));
+        QVERIFY(surface.canCommand(QStringLiteral("promise")));
+        QVERIFY(surface.canCommand(QStringLiteral("predict")));
+        QVERIFY(!surface.reflect());
+        QCOMPARE(events.count(), beforeFailedReflection);
+        QVERIFY(!surface.identityState().isEmpty());
+
+        m_selfd = start(m_selfdPath);
+        QVERIFY(m_selfd);
+        SelfClient self;
+        QTRY_VERIFY_WITH_TIMEOUT(self.ready(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityDetails().value(QStringLiteral("self-assessment")).toMap()
+                .value(QStringLiteral("recoveryProgress")).toString(),
+            QStringLiteral("verifying"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(surface.canCommand(QStringLiteral("reflect")), 5000);
+
+        stop(m_workspaced);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityStates().value(QStringLiteral("attention-workspace")).toString(),
+            QStringLiteral("unavailable"), 5000);
+        const QVariantMap workspaceDetail =
+            surface.capabilityDetails().value(QStringLiteral("attention-workspace")).toMap();
+        QVERIFY(workspaceDetail.value(QStringLiteral("dependencies")).toStringList().contains(
+            QStringLiteral("workspaced")));
+        QCOMPARE(workspaceDetail.value(QStringLiteral("recoveryProgress")).toString(),
+                 QStringLiteral("waiting"));
+        QVERIFY(!surface.canCommand(QStringLiteral("attention")));
+        QVERIFY(surface.canCommand(QStringLiteral("promise")));
+        QVERIFY(surface.canCommand(QStringLiteral("predict")));
+        const qulonglong beforeUnavailableAttention = events.count();
+        QVERIFY(surface.attention().isEmpty());
+        QCOMPARE(events.count(), beforeUnavailableAttention);
+        QCOMPARE(surface.capabilityStates().value(QStringLiteral("consolidation")).toString(),
+                 QStringLiteral("unavailable"));
+
+        m_workspaced = start(m_workspacedPath);
+        QVERIFY(m_workspaced);
+        WorkspaceClient workspace;
+        QTRY_VERIFY_WITH_TIMEOUT(workspace.ready(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(
+            surface.capabilityDetails().value(QStringLiteral("attention-workspace")).toMap()
+                .value(QStringLiteral("recoveryProgress")).toString(),
+            QStringLiteral("verifying"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(health.callBool(QStringLiteral("Refresh")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(surface.canCommand(QStringLiteral("attention")), 5000);
+        QCOMPARE(surface.capabilityDetails().value(QStringLiteral("attention-workspace")).toMap()
+                     .value(QStringLiteral("recoveryProgress")).toString(),
+                 QStringLiteral("ready"));
+    }
 };
 
 QTEST_MAIN(TestM4Processes)

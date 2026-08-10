@@ -98,6 +98,10 @@ the `waiting → verifying → ready` recovery progression while independent com
 The same scenario validates `commandAvailability`, backend command enforcement, and the independent
 state combinations `Awake + Limited` and `Recovering + Limited`.
 
+P6.6 optional-organ coverage separately stops selfd and workspaced. Reflection and attention fail
+before Event1 mutation, only their declared capabilities/commands become unavailable, unrelated
+commands stay enabled, and two owner-backed refreshes prove verifying then ready recovery.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

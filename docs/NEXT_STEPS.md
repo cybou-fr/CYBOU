@@ -448,9 +448,15 @@ durable schemas. Language, confidence, and general epistemic claims remain outsi
 
 ## P6.6 — Prove partial availability and recovery
 
+**Slice 1: implemented.** Real process fault injection now stops and restores predictord, selfd,
+and workspaced independently. Each loss produces only its mapped typed deficits and command gates;
+failed reflection and unavailable attention are rejected before any Event1 mutation, while
+unrelated identity, commitments, prediction, and presentation remain usable. Recovery is observed
+through `waiting → verifying → ready` rather than inferred from process existence.
+
 ### Fault-injection matrix
 
-- stop/restart each optional organ independently;
+- stop/restart remaining optional infrastructure independently (lifecycled and presenced boundaries);
 - remove `presenced` and recreate the QML proxy;
 - make a process own D-Bus but exceed its RPC deadline;
 - crash during retry and circuit-breaker transitions;
