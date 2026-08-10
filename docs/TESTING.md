@@ -83,6 +83,10 @@ outcomes. A failpoint crashes lifecycled after durable scheduled-run creation bu
 restart enters `Recovering`, resumes the same run, completes both owners, and leaves consumer
 backlog at zero. Test environments disable timers/signals only to keep triggering deterministic.
 
+Lifecycle unit and process tests also prove that Presence activity interrupts an automatic run,
+persists its cooldown across lifecycled restart, and leaves a manual run active. Policy tests prove
+that an otherwise authorized runnable decision defers until the cooldown expires.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while

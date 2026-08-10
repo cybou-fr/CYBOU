@@ -13,6 +13,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QtGlobal>
 namespace cybou {
 namespace {
 const QString kConsolidationConsumer = QStringLiteral("lifecycle.consolidation");
@@ -50,6 +51,7 @@ QByteArray schedulerReply(
 LifecycleMode modeFrom(const QString &s) { for (int i=1;i<=7;++i) { auto m=static_cast<LifecycleMode>(i); if (lifecycleModeToString(m)==s) return m; } return static_cast<LifecycleMode>(0); }
 LifecycleRunStatus statusFrom(const QString &s) { for (int i=1;i<=5;++i) { auto v=static_cast<LifecycleRunStatus>(i); if (lifecycleRunStatusToString(v)==s) return v; } return static_cast<LifecycleRunStatus>(0); }
 void failpoint(const char *name) { if (qEnvironmentVariable("CYBOU_LIFECYCLE_FAILPOINT") == QLatin1String(name)) qFatal("lifecycled fault injection: %s", name); }
+int activityCooldownMs() { bool ok=false; const int value=qEnvironmentVariableIntValue("CYBOU_LIFECYCLE_ACTIVITY_COOLDOWN_MS",&ok); return ok?qBound(0,value,3600000):60000; }
 }
 LifecycleService::LifecycleService(const QString &path, QObject *parent):QObject(parent),m_path(path)
 {
@@ -76,28 +78,32 @@ bool LifecycleService::load() {
     if (!f.open(QIODevice::ReadOnly)) { m_error="cannot read lifecycle state"; return false; }
     auto o=QJsonDocument::fromJson(f.readAll()).object();
     const int version=o["version"].toInt(0);
-    if(version<0||version>1){m_error="unsupported lifecycle state version";return false;}
-    const bool migrate=version==0;
+    if(version<0||version>2){m_error="unsupported lifecycle state version";return false;}
+    const bool migrate=version<2;
     if(migrate){const QString backup=m_path+".pre-v1";if(!QFile::exists(backup)&&!QFile::copy(m_path,backup)){m_error="cannot back up legacy lifecycle state";return false;}}
     m_mode=modeFrom(o["mode"].toString());
     if (static_cast<int>(m_mode)==0) { m_error="invalid lifecycle mode"; return false; }
     const QByteArray run=QByteArray::fromBase64(o["run"].toString().toLatin1());
     if (!run.isEmpty()) { QString e; m_run=decodeLifecycleRun(run,&e); if(!e.isEmpty()){m_error=e;return false;} m_hasRun=true; }
+    m_lastUserActivityAt=QDateTime::fromString(o["lastUserActivityAt"].toString(),Qt::ISODateWithMs).toUTC();
+    m_schedulerCooldownUntil=QDateTime::fromString(o["schedulerCooldownUntil"].toString(),Qt::ISODateWithMs).toUTC();
     if (m_hasRun && m_run.status==LifecycleRunStatus::Active) m_mode=LifecycleMode::Recovering;
     return migrate||m_mode==LifecycleMode::Recovering ? save() : true;
 }
 bool LifecycleService::save() {
     QDir().mkpath(QFileInfo(m_path).absolutePath()); QJsonObject o;
-    o["version"]=1; o["mode"]=lifecycleModeToString(m_mode);
+    o["version"]=2; o["mode"]=lifecycleModeToString(m_mode);
     o["run"]=m_hasRun?QString::fromLatin1(encodeLifecycleRun(m_run).toBase64()):QString();
+    o["lastUserActivityAt"]=m_lastUserActivityAt.isValid()?m_lastUserActivityAt.toUTC().toString(Qt::ISODateWithMs):QString();
+    o["schedulerCooldownUntil"]=m_schedulerCooldownUntil.isValid()?m_schedulerCooldownUntil.toUTC().toString(Qt::ISODateWithMs):QString();
     QSaveFile f(m_path); if(!f.open(QIODevice::WriteOnly)){m_error="cannot write lifecycle state";return false;}
     f.write(QJsonDocument(o).toJson(QJsonDocument::Compact)); if(!f.commit()){m_error="cannot commit lifecycle state";return false;} Q_EMIT Changed(); return true;
 }
-QByteArray LifecycleService::State() const { QVariantMap m; m["mode"]=lifecycleModeToString(m_mode); m["hasRun"]=m_hasRun; if(m_hasRun){m["runId"]=m_run.runId.toString(QUuid::WithoutBraces);m["kind"]=m_run.kind;m["policyId"]=m_run.policyId;m["requestedAt"]=m_run.requestedAt;m["status"]=lifecycleRunStatusToString(m_run.status);m["inputHighWaterMark"]=m_run.inputHighWaterMark;m["requiredCapabilities"]=m_run.requiredCapabilities;m["optionalCapabilities"]=m_run.optionalCapabilities;m["completedWork"]=m_run.completedWork;m["missingWork"]=m_run.missingWork;QVariantMap refs;for(auto it=m_run.workContributions.cbegin();it!=m_run.workContributions.cend();++it)refs[it.key()]=it.value().toString(QUuid::WithoutBraces);m["workContributions"]=refs;QVariantMap causes;for(auto it=m_run.missingCauses.cbegin();it!=m_run.missingCauses.cend();++it)causes[it.key()]=it.value();m["missingCauses"]=causes;m["terminalCause"]=m_run.terminalCause;m["terminalContributionId"]=m_run.terminalContributionId.toString(QUuid::WithoutBraces);} return FabricCodec::encodeMap(m); }
+QByteArray LifecycleService::State() const { QVariantMap m; m["mode"]=lifecycleModeToString(m_mode); m["hasRun"]=m_hasRun;m["lastUserActivityAt"]=m_lastUserActivityAt;m["schedulerCooldownUntil"]=m_schedulerCooldownUntil;m["schedulerCooldownActive"]=m_schedulerCooldownUntil.isValid()&&m_schedulerCooldownUntil>QDateTime::currentDateTimeUtc(); if(m_hasRun){m["runId"]=m_run.runId.toString(QUuid::WithoutBraces);m["kind"]=m_run.kind;m["policyId"]=m_run.policyId;m["requestedAt"]=m_run.requestedAt;m["status"]=lifecycleRunStatusToString(m_run.status);m["inputHighWaterMark"]=m_run.inputHighWaterMark;m["requiredCapabilities"]=m_run.requiredCapabilities;m["optionalCapabilities"]=m_run.optionalCapabilities;m["completedWork"]=m_run.completedWork;m["missingWork"]=m_run.missingWork;QVariantMap refs;for(auto it=m_run.workContributions.cbegin();it!=m_run.workContributions.cend();++it)refs[it.key()]=it.value().toString(QUuid::WithoutBraces);m["workContributions"]=refs;QVariantMap causes;for(auto it=m_run.missingCauses.cbegin();it!=m_run.missingCauses.cend();++it)causes[it.key()]=it.value();m["missingCauses"]=causes;m["terminalCause"]=m_run.terminalCause;m["terminalContributionId"]=m_run.terminalContributionId.toString(QUuid::WithoutBraces);} return FabricCodec::encodeMap(m); }
 QByteArray LifecycleService::EvaluateScheduling() const
 {
     const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
-        m_mode, m_hasRun && !m_run.isTerminal(), m_health.snapshot(), m_health.measurements());
+        m_mode, m_hasRun && !m_run.isTerminal(), m_health.snapshot(), m_health.measurements(), false, QDateTime::currentDateTimeUtc(), m_schedulerCooldownUntil);
     return FabricCodec::encodeMap(evaluation.toMap());
 }
 QString LifecycleService::ExecuteSchedulingDecision(
@@ -123,7 +129,7 @@ QString LifecycleService::ExecuteSchedulingDecision(
         return {};
     }
     const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
-        m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis);
+        m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis, false, QDateTime::currentDateTimeUtc(), m_schedulerCooldownUntil);
     if (evaluation.decision != SchedulingDecision::Run) {
         m_error = evaluation.reason;
         return {};
@@ -171,7 +177,7 @@ QByteArray LifecycleService::RunSchedulingCycle()
     const CapabilitySnapshot capabilities = m_health.snapshot();
     const HomeostasisSnapshot homeostasis = m_health.measurements();
     const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
-        m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis);
+        m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis, false, QDateTime::currentDateTimeUtc(), m_schedulerCooldownUntil);
     if (evaluation.decision != SchedulingDecision::Run)
         return schedulerReply(
             evaluation.decision == SchedulingDecision::Block
@@ -184,6 +190,19 @@ QByteArray LifecycleService::RunSchedulingCycle()
     if (runId.isEmpty()) return schedulerReply(QStringLiteral("failed"), QString(), m_error);
     failpoint("after-scheduled-execute");
     return continueScheduledRun();
+}
+bool LifecycleService::NotifyUserActivity(const QString &cause)
+{
+    const QString reason=cause.trimmed();
+    if(reason.isEmpty()){m_error="user activity cause is empty";return false;}
+    const auto oldRun=m_run;const auto oldMode=m_mode;const auto oldActivity=m_lastUserActivityAt;const auto oldCooldown=m_schedulerCooldownUntil;
+    m_lastUserActivityAt=QDateTime::currentDateTimeUtc();
+    m_schedulerCooldownUntil=m_lastUserActivityAt.addMSecs(activityCooldownMs());
+    const bool automatic=m_hasRun&&m_run.status==LifecycleRunStatus::Active&&m_run.policyId.startsWith(QStringLiteral("event-backlog-v1:"));
+    if(automatic){m_run.status=LifecycleRunStatus::Interrupted;m_run.terminalCause=reason;m_mode=LifecycleMode::Awake;}
+    else if(m_mode==LifecycleMode::Idle)m_mode=LifecycleMode::Awake;
+    if(!save()){m_run=oldRun;m_mode=oldMode;m_lastUserActivityAt=oldActivity;m_schedulerCooldownUntil=oldCooldown;return false;}
+    m_error.clear();return true;
 }
 bool LifecycleService::Transition(const QString &mode) { auto next=modeFrom(mode); if(static_cast<int>(next)==0||!canTransition(m_mode,next)){m_error="illegal lifecycle transition";return false;} auto old=m_mode;m_mode=next;if(!save()){m_mode=old;return false;}m_error.clear();return true; }
 bool LifecycleService::BeginRun(const QByteArray &encoded) { QString e; auto run=decodeLifecycleRun(encoded,&e); if(!e.isEmpty()||run.status!=LifecycleRunStatus::Requested||m_hasRun&&!m_run.isTerminal()||m_mode!=LifecycleMode::Idle){m_error=e.isEmpty()?"cannot begin lifecycle run":e;return false;}const auto oldRun=m_run;const auto oldMode=m_mode;const bool oldHasRun=m_hasRun;m_run=run;m_run.status=LifecycleRunStatus::Active;m_hasRun=true;m_mode=LifecycleMode::Consolidating;if(!save()){m_run=oldRun;m_mode=oldMode;m_hasRun=oldHasRun;return false;}return true; }

@@ -346,6 +346,7 @@ QString PresenceService::Promise(
     const QString &description)
 {
     m_lastError.clear();
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"));
 
     if (description.trimmed().isEmpty()
         || !capabilityAvailable(QStringLiteral("accepted-biography"))
@@ -380,6 +381,7 @@ QString PresenceService::Promise(
 bool PresenceService::Reflect()
 {
     m_lastError.clear();
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.reflect"));
     if (!capabilityAvailable(QStringLiteral("accepted-biography"))
         || !capabilityAvailable(QStringLiteral("self-assessment"))) return false;
 
@@ -405,6 +407,7 @@ bool PresenceService::Reflect()
 bool PresenceService::FulfillIndex(int index)
 {
     m_lastError.clear();
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.fulfill"));
     if (!capabilityAvailable(QStringLiteral("commitment-access"))) return false;
 
     const QVariantList open = m_intentions.open();
@@ -431,6 +434,7 @@ bool PresenceService::FulfillIndex(int index)
 bool PresenceService::AbandonIndex(int index)
 {
     m_lastError.clear();
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.abandon"));
     if (!capabilityAvailable(QStringLiteral("commitment-access"))) return false;
 
     const QVariantList open = m_intentions.open();
@@ -459,6 +463,7 @@ bool PresenceService::Observe(
     double value)
 {
     m_lastError.clear();
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.observe"));
     if (!capabilityAvailable(QStringLiteral("prediction"))) return false;
 
     const bool ok = m_predictor.observe(subject, value);
@@ -472,6 +477,7 @@ QByteArray PresenceService::Predict(
     const QString &subject)
 {
     m_lastError.clear();
+    m_lifecycle.notifyUserActivity(QStringLiteral("presence.predict"));
     if (!capabilityAvailable(QStringLiteral("prediction")))
         return FabricCodec::encodeMap(QVariantMap{});
 

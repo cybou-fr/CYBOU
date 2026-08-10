@@ -94,17 +94,18 @@ or authorization state.
 - restarting workspaced reconstructs bounded attention from Event1 history.
 
 The P6.1–P6.4 capability-deficit owner, bounded observation, and typed homeostatic projection are
-implemented. The first P6.5 slice projects Health1 state through Presence1 and gates each command
-by its actual capability dependencies. The second slice adds dry-run capability-aware lifecycle
-policy; an owner-backed pressure signal and automatic scheduling remain future P6.5 work.
+implemented. P6.5 projects Health1 state through Presence1, gates commands by their actual
+capability dependencies, and adds owner-backed automatic lifecycle scheduling with durable
+user-activity cooldown arbitration.
 
 Lifecycle scheduling policy lives in lifecycled. Healthd supplies immutable capability and
 homeostatic observations; it never transitions lifecycle mode or creates a run. The current
 `EvaluateScheduling` path is deliberately dry-run: it computes worker eligibility and 32/8 backlog
 hysteresis from Event1's durable `lifecycle.consolidation` consumer offset. Homeostasis v2
 authorizes only the reviewed `event-backlog-v1` policy when that measurement is current. Event1 excludes consolidation-scoped outputs
-from their own pressure, so a completed run cannot schedule itself again. Presence merely projects
-the decision and its reason; even an authorized `Run` evaluation is not an automatic mutation.
+from their own pressure, so a completed run cannot schedule itself again. Presence projects the
+decision and its reason; evaluation itself remains read-only, while the lifecycled trigger owns
+the separate bounded mutation.
 
 Execution is a separate Lifecycle1 command. It binds the decision to both Health1 snapshot UUIDs,
 revalidates them to close the evaluation/execution race, and derives the lifecycle run UUID from
@@ -115,6 +116,9 @@ Lifecycled owns the trigger as well as the transaction: a 100 ms Health1-change 
 reactivity and a 30-second timer provides verification. The cycle is a no-op for blocked/deferred
 decisions. Existing scheduled recovery is resumed before any new evaluation, so a crash between
 run creation and dispatch cannot fork lifecycle work.
+Presence commands report user activity to Lifecycle1. A durable 60-second cooldown defers new
+automatic work across restart, and activity interrupts an active automatic backlog run without
+cancelling manual maintenance.
 
 Presence1 endpoint readiness intentionally means that the presentation boundary answers. It does
 not depend on Health1 because healthd probes presenced; coupling the two readiness checks would form

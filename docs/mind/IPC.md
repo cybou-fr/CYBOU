@@ -75,6 +75,11 @@ terminal Event1 contribution closes that idempotency window.
 dispatches, and completes the existing transaction. If lifecycled restarts with an active scheduled
 run in `Recovering`, the same method resumes and continues it rather than evaluating a second run.
 
+`NotifyUserActivity(cause)` is the Presence-to-Lifecycle arbitration command. It durably records
+activity and a scheduler cooldown, wakes `Idle`, and interrupts an active automatically scheduled
+`event-backlog-v1:*` run. It deliberately leaves manual runs active. `State()` projects
+`lastUserActivityAt`, `schedulerCooldownUntil`, and `schedulerCooldownActive`.
+
 ## Resilient asynchronous calls
 
 Calls that must not block a shell or owner event loop use the typed policy in

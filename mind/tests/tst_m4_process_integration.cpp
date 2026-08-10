@@ -470,6 +470,47 @@ private Q_SLOTS:
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
     }
 
+    void presenceActivityPersistsCooldownAndOnlyInterruptsAutomaticRun()
+    {
+        RpcClient lifecycle(kLifecycleEndpoint);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QString automatic = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("consolidation"), QStringLiteral("event-backlog-v1:activity-test"),
+             QVariant::fromValue<qulonglong>(EventClient().count()), QStringList{}, QStringList{}});
+        QVERIFY(!automatic.isEmpty());
+        PresenceClient().predict(QStringLiteral("activity-probe"));
+        QVariantMap state = LifecycleClient().state();
+        QCOMPARE(state.value(QStringLiteral("status")).toString(), QStringLiteral("interrupted"));
+        QCOMPARE(state.value(QStringLiteral("mode")).toString(), QStringLiteral("awake"));
+        QVERIFY(state.value(QStringLiteral("schedulerCooldownActive")).toBool());
+        QVERIFY(state.value(QStringLiteral("lastUserActivityAt")).toDateTime().isValid());
+
+        stop(m_lifecycled);
+        m_lifecycled = start(m_lifecycledPath);
+        QVERIFY(m_lifecycled);
+        LifecycleClient recovered;
+        QTRY_VERIFY_WITH_TIMEOUT(recovered.ready(), 5000);
+        state = recovered.state();
+        QVERIFY(state.value(QStringLiteral("schedulerCooldownActive")).toBool());
+        QCOMPARE(state.value(QStringLiteral("status")).toString(), QStringLiteral("interrupted"));
+
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QString manual = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("maintenance"), QStringLiteral("manual-activity-test"),
+             QVariant::fromValue<qulonglong>(EventClient().count()), QStringList{}, QStringList{}});
+        QVERIFY(!manual.isEmpty());
+        PresenceClient().reflect();
+        state = LifecycleClient().state();
+        QCOMPARE(state.value(QStringLiteral("runId")).toString(), manual);
+        QCOMPARE(state.value(QStringLiteral("status")).toString(), QStringLiteral("active"));
+        QCOMPARE(state.value(QStringLiteral("mode")).toString(), QStringLiteral("consolidating"));
+        QVERIFY(lifecycle.callBool(QStringLiteral("FinishRun"),
+                                   {QStringLiteral("interrupted"), QStringLiteral("cleanup")}));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
+    }
+
     void lifecycleTimeoutDoesNotBlockProxyEventLoopOrMutateRun()
     {
         RpcClient lifecycle(kLifecycleEndpoint);

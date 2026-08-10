@@ -155,6 +155,22 @@ private Q_SLOTS:
         QCOMPARE(partial.eligibleWorkers, QStringList({QStringLiteral("workspace")}));
         QVERIFY(partial.missingWorkers.contains(QStringLiteral("predictor")));
     }
+
+    void activeUserCooldownDefersOtherwiseRunnableWork()
+    {
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        HomeostasisSnapshot authorized = backlogSnapshot(now, 50);
+        authorized.authorizedPolicyIds.append(QStringLiteral("event-backlog-v1"));
+        const SchedulingEvaluation deferred = LifecycleSchedulingPolicy::evaluate(
+            LifecycleMode::Idle, false, healthyCapabilities(now), authorized,
+            false, now, now.addSecs(60));
+        QCOMPARE(deferred.decision, SchedulingDecision::Defer);
+        QVERIFY(deferred.reason.startsWith(QStringLiteral("scheduler cooldown is active")));
+        const SchedulingEvaluation runnable = LifecycleSchedulingPolicy::evaluate(
+            LifecycleMode::Idle, false, healthyCapabilities(now), authorized,
+            false, now, now);
+        QCOMPARE(runnable.decision, SchedulingDecision::Run);
+    }
 };
 
 QTEST_MAIN(TestLifecycleSchedulingPolicy)

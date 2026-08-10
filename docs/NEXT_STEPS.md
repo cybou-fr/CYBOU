@@ -408,9 +408,16 @@ Recovery always continues an existing scheduled run before considering new evide
 durable run creation but before dispatch resumes and completes the same run with zero residual
 backlog. Tests can disable automatic triggers while invoking the identical production method.
 
+**Slice 7: implemented.** Presence command entry points now report explicit user activity to
+Lifecycle1. Lifecycle schema v2 durably stores the last activity time and scheduler cooldown end;
+evaluation and execution defer while the cooldown is active, including after lifecycled restart.
+Activity wakes `Idle` and atomically interrupts an active `event-backlog-v1:*` run, but never
+silently terminates a manually requested maintenance run. The current synchronous owner-dispatch
+transaction yields to activity between bounded cycles; interruption during an in-flight owner RPC
+requires the planned asynchronous dispatch refinement.
+
 ### Work
 
-- add user-activity interruption and explicit scheduler cooldown policy;
 - keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
 - refine presentation of available, limited, unavailable, stale, unknown, and recovering capabilities;
 - show causes, operational impact, last verification, and recovery progress in Presence;

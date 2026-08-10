@@ -153,6 +153,12 @@ after restart it resumes from `Recovering` and continues the same run. Fault inj
 after durable scheduled-run creation proves restart recovery, owner dispatch, terminal completion,
 and zero residual consumer backlog without a duplicate run.
 
+P6.5 slice 7 adds durable user-activity arbitration. Presence commands call
+`Lifecycle1.NotifyUserActivity`; lifecycle state schema v2 records `lastUserActivityAt` and
+`schedulerCooldownUntil`. Activity wakes an idle lifecycle, defers automatic scheduling for the
+configured window (60 seconds by default), and interrupts only active automatic backlog runs.
+Cooldown survives restart, while manual maintenance runs retain their active state.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

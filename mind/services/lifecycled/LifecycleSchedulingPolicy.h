@@ -42,7 +42,8 @@ public:
         const CapabilitySnapshot &capabilities,
         const HomeostasisSnapshot &homeostasis,
         bool pressureLatched = false,
-        const QDateTime &now = QDateTime::currentDateTimeUtc());
+        const QDateTime &now = QDateTime::currentDateTimeUtc(),
+        const QDateTime &schedulerCooldownUntil = {});
 };
 
 } // namespace cybou

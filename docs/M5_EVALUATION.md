@@ -25,7 +25,7 @@ action remain outside this candidate.
 | terminal split commit | deterministic terminal outcome is reused after crash/reboot | process and VM integration |
 | optional owner deficit | explicit missing capability and cause; completed run becomes `Degraded` | lifecycle tests |
 | user interruption | asynchronous shell command; durable `Interrupted` transition owned by lifecycled | process integration |
-| legacy lifecycle state | backup to `.pre-v1`, migration to schema v1 | lifecycle tests |
+| legacy lifecycle state | backup to `.pre-v1`, v0/v1 migration to schema v2 | lifecycle tests |
 
 ## Unsupported or not yet release-qualified
 

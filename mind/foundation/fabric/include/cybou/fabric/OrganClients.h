@@ -155,6 +155,7 @@ public:
     QString health() const { return m_rpc.health(); }
     QVariantMap state() const;
     QVariantMap schedulingEvaluation() const;
+    bool notifyUserActivity(const QString &cause) const;
     bool finishRun(const QString &status, const QString &cause) const;
     QString lastError() const;
 

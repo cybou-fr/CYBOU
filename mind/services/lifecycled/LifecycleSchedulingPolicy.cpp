@@ -61,7 +61,8 @@ SchedulingEvaluation LifecycleSchedulingPolicy::evaluate(
     const CapabilitySnapshot &capabilities,
     const HomeostasisSnapshot &homeostasis,
     bool pressureLatched,
-    const QDateTime &now)
+    const QDateTime &now,
+    const QDateTime &schedulerCooldownUntil)
 {
     SchedulingEvaluation result;
     result.observedAt = now.toUTC();
@@ -85,6 +86,12 @@ SchedulingEvaluation LifecycleSchedulingPolicy::evaluate(
     if (mode != LifecycleMode::Idle || hasActiveRun) {
         result.decision = SchedulingDecision::Defer;
         result.reason = QStringLiteral("lifecycle is not idle");
+        return result;
+    }
+    if (schedulerCooldownUntil.isValid() && schedulerCooldownUntil > now) {
+        result.decision = SchedulingDecision::Defer;
+        result.reason = QStringLiteral("scheduler cooldown is active until %1")
+                            .arg(schedulerCooldownUntil.toUTC().toString(Qt::ISODateWithMs));
         return result;
     }
 

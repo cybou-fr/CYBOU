@@ -24,6 +24,7 @@ public Q_SLOTS:
         const QString &capabilitySnapshotId,
         const QString &homeostasisSnapshotId);
     QByteArray RunSchedulingCycle();
+    bool NotifyUserActivity(const QString &cause);
     bool Transition(const QString &mode);
     bool BeginRun(const QByteArray &encoded);
     QString RequestRun(const QString &kind, const QString &policyId,
@@ -51,6 +52,8 @@ private:
     QByteArray continueScheduledRun();
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
+    QDateTime m_lastUserActivityAt;
+    QDateTime m_schedulerCooldownUntil;
     EventClient m_events;
     HealthClient m_health;
     QTimer m_schedulerTimer;

@@ -291,6 +291,12 @@ QVariantMap LifecycleClient::schedulingEvaluation() const
         m_rpc.callBytes(QStringLiteral("EvaluateScheduling")), &m_codecError);
 }
 
+bool LifecycleClient::notifyUserActivity(const QString &cause) const
+{
+    m_codecError.clear();
+    return m_rpc.callBool(QStringLiteral("NotifyUserActivity"), {cause});
+}
+
 bool LifecycleClient::finishRun(const QString &status, const QString &cause) const
 {
     m_codecError.clear();

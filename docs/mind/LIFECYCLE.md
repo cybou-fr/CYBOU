@@ -169,6 +169,12 @@ flag. Presence1 validates that a run is active and asks Lifecycle1 to persist `I
 the applet nor presenced writes lifecycle state. The five-second transport timeout completes as an
 error without blocking the Plasma event loop.
 
+Ordinary Presence commands also report user activity before their capability gate. Lifecycle1
+persists the activity timestamp and a 60-second scheduler cooldown, wakes `Idle`, and interrupts
+only automatically scheduled backlog work. A manual maintenance run is not implicitly cancelled.
+The cooldown is evaluated again immediately before run creation and remains effective after a
+lifecycled restart.
+
 ## P2 continuity matrix
 
 | Boundary | Current automated evidence | Remaining evidence |
@@ -180,7 +186,7 @@ error without blocking the Plasma event loop.
 | identity continuity | simulated login and booted reboot preserve UUID and increment logical session | none for P2 scope |
 | open intentions | simulated login reconstructs accepted commitment | booted reboot proof |
 | system reboot | focused NixOS gate preserves identity and exact run blob, then enters `Recovering` | none for P2 scope |
-| architecture upgrade | legacy v0 backup+migration; future schema fails closed | multi-version migrations |
+| architecture upgrade | legacy v0/v1 backup+migration to v2; future schema fails closed | multi-version migrations |
 
 ## Related documents
 
