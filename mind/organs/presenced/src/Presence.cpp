@@ -129,6 +129,17 @@ QDateTime Presence::capabilityObservedAt() const
     return m_snapshot.value(QStringLiteral("capabilityObservedAt")).toDateTime();
 }
 
+QVariantMap Presence::commandAvailability() const
+{
+    return m_snapshot.value(QStringLiteral("commandAvailability")).toMap();
+}
+
+bool Presence::canCommand(const QString &commandId) const
+{
+    return commandAvailability().value(commandId).toMap()
+        .value(QStringLiteral("available")).toBool();
+}
+
 bool Presence::hasCapability(const QString &capabilityId) const
 {
     return capabilityStates().value(capabilityId).toString() == QStringLiteral("available");

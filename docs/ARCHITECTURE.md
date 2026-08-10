@@ -130,6 +130,8 @@ a cycle. Aggregate/per-capability state and raw deficits remain a separate proje
 Health1; Presence additionally groups them into UI-ready details with causes, impact, verification
 time, and recovery progress. Consequently loss of predictord disables Observe/Predict while identity,
 commitments, biography, attention, lifecycle control, and the Presence endpoint remain usable.
+Presence also publishes the command-to-capability mapping for QML, while every backend command
+independently enforces the same gate. Lifecycle mode and aggregate health remain separate axes.
 
 ## Durable-to-visible ordering
 

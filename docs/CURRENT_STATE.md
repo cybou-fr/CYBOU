@@ -171,6 +171,12 @@ availability, causes, impact, dependencies, verification time, recovery policy, 
 progress. Predictor-loss process coverage proves unrelated commands remain usable and the same
 record moves from unavailable/waiting through recovering/verifying to available/ready.
 
+P6.5 slice 10 adds the command-side presentation contract. `commandAvailability` and
+`canCommand(id)` expose required/missing capabilities without weakening backend enforcement.
+Process coverage proves useful commands survive optional predictor loss and explicitly observes
+`Awake + Limited` and `Recovering + Limited`; lifecycle mode is not an alias for health. P6.5 is
+therefore complete, and implementation focus moves to the P6.6 failure/recovery matrix.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is
 the current engineering milestone; the tree does not yet contain the planned M8 language faculty

@@ -841,6 +841,16 @@ private Q_SLOTS:
         QVERIFY(unavailablePrediction.value(QStringLiteral("lastVerifiedAt")).toDateTime().isValid());
         QCOMPARE(unavailablePrediction.value(QStringLiteral("recoveryProgress")).toString(),
                  QStringLiteral("waiting"));
+        QVERIFY(!surface.canCommand(QStringLiteral("predict")));
+        QVERIFY(!surface.canCommand(QStringLiteral("observe")));
+        QVERIFY(surface.canCommand(QStringLiteral("promise")));
+        QVERIFY(surface.canCommand(QStringLiteral("fulfill")));
+        QVERIFY(surface.canCommand(QStringLiteral("identity")));
+        QVERIFY(surface.canCommand(QStringLiteral("attention")));
+        QCOMPARE(surface.commandAvailability().value(QStringLiteral("predict")).toMap()
+                     .value(QStringLiteral("missingCapabilities")).toStringList(),
+                 QStringList{QStringLiteral("prediction")});
+        QCOMPARE(surface.lifecycleMode(), QStringLiteral("awake"));
         QVERIFY(surface.runtimeReachable());
         QVERIFY(surface.isAwake());
         QVERIFY(surface.hasCapability(QStringLiteral("identity-continuity")));
@@ -849,6 +859,26 @@ private Q_SLOTS:
         QVERIFY(!surface.hasCapability(QStringLiteral("prediction")));
         QVERIFY(!surface.identityState().isEmpty());
         QVERIFY(!surface.promise(QStringLiteral("continue without prediction")).isNull());
+
+        RpcClient lifecycle(kLifecycleEndpoint);
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("idle")}));
+        const QString orthogonalRun = lifecycle.callString(
+            QStringLiteral("RequestRun"),
+            {QStringLiteral("maintenance"), QStringLiteral("health-orthogonality-test"),
+             QVariant::fromValue<qulonglong>(EventClient().count()), QStringList{}, QStringList{}});
+        QVERIFY(!orthogonalRun.isEmpty());
+        stop(m_lifecycled);
+        m_lifecycled = start(m_lifecycledPath);
+        QVERIFY(m_lifecycled);
+        LifecycleClient recoveredLifecycle;
+        QTRY_VERIFY_WITH_TIMEOUT(recoveredLifecycle.ready(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(surface.lifecycleMode(), QStringLiteral("recovering"), 5000);
+        QCOMPARE(surface.aggregateCapabilityState(), QStringLiteral("limited"));
+        QVERIFY(surface.canCommand(QStringLiteral("promise")));
+        QVERIFY(lifecycle.callBool(
+            QStringLiteral("FinishRun"),
+            {QStringLiteral("interrupted"), QStringLiteral("orthogonality cleanup")}));
+        QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
 
         QVERIFY(m_eventd->state() != QProcess::NotRunning);
         QVERIFY(m_identityd->state() != QProcess::NotRunning);

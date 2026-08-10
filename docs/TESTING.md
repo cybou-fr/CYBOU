@@ -95,6 +95,8 @@ consumer backlog must remain unadvanced.
 Optional-organ process coverage inspects the UI-ready `capabilityDetails` record during predictor
 loss and recovery. It verifies typed cause, operational impact, dependency, verification time, and
 the `waiting → verifying → ready` recovery progression while independent commands remain usable.
+The same scenario validates `commandAvailability`, backend command enforcement, and the independent
+state combinations `Awake + Limited` and `Recovering + Limited`.
 
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an

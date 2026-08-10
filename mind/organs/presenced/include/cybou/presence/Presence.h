@@ -35,6 +35,7 @@ class Presence : public QObject
     Q_PROPERTY(QVariantMap capabilityDetails READ capabilityDetails NOTIFY changed)
     Q_PROPERTY(QVariantList capabilityDeficits READ capabilityDeficits NOTIFY changed)
     Q_PROPERTY(QDateTime capabilityObservedAt READ capabilityObservedAt NOTIFY changed)
+    Q_PROPERTY(QVariantMap commandAvailability READ commandAvailability NOTIFY changed)
     Q_PROPERTY(QString lastError READ lastError NOTIFY changed)
     Q_PROPERTY(QString narration READ narration NOTIFY changed)
     Q_PROPERTY(QStringList obligations READ obligations NOTIFY changed)
@@ -65,7 +66,9 @@ public:
     QVariantMap capabilityDetails() const;
     QVariantList capabilityDeficits() const;
     QDateTime capabilityObservedAt() const;
+    QVariantMap commandAvailability() const;
     Q_INVOKABLE bool hasCapability(const QString &capabilityId) const;
+    Q_INVOKABLE bool canCommand(const QString &commandId) const;
 
     QString narration() const;
     QStringList obligations() const;

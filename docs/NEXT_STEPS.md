@@ -430,10 +430,16 @@ progress (`ready`, `waiting`, `verifying`, or `unknown`). QML no longer needs to
 deficit records to explain partial availability. Process integration proves predictor loss keeps
 identity, commitments, attention, and biography useful, then projects verification and recovery.
 
+**Slice 10: implemented.** Presence1 publishes `commandAvailability`, the authoritative UI mapping
+from each command to required and currently missing capabilities, plus `canCommand(id)`. Backend
+methods retain their own fail-closed gates. Process integration proves prediction loss disables
+only Observe/Predict while promise, commitment, identity, and attention operations remain enabled.
+It also proves lifecycle and capability health are orthogonal by observing both `Awake + Limited`
+and `Recovering + Limited`. This completes the P6.5 exit gate.
+
 ### Work
 
-- keep lifecycle mode orthogonal to aggregate health (`Awake + Degraded`, `Recovering + Limited`);
-- preserve useful independent commands when optional capabilities are absent.
+No remaining P6.5 implementation work. Continue with P6.6 fault-injection coverage.
 
 ### Exit gate
 

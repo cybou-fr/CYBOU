@@ -25,6 +25,7 @@ capabilityStates
 capabilityDetails
 capabilityDeficits
 capabilityObservedAt
+commandAvailability
 lastError
 narration
 obligations
@@ -53,6 +54,10 @@ policy evaluation and explains why automatic work is blocked or deferred.
 `recoveryProgress`. Raw `capabilityDeficits` remains available for diagnostics, but UI code does
 not need to group or rank those records itself.
 
+`commandAvailability[id]` contains `available`, `requiredCapabilities`, and
+`missingCapabilities`. `canCommand(id)` is the corresponding QML convenience gate. Presence owns
+this presentation mapping; the target organ still enforces the same capability requirements.
+
 `lastError` is presentation diagnostics for connection/retry UX. It does not make QML the owner of
 the failing organ or storage resource.
 
@@ -67,6 +72,7 @@ abandonIndex(index)
 observe(subject, value)
 predict(subject)
 hasCapability(id)
+canCommand(id)
 interruptLifecycle(cause)
 ```
 

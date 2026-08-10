@@ -117,6 +117,40 @@ QVariantMap capabilityProjection(const CapabilitySnapshot &snapshot)
     return projection;
 }
 
+QVariantMap commandProjection(const CapabilitySnapshot &snapshot, bool lifecycleReady)
+{
+    const QVariantMap requirements{
+        {QStringLiteral("activity"), QStringList{QStringLiteral("accepted-biography")}},
+        {QStringLiteral("promise"), QStringList{QStringLiteral("accepted-biography"), QStringLiteral("commitment-access")}},
+        {QStringLiteral("reflect"), QStringList{QStringLiteral("accepted-biography"), QStringLiteral("self-assessment")}},
+        {QStringLiteral("fulfill"), QStringList{QStringLiteral("commitment-access")}},
+        {QStringLiteral("abandon"), QStringList{QStringLiteral("commitment-access")}},
+        {QStringLiteral("observe"), QStringList{QStringLiteral("prediction")}},
+        {QStringLiteral("predict"), QStringList{QStringLiteral("prediction")}},
+        {QStringLiteral("identity"), QStringList{QStringLiteral("identity-continuity")}},
+        {QStringLiteral("attention"), QStringList{QStringLiteral("attention-workspace")}},
+    };
+    QVariantMap commands;
+    for (auto it = requirements.cbegin(); it != requirements.cend(); ++it) {
+        const QStringList required = it.value().toStringList();
+        QStringList missing;
+        for (const QString &capability : required)
+            if (!isAvailable(snapshot, capability)) missing.append(capability);
+        commands[it.key()] = QVariantMap{
+            {QStringLiteral("available"), missing.isEmpty()},
+            {QStringLiteral("requiredCapabilities"), required},
+            {QStringLiteral("missingCapabilities"), missing},
+        };
+    }
+    commands[QStringLiteral("interruptLifecycle")] = QVariantMap{
+        {QStringLiteral("available"), lifecycleReady},
+        {QStringLiteral("requiredCapabilities"), QStringList{}},
+        {QStringLiteral("missingCapabilities"), lifecycleReady
+             ? QStringList{} : QStringList{QStringLiteral("lifecycle-control")}},
+    };
+    return commands;
+}
+
 QVariantMap lifecycleProjection(const QVariantMap &state)
 {
     QVariantMap projection;
@@ -280,6 +314,7 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("capabilityDetails")] = capability.value(QStringLiteral("details"));
     map[QStringLiteral("capabilityDeficits")] = capability.value(QStringLiteral("deficits"));
     map[QStringLiteral("capabilityObservedAt")] = capability.value(QStringLiteral("observedAt"));
+    map[QStringLiteral("commandAvailability")] = commandProjection(health, m_lifecycle.ready());
     map[QStringLiteral("lifecycleState")] = lifecycle;
     map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
     map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
