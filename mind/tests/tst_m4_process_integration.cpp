@@ -18,6 +18,7 @@
 #include <QTest>
 #include <QTimer>
 
+#include <algorithm>
 #include <memory>
 #include <signal.h>
 
@@ -572,6 +573,28 @@ private Q_SLOTS:
         PresenceClient presence;
         QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
 
+        // This test proves that a suspended owner cannot accumulate independent timeouts, which it
+        // can only do if presenced actually calls that owner. presenced gates the selfd read on
+        // Health1 reporting self-assessment as available, and returns an instantly empty snapshot
+        // when healthd has not produced one yet. Without this precondition the test passes for the
+        // wrong reason: every gated read is skipped, the budget survives untouched, and no
+        // accumulation is exercised at all. Assert the precondition rather than assume the
+        // preceding tests left healthd in that state.
+        // Wait for the precondition rather than sampling it once: healthd may still be carrying an
+        // older observation from a preceding test, and it re-probes on its own timer.
+        HealthClient healthGate;
+        const auto selfAssessmentAvailable = [&healthGate]() {
+            const CapabilitySnapshot gate = healthGate.snapshot();
+            return gate.isValid()
+                && std::none_of(
+                       gate.deficits.cbegin(),
+                       gate.deficits.cend(),
+                       [](const CapabilityDeficit &deficit) {
+                           return deficit.capabilityId == QStringLiteral("self-assessment");
+                       });
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(selfAssessmentAvailable(), 35000);
+
         QCOMPARE(::kill(static_cast<pid_t>(m_selfd->processId()), SIGSTOP), 0);
         QElapsedTimer elapsed;
         elapsed.start();
@@ -579,17 +602,65 @@ private Q_SLOTS:
         const qint64 snapshotElapsedMs = elapsed.elapsed();
         QCOMPARE(::kill(static_cast<pid_t>(m_selfd->processId()), SIGCONT), 0);
 
-        QVERIFY2(snapshotElapsedMs < 1500, "snapshot accumulated independent owner timeouts");
+        // The guarantee is one shared budget, not a particular casualty of it. The suspended owner
+        // must consume the budget rather than multiply it, and the projection must stay
+        // structurally valid with typed defaults for whatever was not reached.
+        QVERIFY2(
+            snapshotElapsedMs < 1500,
+            qPrintable(QStringLiteral("snapshot accumulated independent owner timeouts: %1 ms")
+                           .arg(snapshotElapsedMs)));
         QVERIFY(snapshot.contains(QStringLiteral("runtimeReachable")));
         QVERIFY(snapshot.contains(QStringLiteral("lifecycleState")));
         QVERIFY(snapshot.contains(QStringLiteral("organHealth")));
+        QVERIFY(snapshot.contains(QStringLiteral("capabilityStates")));
         QVERIFY(snapshot.value(QStringLiteral("stats")).toMap().isEmpty());
-        QVERIFY(snapshot.value(QStringLiteral("lifecycleState")).toMap().isEmpty());
+
+        // Deliberately not asserted: that any specific later section is empty. Which owners are
+        // still reached depends on how much of the budget the suspended one happened to consume -
+        // it left roughly 16 ms here, enough for a local owner to answer - so pinning a named
+        // section to empty tests the ordering of this function rather than the bounded-budget
+        // contract, and breaks on timing shifts elsewhere in the tree.
 
         stop(m_presenced);
         m_presenced = start(m_presencedPath);
         QVERIFY(m_presenced);
         QTRY_VERIFY_WITH_TIMEOUT(PresenceClient().ready(), 5000);
+    }
+
+    // Health1 graphs the presence-presentation capability from presenced's own Health() answer, so
+    // a constant answer would leave that capability unable to enter a deficit however much of the
+    // projection had gone missing. The answer describes the last projection attempted: it stays
+    // healthy until a projection actually fails, then recovers on the next successful one.
+    void presenceHealthReportsDegradedProjection()
+    {
+        PresenceClient presence;
+        QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+        QVERIFY(!presence.snapshot().isEmpty());
+        QCOMPARE(presence.health(), QStringLiteral("healthy"));
+
+        // Losing Health1 makes every gated section a skip rather than an observation, which is the
+        // case a constant answer hid: presenced is still reachable, but it cannot present.
+        stop(m_healthd);
+        const QVariantMap degraded = presence.snapshot();
+        QCOMPARE(presence.health(), QStringLiteral("degraded"));
+
+        // Readiness is a separate dimension and must not follow health: presenced loads no
+        // persistent state and is still answering calls.
+        QVERIFY(presence.ready());
+
+        // The projection stays structurally valid while degraded - the UI must be able to render
+        // unknown capability states rather than receive a truncated map.
+        QVERIFY(degraded.contains(QStringLiteral("capabilityStates")));
+        QVERIFY(degraded.contains(QStringLiteral("organHealth")));
+        QCOMPARE(
+            degraded.value(QStringLiteral("aggregateCapabilityState")).toString(),
+            QStringLiteral("unknown"));
+
+        m_healthd = start(m_healthdPath);
+        QVERIFY(m_healthd);
+        QTRY_VERIFY_WITH_TIMEOUT(HealthClient().snapshot().isValid(), 5000);
+        QVERIFY(!presence.snapshot().isEmpty());
+        QCOMPARE(presence.health(), QStringLiteral("healthy"));
     }
 
     void userActivityInterruptsInFlightAutomaticOwnerRpc()

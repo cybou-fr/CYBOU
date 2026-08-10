@@ -1,0 +1,216 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: MIT
+-->
+
+# Implementation Audit — 2026-08-10
+
+## Audit identity
+
+| Field | Value |
+|---|---|
+| Audited commit | `108f0304` |
+| Method | source reading of the Mind C++ tree, Nix modules, and CI workflow |
+| Relationship to the checkpoint | complements [Project Checkpoint — 2026-08-10](PROJECT_CHECKPOINT_2026-08-10.md) |
+| Scope | implementation evidence only; no new capability was assessed |
+
+The checkpoint records what the architecture claims and how mature each area is. This document
+records where the shipped implementation does not yet support a claim, with the specific source
+location for each finding. Where the two disagree, this document is the more specific evidence and
+the checkpoint's maturity scores should be read as adjusted by the "Effect on the checkpoint"
+section below.
+
+Findings are ordered by how directly they contradict a stated invariant, not by effort.
+
+## A1 — Journal acceptance is not durable across power loss
+
+**Where:** [`Journal.cpp`](../mind/foundation/storage/src/Journal.cpp) constructor, `PRAGMA
+synchronous=NORMAL` alongside `journal_mode=WAL`; acceptance is published from `Journal::append`
+after `COMMIT`.
+
+**Claim under test:** "Durable before visible" — Mind Model invariant 1, and the checkpoint's
+statement that a UI refresh cannot become evidence that a fact was durably accepted.
+
+**What the code does:** in WAL mode with `synchronous=NORMAL`, SQLite does not fsync the write-ahead
+log at commit. `COMMIT` returns, `Event1 Accepted` is emitted, Workspace admits the contribution and
+Presence projects it — while the bytes may still be in the operating system page cache. A kernel
+panic or power loss can therefore drop a contribution that Presence already displayed as accepted.
+
+**Why the existing evidence does not catch it:** the fault matrix exercises process termination and
+clean reboot. Process termination leaves page-cache contents intact, and a clean reboot flushes
+them. Neither scenario can expose an unsynced commit. The gap is structural in the test design, not
+an oversight in any individual test.
+
+**Resolution:** either raise durability to `synchronous=FULL` and accept the write-latency cost, or
+restate the invariant as durability to the operating system rather than to storage. The first is
+correct for personal biography that cannot be regenerated; the invariant should not be weakened
+silently.
+
+## A2 — The resilient RPC stack is not used on the presentation path
+
+**Where:** [`RpcClient.cpp`](../mind/foundation/fabric/src/RpcClient.cpp) `RpcClient::call` uses
+`QDBusPendingCall::waitForFinished()`. [`PresenceService.cpp`](../mind/organs/presenced/service/PresenceService.cpp)
+performs its compound reads and mutations through that client.
+
+**Claim under test:** the checkpoint's "RPC resilience: 3" and "responsive async paths".
+
+**What the code does:** the project has two RPC stacks. `AsyncRpcClient`
+([`RpcResilience.cpp`](../mind/foundation/fabric/src/RpcResilience.cpp)) implements typed outcomes,
+retry with deterministic jitter, and a circuit breaker, and is covered by `tst_rpc_resilience`. The
+Presence path does not use it: every downstream call blocks the presenced main thread.
+
+P6.7 correctly bounded the *total* latency of a compound operation to one monotonic budget, so an
+unresponsive owner no longer multiplies timeouts. It did not make presenced concurrent. While
+presenced is inside `snapshotMap`, it is a single-threaded D-Bus service that cannot answer any
+other caller — the Plasma applet, a second surface, or healthd.
+
+**Interaction with healthd:** healthd probes every endpoint including presenced, on a 30-second
+timer and on every bus name-owner change ([`healthd/main.cpp`](../mind/services/healthd/main.cpp),
+[`HealthService.cpp`](../mind/services/healthd/HealthService.cpp)). Those probes are blocking calls
+from the same synchronous client. A Presence aggregation in flight and a health refresh in flight
+therefore stall each other until the D-Bus timeouts expire. There is no call cycle in the code — see
+A3, presenced answers `Health()` without a downstream call — so this is mutual latency, not a true
+deadlock. It is still a self-inflicted stall on the two processes the user sees most.
+
+**Resolution:** migrate the Presence aggregation to `AsyncRpcClient` so the compound read is issued
+concurrently under one deadline rather than sequentially under one deadline. This is the largest
+item in this audit and is scheduled separately from the mechanical fixes; it changes the shape of
+`PresenceService`, not just its parameters.
+
+## A3 — presenced cannot be reported as degraded
+
+**Where:** [`PresenceService.cpp`](../mind/organs/presenced/service/PresenceService.cpp),
+`PresenceService::Ready()` returns `true` unconditionally and `PresenceService::Health()` returns
+`"healthy"` unconditionally.
+
+**Claim under test:** capability-specific degradation, and the `presence-presentation` capability in
+healthd's graph.
+
+**What the code does:** healthd derives component health from exactly these two answers. Because both
+are constants, `presence-presentation` cannot enter a deficit state for any reason. presenced can
+have every downstream owner unavailable, be returning empty projections, and be reporting its own
+failures through `LastError()` — and still be graphed as healthy.
+
+`LastError()` already aggregates the real failure state from each client. The information exists;
+`Health()` simply does not consult it.
+
+**Resolution:** derive `Health()` from the most recent aggregation outcome and the reachability of
+required downstream owners, keeping "presenced is running" separate from "presenced can present".
+`Ready()` may legitimately stay `true` — presenced has no startup state to load — but that should be
+a stated reason rather than a coincidence.
+
+## A4 — Unbounded read paths on the single-writer process
+
+**Where:** [`EventService.cpp`](../mind/services/eventd/src/EventService.cpp) and
+[`Journal.cpp`](../mind/foundation/storage/src/Journal.cpp).
+
+Three separate paths on `cybou-eventd` have no size bound, and each is a synchronous D-Bus method on
+the process that owns the only write path to the Journal:
+
+1. `EventService::Verify` calls `Journal::verify`, which reads every row and recomputes the entire
+   hash chain. Cost grows without limit with biography size.
+2. `EventService::ConsumerBacklog` special-cases the `lifecycle.consolidation` consumer by issuing
+   one `atSequence` query per row of backlog, rather than one aggregate query.
+3. `Journal::recent` treats a non-positive limit as "no limit" and serialises the entire table into
+   one D-Bus reply.
+
+**Claim under test:** the checkpoint's P0 risk "no performance envelope for Journal and compound
+projections", and the P0 risk that same-user D-Bus is not a security boundary. These three paths are
+where the two risks meet concretely: any process in the user session can hold the canonical writer
+busy by calling a read method in a loop.
+
+**Resolution:** give `ConsumerBacklog` a single counting query, give `recent` an enforced maximum,
+and make `Verify` incremental or explicitly bounded per call. This does not close the same-user
+authorization gap — that needs caller checks in `ServiceHost` — but it removes the cheapest way to
+exploit it.
+
+## A5 — Fault injection is compiled into shipped binaries
+
+**Where:** [`RpcResilience.cpp`](../mind/foundation/fabric/src/RpcResilience.cpp) reads
+`CYBOU_RPC_FAILPOINT` and `CYBOU_RPC_FAILPOINT_METHOD`;
+[`LifecycleService.cpp`](../mind/services/lifecycled/LifecycleService.cpp) reads
+`CYBOU_LIFECYCLE_FAILPOINT`. Both call `qFatal` when the variable matches.
+
+**What the code does:** an environment variable crashes a Mind process in the installed build. These
+are test hooks, and they are good ones — the split-commit evidence depends on them — but they belong
+to test builds. Related timing knobs (`CYBOU_PRESENCE_ARTIFICIAL_DELAY_MS` and the predictord
+equivalent) insert real `QThread::msleep` calls into the production binary for the same reason.
+
+**Resolution:** put the crash failpoints behind a CMake option that the test builds enable and the
+package build does not. The timing knobs can follow the same option.
+
+## A6 — Mind units carry no hardening directives
+
+**Where:** [`mind-services.nix`](../modules/mind-services.nix).
+
+Every unit sets `Type`, `BusName`, `ExecStart`, and restart policy, and nothing else. There is no
+`NoNewPrivileges`, no filesystem protection, no address-family restriction, and no memory bound.
+
+**Scope of the fix:** this is the cheapest item in the audit, and it is also the one most likely to
+be overstated. Unit hardening constrains what a compromised Mind process can reach. It does nothing
+about the checkpoint's actual P0 — that any same-user process may call Mind mutation interfaces —
+because that caller is a peer, not a child. Both are worth doing; they are not substitutes, and the
+hardening should not be recorded as progress on the authorization boundary.
+
+## A7 — No fault evidence runs in hosted CI
+
+**Where:** [`checks.yml`](../.github/workflows/checks.yml) and the four gates in `tests/`.
+
+The fast workflow runs the static validators, both packages, and — through the `cybou-mind` package
+build — the CTest suites. None of `vm-smoke`, `p4-plasma-lifecycle`, `lifecycle-continuity`, or
+`m6-recovery-boundary` runs on a push, because all four need KVM.
+
+The workflow comments explain this decision for the ISO, and that reasoning is sound: a gate that
+fails for infrastructure reasons trains everyone to ignore red CI. The consequence is broader than
+the comment acknowledges. Restart continuity, split-commit recovery, reboot reconstruction, and
+Plasma recreation are the project's most distinctive evidence, and a regression in any of them is
+invisible until someone runs the gates by hand.
+
+**Resolution:** this is a policy question, not a code fix, and it is recorded here rather than
+scheduled. The options are a KVM-capable runner, a scheduled rather than per-push run, or an explicit
+documented statement that the fault tier is a pre-tag manual gate with a named owner. The current
+state is the third option without the statement.
+
+## A8 — One bounded-budget assertion tested ordering rather than the contract
+
+**Where:** `presenceSnapshotHasOneBoundedOwnerBudget` in
+[`tst_m4_process_integration.cpp`](../mind/tests/tst_m4_process_integration.cpp).
+
+Found while fixing A1, not by reading: raising the Journal commit mode shifted timing by roughly
+sixteen milliseconds and turned this test red.
+
+**What the test asserted:** that after suspending selfd under a 500 ms budget, both the selfd
+section *and* the lifecycle section of the projection come back empty.
+
+**Why that is not the contract:** P6.7 guarantees that a compound read consumes one shared budget
+and stays structurally valid, with typed defaults for whatever it did not reach. It does not
+guarantee which owners go unreached — that depends on how much of the budget the suspended owner
+happens to consume. Here the suspended owner used 484 ms of 500 ms, and lifecycled, being local and
+fast, answered inside the remaining margin. The projection was correct; the assertion was pinned to
+the ordering of `snapshotMap` rather than to the property under test.
+
+The test also carried an unstated precondition. presenced gates the selfd read on Health1 reporting
+`self-assessment` as available, and healthd returns an instantly empty snapshot before its first
+refresh. With Health1 unavailable the gated read is skipped, the budget survives untouched, and the
+test passes without exercising accumulation at all — passing for the opposite of the intended
+reason.
+
+**Resolution:** assert the bounded total, the presence of every projection key, and the suspended
+owner's own empty section; wait for the capability precondition rather than assume it; and state in
+the test why no specific later section is pinned. This is the "no silent caps" problem in test form:
+a green result was reporting more coverage than it had.
+
+## Effect on the checkpoint
+
+The checkpoint's structural conclusions hold. The maturity matrix needs three adjustments:
+
+| Area | Checkpoint | Adjusted | Reason |
+|---|---:|---:|---|
+| Canonical memory/Event1 | 3 | 2 | A1: the durability claim is not supported against power loss, and the test design cannot test it |
+| RPC resilience | 3 | 2 | A2: the rated stack is not on the presentation path |
+| Degraded operation | 3 | 2 | A3: one of eight projected capabilities cannot enter a deficit |
+
+The recommended M7 entry sequence does not change. A1, A3, A4, and A5 should land before P7.0,
+because M7 raises event volume and adds a second projection — which is precisely when an unbounded
+read path, a dishonest health answer, and an untestable durability claim become expensive. A2 is
+scheduled with them but sized as a refactor. A6 is independent. A7 is a decision for the maintainer.

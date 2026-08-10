@@ -155,6 +155,26 @@ bool rawExec(const QString &path, const QString &sql)
     return ok;
 }
 
+QString persistedJournalMode(const QString &path)
+{
+    const QString connection = QStringLiteral("mode-%1")
+                                   .arg(QUuid::createUuid().toString(QUuid::Id128));
+    QString mode;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        db.setDatabaseName(path);
+        if (db.open()) {
+            QSqlQuery query(db);
+            if (query.exec(QStringLiteral("PRAGMA journal_mode")) && query.next()) {
+                mode = query.value(0).toString().toLower();
+            }
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(connection);
+    return mode;
+}
+
 bool indexExists(const QString &path, const QString &indexName)
 {
     const QString connection = QStringLiteral("index-%1")
@@ -424,6 +444,34 @@ private Q_SLOTS:
         QCOMPARE(journal.append(second), 0u);
 
         QVERIFY(indexExists(path, QStringLiteral("idx_one_outcome_per_cause")));
+    }
+
+    // Event1 publishes Accepted only after COMMIT returns, so the commit mode is part of the
+    // "durable before visible" invariant rather than a tuning detail. Journal mode is persisted in
+    // the database file, so a silent fallback away from WAL is observable here; the synchronous
+    // level is connection-scoped and is enforced by ensureDurability() at open, which is what a
+    // successful open on a file-backed path demonstrates.
+    void durableCommitModeIsEnforcedAtOpen()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        Journal journal(path);
+
+        QVERIFY2(
+            journal.isOpen(),
+            qPrintable(QStringLiteral("journal refused to open: %1").arg(journal.lastError())));
+        QVERIFY(journal.append(observation()) > 0);
+        QCOMPARE(persistedJournalMode(path), QStringLiteral("wal"));
+    }
+
+    // The exemption is deliberate: an in-memory journal is test scaffolding and makes no durability
+    // claim, so requiring WAL of it would only break the suites that use it.
+    void inMemoryJournalIsExemptFromDurabilityEnforcement()
+    {
+        Journal journal(QStringLiteral(":memory:"));
+
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observation()) > 0);
     }
 
     void episodeReplaysInOrder()

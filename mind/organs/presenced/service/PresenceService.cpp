@@ -246,14 +246,36 @@ PresenceService::PresenceService(QObject *parent)
     connect(&m_health, &HealthClient::changed, this, [this]() { Q_EMIT Changed(); });
 }
 
+// presenced loads no persistent state at startup, so there is no window in which it is running but
+// not yet able to accept a call. Readiness is therefore genuinely constant, unlike Health() below;
+// it is stated here as a property of this organ rather than left to look like an oversight.
 bool PresenceService::Ready() const
 {
     return true;
 }
 
+// Health1 derives the `presence-presentation` capability from this answer. presenced owns nothing
+// durable, so its health is entirely a statement about whether it can still project its owners:
+// answering a constant "healthy" would mean that capability could never enter a deficit no matter
+// how much of the projection had gone missing.
+//
+// The answer describes the last projection actually attempted, not a fresh probe. Probing here
+// would issue downstream calls from inside the health refresh that healthd runs against presenced,
+// which is the accumulation P6.7 exists to prevent.
 QString PresenceService::Health() const
 {
-    return QStringLiteral("healthy");
+    // Both failure outcomes report "degraded" rather than "unavailable": presenced answered the
+    // call, so it is reachable and still serving the ungated part of the projection. Which of the
+    // two occurred is a diagnostic question, and LastError() carries the originating client error.
+    switch (m_lastProjection) {
+    case ProjectionOutcome::NotAttempted:
+    case ProjectionOutcome::Complete:
+        return QStringLiteral("healthy");
+    case ProjectionOutcome::CapabilitiesUnavailable:
+    case ProjectionOutcome::BudgetExhausted:
+        return QStringLiteral("degraded");
+    }
+    return QStringLiteral("degraded");
 }
 
 QString PresenceService::LastError() const
@@ -303,6 +325,13 @@ QVariantMap PresenceService::snapshotMap() const
     int timeoutMs = deadline.remaining();
     const CapabilitySnapshot health = timeoutMs > 0
         ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
+    // Health1 gates almost every section below, so losing it does not degrade one part of the
+    // projection - it makes the capability states unknown and turns every gated read into a skip.
+    // Record that before continuing; the tail of this function upgrades the outcome only if the
+    // whole collection then completes inside the budget.
+    m_lastProjection = health.isValid()
+        ? ProjectionOutcome::Complete
+        : ProjectionOutcome::CapabilitiesUnavailable;
     const QVariantMap capability = capabilityProjection(health);
     timeoutMs = deadline.remaining();
     const QVariantMap self = timeoutMs > 0
@@ -368,6 +397,17 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("moment")] = timeoutMs > 0
             && isAvailable(health, QStringLiteral("attention-workspace"))
         ? m_workspace.moment(timeoutMs) : QVariantMap{};
+    // Settle the outcome before healthMap(), which embeds this organ's own Health() answer in the
+    // projection: deciding afterwards would publish a snapshot claiming presenced was healthy
+    // during the very collection that ran out of budget.
+    //
+    // Expiry is only reported when the projection was otherwise complete. A missing Health1
+    // snapshot is the more specific fact and must not be overwritten by the budget outcome, since
+    // skipping gated reads is exactly what makes the remaining budget look healthy.
+    if (m_lastProjection == ProjectionOutcome::Complete && deadline.remaining() == 0) {
+        m_lastProjection = ProjectionOutcome::BudgetExhausted;
+    }
+
     map[QStringLiteral("organHealth")] = healthMap(health);
 
     return map;

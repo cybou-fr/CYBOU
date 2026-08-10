@@ -68,8 +68,13 @@ Journal::Journal(
     pragma.finish();
     pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
     pragma.finish();
-    pragma.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+    pragma.exec(QStringLiteral("PRAGMA synchronous=FULL"));
     pragma.finish();
+
+    if (!ensureDurability()) {
+        m_db.close();
+        return;
+    }
 
     if (!ensureSchema()) {
         m_db.close();
@@ -160,6 +165,54 @@ bool Journal::columnExists(const QString &table, const QString &column) const
         }
     }
     return false;
+}
+
+// Mind Model invariant 1 says a contribution is durable before it is visible: Event1 publishes
+// Accepted only after COMMIT returns. That ordering is only worth anything if COMMIT has reached
+// storage. In WAL mode `synchronous=NORMAL` does not fsync the log at commit, so a power loss can
+// drop a contribution that Presence already displayed as accepted; the fault matrix cannot catch
+// that, because killing a process leaves the page cache intact and a clean reboot flushes it.
+//
+// So the pragmas above are not advisory. SQLite silently keeps the previous mode when it cannot
+// apply one - a filesystem without shared-memory support falls back from WAL, for instance - and a
+// silent fallback would leave the invariant stated more strongly than the storage supports. Read
+// both values back and refuse to open the Journal rather than weaken the guarantee unannounced.
+//
+// An in-memory Journal is exempt: it is test scaffolding with no durability claim to make.
+bool Journal::ensureDurability()
+{
+    if (m_path == QLatin1String(":memory:")) {
+        return true;
+    }
+
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral("PRAGMA journal_mode")) || !query.next()) {
+        m_lastError = QStringLiteral("cannot read the journal commit mode");
+        return false;
+    }
+    const QString mode = query.value(0).toString().toLower();
+    query.finish();
+    if (mode != QLatin1String("wal")) {
+        m_lastError =
+            QStringLiteral("journal commit mode is %1, not the required write-ahead log").arg(mode);
+        return false;
+    }
+
+    if (!query.exec(QStringLiteral("PRAGMA synchronous")) || !query.next()) {
+        m_lastError = QStringLiteral("cannot read the journal synchronisation level");
+        return false;
+    }
+    const int synchronous = query.value(0).toInt();
+    query.finish();
+    if (synchronous < kRequiredSynchronousLevel) {
+        m_lastError = QStringLiteral(
+                          "journal synchronisation level %1 does not survive power loss; "
+                          "acceptance cannot be published as durable")
+                          .arg(synchronous);
+        return false;
+    }
+
+    return true;
 }
 
 bool Journal::ensureSchema()

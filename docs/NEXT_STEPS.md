@@ -561,6 +561,51 @@ suspends a still-registered selfd under a 500 ms server budget and proves Snapsh
 partial projection in under 1.5 seconds without reaching later owners. The same remaining-budget
 contract now covers every compound Presence read and mutation.
 
+Next, close the substrate findings recorded in P6.8 before opening the first M7 vertical slice.
+
+## P6.8 — Close the substrate audit findings
+
+**Status: in progress.** The [Implementation Audit — 2026-08-10](CODE_AUDIT_2026-08-10.md) found
+four places where the shipped implementation does not support a stated invariant, plus two hygiene
+items. This package closes them before M7 raises event volume and adds a second projection, because
+each finding becomes more expensive to fix once a perception adapter depends on it.
+
+This is substrate repair on existing owners. It introduces no new process, no new persistent state
+location, and no new wire contract.
+
+### Work
+
+- **A1 durability.** Raise the Journal to a commit mode that survives power loss, or restate the
+  "durable before visible" invariant as durability to the operating system. Do not leave the
+  invariant stated more strongly than the storage configuration supports.
+- **A3 health honesty.** Derive presenced `Health()` from real aggregation outcomes and required
+  downstream reachability, so `presence-presentation` can enter a deficit. Keep "the process is
+  running" separate from "the process can present".
+- **A4 bounded reads.** Replace the per-row `ConsumerBacklog` scan with one counting query, enforce
+  a maximum on `Recent`, and bound `Verify` so no single call rechains an unbounded biography.
+- **A5 failpoints.** Move the `qFatal` fault-injection hooks and the artificial-delay knobs behind a
+  build option that test builds enable and the package build does not.
+- **A6 unit hardening.** Add justified systemd hardening to the Mind units. Record it as reducing
+  the blast radius of a compromised Mind process, not as progress on the same-user D-Bus
+  authorization boundary, which it does not address.
+
+### Deferred within this package
+
+**A2 — migrate the Presence aggregation to `AsyncRpcClient`.** The resilient RPC stack exists and is
+tested, but the presentation path still uses the blocking client, so presenced cannot answer a second
+caller while it aggregates. This is a change to the shape of `PresenceService`, not to its
+parameters, and it is sized as its own slice rather than bundled with the mechanical fixes above.
+
+**A7 — fault-tier CI coverage.** None of the four KVM gates runs on a push. This is a maintainer
+policy decision — KVM-capable runner, scheduled run, or a documented pre-tag manual gate with a named
+owner — and not a code change.
+
+### Exit gate
+
+The fast Nix check set and both package builds pass from a clean tree, the Mind CTest suites pass
+including new coverage for the bounded read paths and the derived presenced health answer, and the
+four KVM gates pass on a KVM-capable host with no change to their continuity and recovery assertions.
+
 Next, begin the first M7 vertical slice: one provenance-bearing local system perception adapter,
 typed freshness/retention policy, an accepted Event1 observation, and a read-only Presence
 projection. Keep contradiction handling explicit and do not add autonomous action authority.

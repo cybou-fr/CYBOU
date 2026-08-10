@@ -17,6 +17,10 @@ inline constexpr int kCurrentDatabaseSchemaVersion = 2;
 inline constexpr int kLegacyJournalHashVersion = 1;
 inline constexpr int kCurrentJournalHashVersion = 2;
 
+/// SQLite `synchronous` level at or above which a returned COMMIT has reached storage. Below this,
+/// Event1 would publish acceptance for a commit that a power loss can still discard.
+inline constexpr int kRequiredSynchronousLevel = 2; // FULL
+
 /// Low-level SQLite implementation.
 ///
 /// Production organs do not depend on this class after M3. cybou-eventd owns the production
@@ -57,6 +61,7 @@ public:
         const QString &originOrgan = QString()) const override;
 
 private:
+    bool ensureDurability();
     bool ensureSchema();
     bool createSchemaV2();
     bool migrateV1ToV2();

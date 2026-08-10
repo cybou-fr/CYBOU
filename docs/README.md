@@ -15,6 +15,7 @@ with [Current State](CURRENT_STATE.md).
 
 - [Repository overview](../README.md)
 - [Project Checkpoint — 2026-08-10](PROJECT_CHECKPOINT_2026-08-10.md) — expanded point-in-time assessment and M7 entry gates
+- [Implementation Audit — 2026-08-10](CODE_AUDIT_2026-08-10.md) — source-level findings that adjust the checkpoint's maturity scores
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
