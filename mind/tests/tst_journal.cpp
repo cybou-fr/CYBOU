@@ -474,6 +474,39 @@ private Q_SLOTS:
         QVERIFY(journal.append(observation()) > 0);
     }
 
+    // Consolidation must not count its own output as new input. Answering that with one aggregate
+    // query rather than decoding every envelope after the offset removes an unbounded per-call cost
+    // from the process that owns the only write path.
+    void capabilityExcludingCountSkipsOnlyTheNamedScope()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        const QString consolidation = QStringLiteral("lifecycle.consolidation");
+
+        CognitiveEnvelope unscoped = observation();
+        QVERIFY(journal.append(unscoped) > 0);
+
+        CognitiveEnvelope owned = observation();
+        owned.capabilityScope = consolidation;
+        QVERIFY(journal.append(owned) > 0);
+
+        CognitiveEnvelope other = observation();
+        other.capabilityScope = QStringLiteral("presence.promise");
+        QVERIFY(journal.append(other) > 0);
+
+        // A contribution with no capability scope is stored as NULL, and a plain SQL inequality
+        // would silently drop it through three-valued logic. It is not the excluded scope, so it
+        // must count.
+        QCOMPARE(journal.countAfterExcludingCapability(0, consolidation), 2u);
+
+        // The offset is exclusive, matching the consumer high-water mark.
+        QCOMPARE(journal.countAfterExcludingCapability(1, consolidation), 1u);
+        QCOMPARE(journal.countAfterExcludingCapability(3, consolidation), 0u);
+
+        // Excluding a scope no contribution carries leaves every row counted.
+        QCOMPARE(journal.countAfterExcludingCapability(0, QStringLiteral("absent.scope")), 3u);
+    }
+
     void episodeReplaysInOrder()
     {
         QTemporaryDir dir;

@@ -57,4 +57,9 @@ backups, and future inter-node messages.
 - lifecycle ownership, recovery, scheduling, and bounded transport are active enforcement paths;
   epistemic governance and the M9 authorized-action boundary remain proposed;
 - user-service hardening does not yet define a least-privilege filesystem/network sandbox for
-  every daemon.
+  every daemon;
+- Mind binaries retain environment-triggered fault-injection hooks, which the reboot and
+  split-commit gates set against the installed package. This is accepted rather than outstanding: a
+  same-user process can already terminate any daemon with a signal, so the hooks grant no capability
+  the same-user boundary does not already concede, and removing them would move the recovery
+  evidence onto a binary that is not the shipped one.

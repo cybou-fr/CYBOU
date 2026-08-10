@@ -11,6 +11,45 @@
 let
   mind = cybouPackages.cybou-mind;
 
+  # Shared hardening for every Mind daemon. This reduces what a compromised Mind process can reach.
+  # It is deliberately NOT a fix for the open same-user D-Bus question: another process in the same
+  # session is a peer, not a child, so none of these directives constrain it. Recording that here
+  # keeps this from being counted as progress on the authorization boundary.
+  #
+  # Everything below is enforced through seccomp, rlimits, or the no-new-privileges bit, all of
+  # which apply to unprivileged `systemd --user` units. Namespace-based options - ProtectSystem,
+  # PrivateTmp, ProtectHome, PrivateNetwork - are omitted on purpose: they need privileges a user
+  # manager does not reliably have, and a directive that fails to apply is worse than an absent one
+  # because it reads as protection that is not there. ProtectHome would also be wrong regardless,
+  # since the canonical Journal lives under $XDG_STATE_HOME in the user's home directory.
+  hardening = {
+    NoNewPrivileges = true;
+
+    # Mind is entirely local: D-Bus, the Journal, and state files. Nothing opens a network socket,
+    # so AF_UNIX is the whole legitimate surface.
+    RestrictAddressFamilies = [ "AF_UNIX" ];
+
+    SystemCallArchitectures = "native";
+    SystemCallFilter = [
+      "@system-service"
+      "~@privileged"
+      "~@resources"
+    ];
+
+    RestrictNamespaces = true;
+    RestrictRealtime = true;
+    RestrictSUIDSGID = true;
+    LockPersonality = true;
+
+    # Deliberately not set: MemoryDenyWriteExecute. Qt allocates executable pages for its JIT, and
+    # forbidding them trades a real startup failure for a speculative gain.
+    #
+    # Deliberately not set: CapabilityBoundingSet. A user manager cannot drop the bounding set and
+    # fails the unit at step CAPABILITIES with status 218 - which is how the first attempt at this
+    # hardening broke every Mind daemon. Unprivileged user units hold no capabilities to drop, so
+    # the directive was redundant as well as fatal.
+  };
+
   mkService =
     {
       description,
@@ -29,7 +68,8 @@ let
         ExecStart = "${mind}/bin/${binary}";
         Restart = "on-failure";
         RestartSec = "1s";
-      };
+      }
+      // hardening;
     };
 in
 {

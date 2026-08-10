@@ -189,14 +189,13 @@ QByteArray EventService::ConsumerBacklog(const QString &consumerId) const
     result.insert(QStringLiteral("head"), QString::number(head));
     result.insert(QStringLiteral("offset"), QString::number(offset));
     quint64 backlog = registered ? head - offset : 0;
+    // Consolidation must not count its own output as new input, so its backlog excludes
+    // contributions carrying that capability scope. This used to decode one envelope per row of
+    // backlog, which put an unbounded per-call cost on the process that owns the only write path -
+    // the backlog grows with the biography, and any caller in the session could hold the writer
+    // busy by asking repeatedly. One aggregate query answers the same question.
     if (registered && consumerId == QStringLiteral("lifecycle.consolidation")) {
-        backlog = 0;
-        for (quint64 sequence = offset + 1; sequence <= head; ++sequence) {
-            const auto envelope = m_journal.atSequence(sequence);
-            if (envelope
-                && envelope->capabilityScope != QStringLiteral("lifecycle.consolidation"))
-                ++backlog;
-        }
+        backlog = m_journal.countAfterExcludingCapability(offset, consumerId);
     }
     result.insert(QStringLiteral("backlog"), QString::number(backlog));
     return result.toCborValue().toCbor();

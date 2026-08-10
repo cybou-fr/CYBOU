@@ -53,6 +53,15 @@ public:
     QList<CognitiveEnvelope> episode(const QUuid &correlationId) const override;
     std::optional<CognitiveEnvelope> atSequence(quint64 sequence) const override;
 
+    /// Number of contributions after `offset` whose capability scope is not `excludedCapability`.
+    ///
+    /// This exists so a consumer backlog can be answered by one aggregate query instead of reading
+    /// every envelope after the offset. It is not part of the EventStore contract: it is a counting
+    /// shortcut for the Journal owner, not a new way to read biography.
+    quint64 countAfterExcludingCapability(
+        quint64 offset,
+        const QString &excludedCapability) const;
+
     bool contains(const QUuid &messageId) const override;
     std::optional<CognitiveEnvelope> contribution(const QUuid &messageId) const override;
     QList<QUuid> evidenceFor(const QUuid &messageId) const override;

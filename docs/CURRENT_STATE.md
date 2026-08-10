@@ -245,6 +245,24 @@ component records. A real process test suspends selfd while it remains registere
 bounded partial snapshot, resumes it, and leaves subsequent recovery tests clean. All compound
 Presence reads and mutations are now protected from sequential timeout multiplication.
 
+P6.8 closes the substrate findings recorded in the [Implementation Audit](CODE_AUDIT_2026-08-10.md).
+The Journal commits at `synchronous=FULL` and verifies both commit pragmas at open, refusing to
+start rather than let a silent fallback leave durable-before-visible stated more strongly than
+storage supports; an in-memory Journal remains exempt because it makes no durability claim.
+presenced derives `Health()` from the outcome of its last projection, so Health1 can report a
+`presence-presentation` deficit when capabilities are unreachable or the shared budget expires,
+while readiness stays a separate dimension. The consolidation consumer backlog is answered by one
+aggregate query instead of decoding every envelope after the offset. Mind user units carry seccomp,
+rlimit, and no-new-privileges hardening; namespace-based directives are omitted because an
+unprivileged user manager cannot enforce them and `ProtectHome` would hide the Journal.
+
+Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
+call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
+`Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and
+incremental verification against a persisted checkpoint rather than a truncating limit. Unit
+hardening reduces the blast radius of a compromised Mind process and is not progress on the
+same-user D-Bus authorization boundary, which remains open.
+
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
 that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty
@@ -402,5 +420,9 @@ the corresponding milestone is implemented and gated.
   recovery fault matrix, and focused KVM gate.
 - P6.7: complete post-M6 latency hardening. Compound Presence mutations and reads share monotonic
   budgets and cannot multiply per-owner transport deadlines.
+- P6.8: substrate audit repair. Durable commit mode enforced at open, presenced health derived from
+  real projection outcomes, consolidation backlog counted by aggregate query, and user-unit
+  hardening limited to directives a user manager can enforce. Scalable biography replay and the
+  Presence migration to the async RPC client remain open.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.

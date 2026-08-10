@@ -581,13 +581,23 @@ location, and no new wire contract.
 - **A3 health honesty.** Derive presenced `Health()` from real aggregation outcomes and required
   downstream reachability, so `presence-presentation` can enter a deficit. Keep "the process is
   running" separate from "the process can present".
-- **A4 bounded reads.** Replace the per-row `ConsumerBacklog` scan with one counting query, enforce
-  a maximum on `Recent`, and bound `Verify` so no single call rechains an unbounded biography.
-- **A5 failpoints.** Move the `qFatal` fault-injection hooks and the artificial-delay knobs behind a
-  build option that test builds enable and the package build does not.
-- **A6 unit hardening.** Add justified systemd hardening to the Mind units. Record it as reducing
-  the blast radius of a compromised Mind process, not as progress on the same-user D-Bus
-  authorization boundary, which it does not address.
+- **A4 bounded reads.** Replace the per-row `ConsumerBacklog` scan with one aggregate counting
+  query. Do not cap `Recent` or bound `Verify`: `recent(0)` is how intentiond, predictord, and selfd
+  replay their entire state, and selfd calls `Verify` on the ordinary self-assessment path, so a cap
+  would silently truncate organ reconstruction and a partial verification would be reported as an
+  integrity result. Those two need a cursor-carrying replay API and incremental verification against
+  a persisted checkpoint, which is a contract change and is deferred below.
+- **A5 failpoints — withdrawn, no change.** The hooks stay in the shipped binaries. `qFatal` grants
+  no capability a same-user process lacks, since that process can already signal any daemon, and the
+  reboot gate sets `CYBOU_LIFECYCLE_FAILPOINT` against the installed package — gating them out would
+  move the split-commit evidence onto a binary that is not the shipped one. Recorded as an accepted
+  property in the threat model.
+- **A6 unit hardening.** Add justified systemd hardening to the Mind units, limited to directives a
+  user manager can actually enforce — seccomp, rlimits, and no-new-privileges. Namespace-based
+  options are omitted because an unprivileged user manager cannot apply them reliably, and
+  `ProtectHome` would hide the Journal. Record the result as reducing the blast radius of a
+  compromised Mind process, not as progress on the same-user D-Bus authorization boundary, which it
+  does not address.
 
 ### Deferred within this package
 
@@ -595,6 +605,12 @@ location, and no new wire contract.
 tested, but the presentation path still uses the blocking client, so presenced cannot answer a second
 caller while it aggregates. This is a change to the shape of `PresenceService`, not to its
 parameters, and it is sized as its own slice rather than bundled with the mechanical fixes above.
+
+**A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
+biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that
+carries a cursor and an incremental `Verify` against a persisted checkpoint, so a partial result is
+reported as partial. Both are wire-contract changes and belong with the M7 scale fixtures that give
+them a budget to be measured against.
 
 **A7 — fault-tier CI coverage.** None of the four KVM gates runs on a push. This is a maintainer
 policy decision — KVM-capable runner, scheduled run, or a documented pre-tag manual gate with a named

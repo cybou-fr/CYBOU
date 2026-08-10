@@ -119,10 +119,28 @@ projections", and the P0 risk that same-user D-Bus is not a security boundary. T
 where the two risks meet concretely: any process in the user session can hold the canonical writer
 busy by calling a read method in a loop.
 
-**Resolution:** give `ConsumerBacklog` a single counting query, give `recent` an enforced maximum,
-and make `Verify` incremental or explicitly bounded per call. This does not close the same-user
-authorization gap — that needs caller checks in `ServiceHost` — but it removes the cheapest way to
-exploit it.
+**Resolution, corrected during implementation.** The original resolution here proposed capping
+`Recent` and bounding `Verify` per call. Reading the callers showed that would be wrong, and the
+correction is recorded rather than quietly dropped:
+
+- `ConsumerBacklog` **is** a pure oversight and is fixed. One aggregate counting query replaces the
+  per-row decode. The NULL capability scope is handled explicitly, because a plain SQL inequality
+  would drop those rows through three-valued logic and undercount the backlog.
+- `Recent` **must not** be capped. `recent(0)` is deliberate: intentiond, predictord, and selfd
+  reconstruct their entire state by replaying the whole biography through it. A cap would silently
+  truncate organ state reconstruction — a correctness failure strictly worse than the latency it
+  would fix.
+- `Verify` **must not** be bounded per call without changing what it means. selfd calls it on the
+  ordinary self-assessment path, so a partial verification would have to be reported as partial
+  rather than presented as an integrity result.
+
+So two of the three are not oversights. They are a design that is correct and does not scale: every
+organ rebuild pulls the full biography across D-Bus, and every self-assessment rechains it. Fixing
+that properly means incremental verification against a persisted checkpoint and a replay API that
+carries a cursor — a schema and contract change, not a parameter change. It is scheduled as its own
+slice rather than mechanically capped here.
+
+None of this closes the same-user authorization gap; that needs caller checks in `ServiceHost`.
 
 ## A5 — Fault injection is compiled into shipped binaries
 
@@ -131,13 +149,27 @@ exploit it.
 [`LifecycleService.cpp`](../mind/services/lifecycled/LifecycleService.cpp) reads
 `CYBOU_LIFECYCLE_FAILPOINT`. Both call `qFatal` when the variable matches.
 
-**What the code does:** an environment variable crashes a Mind process in the installed build. These
-are test hooks, and they are good ones — the split-commit evidence depends on them — but they belong
-to test builds. Related timing knobs (`CYBOU_PRESENCE_ARTIFICIAL_DELAY_MS` and the predictord
-equivalent) insert real `QThread::msleep` calls into the production binary for the same reason.
+**What the code does:** an environment variable crashes a Mind process in the installed build.
+Related timing knobs (`CYBOU_PRESENCE_ARTIFICIAL_DELAY_MS` and the predictord equivalent) insert
+real `QThread::msleep` calls into the production binary for the same reason.
 
-**Resolution:** put the crash failpoints behind a CMake option that the test builds enable and the
-package build does not. The timing knobs can follow the same option.
+**Withdrawn on examination. This is not a finding; the original resolution was wrong.** Two facts
+that reading the code more carefully made clear:
+
+1. **The failpoints grant no capability.** `qFatal` terminates the process. Any process in the same
+   user session can already do exactly that with a signal, and the same-user boundary is the one
+   the checkpoint already records as a P0. Setting the variable for a running service additionally
+   requires control of the service manager environment, which is strictly more privilege than the
+   crash it would buy. Removing them would close nothing.
+2. **Removing them would weaken real evidence.** `tests/lifecycle-continuity.nix` sets
+   `CYBOU_LIFECYCLE_FAILPOINT` against the **installed** package to prove split-commit recovery
+   across a real reboot. Gating the hooks out of the package build would move that evidence onto a
+   binary that is not the one shipped — trading proof about the artifact for tidiness in it.
+
+**Resolution:** the hooks stay, and the reason is recorded in the threat model as an accepted
+property rather than left to look accidental. The general rule this case illustrates is worth
+keeping: test scaffolding in a shipped binary is a smell, but a smell is a reason to check the
+threat, not a finding on its own.
 
 ## A6 — Mind units carry no hardening directives
 
@@ -151,6 +183,28 @@ be overstated. Unit hardening constrains what a compromised Mind process can rea
 about the checkpoint's actual P0 — that any same-user process may call Mind mutation interfaces —
 because that caller is a peer, not a child. Both are worth doing; they are not substitutes, and the
 hardening should not be recorded as progress on the authorization boundary.
+
+**Resolution: applied and verified.** The units now set `NoNewPrivileges`,
+`RestrictAddressFamilies=AF_UNIX` (Mind opens no network socket), a `@system-service` system-call
+filter less `@privileged` and `@resources`, and the namespace/realtime/SUID/personality
+restrictions. All of these are enforced through seccomp, rlimits, or the no-new-privileges bit,
+which apply to unprivileged `systemd --user` units.
+
+Namespace-based directives — `ProtectSystem`, `PrivateTmp`, `ProtectHome`, `PrivateNetwork` — are
+omitted deliberately. A user manager cannot reliably apply them, and a directive that silently fails
+to apply is worse than an absent one because it reads as protection that is not there. `ProtectHome`
+would be wrong in any case: the canonical Journal lives under `$XDG_STATE_HOME` in the user's home.
+
+Two directives were removed after the VM gate rejected them, which is worth recording because it is
+the argument for running these gates at all:
+
+- `CapabilityBoundingSet` failed every daemon at step `CAPABILITIES` with status 218 — a user
+  manager cannot drop the bounding set. It was also redundant, since unprivileged user units hold no
+  capabilities to drop. Had this been merged on the strength of the fast checks alone, it would have
+  broken Mind on every desktop while CI stayed green.
+- `MemoryDenyWriteExecute` is not set, because Qt allocates executable pages.
+
+All four KVM gates pass with the hardening applied, including both split-commit reboot recoveries.
 
 ## A7 — No fault evidence runs in hosted CI
 

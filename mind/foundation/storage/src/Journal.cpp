@@ -772,6 +772,24 @@ QList<CognitiveEnvelope> Journal::episode(const QUuid &correlationId) const
     return out;
 }
 
+quint64 Journal::countAfterExcludingCapability(
+    quint64 offset,
+    const QString &excludedCapability) const
+{
+    QSqlQuery query(m_db);
+    // A NULL or empty capability scope is not the excluded one, so it counts. Comparing in SQL
+    // would drop NULL rows through three-valued logic, which is why the IS NULL arm is explicit.
+    query.prepare(QStringLiteral(
+        "SELECT COUNT(*) FROM contribution "
+        "WHERE seq > ? AND (capability IS NULL OR capability <> ?)"));
+    query.addBindValue(static_cast<qulonglong>(offset));
+    query.addBindValue(excludedCapability);
+    if (!query.exec() || !query.next()) {
+        return 0;
+    }
+    return query.value(0).toULongLong();
+}
+
 bool Journal::contains(const QUuid &messageId) const
 {
     if (messageId.isNull()) {
