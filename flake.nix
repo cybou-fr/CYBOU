@@ -186,6 +186,13 @@
           cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
         };
 
+        # Focused M6 gate: Plasma remains present while D-Bus activation, timeout recovery,
+        # and required Event1 loss are exercised through installed user services.
+        m6-recovery-boundary = import ./tests/m6-recovery-boundary.nix {
+          inherit pkgs;
+          cybouPackages = self.packages.${pkgs.stdenv.hostPlatform.system};
+        };
+
         # Static KDE package validation. Catches the Gate B failures - wrong metadata
         # file name, ID/directory mismatch, wrong layout script name, symlinks,
         # malformed SVG, TBD licences - without needing a Plasma session.

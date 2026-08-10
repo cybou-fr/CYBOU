@@ -479,11 +479,18 @@ remains alive. Presence stays reachable but accepted biography, identity continu
 access fail closed; a Promise attempt creates no accepted contribution. Restart opens the same
 Journal with an unchanged count, UUID, session count, and existing commitment, and the rejected
 description is absent. Owner-verified refresh restores commands. This completes the process-level
-P6.6 matrix; the focused KVM boundary remains.
+P6.6 matrix.
+
+**Slice 6: implemented.** The focused single-node KVM gate boots the shipped Plasma session,
+proves D-Bus/systemd activation of Presence without replacing plasmashell, and exercises a delayed
+lifecycle interruption without permitting a false durable transition. It then recovers the same
+service boundary, suspends the required Event1 owner, observes a fail-closed Promise with no Journal
+growth, resumes Event1, and verifies both owner and Plasma continuity. This completes P6.6.
 
 ### Fault-injection matrix
 
-All process-level cases above are implemented with recovery and duplicate-effect assertions.
+All process-level cases above and the focused system boundary are implemented with recovery and
+duplicate-effect assertions.
 
 Use process integration for the complete matrix and one focused KVM gate for D-Bus/systemd
 activation, timeout, recovery, and Plasma projection. Do not multiply the expensive two-node smoke
@@ -494,6 +501,11 @@ test for cases already proven below the system boundary.
 Loss of every optional organ has an explicit capability deficit, useful remaining behavior,
 bounded retry/recovery rule, Presence projection, and test. Required-owner loss fails closed without
 identity replacement, commitment loss, false acceptance, or duplicate durable effects.
+
+**Status: satisfied.** The complete process matrix plus `m6-recovery-boundary` provide the M6 exit
+evidence. Before broadening into M7, harden compound Presence commands with one propagated command
+deadline: individual owner calls are bounded, but a multi-owner command can currently accumulate
+those budgets (the Event1-unresponsive KVM case returns fail-closed in about 24 seconds).
 
 ## Deferred behind gates
 

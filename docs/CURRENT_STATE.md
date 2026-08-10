@@ -200,7 +200,15 @@ P6.6 slice 5 covers required Event1 loss. Presence remains a responsive presenta
 projects biography, identity continuity, and commitments as unavailable. Rejected Promise creates
 no Journal effect; restart preserves exact count, identity/session continuity, and existing
 commitments, excludes the rejected description, and restores commands after verification. The
-process fault matrix is complete; focused KVM evidence is still required for the M6 exit gate.
+process fault matrix is complete.
+
+P6.6 slice 6 adds the focused KVM exit gate. A real Plasma session proves Presence D-Bus/systemd
+activation without shell replacement, durable lifecycle state remains unchanged across a timed-out
+interruption and changes only after recovery, and an unresponsive Event1 owner rejects Promise
+without Journal growth. Resuming the same owner preserves its PID, count, and the plasmashell PID.
+Together with slices 1–5, this completes P6.6 and satisfies the M6 exit gate. The next hardening
+slice is a propagated deadline for compound Presence commands; per-owner calls are bounded today,
+but their budgets can accumulate across one command.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M5 form the implemented process-isolated, continuity-preserving substrate of that model. M6 is

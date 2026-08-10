@@ -121,6 +121,13 @@ Presence reachability with fail-closed biography/identity/commitment gates, reje
 acceptance, then verifies identical Journal count, UUID, session count, existing commitments, and
 absence of the rejected description after restart.
 
+`m6-recovery-boundary` is the focused P6.6 KVM exit gate. It boots the shipped Plasma session,
+checks D-Bus/systemd activation of presenced without replacing plasmashell, proves a delayed
+interruption cannot invent a lifecycle transition, then verifies successful recovery. Finally it
+suspends eventd, refreshes Health1, requires Promise to fail closed under an explicit 40-second
+client deadline, resumes the same owner, and asserts unchanged Event1 count and Plasma PID. Run it
+with `nix build .#checks.x86_64-linux.m6-recovery-boundary --print-build-logs` on a KVM host.
+
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
 eventd restart. Lifecycle process integration proves a completed run advances its consumer while
