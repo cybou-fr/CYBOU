@@ -214,6 +214,7 @@ target_link_libraries(
     test-m4-process-integration
     PRIVATE
         cybou-event-client
+        cybou-eventd-core
         cybou-fabric
         cybou-presence
         Qt6::Test

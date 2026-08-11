@@ -619,9 +619,42 @@ A claim made when this package was opened has been withdrawn. healthd does **not
 synchronous client — `Refresh` already issues every probe concurrently through `AsyncRpcClient`
 under a bounded deadline. No healthd work was needed.
 
-**P6.8 is complete.** The next work is the M7 entry sequence below, beginning with scale budgets.
-Do not open a P6.9 for further polish: the substrate findings are closed or explicitly deferred with
-reasons, and the remaining risks are M7's to carry.
+**P6.8 is complete.** Do not open a P6.9 for further polish: the substrate findings are closed or
+explicitly deferred with reasons, and the remaining risks are M7's to carry.
+
+## P7.0-trust — Bind Event1 origin to the calling process
+
+**Status: implemented.** `originOrgan` is provenance, and until now the caller simply asserted it.
+eventd resolves the calling connection to its executable, caches that per connection, and refuses
+any contribution claiming one of the nine organ identities unless the caller is that organ.
+
+The binding is to the executable, not to D-Bus name ownership. identityd records its session to
+Event1 from its constructor, before `ServiceHost` publishes its name, so requiring ownership would
+reject that write and break identity continuity at startup — a worse failure than the forgery it
+prevents. A same-user process cannot fake `/proc/<pid>/exe` without actually being that binary, and
+the answer does not depend on startup ordering.
+
+This is scoped deliberately. It closes impersonation, not authorship: a caller that is not an organ
+may still contribute under a name of its own, which is how tools and the test suite write. Method-
+level authorization and capability tokens remain outstanding and are recorded as such in the threat
+model.
+
+Sequenced before the scale fixtures on purpose: it changes what `Submit` accepts, so building
+fixtures first would mean rebuilding them.
+
+### Exit gate
+
+A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
+unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
+
+## P7.0-scale — Journal fixtures and budgets
+
+Deterministic fixtures at 10k / 100k / 1m contributions, measuring append, full replay, `Verify`,
+cold reconstruction per organ, Presence snapshot, lifecycle consolidation, RSS and Journal size. Run
+10k in the ordinary checks, 100k in a separate scale gate, 1m as a release or manual benchmark.
+
+Budgets first, optimisation second. The paged replay and incremental verification below are the
+likely responses, but neither should be designed before there are numbers to design against.
 
 **A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
 biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that

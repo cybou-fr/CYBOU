@@ -3,6 +3,7 @@
 
 #include "cybou/fabric/OrganClients.h"
 #include "cybou/fabric/FabricCodec.h"
+#include "cybou/eventd/EventService.h"
 #include "cybou/ipc/EventClient.h"
 #include "cybou/presence/Presence.h"
 
@@ -1365,6 +1366,56 @@ private Q_SLOTS:
     // probe - waited behind it for the whole budget. presenceSnapshotHasOneBoundedOwnerBudget
     // cannot see this: total latency was already bounded, it was the exclusivity that was wrong.
     //
+    // originOrgan is provenance: it answers who brought a contribution into the biography. Nothing
+    // downstream can check that claim, so eventd binds it to the process that actually called.
+    // Until it did, any process in the session could attribute a contribution to predictord or
+    // presenced, and the Journal would record the lie as fact.
+    //
+    // This test process is not a Mind organ, so it stands in for exactly the attacker the M7
+    // perception work has to exclude before a perception adapter's origin means anything.
+    void eventOriginCannotBeForged()
+    {
+        EventClient events;
+        QVERIFY(events.isOpen());
+        const quint64 before = events.count();
+
+        for (const QString &stolen : reservedOrganIdentities()) {
+            CognitiveEnvelope forged;
+            forged.messageId = QUuid::createUuid();
+            forged.correlationId = forged.messageId;
+            forged.originOrgan = stolen;
+            forged.originNode = QStringLiteral("local");
+            forged.kind = ContributionKind::Observation;
+            forged.wallTime = QDateTime::currentDateTimeUtc();
+            forged.confidence = 1.0;
+            forged.privacy = PrivacyClass::Local;
+
+            QVERIFY2(
+                events.append(forged) == 0,
+                qPrintable(QStringLiteral("eventd accepted a contribution forged as %1")
+                               .arg(stolen)));
+            QVERIFY(events.lastError().contains(QStringLiteral("does not belong")));
+        }
+
+        // Rejection must be total: nothing forged reached the Journal.
+        QCOMPARE(events.count(), before);
+
+        // Authorship is not what this closes. A caller that is not an organ may still contribute
+        // under a name of its own - that is how tools and these tests write - and a general
+        // capability model remains outstanding.
+        CognitiveEnvelope own;
+        own.messageId = QUuid::createUuid();
+        own.correlationId = own.messageId;
+        own.originOrgan = QStringLiteral("provenance-test");
+        own.originNode = QStringLiteral("local");
+        own.kind = ContributionKind::Observation;
+        own.wallTime = QDateTime::currentDateTimeUtc();
+        own.confidence = 1.0;
+        own.privacy = PrivacyClass::Local;
+        QVERIFY2(events.append(own) > 0, qPrintable(events.lastError()));
+        QCOMPARE(events.count(), before + 1);
+    }
+
     // Mutations are causally ordered - gate, Event1 preflight, activity, durable Observation, then
     // the domain mutation - so unlike the projection they are not parallelised. Making them
     // asynchronous is a separate property from making them concurrent: the chain still runs in

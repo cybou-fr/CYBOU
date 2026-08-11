@@ -7,6 +7,10 @@
 #include "cybou/events/EventStore.h"
 
 #include <QCborMap>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusMessage>
+#include <QDBusReply>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -34,7 +38,106 @@ bool validConsumerId(const QString &consumerId)
     return pattern.match(consumerId).hasMatch();
 }
 
+// Map a Mind executable to the organ identity it is entitled to claim.
+//
+// The Nix build wraps Qt applications, so the running executable is not `cybou-identityd` but
+// `.cybou-identityd-wrapped`. Resolving the real binary and then undoing that decoration is what
+// makes this work against the installed package rather than only a development build.
+QString organIdentityForExecutable(const QString &executablePath)
+{
+    QString name = QFileInfo(executablePath).fileName();
+    if (name.startsWith(QLatin1Char('.'))) {
+        name.remove(0, 1);
+    }
+    if (name.endsWith(QLatin1String("-wrapped"))) {
+        name.chop(QStringLiteral("-wrapped").size());
+    }
+    if (!name.startsWith(QLatin1String("cybou-"))) {
+        return {};
+    }
+    name.remove(0, QStringLiteral("cybou-").size());
+    return reservedOrganIdentities().contains(name) ? name : QString();
+}
+
 } // namespace
+
+QStringList reservedOrganIdentities()
+{
+    static const QStringList identities{
+        QStringLiteral("eventd"),
+        QStringLiteral("healthd"),
+        QStringLiteral("lifecycled"),
+        QStringLiteral("identityd"),
+        QStringLiteral("intentiond"),
+        QStringLiteral("predictord"),
+        QStringLiteral("selfd"),
+        QStringLiteral("workspaced"),
+        QStringLiteral("presenced"),
+    };
+    return identities;
+}
+
+// Bind the claimed origin to the process that actually made the call.
+//
+// The obvious binding - require the caller to own the organ's well-known D-Bus name - does not
+// work: identityd writes "session began" to Event1 from its constructor, before ServiceHost
+// publishes its name. Enforcing name ownership would reject that and break identity continuity at
+// startup, which is a worse failure than the forgery it prevents.
+//
+// So the binding is to the caller's executable. A same-user process cannot fake /proc/<pid>/exe
+// without actually being that binary, and the answer does not depend on startup ordering.
+QString EventService::callerOrganIdentity() const
+{
+    if (!calledFromDBus()) {
+        return {};
+    }
+
+    const QString sender = message().service();
+    if (sender.isEmpty()) {
+        return {};
+    }
+    const auto cached = m_resolvedCallers.constFind(sender);
+    if (cached != m_resolvedCallers.constEnd()) {
+        return *cached;
+    }
+
+    QString identity;
+    QDBusConnectionInterface *bus = connection().interface();
+    if (bus) {
+        // One bus round trip per connection, not per submission. eventd owns the only write path,
+        // so asking the bus about the same peer on every append would put an avoidable cost on it.
+        const QDBusReply<uint> pid = bus->servicePid(sender);
+        if (pid.isValid()) {
+            identity = organIdentityForExecutable(
+                QFile::symLinkTarget(QStringLiteral("/proc/%1/exe").arg(pid.value())));
+        }
+    }
+
+    m_resolvedCallers.insert(sender, identity);
+    return identity;
+}
+
+bool EventService::originIsAuthentic(const QString &claimedOrigin) const
+{
+    // An in-process caller is the owning service itself, not a peer: unit tests construct
+    // EventService directly and there is no sender to check against.
+    if (!calledFromDBus()) {
+        return true;
+    }
+
+    const QString caller = callerOrganIdentity();
+    if (!caller.isEmpty()) {
+        // A Mind organ may only speak as itself. This is the case that matters: it stops one organ,
+        // or anything running an organ binary, from attributing a contribution to another.
+        return claimedOrigin == caller;
+    }
+
+    // Everything else - tools, tests, future adapters that are not yet reserved identities - may
+    // contribute under its own name, but may not borrow an organ's. Non-reserved origins stay open
+    // deliberately: this closes impersonation, not authorship, and a general capability model is
+    // still outstanding.
+    return !reservedOrganIdentities().contains(claimedOrigin);
+}
 
 EventService::EventService(const QString &journalPath, QObject *parent)
     : QObject(parent)
@@ -131,6 +234,13 @@ QByteArray EventService::Submit(const QByteArray &encodedEnvelope)
         return submitReply(
             0,
             QStringLiteral("invalid Event1 proposal: %1").arg(decodeError));
+    }
+
+    if (!originIsAuthentic(envelope->originOrgan)) {
+        return submitReply(
+            0,
+            QStringLiteral("origin %1 does not belong to the calling process")
+                .arg(envelope->originOrgan));
     }
 
     const quint64 sequence = m_journal.append(*envelope);

@@ -39,6 +39,8 @@ backups, and future inter-node messages.
 ## Controls
 
 - single Journal writer;
+- contribution origin bound to the calling process: eventd resolves the caller's executable and
+  refuses any contribution claiming an organ identity that caller is not;
 - canonical full-envelope hashing;
 - stable D-Bus policy;
 - message uniqueness;
@@ -51,7 +53,10 @@ backups, and future inter-node messages.
 
 ## Current limitations
 
-- same-user D-Bus callers do not yet have capability tokens or method-level authorization;
+- same-user D-Bus callers do not yet have capability tokens or method-level authorization. Event1
+  now refuses organ impersonation, which closes forged provenance specifically; it does not
+  constrain what a non-organ caller may contribute under a name of its own, and it is not a general
+  authorization model;
 - Journal hashing detects inconsistency but is not an external signature/trust anchor;
 - retention and replica erasure are design targets, not implemented controls;
 - lifecycle ownership, recovery, scheduling, and bounded transport are active enforcement paths;

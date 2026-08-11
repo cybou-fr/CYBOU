@@ -273,6 +273,16 @@ interruption. A process test suspends intentiond mid-command and observes a seco
 while the mutation is still in flight. healthd already probed concurrently through the async client
 and was not altered.
 
+Event1 binds a contribution's claimed `originOrgan` to the process that submitted it. eventd resolves
+the calling connection to its executable, caches that per connection, and refuses any contribution
+claiming one of the nine organ identities unless the caller is that organ. The binding is to the
+executable rather than to D-Bus name ownership because identityd records its session to Event1 from
+its constructor, before it publishes its name; requiring ownership would reject that and break
+identity continuity at startup. A process test proves all nine identities are refused to a non-organ
+caller, that nothing forged reaches the Journal, and that a caller contributing under its own name
+still succeeds. This closes forged provenance; it is not a general authorization model, and what a
+non-organ caller may contribute under its own name is unchanged.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and
