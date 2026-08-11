@@ -3,6 +3,7 @@
 
 #include "PresenceService.h"
 
+#include "cybou/events/EnvelopeCodec.h"
 #include "cybou/fabric/FabricCodec.h"
 
 #include <QCborMap>
@@ -39,23 +40,6 @@ int presenceCommandTimeoutMs()
         "CYBOU_PRESENCE_COMMAND_TIMEOUT_MS", &ok);
     return ok ? std::clamp(configured, 50, 60000) : kPresenceCommandTimeoutMs;
 }
-
-class CommandDeadline
-{
-public:
-    CommandDeadline()
-        : m_deadline(presenceCommandTimeoutMs())
-    {
-    }
-
-    int remaining() const
-    {
-        return static_cast<int>(std::max<qint64>(0, m_deadline.remainingTime()));
-    }
-
-private:
-    QDeadlineTimer m_deadline;
-};
 
 bool isAvailable(const CapabilitySnapshot &snapshot, const QString &capabilityId)
 {
@@ -304,6 +288,28 @@ RpcRetryPolicy projectionPolicy()
 
 } // namespace
 
+// One in-flight compound mutation. Carries the delayed reply and the shared budget across the
+// continuation chain; `lastError` is published through LastError() when the reply is sent.
+struct CommandRequest {
+    QDBusConnection connection;
+    QDBusMessage message;
+    QDeadlineTimer deadline;
+    QString lastError;
+    bool replied{false};
+
+    CommandRequest(QDBusConnection bus, QDBusMessage request, int budgetMs)
+        : connection(std::move(bus))
+        , message(std::move(request))
+        , deadline(budgetMs)
+    {
+    }
+
+    int remaining() const
+    {
+        return static_cast<int>(std::max<qint64>(0, deadline.remainingTime()));
+    }
+};
+
 PresenceService::PresenceService(QObject *parent)
     : QObject(parent)
     , m_healthRpc(kHealthEndpoint, projectionPolicy())
@@ -358,32 +364,15 @@ QString PresenceService::Health() const
     return QStringLiteral("degraded");
 }
 
+// Every command now records why it failed on its own request and publishes that when it replies, so
+// this is a single value rather than a search.
+//
+// The chain this replaces walked each synchronous client's lastError() in turn. Those clients no
+// longer carry the commands, so the fallbacks could only ever return state left over from an
+// unrelated earlier call - a stale error attributed to whichever command asked next.
 QString PresenceService::LastError() const
 {
-    if (!m_lastError.isEmpty()) {
-        return m_lastError;
-    }
-
-    if (!m_events.lastError().isEmpty()) {
-        return m_events.lastError();
-    }
-    if (!m_health.lastError().isEmpty()) return m_health.lastError();
-    if (!m_identity.lastError().isEmpty()) {
-        return m_identity.lastError();
-    }
-    if (!m_intentions.lastError().isEmpty()) {
-        return m_intentions.lastError();
-    }
-    if (!m_predictor.lastError().isEmpty()) {
-        return m_predictor.lastError();
-    }
-    if (!m_self.lastError().isEmpty()) {
-        return m_self.lastError();
-    }
-    if (!m_workspace.lastError().isEmpty()) {
-        return m_workspace.lastError();
-    }
-    return m_lifecycle.lastError();
+    return m_lastError;
 }
 
 QVariantMap PresenceService::healthMap(const CapabilitySnapshot &snapshot) const
@@ -660,56 +649,112 @@ QByteArray PresenceService::Snapshot() const
     return {};
 }
 
+// Activity and DetailedObligations are two-step gated reads rather than compound gathers, but they
+// are still Presence surface: leaving them on the blocking client would mean a slow Event1 or
+// Intention1 could hold presenced exactly as the projection used to. Same shape as the mutations -
+// gate first, then read - only without a durable contribution.
+void PresenceService::gatedRead(
+    const std::shared_ptr<CommandRequest> &request,
+    const QString &capabilityId,
+    AsyncRpcClient &client,
+    const QString &method,
+    const QVariantList &arguments,
+    std::function<QVariant(const RpcResult &)> project,
+    const QVariant &failureValue) const
+{
+    m_healthRpc.call(
+        QStringLiteral("Snapshot"),
+        {},
+        RpcOperationSemantics::ReadOnly,
+        [this, request, capabilityId, &client, method, arguments,
+         project = std::move(project), failureValue](const RpcResult &healthResult) {
+            CapabilitySnapshot capabilities;
+            if (healthResult.succeeded() && !healthResult.reply.arguments().isEmpty()) {
+                QString error;
+                capabilities = decodeCapabilitySnapshot(
+                    healthResult.reply.arguments().first().toByteArray(), &error);
+            }
+            if (!isAvailable(capabilities, capabilityId) || request->remaining() == 0) {
+                replyOnce(request, failureValue);
+                return;
+            }
+            client.call(
+                method,
+                arguments,
+                RpcOperationSemantics::ReadOnly,
+                [this, request, project](const RpcResult &result) {
+                    replyOnce(request, project(result));
+                },
+                request->remaining());
+        },
+        request->remaining());
+}
+
 QByteArray PresenceService::Activity(int limit) const
 {
-    QVariantList result;
-    CommandDeadline deadline;
+    auto request = beginRequest();
+    const QVariant empty = QVariant(FabricCodec::encodeList(QVariantList{}));
 
-    int timeoutMs = deadline.remaining();
-    const CapabilitySnapshot health = timeoutMs > 0
-        ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
-    if (limit <= 0 || !isAvailable(health, QStringLiteral("accepted-biography"))) {
-        return FabricCodec::encodeList(result);
+    if (limit <= 0) {
+        replyOnce(request, empty);
+        return {};
     }
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return FabricCodec::encodeList(result);
-    for (const CognitiveEnvelope &envelope :
-         m_events.recent(limit, timeoutMs)) {
-        QVariantMap map;
-        map[QStringLiteral("when")] =
-            envelope.wallTime.toLocalTime();
-        map[QStringLiteral("organ")] =
-            envelope.originOrgan;
-        map[QStringLiteral("kind")] =
-            kindToString(envelope.kind);
-        map[QStringLiteral("thread")] =
-            envelope.correlationId.toString(QUuid::WithoutBraces);
-        result.append(map);
-    }
+    gatedRead(
+        request,
+        QStringLiteral("accepted-biography"),
+        m_eventRpc,
+        QStringLiteral("Recent"),
+        {limit},
+        [](const RpcResult &result) {
+            QVariantList activity;
+            if (result.succeeded() && !result.reply.arguments().isEmpty()) {
+                QString error;
+                for (const CognitiveEnvelope &envelope : EnvelopeCodec::decodeList(
+                         result.reply.arguments().first().toByteArray(), &error)) {
+                    QVariantMap entry;
+                    entry[QStringLiteral("when")] = envelope.wallTime.toLocalTime();
+                    entry[QStringLiteral("organ")] = envelope.originOrgan;
+                    entry[QStringLiteral("kind")] = kindToString(envelope.kind);
+                    entry[QStringLiteral("thread")] =
+                        envelope.correlationId.toString(QUuid::WithoutBraces);
+                    activity.append(entry);
+                }
+            }
+            return QVariant(FabricCodec::encodeList(activity));
+        },
+        empty);
 
-    return FabricCodec::encodeList(result);
+    return {};
 }
 
 QByteArray PresenceService::DetailedObligations() const
 {
-    CommandDeadline deadline;
-    int timeoutMs = deadline.remaining();
-    const CapabilitySnapshot health = timeoutMs > 0
-        ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
-    if (!isAvailable(health, QStringLiteral("commitment-access")))
-        return FabricCodec::encodeList(QVariantList{});
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return FabricCodec::encodeList(QVariantList{});
-    return FabricCodec::encodeList(
-        m_intentions.open(timeoutMs));
+    auto request = beginRequest();
+    const QVariant empty = QVariant(FabricCodec::encodeList(QVariantList{}));
+
+    gatedRead(
+        request,
+        QStringLiteral("commitment-access"),
+        m_intentionRpc,
+        QStringLiteral("Open"),
+        {},
+        [](const RpcResult &result) {
+            QString error;
+            const QVariantList open = result.succeeded()
+                    && !result.reply.arguments().isEmpty()
+                ? FabricCodec::decodeList(result.reply.arguments().first().toByteArray(), &error)
+                : QVariantList{};
+            return QVariant(FabricCodec::encodeList(open));
+        },
+        empty);
+
+    return {};
 }
 
-bool PresenceService::appendUserObservation(
-    const QString &event,
-    const QVariantMap &details,
-    QUuid *messageId,
-    int timeoutMs)
+namespace {
+
+CognitiveEnvelope userObservation(const QString &event, const QVariantMap &details)
 {
     CognitiveEnvelope observation;
     observation.messageId = QUuid::createUuid();
@@ -723,318 +768,482 @@ bool PresenceService::appendUserObservation(
     QCborMap payload;
     payload.insert(QStringLiteral("event"), event);
     for (auto it = details.cbegin(); it != details.cend(); ++it) {
-        payload.insert(
-            it.key(),
-            QCborValue::fromVariant(it.value()));
+        payload.insert(it.key(), QCborValue::fromVariant(it.value()));
     }
-    observation.payloadCbor =
-        payload.toCborValue().toCbor();
+    observation.payloadCbor = payload.toCborValue().toCbor();
+    return observation;
+}
 
-    if (m_events.append(observation, timeoutMs) == 0) {
-        m_lastError = m_events.lastError();
+// eventd answers Submit with a CBOR {sequence, error} map rather than a bare value, so acceptance
+// has to be read out of the payload instead of inferred from the call succeeding.
+bool submitAccepted(const RpcResult &result, QString *error)
+{
+    if (!result.succeeded() || result.reply.arguments().isEmpty()) {
+        *error = rpcOutcomeToString(result.outcome) + QStringLiteral(": ") + result.errorMessage;
         return false;
     }
-
-    if (messageId) {
-        *messageId = observation.messageId;
+    const QCborValue value =
+        QCborValue::fromCbor(result.reply.arguments().first().toByteArray());
+    if (!value.isMap()) {
+        *error = QStringLiteral("eventd returned an invalid Submit reply");
+        return false;
     }
-
+    bool ok = false;
+    const quint64 sequence =
+        value.toMap().value(QStringLiteral("sequence")).toString().toULongLong(&ok);
+    if (!ok || sequence == 0) {
+        const QString reported = value.toMap().value(QStringLiteral("error")).toString();
+        *error = reported.isEmpty() ? QStringLiteral("eventd rejected the contribution") : reported;
+        return false;
+    }
     return true;
 }
 
-QString PresenceService::Promise(
-    const QString &description)
+} // namespace
+
+std::shared_ptr<CommandRequest> PresenceService::beginRequest() const
 {
     m_lastError.clear();
+    setDelayedReply(true);
+    return std::make_shared<CommandRequest>(
+        connection(), message(), presenceCommandTimeoutMs());
+}
+
+void PresenceService::replyOnce(
+    const std::shared_ptr<CommandRequest> &request,
+    const QVariant &value) const
+{
+    if (request->replied) {
+        return;
+    }
+    request->replied = true;
+    if (!request->lastError.isEmpty()) {
+        m_lastError = request->lastError;
+    }
+    request->connection.send(request->message.createReply(value));
+}
+
+void PresenceService::beginUserCommand(
+    const std::shared_ptr<CommandRequest> &request,
+    const QStringList &requiredCapabilities,
+    const QString &activityCause,
+    const QString &observationEvent,
+    const QVariantMap &observationDetails,
+    const QVariant &failureValue,
+    std::function<void(const QUuid &causeId)> committed) const
+{
+    const auto fail = [this, request, failureValue](const QString &reason) {
+        request->lastError = reason;
+        replyOnce(request, failureValue);
+    };
+
+    if (request->remaining() == 0) {
+        fail(QStringLiteral("the command budget expired before it started"));
+        return;
+    }
+
+    m_healthRpc.call(
+        QStringLiteral("Snapshot"),
+        {},
+        RpcOperationSemantics::ReadOnly,
+        [this, request, requiredCapabilities, activityCause, observationEvent, observationDetails,
+         failureValue, committed = std::move(committed), fail](const RpcResult &healthResult) {
+            CapabilitySnapshot capabilities;
+            if (healthResult.succeeded() && !healthResult.reply.arguments().isEmpty()) {
+                QString error;
+                capabilities = decodeCapabilitySnapshot(
+                    healthResult.reply.arguments().first().toByteArray(), &error);
+            }
+            for (const QString &capabilityId : requiredCapabilities) {
+                if (!isAvailable(capabilities, capabilityId)) {
+                    fail(QStringLiteral("%1 is unavailable").arg(capabilityId));
+                    return;
+                }
+            }
+
+            // Event1 is the durability boundary for everything this command produces. Probe it
+            // before notifying auxiliary owners, so an unavailable Journal costs one bounded step
+            // rather than the budget of every step that would have followed it.
+            if (request->remaining() == 0) {
+                fail(QStringLiteral("the command budget expired before the Event1 preflight"));
+                return;
+            }
+            m_eventRpc.call(
+                QStringLiteral("Ready"),
+                {},
+                RpcOperationSemantics::ReadOnly,
+                [this, request, activityCause, observationEvent, observationDetails,
+                 committed = std::move(committed), fail](const RpcResult &readyResult) {
+                    const bool journalOpen = readyResult.succeeded()
+                        && !readyResult.reply.arguments().isEmpty()
+                        && readyResult.reply.arguments().first().toBool();
+                    if (!journalOpen) {
+                        fail(QStringLiteral("the cognitive journal is unavailable"));
+                        return;
+                    }
+
+                    // Lifecycle activity is advisory: the user acted, and an unreachable
+                    // coordinator must not veto a command the capability graph already allowed.
+                    // Its reply is awaited only to keep the ordering explicit.
+                    m_lifecycleRpc.call(
+                        QStringLiteral("NotifyUserActivity"),
+                        {activityCause},
+                        RpcOperationSemantics::IdempotentMutation,
+                        [this, request, observationEvent, observationDetails,
+                         committed = std::move(committed), fail](const RpcResult &) {
+                            if (request->remaining() == 0) {
+                                fail(QStringLiteral(
+                                    "the command budget expired before the durable observation"));
+                                return;
+                            }
+
+                            const CognitiveEnvelope observation =
+                                userObservation(observationEvent, observationDetails);
+                            const QUuid causeId = observation.messageId;
+
+                            // Submitting the same envelope twice would create a second
+                            // contribution, so this step is non-idempotent and must not be retried
+                            // on an unknown outcome.
+                            m_eventRpc.call(
+                                QStringLiteral("Submit"),
+                                QVariantList{
+                                    QVariant(EnvelopeCodec::encode(observation))},
+                                RpcOperationSemantics::NonIdempotentMutation,
+                                [causeId, committed = std::move(committed), fail](
+                                    const RpcResult &submitResult) {
+                                    QString error;
+                                    if (!submitAccepted(submitResult, &error)) {
+                                        fail(error);
+                                        return;
+                                    }
+                                    committed(causeId);
+                                },
+                                request->remaining());
+                        },
+                        request->remaining());
+                },
+                request->remaining());
+        },
+        request->remaining());
+}
+
+QString PresenceService::Promise(const QString &description)
+{
+    auto request = beginRequest();
     const QString normalized = description.trimmed();
-    CommandDeadline deadline;
-
     if (normalized.isEmpty()) {
+        replyOnce(request, QVariant(QString()));
         return {};
     }
 
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return {};
-    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
-    if (!isAvailable(capabilities, QStringLiteral("accepted-biography"))
-        || !isAvailable(capabilities, QStringLiteral("commitment-access"))) return {};
+    beginUserCommand(
+        request,
+        {QStringLiteral("accepted-biography"), QStringLiteral("commitment-access")},
+        QStringLiteral("presence.promise"),
+        QStringLiteral("user-requested-intention"),
+        {{QStringLiteral("description"), normalized}},
+        QVariant(QString()),
+        [this, request, normalized](const QUuid &causeId) {
+            m_intentionRpc.call(
+                QStringLiteral("Form"),
+                {normalized,
+                 QStringLiteral("asked by the user"),
+                 causeId.toString(QUuid::WithoutBraces)},
+                RpcOperationSemantics::NonIdempotentMutation,
+                [this, request](const RpcResult &result) {
+                    const QString intentionId = result.succeeded()
+                            && !result.reply.arguments().isEmpty()
+                        ? result.reply.arguments().first().toString()
+                        : QString();
+                    if (intentionId.isEmpty()) {
+                        request->lastError = rpcOutcomeToString(result.outcome)
+                            + QStringLiteral(": ") + result.errorMessage;
+                    }
+                    replyOnce(request, QVariant(intentionId));
+                },
+                request->remaining());
+        });
 
-    // Event1 is the required durability boundary for both records created by
-    // Promise. Probe it before notifying auxiliary owners so an unavailable
-    // journal consumes one bounded RPC budget instead of accumulating the
-    // budgets of every step in this compound command.
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
-        m_lastError = m_events.lastError();
-        return {};
-    }
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return {};
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.promise"), timeoutMs);
-
-    QVariantMap details;
-    details[QStringLiteral("description")] =
-        normalized;
-
-    QUuid requestId;
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !appendUserObservation(
-            QStringLiteral("user-requested-intention"),
-            details,
-            &requestId,
-            timeoutMs)) {
-        return {};
-    }
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return {};
-    const QString intentionId = m_intentions.form(
-        normalized,
-        QStringLiteral("asked by the user"),
-        requestId.toString(QUuid::WithoutBraces),
-        timeoutMs);
-
-    if (intentionId.isEmpty()) {
-        m_lastError = m_intentions.lastError();
-    }
-
-    return intentionId;
+    return {};
 }
 
 bool PresenceService::Reflect()
 {
-    m_lastError.clear();
-    CommandDeadline deadline;
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
-    if (!isAvailable(capabilities, QStringLiteral("accepted-biography"))
-        || !isAvailable(capabilities, QStringLiteral("self-assessment"))) return false;
+    auto request = beginRequest();
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
-        m_lastError = m_events.lastError();
-        return false;
-    }
+    beginUserCommand(
+        request,
+        {QStringLiteral("accepted-biography"), QStringLiteral("self-assessment")},
+        QStringLiteral("presence.reflect"),
+        QStringLiteral("self-inspection-requested"),
+        {},
+        QVariant(false),
+        [this, request](const QUuid &causeId) {
+            m_selfRpc.call(
+                QStringLiteral("Assess"),
+                {causeId.toString(QUuid::WithoutBraces)},
+                RpcOperationSemantics::NonIdempotentMutation,
+                [this, request](const RpcResult &result) {
+                    QString error;
+                    const QVariantMap report = result.succeeded()
+                            && !result.reply.arguments().isEmpty()
+                        ? FabricCodec::decodeMap(
+                              result.reply.arguments().first().toByteArray(), &error)
+                        : QVariantMap{};
+                    if (report.isEmpty()) {
+                        request->lastError = rpcOutcomeToString(result.outcome)
+                            + QStringLiteral(": ") + result.errorMessage;
+                    }
+                    replyOnce(request, QVariant(!report.isEmpty()));
+                },
+                request->remaining());
+        });
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.reflect"), timeoutMs);
+    return false;
+}
 
-    QUuid requestId;
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !appendUserObservation(
-            QStringLiteral("self-inspection-requested"),
-            {},
-            &requestId,
-            timeoutMs)) {
-        return false;
-    }
+// Fulfil and abandon differ only in the resolution they record, so they share one continuation.
+// The open list is read after the durable Observation is accepted, because the index the user acted
+// on refers to what Presence was showing, and re-reading it is what turns that index into an id.
+void PresenceService::closeIntentionAtIndex(
+    const std::shared_ptr<CommandRequest> &request,
+    int index,
+    int resolution,
+    const QString &activityCause,
+    const QString &observationEvent) const
+{
+    beginUserCommand(
+        request,
+        {QStringLiteral("commitment-access")},
+        activityCause,
+        observationEvent,
+        {{QStringLiteral("index"), index}},
+        QVariant(false),
+        [this, request, index, resolution](const QUuid &) {
+            m_intentionRpc.call(
+                QStringLiteral("Open"),
+                {},
+                RpcOperationSemantics::ReadOnly,
+                [this, request, index, resolution](const RpcResult &openResult) {
+                    QString error;
+                    const QVariantList open = openResult.succeeded()
+                            && !openResult.reply.arguments().isEmpty()
+                        ? FabricCodec::decodeList(
+                              openResult.reply.arguments().first().toByteArray(), &error)
+                        : QVariantList{};
+                    if (index < 0 || index >= open.size()) {
+                        request->lastError =
+                            QStringLiteral("no open commitment at the requested position");
+                        replyOnce(request, QVariant(false));
+                        return;
+                    }
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const QVariantMap report = m_self.assess(
-        requestId.toString(QUuid::WithoutBraces),
-        timeoutMs);
-
-    if (report.isEmpty()) {
-        m_lastError = m_self.lastError();
-        return false;
-    }
-
-    return true;
+                    const QString id = open.at(index)
+                                           .toMap()
+                                           .value(QStringLiteral("correlationId"))
+                                           .toString();
+                    m_intentionRpc.call(
+                        QStringLiteral("Close"),
+                        {id, resolution, QString()},
+                        RpcOperationSemantics::IdempotentMutation,
+                        [this, request](const RpcResult &closeResult) {
+                            const bool ok = closeResult.succeeded()
+                                && !closeResult.reply.arguments().isEmpty()
+                                && closeResult.reply.arguments().first().toBool();
+                            if (!ok) {
+                                request->lastError = rpcOutcomeToString(closeResult.outcome)
+                                    + QStringLiteral(": ") + closeResult.errorMessage;
+                            }
+                            replyOnce(request, QVariant(ok));
+                        },
+                        request->remaining());
+                },
+                request->remaining());
+        });
 }
 
 bool PresenceService::FulfillIndex(int index)
 {
-    m_lastError.clear();
-    CommandDeadline deadline;
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
-    if (!isAvailable(capabilities, QStringLiteral("commitment-access"))) return false;
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
-        m_lastError = m_events.lastError();
-        return false;
-    }
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.fulfill"), timeoutMs);
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const QVariantList open = m_intentions.open(timeoutMs);
-    if (index < 0 || index >= open.size()) {
-        return false;
-    }
-
-    const QString id =
-        open.at(index)
-            .toMap()
-            .value(QStringLiteral("correlationId"))
-            .toString();
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const bool ok = m_intentions.close(
-        id,
+    closeIntentionAtIndex(
+        beginRequest(),
+        index,
         0,
-        QString(),
-        timeoutMs);
-    if (!ok) {
-        m_lastError = m_intentions.lastError();
-    }
-    return ok;
+        QStringLiteral("presence.fulfill"),
+        QStringLiteral("user-fulfilled-intention"));
+    return false;
 }
 
 bool PresenceService::AbandonIndex(int index)
 {
-    m_lastError.clear();
-    CommandDeadline deadline;
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
-    if (!isAvailable(capabilities, QStringLiteral("commitment-access"))) return false;
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
-        m_lastError = m_events.lastError();
-        return false;
-    }
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.abandon"), timeoutMs);
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const QVariantList open = m_intentions.open(timeoutMs);
-    if (index < 0 || index >= open.size()) {
-        return false;
-    }
-
-    const QString id =
-        open.at(index)
-            .toMap()
-            .value(QStringLiteral("correlationId"))
-            .toString();
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const bool ok = m_intentions.close(
-        id,
+    closeIntentionAtIndex(
+        beginRequest(),
+        index,
         1,
-        QString(),
-        timeoutMs);
-    if (!ok) {
-        m_lastError = m_intentions.lastError();
-    }
-    return ok;
+        QStringLiteral("presence.abandon"),
+        QStringLiteral("user-abandoned-intention"));
+    return false;
 }
 
-bool PresenceService::Observe(
-    const QString &subject,
-    double value)
+bool PresenceService::Observe(const QString &subject, double value)
 {
-    m_lastError.clear();
-    CommandDeadline deadline;
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
-    if (!isAvailable(capabilities, QStringLiteral("prediction"))) return false;
+    auto request = beginRequest();
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0 || !m_events.isOpen(timeoutMs)) {
-        m_lastError = m_events.lastError();
-        return false;
-    }
+    beginUserCommand(
+        request,
+        {QStringLiteral("prediction")},
+        QStringLiteral("presence.observe"),
+        QStringLiteral("user-recorded-observation"),
+        {{QStringLiteral("subject"), subject}, {QStringLiteral("value"), value}},
+        QVariant(false),
+        [this, request, subject, value](const QUuid &) {
+            m_predictorRpc.call(
+                QStringLiteral("Observe"),
+                {subject, value},
+                RpcOperationSemantics::NonIdempotentMutation,
+                [this, request](const RpcResult &result) {
+                    const bool ok = result.succeeded() && !result.reply.arguments().isEmpty()
+                        && result.reply.arguments().first().toBool();
+                    if (!ok) {
+                        request->lastError = rpcOutcomeToString(result.outcome)
+                            + QStringLiteral(": ") + result.errorMessage;
+                    }
+                    replyOnce(request, QVariant(ok));
+                },
+                request->remaining());
+        });
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.observe"), timeoutMs);
-
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) return false;
-    const bool ok = m_predictor.observe(subject, value, timeoutMs);
-    if (!ok) {
-        m_lastError = m_predictor.lastError();
-    }
-    return ok;
+    return false;
 }
 
-QByteArray PresenceService::Predict(
-    const QString &subject)
+// Predict reads; it does not contribute to biography. It therefore skips the Event1 preflight and
+// the durable Observation, and keeps only the capability gate and the activity notification.
+QByteArray PresenceService::Predict(const QString &subject)
 {
-    m_lastError.clear();
-    CommandDeadline deadline;
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0)
-        return FabricCodec::encodeMap(QVariantMap{});
-    const CapabilitySnapshot capabilities = m_health.snapshot(timeoutMs);
-    if (!isAvailable(capabilities, QStringLiteral("prediction")))
-        return FabricCodec::encodeMap(QVariantMap{});
+    auto request = beginRequest();
+    const QVariant empty = QVariant(FabricCodec::encodeMap(QVariantMap{}));
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0)
-        return FabricCodec::encodeMap(QVariantMap{});
-    m_lifecycle.notifyUserActivity(QStringLiteral("presence.predict"), timeoutMs);
+    m_healthRpc.call(
+        QStringLiteral("Snapshot"),
+        {},
+        RpcOperationSemantics::ReadOnly,
+        [this, request, subject, empty](const RpcResult &healthResult) {
+            CapabilitySnapshot capabilities;
+            if (healthResult.succeeded() && !healthResult.reply.arguments().isEmpty()) {
+                QString error;
+                capabilities = decodeCapabilitySnapshot(
+                    healthResult.reply.arguments().first().toByteArray(), &error);
+            }
+            if (!isAvailable(capabilities, QStringLiteral("prediction"))) {
+                request->lastError = QStringLiteral("prediction is unavailable");
+                replyOnce(request, empty);
+                return;
+            }
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0)
-        return FabricCodec::encodeMap(QVariantMap{});
-    const QVariantMap prediction =
-        m_predictor.predict(subject, {}, timeoutMs);
+            m_lifecycleRpc.call(
+                QStringLiteral("NotifyUserActivity"),
+                {QStringLiteral("presence.predict")},
+                RpcOperationSemantics::IdempotentMutation,
+                [this, request, subject, empty](const RpcResult &) {
+                    m_predictorRpc.call(
+                        QStringLiteral("Predict"),
+                        {subject, QString()},
+                        RpcOperationSemantics::ReadOnly,
+                        [this, request, empty](const RpcResult &result) {
+                            QString error;
+                            const QVariantMap prediction = result.succeeded()
+                                    && !result.reply.arguments().isEmpty()
+                                ? FabricCodec::decodeMap(
+                                      result.reply.arguments().first().toByteArray(), &error)
+                                : QVariantMap{};
+                            if (prediction.isEmpty()) {
+                                request->lastError = rpcOutcomeToString(result.outcome)
+                                    + QStringLiteral(": ") + result.errorMessage;
+                            }
+                            replyOnce(
+                                request, QVariant(FabricCodec::encodeMap(prediction)));
+                        },
+                        request->remaining());
+                },
+                request->remaining());
+        },
+        request->remaining());
 
-    if (prediction.isEmpty()) {
-        m_lastError = m_predictor.lastError();
-    }
-
-    return FabricCodec::encodeMap(prediction);
+    return {};
 }
 
+// InterruptLifecycle is not a user contribution: it terminates an existing run rather than adding
+// to biography, so it has no Event1 preflight and no Observation. FinishRun stays non-idempotent -
+// the shell relies on a timeout surfacing as unknown-outcome rather than as a failure, because a
+// reply that never arrived does not mean the run was not finished.
 bool PresenceService::InterruptLifecycle(const QString &cause)
 {
-    m_lastError.clear();
-    CommandDeadline deadline;
+    auto request = beginRequest();
+
     bool delayOk = false;
-    const int delayMs = qEnvironmentVariableIntValue(
-        "CYBOU_PRESENCE_INTERRUPT_DELAY_MS", &delayOk);
+    const int delayMs =
+        qEnvironmentVariableIntValue("CYBOU_PRESENCE_INTERRUPT_DELAY_MS", &delayOk);
     if (delayOk && delayMs > 0) {
         QThread::msleep(static_cast<unsigned long>(delayMs));
     }
 
-    int timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) {
-        m_lastError = QStringLiteral("lifecycle interruption deadline exceeded");
-        return false;
-    }
     const QString reason = cause.trimmed().isEmpty()
         ? QStringLiteral("interrupted by user")
         : cause.trimmed();
-    const QVariantMap state = m_lifecycle.state(timeoutMs);
-    if (state.isEmpty() && !m_lifecycle.lastError().isEmpty()) {
-        m_lastError = m_lifecycle.lastError();
-        return false;
-    }
-    if (state.value(QStringLiteral("status")).toString() != QStringLiteral("active")) {
-        m_lastError = QStringLiteral("no active lifecycle run to interrupt");
+
+    if (request->remaining() == 0) {
+        request->lastError = QStringLiteral("lifecycle interruption deadline exceeded");
+        replyOnce(request, QVariant(false));
         return false;
     }
 
-    timeoutMs = deadline.remaining();
-    if (timeoutMs == 0) {
-        m_lastError = QStringLiteral("lifecycle interruption deadline exceeded");
-        return false;
-    }
-    if (!m_lifecycle.finishRun(QStringLiteral("interrupted"), reason, timeoutMs)) {
-        m_lastError = m_lifecycle.lastError();
-        return false;
-    }
-    return true;
+    m_lifecycleRpc.call(
+        QStringLiteral("State"),
+        {},
+        RpcOperationSemantics::ReadOnly,
+        [this, request, reason](const RpcResult &stateResult) {
+            QString error;
+            const QVariantMap state = stateResult.succeeded()
+                    && !stateResult.reply.arguments().isEmpty()
+                ? FabricCodec::decodeMap(
+                      stateResult.reply.arguments().first().toByteArray(), &error)
+                : QVariantMap{};
+            if (!stateResult.succeeded()) {
+                request->lastError = rpcOutcomeToString(stateResult.outcome)
+                    + QStringLiteral(": ") + stateResult.errorMessage;
+                replyOnce(request, QVariant(false));
+                return;
+            }
+            if (state.value(QStringLiteral("status")).toString()
+                != QStringLiteral("active")) {
+                request->lastError = QStringLiteral("no active lifecycle run to interrupt");
+                replyOnce(request, QVariant(false));
+                return;
+            }
+            if (request->remaining() == 0) {
+                request->lastError = QStringLiteral("lifecycle interruption deadline exceeded");
+                replyOnce(request, QVariant(false));
+                return;
+            }
+
+            m_lifecycleRpc.call(
+                QStringLiteral("FinishRun"),
+                {QStringLiteral("interrupted"), reason},
+                RpcOperationSemantics::NonIdempotentMutation,
+                [this, request](const RpcResult &finishResult) {
+                    const bool ok = finishResult.succeeded()
+                        && !finishResult.reply.arguments().isEmpty()
+                        && finishResult.reply.arguments().first().toBool();
+                    if (!ok) {
+                        request->lastError = rpcOutcomeToString(finishResult.outcome)
+                            + QStringLiteral(": ") + finishResult.errorMessage;
+                    }
+                    replyOnce(request, QVariant(ok));
+                },
+                request->remaining());
+        },
+        request->remaining());
+
+    return false;
 }
 
 } // namespace cybou

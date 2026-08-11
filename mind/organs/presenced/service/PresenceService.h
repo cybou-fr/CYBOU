@@ -5,12 +5,13 @@
 
 #include "cybou/fabric/OrganClients.h"
 #include "cybou/fabric/RpcResilience.h"
-#include "cybou/ipc/EventClient.h"
 
 #include <QDBusContext>
 #include <QObject>
 #include <QUuid>
+#include <QVariant>
 
+#include <functional>
 #include <memory>
 
 namespace cybou {
@@ -44,6 +45,15 @@ enum class ProjectionOutcome {
 /// overlapping requests never share partial state.
 struct SnapshotRequest;
 
+/// One in-flight compound mutation.
+///
+/// Unlike the projection, a mutation's steps are causally ordered: the capability gate decides
+/// whether the command is legal, the Event1 preflight decides whether it can be made durable, and
+/// the durable Observation is the cause the domain mutation is linked to. Running them concurrently
+/// would be wrong. Running them asynchronously is not - each step continues from the previous one's
+/// reply instead of blocking the thread waiting for it.
+struct CommandRequest;
+
 class PresenceService
     : public QObject
     , protected QDBusContext
@@ -75,11 +85,42 @@ Q_SIGNALS:
     void Changed();
 
 private:
-    bool appendUserObservation(
-        const QString &event,
-        const QVariantMap &details,
-        QUuid *messageId,
-        int timeoutMs = -1);
+    /// Shared prefix of every user-initiated mutation: capability gate, Event1 durability preflight,
+    /// lifecycle activity notification, and the durable Observation that records what the user
+    /// asked for. `committed` receives the accepted Observation's message id, which the caller links
+    /// its domain mutation to as the cause. Any failure replies with `failureValue` and `committed`
+    /// is not run.
+    void beginUserCommand(
+        const std::shared_ptr<CommandRequest> &request,
+        const QStringList &requiredCapabilities,
+        const QString &activityCause,
+        const QString &observationEvent,
+        const QVariantMap &observationDetails,
+        const QVariant &failureValue,
+        std::function<void(const QUuid &causeId)> committed) const;
+
+    /// Send the delayed reply exactly once.
+    void replyOnce(
+        const std::shared_ptr<CommandRequest> &request,
+        const QVariant &value) const;
+
+    std::shared_ptr<CommandRequest> beginRequest() const;
+
+    void gatedRead(
+        const std::shared_ptr<CommandRequest> &request,
+        const QString &capabilityId,
+        AsyncRpcClient &client,
+        const QString &method,
+        const QVariantList &arguments,
+        std::function<QVariant(const RpcResult &)> project,
+        const QVariant &failureValue) const;
+
+    void closeIntentionAtIndex(
+        const std::shared_ptr<CommandRequest> &request,
+        int index,
+        int resolution,
+        const QString &activityCause,
+        const QString &observationEvent) const;
 
     QVariantMap healthMap(const CapabilitySnapshot &snapshot) const;
 
@@ -92,10 +133,13 @@ private:
     mutable QString m_lastError;
     mutable ProjectionOutcome m_lastProjection{ProjectionOutcome::NotAttempted};
 
-    // Async transport for the read-only projection. These carry the typed outcomes, bounded retry
-    // and circuit behavior that the synchronous clients below do not, and they are what makes the
-    // gather concurrent rather than sequential. The synchronous clients remain in use for the
-    // compound mutations, which are ordered by construction and are migrated separately.
+    // Transport for the whole Presence surface. Every projection, read and mutation goes through
+    // these, so no call on this object blocks the thread.
+    //
+    // The policy is single-attempt and non-latching. Safety for mutations comes from the operation
+    // semantics rather than the policy: a NonIdempotentMutation is never retried whatever the
+    // policy says, and a timeout on one surfaces as unknown-outcome rather than failure, which is
+    // the contract the shell relies on for InterruptLifecycle.
     mutable AsyncRpcClient m_healthRpc;
     mutable AsyncRpcClient m_selfRpc;
     mutable AsyncRpcClient m_lifecycleRpc;
@@ -105,12 +149,9 @@ private:
     mutable AsyncRpcClient m_predictorRpc;
     mutable AsyncRpcClient m_eventRpc;
 
-    EventClient m_events;
+    // Retained only for their Changed subscriptions, which is how presenced learns to re-emit its
+    // own Changed signal. They no longer carry any call.
     HealthClient m_health;
-    IdentityClient m_identity;
-    IntentionClient m_intentions;
-    PredictorClient m_predictor;
-    SelfClient m_self;
     WorkspaceClient m_workspace;
     LifecycleClient m_lifecycle;
 };

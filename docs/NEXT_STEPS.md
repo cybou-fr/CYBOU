@@ -608,13 +608,20 @@ rather than the sum. The projection clients use a single attempt and no circuit 
 a latched circuit outlives the request that opened it and would render a transient stall as a
 permanently empty section for five seconds.
 
-Still outstanding, and the reason the maturity score is not restored: the compound Presence
-mutations remain sequential on the synchronous client. Their steps are genuinely ordered, unlike the
-projection's, but they still hold the thread.
+**A2 is now closed.** The mutations, `Activity` and `DetailedObligations` are asynchronous
+continuations with delayed replies, so no call on the Presence surface blocks. Mutations remain
+ordered — gate, Event1 preflight, activity, durable Observation, domain mutation — because their
+steps are causally dependent; asynchronous is not the same property as concurrent. Safety comes from
+the operation semantics, not the retry policy: a non-idempotent step is never retried, and its
+timeout surfaces as `unknown-outcome`.
 
 A claim made when this package was opened has been withdrawn. healthd does **not** probe with the
 synchronous client — `Refresh` already issues every probe concurrently through `AsyncRpcClient`
-under a bounded deadline. No healthd work is needed or planned here.
+under a bounded deadline. No healthd work was needed.
+
+**P6.8 is complete.** The next work is the M7 entry sequence below, beginning with scale budgets.
+Do not open a P6.9 for further polish: the substrate findings are closed or explicitly deferred with
+reasons, and the remaining risks are M7's to carry.
 
 **A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
 biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that

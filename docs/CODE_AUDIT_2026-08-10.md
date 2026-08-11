@@ -105,11 +105,27 @@ reading:
   here is the shared deadline and the typed empty projection; retry belongs on the mutation paths,
   where idempotency is actually reasoned about.
 
-**Still on the synchronous client: the compound Presence mutations.** `Promise`, `Reflect`,
-`Observe`, `Predict`, the commitment mutations, and `InterruptLifecycle` remain sequential. That is
-defensible in a way the projection was not — a mutation's steps are genuinely ordered, and Event1
-preflight before auxiliary notification is the point — but they still hold the thread. They are a
-separate slice.
+**Now also migrated: the mutations and the remaining reads.** `Promise`, `Reflect`, `Observe`,
+`Predict`, the commitment mutations, `InterruptLifecycle`, `Activity` and `DetailedObligations` are
+all asynchronous continuations with delayed replies. No call on the Presence surface blocks.
+
+The distinction that matters: mutations are **not** parallelised, and should not be. Their steps are
+causally ordered — the capability gate decides legality, the Event1 preflight decides durability,
+and the accepted Observation is the cause the domain mutation links to. Asynchronous is a separate
+property from concurrent: the chain still runs in order, it just continues from each reply instead
+of blocking on it. A process test suspends intentiond mid-chain and measures a second caller being
+served in 0 ms while the command is in flight.
+
+Safety comes from the operation semantics rather than the retry policy. A `NonIdempotentMutation` is
+never retried whatever the policy says, and a timeout on one surfaces as `unknown-outcome` rather
+than failure — the contract the shell relies on for `InterruptLifecycle`, since a reply that never
+arrived does not mean the run was not finished.
+
+Two cleanups fell out. `LastError()` walked each synchronous client in turn; those clients no longer
+carry commands, so every fallback could only return state left over from an unrelated earlier call —
+a stale error attributed to whichever command asked next. Each command now records its own failure
+and publishes it when it replies. The synchronous clients are gone except where their `Changed`
+subscriptions are still how presenced learns to re-emit its own.
 
 The new coverage is ordered last in the suite because suspending an owner leaves healthd's capability
 graph degraded until it re-probes, and the scheduling tests refuse to start a run against that. The
@@ -299,7 +315,7 @@ The checkpoint's structural conclusions hold. The maturity matrix needs three ad
 | Area | Checkpoint | Adjusted | Reason |
 |---|---:|---:|---|
 | Canonical memory/Event1 | 3 | 2 | A1: the durability claim is not supported against power loss, and the test design cannot test it |
-| RPC resilience | 3 | 2 | A2: the rated stack was not on the presentation path. The read-only projection now uses it; the compound Presence mutations still do not. healthd was already using it — see the correction in A2 |
+| RPC resilience | 3 | 3 | A2 closed: the whole Presence surface now uses the rated stack, and healthd already did. Restored rather than raised — the evidence is the same focused kind the score already described |
 | Degraded operation | 3 | 2 | A3: one of eight projected capabilities cannot enter a deficit |
 
 The recommended M7 entry sequence does not change. A1, A3, A4, and A5 should land before P7.0,

@@ -1365,6 +1365,75 @@ private Q_SLOTS:
     // probe - waited behind it for the whole budget. presenceSnapshotHasOneBoundedOwnerBudget
     // cannot see this: total latency was already bounded, it was the exclusivity that was wrong.
     //
+    // Mutations are causally ordered - gate, Event1 preflight, activity, durable Observation, then
+    // the domain mutation - so unlike the projection they are not parallelised. Making them
+    // asynchronous is a separate property from making them concurrent: the chain still runs in
+    // order, it just continues from each reply instead of blocking on it. A slow Intention1
+    // therefore no longer makes presenced unavailable to everyone else for the whole budget.
+    //
+    // Ordered next to the projection concurrency test and before the health test, for the same
+    // reason: it suspends an owner and must not leave that behind for the scheduling tests.
+    void presenceServesOtherCallersDuringAMutation()
+    {
+        stop(m_presenced);
+        m_presenced = start(
+            m_presencedPath,
+            {{QStringLiteral("CYBOU_PRESENCE_COMMAND_TIMEOUT_MS"), QStringLiteral("3000")}});
+        QVERIFY(m_presenced);
+        QTRY_VERIFY_WITH_TIMEOUT(PresenceClient().ready(), 5000);
+
+        HealthClient healthGate;
+        const auto commitmentAvailable = [&healthGate]() {
+            const CapabilitySnapshot gate = healthGate.snapshot();
+            return gate.isValid()
+                && std::none_of(
+                       gate.deficits.cbegin(),
+                       gate.deficits.cend(),
+                       [](const CapabilityDeficit &deficit) {
+                           return deficit.capabilityId == QStringLiteral("commitment-access");
+                       });
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(commitmentAvailable(), 35000);
+
+        // Suspend the owner of the final step. The gate, preflight and durable Observation all
+        // still complete, so the command is genuinely mid-chain rather than rejected up front.
+        QCOMPARE(::kill(static_cast<pid_t>(m_intentiond->processId()), SIGSTOP), 0);
+
+        QDBusMessage request = QDBusMessage::createMethodCall(
+            QString::fromLatin1(kPresenceEndpoint.service),
+            QString::fromLatin1(kPresenceEndpoint.objectPath),
+            QString::fromLatin1(kPresenceEndpoint.interfaceName),
+            QStringLiteral("Promise"));
+        request.setArguments({QStringLiteral("a commitment made while intentiond is suspended")});
+        QDBusPendingCall pending = QDBusConnection::sessionBus().asyncCall(request, 10000);
+
+        QElapsedTimer elapsed;
+        elapsed.start();
+        const bool ready = PresenceClient().ready();
+        const qint64 readyElapsedMs = elapsed.elapsed();
+
+        QVERIFY(ready);
+        QVERIFY2(
+            readyElapsedMs < 500,
+            qPrintable(QStringLiteral("a second caller waited %1 ms behind an in-flight mutation")
+                           .arg(readyElapsedMs)));
+
+        pending.waitForFinished();
+        QCOMPARE(::kill(static_cast<pid_t>(m_intentiond->processId()), SIGCONT), 0);
+
+        // The command still answers, and answers honestly: the commitment was not formed.
+        QVERIFY(!pending.isError());
+        QVERIFY(pending.reply().arguments().value(0).toString().isEmpty());
+
+        stop(m_presenced);
+        m_presenced = start(m_presencedPath);
+        QVERIFY(m_presenced);
+        QTRY_VERIFY_WITH_TIMEOUT(PresenceClient().ready(), 5000);
+
+        RpcClient(kHealthEndpoint).callBool(QStringLiteral("Refresh"));
+        QTRY_VERIFY_WITH_TIMEOUT(commitmentAvailable(), 35000);
+    }
+
     // Deliberately last in the suite. Suspending an owner leaves healthd's capability graph
     // degraded until it re-probes, and the scheduling tests refuse to start a run against that.
     // Running here means this test's disturbance cannot be inherited by a later one and reported as

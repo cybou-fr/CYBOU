@@ -262,9 +262,16 @@ through the async RPC client, and the reply is sent when the last one lands or t
 expires. presenced no longer blocks its own event loop during a projection, and a process test
 proves a second caller is answered while a gather is in flight. The projection clients use one
 attempt and no circuit latching, so a transient owner stall cannot blank a section of the UI beyond
-the request that observed it. The compound Presence mutations remain sequential on the synchronous
-client; their steps are ordered by construction. healthd already probed concurrently through the
-async client before this change and was not altered by it.
+the request that observed it.
+
+The compound mutations, `Activity` and `DetailedObligations` are asynchronous continuations with
+delayed replies as well, so no call on the Presence surface blocks. Mutations stay ordered — gate,
+Event1 preflight, activity notification, durable Observation, domain mutation — because those steps
+are causally dependent; only the waiting is removed. A non-idempotent step is never retried and its
+timeout surfaces as `unknown-outcome`, which is the contract the shell relies on for lifecycle
+interruption. A process test suspends intentiond mid-command and observes a second caller answered
+while the mutation is still in flight. healthd already probed concurrently through the async client
+and was not altered.
 
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
@@ -430,9 +437,10 @@ the corresponding milestone is implemented and gated.
   recovery fault matrix, and focused KVM gate.
 - P6.7: complete post-M6 latency hardening. Compound Presence mutations and reads share monotonic
   budgets and cannot multiply per-owner transport deadlines.
-- P6.8: substrate audit repair. Durable commit mode enforced at open, presenced health derived from
-  real projection outcomes, consolidation backlog counted by aggregate query, and user-unit
-  hardening limited to directives a user manager can enforce. Scalable biography replay and the
-  Presence migration to the async RPC client remain open.
+- P6.8: complete. Substrate audit repair — durable commit mode enforced at open, presenced health
+  derived from real projection outcomes, consolidation backlog counted by aggregate query, user-unit
+  hardening limited to directives a user manager can enforce, and the whole Presence surface moved
+  to non-blocking asynchronous transport. Scalable biography replay and incremental verification
+  remain open and are carried into M7 with the scale budgets that give them a target.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.
