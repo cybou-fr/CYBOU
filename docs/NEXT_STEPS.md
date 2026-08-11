@@ -678,6 +678,41 @@ may be ingested. The first source — NixOS system generation and build identity
 constraint costs nothing: local, non-sensitive, and naturally contradictory, since the generation
 changes while an earlier observation still claims to be current.
 
+## P7.1 — One typed local perception envelope
+
+**Status: ObservationV1 frozen; the adapter is next.**
+
+`ObservationV1` carries `sourceId`, `subject`, a typed `value`, `acquiredAt`, `freshnessUntil` and
+`provenance`, exactly as [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) requires. The
+schema landed before the adapter deliberately: an adapter written first would have defined the
+envelope by accident, in whatever shape its own source happened to need.
+
+Three properties are load-bearing and tested:
+
+- **Unknown schemas fail closed**, older and newer alike. There is one schema so far, so any other
+  number means the payload was written by something this build cannot interpret, and evidence read
+  under guessed rules is worse than no evidence.
+- **A valueless observation is invalid.** A failure to observe is not an observation of nothing, so
+  an adapter that cannot read its source must report a typed failure rather than contribute an empty
+  value. This is what makes the checkpoint's "source unavailability has a typed result" enforceable
+  rather than merely intended.
+- **Acquisition identity is deterministic** over source, subject and acquisition time, so
+  re-reporting one reading after a restart or retry resolves to the same contribution and Event1's
+  existing duplicate rejection makes it a durable no-op. The value is excluded on purpose: two
+  different values for one subject at one instant is a contradiction for the projection to surface,
+  not two contributions to record. Timezone does not affect identity, or every observation would
+  duplicate across a DST change.
+
+`freshnessUntil` is declared by the adapter, which knows how fast its source changes, rather than
+inferred by whoever reads the observation later. `acquiredAt` stays distinct from the envelope's
+acceptance time throughout.
+
+### Remaining for P7.1
+
+The adapter itself: read the NixOS current system generation, produce an `ObservationV1`, propose it
+through Event1. It needs its own reserved organ identity so Event1 can bind its provenance, and it
+must not become a Journal owner or mutate system configuration.
+
 ## P7.0-registry — One capability and command declaration
 
 **Status: implemented.** `CapabilityRegistry` in `cybou-protocol` is the single declaration of which

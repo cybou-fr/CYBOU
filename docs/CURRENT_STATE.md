@@ -317,6 +317,13 @@ so healthd remains the sole owner of capability health. A generated matrix marks
 unavailable in turn and compares the resulting deficits against the declaration in both directions,
 replacing the representative sample the checkpoint recorded as insufficient.
 
+`ObservationV1` is frozen as the typed perception payload: source, subject, typed value, acquisition
+time, declared freshness horizon and provenance. Unknown schema versions fail closed in both
+directions, a valueless observation is structurally invalid so a failure to observe cannot be
+contributed as one, and acquisition identity is deterministic over source, subject and acquisition
+time so a repeated report is a durable no-op rather than a second contribution. No perception
+adapter exists yet, so nothing produces these in the running system.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and
