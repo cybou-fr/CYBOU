@@ -7,11 +7,17 @@
 
 #include <QCborMap>
 #include <QCborValue>
+#include <QDBusConnection>
+#include <QDBusMessage>
 #include <QDateTime>
 #include <QDeadlineTimer>
 #include <QThread>
+#include <QTimer>
 
 #include <algorithm>
+#include <functional>
+#include <limits>
+#include <utility>
 
 namespace cybou {
 
@@ -232,8 +238,82 @@ QVariantMap lifecycleProjection(const QVariantMap &state)
 
 } // namespace
 
+// One in-flight compound Snapshot. Lives as long as its outstanding calls, and replies exactly
+// once - either when the last owner lands or when the guard timer fires.
+struct SnapshotRequest {
+    QDBusConnection connection;
+    QDBusMessage message;
+    QDeadlineTimer deadline;
+
+    CapabilitySnapshot health;
+    QVariantMap self;
+    QVariantMap lifecycle;
+    QVariantMap scheduling;
+    QVariantMap identity;
+    QVariantMap moment;
+    QVariantList intentions;
+    QVariantList calibrations;
+    QVariantList coalitions;
+    QString attention;
+    qulonglong contributions{0};
+
+    int pending{0};
+    bool replied{false};
+    bool budgetExpired{false};
+
+    SnapshotRequest(QDBusConnection bus, QDBusMessage request, int budgetMs)
+        : connection(std::move(bus))
+        , message(std::move(request))
+        , deadline(budgetMs)
+    {
+    }
+
+    int remaining() const
+    {
+        return static_cast<int>(std::max<qint64>(0, deadline.remainingTime()));
+    }
+};
+
+namespace {
+
+// Transport policy for the read-only projection.
+//
+// The default policy retries with backoff and latches a circuit open for five seconds after three
+// infrastructure failures. Both are wrong for this path, in ways that only show up as a UI that
+// lies:
+//
+// - Retries cannot help inside a deadline the guard is about to cut off anyway. They only spend
+//   budget that later owners in the same gather still need.
+// - A latched circuit outlives the request that opened it. One transient stall would blank that
+//   owner's section of every subsequent projection for five seconds, and because the projection
+//   reports typed defaults for anything it could not read, the UI would present that as "nothing
+//   there" rather than "not asked". P6.7 bounds degradation per request; a circuit that persists
+//   across requests quietly converts a transient fault into a sticky one.
+//
+// One attempt, no latching. Resilience on this path is the shared deadline and the typed empty
+// projection, not retry. The mutation paths keep the default policy, where retry semantics and
+// idempotency are actually reasoned about.
+RpcRetryPolicy projectionPolicy()
+{
+    RpcRetryPolicy policy;
+    policy.maximumAttempts = 1;
+    policy.circuitFailureThreshold = std::numeric_limits<int>::max();
+    policy.circuitOpenMs = 0;
+    return policy;
+}
+
+} // namespace
+
 PresenceService::PresenceService(QObject *parent)
     : QObject(parent)
+    , m_healthRpc(kHealthEndpoint, projectionPolicy())
+    , m_selfRpc(kSelfEndpoint, projectionPolicy())
+    , m_lifecycleRpc(kLifecycleEndpoint, projectionPolicy())
+    , m_intentionRpc(kIntentionEndpoint, projectionPolicy())
+    , m_workspaceRpc(kWorkspaceEndpoint, projectionPolicy())
+    , m_identityRpc(kIdentityEndpoint, projectionPolicy())
+    , m_predictorRpc(kPredictorEndpoint, projectionPolicy())
+    , m_eventRpc(kEventEndpoint, projectionPolicy())
 {
     connect(
         &m_workspace,
@@ -317,40 +397,14 @@ QVariantMap PresenceService::healthMap(const CapabilitySnapshot &snapshot) const
     return map;
 }
 
-QVariantMap PresenceService::snapshotMap() const
+QVariantMap PresenceService::assembleSnapshot(const SnapshotRequest &request) const
 {
     QVariantMap map;
-    CommandDeadline deadline;
-
-    int timeoutMs = deadline.remaining();
-    const CapabilitySnapshot health = timeoutMs > 0
-        ? m_health.snapshot(timeoutMs) : CapabilitySnapshot{};
-    // Health1 gates almost every section below, so losing it does not degrade one part of the
-    // projection - it makes the capability states unknown and turns every gated read into a skip.
-    // Record that before continuing; the tail of this function upgrades the outcome only if the
-    // whole collection then completes inside the budget.
-    m_lastProjection = health.isValid()
-        ? ProjectionOutcome::Complete
-        : ProjectionOutcome::CapabilitiesUnavailable;
-    const QVariantMap capability = capabilityProjection(health);
-    timeoutMs = deadline.remaining();
-    const QVariantMap self = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("self-assessment"))
-        ? m_self.measure(timeoutMs) : QVariantMap{};
-    timeoutMs = deadline.remaining();
-    const QVariantMap lifecycle = timeoutMs > 0
-        ? m_lifecycle.state(timeoutMs) : QVariantMap{};
-    timeoutMs = deadline.remaining();
-    const QVariantList intentions = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("commitment-access"))
-        ? m_intentions.open(timeoutMs) : QVariantList{};
+    const QVariantMap capability = capabilityProjection(request.health);
 
     QStringList obligations;
-    for (const QVariant &entry : intentions) {
-        obligations.append(
-            entry.toMap()
-                .value(QStringLiteral("description"))
-                .toString());
+    for (const QVariant &entry : request.intentions) {
+        obligations.append(entry.toMap().value(QStringLiteral("description")).toString());
     }
 
     map[QStringLiteral("runtimeReachable")] = true;
@@ -361,42 +415,23 @@ QVariantMap PresenceService::snapshotMap() const
     map[QStringLiteral("capabilityDetails")] = capability.value(QStringLiteral("details"));
     map[QStringLiteral("capabilityDeficits")] = capability.value(QStringLiteral("deficits"));
     map[QStringLiteral("capabilityObservedAt")] = capability.value(QStringLiteral("observedAt"));
-    map[QStringLiteral("commandAvailability")] = commandProjection(health, !lifecycle.isEmpty());
-    map[QStringLiteral("lifecycleState")] = lifecycle;
-    map[QStringLiteral("lifecycleMode")] = lifecycle.value(QStringLiteral("mode"));
-    map[QStringLiteral("lifecycleStatus")] = lifecycle.value(QStringLiteral("status"));
-    map[QStringLiteral("lifecycleProjection")] = lifecycleProjection(lifecycle);
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("lifecycleScheduling")] = timeoutMs > 0
-        ? m_lifecycle.schedulingEvaluation(timeoutMs) : QVariantMap{};
-    map[QStringLiteral("narration")] =
-        self.value(QStringLiteral("narration")).toString();
+    map[QStringLiteral("commandAvailability")] =
+        commandProjection(request.health, !request.lifecycle.isEmpty());
+    map[QStringLiteral("lifecycleState")] = request.lifecycle;
+    map[QStringLiteral("lifecycleMode")] = request.lifecycle.value(QStringLiteral("mode"));
+    map[QStringLiteral("lifecycleStatus")] = request.lifecycle.value(QStringLiteral("status"));
+    map[QStringLiteral("lifecycleProjection")] = lifecycleProjection(request.lifecycle);
+    map[QStringLiteral("lifecycleScheduling")] = request.scheduling;
+    map[QStringLiteral("narration")] = request.self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("attention")] = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("attention-workspace"))
-        ? m_workspace.attention(timeoutMs) : QString();
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("contributions")] = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("accepted-biography"))
-        ? static_cast<qulonglong>(m_events.count(timeoutMs)) : 0;
-    map[QStringLiteral("stats")] = self;
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("identityState")] = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("identity-continuity"))
-        ? m_identity.state(timeoutMs) : QVariantMap{};
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("calibrations")] = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("prediction"))
-        ? m_predictor.calibrations(timeoutMs) : QVariantList{};
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("coalitions")] = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("attention-workspace"))
-        ? m_workspace.coalitions(timeoutMs) : QVariantList{};
-    timeoutMs = deadline.remaining();
-    map[QStringLiteral("moment")] = timeoutMs > 0
-            && isAvailable(health, QStringLiteral("attention-workspace"))
-        ? m_workspace.moment(timeoutMs) : QVariantMap{};
+    map[QStringLiteral("attention")] = request.attention;
+    map[QStringLiteral("contributions")] = request.contributions;
+    map[QStringLiteral("stats")] = request.self;
+    map[QStringLiteral("identityState")] = request.identity;
+    map[QStringLiteral("calibrations")] = request.calibrations;
+    map[QStringLiteral("coalitions")] = request.coalitions;
+    map[QStringLiteral("moment")] = request.moment;
+
     // Settle the outcome before healthMap(), which embeds this organ's own Health() answer in the
     // projection: deciding afterwards would publish a snapshot claiming presenced was healthy
     // during the very collection that ran out of budget.
@@ -404,18 +439,225 @@ QVariantMap PresenceService::snapshotMap() const
     // Expiry is only reported when the projection was otherwise complete. A missing Health1
     // snapshot is the more specific fact and must not be overwritten by the budget outcome, since
     // skipping gated reads is exactly what makes the remaining budget look healthy.
-    if (m_lastProjection == ProjectionOutcome::Complete && deadline.remaining() == 0) {
+    m_lastProjection = request.health.isValid()
+        ? ProjectionOutcome::Complete
+        : ProjectionOutcome::CapabilitiesUnavailable;
+    if (m_lastProjection == ProjectionOutcome::Complete && request.budgetExpired) {
         m_lastProjection = ProjectionOutcome::BudgetExhausted;
     }
 
-    map[QStringLiteral("organHealth")] = healthMap(health);
+    map[QStringLiteral("organHealth")] = healthMap(request.health);
 
     return map;
 }
 
+void PresenceService::finishSnapshot(const std::shared_ptr<SnapshotRequest> &request) const
+{
+    if (request->replied) {
+        return;
+    }
+    request->replied = true;
+
+    const QVariantMap map = assembleSnapshot(*request);
+    request->connection.send(
+        request->message.createReply(QVariant(FabricCodec::encodeMap(map))));
+}
+
+// Every read below is independent: none of them feeds another, they only share the gate that
+// Health1 already answered. Issuing them together turns the cost of a projection from the sum of
+// the owner latencies into the largest one, and because nothing blocks, presenced keeps answering
+// other callers while they are in flight.
+void PresenceService::gatherSnapshot(const std::shared_ptr<SnapshotRequest> &request) const
+{
+    const CapabilitySnapshot &health = request->health;
+    const int budget = request->remaining();
+
+    // The guard is what preserves the P6.7 contract under retries. Each call is given the remaining
+    // budget as its transport timeout, but the retry policy can schedule another attempt after a
+    // failure, which would otherwise push the total past the deadline. When the guard fires, the
+    // projection is assembled from whatever landed - structurally complete, with typed defaults for
+    // the rest - and later replies find `replied` already set.
+    QTimer *guard = new QTimer(const_cast<PresenceService *>(this));
+    guard->setSingleShot(true);
+    guard->setInterval(budget);
+    connect(guard, &QTimer::timeout, this, [this, request, guard]() {
+        guard->deleteLater();
+        if (!request->replied) {
+            request->budgetExpired = true;
+            finishSnapshot(request);
+        }
+    });
+    guard->start();
+
+    // Hold one reference for the issuing loop itself. AsyncRpcClient can complete synchronously -
+    // an open circuit rejects without ever reaching the bus - so without this the first such
+    // completion would drive `pending` to zero while later reads are still being issued, and the
+    // request would reply with a projection missing every section after that point.
+    request->pending = 1;
+
+    const auto arrived = [this, request, guard]() {
+        if (--request->pending > 0 || request->replied) {
+            return;
+        }
+        guard->stop();
+        guard->deleteLater();
+        request->budgetExpired = request->remaining() == 0;
+        finishSnapshot(request);
+    };
+
+    // Decode only on success. A failed call leaves the field at its typed default, which is exactly
+    // what a section that could not be measured should project.
+    const auto readBytes = [](const RpcResult &result) {
+        return result.succeeded() && !result.reply.arguments().isEmpty()
+            ? result.reply.arguments().first().toByteArray()
+            : QByteArray();
+    };
+
+    const auto issue = [&](AsyncRpcClient &client,
+                           const QString &method,
+                           bool gated,
+                           std::function<void(const RpcResult &)> handle) {
+        if (!gated) {
+            return;
+        }
+        ++request->pending;
+        client.call(
+            method,
+            {},
+            RpcOperationSemantics::ReadOnly,
+            [handle = std::move(handle), arrived](const RpcResult &result) {
+                handle(result);
+                arrived();
+            },
+            request->remaining());
+    };
+
+    issue(
+        m_selfRpc,
+        QStringLiteral("Measure"),
+        isAvailable(health, QStringLiteral("self-assessment")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->self = FabricCodec::decodeMap(readBytes(result), &error);
+        });
+
+    // Lifecycle state is deliberately ungated: lifecycle mode is orthogonal to capability health,
+    // and the UI distinguishes an unavailable coordinator from an idle one.
+    issue(
+        m_lifecycleRpc,
+        QStringLiteral("State"),
+        true,
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->lifecycle = FabricCodec::decodeMap(readBytes(result), &error);
+        });
+
+    issue(
+        m_lifecycleRpc,
+        QStringLiteral("EvaluateScheduling"),
+        true,
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->scheduling = FabricCodec::decodeMap(readBytes(result), &error);
+        });
+
+    issue(
+        m_intentionRpc,
+        QStringLiteral("Open"),
+        isAvailable(health, QStringLiteral("commitment-access")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->intentions = FabricCodec::decodeList(readBytes(result), &error);
+        });
+
+    issue(
+        m_workspaceRpc,
+        QStringLiteral("Attention"),
+        isAvailable(health, QStringLiteral("attention-workspace")),
+        [request](const RpcResult &result) {
+            if (result.succeeded() && !result.reply.arguments().isEmpty()) {
+                request->attention = result.reply.arguments().first().toString();
+            }
+        });
+
+    issue(
+        m_workspaceRpc,
+        QStringLiteral("Coalitions"),
+        isAvailable(health, QStringLiteral("attention-workspace")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->coalitions = FabricCodec::decodeList(readBytes(result), &error);
+        });
+
+    issue(
+        m_workspaceRpc,
+        QStringLiteral("Moment"),
+        isAvailable(health, QStringLiteral("attention-workspace")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->moment = FabricCodec::decodeMap(readBytes(result), &error);
+        });
+
+    issue(
+        m_eventRpc,
+        QStringLiteral("Count"),
+        isAvailable(health, QStringLiteral("accepted-biography")),
+        [request](const RpcResult &result) {
+            if (result.succeeded() && !result.reply.arguments().isEmpty()) {
+                request->contributions = result.reply.arguments().first().toULongLong();
+            }
+        });
+
+    issue(
+        m_identityRpc,
+        QStringLiteral("State"),
+        isAvailable(health, QStringLiteral("identity-continuity")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->identity = FabricCodec::decodeMap(readBytes(result), &error);
+        });
+
+    issue(
+        m_predictorRpc,
+        QStringLiteral("Calibrations"),
+        isAvailable(health, QStringLiteral("prediction")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->calibrations = FabricCodec::decodeList(readBytes(result), &error);
+        });
+
+    // Release the issuing reference. If Health1 was unavailable every read above was gated off, or
+    // all of them completed synchronously, this is what replies.
+    arrived();
+}
+
+// Snapshot answers through a delayed reply. The method returns immediately and presenced continues
+// serving its event loop while the owners answer, instead of holding the thread inside a chain of
+// blocking calls where a single slow owner stalls every other caller.
 QByteArray PresenceService::Snapshot() const
 {
-    return FabricCodec::encodeMap(snapshotMap());
+    setDelayedReply(true);
+
+    auto request = std::make_shared<SnapshotRequest>(
+        connection(), message(), presenceCommandTimeoutMs());
+
+    // Health1 is the one genuinely sequential step: its answer decides which of the reads below are
+    // legitimate to make at all. Everything after it goes out together.
+    m_healthRpc.call(
+        QStringLiteral("Snapshot"),
+        {},
+        RpcOperationSemantics::ReadOnly,
+        [this, request](const RpcResult &result) {
+            if (result.succeeded() && !result.reply.arguments().isEmpty()) {
+                QString error;
+                request->health = decodeCapabilitySnapshot(
+                    result.reply.arguments().first().toByteArray(), &error);
+            }
+            gatherSnapshot(request);
+        },
+        request->remaining());
+
+    return {};
 }
 
 QByteArray PresenceService::Activity(int limit) const

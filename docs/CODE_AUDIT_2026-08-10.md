@@ -72,10 +72,34 @@ therefore stall each other until the D-Bus timeouts expire. There is no call cyc
 A3, presenced answers `Health()` without a downstream call — so this is mutual latency, not a true
 deadlock. It is still a self-inflicted stall on the two processes the user sees most.
 
-**Resolution:** migrate the Presence aggregation to `AsyncRpcClient` so the compound read is issued
-concurrently under one deadline rather than sequentially under one deadline. This is the largest
-item in this audit and is scheduled separately from the mechanical fixes; it changes the shape of
-`PresenceService`, not just its parameters.
+**Resolution: applied for the projection path.** `Snapshot` is now a delayed-reply D-Bus method.
+Health1 remains the one sequential step, because its answer decides which reads are legitimate at
+all; every read it gates then goes out together through `AsyncRpcClient` and the reply is sent when
+the last lands or the shared guard expires. presenced no longer blocks its own event loop, so the
+cost of a projection is the slowest owner rather than the sum, and other callers are served while a
+gather is in flight.
+
+Two defects surfaced while building it, both worth recording because neither was visible from
+reading:
+
+- **Synchronous completion.** `AsyncRpcClient` can complete without reaching the bus — an open
+  circuit rejects immediately. The first such completion drove the outstanding count to zero while
+  later reads were still being issued, and the request replied with everything after that point
+  missing. The issuing loop now holds its own reference until every call is dispatched.
+- **The circuit breaker was wrong for this path.** A latched circuit outlives the request that
+  opened it, so one transient stall blanked that owner's section of *every* projection for the
+  next five seconds. Because the projection reports typed defaults for what it could not read, the
+  UI would render that as "nothing there" rather than "not asked" — a transient fault converted
+  into a sticky lie. The projection clients now use a single attempt and no latching. Resilience
+  here is the shared deadline and the typed empty projection; retry belongs on the mutation paths,
+  where idempotency is actually reasoned about.
+
+**Not migrated: healthd.** healthd still probes every organ with the synchronous client, so a
+suspended owner makes healthd unresponsive for the length of its own probe. That is the same defect
+in a different process, and the new coverage had to be ordered last in the suite to keep its
+disturbance from being inherited by later tests — which is a fair description of the remaining
+problem. The compound Presence *mutations* also still use the synchronous client; they are ordered
+by construction and are a separate slice.
 
 ## A3 — presenced cannot be reported as degraded
 
@@ -261,7 +285,7 @@ The checkpoint's structural conclusions hold. The maturity matrix needs three ad
 | Area | Checkpoint | Adjusted | Reason |
 |---|---:|---:|---|
 | Canonical memory/Event1 | 3 | 2 | A1: the durability claim is not supported against power loss, and the test design cannot test it |
-| RPC resilience | 3 | 2 | A2: the rated stack is not on the presentation path |
+| RPC resilience | 3 | 2 | A2: the rated stack was not on the presentation path. The read-only projection now uses it; healthd's probes and the Presence mutations still do not |
 | Degraded operation | 3 | 2 | A3: one of eight projected capabilities cannot enter a deficit |
 
 The recommended M7 entry sequence does not change. A1, A3, A4, and A5 should land before P7.0,

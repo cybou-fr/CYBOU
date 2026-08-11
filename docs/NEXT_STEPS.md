@@ -601,10 +601,16 @@ location, and no new wire contract.
 
 ### Deferred within this package
 
-**A2 — migrate the Presence aggregation to `AsyncRpcClient`.** The resilient RPC stack exists and is
-tested, but the presentation path still uses the blocking client, so presenced cannot answer a second
-caller while it aggregates. This is a change to the shape of `PresenceService`, not to its
-parameters, and it is sized as its own slice rather than bundled with the mechanical fixes above.
+**A2 — Presence projection migrated; healthd and the mutations are not.** `Snapshot` is now a
+delayed-reply method that gathers every capability-gated owner concurrently through
+`AsyncRpcClient`, so presenced serves other callers while aggregating and pays the slowest owner
+rather than the sum. The projection clients use a single attempt and no circuit latching:
+a latched circuit outlives the request that opened it and would render a transient stall as a
+permanently empty section for five seconds.
+
+Still outstanding, and the reason the maturity score is not restored: healthd probes every organ
+with the synchronous client, so suspending one owner still makes healthd unresponsive for the length
+of its probe. The compound Presence mutations also still use it. Both are separate slices.
 
 **A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
 biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that

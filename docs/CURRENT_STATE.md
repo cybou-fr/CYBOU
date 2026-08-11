@@ -256,6 +256,15 @@ aggregate query instead of decoding every envelope after the offset. Mind user u
 rlimit, and no-new-privileges hardening; namespace-based directives are omitted because an
 unprivileged user manager cannot enforce them and `ProtectHome` would hide the Journal.
 
+Presence `Snapshot` is now a delayed-reply D-Bus method. Health1 remains the single sequential step
+because its answer decides which reads are legitimate; every gated read then issues concurrently
+through the async RPC client, and the reply is sent when the last one lands or the shared guard
+expires. presenced no longer blocks its own event loop during a projection, and a process test
+proves a second caller is answered while a gather is in flight. The projection clients use one
+attempt and no circuit latching, so a transient owner stall cannot blank a section of the UI beyond
+the request that observed it. healthd still probes with the synchronous client, and the compound
+Presence mutations still use it.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and

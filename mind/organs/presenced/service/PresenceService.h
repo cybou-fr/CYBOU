@@ -4,10 +4,14 @@
 #pragma once
 
 #include "cybou/fabric/OrganClients.h"
+#include "cybou/fabric/RpcResilience.h"
 #include "cybou/ipc/EventClient.h"
 
+#include <QDBusContext>
 #include <QObject>
 #include <QUuid>
+
+#include <memory>
 
 namespace cybou {
 
@@ -32,7 +36,17 @@ enum class ProjectionOutcome {
     BudgetExhausted,
 };
 
-class PresenceService : public QObject
+/// One in-flight compound Snapshot.
+///
+/// Snapshot is a delayed-reply D-Bus method: it returns immediately and the reply is sent when the
+/// gather finishes, so presenced keeps serving its event loop instead of blocking inside a
+/// sequential chain of downstream calls. Each concurrent caller owns its own instance, so
+/// overlapping requests never share partial state.
+struct SnapshotRequest;
+
+class PresenceService
+    : public QObject
+    , protected QDBusContext
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.cybou.Mind.Presence1")
@@ -68,10 +82,28 @@ private:
         int timeoutMs = -1);
 
     QVariantMap healthMap(const CapabilitySnapshot &snapshot) const;
-    QVariantMap snapshotMap() const;
+
+    /// Issue every capability-gated owner read at once and reply when the last one lands or the
+    /// shared budget expires, whichever comes first.
+    void gatherSnapshot(const std::shared_ptr<SnapshotRequest> &request) const;
+    void finishSnapshot(const std::shared_ptr<SnapshotRequest> &request) const;
+    QVariantMap assembleSnapshot(const SnapshotRequest &request) const;
 
     mutable QString m_lastError;
     mutable ProjectionOutcome m_lastProjection{ProjectionOutcome::NotAttempted};
+
+    // Async transport for the read-only projection. These carry the typed outcomes, bounded retry
+    // and circuit behavior that the synchronous clients below do not, and they are what makes the
+    // gather concurrent rather than sequential. The synchronous clients remain in use for the
+    // compound mutations, which are ordered by construction and are migrated separately.
+    mutable AsyncRpcClient m_healthRpc;
+    mutable AsyncRpcClient m_selfRpc;
+    mutable AsyncRpcClient m_lifecycleRpc;
+    mutable AsyncRpcClient m_intentionRpc;
+    mutable AsyncRpcClient m_workspaceRpc;
+    mutable AsyncRpcClient m_identityRpc;
+    mutable AsyncRpcClient m_predictorRpc;
+    mutable AsyncRpcClient m_eventRpc;
 
     EventClient m_events;
     HealthClient m_health;

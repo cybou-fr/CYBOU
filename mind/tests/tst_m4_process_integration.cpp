@@ -6,6 +6,9 @@
 #include "cybou/ipc/EventClient.h"
 #include "cybou/presence/Presence.h"
 
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCall>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -1355,6 +1358,87 @@ private Q_SLOTS:
         QVERIFY(!obligations.contains(rejected));
         QCOMPARE(recoveredEvents.count(), countBefore);
     }
+
+    // The projection is a delayed reply gathered concurrently, so a slow owner no longer holds the
+    // presenced thread. Before that change every Snapshot blocked inside a sequential chain of
+    // synchronous calls, and any other caller - the Plasma applet, a second surface, healthd's own
+    // probe - waited behind it for the whole budget. presenceSnapshotHasOneBoundedOwnerBudget
+    // cannot see this: total latency was already bounded, it was the exclusivity that was wrong.
+    //
+    // Deliberately last in the suite. Suspending an owner makes healthd unresponsive for the length
+    // of its own blocking probe of that owner - healthd still uses the synchronous client, so the
+    // fix applied to presenced does not extend to it - and the scheduling tests refuse to start a
+    // run against the degraded capability graph that leaves behind. Running here means this test's
+    // disturbance cannot be inherited by a later one and reported as that test's failure.
+    void presenceServesOtherCallersWhileAggregating()
+    {
+        stop(m_presenced);
+        m_presenced = start(
+            m_presencedPath,
+            {{QStringLiteral("CYBOU_PRESENCE_COMMAND_TIMEOUT_MS"), QStringLiteral("3000")}});
+        QVERIFY(m_presenced);
+        PresenceClient presence;
+        QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+
+        HealthClient healthGate;
+        const auto selfAssessmentAvailable = [&healthGate]() {
+            const CapabilitySnapshot gate = healthGate.snapshot();
+            return gate.isValid()
+                && std::none_of(
+                       gate.deficits.cbegin(),
+                       gate.deficits.cend(),
+                       [](const CapabilityDeficit &deficit) {
+                           return deficit.capabilityId == QStringLiteral("self-assessment");
+                       });
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(selfAssessmentAvailable(), 35000);
+
+        QCOMPARE(::kill(static_cast<pid_t>(m_selfd->processId()), SIGSTOP), 0);
+
+        // Issue Snapshot without waiting for it, so it is genuinely in flight below.
+        QDBusMessage request = QDBusMessage::createMethodCall(
+            QString::fromLatin1(kPresenceEndpoint.service),
+            QString::fromLatin1(kPresenceEndpoint.objectPath),
+            QString::fromLatin1(kPresenceEndpoint.interfaceName),
+            QStringLiteral("Snapshot"));
+        QDBusPendingCall pending =
+            QDBusConnection::sessionBus().asyncCall(request, 10000);
+
+        QElapsedTimer elapsed;
+        elapsed.start();
+        const bool ready = PresenceClient().ready();
+        const qint64 readyElapsedMs = elapsed.elapsed();
+
+        QVERIFY(ready);
+        QVERIFY2(
+            readyElapsedMs < 500,
+            qPrintable(
+                QStringLiteral("a second caller waited %1 ms behind an in-flight projection")
+                    .arg(readyElapsedMs)));
+
+        pending.waitForFinished();
+        QCOMPARE(::kill(static_cast<pid_t>(m_selfd->processId()), SIGCONT), 0);
+
+        // The delayed reply still arrives, and still carries a structurally valid projection.
+        QVERIFY(!pending.isError());
+        const QVariantMap snapshot = FabricCodec::decodeMap(
+            pending.reply().arguments().value(0).toByteArray());
+        QVERIFY(snapshot.contains(QStringLiteral("capabilityStates")));
+        QVERIFY(snapshot.contains(QStringLiteral("organHealth")));
+
+        stop(m_presenced);
+        m_presenced = start(m_presencedPath);
+        QVERIFY(m_presenced);
+        QTRY_VERIFY_WITH_TIMEOUT(PresenceClient().ready(), 5000);
+
+        // Resuming selfd is not enough: healthd may still be carrying the observation it made while
+        // the process was suspended, and the scheduling tests that follow refuse to start a run
+        // against a degraded capability graph. Leave health agreeing that selfd is back, so a later
+        // failure means what it says instead of inheriting this test's disturbance.
+        RpcClient(kHealthEndpoint).callBool(QStringLiteral("Refresh"));
+        QTRY_VERIFY_WITH_TIMEOUT(selfAssessmentAvailable(), 35000);
+    }
+
 };
 
 QTEST_MAIN(TestM4Processes)

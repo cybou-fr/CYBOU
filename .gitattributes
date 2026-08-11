@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# Cybou targets NixOS and is built through Nix on Linux, but is developed in part from Windows via
+# WSL. Without this, a Windows checkout with core.autocrlf=true materialises CRLF in the working
+# tree, Nix copies that dirty tree verbatim, and shell fragments embedded in .nix derivations fail
+# with `$'\r': command not found` - a build failure with no connection to the change being made.
+#
+# Normalise everything to LF in both the index and the working tree.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.webp binary
