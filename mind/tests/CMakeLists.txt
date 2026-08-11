@@ -129,6 +129,15 @@ target_link_libraries(test-observation PRIVATE cybou-protocol Qt6::Test)
 add_test(NAME observation COMMAND test-observation)
 set_tests_properties(observation PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(test-system-generation-source tst_system_generation_source.cpp)
+target_link_libraries(
+    test-system-generation-source PRIVATE cybou-perception cybou-protocol Qt6::Test
+)
+add_test(NAME system-generation-source COMMAND test-system-generation-source)
+set_tests_properties(
+    system-generation-source PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-identity tst_identity.cpp)
 target_link_libraries(test-identity PRIVATE cybou-identity cybou-storage Qt6::Test)
 add_test(NAME identity COMMAND test-identity)
