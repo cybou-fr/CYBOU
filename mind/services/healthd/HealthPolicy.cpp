@@ -3,6 +3,8 @@
 
 #include "HealthPolicy.h"
 
+#include "cybou/protocol/CapabilityRegistry.h"
+
 #include <algorithm>
 
 namespace cybou {
@@ -52,44 +54,25 @@ int severity(CapabilityState state)
 
 } // namespace
 
+// Projected from the shared registry rather than restated here. healthd remains the only owner of
+// capability *health*; what it no longer owns privately is the *declaration* of which capabilities
+// exist and what they depend on, which Presence needs to agree with exactly.
 QList<CapabilityDefinition> HealthPolicy::definitions()
 {
-    return {
-        {QStringLiteral("accepted-biography"), {QStringLiteral("eventd")}, true,
-         QStringLiteral("accepted cognitive history is unavailable")},
-        {QStringLiteral("identity-continuity"),
-         {QStringLiteral("eventd"), QStringLiteral("identityd")}, true,
-         QStringLiteral("identity continuity cannot be verified")},
-        {QStringLiteral("commitment-access"),
-         {QStringLiteral("eventd"), QStringLiteral("intentiond")}, true,
-         QStringLiteral("accepted commitments are unavailable")},
-        {QStringLiteral("prediction"), {QStringLiteral("predictord")}, false,
-         QStringLiteral("new predictions are unavailable")},
-        {QStringLiteral("self-assessment"), {QStringLiteral("selfd")}, false,
-         QStringLiteral("self assessment is unavailable")},
-        {QStringLiteral("attention-workspace"), {QStringLiteral("workspaced")}, false,
-         QStringLiteral("bounded attention is unavailable")},
-        {QStringLiteral("consolidation"),
-         {QStringLiteral("lifecycled"), QStringLiteral("predictord"),
-          QStringLiteral("workspaced")}, false,
-         QStringLiteral("consolidation is limited by an unavailable owner")},
-        {QStringLiteral("presence-presentation"), {QStringLiteral("presenced")}, false,
-         QStringLiteral("Mind presentation is unavailable")},
-    };
+    QList<CapabilityDefinition> definitions;
+    for (const CapabilityDeclaration &declaration : CapabilityRegistry::capabilities()) {
+        definitions.append(
+            {declaration.capabilityId,
+             declaration.components,
+             declaration.required,
+             declaration.unavailableImpact});
+    }
+    return definitions;
 }
 
 QStringList HealthPolicy::componentIds()
 {
-    return {
-        QStringLiteral("eventd"),
-        QStringLiteral("lifecycled"),
-        QStringLiteral("identityd"),
-        QStringLiteral("intentiond"),
-        QStringLiteral("predictord"),
-        QStringLiteral("selfd"),
-        QStringLiteral("workspaced"),
-        QStringLiteral("presenced"),
-    };
+    return CapabilityRegistry::componentIds();
 }
 
 CapabilitySnapshot HealthPolicy::evaluate(

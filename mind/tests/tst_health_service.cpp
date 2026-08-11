@@ -3,6 +3,7 @@
 
 #include "HealthPolicy.h"
 #include "HealthService.h"
+#include "cybou/protocol/CapabilityRegistry.h"
 #include "cybou/protocol/Health.h"
 #include "cybou/protocol/Homeostasis.h"
 
@@ -39,6 +40,97 @@ class TestHealthService : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
+    // The registry is the single declaration of what Mind can do and what each ability rests on.
+    // These checks are what make it a declaration rather than a fourth copy: if it disagrees with
+    // itself, or with the policy derived from it, that is caught here rather than as a capability
+    // silently never appearing in a projection.
+    void registryIsInternallyConsistent()
+    {
+        const QStringList components = CapabilityRegistry::componentIds();
+        const QStringList capabilities = CapabilityRegistry::capabilityIds();
+
+        QVERIFY(!components.isEmpty());
+        QVERIFY(!capabilities.isEmpty());
+        QCOMPARE(capabilities.size(), QSet<QString>(capabilities.begin(), capabilities.end()).size());
+
+        for (const CapabilityDeclaration &capability : CapabilityRegistry::capabilities()) {
+            QVERIFY2(
+                !capability.components.isEmpty(),
+                qPrintable(QStringLiteral("%1 rests on nothing").arg(capability.capabilityId)));
+            QVERIFY2(
+                !capability.unavailableImpact.isEmpty(),
+                qPrintable(QStringLiteral("%1 does not say what its loss costs")
+                               .arg(capability.capabilityId)));
+            for (const QString &component : capability.components) {
+                QVERIFY2(
+                    components.contains(component),
+                    qPrintable(QStringLiteral("%1 depends on unknown component %2")
+                                   .arg(capability.capabilityId, component)));
+            }
+        }
+
+        // A command requiring a capability that does not exist can never become available, and
+        // nothing else would report that.
+        for (const CommandDeclaration &command : CapabilityRegistry::commands()) {
+            QVERIFY2(
+                !command.requiredCapabilities.isEmpty(),
+                qPrintable(QStringLiteral("%1 declares no requirement").arg(command.commandId)));
+            for (const QString &capability : command.requiredCapabilities) {
+                QVERIFY2(
+                    capabilities.contains(capability),
+                    qPrintable(QStringLiteral("command %1 requires unknown capability %2")
+                                   .arg(command.commandId, capability)));
+            }
+        }
+    }
+
+    // The whole dependency graph, one component at a time, rather than the representative sample
+    // the checkpoint flagged as insufficient. Expectations come from the registry, so adding a
+    // capability extends this matrix without anyone editing it.
+    void everyComponentLossProducesTheDeclaredDeficits()
+    {
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        for (const QString &lost : CapabilityRegistry::componentIds()) {
+            auto observations = healthyObservations(now);
+            observations[lost] = {lost, ComponentHealth::Unavailable, now, {}, QStringLiteral("down")};
+
+            const CapabilitySnapshot snapshot = HealthPolicy::evaluate(observations, now);
+            QVERIFY2(snapshot.isValid(), qPrintable(QStringLiteral("losing %1").arg(lost)));
+
+            QSet<QString> expected;
+            for (const CapabilityDeclaration &capability : CapabilityRegistry::capabilities()) {
+                if (capability.components.contains(lost)) {
+                    expected.insert(capability.capabilityId);
+                }
+            }
+
+            QSet<QString> observed;
+            for (const CapabilityDeficit &deficit : snapshot.deficits) {
+                observed.insert(deficit.capabilityId);
+            }
+
+            QVERIFY2(
+                observed == expected,
+                qPrintable(
+                    QStringLiteral("losing %1 produced deficits {%2}, registry declares {%3}")
+                        .arg(lost,
+                             QStringList(observed.begin(), observed.end()).join(QStringLiteral(", ")),
+                             QStringList(expected.begin(), expected.end()).join(QStringLiteral(", ")))));
+
+            // A capability that does not depend on the lost component must remain untouched.
+            for (const CapabilityDeclaration &capability : CapabilityRegistry::capabilities()) {
+                if (capability.components.contains(lost)) {
+                    continue;
+                }
+                QVERIFY2(
+                    !observed.contains(capability.capabilityId),
+                    qPrintable(QStringLiteral("losing %1 wrongly degraded %2")
+                                   .arg(lost, capability.capabilityId)));
+            }
+        }
+    }
+
     void mapsOnlyDependentOptionalCapabilities()
     {
         const QDateTime now = QDateTime::currentDateTimeUtc();

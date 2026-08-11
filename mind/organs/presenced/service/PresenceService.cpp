@@ -5,6 +5,7 @@
 
 #include "cybou/events/EnvelopeCodec.h"
 #include "cybou/fabric/FabricCodec.h"
+#include "cybou/protocol/CapabilityRegistry.h"
 
 #include <QCborMap>
 #include <QCborValue>
@@ -24,12 +25,13 @@ namespace cybou {
 
 namespace {
 
-const QStringList kProjectedCapabilities = {
-    QStringLiteral("accepted-biography"), QStringLiteral("identity-continuity"),
-    QStringLiteral("commitment-access"), QStringLiteral("prediction"),
-    QStringLiteral("self-assessment"), QStringLiteral("attention-workspace"),
-    QStringLiteral("consolidation"), QStringLiteral("presence-presentation"),
-};
+// Projected in the registry's order, so a capability added there appears here without anyone
+// having to remember this list exists.
+const QStringList &projectedCapabilities()
+{
+    static const QStringList ids = CapabilityRegistry::capabilityIds();
+    return ids;
+}
 
 constexpr int kPresenceCommandTimeoutMs = 5000;
 
@@ -59,7 +61,7 @@ QVariantMap capabilityProjection(const CapabilitySnapshot &snapshot)
     projection[QStringLiteral("observedAt")] = snapshot.observedAt;
     QVariantMap states;
     QVariantMap details;
-    for (const QString &capabilityId : kProjectedCapabilities) {
+    for (const QString &capabilityId : projectedCapabilities()) {
         states[capabilityId] = snapshot.isValid()
             ? QStringLiteral("available") : QStringLiteral("unknown");
         details[capabilityId] = QVariantMap{
@@ -137,26 +139,14 @@ QVariantMap capabilityProjection(const CapabilitySnapshot &snapshot)
 
 QVariantMap commandProjection(const CapabilitySnapshot &snapshot, bool lifecycleReady)
 {
-    const QVariantMap requirements{
-        {QStringLiteral("activity"), QStringList{QStringLiteral("accepted-biography")}},
-        {QStringLiteral("promise"), QStringList{QStringLiteral("accepted-biography"), QStringLiteral("commitment-access")}},
-        {QStringLiteral("reflect"), QStringList{QStringLiteral("accepted-biography"), QStringLiteral("self-assessment")}},
-        {QStringLiteral("fulfill"), QStringList{QStringLiteral("commitment-access")}},
-        {QStringLiteral("abandon"), QStringList{QStringLiteral("commitment-access")}},
-        {QStringLiteral("observe"), QStringList{QStringLiteral("prediction")}},
-        {QStringLiteral("predict"), QStringList{QStringLiteral("prediction")}},
-        {QStringLiteral("identity"), QStringList{QStringLiteral("identity-continuity")}},
-        {QStringLiteral("attention"), QStringList{QStringLiteral("attention-workspace")}},
-    };
     QVariantMap commands;
-    for (auto it = requirements.cbegin(); it != requirements.cend(); ++it) {
-        const QStringList required = it.value().toStringList();
+    for (const CommandDeclaration &declaration : CapabilityRegistry::commands()) {
         QStringList missing;
-        for (const QString &capability : required)
+        for (const QString &capability : declaration.requiredCapabilities)
             if (!isAvailable(snapshot, capability)) missing.append(capability);
-        commands[it.key()] = QVariantMap{
+        commands[declaration.commandId] = QVariantMap{
             {QStringLiteral("available"), missing.isEmpty()},
-            {QStringLiteral("requiredCapabilities"), required},
+            {QStringLiteral("requiredCapabilities"), declaration.requiredCapabilities},
             {QStringLiteral("missingCapabilities"), missing},
         };
     }
@@ -655,7 +645,7 @@ QByteArray PresenceService::Snapshot() const
 // gate first, then read - only without a durable contribution.
 void PresenceService::gatedRead(
     const std::shared_ptr<CommandRequest> &request,
-    const QString &capabilityId,
+    const QStringList &requiredCapabilities,
     AsyncRpcClient &client,
     const QString &method,
     const QVariantList &arguments,
@@ -666,7 +656,7 @@ void PresenceService::gatedRead(
         QStringLiteral("Snapshot"),
         {},
         RpcOperationSemantics::ReadOnly,
-        [this, request, capabilityId, &client, method, arguments,
+        [this, request, requiredCapabilities, &client, method, arguments,
          project = std::move(project), failureValue](const RpcResult &healthResult) {
             CapabilitySnapshot capabilities;
             if (healthResult.succeeded() && !healthResult.reply.arguments().isEmpty()) {
@@ -674,7 +664,11 @@ void PresenceService::gatedRead(
                 capabilities = decodeCapabilitySnapshot(
                     healthResult.reply.arguments().first().toByteArray(), &error);
             }
-            if (!isAvailable(capabilities, capabilityId) || request->remaining() == 0) {
+            const bool gated = std::any_of(
+                requiredCapabilities.cbegin(),
+                requiredCapabilities.cend(),
+                [&capabilities](const QString &id) { return !isAvailable(capabilities, id); });
+            if (gated || request->remaining() == 0) {
                 replyOnce(request, failureValue);
                 return;
             }
@@ -702,7 +696,7 @@ QByteArray PresenceService::Activity(int limit) const
 
     gatedRead(
         request,
-        QStringLiteral("accepted-biography"),
+        CapabilityRegistry::requiredCapabilitiesFor(QStringLiteral("activity")),
         m_eventRpc,
         QStringLiteral("Recent"),
         {limit},
@@ -735,7 +729,7 @@ QByteArray PresenceService::DetailedObligations() const
 
     gatedRead(
         request,
-        QStringLiteral("commitment-access"),
+        CapabilityRegistry::requiredCapabilitiesFor(QStringLiteral("fulfill")),
         m_intentionRpc,
         QStringLiteral("Open"),
         {},
@@ -938,7 +932,7 @@ QString PresenceService::Promise(const QString &description)
 
     beginUserCommand(
         request,
-        {QStringLiteral("accepted-biography"), QStringLiteral("commitment-access")},
+        CapabilityRegistry::requiredCapabilitiesFor(QStringLiteral("promise")),
         QStringLiteral("presence.promise"),
         QStringLiteral("user-requested-intention"),
         {{QStringLiteral("description"), normalized}},
@@ -973,7 +967,7 @@ bool PresenceService::Reflect()
 
     beginUserCommand(
         request,
-        {QStringLiteral("accepted-biography"), QStringLiteral("self-assessment")},
+        CapabilityRegistry::requiredCapabilitiesFor(QStringLiteral("reflect")),
         QStringLiteral("presence.reflect"),
         QStringLiteral("self-inspection-requested"),
         {},
@@ -1009,12 +1003,14 @@ void PresenceService::closeIntentionAtIndex(
     const std::shared_ptr<CommandRequest> &request,
     int index,
     int resolution,
+    const QString &commandId,
     const QString &activityCause,
     const QString &observationEvent) const
 {
     beginUserCommand(
         request,
-        {QStringLiteral("commitment-access")},
+        // Fulfil and abandon declare the same requirement, so the caller passes which one it is.
+        CapabilityRegistry::requiredCapabilitiesFor(commandId),
         activityCause,
         observationEvent,
         {{QStringLiteral("index"), index}},
@@ -1068,6 +1064,7 @@ bool PresenceService::FulfillIndex(int index)
         beginRequest(),
         index,
         0,
+        QStringLiteral("fulfill"),
         QStringLiteral("presence.fulfill"),
         QStringLiteral("user-fulfilled-intention"));
     return false;
@@ -1079,6 +1076,7 @@ bool PresenceService::AbandonIndex(int index)
         beginRequest(),
         index,
         1,
+        QStringLiteral("abandon"),
         QStringLiteral("presence.abandon"),
         QStringLiteral("user-abandoned-intention"));
     return false;
@@ -1090,7 +1088,7 @@ bool PresenceService::Observe(const QString &subject, double value)
 
     beginUserCommand(
         request,
-        {QStringLiteral("prediction")},
+        CapabilityRegistry::requiredCapabilitiesFor(QStringLiteral("observe")),
         QStringLiteral("presence.observe"),
         QStringLiteral("user-recorded-observation"),
         {{QStringLiteral("subject"), subject}, {QStringLiteral("value"), value}},
@@ -1133,7 +1131,12 @@ QByteArray PresenceService::Predict(const QString &subject)
                 capabilities = decodeCapabilitySnapshot(
                     healthResult.reply.arguments().first().toByteArray(), &error);
             }
-            if (!isAvailable(capabilities, QStringLiteral("prediction"))) {
+            const QStringList required =
+                CapabilityRegistry::requiredCapabilitiesFor(QStringLiteral("predict"));
+            if (std::any_of(
+                    required.cbegin(), required.cend(), [&capabilities](const QString &id) {
+                        return !isAvailable(capabilities, id);
+                    })) {
                 request->lastError = QStringLiteral("prediction is unavailable");
                 replyOnce(request, empty);
                 return;

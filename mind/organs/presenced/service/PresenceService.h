@@ -108,7 +108,7 @@ private:
 
     void gatedRead(
         const std::shared_ptr<CommandRequest> &request,
-        const QString &capabilityId,
+        const QStringList &requiredCapabilities,
         AsyncRpcClient &client,
         const QString &method,
         const QVariantList &arguments,
@@ -119,6 +119,7 @@ private:
         const std::shared_ptr<CommandRequest> &request,
         int index,
         int resolution,
+        const QString &commandId,
         const QString &activityCause,
         const QString &observationEvent) const;
 

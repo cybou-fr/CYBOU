@@ -309,6 +309,14 @@ to decide and again to execute, refusing to start a run whose health evidence wa
 between; healthd refreshes on a timer and on bus owner changes, so that supersession is ordinary
 rather than exceptional. It is now reported as `deferred` with a reason naming it, not as `failed`.
 
+Capability and command policy has one declaration. `CapabilityRegistry` in `cybou-protocol` states
+which capabilities exist, which components each rests on, and which capabilities each Presence
+command requires; healthd derives its dependency graph from it and presenced derives both the
+command projection and the capability gate of every command. It declares policy and owns no state,
+so healthd remains the sole owner of capability health. A generated matrix marks each component
+unavailable in turn and compares the resulting deficits against the declaration in both directions,
+replacing the representative sample the checkpoint recorded as insufficient.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and

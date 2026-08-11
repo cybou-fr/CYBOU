@@ -647,6 +647,44 @@ fixtures first would mean rebuilding them.
 A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
 unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
 
+## P7.0-registry — One capability and command declaration
+
+**Status: implemented.** `CapabilityRegistry` in `cybou-protocol` is the single declaration of which
+capabilities exist, which components each rests on, and which capabilities each Presence command
+requires.
+
+The same knowledge had been written down four times: the dependency graph in `HealthPolicy`, the
+component list beside it, the command-to-capability map in the Presence projection, and again in the
+capability gate of every Presence mutation. They agreed by hand. The fourth copy was added during
+P6.8, which is the argument for doing this before M7 rather than after — perception, epistemic
+projection and retention each add capabilities to all of them at once.
+
+It is a policy declaration, not a state owner. It says nothing about whether anything is currently
+healthy; healthd remains the sole owner of that, and reading the registry makes no other process a
+second authority on capability health.
+
+`interruptLifecycle` is deliberately absent from the command table: it is gated on lifecycled being
+reachable rather than on a capability, because lifecycle mode is orthogonal to capability health and
+a run must stay interruptible while other capabilities are degraded.
+
+### Generated fault expectations
+
+`everyComponentLossProducesTheDeclaredDeficits` walks every component, marks it unavailable, and
+compares the resulting deficits against what the registry declares — in both directions, so a
+capability that should *not* have degraded is caught too. This addresses the checkpoint's risk that
+health tests sample representative failures rather than the whole graph, and adding a capability
+extends the matrix without anyone editing the test.
+
+`registryIsInternallyConsistent` rejects a capability resting on an unknown component, a command
+requiring a capability that does not exist, and a capability that does not say what its loss costs.
+Verified by deliberately breaking the registry: the check named the fault precisely, and healthd's
+own integration tests failed alongside it, which confirms the registry drives production rather than
+sitting beside it.
+
+Still hand-written: the process-level matrix, where components are really stopped rather than
+modelled. The policy-level matrix above covers the graph; the process level covers the wiring, and
+they are not substitutes.
+
 ## P7.0-verify — Incremental verification
 
 **Status: mechanism implemented and tested; not yet wired to selfd.** `Journal::verifyFrom(anchor)`
