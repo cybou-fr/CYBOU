@@ -126,9 +126,18 @@ QString LifecycleService::ExecuteSchedulingDecision(
     const CapabilitySnapshot capabilities = m_health.snapshot();
     const HomeostasisSnapshot homeostasis = m_health.measurements();
     if (capabilities.snapshotId != capabilityId || homeostasis.snapshotId != homeostasisId) {
-        m_error = QStringLiteral("scheduling evidence was superseded");
+        // Refusing to start a run on evidence that has been replaced is correct: the decision was
+        // reasoned about one snapshot and healthd has since produced another. But it is a race, not
+        // a fault - healthd refreshes on a 30 s timer and on every bus owner change, so a refresh
+        // landing between the caller's snapshot and this one is ordinary. Marking it retryable is
+        // what separates "ask again" from "something is broken"; reporting it as a failure made an
+        // ordinary race look like a defect and produced an intermittent test failure with no
+        // information attached to it.
+        m_error = QStringLiteral("scheduling evidence was superseded by a newer health snapshot");
+        m_lastSchedulingRaceLost = true;
         return {};
     }
+    m_lastSchedulingRaceLost = false;
     const SchedulingEvaluation evaluation = LifecycleSchedulingPolicy::evaluate(
         m_mode, m_hasRun && !m_run.isTerminal(), capabilities, homeostasis, false, QDateTime::currentDateTimeUtc(), m_schedulerCooldownUntil);
     if (evaluation.decision != SchedulingDecision::Run) {
@@ -280,7 +289,14 @@ QByteArray LifecycleService::RunSchedulingCycle()
     const QString runId = ExecuteSchedulingDecision(
         capabilities.snapshotId.toString(QUuid::WithoutBraces),
         homeostasis.snapshotId.toString(QUuid::WithoutBraces));
-    if (runId.isEmpty()) return schedulerReply(QStringLiteral("failed"), QString(), m_error);
+    // A lost race is deferred, not failed. "deferred" already means the run did not start and a
+    // later attempt may succeed, which is exactly the situation; "failed" means the scheduler could
+    // not do its job.
+    if (runId.isEmpty())
+        return schedulerReply(
+            m_lastSchedulingRaceLost ? QStringLiteral("deferred") : QStringLiteral("failed"),
+            QString(),
+            m_error);
     failpoint("after-scheduled-execute");
     return continueScheduledRun();
 }

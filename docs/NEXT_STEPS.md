@@ -687,19 +687,33 @@ says which evidence was actually gathered.
 
 **The 460k cliff is closed.** `Reflect` no longer scales with the length of the biography.
 
-## Known defect — flaky process test
+## Scheduling flake — diagnosed and fixed
 
-`scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable` is nondeterministic. `RunSchedulingCycle`
-intermittently answers `failed` where the test expects `started`. This was observed twice against
-**the same Nix derivation hash** — one failing run and two passing runs of identical inputs — so it
-is the test or the scheduling policy, not any change under test.
+`scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable` intermittently saw `RunSchedulingCycle`
+answer `failed` where it expected `started`. Established as a genuine flake before anything was
+changed: the same Nix derivation hash produced one failing and two passing runs, so identical inputs
+gave different outcomes.
 
-It matters more than an ordinary flake: this suite is the evidence base for lifecycle and recovery
-claims, and a gate that passes intermittently cannot support them. It also costs real time, because
-an unrelated change lands and the failure looks like it caused it.
+**Cause.** The policy is evaluated twice. `RunSchedulingCycle` takes a health snapshot and decides,
+then `ExecuteSchedulingDecision` re-fetches health and requires the snapshot identity to be
+unchanged. healthd refreshes on a 30 s timer and on every bus owner change, so a refresh landing in
+that window supersedes the evidence and the run is refused.
 
-Not yet diagnosed. The likely area is the interaction between the cooldown, the capability graph
-left by a preceding test, and the timing of healthd's refresh.
+The refusal is correct — a decision reasoned about one snapshot should not execute against another.
+What was wrong is that it was reported as `failed`, the same outcome as a scheduler that could not do
+its job. An ordinary race was indistinguishable from a defect.
+
+Isolated repeat runs never reproduced it; both real failures happened during full builds. The window
+between the two evaluations widens under load, which is why it only appeared there.
+
+**Fix.** A lost evidence race now answers `deferred` — which already means the run did not start and
+a later attempt may succeed — with a reason naming the supersession. The tests retry on exactly that
+condition and fail immediately on anything else.
+
+**Separately, the assertions were unactionable.** They compared only the outcome and discarded the
+`reason` the scheduler already returns, so every intermittent failure read as "expected started, got
+failed" with nothing to act on. All three now print the reason. That is most of why this took two
+sightings to diagnose.
 
 ## P7.0-replay — Paged Event1 replay
 

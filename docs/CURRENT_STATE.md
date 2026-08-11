@@ -304,6 +304,11 @@ the point near 460,000 contributions where `Reflect` would have stopped being po
 full verification remains the heavy integrity gate, because corruption inside a trusted prefix is by
 construction invisible to the incremental check.
 
+Automatic scheduling distinguishes a lost race from a failure. Lifecycled evaluates its policy once
+to decide and again to execute, refusing to start a run whose health evidence was replaced in
+between; healthd refreshes on a timer and on bus owner changes, so that supersession is ordinary
+rather than exceptional. It is now reported as `deferred` with a reason naming it, not as `failed`.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and

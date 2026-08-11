@@ -59,6 +59,11 @@ private:
                                     const RpcResult &result);
     QString m_path; LifecycleMode m_mode{LifecycleMode::Awake}; LifecycleRun m_run;
     bool m_hasRun{false}; bool m_ready{false}; QString m_error;
+
+    /// Whether the last scheduling attempt was refused because its health evidence had been
+    /// replaced between the decision and its execution. That is a race, not a fault, so it is
+    /// reported as deferred rather than failed.
+    bool m_lastSchedulingRaceLost{false};
     QDateTime m_lastUserActivityAt;
     QDateTime m_schedulerCooldownUntil;
     EventClient m_events;

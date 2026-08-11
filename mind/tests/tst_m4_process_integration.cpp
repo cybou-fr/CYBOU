@@ -401,7 +401,7 @@ private Q_SLOTS:
         const QVariantMap cycle = FabricCodec::decodeMap(
             lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
-        QCOMPARE(cycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+        assertSchedulingStarted(cycle);
         QTRY_COMPARE_WITH_TIMEOUT(
             LifecycleClient().state().value(QStringLiteral("status")).toString(),
             QStringLiteral("completed"), 10000);
@@ -708,7 +708,7 @@ private Q_SLOTS:
         const QVariantMap cycle = FabricCodec::decodeMap(
             lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
-        QCOMPARE(cycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+        assertSchedulingStarted(cycle);
 
         QElapsedTimer elapsed;
         elapsed.start();
@@ -774,7 +774,7 @@ private Q_SLOTS:
         const QVariantMap cycle = FabricCodec::decodeMap(
             lifecycle.callBytes(QStringLiteral("RunSchedulingCycle")), &error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
-        QCOMPARE(cycle.value(QStringLiteral("outcome")).toString(), QStringLiteral("started"));
+        assertSchedulingStarted(cycle);
         QTRY_COMPARE_WITH_TIMEOUT(LifecycleClient().state().value(QStringLiteral("status")).toString(),
                                   QStringLiteral("failed"), 5000);
         QVariantMap state = LifecycleClient().state();
@@ -1366,6 +1366,38 @@ private Q_SLOTS:
     // probe - waited behind it for the whole budget. presenceSnapshotHasOneBoundedOwnerBudget
     // cannot see this: total latency was already bounded, it was the exclusivity that was wrong.
     //
+private:
+    // healthd refreshes on a 30 s timer and on every bus owner change, and lifecycled deliberately
+    // refuses to start a run whose health evidence was replaced between the decision and its
+    // execution. So a scheduling cycle can be legitimately deferred through no fault of the test,
+    // and asserting that the first attempt always starts is asserting that a race never happens.
+    //
+    // Retry on a deferral caused by that race; treat anything else as the failure it is. The reason
+    // is always printed, because an outcome without it is not actionable.
+    void assertSchedulingStarted(const QVariantMap &firstAttempt)
+    {
+        QVariantMap cycle = firstAttempt;
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            const QString outcome = cycle.value(QStringLiteral("outcome")).toString();
+            if (outcome == QStringLiteral("started")) {
+                return;
+            }
+            const QString reason = cycle.value(QStringLiteral("reason")).toString();
+            if (!(outcome == QStringLiteral("deferred") && reason.contains(QStringLiteral("superseded")))) {
+                QFAIL(qPrintable(
+                    QStringLiteral("scheduling cycle answered %1: %2").arg(outcome, reason)));
+            }
+
+            QString error;
+            cycle = FabricCodec::decodeMap(
+                RpcClient(kLifecycleEndpoint).callBytes(QStringLiteral("RunSchedulingCycle")),
+                &error);
+            QVERIFY2(error.isEmpty(), qPrintable(error));
+        }
+        QFAIL("scheduling evidence was superseded on every attempt");
+    }
+
+private Q_SLOTS:
     // originOrgan is provenance: it answers who brought a contribution into the biography. Nothing
     // downstream can check that claim, so eventd binds it to the process that actually called.
     // Until it did, any process in the session could attribute a contribution to predictord or
