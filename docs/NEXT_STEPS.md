@@ -608,9 +608,13 @@ rather than the sum. The projection clients use a single attempt and no circuit 
 a latched circuit outlives the request that opened it and would render a transient stall as a
 permanently empty section for five seconds.
 
-Still outstanding, and the reason the maturity score is not restored: healthd probes every organ
-with the synchronous client, so suspending one owner still makes healthd unresponsive for the length
-of its probe. The compound Presence mutations also still use it. Both are separate slices.
+Still outstanding, and the reason the maturity score is not restored: the compound Presence
+mutations remain sequential on the synchronous client. Their steps are genuinely ordered, unlike the
+projection's, but they still hold the thread.
+
+A claim made when this package was opened has been withdrawn. healthd does **not** probe with the
+synchronous client — `Refresh` already issues every probe concurrently through `AsyncRpcClient`
+under a bounded deadline. No healthd work is needed or planned here.
 
 **A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
 biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that

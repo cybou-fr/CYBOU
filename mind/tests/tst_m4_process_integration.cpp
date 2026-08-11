@@ -1365,11 +1365,10 @@ private Q_SLOTS:
     // probe - waited behind it for the whole budget. presenceSnapshotHasOneBoundedOwnerBudget
     // cannot see this: total latency was already bounded, it was the exclusivity that was wrong.
     //
-    // Deliberately last in the suite. Suspending an owner makes healthd unresponsive for the length
-    // of its own blocking probe of that owner - healthd still uses the synchronous client, so the
-    // fix applied to presenced does not extend to it - and the scheduling tests refuse to start a
-    // run against the degraded capability graph that leaves behind. Running here means this test's
-    // disturbance cannot be inherited by a later one and reported as that test's failure.
+    // Deliberately last in the suite. Suspending an owner leaves healthd's capability graph
+    // degraded until it re-probes, and the scheduling tests refuse to start a run against that.
+    // Running here means this test's disturbance cannot be inherited by a later one and reported as
+    // that test's failure.
     void presenceServesOtherCallersWhileAggregating()
     {
         stop(m_presenced);
@@ -1435,6 +1434,10 @@ private Q_SLOTS:
         // the process was suspended, and the scheduling tests that follow refuse to start a run
         // against a degraded capability graph. Leave health agreeing that selfd is back, so a later
         // failure means what it says instead of inheriting this test's disturbance.
+        //
+        // The return value is deliberately ignored. Refresh refuses while one is already running,
+        // which is a re-entrancy guard rather than a failure; the wait below is what establishes
+        // that the graph has actually recovered.
         RpcClient(kHealthEndpoint).callBool(QStringLiteral("Refresh"));
         QTRY_VERIFY_WITH_TIMEOUT(selfAssessmentAvailable(), 35000);
     }

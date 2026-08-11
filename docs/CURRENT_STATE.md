@@ -262,8 +262,9 @@ through the async RPC client, and the reply is sent when the last one lands or t
 expires. presenced no longer blocks its own event loop during a projection, and a process test
 proves a second caller is answered while a gather is in flight. The projection clients use one
 attempt and no circuit latching, so a transient owner stall cannot blank a section of the UI beyond
-the request that observed it. healthd still probes with the synchronous client, and the compound
-Presence mutations still use it.
+the request that observed it. The compound Presence mutations remain sequential on the synchronous
+client; their steps are ordered by construction. healthd already probed concurrently through the
+async client before this change and was not altered by it.
 
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls

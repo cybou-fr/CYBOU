@@ -64,13 +64,24 @@ unresponsive owner no longer multiplies timeouts. It did not make presenced conc
 presenced is inside `snapshotMap`, it is a single-threaded D-Bus service that cannot answer any
 other caller — the Plasma applet, a second surface, or healthd.
 
-**Interaction with healthd:** healthd probes every endpoint including presenced, on a 30-second
-timer and on every bus name-owner change ([`healthd/main.cpp`](../mind/services/healthd/main.cpp),
-[`HealthService.cpp`](../mind/services/healthd/HealthService.cpp)). Those probes are blocking calls
-from the same synchronous client. A Presence aggregation in flight and a health refresh in flight
-therefore stall each other until the D-Bus timeouts expire. There is no call cycle in the code — see
-A3, presenced answers `Health()` without a downstream call — so this is mutual latency, not a true
-deadlock. It is still a self-inflicted stall on the two processes the user sees most.
+**Correction — the claim originally made here about healthd was false.** This section first stated
+that healthd probes its endpoints with the same synchronous client, and that a Presence aggregation
+and a health refresh therefore stall each other. That is not what the code does.
+[`HealthService::Refresh`](../mind/services/healthd/HealthService.cpp) uses `AsyncRpcClient`
+exclusively: it issues every probe concurrently with a 750 ms per-probe timeout under a 2 s refresh
+deadline, driven by a nested event loop that keeps serving healthd's own callers. healthd was
+already doing what A2 asks of presenced. The error came from reading `endpoints()` and the probe
+call sites without reading the dispatch around them.
+
+What the flaky test runs actually showed was different and benign: `Refresh` returns `false` while a
+refresh is already in progress, by an explicit re-entrancy guard. Suspending an owner makes a
+refresh occupy its full deadline, so a test calling `Refresh` in that window is refused — correct
+behavior being misread as unresponsiveness.
+
+One consequence is worth keeping. Because the probe clients are owned by the refresh and destroyed
+when it returns, their pending watchers are destroyed with them, so a callback that misses the
+deadline cannot fire against a dead stack frame. That is the hazard a nested event loop usually
+carries, and it is already handled.
 
 **Resolution: applied for the projection path.** `Snapshot` is now a delayed-reply D-Bus method.
 Health1 remains the one sequential step, because its answer decides which reads are legitimate at
@@ -94,12 +105,15 @@ reading:
   here is the shared deadline and the typed empty projection; retry belongs on the mutation paths,
   where idempotency is actually reasoned about.
 
-**Not migrated: healthd.** healthd still probes every organ with the synchronous client, so a
-suspended owner makes healthd unresponsive for the length of its own probe. That is the same defect
-in a different process, and the new coverage had to be ordered last in the suite to keep its
-disturbance from being inherited by later tests — which is a fair description of the remaining
-problem. The compound Presence *mutations* also still use the synchronous client; they are ordered
-by construction and are a separate slice.
+**Still on the synchronous client: the compound Presence mutations.** `Promise`, `Reflect`,
+`Observe`, `Predict`, the commitment mutations, and `InterruptLifecycle` remain sequential. That is
+defensible in a way the projection was not — a mutation's steps are genuinely ordered, and Event1
+preflight before auxiliary notification is the point — but they still hold the thread. They are a
+separate slice.
+
+The new coverage is ordered last in the suite because suspending an owner leaves healthd's capability
+graph degraded until it re-probes, and the scheduling tests refuse to start a run against that. The
+disturbance is to the *graph*, not to healthd's responsiveness.
 
 ## A3 — presenced cannot be reported as degraded
 
@@ -285,7 +299,7 @@ The checkpoint's structural conclusions hold. The maturity matrix needs three ad
 | Area | Checkpoint | Adjusted | Reason |
 |---|---:|---:|---|
 | Canonical memory/Event1 | 3 | 2 | A1: the durability claim is not supported against power loss, and the test design cannot test it |
-| RPC resilience | 3 | 2 | A2: the rated stack was not on the presentation path. The read-only projection now uses it; healthd's probes and the Presence mutations still do not |
+| RPC resilience | 3 | 2 | A2: the rated stack was not on the presentation path. The read-only projection now uses it; the compound Presence mutations still do not. healthd was already using it — see the correction in A2 |
 | Degraded operation | 3 | 2 | A3: one of eight projected capabilities cannot enter a deficit |
 
 The recommended M7 entry sequence does not change. A1, A3, A4, and A5 should land before P7.0,
