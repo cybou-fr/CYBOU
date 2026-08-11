@@ -48,6 +48,16 @@ public Q_SLOTS:
     QByteArray ConsumerBacklog(const QString &consumerId) const;
 
     QByteArray Recent(int limit) const;
+
+    /// One page of contributions after `afterSequence`, oldest first.
+    ///
+    /// The paged counterpart to Recent. Recent(0) returns the entire biography in one reply, which
+    /// is how organs used to rebuild their state; at scale that is seconds of work and hundreds of
+    /// megabytes across the bus, paid separately by each organ on every start. Replay lets a caller
+    /// resume from a cursor and bound what it asks for.
+    ///
+    /// Answers a CBOR map: from, to, head, hasMore, envelopes.
+    QByteArray Replay(qulonglong afterSequence, int limit) const;
     QByteArray Episode(const QString &correlationId) const;
     QByteArray AtSequence(qulonglong sequence) const;
 

@@ -38,6 +38,7 @@ machine-specific; the per-contribution costs and their linearity are the transfe
 | Fixture build (batched, 1000/commit) | 379 ms | 4,739 ms | 61,568 ms | ~62 µs |
 | Append, one fsync each | — | — | — | **~1.2 ms** |
 | Full replay `recent(0)` | 81 ms | 832 ms | 8,927 ms | **~8.9 µs** |
+| Paged replay, 1000/page | — | 728 ms | — | ~7.3 µs |
 | Full `Verify` | 109 ms | 1,036 ms | 10,915 ms | **~10.9 µs** |
 | Consolidation backlog count | 1 ms | 13 ms | 130 ms | ~0.13 µs |
 | Indexed lookup (oldest / newest) | 5 / 5 ms | 5 / 4 ms | 5 / 5 ms | flat |
@@ -60,6 +61,20 @@ contribution, and intentiond, predictord and selfd each replay the entire histor
 state on every start. At a million contributions that is ~9 s *each*, plus serialising ~347 MiB
 across D-Bus three times. This is the concrete form of the deferred A4 finding: the design is
 correct and does not scale.
+
+**Paging does not make replay faster, and it was never going to.** Measured at 100k, paged replay
+costs 728 ms against 762 ms for `recent(0)` — the same work, within noise. The same rows are read
+and decoded either way; paging adds one query per page and removes nothing.
+
+What paging buys is different and still worth having: memory no longer scales with history, because
+no caller holds the whole biography at once, and across D-Bus there is no single reply carrying
+hundreds of megabytes. Those are real failure modes, not slowness.
+
+The consequence matters for sequencing: **paged replay alone does not move the cold-reconstruction
+budget.** Nine seconds per organ at a million contributions is the cost of reading and decoding a
+million rows, and no cursor changes that. Moving it requires organs to stop replaying everything —
+that is what projection checkpoints are for, and this measurement is the evidence that they are
+required rather than merely desirable.
 
 **`Verify` reaches a user-visible path.** selfd calls it during ordinary self-assessment, which
 presenced reaches through `Reflect` under a 5 s command budget. At ~10.9 µs per contribution,

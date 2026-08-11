@@ -817,6 +817,39 @@ QList<CognitiveEnvelope> Journal::recent(int limit) const
     return out;
 }
 
+// One page, oldest first, driven off the sequence primary key. Reading `limit + 1` rows is how
+// hasMore is answered without a second COUNT over the tail of the journal.
+ContributionPage Journal::after(quint64 afterSequence, int limit) const
+{
+    ContributionPage page;
+    if (!isOpen() || limit <= 0) {
+        return page;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+                      "SELECT seq, %1 FROM contribution WHERE seq > ? ORDER BY seq LIMIT ?")
+                      .arg(envelopeColumns()));
+    query.addBindValue(static_cast<qulonglong>(afterSequence));
+    query.addBindValue(limit + 1);
+    if (!query.exec()) {
+        return page;
+    }
+
+    while (query.next()) {
+        if (page.envelopes.size() == limit) {
+            page.hasMore = true;
+            break;
+        }
+        page.lastSequence = query.value(0).toULongLong();
+        page.envelopes.append(envelopeFromQuery(query, 1));
+    }
+
+    page.head = count();
+    page.ok = true;
+    return page;
+}
+
 QList<CognitiveEnvelope> Journal::episode(const QUuid &correlationId) const
 {
     QList<CognitiveEnvelope> out;

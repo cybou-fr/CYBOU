@@ -7,6 +7,7 @@
 #include "cybou/events/EventStore.h"
 
 #include <QCborMap>
+#include <QCborValue>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
@@ -18,6 +19,8 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QSaveFile>
+
+#include <algorithm>
 
 namespace cybou {
 
@@ -314,6 +317,28 @@ QByteArray EventService::ConsumerBacklog(const QString &consumerId) const
 QByteArray EventService::Recent(int limit) const
 {
     return EnvelopeCodec::encodeList(m_journal.recent(limit));
+}
+
+// Bounded by construction: a caller asking for more than kMaxReplayPage gets kMaxReplayPage. The
+// cap is the difference between a paged protocol and Recent(0) wearing a cursor - without it a
+// caller could still demand the whole biography in one reply and nothing would have improved.
+QByteArray EventService::Replay(qulonglong afterSequence, int limit) const
+{
+    constexpr int kMaxReplayPage = 1000;
+    const ContributionPage page = m_journal.after(
+        static_cast<quint64>(afterSequence),
+        limit <= 0 ? kMaxReplayPage : std::min(limit, kMaxReplayPage));
+
+    QCborMap reply;
+    reply.insert(QStringLiteral("ok"), page.ok);
+    reply.insert(QStringLiteral("from"), QString::number(afterSequence));
+    reply.insert(QStringLiteral("to"), QString::number(page.lastSequence));
+    reply.insert(QStringLiteral("head"), QString::number(page.head));
+    reply.insert(QStringLiteral("hasMore"), page.hasMore);
+    reply.insert(
+        QStringLiteral("envelopes"),
+        QCborValue::fromVariant(QVariant(EnvelopeCodec::encodeList(page.envelopes))));
+    return reply.toCborValue().toCbor();
 }
 
 QByteArray EventService::Episode(const QString &correlationId) const

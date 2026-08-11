@@ -220,6 +220,52 @@ std::optional<quint64> EventClient::consumerBacklog(const QString &consumerId) c
     return backlog;
 }
 
+ContributionPage EventClient::after(quint64 afterSequence, int limit) const
+{
+    return after(afterSequence, limit, -1);
+}
+
+ContributionPage EventClient::after(quint64 afterSequence, int limit, int timeoutMs) const
+{
+    m_lastError.clear();
+    ContributionPage page;
+
+    const QByteArray replyBytes = callBytes(
+        QStringLiteral("Replay"),
+        {static_cast<qulonglong>(afterSequence), limit},
+        timeoutMs);
+    if (replyBytes.isEmpty()) {
+        // An empty reply is a transport failure, not an empty page. Reporting it as the end of
+        // history would let a caller rebuild state from a prefix and believe it was complete.
+        if (m_lastError.isEmpty())
+            m_lastError = QStringLiteral("eventd did not answer Replay");
+        return page;
+    }
+
+    const QCborValue value = QCborValue::fromCbor(replyBytes);
+    if (!value.isMap() || !value.toMap().value(QStringLiteral("ok")).toBool()) {
+        m_lastError = QStringLiteral("eventd returned an invalid Replay page");
+        return page;
+    }
+
+    const QCborMap map = value.toMap();
+    page.lastSequence = map.value(QStringLiteral("to")).toString().toULongLong();
+    page.head = map.value(QStringLiteral("head")).toString().toULongLong();
+    page.hasMore = map.value(QStringLiteral("hasMore")).toBool();
+
+    QString decodeError;
+    page.envelopes = EnvelopeCodec::decodeList(
+        map.value(QStringLiteral("envelopes")).toByteArray(), &decodeError);
+    if (!decodeError.isEmpty()) {
+        m_lastError = decodeError;
+        page.envelopes.clear();
+        return page;
+    }
+
+    page.ok = true;
+    return page;
+}
+
 QList<CognitiveEnvelope> EventClient::recent(int limit) const
 {
     return recent(limit, -1);

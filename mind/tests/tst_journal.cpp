@@ -507,6 +507,63 @@ private Q_SLOTS:
         QCOMPARE(journal.countAfterExcludingCapability(0, QStringLiteral("absent.scope")), 3u);
     }
 
+    // Paging is the replacement for recent(0). What has to hold is that the pages tile the history
+    // exactly: no contribution seen twice, none skipped, and the end distinguishable from a failure.
+    void pagedReplayTilesHistoryExactly()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        QList<QUuid> written;
+        for (int i = 0; i < 25; ++i) {
+            CognitiveEnvelope e = observation();
+            QVERIFY(journal.append(e) > 0);
+            written.append(e.messageId);
+        }
+
+        // A page smaller than the history reports more to come and stops exactly on the boundary.
+        const ContributionPage first = journal.after(0, 10);
+        QVERIFY(first.ok);
+        QCOMPARE(first.envelopes.size(), 10);
+        QVERIFY(first.hasMore);
+        QCOMPARE(first.lastSequence, 10u);
+        QCOMPARE(first.head, 25u);
+        QCOMPARE(first.envelopes.first().messageId, written.first());
+
+        // Resuming from the cursor continues rather than repeats.
+        const ContributionPage second = journal.after(first.lastSequence, 10);
+        QVERIFY(second.ok);
+        QCOMPARE(second.envelopes.first().messageId, written.at(10));
+
+        // The final page reports no more, which is how the end is told apart from a failure.
+        const ContributionPage last = journal.after(20, 10);
+        QVERIFY(last.ok);
+        QCOMPARE(last.envelopes.size(), 5);
+        QVERIFY(!last.hasMore);
+        QCOMPARE(last.lastSequence, 25u);
+
+        // Past the end: empty, but still a successful read.
+        const ContributionPage beyond = journal.after(25, 10);
+        QVERIFY(beyond.ok);
+        QVERIFY(beyond.envelopes.isEmpty());
+        QVERIFY(!beyond.hasMore);
+
+        // replayAll walks the whole history, oldest first, across page boundaries.
+        QList<QUuid> replayed;
+        QVERIFY(journal.replayAll(
+            [&replayed](const CognitiveEnvelope &e) { replayed.append(e.messageId); }, 7));
+        QCOMPARE(replayed, written);
+
+        // recent(0) yields the same contributions in the opposite order. Stating it here is what
+        // makes the hazard explicit for anything still being migrated off it.
+        QList<QUuid> reversed;
+        for (const CognitiveEnvelope &e : journal.recent(0)) {
+            reversed.prepend(e.messageId);
+        }
+        QCOMPARE(reversed, written);
+    }
+
     void episodeReplaysInOrder()
     {
         QTemporaryDir dir;

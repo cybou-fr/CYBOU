@@ -647,6 +647,44 @@ fixtures first would mean rebuilding them.
 A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
 unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
 
+## P7.0-replay — Paged Event1 replay
+
+**Status: API implemented, one organ migrated.** `Event1.Replay(afterSequence, limit)` answers a
+page as `{ok, from, to, head, hasMore, envelopes}`, capped server-side at 1000 so it cannot become
+`Recent(0)` wearing a cursor. `EventStore` gained `after()` and a `replayAll()` helper; `Journal` and
+`EventClient` both implement it. `Recent` is unchanged and stays what it should be — genuinely recent
+activity for the UI, not a replay protocol.
+
+The page reports `ok` separately from being empty. Without that, a replay whose transport died
+halfway looks exactly like one that finished, and an organ rebuilds its state from a prefix while
+believing it has the whole history.
+
+**intentiond is migrated.** Two chronological passes, both paged, replacing one `recent(0)` that
+was walked three times. Two hazards had to be handled, and both are the reason the remaining organs
+are not done in the same change:
+
+- **Order is inverted.** `recent(0)` yields newest first; `replayAll` yields oldest first. The old
+  code ended with a `std::reverse` to correct for that, and keeping it would have inverted the order
+  Presence shows commitments in.
+- **Partial replay must fail closed.** If the first pass dies halfway, commitments whose closing
+  Outcome was not read look open. Returning a partial open set is worse than returning none.
+
+**Not yet migrated: predictord, selfd, workspaced.** Each has its own order dependence and must be
+read before it is changed:
+
+- `Predictor::samples` appends in newest-first order and downstream treats position as recency;
+  reversing it silently changes which samples a prediction is built from.
+- `Predictor::calibration` and `allCalibrations` sum and set-collect, so they are order-independent
+  and are the safe ones.
+- `SelfModel::subjects` already iterates `recent(0)` in reverse to get oldest-first, so it becomes
+  simpler, not harder.
+- `Workspace` uses `recent(m_capacity)` — bounded already, and not a replay at all. It may not need
+  migrating.
+
+**What this does not fix.** Paged replay is not faster: 728 ms against 762 ms at 100k. It bounds
+memory and removes the single enormous D-Bus reply, both real failure modes, but the
+cold-reconstruction budget is unmoved. See [Scale Budgets](mind/SCALE_BUDGETS.md).
+
 ## P7.0-scale — Journal fixtures and budgets
 
 **Status: implemented for the Journal paths.** `journal-scale` builds a deterministic fixture and

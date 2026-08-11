@@ -164,6 +164,28 @@ private Q_SLOTS:
             QStringLiteral("%1 us").arg(double(replayMs) * 1000.0 / all.size(), 0, 'f', 2));
     }
 
+    // The paged replacement for recent(0). In-process this is not expected to be faster - the same
+    // rows are read and decoded, plus one query per page - so the number here is a check that
+    // paging costs little, not a claimed speedup. The win paging buys is memory, and across D-Bus
+    // the absence of a single reply carrying the entire biography.
+    void pagedReplay()
+    {
+        Journal journal(m_path);
+        QVERIFY(journal.isOpen());
+
+        int seen = 0;
+        QElapsedTimer elapsed;
+        elapsed.start();
+        QVERIFY(journal.replayAll([&seen](const CognitiveEnvelope &) { ++seen; }, 1000));
+        const qint64 pagedMs = elapsed.elapsed();
+
+        QCOMPARE(static_cast<quint64>(seen), journal.count());
+        reportMs(QStringLiteral("paged replay, 1000 per page"), pagedMs);
+        report(
+            QStringLiteral("paged replay per contribution"),
+            QStringLiteral("%1 us").arg(double(pagedMs) * 1000.0 / seen, 0, 'f', 2));
+    }
+
     // Verify rechains the whole journal and is reachable from selfd's ordinary self-assessment
     // path, so its cost is not confined to a maintenance task.
     void fullVerification()

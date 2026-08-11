@@ -120,27 +120,41 @@ QList<Intention> Intentions::open() const
         return result;
     }
 
-    const auto all = m_events->recent(0);
-
+    // Replayed in pages rather than pulled in one reply. This used to be recent(0), which
+    // materialises the entire biography and carries it across the bus in a single message - about
+    // nine seconds and hundreds of megabytes at a million contributions, paid on every call.
+    //
+    // Two passes are still needed, because an Outcome closing an Intention can only be recognised
+    // once that Intention has been seen, and a single chronological pass would meet some Outcomes
+    // first. So the first pass collects what was closed and the second builds the open set. Both
+    // are paged; neither holds the whole history.
     QSet<QUuid> intentionIds;
-    for (const auto &e : all) {
+    QSet<QUuid> closed;
+    const bool firstPass = m_events->replayAll([&](const CognitiveEnvelope &e) {
         if (e.kind == ContributionKind::Intention) {
             intentionIds.insert(e.messageId);
+            return;
         }
-    }
-
-    QSet<QUuid> closed;
-    for (const auto &e : all) {
+        // The Intention is required to have been seen already. Causation guarantees it precedes its
+        // Outcome, so in chronological order that check is always satisfiable here - which is
+        // exactly why the two passes can be chronological at all.
         if (e.kind == ContributionKind::Outcome
             && e.originOrgan == QLatin1String("intentiond")
             && intentionIds.contains(e.causationId)) {
             closed.insert(e.causationId);
         }
+    });
+
+    // A replay that failed halfway would leave commitments looking open because the Outcome that
+    // closed them was never read. Reporting a partial answer as the open set is worse than
+    // reporting none, so this fails closed.
+    if (!firstPass) {
+        return result;
     }
 
-    for (const auto &e : all) {
+    const bool secondPass = m_events->replayAll([&](const CognitiveEnvelope &e) {
         if (e.kind != ContributionKind::Intention || closed.contains(e.messageId)) {
-            continue;
+            return;
         }
 
         const QCborMap payload = QCborValue::fromCbor(e.payloadCbor).toMap();
@@ -150,9 +164,15 @@ QList<Intention> Intentions::open() const
         i.trigger = payload[QStringLiteral("trigger")].toString();
         i.formed = e.wallTime;
         result.append(i);
+    });
+
+    if (!secondPass) {
+        return {};
     }
 
-    std::reverse(result.begin(), result.end());
+    // No reverse here, unlike the recent(0) version. That call yields newest first and the result
+    // had to be flipped to put oldest first; replayAll already yields oldest first, so reversing
+    // would now invert the order Presence shows commitments in.
     return result;
 }
 

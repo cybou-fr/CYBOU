@@ -40,6 +40,8 @@ public:
 
     QList<CognitiveEnvelope> recent(int limit = 50) const override;
     QList<CognitiveEnvelope> recent(int limit, int timeoutMs) const;
+    ContributionPage after(quint64 afterSequence, int limit) const override;
+    ContributionPage after(quint64 afterSequence, int limit, int timeoutMs) const;
     QList<CognitiveEnvelope> episode(const QUuid &correlationId) const override;
     std::optional<CognitiveEnvelope> atSequence(quint64 sequence) const override;
 
