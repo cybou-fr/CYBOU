@@ -84,8 +84,14 @@ verification alone consumes that entire budget at roughly **460,000 contribution
 
 Incremental verification removes that scaling: anchored at a checkpoint, checking 500 new
 contributions against a 100k journal costs 4 ms rather than 1,060 ms, because the cost follows what
-has arrived since the last check rather than the whole history. **selfd now uses it, so the cliff is
-closed**: `Reflect` no longer scales with the length of the biography.
+has arrived since the last check rather than the whole history, and selfd uses it.
+
+**That claim was previously stated too strongly here, and is corrected.** Verification no longer
+scales with the biography. `Reflect` still does, through a different path that was never measured:
+`SelfModel::measure` builds its subject list with `recent(0)`, then calls `Predictor::calibration`
+for each subject, and that does its own `recent(0)`. The cost is therefore roughly O(N x S) in
+contributions and subjects — worse than the verification cost it replaced. Fixing one cost on a path
+and assuming it was the only one is how the wrong claim was reached.
 
 The optimisation has an honest limit, and it is the reason the result is typed. Incremental
 verification trusts the prefix its checkpoint covers, so corruption inside that prefix is invisible
@@ -105,7 +111,8 @@ contributions rather than seconds so they can be checked against a real journal.
 
 | Budget | Threshold | Consequence of crossing it |
 |---|---:|---|
-| `Verify` within the Presence command budget | ~~**~460k**~~ | Closed. selfd verifies incrementally against a persisted checkpoint, so the cost follows the increment, not the history |
+| `Verify` within the Presence command budget | ~~**~460k**~~ | Closed for verification. selfd verifies incrementally against a persisted checkpoint |
+| `Reflect` within the Presence command budget | **not measured** | Still open, and worse than linear: `SelfModel::measure` replays the biography once per subject through `Predictor::calibration`. Needs incremental projections in predictord, not another replay optimisation |
 | Organ cold reconstruction within a plausible session start | **~500k** | Three organs each spend ~5 s replaying before they are useful; needs paged replay with a cursor |
 | Sustained ingestion | **~800/s** | Above this, Event1 acceptance becomes the bottleneck and a perception adapter must batch or drop |
 | Journal size on a normal disk | not binding below ~10m | ~3.5 GiB; time budgets bind long before storage does |

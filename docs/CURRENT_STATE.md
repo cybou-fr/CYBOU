@@ -13,7 +13,7 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs twenty CTest suites, including Event1, lifecycle persistence/recovery,
+The Mind package runs twenty-three CTest suites, including Event1, lifecycle persistence/recovery,
 Lifecycle1 process restart, and nine-process integration. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count, and that compound Presence reads and mutations obey one bounded deadline.
@@ -299,8 +299,11 @@ describes the journal and then walks only what follows it; eventd owns the check
 it only on a chain that held. `Event1.VerifyIncremental()` carries a typed result — `FullyVerified`,
 `VerifiedThrough`, `InvalidAt`, `CheckpointMismatch` — and selfd reports it alongside
 `journalIntact`, so a check that trusted a prefix is never presented as a whole-history guarantee.
-At 100k, checking 500 new contributions costs 4 ms against 1,060 ms for the full walk, which removes
-the point near 460,000 contributions where `Reflect` would have stopped being possible. A periodic
+At 100k, checking 500 new contributions costs 4 ms against 1,060 ms for the full walk. This removes
+verification as a limit on `Reflect`; it does not make `Reflect` independent of the biography, which
+an earlier version of this paragraph wrongly claimed. `SelfModel::measure` still builds its subject
+list with `recent(0)` and then replays the biography again inside `Predictor::calibration` for every
+subject, so that path remains roughly O(contributions x subjects) and is now the larger cost. A periodic
 full verification remains the heavy integrity gate, because corruption inside a trusted prefix is by
 construction invisible to the incremental check.
 
