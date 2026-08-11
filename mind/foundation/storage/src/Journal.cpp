@@ -737,27 +737,90 @@ CognitiveEnvelope Journal::envelopeFromQuery(const QSqlQuery &query, int offset)
     return e;
 }
 
-quint64 Journal::verify() const
+QString verificationStatusToString(VerificationStatus status)
 {
-    if (!m_db.isOpen()) {
-        return 1;
+    switch (status) {
+    case VerificationStatus::FullyVerified: return QStringLiteral("fully-verified");
+    case VerificationStatus::VerifiedThrough: return QStringLiteral("verified-through");
+    case VerificationStatus::InvalidAt: return QStringLiteral("invalid-at");
+    case VerificationStatus::CheckpointMismatch: return QStringLiteral("checkpoint-mismatch");
+    }
+    return QStringLiteral("unknown");
+}
+
+VerifiedCheckpoint Journal::checkpointAtHead() const
+{
+    VerifiedCheckpoint checkpoint;
+    if (!isOpen()) {
+        return checkpoint;
     }
 
     QSqlQuery query(m_db);
-    const QString sql = QStringLiteral(
-                            "SELECT seq, hash_version, %1, prev_hash, hash "
-                            "FROM contribution ORDER BY seq")
-                            .arg(envelopeColumns());
-    if (!query.exec(sql)) {
-        return 1;
+    if (query.exec(QStringLiteral("SELECT seq, hash FROM contribution ORDER BY seq DESC LIMIT 1"))
+        && query.next()) {
+        checkpoint.sequence = query.value(0).toULongLong();
+        checkpoint.hash = query.value(1).toByteArray();
+        checkpoint.verifiedAt = QDateTime::currentDateTimeUtc();
+    }
+    return checkpoint;
+}
+
+// Walk the chain from `anchor` forward.
+//
+// Full verification is this with an empty anchor: the chain is rebuilt from the first contribution,
+// so the previous hash starts empty and every row is recomputed. With an anchor, the prefix is
+// taken on trust and the walk starts from the hash recorded there - which is why the anchor is
+// checked against the stored row first. If it does not match, nothing is concluded about the
+// journal; the checkpoint is simply unusable and the caller is told so.
+VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
+{
+    VerificationResult result;
+
+    if (!m_db.isOpen()) {
+        result.status = VerificationStatus::InvalidAt;
+        result.brokenAt = 1;
+        return result;
     }
 
-    quint64 expectedSequence = 1;
+    quint64 startAfter = 0;
     QByteArray expectedPrevious;
+
+    if (!anchor.isEmpty()) {
+        QSqlQuery anchorQuery(m_db);
+        anchorQuery.prepare(
+            QStringLiteral("SELECT hash FROM contribution WHERE seq = ? LIMIT 1"));
+        anchorQuery.addBindValue(static_cast<qulonglong>(anchor.sequence));
+        if (!anchorQuery.exec() || !anchorQuery.next()
+            || anchorQuery.value(0).toByteArray() != anchor.hash) {
+            result.status = VerificationStatus::CheckpointMismatch;
+            result.brokenAt = anchor.sequence;
+            return result;
+        }
+        startAfter = anchor.sequence;
+        expectedPrevious = anchor.hash;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT seq, hash_version, %1, prev_hash, hash "
+                                 "FROM contribution WHERE seq > ? ORDER BY seq")
+                      .arg(envelopeColumns()));
+    query.addBindValue(static_cast<qulonglong>(startAfter));
+    if (!query.exec()) {
+        result.status = VerificationStatus::InvalidAt;
+        result.brokenAt = startAfter + 1;
+        return result;
+    }
+
+    result.verifiedFrom = startAfter;
+    result.verifiedThrough = startAfter;
+
+    quint64 expectedSequence = startAfter + 1;
     while (query.next()) {
         const quint64 sequence = query.value(0).toULongLong();
         if (sequence != expectedSequence) {
-            return expectedSequence;
+            result.status = VerificationStatus::InvalidAt;
+            result.brokenAt = expectedSequence;
+            return result;
         }
 
         const int hashVersion = query.value(1).toInt();
@@ -765,7 +828,9 @@ quint64 Journal::verify() const
         const QByteArray storedPrevious = query.value(16).toByteArray();
         const QByteArray storedHash = query.value(17).toByteArray();
         if (storedPrevious != expectedPrevious) {
-            return sequence;
+            result.status = VerificationStatus::InvalidAt;
+            result.brokenAt = sequence;
+            return result;
         }
 
         QByteArray expectedHash;
@@ -775,18 +840,35 @@ quint64 Journal::verify() const
                    && e.schemaVersion == kCurrentEnvelopeSchemaVersion) {
             expectedHash = rowHashV2(sequence, e, storedPrevious);
         } else {
-            return sequence;
+            result.status = VerificationStatus::InvalidAt;
+            result.brokenAt = sequence;
+            return result;
         }
 
         if (expectedHash != storedHash) {
-            return sequence;
+            result.status = VerificationStatus::InvalidAt;
+            result.brokenAt = sequence;
+            return result;
         }
 
         expectedPrevious = storedHash;
+        result.verifiedThrough = sequence;
         ++expectedSequence;
     }
 
-    return 0;
+    result.status = anchor.isEmpty()
+        ? VerificationStatus::FullyVerified
+        : VerificationStatus::VerifiedThrough;
+    return result;
+}
+
+// The original whole-history contract, kept as-is: 0 means intact, otherwise the first bad
+// sequence. Expressed through verifyFrom with no anchor so there is one chain walk to be right
+// about rather than two that can drift.
+quint64 Journal::verify() const
+{
+    const VerificationResult result = verifyFrom({});
+    return result.intact() ? 0 : result.brokenAt;
 }
 
 std::optional<CognitiveEnvelope> Journal::readOne(QSqlQuery &query) const

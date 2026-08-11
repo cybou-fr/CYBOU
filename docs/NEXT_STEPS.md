@@ -647,6 +647,37 @@ fixtures first would mean rebuilding them.
 A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
 unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
 
+## P7.0-verify — Incremental verification
+
+**Status: mechanism implemented and tested; not yet wired to selfd.** `Journal::verifyFrom(anchor)`
+checks the anchor still describes the journal, then walks only the contributions after it.
+`checkpointAtHead()` produces the anchor to persist after a successful check. The result is typed —
+`FullyVerified`, `VerifiedThrough`, `InvalidAt`, `CheckpointMismatch` — so a partial check can never
+be read as a whole-history guarantee.
+
+`verify()` keeps its existing contract and is now expressed through the same chain walk, so there is
+one implementation to be right about instead of two that can drift.
+
+At 100k, checking 500 new contributions costs 4 ms against 1,060 ms for the full walk: the cost
+follows the increment, not the history.
+
+Three semantics worth keeping in view:
+
+- **A checkpoint is an accelerator, never an authority.** The Journal remains the only source of
+  truth about its own integrity. Losing a checkpoint costs a full verification, not correctness.
+- **`CheckpointMismatch` is not corruption.** It says the checkpoint is unusable, not that the
+  journal is bad; reporting it as damage would send someone looking for a fault that is not there.
+- **The prefix is trusted, so corruption inside it is invisible.** A test tampers with an early
+  contribution and confirms the incremental check still reports intact while the full walk catches
+  it. That is why the result is typed, and why a periodic full verification stays as the heavy gate.
+
+### Remaining
+
+selfd still calls the full `Verify`, so the 460k cliff is not yet closed. Wiring it needs an Event1
+method carrying the typed result, checkpoint persistence owned by eventd — a file beside the journal
+as with consumer offsets, so it stays clearly derived — and selfd reporting the distinction rather
+than flattening it back to a boolean.
+
 ## P7.0-replay — Paged Event1 replay
 
 **Status: API implemented, one organ migrated.** `Event1.Replay(afterSequence, limit)` answers a

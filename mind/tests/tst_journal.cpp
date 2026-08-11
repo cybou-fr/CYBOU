@@ -564,6 +564,93 @@ private Q_SLOTS:
         QCOMPARE(reversed, written);
     }
 
+    // Incremental verification exists because a full rechain costs ~10.9 us per contribution and is
+    // reachable from selfd's ordinary self-assessment, so it exhausts the Presence command budget
+    // near 460k contributions. What must not happen is that the cheaper check quietly reports the
+    // stronger claim.
+    void incrementalVerificationReportsWhatItActuallyChecked()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        VerifiedCheckpoint anchor;
+
+        {
+            Journal journal(path);
+            QVERIFY(journal.isOpen());
+            for (int i = 0; i < 10; ++i) {
+                QVERIFY(journal.append(observation()) > 0);
+            }
+
+            // No checkpoint means verify everything, and say so.
+            const VerificationResult full = journal.verifyFrom({});
+            QCOMPARE(full.status, VerificationStatus::FullyVerified);
+            QCOMPARE(full.verifiedFrom, 0u);
+            QCOMPARE(full.verifiedThrough, 10u);
+            QVERIFY(full.intact());
+
+            anchor = journal.checkpointAtHead();
+            QCOMPARE(anchor.sequence, 10u);
+            QVERIFY(!anchor.hash.isEmpty());
+
+            for (int i = 0; i < 5; ++i) {
+                QVERIFY(journal.append(observation()) > 0);
+            }
+
+            // With a checkpoint only the suffix is examined, and the status says so rather than
+            // claiming the whole history was rebuilt.
+            const VerificationResult incremental = journal.verifyFrom(anchor);
+            QCOMPARE(incremental.status, VerificationStatus::VerifiedThrough);
+            QCOMPARE(incremental.verifiedFrom, 10u);
+            QCOMPARE(incremental.verifiedThrough, 15u);
+            QVERIFY(incremental.intact());
+
+            // A checkpoint that does not describe this journal is unusable. That is not the same as
+            // the journal being bad, and reporting it as corruption would send a caller looking for
+            // damage that is not there.
+            VerifiedCheckpoint wrong = anchor;
+            wrong.hash = QByteArray("not-the-hash-that-was-recorded");
+            const VerificationResult mismatch = journal.verifyFrom(wrong);
+            QCOMPARE(mismatch.status, VerificationStatus::CheckpointMismatch);
+            QVERIFY(!mismatch.intact());
+
+            // An anchor past the end is equally unusable.
+            VerifiedCheckpoint beyond = anchor;
+            beyond.sequence = 999;
+            QCOMPARE(journal.verifyFrom(beyond).status, VerificationStatus::CheckpointMismatch);
+        }
+
+        // Corrupt a contribution inside the checkpointed prefix, then verify both ways. This is the
+        // honest limit of the optimisation: incremental verification trusts the prefix, so it
+        // cannot see this, and only the full walk can. The test states that limit rather than
+        // pretending the cheap check is equivalent.
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(
+                QStringLiteral("QSQLITE"), QStringLiteral("corrupt"));
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery query(db);
+            QVERIFY(query.exec(
+                QStringLiteral("UPDATE contribution SET origin_organ = 'tampered' WHERE seq = 3")));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("corrupt"));
+
+        Journal reopened(path);
+        QVERIFY(reopened.isOpen());
+
+        const VerificationResult afterTampering = reopened.verifyFrom(anchor);
+        QCOMPARE(afterTampering.status, VerificationStatus::VerifiedThrough);
+        QVERIFY(afterTampering.intact());
+
+        const VerificationResult fullAfterTampering = reopened.verifyFrom({});
+        QCOMPARE(fullAfterTampering.status, VerificationStatus::InvalidAt);
+        QCOMPARE(fullAfterTampering.brokenAt, 3u);
+        QVERIFY(!fullAfterTampering.intact());
+
+        // The whole-history contract is unchanged for existing callers.
+        QCOMPARE(reopened.verify(), 3u);
+    }
+
     void episodeReplaysInOrder()
     {
         QTemporaryDir dir;

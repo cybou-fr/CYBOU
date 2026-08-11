@@ -202,6 +202,31 @@ private Q_SLOTS:
         reportMs(QStringLiteral("full verify"), verifyMs);
     }
 
+    // The same check anchored at a checkpoint. This is the number the 460k cliff turns on: full
+    // verification scales with the whole history, incremental verification scales with what has
+    // arrived since it was last run.
+    void incrementalVerification()
+    {
+        Journal journal(m_path);
+        QVERIFY(journal.isOpen());
+
+        const VerifiedCheckpoint anchor = journal.checkpointAtHead();
+        QVERIFY(!anchor.isEmpty());
+
+        // A realistic suffix: what a session might add between two verifications.
+        for (int index = 0; index < 500; ++index) {
+            QVERIFY(journal.append(contributionAt(m_count + 100000 + index)) > 0);
+        }
+
+        QElapsedTimer elapsed;
+        elapsed.start();
+        const VerificationResult result = journal.verifyFrom(anchor);
+        const qint64 incrementalMs = elapsed.elapsed();
+
+        QCOMPARE(result.status, VerificationStatus::VerifiedThrough);
+        reportMs(QStringLiteral("incremental verify, 500 new"), incrementalMs);
+    }
+
     // Indexed lookups must not care how much history precedes them. This is the one assertion that
     // is about shape rather than speed, and it is machine-independent: a scan would make the last
     // contribution dramatically more expensive to reach than the first.

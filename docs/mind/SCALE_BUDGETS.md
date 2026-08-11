@@ -40,6 +40,7 @@ machine-specific; the per-contribution costs and their linearity are the transfe
 | Full replay `recent(0)` | 81 ms | 832 ms | 8,927 ms | **~8.9 µs** |
 | Paged replay, 1000/page | — | 728 ms | — | ~7.3 µs |
 | Full `Verify` | 109 ms | 1,036 ms | 10,915 ms | **~10.9 µs** |
+| Incremental `Verify`, 500 new | — | 4 ms | — | independent of history |
 | Consolidation backlog count | 1 ms | 13 ms | 130 ms | ~0.13 µs |
 | Indexed lookup (oldest / newest) | 5 / 5 ms | 5 / 4 ms | 5 / 5 ms | flat |
 | Journal size | 3.6 MiB | 34.6 MiB | 347 MiB | **~364 bytes** |
@@ -80,6 +81,20 @@ required rather than merely desirable.
 presenced reaches through `Reflect` under a 5 s command budget. At ~10.9 µs per contribution,
 verification alone consumes that entire budget at roughly **460,000 contributions**. Past that,
 `Reflect` cannot succeed regardless of how healthy everything else is.
+
+Incremental verification removes that scaling: anchored at a checkpoint, checking 500 new
+contributions against a 100k journal costs 4 ms rather than 1,060 ms, because the cost follows what
+has arrived since the last check rather than the whole history. The mechanism exists and is tested;
+**the cliff is not yet closed, because selfd still calls the full `Verify`.** Wiring it through is
+the remaining step.
+
+The optimisation has an honest limit, and it is the reason the result is typed. Incremental
+verification trusts the prefix its checkpoint covers, so corruption inside that prefix is invisible
+to it — a test tampers with an early contribution and confirms the incremental check still reports
+intact while the full walk finds it. That is not a defect to be fixed but a property to be reported:
+`VerifiedThrough` says a suffix was checked, `FullyVerified` says the history was rebuilt, and a
+caller needing the stronger claim can tell which it received. A periodic full verification remains
+the heavy integrity gate.
 
 **Storage growth is modest.** ~364 bytes per contribution means a million contributions is ~350 MiB.
 That is not the pressing constraint; time is.
