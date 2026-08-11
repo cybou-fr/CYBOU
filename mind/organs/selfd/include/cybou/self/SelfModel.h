@@ -27,6 +27,14 @@ struct SelfReport {
     bool journalIntact{true};
     quint64 firstBrokenAt{0};
 
+    /// What the integrity check actually established, not merely whether it passed.
+    ///
+    /// A full rechain and a check anchored at a checkpoint both leave journalIntact true, but they
+    /// are not the same evidence: the second trusts a prefix it did not re-examine. Carrying the
+    /// status keeps self-assessment from reporting the weaker claim as the stronger one.
+    VerificationStatus verification{VerificationStatus::FullyVerified};
+    quint64 verifiedFrom{0};
+
     bool isValid() const { return taken.isValid(); }
 };
 

@@ -5,12 +5,72 @@
 
 #include "cybou/protocol/CognitiveEnvelope.h"
 
+#include <QDateTime>
 #include <QObject>
 
 #include <functional>
 #include <optional>
 
 namespace cybou {
+
+/// A position in the hash chain that was verified, and the hash observed there.
+///
+/// This is an accelerator, never an authority. The Journal remains the only source of truth about
+/// its own integrity: a checkpoint lets verification skip a prefix it has already checked, and
+/// losing one costs a full verification rather than any correctness.
+struct VerifiedCheckpoint {
+    quint64 sequence{0};
+    QByteArray hash;
+    QDateTime verifiedAt;
+
+    bool isEmpty() const { return sequence == 0 || hash.isEmpty(); }
+};
+
+/// What a verification actually established.
+///
+/// The distinction is the point. Full verification rechains from the beginning; incremental
+/// verification trusts a prefix it checked earlier. Both are useful, but presenting the second as
+/// the first would claim evidence that was not gathered - so the result says which happened, and a
+/// caller that needs a whole-history guarantee can tell it did not get one.
+enum class VerificationStatus {
+    /// The chain was rebuilt from the first contribution and holds throughout.
+    FullyVerified,
+    /// The chain holds from the checkpoint forward. The prefix was not re-examined.
+    VerifiedThrough,
+    /// The chain is broken. `brokenAt` is the first bad sequence.
+    InvalidAt,
+    /// The checkpoint does not describe this journal: the anchor row is missing or its hash differs.
+    /// The journal is not thereby proven bad - the checkpoint is proven unusable, and the caller
+    /// must fall back to full verification rather than trust either.
+    CheckpointMismatch,
+};
+
+struct VerificationResult {
+    VerificationStatus status{VerificationStatus::InvalidAt};
+    /// Exclusive lower bound actually examined; 0 when verification started from the beginning.
+    quint64 verifiedFrom{0};
+    /// Highest sequence confirmed good.
+    quint64 verifiedThrough{0};
+    /// First bad sequence, or 0 when nothing is known to be bad.
+    quint64 brokenAt{0};
+
+    bool intact() const
+    {
+        return status == VerificationStatus::FullyVerified
+            || status == VerificationStatus::VerifiedThrough;
+    }
+};
+
+inline QString verificationStatusToString(VerificationStatus status)
+{
+    switch (status) {
+    case VerificationStatus::FullyVerified: return QStringLiteral("fully-verified");
+    case VerificationStatus::VerifiedThrough: return QStringLiteral("verified-through");
+    case VerificationStatus::InvalidAt: return QStringLiteral("invalid-at");
+    case VerificationStatus::CheckpointMismatch: return QStringLiteral("checkpoint-mismatch");
+    }
+    return QStringLiteral("unknown");
+}
 
 /// One page of a paged replay.
 ///
@@ -57,6 +117,13 @@ public:
     virtual quint64 count() const = 0;
     virtual QByteArray head() const = 0;
     virtual quint64 verify() const = 0;
+
+    /// Verify the chain, using a checkpoint if the implementation has one.
+    ///
+    /// The result says which claim it established. An implementation with no checkpoint owner
+    /// answers FullyVerified, because that is what it did - never VerifiedThrough, which would
+    /// assert a prefix was trusted when none was.
+    virtual VerificationResult verifyIncremental() const = 0;
 
     /// Most recent contributions first, newest to oldest.
     ///

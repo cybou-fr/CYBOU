@@ -671,12 +671,35 @@ Three semantics worth keeping in view:
   contribution and confirms the incremental check still reports intact while the full walk catches
   it. That is why the result is typed, and why a periodic full verification stays as the heavy gate.
 
-### Remaining
+### Wiring — complete
 
-selfd still calls the full `Verify`, so the 460k cliff is not yet closed. Wiring it needs an Event1
-method carrying the typed result, checkpoint persistence owned by eventd — a file beside the journal
-as with consumer offsets, so it stays clearly derived — and selfd reporting the distinction rather
-than flattening it back to a boolean.
+`Event1.VerifyIncremental()` answers the typed result. eventd owns the checkpoint as
+`verification-checkpoint.json` beside the journal, the same pattern as consumer offsets, so it stays
+visibly derived: losing it costs one full verification and nothing else. A checkpoint that no longer
+describes the journal is discarded and the full walk runs, because a stale accelerator says nothing
+about the biography. The checkpoint only advances on a chain that held — advancing past a break
+would make the next verification skip the very contribution that is wrong.
+
+selfd now calls it on the self-assessment path and carries `verification` and `verifiedFrom` into
+its report alongside `journalIntact`. The distinction is preserved rather than flattened: a
+full rechain and a checkpoint-anchored check both leave `journalIntact` true, and only the status
+says which evidence was actually gathered.
+
+**The 460k cliff is closed.** `Reflect` no longer scales with the length of the biography.
+
+## Known defect — flaky process test
+
+`scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable` is nondeterministic. `RunSchedulingCycle`
+intermittently answers `failed` where the test expects `started`. This was observed twice against
+**the same Nix derivation hash** — one failing run and two passing runs of identical inputs — so it
+is the test or the scheduling policy, not any change under test.
+
+It matters more than an ordinary flake: this suite is the evidence base for lifecycle and recovery
+claims, and a gate that passes intermittently cannot support them. It also costs real time, because
+an unrelated change lands and the failure looks like it caused it.
+
+Not yet diagnosed. The likely area is the interaction between the cooldown, the capability graph
+left by a preceding test, and the timing of healthd's refresh.
 
 ## P7.0-replay — Paged Event1 replay
 

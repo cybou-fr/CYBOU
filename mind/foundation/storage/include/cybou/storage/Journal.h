@@ -5,7 +5,6 @@
 
 #include "cybou/events/EventStore.h"
 
-#include <QDateTime>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QString>
@@ -22,55 +21,6 @@ inline constexpr int kCurrentJournalHashVersion = 2;
 /// Event1 would publish acceptance for a commit that a power loss can still discard.
 inline constexpr int kRequiredSynchronousLevel = 2; // FULL
 
-/// A position in the hash chain that was verified, and the hash observed there.
-///
-/// This is an accelerator, never an authority. The Journal remains the only source of truth about
-/// its own integrity: a checkpoint lets verification skip a prefix it has already checked, and
-/// losing one costs a full verification rather than any correctness.
-struct VerifiedCheckpoint {
-    quint64 sequence{0};
-    QByteArray hash;
-    QDateTime verifiedAt;
-
-    bool isEmpty() const { return sequence == 0 || hash.isEmpty(); }
-};
-
-/// What a verification actually established.
-///
-/// The distinction is the point. Full verification rechains from the beginning; incremental
-/// verification trusts a prefix it checked earlier. Both are useful, but presenting the second as
-/// the first would claim evidence that was not gathered - so the result says which happened, and a
-/// caller that needs a whole-history guarantee can tell it did not get one.
-enum class VerificationStatus {
-    /// The chain was rebuilt from the first contribution and holds throughout.
-    FullyVerified,
-    /// The chain holds from the checkpoint forward. The prefix was not re-examined.
-    VerifiedThrough,
-    /// The chain is broken. `brokenAt` is the first bad sequence.
-    InvalidAt,
-    /// The checkpoint does not describe this journal: the anchor row is missing or its hash differs.
-    /// The journal is not thereby proven bad - the checkpoint is proven unusable, and the caller
-    /// must fall back to full verification rather than trust either.
-    CheckpointMismatch,
-};
-
-struct VerificationResult {
-    VerificationStatus status{VerificationStatus::InvalidAt};
-    /// Exclusive lower bound actually examined; 0 when verification started from the beginning.
-    quint64 verifiedFrom{0};
-    /// Highest sequence confirmed good.
-    quint64 verifiedThrough{0};
-    /// First bad sequence, or 0 when nothing is known to be bad.
-    quint64 brokenAt{0};
-
-    bool intact() const
-    {
-        return status == VerificationStatus::FullyVerified
-            || status == VerificationStatus::VerifiedThrough;
-    }
-};
-
-QString verificationStatusToString(VerificationStatus status);
 
 /// Low-level SQLite implementation.
 ///
@@ -110,6 +60,7 @@ public:
     quint64 count() const override;
     QByteArray head() const override;
     quint64 verify() const override;
+    VerificationResult verifyIncremental() const override;
 
     /// Verify only the contributions after `anchor`, having first confirmed the anchor still
     /// describes this journal.

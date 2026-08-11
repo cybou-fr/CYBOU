@@ -84,8 +84,11 @@ SelfReport SelfModel::measure() const
     }
 
     report.contributions = m_events->count();
-    report.firstBrokenAt = m_events->verify();
-    report.journalIntact = report.firstBrokenAt == 0;
+    const VerificationResult verification = m_events->verifyIncremental();
+    report.verification = verification.status;
+    report.verifiedFrom = verification.verifiedFrom;
+    report.journalIntact = verification.intact();
+    report.firstBrokenAt = verification.brokenAt;
     return report;
 }
 

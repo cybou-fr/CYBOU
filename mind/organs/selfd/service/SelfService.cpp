@@ -131,8 +131,15 @@ SelfReport SelfService::measureReport() const
     }
 
     report.contributions = m_events.count();
-    report.firstBrokenAt = m_events.verify();
-    report.journalIntact = report.firstBrokenAt == 0;
+
+    // Incremental where a checkpoint exists. Full verification is reachable from this ordinary
+    // path, and at ~10.9 us per contribution it exhausts the five second Presence budget near 460k
+    // contributions - so Reflect would stop being possible on a long-lived biography.
+    const VerificationResult verification = m_events.verifyIncremental();
+    report.verification = verification.status;
+    report.verifiedFrom = verification.verifiedFrom;
+    report.journalIntact = verification.intact();
+    report.firstBrokenAt = verification.brokenAt;
     return report;
 }
 
@@ -173,6 +180,10 @@ QVariantMap SelfService::reportMap(
         report.journalIntact;
     map[QStringLiteral("firstBrokenAt")] =
         static_cast<qulonglong>(report.firstBrokenAt);
+    map[QStringLiteral("verification")] =
+        verificationStatusToString(report.verification);
+    map[QStringLiteral("verifiedFrom")] =
+        static_cast<qulonglong>(report.verifiedFrom);
     map[QStringLiteral("narration")] =
         narrateSelfReport(report);
     return map;

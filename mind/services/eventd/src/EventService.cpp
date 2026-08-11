@@ -12,6 +12,7 @@
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
 #include <QDBusReply>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -147,8 +148,11 @@ EventService::EventService(const QString &journalPath, QObject *parent)
     , m_journal(journalPath, QStringLiteral("cybou-eventd"))
     , m_offsetsPath(QFileInfo(journalPath).dir().filePath(
           QStringLiteral("consumer-offsets.json")))
+    , m_checkpointPath(QFileInfo(journalPath).dir().filePath(
+          QStringLiteral("verification-checkpoint.json")))
 {
     m_offsetsReady = loadOffsets();
+    loadCheckpoint();
     connect(
         &m_journal,
         &EventStore::accepted,
@@ -260,6 +264,85 @@ qulonglong EventService::Count() const
 QByteArray EventService::Head() const
 {
     return m_journal.head();
+}
+
+// A checkpoint that cannot be read is simply absent: verification then costs a full walk, which is
+// correct, so there is nothing to fail about. It is never an error to lack an accelerator.
+bool EventService::loadCheckpoint()
+{
+    m_checkpoint = {};
+    QFile file(m_checkpointPath);
+    if (!file.exists() || !file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+    if (root.value(QStringLiteral("version")).toInt() != 1) {
+        return false;
+    }
+
+    bool ok = false;
+    const quint64 sequence =
+        root.value(QStringLiteral("sequence")).toString().toULongLong(&ok);
+    const QByteArray hash = QByteArray::fromHex(
+        root.value(QStringLiteral("hash")).toString().toLatin1());
+    if (!ok || sequence == 0 || hash.isEmpty()) {
+        return false;
+    }
+
+    m_checkpoint.sequence = sequence;
+    m_checkpoint.hash = hash;
+    m_checkpoint.verifiedAt = QDateTime::fromString(
+        root.value(QStringLiteral("verifiedAt")).toString(), Qt::ISODateWithMs);
+    return true;
+}
+
+void EventService::saveCheckpoint(const VerifiedCheckpoint &checkpoint)
+{
+    if (checkpoint.isEmpty()) {
+        return;
+    }
+
+    QJsonObject root;
+    root.insert(QStringLiteral("version"), 1);
+    root.insert(QStringLiteral("sequence"), QString::number(checkpoint.sequence));
+    root.insert(QStringLiteral("hash"), QString::fromLatin1(checkpoint.hash.toHex()));
+    root.insert(
+        QStringLiteral("verifiedAt"), checkpoint.verifiedAt.toString(Qt::ISODateWithMs));
+
+    QSaveFile file(m_checkpointPath);
+    if (file.open(QIODevice::WriteOnly)
+        && file.write(QJsonDocument(root).toJson(QJsonDocument::Compact)) >= 0
+        && file.commit()) {
+        m_checkpoint = checkpoint;
+    }
+    // A checkpoint that fails to persist costs a full verification next time and nothing else, so
+    // it is deliberately not an error the caller has to handle.
+}
+
+QByteArray EventService::VerifyIncremental()
+{
+    VerificationResult result = m_journal.verifyFrom(m_checkpoint);
+
+    // A checkpoint that no longer describes this journal says nothing about the journal. Fall back
+    // to the full walk rather than reporting damage that has not been established.
+    if (result.status == VerificationStatus::CheckpointMismatch) {
+        m_checkpoint = {};
+        result = m_journal.verifyFrom({});
+    }
+
+    // Only advance the checkpoint on a chain that actually held. Advancing past a break would make
+    // the next verification skip the very contribution that is wrong.
+    if (result.intact()) {
+        saveCheckpoint(m_journal.checkpointAtHead());
+    }
+
+    QCborMap reply;
+    reply.insert(QStringLiteral("status"), verificationStatusToString(result.status));
+    reply.insert(QStringLiteral("verifiedFrom"), QString::number(result.verifiedFrom));
+    reply.insert(QStringLiteral("verifiedThrough"), QString::number(result.verifiedThrough));
+    reply.insert(QStringLiteral("brokenAt"), QString::number(result.brokenAt));
+    return reply.toCborValue().toCbor();
 }
 
 qulonglong EventService::Verify() const

@@ -43,6 +43,12 @@ public Q_SLOTS:
     qulonglong Count() const;
     QByteArray Head() const;
     qulonglong Verify() const;
+
+    /// Verify against the persisted checkpoint, answering a CBOR map:
+    /// status, verifiedFrom, verifiedThrough, brokenAt.
+    ///
+    /// Not const: a successful verification advances the checkpoint, which is the whole point.
+    QByteArray VerifyIncremental();
     bool EnsureConsumer(const QString &consumerId, qulonglong initialOffset);
     bool AdvanceConsumer(const QString &consumerId, qulonglong offset);
     QByteArray ConsumerBacklog(const QString &consumerId) const;
@@ -72,6 +78,9 @@ Q_SIGNALS:
     void Accepted(const QByteArray &encodedEnvelope, qulonglong sequence);
 
 private:
+    bool loadCheckpoint();
+    void saveCheckpoint(const VerifiedCheckpoint &checkpoint);
+
     bool loadOffsets();
     bool saveOffsets(const QMap<QString, quint64> &offsets);
 
@@ -92,6 +101,12 @@ private:
     /// for its whole lifetime and is never reused, so this cannot go stale in a way that would
     /// admit an impostor; it only avoids asking the bus for the same process on every submission.
     mutable QHash<QString, QString> m_resolvedCallers;
+
+    /// Beside the journal rather than inside it, like consumer offsets. A checkpoint is derived:
+    /// losing it costs one full verification, and keeping it outside the database makes it obvious
+    /// that it is not part of the biography.
+    QString m_checkpointPath;
+    VerifiedCheckpoint m_checkpoint;
 };
 
 } // namespace cybou

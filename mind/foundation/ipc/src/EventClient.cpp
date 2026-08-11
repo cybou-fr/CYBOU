@@ -171,6 +171,40 @@ QByteArray EventClient::head() const
     return callBytes(QStringLiteral("Head"));
 }
 
+// Asks eventd to verify against the checkpoint it owns. The typed status comes back untouched:
+// flattening verified-through into "intact" here would discard exactly the distinction the caller
+// needs to know whether a whole-history guarantee was established.
+VerificationResult EventClient::verifyIncremental() const
+{
+    m_lastError.clear();
+    VerificationResult result;
+
+    const QByteArray replyBytes = callBytes(QStringLiteral("VerifyIncremental"));
+    const QCborValue value = QCborValue::fromCbor(replyBytes);
+    if (replyBytes.isEmpty() || !value.isMap()) {
+        if (m_lastError.isEmpty())
+            m_lastError = QStringLiteral("eventd did not answer VerifyIncremental");
+        result.status = VerificationStatus::InvalidAt;
+        return result;
+    }
+
+    const QCborMap map = value.toMap();
+    const QString status = map.value(QStringLiteral("status")).toString();
+    if (status == QLatin1String("fully-verified"))
+        result.status = VerificationStatus::FullyVerified;
+    else if (status == QLatin1String("verified-through"))
+        result.status = VerificationStatus::VerifiedThrough;
+    else if (status == QLatin1String("checkpoint-mismatch"))
+        result.status = VerificationStatus::CheckpointMismatch;
+    else
+        result.status = VerificationStatus::InvalidAt;
+
+    result.verifiedFrom = map.value(QStringLiteral("verifiedFrom")).toString().toULongLong();
+    result.verifiedThrough = map.value(QStringLiteral("verifiedThrough")).toString().toULongLong();
+    result.brokenAt = map.value(QStringLiteral("brokenAt")).toString().toULongLong();
+    return result;
+}
+
 quint64 EventClient::verify() const
 {
     m_lastError.clear();

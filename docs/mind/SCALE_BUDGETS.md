@@ -84,9 +84,8 @@ verification alone consumes that entire budget at roughly **460,000 contribution
 
 Incremental verification removes that scaling: anchored at a checkpoint, checking 500 new
 contributions against a 100k journal costs 4 ms rather than 1,060 ms, because the cost follows what
-has arrived since the last check rather than the whole history. The mechanism exists and is tested;
-**the cliff is not yet closed, because selfd still calls the full `Verify`.** Wiring it through is
-the remaining step.
+has arrived since the last check rather than the whole history. **selfd now uses it, so the cliff is
+closed**: `Reflect` no longer scales with the length of the biography.
 
 The optimisation has an honest limit, and it is the reason the result is typed. Incremental
 verification trusts the prefix its checkpoint covers, so corruption inside that prefix is invisible
@@ -106,7 +105,7 @@ contributions rather than seconds so they can be checked against a real journal.
 
 | Budget | Threshold | Consequence of crossing it |
 |---|---:|---|
-| `Verify` within the Presence command budget | **~460k** | `Reflect` fails for everyone; needs incremental verification against a persisted checkpoint |
+| `Verify` within the Presence command budget | ~~**~460k**~~ | Closed. selfd verifies incrementally against a persisted checkpoint, so the cost follows the increment, not the history |
 | Organ cold reconstruction within a plausible session start | **~500k** | Three organs each spend ~5 s replaying before they are useful; needs paged replay with a cursor |
 | Sustained ingestion | **~800/s** | Above this, Event1 acceptance becomes the bottleneck and a perception adapter must batch or drop |
 | Journal size on a normal disk | not binding below ~10m | ~3.5 GiB; time budgets bind long before storage does |

@@ -737,17 +737,6 @@ CognitiveEnvelope Journal::envelopeFromQuery(const QSqlQuery &query, int offset)
     return e;
 }
 
-QString verificationStatusToString(VerificationStatus status)
-{
-    switch (status) {
-    case VerificationStatus::FullyVerified: return QStringLiteral("fully-verified");
-    case VerificationStatus::VerifiedThrough: return QStringLiteral("verified-through");
-    case VerificationStatus::InvalidAt: return QStringLiteral("invalid-at");
-    case VerificationStatus::CheckpointMismatch: return QStringLiteral("checkpoint-mismatch");
-    }
-    return QStringLiteral("unknown");
-}
-
 VerifiedCheckpoint Journal::checkpointAtHead() const
 {
     VerifiedCheckpoint checkpoint;
@@ -865,6 +854,14 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
 // The original whole-history contract, kept as-is: 0 means intact, otherwise the first bad
 // sequence. Expressed through verifyFrom with no anchor so there is one chain walk to be right
 // about rather than two that can drift.
+// A Journal used directly has no checkpoint owner - deciding when to trust a prefix belongs to
+// whoever persists the checkpoint, which in production is eventd. So this verifies fully and says
+// so, rather than inventing an anchor and reporting a weaker claim as if it were the same.
+VerificationResult Journal::verifyIncremental() const
+{
+    return verifyFrom({});
+}
+
 quint64 Journal::verify() const
 {
     const VerificationResult result = verifyFrom({});

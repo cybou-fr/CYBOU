@@ -293,6 +293,17 @@ must remain per-contribution. Measurements and the thresholds derived from them 
 `Verify` exhausts the Presence command budget near 460,000 contributions, and organ cold
 reconstruction costs roughly nine seconds per organ at a million.
 
+Journal verification is incremental. `Journal::verifyFrom(anchor)` confirms the anchor still
+describes the journal and then walks only what follows it; eventd owns the checkpoint as
+`verification-checkpoint.json` beside the journal, discards one that no longer matches, and advances
+it only on a chain that held. `Event1.VerifyIncremental()` carries a typed result — `FullyVerified`,
+`VerifiedThrough`, `InvalidAt`, `CheckpointMismatch` — and selfd reports it alongside
+`journalIntact`, so a check that trusted a prefix is never presented as a whole-history guarantee.
+At 100k, checking 500 new contributions costs 4 ms against 1,060 ms for the full walk, which removes
+the point near 460,000 contributions where `Reflect` would have stopped being possible. A periodic
+full verification remains the heavy integrity gate, because corruption inside a trusted prefix is by
+construction invisible to the incremental check.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and
