@@ -7,11 +7,15 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
 
 This is an implementation decision, narrower than [ADR-0025](ADR-0025-grounding-epistemics-and-cognitive-governance.md),
-which deliberately left the owner open. It must be accepted before P7.1 begins, because every
+which deliberately left the owner open. It had to be accepted before P7.1 began, because every
 question below is one that a perception adapter would otherwise answer by accident.
+
+Being Accepted, this outranks [Current State](../CURRENT_STATE.md): where an implementation and this
+document disagree, the implementation is wrong. In particular the retention constraint below is
+binding, not advisory.
 
 ## Context
 

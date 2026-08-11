@@ -649,9 +649,11 @@ unchanged by the attempt, and a contribution under a non-reserved name still suc
 
 ## P7.0-ADR — Freeze the epistemic owner and ObservationV1
 
-**Status: drafted as [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md), Proposed.** It is
-an architectural decision, so it is written as a proposal and needs explicit acceptance before P7.1
-starts. Every question it settles is one a perception adapter would otherwise answer by accident.
+**Status: complete. [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) is Accepted.**
+Every question it settles is one a perception adapter would otherwise have answered by accident.
+
+Being Accepted, it outranks Current State: where an implementation and that ADR disagree, the
+implementation is wrong. **P7.1 is unblocked.**
 
 What it proposes: a separate `cybou-epistemicd` owning the derived projection, freshness,
 contradiction and reconciliation — and owning neither the Journal, nor any perception source, nor
