@@ -33,3 +33,4 @@ SPDX-License-Identifier: MIT
 | [0024](ADR-0024-cognitive-lifecycle-and-consolidation.md) | Cognitive Lifecycle and Consolidation | Proposed |
 | [0025](ADR-0025-grounding-epistemics-and-cognitive-governance.md) | Grounding, Epistemics, and Cognitive Governance | Proposed |
 | [0026](ADR-0026-lifecycle-owner-and-wire-contract.md) | Lifecycle Owner and Wire Contract | Accepted |
+| [0027](ADR-0027-local-epistemic-projection-owner.md) | Local Epistemic Projection Owner | Proposed |

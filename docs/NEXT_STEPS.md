@@ -647,6 +647,35 @@ fixtures first would mean rebuilding them.
 A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
 unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
 
+## P7.0-ADR — Freeze the epistemic owner and ObservationV1
+
+**Status: drafted as [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md), Proposed.** It is
+an architectural decision, so it is written as a proposal and needs explicit acceptance before P7.1
+starts. Every question it settles is one a perception adapter would otherwise answer by accident.
+
+What it proposes: a separate `cybou-epistemicd` owning the derived projection, freshness,
+contradiction and reconciliation — and owning neither the Journal, nor any perception source, nor
+system-wide retention. Folding it into selfd or healthd was rejected because those project Mind's own
+state and component health, while an epistemic projection is a claim about the world; merging them
+would make one process the authority on two different kinds of assertion.
+
+It separates `originOrgan` (who brought this into Mind, bound to the calling process since
+P7.0-trust) from `sourceId` (what was observed). Conflating them would mean replacing an adapter
+silently rewrote the provenance of everything it ever reported, and two adapters on one source would
+look independent — the exact condition under which a contradiction check agrees with itself.
+
+Its budgets come from [Scale Budgets](mind/SCALE_BUDGETS.md) rather than intuition, and one of them
+has a direct consequence: an epistemic projection replaying the whole biography would exhaust the
+5 s Presence budget near 560k contributions, so `epistemicd` must consume Event1 through the paged
+`Replay` cursor with a persisted position. It is therefore the first real consumer of P7.0-replay,
+and the first place a projection checkpoint will be justified by measurement rather than anticipated.
+
+**Retention is deliberately not decided there**, and until a separate storage ADR covers expiry,
+tombstones, derived-data propagation, backups and possibly per-record keys, no sensitive observation
+may be ingested. The first source — NixOS system generation and build identity — is chosen so that
+constraint costs nothing: local, non-sensitive, and naturally contradictory, since the generation
+changes while an earlier observation still claims to be current.
+
 ## P7.0-registry — One capability and command declaration
 
 **Status: implemented.** `CapabilityRegistry` in `cybou-protocol` is the single declaration of which
