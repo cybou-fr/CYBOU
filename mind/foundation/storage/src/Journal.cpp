@@ -501,32 +501,24 @@ QByteArray Journal::rowHashV2(
         canonicalJournalRowV2(seq, prev, e), QCryptographicHash::Sha256);
 }
 
-quint64 Journal::append(const CognitiveEnvelope &e)
+// Validate and write one contribution inside an already-open transaction.
+//
+// Split out of append() so a batch can reuse the identical validation, hashing and chaining. The
+// caller owns the transaction, so this never commits: that is what lets appendBatch amortise one
+// fsync across many contributions without any of them skipping a check.
+quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
 {
-    m_lastError.clear();
-
-    if (!isOpen()) {
-        m_lastError = QStringLiteral("journal is not open");
-        return 0;
-    }
-    if (!e.isValid()) {
-        m_lastError = QStringLiteral("refusing to append an invalid envelope");
-        return 0;
-    }
-    if (e.schemaVersion != kCurrentEnvelopeSchemaVersion) {
-        m_lastError = QStringLiteral("new contributions must use envelope schema v2");
-        return 0;
-    }
-    if (!beginImmediate()) {
-        return 0;
-    }
-
     const auto fail = [this](const QString &message) -> quint64 {
-        rollbackTransaction();
         m_lastError = message;
         return 0;
     };
 
+    if (!e.isValid()) {
+        return fail(QStringLiteral("refusing to append an invalid envelope"));
+    }
+    if (e.schemaVersion != kCurrentEnvelopeSchemaVersion) {
+        return fail(QStringLiteral("new contributions must use envelope schema v2"));
+    }
     if (contains(e.messageId)) {
         return fail(QStringLiteral("messageId already exists"));
     }
@@ -616,6 +608,26 @@ quint64 Journal::append(const CognitiveEnvelope &e)
         }
     }
 
+    return sequence;
+}
+
+quint64 Journal::append(const CognitiveEnvelope &e)
+{
+    m_lastError.clear();
+
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("journal is not open");
+        return 0;
+    }
+    if (!beginImmediate()) {
+        return 0;
+    }
+
+    const quint64 sequence = appendWithinTransaction(e);
+    if (sequence == 0) {
+        rollbackTransaction();
+        return 0;
+    }
     if (!commitTransaction()) {
         rollbackTransaction();
         return 0;
@@ -623,6 +635,56 @@ quint64 Journal::append(const CognitiveEnvelope &e)
 
     Q_EMIT accepted(e, sequence);
     return sequence;
+}
+
+// Append many contributions under one transaction, and therefore one fsync.
+//
+// This exists so a large Journal can be constructed for measurement without spending an fsync per
+// contribution, which at a million rows is the difference between minutes and hours. Every
+// contribution still goes through exactly the same validation, hashing and chaining as append();
+// only the commit is shared.
+//
+// Deliberately not exposed over Event1. Acceptance there is per-contribution and must remain so:
+// batching acceptance would mean publishing Accepted for contributions whose commit had not yet
+// returned, which is the durability ordering this Journal exists to preserve. The batch is atomic,
+// so a failure anywhere leaves the Journal exactly as it was.
+quint64 Journal::appendBatch(const QList<CognitiveEnvelope> &envelopes)
+{
+    m_lastError.clear();
+
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("journal is not open");
+        return 0;
+    }
+    if (envelopes.isEmpty()) {
+        return 0;
+    }
+    if (!beginImmediate()) {
+        return 0;
+    }
+
+    QList<quint64> sequences;
+    sequences.reserve(envelopes.size());
+    for (const CognitiveEnvelope &envelope : envelopes) {
+        const quint64 sequence = appendWithinTransaction(envelope);
+        if (sequence == 0) {
+            rollbackTransaction();
+            return 0;
+        }
+        sequences.append(sequence);
+    }
+
+    if (!commitTransaction()) {
+        rollbackTransaction();
+        return 0;
+    }
+
+    // Each contribution carries its own sequence. Announcing them all under the batch's last one
+    // would hand every subscriber the wrong position in the biography.
+    for (int i = 0; i < envelopes.size(); ++i) {
+        Q_EMIT accepted(envelopes.at(i), sequences.at(i));
+    }
+    return sequences.last();
 }
 
 quint64 Journal::count() const

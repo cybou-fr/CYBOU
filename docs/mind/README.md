@@ -25,10 +25,11 @@ Then read the implementation documents in this order:
 12. [Capability and Health Contract](HEALTH.md) — implemented P6.1/P6.2 protocol and owner boundary
 13. [RPC Resilience](RPC_RESILIENCE.md) — implemented P6.3/P6.7 transport and compound-budget policy
 14. [Homeostatic Measurements](HOMEOSTASIS.md) — implemented P6.4/P6.5 measurement and scheduling input
-15. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — future M7 contract
+15. [Journal Scale Baseline and Budgets](SCALE_BUDGETS.md) — measured growth costs and the thresholds they imply
+16. [Grounding, Epistemics, and Cognitive Governance](EPISTEMIC_GOVERNANCE.md) — future M7 contract
 
-Documents 1–14 specify or explain the implemented M1–M6/P6.7 substrate. Document 15 is a
-future-target contract and must not be used as evidence that M7 behavior exists.
+Documents 1–15 specify or explain the implemented substrate. Document 16 is a future-target
+contract and must not be used as evidence that M7 behavior exists.
 
 For current implementation status, see [Current State](../CURRENT_STATE.md).
 For milestone semantics, see [Roadmap](../ROADMAP.md).

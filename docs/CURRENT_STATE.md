@@ -283,6 +283,16 @@ caller, that nothing forged reaches the Journal, and that a caller contributing 
 still succeeds. This closes forged provenance; it is not a general authorization model, and what a
 non-organ caller may contribute under its own name is unchanged.
 
+A Journal scale baseline exists. `journal-scale` builds a deterministic fixture — 10,000
+contributions by default, larger through `CYBOU_SCALE_CONTRIBUTIONS` — and measures append under
+production durability, full replay, `Verify`, backlog counting, indexed lookup and size. `Journal`
+gained `appendBatch`, which shares one transaction across many contributions so a large fixture can
+be built without one fsync per row; it is deliberately not reachable from Event1, where acceptance
+must remain per-contribution. Measurements and the thresholds derived from them are recorded in
+[Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md): every growth-sensitive path is linear,
+`Verify` exhausts the Presence command budget near 460,000 contributions, and organ cold
+reconstruction costs roughly nine seconds per organ at a million.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and

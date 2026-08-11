@@ -78,6 +78,7 @@ Read the [Mind index](mind/README.md), or open a specific contract:
 - [Capability and Health Contract](mind/HEALTH.md) — P6.1/P6.2 protocol, owner, graph, and recovery
 - [RPC Resilience](mind/RPC_RESILIENCE.md) — P6.3 outcomes, retry safety, backoff, and circuit breaker
 - [Homeostatic Measurements](mind/HOMEOSTASIS.md) — typed signals and policy-scoped M6 scheduling authority
+- [Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md) — measured growth costs and the thresholds they imply
 - [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M7 contract
 
 ## Security

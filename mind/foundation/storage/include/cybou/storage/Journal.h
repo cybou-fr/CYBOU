@@ -45,6 +45,17 @@ public:
 
     quint64 append(const CognitiveEnvelope &envelope) override;
 
+    /// Append many contributions under one transaction, returning the last accepted sequence.
+    ///
+    /// Every contribution is validated, hashed and chained exactly as `append` does; only the
+    /// commit - and therefore the fsync - is shared. This exists so a large Journal can be built
+    /// for measurement without spending one fsync per row.
+    ///
+    /// Not exposed over Event1, and must not be: acceptance there is per-contribution, and batching
+    /// it would publish Accepted for contributions whose commit had not yet returned. The batch is
+    /// atomic, so a failure anywhere leaves the Journal unchanged.
+    quint64 appendBatch(const QList<CognitiveEnvelope> &envelopes);
+
     quint64 count() const override;
     QByteArray head() const override;
     quint64 verify() const override;
@@ -70,6 +81,10 @@ public:
         const QString &originOrgan = QString()) const override;
 
 private:
+    /// Validate and write one contribution inside a transaction the caller already opened.
+    /// Returns the assigned sequence, or 0 with `m_lastError` set. Never commits or rolls back.
+    quint64 appendWithinTransaction(const CognitiveEnvelope &envelope);
+
     bool ensureDurability();
     bool ensureSchema();
     bool createSchemaV2();

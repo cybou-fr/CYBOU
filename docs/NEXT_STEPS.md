@@ -649,12 +649,23 @@ unchanged by the attempt, and a contribution under a non-reserved name still suc
 
 ## P7.0-scale — Journal fixtures and budgets
 
-Deterministic fixtures at 10k / 100k / 1m contributions, measuring append, full replay, `Verify`,
-cold reconstruction per organ, Presence snapshot, lifecycle consolidation, RSS and Journal size. Run
-10k in the ordinary checks, 100k in a separate scale gate, 1m as a release or manual benchmark.
+**Status: implemented for the Journal paths.** `journal-scale` builds a deterministic fixture and
+measures append, full replay, `Verify`, backlog counting, indexed lookup and size. It defaults to
+10k so it runs in the ordinary checks; 100k and 1m are the same code with
+`CYBOU_SCALE_CONTRIBUTIONS` set. Results and the budgets derived from them are in
+[Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md).
 
-Budgets first, optimisation second. The paged replay and incremental verification below are the
-likely responses, but neither should be designed before there are numbers to design against.
+Every growth-sensitive path is linear across two orders of magnitude and indexed lookup is flat, so
+there is no hidden quadratic. The two thresholds that matter both land near half a million
+contributions: `Verify` consumes the entire 5 s Presence command budget at ~460k, which makes
+`Reflect` impossible, and organ cold reconstruction costs ~9 s per organ at 1m with three organs
+each replaying the whole history. Those are the numbers the paged-replay and incremental-verification
+packages exist to move.
+
+Not yet measured, and the honest gaps: per-organ cold reconstruction end to end rather than just the
+Journal read under it, RSS, Presence and consolidation behaviour under a large journal, concurrent
+read/write pressure, and the growth rate of a real biography — without which the thresholds cannot be
+turned into a date.
 
 **A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
 biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that
