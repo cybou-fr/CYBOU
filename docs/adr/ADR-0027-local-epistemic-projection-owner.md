@@ -81,8 +81,13 @@ An Observation payload carries, at minimum:
 | `value` | Typed. Not a string that a later reader has to guess the shape of. |
 | `acquiredAt` | When the source was read, which is not when the contribution was accepted. |
 | `freshnessUntil` | When the observation stops being current *by declaration*, not by inference. |
-| `privacy` | Classification, inherited through Event1's existing rules. |
 | `provenance` | How the value was obtained, sufficient to re-derive or challenge it. |
+
+**Amended.** This table originally listed `privacy` as an `ObservationV1` field. It is not one, and
+should not be: privacy travels on the surrounding `CognitiveEnvelope`, where Event1 already enforces
+inheritance by refusing a contribution whose class is weaker than its references. Duplicating it in
+the payload would create two copies free to disagree, and nothing would say which one governs. The
+implementation was right and this document was wrong; the ADR is corrected rather than the code.
 
 `acquiredAt` and the envelope's `wallTime` are deliberately distinct. Acceptance time is a fact
 about Mind; acquisition time is a fact about the world, and a slow adapter must not be able to make

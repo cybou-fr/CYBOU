@@ -403,9 +403,8 @@ justification it contradicts. Now one pass.
 - **Incremental projections.** `open()` reconstructs on every call and predictord recomputes per
   query. Both want an organ to hold derived state updated on `Accepted` rather than rebuilding on
   demand — one piece of work, not two.
-- **ADR-0027 lists `privacy` on `ObservationV1`**; the implementation carries it in the envelope.
-  The implementation is right — duplicating privacy invites the copies to disagree — so the ADR
-  should be amended.
+- ~~**ADR-0027 lists `privacy` on `ObservationV1`.**~~ Amended: privacy travels on the envelope,
+  where Event1 already enforces inheritance, and the ADR no longer lists it as a payload field.
 - **The scale fixture is all root Observations.** A realistic mix with causation and evidence links
   will cost more, because evidence is fetched per contribution.
 - **Typed acquisition failure exists but its durability is undecided**: whether a failed read is
@@ -488,7 +487,21 @@ Three things were established:
   result, or say plainly that one is already running so a caller can distinguish "refused" from
   "failed".
 
-Everything attempted at the assertion level was reverted. The suite is no better than before, and
+A second attempt disabled healthd's automatic refresh for this suite, as the healthd integration
+suite already does, on the reasoning that the tests should decide when things happen. That failed
+too, and informatively: several tests depend on healthd re-observing by itself. Recovery progress
+only reaches `verifying` or `ready` because an automatic refresh notices the owner returned, and the
+capability graph requires an explicit `Recovering` observation before a component counts as healthy
+again. Those tests are exercising automatic re-observation, not merely tolerating it.
+
+So the solution space is now narrower than it looked. Assertion-level changes cannot work, because
+the waits are load-bearing. Disabling automatic refresh cannot work, because the behaviour is under
+test. What remains is healthd coalescing rather than serialising: a refresh requested while one runs
+should mark the graph dirty and re-run once at the end, so a queue of owner changes cannot lock an
+explicit caller out for seconds. That is a change to healthd's core loop and should not be attempted
+against a suite too flaky to verify it — the fix and its evidence have to arrive together.
+
+Everything attempted was reverted. The suite is no better than before, and
 the diagnosis above is the whole of what this attempt produced.
 
 **Remaining sites of the original class.** After that fix a run still failed at two other places where
