@@ -8,6 +8,8 @@
 #include <QSet>
 
 #include <algorithm>
+#include <QMap>
+
 #include <cmath>
 
 namespace cybou {
@@ -245,18 +247,46 @@ QList<Calibration> Predictor::allCalibrations() const
         return result;
     }
 
-    QSet<QString> subjects;
+    // One pass over the biography, accumulating every subject at once.
+    //
+    // This used to replay the history to collect the subjects and then call calibration() for each
+    // of them, which replays it again - so the cost was the length of the biography multiplied by
+    // the number of subjects. selfd reaches this through Reflect under a five second budget, and
+    // the multiplication is what made that budget a function of two growing quantities rather than
+    // one. The per-subject arithmetic never needed more than a single read.
+    struct Accumulator {
+        int settled{0};
+        double absolute{0.0};
+        double signedSum{0.0};
+    };
+    QMap<QString, Accumulator> bySubject;
+
     for (const auto &e : m_events->recent(0)) {
-        if (e.kind == ContributionKind::Outcome && e.originOrgan == QLatin1String(kOrgan)) {
-            const QString subject = subjectOf(payloadOf(e));
-            if (!subject.isEmpty()) {
-                subjects.insert(subject);
-            }
+        if (e.kind != ContributionKind::Outcome || e.originOrgan != QLatin1String(kOrgan)) {
+            continue;
         }
+        const QCborMap payload = payloadOf(e);
+        const QString subject = subjectOf(payload);
+        if (subject.isEmpty() || !payload.contains(QStringLiteral("error"))) {
+            continue;
+        }
+
+        const double error = payload[QStringLiteral("error")].toDouble();
+        Accumulator &accumulator = bySubject[subject];
+        accumulator.absolute += std::fabs(error);
+        accumulator.signedSum += error;
+        ++accumulator.settled;
     }
 
-    for (const QString &subject : subjects) {
-        result.append(calibration(subject));
+    for (auto it = bySubject.cbegin(); it != bySubject.cend(); ++it) {
+        Calibration calibration;
+        calibration.subject = it.key();
+        calibration.settled = it.value().settled;
+        if (calibration.settled > 0) {
+            calibration.meanError = it.value().absolute / calibration.settled;
+            calibration.bias = it.value().signedSum / calibration.settled;
+        }
+        result.append(calibration);
     }
     return result;
 }

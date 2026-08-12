@@ -24,35 +24,6 @@ SelfModel::SelfModel(
 {
 }
 
-QStringList SelfModel::testedSubjects() const
-{
-    QStringList subjects;
-    if (!m_events) {
-        return subjects;
-    }
-
-    const auto all = m_events->recent(0);
-    for (auto it = all.crbegin(); it != all.crend(); ++it) {
-        if (it->kind != ContributionKind::Outcome
-            || it->originOrgan != QLatin1String("predictord")) {
-            continue;
-        }
-
-        const QCborMap payload =
-            QCborValue::fromCbor(it->payloadCbor).toMap();
-        if (!payload.contains(QStringLiteral("error"))) {
-            continue;
-        }
-
-        const QString subject =
-            payload[QStringLiteral("subject")].toString();
-        if (!subject.isEmpty() && !subjects.contains(subject)) {
-            subjects.append(subject);
-        }
-    }
-    return subjects;
-}
-
 SelfReport SelfModel::measure() const
 {
     SelfReport report;
@@ -74,9 +45,12 @@ SelfReport SelfModel::measure() const
             openIntentions.first().formed.daysTo(report.taken);
     }
 
-    for (const QString &subject : testedSubjects()) {
-        const Calibration calibration =
-            m_predictor->calibration(subject);
+    // Ask the predictor for its whole calibration projection rather than discovering subjects here
+    // and then asking about each one. Building the subject list replayed the biography, and every
+    // per-subject question replayed it again, so self-assessment cost the length of the history
+    // multiplied by the number of subjects. The predictor owns this knowledge and can produce all
+    // of it in one read.
+    for (const Calibration &calibration : m_predictor->allCalibrations()) {
         if (calibration.settled > 0) {
             report.calibrations.append(calibration);
             report.settledPredictions += calibration.settled;

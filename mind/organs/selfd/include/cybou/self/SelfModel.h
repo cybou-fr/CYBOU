@@ -60,7 +60,6 @@ public:
     QString lastError() const { return m_lastError; }
 
 private:
-    QStringList testedSubjects() const;
 
     EventStore *m_events;
     Identity *m_identity;

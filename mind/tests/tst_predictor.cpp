@@ -6,6 +6,7 @@
 #include "cybou/fabric/FabricCodec.h"
 #include "cybou/storage/Journal.h"
 
+#include <QMap>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -16,6 +17,59 @@ class TestPredictor : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
+    // allCalibrations had no coverage at all, which is how it kept a defect that made
+    // self-assessment cost the length of the biography multiplied by the number of subjects: it
+    // replayed history to find the subjects, then replayed it again for each one. It now
+    // accumulates every subject in a single pass, and this pins the arithmetic that refactor could
+    // have changed.
+    void everySubjectIsCalibratedFromOneReading()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Predictor predictor(&journal);
+
+        // Two subjects, settled with errors of known sign and size.
+        QVERIFY(predictor.observe(QStringLiteral("build"), 10.0));
+        const Forecast build = predictor.predict(QStringLiteral("build"));
+        QVERIFY(predictor.settle(build.id, 14.0));
+
+        QVERIFY(predictor.observe(QStringLiteral("boot"), 20.0));
+        const Forecast boot = predictor.predict(QStringLiteral("boot"));
+        QVERIFY(predictor.settle(boot.id, 18.0));
+
+        const QList<Calibration> all = predictor.allCalibrations();
+        QCOMPARE(all.size(), 2);
+
+        // Each subject must carry its own arithmetic. A single-pass accumulator that shared state
+        // between subjects would still return two entries, so the values are what proves it.
+        QMap<QString, Calibration> bySubject;
+        for (const Calibration &calibration : all) {
+            bySubject.insert(calibration.subject, calibration);
+        }
+        QVERIFY(bySubject.contains(QStringLiteral("build")));
+        QVERIFY(bySubject.contains(QStringLiteral("boot")));
+        QCOMPARE(bySubject[QStringLiteral("build")].settled, 1);
+        QCOMPARE(bySubject[QStringLiteral("boot")].settled, 1);
+
+        // And must agree with what the single-subject query says, which is the contract the
+        // refactor had to preserve.
+        for (const QString &subject : {QStringLiteral("build"), QStringLiteral("boot")}) {
+            const Calibration direct = predictor.calibration(subject);
+            QCOMPARE(bySubject[subject].settled, direct.settled);
+            QCOMPARE(bySubject[subject].meanError, direct.meanError);
+            QCOMPARE(bySubject[subject].bias, direct.bias);
+        }
+
+        // Opposite-signed errors must not cancel across subjects.
+        QVERIFY(
+            bySubject[QStringLiteral("build")].bias
+            != bySubject[QStringLiteral("boot")].bias);
+
+        // A subject that was never settled contributes nothing.
+        QVERIFY(predictor.observe(QStringLiteral("unsettled"), 1.0));
+        QCOMPARE(predictor.allCalibrations().size(), 2);
+    }
+
     void withNoHistoryItSaysNothing()
     {
         QTemporaryDir dir;
