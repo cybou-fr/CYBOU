@@ -371,13 +371,33 @@ Anything that is not an `ObservationV1` passes through untouched — including t
 records the adapter itself writes. A source that went unreadable leaves what it last said unchanged,
 because no new evidence is not counter-evidence.
 
+### The projection checkpoint
+
+`snapshot()` and `restore()` make the derived state persistable, which is what ADR-0027 requires of
+`epistemicd`: it must not replay from zero on every start, because at ~8.9 µs per contribution a
+full replay exhausts the Presence budget near 560k.
+
+**A checkpoint must be indistinguishable from the replay it stands in for**, or it is not a cache of
+the Journal but a second biography, with nothing to say which is right. The test compares a restored
+projection against a replayed one at two instants — one where a reading is still fresh and one where
+it has aged out — because status is derived rather than stored, and a checkpoint that froze a status
+would agree at the first and disagree at the second. Both the dispute and the supersession survive
+the round trip, which is what keeps it from being a comparison of two empty projections.
+
+Status is deliberately not serialised. It is an answer about a moment, and persisting it would hand
+back something that was only ever true once as though it were still current.
+
+A bad checkpoint is refused whole rather than partly applied. Rebuilding from the Journal is always
+available and always correct, so a projection half-built from a corrupt cache buys nothing and risks
+being quietly wrong; every refusal leaves what was already known untouched.
+
 ### Remaining for P7.2
 
-`cybou-epistemicd` itself: consume Event1 through the paged `Replay` cursor with a persisted
-position, publish the projection over its own interface, and declare its capability. ADR-0027 has
-already settled that it must not replay from zero — at ~8.9 µs per contribution a full replay
-exhausts the Presence budget near 560k — so this is where a projection checkpoint will first be
-justified by measurement rather than anticipated.
+`cybou-epistemicd` itself: the process, the paged `Replay` cursor persisted alongside the checkpoint,
+the `Epistemic1` interface, and the capability declaration. The cursor and the checkpoint must be
+written together — a checkpoint ahead of its cursor would re-admit contributions, which is harmless
+because admission is idempotent, while a cursor ahead of its checkpoint would leave a gap, which is
+not.
 
 ## P7.1 blockers — contract defects found in review
 

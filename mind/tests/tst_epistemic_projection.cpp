@@ -9,6 +9,7 @@
 
 #include "cybou/epistemic/EpistemicProjection.h"
 
+#include <QCborArray>
 #include <QCborMap>
 #include <QTest>
 
@@ -280,6 +281,119 @@ private Q_SLOTS:
             projection.knowledgeOf(QStringLiteral("current-system"), kNoon).status,
             EpistemicStatus::Unknown);
         QCOMPARE(projection.observationCount(), 0);
+    }
+
+    // A checkpoint must be indistinguishable from the replay it stands in for. If it is not, it is
+    // not a cache of the Journal - it is a second biography, and nothing would say which one is
+    // right.
+    void aCheckpointAnswersExactlyAsAReplayWould()
+    {
+        const QList<CognitiveEnvelope> history{
+            observationOf(
+                QStringLiteral("nixos.system"),
+                QStringLiteral("current-system"),
+                QCborValue(QStringLiteral("aaa")),
+                kNoon),
+            observationOf(
+                QStringLiteral("nixos.system"),
+                QStringLiteral("current-system"),
+                QCborValue(QStringLiteral("bbb")),
+                kNoon.addSecs(60)),
+            observationOf(
+                QStringLiteral("nixos.profile"),
+                QStringLiteral("current-system"),
+                QCborValue(QStringLiteral("ccc")),
+                kNoon.addSecs(70)),
+            observationOf(
+                QStringLiteral("nixos.system"),
+                QStringLiteral("kernel"),
+                QCborValue(QStringLiteral("6.12")),
+                kNoon.addSecs(30),
+                10),
+        };
+
+        EpistemicProjection replayed;
+        for (const CognitiveEnvelope &envelope : history) {
+            replayed.admit(envelope);
+        }
+
+        EpistemicProjection restored;
+        QString error;
+        QVERIFY2(restored.restore(replayed.snapshot(), &error), qPrintable(error));
+        QVERIFY(error.isEmpty());
+
+        // Checked at two instants, because status is derived rather than stored: one where the
+        // kernel reading is still fresh and one where it has aged out. A checkpoint that froze a
+        // status would agree at the first and disagree at the second.
+        for (const QDateTime &at : {kNoon.addSecs(35), kNoon.addSecs(600)}) {
+            const QList<SubjectKnowledge> a = replayed.knowledgeAt(at);
+            const QList<SubjectKnowledge> b = restored.knowledgeAt(at);
+            QCOMPARE(b.size(), a.size());
+            for (int i = 0; i < a.size(); ++i) {
+                QCOMPARE(b.at(i).subject, a.at(i).subject);
+                QCOMPARE(b.at(i).status, a.at(i).status);
+                QCOMPARE(b.at(i).current.size(), a.at(i).current.size());
+                QCOMPARE(b.at(i).superseded.size(), a.at(i).superseded.size());
+                for (int j = 0; j < a.at(i).current.size(); ++j) {
+                    QCOMPARE(b.at(i).current.at(j).value, a.at(i).current.at(j).value);
+                    QCOMPARE(b.at(i).current.at(j).sourceId, a.at(i).current.at(j).sourceId);
+                    QCOMPARE(b.at(i).current.at(j).status, a.at(i).current.at(j).status);
+                }
+            }
+        }
+
+        // The dispute and the supersession both survived, which is what makes this a real test
+        // rather than a comparison of two empty projections.
+        QCOMPARE(
+            restored.knowledgeOf(QStringLiteral("current-system"), kNoon.addSecs(80)).status,
+            EpistemicStatus::Disputed);
+        QCOMPARE(
+            restored.knowledgeOf(QStringLiteral("current-system"), kNoon.addSecs(80))
+                .superseded.size(),
+            1);
+    }
+
+    // A corrupt or unrecognised checkpoint is discarded whole. Rebuilding from the Journal is always
+    // available and always correct, so a projection half-built from a bad cache buys nothing and
+    // risks being quietly wrong.
+    void aBadCheckpointIsRefusedRatherThanPartlyApplied()
+    {
+        EpistemicProjection projection;
+        projection.admit(observationOf(
+            QStringLiteral("nixos.system"),
+            QStringLiteral("current-system"),
+            QCborValue(QStringLiteral("aaa")),
+            kNoon));
+
+        const SubjectKnowledge before =
+            projection.knowledgeOf(QStringLiteral("current-system"), kNoon.addSecs(10));
+
+        QString error;
+        QVERIFY(!projection.restore(QByteArray(), &error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!projection.restore(QCborValue(42).toCbor()));
+
+        QCborMap future = QCborValue::fromCbor(projection.snapshot()).toMap();
+        future.insert(
+            QStringLiteral("schemaVersion"), kCurrentProjectionSchemaVersion + 1);
+        QVERIFY(!projection.restore(future.toCborValue().toCbor(), &error));
+        QVERIFY(error.contains(QStringLiteral("not supported")));
+
+        QCborMap malformed = QCborValue::fromCbor(projection.snapshot()).toMap();
+        QCborMap firstSubject =
+            malformed.value(QStringLiteral("subjects")).toArray().at(0).toMap();
+        // A claim that is a bare string rather than a map: structurally wrong in a way a
+        // best-effort parser would happily skip past.
+        firstSubject.insert(QStringLiteral("current"), QCborArray{QCborValue(QStringLiteral("x"))});
+        malformed.insert(QStringLiteral("subjects"), QCborArray{firstSubject});
+        QVERIFY(!projection.restore(malformed.toCborValue().toCbor()));
+
+        // Every refusal left what was already known untouched.
+        const SubjectKnowledge after =
+            projection.knowledgeOf(QStringLiteral("current-system"), kNoon.addSecs(10));
+        QCOMPARE(after.status, before.status);
+        QCOMPARE(after.current.size(), before.current.size());
+        QCOMPARE(after.current.first().value, before.current.first().value);
     }
 
     // Rebuilding from the same history must produce the same answer, or the projection could not be

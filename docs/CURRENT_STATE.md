@@ -348,8 +348,10 @@ library: it derives `unknown`, `observed`, `stale`, `disputed` and `superseded` 
 observations against a caller-supplied instant, keeps a stale value rather than discarding it,
 treats an unchanged restatement as re-affirmation rather than replacement, refuses to resolve a
 disagreement between sources, and orders by acquisition so a late-arriving older reading cannot
-unseat a newer one. No process owns it yet, so nothing consumes these observations in a running
-system.
+unseat a newer one. The projection is also persistable: a restored checkpoint answers exactly as a
+replay would, at any instant, because status is derived rather than stored, and a corrupt or
+unrecognised checkpoint is refused whole rather than partly applied. No process owns it yet, so
+nothing consumes these observations in a running system.
 
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls

@@ -13,6 +13,8 @@
 
 namespace cybou {
 
+inline constexpr quint16 kCurrentProjectionSchemaVersion = 1;
+
 /// What is known about a subject right now.
 ///
 /// The distinctions are the point. Never having looked is not the same as having looked and the
@@ -84,6 +86,21 @@ public:
     SubjectKnowledge knowledgeOf(const QString &subject, const QDateTime &now) const;
 
     int observationCount() const { return m_admitted; }
+
+    /// Serialise the derived state so a restart need not replay the whole biography.
+    ///
+    /// This is a checkpoint, not a second biography. ADR-0027 requires it - at ~8.9 us per
+    /// contribution a full replay exhausts the Presence budget near 560k - and the same ADR fixes
+    /// what it may be: an accelerator whose loss costs a replay and nothing else. If it ever
+    /// disagrees with the Journal, the Journal is right.
+    QByteArray snapshot() const;
+
+    /// Restore a snapshot, failing closed.
+    ///
+    /// An unreadable or unrecognised checkpoint is discarded rather than partially applied: a
+    /// projection half-built from a corrupt cache is worse than one rebuilt from the Journal, which
+    /// is always possible and always correct.
+    bool restore(const QByteArray &encoded, QString *error = nullptr);
 
 private:
     struct History {
