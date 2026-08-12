@@ -40,7 +40,10 @@ backups, and future inter-node messages.
 
 - single Journal writer;
 - contribution origin bound to the calling process: eventd resolves the caller's executable and
-  refuses any contribution claiming an organ identity that caller is not;
+  refuses any contribution claiming an organ identity that caller is not. The executable must both
+  be named for the organ and sit alongside eventd's own binary, so a look-alike built elsewhere is
+  refused; the trusted location is derived from eventd's own path rather than configured, because a
+  configured one would be settable by anyone able to restart the service;
 - canonical full-envelope hashing;
 - stable D-Bus policy;
 - message uniqueness;

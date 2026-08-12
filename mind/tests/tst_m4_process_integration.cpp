@@ -38,6 +38,7 @@ private:
     QString m_eventdPath;
     QString m_identitydPath;
     QString m_intentiondPath;
+    QTemporaryDir m_installRoot;
     QString m_predictordPath;
     QString m_selfdPath;
     QString m_workspacedPath;
@@ -133,6 +134,35 @@ private Q_SLOTS:
         QVERIFY2(!m_predictordPath.isEmpty(), "CYBOU_PREDICTORD_PATH is not set");
         QVERIFY2(!m_selfdPath.isEmpty(), "CYBOU_SELFD_PATH is not set");
         QVERIFY2(!m_workspacedPath.isEmpty(), "CYBOU_WORKSPACED_PATH is not set");
+
+        // Stage every organ into one directory before starting anything.
+        //
+        // eventd only grants an organ identity to an executable sitting beside itself, because the
+        // installed package puts them all in one place and a binary somewhere else is not the organ
+        // it is named after. The build tree scatters them across per-target directories, so without
+        // this the genuine organs would be refused here for the same reason an impostor is - and
+        // the suite would be testing a layout production never has.
+        //
+        // Copied rather than symlinked: /proc/<pid>/exe resolves through symlinks, so a link would
+        // still report the original scattered path.
+        QVERIFY(m_installRoot.isValid());
+        const auto stage = [this](QString &path) {
+            const QString staged =
+                m_installRoot.filePath(QFileInfo(path).fileName());
+            QVERIFY2(
+                QFile::copy(path, staged),
+                qPrintable(QStringLiteral("cannot stage %1").arg(path)));
+            QVERIFY(QFile::setPermissions(
+                staged,
+                QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner
+                    | QFile::ReadGroup | QFile::ExeGroup));
+            path = staged;
+        };
+        for (QString *path : {&m_eventdPath, &m_identitydPath, &m_intentiondPath,
+                              &m_predictordPath, &m_selfdPath, &m_workspacedPath,
+                              &m_lifecycledPath, &m_healthdPath, &m_presencedPath}) {
+            stage(*path);
+        }
         QVERIFY2(!m_lifecycledPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
         QVERIFY2(!m_healthdPath.isEmpty(), "CYBOU_HEALTHD_PATH is not set");
         QVERIFY2(!m_presencedPath.isEmpty(), "CYBOU_PRESENCED_PATH is not set");
@@ -1446,6 +1476,58 @@ private Q_SLOTS:
         own.privacy = PrivacyClass::Local;
         QVERIFY2(events.append(own) > 0, qPrintable(events.lastError()));
         QCOMPARE(events.count(), before + 1);
+    }
+
+    // A look-alike binary must not inherit an organ's identity.
+    //
+    // The previous check matched on the executable's basename alone, so any user could build an ELF,
+    // call it cybou-predictord, and have Event1 attribute contributions to the prediction organ.
+    // That made the provenance guarantee considerably weaker than it was described as being, and it
+    // is the guarantee the whole M7 epistemic model rests on.
+    //
+    // This runs the *genuine* predictord binary from a different directory. Same bytes, same name,
+    // same behaviour - only the location differs, which is precisely the property under test.
+    void anImpostorCannotInheritAnOrganIdentity()
+    {
+        EventClient events;
+        QVERIFY(events.isOpen());
+
+        // Free the well-known name so the impostor can own it and be reached normally.
+        stop(m_predictord);
+
+        QTemporaryDir elsewhere;
+        QVERIFY(elsewhere.isValid());
+        const QString impostorPath =
+            elsewhere.filePath(QFileInfo(m_predictordPath).fileName());
+        QVERIFY(QFile::copy(m_predictordPath, impostorPath));
+        QVERIFY(QFile::setPermissions(
+            impostorPath,
+            QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+
+        std::unique_ptr<QProcess> impostor = start(impostorPath);
+        QVERIFY(impostor);
+        PredictorClient predictor;
+        QTRY_VERIFY_WITH_TIMEOUT(predictor.ready(), 5000);
+
+        const quint64 before = events.count();
+
+        // Observe makes predictord submit a contribution claiming originOrgan "predictord".
+        predictor.observe(QStringLiteral("impostor-subject"), 1.0);
+
+        // Nothing it says reaches the biography. Waiting rather than checking immediately, so a
+        // late acceptance would still be caught.
+        QTest::qWait(1000);
+        QCOMPARE(events.count(), before);
+
+        stop(impostor);
+        m_predictord = start(m_predictordPath);
+        QVERIFY(m_predictord);
+        QTRY_VERIFY_WITH_TIMEOUT(PredictorClient().ready(), 5000);
+
+        // And the genuine binary, from the staged install directory, is still trusted - otherwise
+        // this test would pass just as well against a check that refuses everyone.
+        QVERIFY(PredictorClient().observe(QStringLiteral("genuine-subject"), 1.0));
+        QTRY_VERIFY_WITH_TIMEOUT(events.count() > before, 5000);
     }
 
     // Mutations are causally ordered - gate, Event1 preflight, activity, durable Observation, then

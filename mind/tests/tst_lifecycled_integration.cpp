@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
+#include "OrganStaging.h"
+
 #include "cybou/fabric/FabricCodec.h"
 #include "cybou/fabric/OrganBus.h"
 #include "cybou/events/EnvelopeCodec.h"
@@ -28,6 +30,7 @@ class TestLifecycledIntegration : public QObject
 private:
     QTemporaryDir m_root;
     QString m_daemonPath;
+    cybou::testing::StagedInstall m_install;
     std::unique_ptr<QProcess> m_daemon;
     std::unique_ptr<QProcess> m_eventd;
     std::unique_ptr<QProcess> m_predictord;
@@ -59,7 +62,7 @@ private:
     std::unique_ptr<QProcess> startAuxiliary(const char *variable)
     {
         auto process = std::make_unique<QProcess>();
-        process->setProgram(qEnvironmentVariable(variable));
+        process->setProgram(m_install.stageFromEnvironment(variable));
         process->setProcessEnvironment(environment());
         process->start();
         if (!process->waitForStarted(3000)) return {};
@@ -90,8 +93,11 @@ private Q_SLOTS:
     void initTestCase()
     {
         QVERIFY(m_root.isValid());
-        m_daemonPath = qEnvironmentVariable("CYBOU_LIFECYCLED_PATH");
-        QVERIFY2(!m_daemonPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
+        QVERIFY(m_install.isValid());
+        // Every organ has to run from one directory, or eventd refuses them their identity - see
+        // OrganStaging.h.
+        m_daemonPath = m_install.stageFromEnvironment("CYBOU_LIFECYCLED_PATH");
+        QVERIFY2(!m_daemonPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set or cannot be staged");
         QVERIFY(QDir().mkpath(m_root.filePath(QStringLiteral("runtime"))));
         m_eventd = startAuxiliary("CYBOU_EVENTD_PATH");
         QVERIFY(m_eventd);

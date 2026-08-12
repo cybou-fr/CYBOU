@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
+#include "OrganStaging.h"
+
 #include "cybou/events/EventStore.h"
 #include "cybou/ipc/EventClient.h"
 
@@ -39,12 +41,13 @@ private:
     std::unique_ptr<QTemporaryDir> m_state;
     std::unique_ptr<QProcess> m_daemon;
     QString m_daemonPath;
+    cybou::testing::StagedInstall m_install;
 
 private Q_SLOTS:
     void initTestCase()
     {
         m_daemonPath =
-            qEnvironmentVariable("CYBOU_EVENTD_PATH");
+            m_install.stageFromEnvironment("CYBOU_EVENTD_PATH");
         QVERIFY2(
             !m_daemonPath.isEmpty(),
             "CYBOU_EVENTD_PATH is not set");

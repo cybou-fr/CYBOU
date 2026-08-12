@@ -42,13 +42,48 @@ bool validConsumerId(const QString &consumerId)
     return pattern.match(consumerId).hasMatch();
 }
 
+// The directory holding the Mind binaries, taken from eventd's own executable.
+//
+// Organs are installed together, so the genuine predictord is the one sitting beside the eventd
+// that is doing the checking. Deriving this rather than configuring it matters: a trusted path read
+// from the environment would be settable by any process able to restart the service, which is the
+// same user this check exists to constrain.
+//
+// Empty when eventd cannot resolve itself, which makes every organ claim fail closed.
+QString trustedOrganDirectory()
+{
+    static const QString directory = [] {
+        const QString self = QFile::symLinkTarget(QStringLiteral("/proc/self/exe"));
+        return self.isEmpty() ? QString() : QFileInfo(self).absolutePath();
+    }();
+    return directory;
+}
+
 // Map a Mind executable to the organ identity it is entitled to claim.
 //
-// The Nix build wraps Qt applications, so the running executable is not `cybou-identityd` but
-// `.cybou-identityd-wrapped`. Resolving the real binary and then undoing that decoration is what
-// makes this work against the installed package rather than only a development build.
+// The name alone is not enough, and an earlier version of this check trusted it. Any user can build
+// an ELF, call it cybou-predictord, and put it in /tmp; matching on the basename let that process
+// attribute contributions to the prediction organ, which made the provenance guarantee this
+// function exists to provide considerably weaker than it was described as being.
+//
+// So the executable must also *be* the installed one: the same directory as eventd itself, compared
+// on canonical paths that /proc resolution has already followed through symlinks. A user cannot
+// write into that directory without already being able to replace Mind outright.
+//
+// The Nix build wraps Qt applications, so the running executable is `.cybou-identityd-wrapped`
+// rather than `cybou-identityd`. Undoing that decoration is what makes this work against the
+// installed package rather than only a development build.
 QString organIdentityForExecutable(const QString &executablePath)
 {
+    if (executablePath.isEmpty()) {
+        return {};
+    }
+
+    const QString trusted = trustedOrganDirectory();
+    if (trusted.isEmpty() || QFileInfo(executablePath).absolutePath() != trusted) {
+        return {};
+    }
+
     QString name = QFileInfo(executablePath).fileName();
     if (name.startsWith(QLatin1Char('.'))) {
         name.remove(0, 1);

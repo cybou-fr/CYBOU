@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
+#include "OrganStaging.h"
+
 #include "cybou/fabric/OrganBus.h"
 #include "cybou/protocol/Health.h"
 #include "cybou/protocol/Homeostasis.h"
@@ -30,6 +32,7 @@ private:
     QTemporaryDir m_root;
     std::vector<std::unique_ptr<QProcess>> m_dependencies;
     std::unique_ptr<QProcess> m_healthd;
+    cybou::testing::StagedInstall m_install;
     QProcess *m_predictord{nullptr};
     QProcess *m_workspaced{nullptr};
 
@@ -67,7 +70,7 @@ private:
     QProcess *startDependency(const char *variable, const BusEndpoint &endpoint)
     {
         auto process = std::make_unique<QProcess>();
-        process->setProgram(qEnvironmentVariable(variable));
+        process->setProgram(m_install.stageFromEnvironment(variable));
         process->setProcessEnvironment(environment());
         process->start();
         if (!process->waitForStarted(3000)) {
@@ -81,7 +84,7 @@ private:
     void startHealthd()
     {
         m_healthd = std::make_unique<QProcess>();
-        m_healthd->setProgram(qEnvironmentVariable("CYBOU_HEALTHD_PATH"));
+        m_healthd->setProgram(m_install.stageFromEnvironment("CYBOU_HEALTHD_PATH"));
         m_healthd->setProcessEnvironment(environment());
         m_healthd->start();
         QVERIFY2(m_healthd->waitForStarted(3000), qPrintable(m_healthd->errorString()));
@@ -241,7 +244,7 @@ private Q_SLOTS:
     void duplicateOwnerIsRejected()
     {
         QProcess duplicate;
-        duplicate.setProgram(qEnvironmentVariable("CYBOU_HEALTHD_PATH"));
+        duplicate.setProgram(m_install.stageFromEnvironment("CYBOU_HEALTHD_PATH"));
         duplicate.setProcessEnvironment(environment());
         duplicate.start();
         QVERIFY(duplicate.waitForStarted(3000));
