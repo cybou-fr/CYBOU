@@ -9,6 +9,8 @@
 
 #include <QDBusConnection>
 #include <QDBusInterface>
+#include <QDBusPendingCall>
+#include <QDBusPendingReply>
 #include <QDBusReply>
 #include <QDir>
 #include <QElapsedTimer>
@@ -81,11 +83,17 @@ private:
         return waitForInterface(endpoint) ? result : nullptr;
     }
 
-    void startHealthd()
+    void startHealthd(int refreshHoldMs = 0)
     {
         m_healthd = std::make_unique<QProcess>();
         m_healthd->setProgram(m_install.stageFromEnvironment("CYBOU_HEALTHD_PATH"));
-        m_healthd->setProcessEnvironment(environment());
+        QProcessEnvironment env = environment();
+        if (refreshHoldMs > 0) {
+            env.insert(
+                QStringLiteral("CYBOU_HEALTH_REFRESH_HOLD_MS"),
+                QString::number(refreshHoldMs));
+        }
+        m_healthd->setProcessEnvironment(env);
         m_healthd->start();
         QVERIFY2(m_healthd->waitForStarted(3000), qPrintable(m_healthd->errorString()));
         QVERIFY(waitForInterface(kHealthEndpoint));
@@ -141,6 +149,56 @@ private:
     }
 
 private Q_SLOTS:
+    // A refresh requested while one is running must be served, not refused.
+    //
+    // healthd refreshes on a 30 s timer and on every bus owner change, each run taking up to its
+    // deadline. A caller arriving during one is refused outright, and under process churn - a suite
+    // starting and stopping nine organs generates owner changes continuously - an explicit caller
+    // can be locked out for seconds together. That is the process-suite flakiness: tests failing on
+    // the refusal rather than on anything they were written to check.
+    //
+    // Refusing is also wrong on its own terms. "I am busy" is not "I could not", and a caller
+    // cannot tell them apart from a bare false.
+    //
+    // The overlap is constructed, not hoped for. An earlier version of this test issued two
+    // concurrent calls and assumed the second would land mid-refresh; instrumentation showed it
+    // never did, because with few organs running a refresh finishes first. The hold knob makes the
+    // running refresh outlast the second request by construction.
+    void aRefreshDuringAnotherIsServedNotRefused()
+    {
+        stopProcess(m_healthd.get());
+        m_healthd.reset();
+        startHealthd(1500);
+
+        QDBusInterface first = interfaceFor(kHealthEndpoint);
+        QDBusInterface second = interfaceFor(kHealthEndpoint);
+
+        QDBusPendingCall firstCall = first.asyncCall(QStringLiteral("Refresh"));
+        // Comfortably inside the hold, and long enough that the first call has certainly been
+        // dispatched and begun collecting.
+        QTest::qWait(300);
+        QDBusPendingCall secondCall = second.asyncCall(QStringLiteral("Refresh"));
+
+        firstCall.waitForFinished();
+        secondCall.waitForFinished();
+
+        const QDBusPendingReply<bool> firstReply(firstCall);
+        const QDBusPendingReply<bool> secondReply(secondCall);
+        QVERIFY2(firstReply.isValid(), qPrintable(firstReply.error().message()));
+        QVERIFY2(secondReply.isValid(), qPrintable(secondReply.error().message()));
+
+        QVERIFY2(firstReply.value(), "the first refresh did not succeed, so the test proves nothing");
+        QVERIFY2(
+            secondReply.value(),
+            "a refresh arriving during another was refused rather than served");
+
+        QVERIFY(snapshot().isValid());
+
+        stopProcess(m_healthd.get());
+        m_healthd.reset();
+        startHealthd();
+    }
+
     void initTestCase()
     {
         QVERIFY(m_root.isValid());

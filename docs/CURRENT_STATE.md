@@ -327,6 +327,13 @@ contributed as one, and acquisition identity is deterministic over source, subje
 time so a repeated report is a durable no-op rather than a second contribution. No perception
 adapter exists yet, so nothing produces these in the running system.
 
+Health1 coalesces refreshes rather than refusing them. A caller arriving while a collection is
+running receives a delayed reply; when that collection finishes one further refresh is scheduled and
+every waiter is answered from it, so one extra collection serves any number of waiters and each gets
+an answer derived from a run that began after it asked. The overlapping-collection guard is
+unchanged — two probes of one owner at once remains forbidden — but a busy owner no longer returns a
+bare false that a caller cannot distinguish from failure.
+
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
 `Verify` on the ordinary self-assessment path, so both need a cursor-carrying replay API and

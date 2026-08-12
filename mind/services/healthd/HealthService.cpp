@@ -12,6 +12,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QElapsedTimer>
+#include <QDBusConnection>
+#include <QDBusMessage>
 #include <QEventLoop>
 #include <QSaveFile>
 #include <QScopedValueRollback>
@@ -149,9 +151,32 @@ bool HealthService::save(const CapabilitySnapshot &snapshot)
     return true;
 }
 
+// Coalesce refreshes rather than refusing them.
+//
+// The guard still forbids overlapping collection - two probes of one owner at once was the defect it
+// exists for - but refusing the caller was the wrong way to enforce it. healthd refreshes on a 30 s
+// timer and on every bus owner change, so under process churn an explicit caller could be locked out
+// for seconds together, and a bare false gave it no way to tell "I am busy" from "I could not".
+//
+// Waiting inside the call cannot work: Refresh drives a nested event loop, so a second D-Bus call
+// arrives within the first one's stack and m_refreshing cannot clear until that frame unwinds. A
+// blocking wait there deadlocks against itself.
+//
+// So a caller arriving mid-refresh gets a delayed reply. When the running collection finishes, one
+// further refresh is scheduled and every waiter is answered from it: one extra collection serves any
+// number of waiters, and each gets an answer derived from a run that began after they asked - which
+// matters, because they may have changed something the in-flight run had already passed.
 bool HealthService::Refresh()
 {
-    if (!m_ready || m_refreshing) {
+    if (!m_ready) {
+        return false;
+    }
+
+    if (m_refreshing) {
+        if (calledFromDBus()) {
+            setDelayedReply(true);
+            m_deferredReplies.append({connection(), message()});
+        }
         return false;
     }
     QScopedValueRollback<bool> refreshing(m_refreshing, true);
@@ -174,8 +199,20 @@ bool HealthService::Refresh()
     QElapsedTimer elapsed;
     elapsed.start();
     int pending = endpoints().size() + 3;
-    auto finish = [&pending, &loop]() {
-        if (--pending == 0) loop.quit();
+
+    // Test-only: hold a refresh open for a known duration so that "a request arrives while a
+    // refresh is running" can be constructed rather than hoped for. Without it that condition
+    // cannot be reproduced on demand - with few organs running a refresh finishes before a second
+    // request can land - and a fix for it cannot be shown to work. Same shape as the delay knobs
+    // predictord and presenced already carry.
+    bool heldOk = false;
+    const int holdMs = qEnvironmentVariableIntValue("CYBOU_HEALTH_REFRESH_HOLD_MS", &heldOk);
+    const int artificialHold = heldOk ? qBound(0, holdMs, 30000) : 0;
+
+    auto finish = [&pending, &loop, artificialHold]() {
+        // With a hold configured the deadline alone ends the refresh, so its duration is the hold
+        // rather than however fast the probes happened to answer.
+        if (--pending == 0 && artificialHold == 0) loop.quit();
     };
     std::vector<std::unique_ptr<AsyncRpcClient>> clients;
     clients.reserve(pending + endpoints().size());
@@ -266,7 +303,7 @@ bool HealthService::Refresh()
     QTimer deadline;
     deadline.setSingleShot(true);
     connect(&deadline, &QTimer::timeout, &loop, &QEventLoop::quit);
-    deadline.start(2000);
+    deadline.start(artificialHold > 0 ? artificialHold : 2000);
     loop.exec();
 
     for (const auto &[componentId, endpoint] : endpoints()) {
@@ -294,9 +331,11 @@ bool HealthService::Refresh()
     const CapabilitySnapshot candidate = HealthPolicy::evaluate(observations, now);
     if (!candidate.isValid()) {
         m_error = QStringLiteral("health policy produced an invalid snapshot");
+        scheduleDeferredRefresh();
         return false;
     }
     if (!save(candidate)) {
+        scheduleDeferredRefresh();
         return false;
     }
 
@@ -370,6 +409,7 @@ bool HealthService::Refresh()
         homeostasis.authorizedPolicyIds.append(QStringLiteral("event-backlog-v1"));
     if (!homeostasis.isValid()) {
         m_error = QStringLiteral("health collector produced an invalid homeostasis snapshot");
+        scheduleDeferredRefresh();
         return false;
     }
     m_snapshot = candidate;
@@ -377,7 +417,27 @@ bool HealthService::Refresh()
     m_hasSnapshot = true;
     m_hasHomeostasis = true;
     Q_EMIT Changed();
+    scheduleDeferredRefresh();
     return true;
+}
+
+void HealthService::scheduleDeferredRefresh()
+{
+    if (m_deferredReplies.isEmpty() || m_deferredScheduled) {
+        return;
+    }
+    // Scheduled rather than immediate: m_refreshing stays set until Refresh returns, so the extra
+    // collection has to run after this frame unwinds.
+    m_deferredScheduled = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_deferredScheduled = false;
+        const QList<DeferredRefresh> waiting = m_deferredReplies;
+        m_deferredReplies.clear();
+        const bool refreshed = Refresh();
+        for (const DeferredRefresh &waiter : waiting) {
+            waiter.connection.send(waiter.message.createReply(refreshed));
+        }
+    });
 }
 
 } // namespace cybou

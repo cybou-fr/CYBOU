@@ -52,8 +52,7 @@ the work actually is. What follows is the current set.
   biography;
 - cold reconstruction still costs a full replay per organ, which the measured budgets put at roughly
   nine seconds each at a million contributions;
-- the process suite is intermittently red because healthd can refuse `Refresh` for seconds at a
-  time under process churn, so a red run needs a human to decide whether it means anything;
+
 - the KVM gates run only locally, so the fault and recovery evidence — the substrate's most
   distinctive asset — is not exercised by any hosted check.
 
@@ -446,97 +445,51 @@ The adapter itself: read the NixOS current system generation, produce an `Observ
 through Event1. It needs its own reserved organ identity so Event1 can bind its provenance, and it
 must not become a Journal owner or mutate system configuration.
 
-## Scheduling flake — diagnosed and fixed
+## Scheduling and refresh flakiness — fixed
 
-`scheduledOwnerTimeoutIsBoundedIdempotentAndRecoverable` intermittently saw `RunSchedulingCycle`
-answer `failed` where it expected `started`. Established as a genuine flake before anything was
-changed: the same Nix derivation hash produced one failing and two passing runs, so identical inputs
-gave different outcomes.
+Two separate defects made the process suite intermittently red. Both are closed.
 
-**Cause.** The policy is evaluated twice. `RunSchedulingCycle` takes a health snapshot and decides,
-then `ExecuteSchedulingDecision` re-fetches health and requires the snapshot identity to be
-unchanged. healthd refreshes on a 30 s timer and on every bus owner change, so a refresh landing in
-that window supersedes the evidence and the run is refused.
+### A lost scheduling race was reported as failure
 
-The refusal is correct — a decision reasoned about one snapshot should not execute against another.
-What was wrong is that it was reported as `failed`, the same outcome as a scheduler that could not do
-its job. An ordinary race was indistinguishable from a defect.
+The policy is evaluated twice: `RunSchedulingCycle` takes a health snapshot and decides, then
+`ExecuteSchedulingDecision` re-fetches and requires the snapshot identity to be unchanged. healthd
+refreshes on a timer and on every bus owner change, so a refresh landing in that window supersedes
+the evidence and the run is refused.
 
-Isolated repeat runs never reproduced it; both real failures happened during full builds. The window
-between the two evaluations widens under load, which is why it only appeared there.
+The refusal is correct — a decision reasoned about one snapshot must not execute against another.
+Reporting it as `failed` was not: that is the same answer as a scheduler which could not do its job.
+It now answers `deferred`, and the tests retry on exactly that condition.
 
-**Diagnosed further, not fixed. Attempted fixes were reverted.**
+Established as a genuine flake before anything changed: the same Nix derivation hash produced one
+failing and two passing runs.
 
-Three things were established:
+### healthd refused refreshes instead of coalescing them
 
-- **The scheduling-outcome assertion appears six times, not three.** The earlier fix routed three of
-  them through the retrying helper and left `:483`, `:841`, `:901` and `:915` comparing the outcome
-  directly, so four sites kept the race the helper exists to absorb. Two of those then read `runId`
-  from the cycle, so the helper has to hand back the cycle that actually started, not merely verify
-  one did.
-- **`QTRY_VERIFY(Refresh)` is a barrier, not only an assertion.** It waits, and that wait is what
-  lets the system settle. Replacing those calls with unasserted ones — on the reasoning that a
-  refusal means a refresh is already running and the intent is met either way — removed the settling
-  and made the suite fail in *more* places. That reasoning is sound about the assertion and wrong
-  about the timing, which is why it must not be reapplied without replacing the wait.
-- **The real defect is in healthd, not the tests.** `Refresh` can refuse for more than five
-  continuous seconds under this suite's process churn: healthd refreshes on a 30 s timer and on
-  every bus owner-change (debounced 100 ms), each refresh runs to a 2 s deadline with 750 ms probes,
-  and a test that starts and stops nine processes keeps that queue saturated. No assertion-level
-  change can fix that; `Refresh` needs to either wait for the in-flight refresh and report its
-  result, or say plainly that one is already running so a caller can distinguish "refused" from
-  "failed".
+`Refresh` returned false whenever one was already collecting. Under process churn — a suite starting
+and stopping nine organs generates owner changes continuously, each refresh running to its deadline —
+an explicit caller could be locked out for seconds together, and a bare false gave it no way to tell
+"I am busy" from "I could not".
 
-A second attempt disabled healthd's automatic refresh for this suite, as the healthd integration
-suite already does, on the reasoning that the tests should decide when things happen. That failed
-too, and informatively: several tests depend on healthd re-observing by itself. Recovery progress
-only reaches `verifying` or `ready` because an automatic refresh notices the owner returned, and the
-capability graph requires an explicit `Recovering` observation before a component counts as healthy
-again. Those tests are exercising automatic re-observation, not merely tolerating it.
+A caller arriving mid-refresh now gets a delayed reply. When the running collection finishes, one
+further refresh is scheduled and every waiter is answered from it: one extra collection serves any
+number of waiters, and each gets an answer from a run that began after they asked — which matters,
+because they may have changed something the in-flight run had already passed.
 
-So the solution space is now narrower than it looked. Assertion-level changes cannot work, because
-the waits are load-bearing. Disabling automatic refresh cannot work, because the behaviour is under
-test. What remains is healthd coalescing rather than serialising: a refresh requested while one runs
-should mark the graph dirty and re-run once at the end, so a queue of owner changes cannot lock an
-explicit caller out for seconds. That is a change to healthd's core loop and should not be attempted
-against a suite too flaky to verify it — the fix and its evidence have to arrive together.
+**Three earlier attempts failed, each on a premise checked only after being built on.** That the
+assertions were at fault — no, `QTRY_VERIFY(Refresh)` is a barrier whose wait is load-bearing, and
+removing it made the suite worse. That automatic refresh could be disabled for the suite — no,
+several tests exercise healthd re-observing by itself. That two concurrent D-Bus calls would overlap
+— no, instrumentation showed they never did, because a refresh with few organs running finishes
+first.
 
-A third attempt built the fix that analysis pointed to: a caller arriving mid-refresh gets a delayed
-reply, and one further collection after the running one answers every waiter. It was written
-test-first, and the test failed before the change as intended — but instrumentation showed the busy
-branch was never reached at all. The two concurrent calls did not overlap: with few organs running,
-a refresh finishes before the second request arrives, so the test failed for an unrelated reason and
-proved nothing. The fix may well be correct; there is no evidence that it is, and it touches
-healthd's core loop.
+What unblocked it was building the missing instrument rather than another fix:
+`CYBOU_HEALTH_REFRESH_HOLD_MS` holds a refresh open for a known duration, so overlap is constructed
+instead of hoped for. With it the test failed for the right reason before the change and passed
+after, and the process suite ran green four times consecutively.
 
-Reverted. Three attempts, three wrong premises: that the assertions were the problem, that automatic
-refresh could be turned off, and that two concurrent D-Bus calls would overlap. Each was plausible
-and each was checked only after being built on.
-
-**What a fourth attempt needs before any code.** A way to make a refresh reliably slow — a probe
-delay knob, in the shape of the ones predictord and presenced already carry — so that overlap is
-constructed rather than hoped for. Without that the condition cannot be reproduced on demand, and a
-fix for it cannot be shown to work.
-
-Everything attempted was reverted. The suite is no better than before, and
-the diagnosis above is the whole of what this attempt produced.
-
-**Remaining sites of the original class.** After that fix a run still failed at two other places where
-`health.callBool("Refresh")` is asserted as a hard precondition. `Refresh` legitimately answers
-`false` while one is already in progress - it is a re-entrancy guard, not an error - so every such
-assertion is a race waiting to fire. Confirmed the same way: one red run and one green run of the
-same derivation. At least `tst_m4_process_integration.cpp:860` and `:1038` need the same treatment
-as the scheduling assertions, and a third failure at `:808` is a `QCOMPARE` that has not been
-diagnosed at all.
-
-**Fix.** A lost evidence race now answers `deferred` — which already means the run did not start and
-a later attempt may succeed — with a reason naming the supersession. The tests retry on exactly that
-condition and fail immediately on anything else.
-
-**Separately, the assertions were unactionable.** They compared only the outcome and discarded the
-`reason` the scheduler already returns, so every intermittent failure read as "expected started, got
-failed" with nothing to act on. All three now print the reason. That is most of why this took two
-sightings to diagnose.
+The knob is deliberate test scaffolding in a shipped binary, on the same terms as the failpoints the
+threat model already accepts: it can only make healthd slower, it grants no capability, and without
+it this defect cannot be reproduced on demand or shown to be fixed.
 
 ## Deferred behind gates
 
