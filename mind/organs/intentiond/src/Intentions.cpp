@@ -120,27 +120,36 @@ QList<Intention> Intentions::open() const
         return result;
     }
 
-    // Replayed in pages rather than pulled in one reply. This used to be recent(0), which
-    // materialises the entire biography and carries it across the bus in a single message - about
-    // nine seconds and hundreds of megabytes at a million contributions, paid on every call.
+    // One chronological pass, paged.
     //
-    // Two passes are still needed, because an Outcome closing an Intention can only be recognised
-    // once that Intention has been seen, and a single chronological pass would meet some Outcomes
-    // first. So the first pass collects what was closed and the second builds the open set. Both
-    // are paged; neither holds the whole history.
-    QSet<QUuid> intentionIds;
+    // This replaces two passes justified by the claim that an Outcome closing an Intention can only
+    // be recognised once that Intention has been seen, so a single pass would meet some Outcomes
+    // first. Causation makes that impossible: an Outcome names the Intention it closes, and the
+    // Intention was accepted before it, so in chronological order the Intention has always been
+    // seen by the time its Outcome arrives. The justification contradicted the guarantee written
+    // directly beneath it.
+    //
+    // So intentions are collected in order as they appear and closures are recorded alongside; the
+    // filter at the end walks the intentions, not the biography.
+    QList<Intention> formed;
+    QSet<QUuid> formedIds;
     QSet<QUuid> closed;
-    const bool firstPass = m_events->replayAll([&](const CognitiveEnvelope &e) {
+
+    const bool replayed = m_events->replayAll([&](const CognitiveEnvelope &e) {
         if (e.kind == ContributionKind::Intention) {
-            intentionIds.insert(e.messageId);
+            const QCborMap payload = QCborValue::fromCbor(e.payloadCbor).toMap();
+            Intention i;
+            i.id = e.messageId;
+            i.description = payload[QStringLiteral("description")].toString();
+            i.trigger = payload[QStringLiteral("trigger")].toString();
+            i.formed = e.wallTime;
+            formed.append(i);
+            formedIds.insert(e.messageId);
             return;
         }
-        // The Intention is required to have been seen already. Causation guarantees it precedes its
-        // Outcome, so in chronological order that check is always satisfiable here - which is
-        // exactly why the two passes can be chronological at all.
         if (e.kind == ContributionKind::Outcome
             && e.originOrgan == QLatin1String("intentiond")
-            && intentionIds.contains(e.causationId)) {
+            && formedIds.contains(e.causationId)) {
             closed.insert(e.causationId);
         }
     });
@@ -148,31 +157,18 @@ QList<Intention> Intentions::open() const
     // A replay that failed halfway would leave commitments looking open because the Outcome that
     // closed them was never read. Reporting a partial answer as the open set is worse than
     // reporting none, so this fails closed.
-    if (!firstPass) {
-        return result;
-    }
-
-    const bool secondPass = m_events->replayAll([&](const CognitiveEnvelope &e) {
-        if (e.kind != ContributionKind::Intention || closed.contains(e.messageId)) {
-            return;
-        }
-
-        const QCborMap payload = QCborValue::fromCbor(e.payloadCbor).toMap();
-        Intention i;
-        i.id = e.messageId;
-        i.description = payload[QStringLiteral("description")].toString();
-        i.trigger = payload[QStringLiteral("trigger")].toString();
-        i.formed = e.wallTime;
-        result.append(i);
-    });
-
-    if (!secondPass) {
+    if (!replayed) {
         return {};
     }
 
-    // No reverse here, unlike the recent(0) version. That call yields newest first and the result
-    // had to be flipped to put oldest first; replayAll already yields oldest first, so reversing
-    // would now invert the order Presence shows commitments in.
+    for (const Intention &intention : formed) {
+        if (!closed.contains(intention.id)) {
+            result.append(intention);
+        }
+    }
+
+    // Oldest first, as replayAll yields. The recent(0) version ended with a reverse because that
+    // call yields newest first; reversing here would invert the order Presence shows commitments in.
     return result;
 }
 
