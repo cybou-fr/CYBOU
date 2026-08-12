@@ -7,7 +7,11 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
+
+Implemented in M5 and given its concrete owner and wire contract by the Accepted
+[ADR-0026](ADR-0026-lifecycle-owner-and-wire-contract.md); leaving this Proposed while its
+implementation ADR was Accepted was a contradiction in the record.
 
 ## Context
 

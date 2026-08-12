@@ -26,11 +26,17 @@ Mind is deliberately not a chatbot or a single AI agent. Language models are pla
 replaceable faculties. They do not own identity, canonical memory, authorization, or privileged
 execution.
 
-The current repository implements the evaluated M1–M6 substrate through P6.7: capability health,
+The current repository implements the evaluated M1–M6 substrate through P6.8: capability health,
 typed homeostasis, automatic evidence-bound lifecycle scheduling, partial-availability recovery,
-bounded RPC, and continuity/fault gates across real processes and Plasma. It does **not** yet
-implement grounded perception adapters, a language model, distributed Mind, or authorized external
-agency. See
+a non-blocking Presence surface, durability enforced at commit, and continuity/fault gates across
+real processes and Plasma.
+
+M7 preparation is partly landed and partly not. Contribution origin is bound to the calling
+executable, Journal growth costs are measured against budgets, Event1 has paged replay and
+incremental verification, capability and command policy has one declaration, and `ObservationV1` is
+frozen with a first perception source available as a library. **No perception adapter runs**, so
+nothing produces observations in a running system, and there is no epistemic projection, language
+model, distributed Mind, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -92,7 +98,12 @@ become a second cognitive owner.
 | Capability-aware Presence and interruptible automatic scheduling | Implemented — M6 P6.5 complete |
 | Partial-availability and recovery fault matrix | Implemented — M6 P6.6 complete, including focused KVM gate |
 | Bounded compound Presence commands and read aggregation | Implemented — post-M6 P6.7 complete |
-| Grounded perception, epistemics, retention, distributed prototype | Planned — M7 |
+| Non-blocking Presence surface and enforced commit durability | Implemented — post-M6 P6.8 complete |
+| Contribution origin bound to the calling executable | Implemented — P7.0 |
+| Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
+| One capability and command declaration | Implemented — P7.0 |
+| `ObservationV1` and the first perception source as a library | Implemented — P7.1 partial; no adapter runs |
+| Epistemic projection, contradiction, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |
 

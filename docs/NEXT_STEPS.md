@@ -7,8 +7,9 @@ SPDX-License-Identifier: MIT
 
 ## Purpose
 
-This document preserves the executable packages that produced the completed M5, M6, and P6.7
-boundaries. [Roadmap](ROADMAP.md) remains the milestone definition; [Current State](CURRENT_STATE.md)
+This document is the executable plan. The packages that produced the completed M5, M6 and P6.7
+boundaries have moved to [Historical Execution](history/M5-M6.md), because a plan whose first thirty
+pages are finished work stops being readable as a plan; the current work now comes first. [Roadmap](ROADMAP.md) remains the milestone definition; [Current State](CURRENT_STATE.md)
 remains the implementation authority. The current M7 entry sequence and risk priorities are
 recorded in the [2026-08-10 Project Checkpoint](PROJECT_CHECKPOINT_2026-08-10.md).
 
@@ -34,13 +35,27 @@ contradiction, retention, and erasure must become testable before replication or
 
 ### Immediate gaps
 
-- Presence readiness is effectively the conjunction of almost every organ `Ready()` value;
-- health strings identify components but do not define which user-visible capabilities remain;
-- most internal RPC is synchronous and has no shared retry/backoff/circuit-breaker contract;
-- timeout, rejection, unavailability, and unknown mutation outcome are not a common typed vocabulary;
-- lifecycle request age is projected, but general measurement/evidence freshness is not;
-- no owner currently maintains a capability dependency graph or homeostatic pressure projection;
-- M7 retention/epistemic, M8 language, and M9 action boundaries must remain deferred.
+Every entry that stood here described the substrate before M6 — no capability dependency owner,
+untyped RPC outcomes, unbounded compound reads — and all of it has since been built. A gap list that
+lists solved problems is worse than none: it makes the document unreadable as a statement of where
+the work actually is. What follows is the current set.
+
+- no perception adapter runs, so `ObservationV1` and the first source exist but nothing produces
+  observations in a running system;
+- no epistemic projection owner exists, so there is no freshness, contradiction or supersession
+  state for anything to consult;
+- retention and erasure remain undecided, and [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md)
+  forbids ingesting any sensitive observation until a storage ADR covers expiry, tombstones,
+  derived-data propagation and backups;
+- organs rebuild derived state on demand rather than maintaining it: `Intentions::open()`
+  reconstructs on every call and predictord recomputes calibrations per query, both linear in the
+  biography;
+- cold reconstruction still costs a full replay per organ, which the measured budgets put at roughly
+  nine seconds each at a million contributions;
+- the process suite is intermittently red because healthd can refuse `Refresh` for seconds at a
+  time under process churn, so a red run needs a human to decide whether it means anything;
+- the KVM gates run only locally, so the fault and recovery evidence — the substrate's most
+  distinctive asset — is not exercised by any hosted check.
 
 ### Architectural direction
 
@@ -56,512 +71,6 @@ Presence remains read-only; lifecycle mode remains orthogonal to capability heal
 3. Every persistent change includes migration, interruption, and recovery tests.
 4. `CURRENT_STATE.md` advances only with demonstrated implementation.
 5. M8 language and M9 action work do not begin before the M6 exit gate.
-
-## P0 — Restore a trustworthy green baseline
-
-**Status: complete.** The fast Nix gate, all four repository-specific validators, REUSE 3.3, both
-primary packages, and the Mind CTest suites pass from the complete working tree.
-
-### Work
-
-- remove the tracked Python bytecode cache and ignore `__pycache__/` and `*.pyc`;
-- add REUSE/SPDX metadata for the Mind handle `metadata.json`;
-- format `packages/cybou-layout-templates/default.nix`;
-- expose the cognitive-doc, Mind-access, QML-API, and UI-polish validators as flake checks;
-- run those checks in the fast GitHub workflow;
-- make documentation link validation part of the same canonical gate;
-- record one clean fast-check command in README/BUILDING/CI.
-
-### Exit gate
-
-```bash
-nix build --print-build-logs \
-  .#checks.x86_64-linux.formatting \
-  .#checks.x86_64-linux.reuse \
-  .#checks.x86_64-linux.package-metadata \
-  .#checks.x86_64-linux.cognitive-docs \
-  .#checks.x86_64-linux.mind-access \
-  .#checks.x86_64-linux.qml-api \
-  .#checks.x86_64-linux.ui-polish \
-  .#packages.x86_64-linux.cybou-mind \
-  .#packages.x86_64-linux.cybou-presence-applet
-
-nix fmt
-git diff --exit-code
-```
-
-All repository-specific validators also run from a flake check and pass. No M5 implementation
-starts from a knowingly red main branch.
-
-## P1 — Freeze the M5 lifecycle contract
-
-**Status: complete.** ADR-0026 selects the lifecycle owner and state roots; lifecycle schema v1,
-transition legality, CBOR encoding, fail-closed validation, and focused protocol tests are present.
-
-### Work
-
-- decide whether lifecycle coordination is a new process or a narrow responsibility attached to an
-  existing service; record the decision in an implementation ADR;
-- define lifecycle/run wire types, mode-transition legality, and error vocabulary;
-- define the persistent/runtime state locations and single owner of run state;
-- define accepted high-water-mark semantics;
-- define operation/idempotency keys and terminal outcome rules;
-- specify concurrency: one active run, compatible shallow tasks, or explicit serialization;
-- update protocol, IPC, ownership, failure, and threat-model documents together.
-
-### Required artifacts
-
-- accepted implementation ADR;
-- versioned protocol schema/API;
-- transition table including illegal transitions;
-- state migration/rollback statement;
-- focused codec and transition tests.
-
-### Exit gate
-
-The contract can represent requested, active, completed, interrupted, failed, recovering, and
-degraded runs without relying on UI strings or direct database access.
-
-## P2 — Prove continuity before consolidation
-
-**Status: complete.** `cybou-lifecycled`, atomic run persistence,
-Lifecycle1, systemd activation, and active-run restart recovery are implemented. Process-level
-D-Bus restart, duplicate-owner, simulated-login identity/open-intention continuity, active-run
-reboot recovery, legacy-state backup/migration, and future-schema rejection are covered. The
-focused headless NixOS gate proves identity and exact persisted-run continuity across a real booted
-system transition; the two-node Plasma smoke remains a separate system/UI gate.
-
-### Work
-
-- build a restart/reboot/logout/upgrade transition test matrix;
-- persist stable run/session transition records;
-- verify identity and open intention reconstruction;
-- distinguish clean suspension, abrupt process death, incomplete migration, and corrupt state;
-- add backup/restore verification around persistent-state migration;
-- expose freshness and last-verified transition in a typed projection.
-
-### Test matrix
-
-| Transition | Identity | Intentions | Journal | Expected mode |
-|---|---|---|---|---|
-| organ restart | unchanged | reconstructed | verified | `Awake` or `Degraded` |
-| presenced/QML restart | unchanged | unchanged | unchanged | current mode |
-| logout/login | same subject, new session | reconstructed | verified | `Recovering → Awake` |
-| reboot | same subject | reconstructed | verified | `Recovering → Awake` |
-| supported upgrade | explicit transition | migrated/restored | verified | `Maintenance → Recovering → Awake` |
-| failed migration | no invented continuity | preserved backup | failure recorded | `Degraded` |
-
-### Exit gate
-
-M5 continuity tests demonstrate that process and system transitions cannot silently create a new
-identity, lose accepted commitments, or report unverified success.
-
-## P3 — Implement the consolidation MVP
-
-**Status: complete.** Lifecycle1 persists idempotent capability
-acknowledgements tied to the run and accepted high-water mark, rejects premature completion,
-represents optional deficits, resumes the same operation keys after recovery, and automatically
-dispatches typed work to Predictor1 and Workspace1. Both owners now commit deterministic,
-evidence-linked Event1 `Learning` contributions before returning typed receipts; repeated dispatch
-does not duplicate them. Capability-to-contribution references are persisted atomically with
-acknowledgement. `Completed` now requires a deterministic accepted Event1 terminal `Outcome`
-caused by every owner result. Lifecycle mode/status/state and lifecycled health now project through
-Presence1 to the QML proxy. Process-level coverage exercises the two
-critical split-commit windows—owner Event1 commit before run acknowledgement, and terminal Event1
-commit before terminal run state—and proves idempotent recovery. The headless NixOS gate repeats
-both scenarios across real reboots and proves Event1 count is unchanged by replay.
-
-### Vertical slice
-
-Implement one small end-to-end run:
-
-```text
-Idle policy or explicit request
-→ ConsolidationRequested
-→ accepted high-water mark
-→ predictord calibration work
-→ workspaced salience/episode maintenance
-→ accepted owner results
-→ ConsolidationCompleted | Interrupted | Failed
-→ Presence projection
-```
-
-### Constraints
-
-- the coordinator never opens Journal or owner storage;
-- owner work cites accepted input evidence;
-- new observations after the high-water mark stay outside the run;
-- interruption followed by retry cannot duplicate calibration or maintenance effects;
-- a missing optional owner produces an explicit degraded result;
-- only an accepted terminal contribution permits `completed` presentation.
-
-### Exit gate
-
-The VM test interrupts both distributed split-commit boundaries, reboots the machine, and observes
-one correct terminal result with intact identity and biography and no duplicate Event1 effect.
-
-## P4 — Make lifecycle visible without moving ownership into UI
-
-**Status: complete.** Presence1 and the QML proxy expose lifecycle mode, status, full state,
-lifecycled health, and a read-only projection with progress class/percentage, request freshness,
-and causal capability deficits. Mind Header and Dashboard render distinct lifecycle modes without
-interpreting the durable run schema. Runtime availability remains orthogonal to lifecycle mode.
-
-### Work
-
-- [done] add explicit progress class, freshness, and deficit presentation to the lifecycle projection;
-- [done] route user lifecycle interruption through a non-blocking QML D-Bus call with pending and
-  timeout-safe completion state;
-- [done] refine the current mode label into distinct `Idle`, `Consolidating`, `Recovering`, and `Degraded`
-  visual treatments;
-- [done] provide user interruption for active runs while lifecycled retains terminal-state ownership;
-- [done] keep the existing shell usable when lifecycle services are absent;
-- add VM interaction assertions (QML static validation is complete).
-
-### Exit gate
-
-Destroying/recreating Plasma or the Presence proxy neither changes lifecycle state nor duplicates a
-run. A timeout cannot freeze the shell for the current five-second blocking RPC window.
-
-Both invariants pass at process level. The focused single-node `p4-plasma-lifecycle` gate isolates
-the shipped-Plasma restart assertion from the two-node Gate A smoke and passes under KVM.
-
-## P5 — Close M5 and publish evidence
-
-**Status: complete for the unversioned evaluation milestone.** The M5 evidence matrix, focused
-lifecycle/Plasma gates, corrected two-node `vm-smoke`, and aggregate flake check pass. VM and ISO
-were built from clean revision `ddd6c83`; immutable Nix outputs, size, SHA-256, environment, and
-compatibility boundary are recorded in `M5_EVALUATION.md`. This is evaluation evidence, not a
-stable tagged release.
-
-### Work
-
-- run the full package, process-integration, and VM-smoke suite;
-- build the development VM and ISO from a clean revision;
-- document supported and unsupported transition paths;
-- update `CURRENT_STATE.md` from M4 to the demonstrated M5 subset;
-- produce release notes and hashes for an evaluation build;
-- keep unfinished retention/epistemic work labelled M7.
-
-### M5 exit gate
-
-- continuity matrix passes;
-- consolidation interruption/recovery matrix passes;
-- no duplicate owner or direct Journal write path exists;
-- lifecycle capability can degrade without erasing identity/biography;
-- docs, tests, and shipped UI describe the same behavior.
-
-## P5.1 — Close documentation and isolate the hardening track
-
-**Status: complete in documentation; implementation gates remain authoritative.** M5 is the clean
-evaluation baseline for M6. In-place upgrade reconciliation beyond the tested lifecycle schema
-v0-to-v1 migration is a separate hardening track and must not be described as supported.
-
-### Exit gate
-
-- `ROADMAP.md`, `CURRENT_STATE.md`, release evidence, and this plan agree that M5 evaluation is complete;
-- unsupported upgrade paths remain explicit;
-- M6 work cannot weaken the existing lifecycle continuity and idempotency gates.
-
-## P6.1 — Freeze the capability and health contract
-
-**Status: complete.** Schema-v1 component health, capability state, typed deficit cause, recovery
-policy, snapshot CBOR, fail-closed validation, component transitions, and focused tests are present.
-The protocol deliberately contains no dependency graph, daemon, D-Bus service, or UI policy.
-
-### Work
-
-- define versioned `ComponentHealth`, `CapabilityState`, `CapabilityDeficit`, dependency, freshness,
-  and recovery-policy wire types;
-- keep component health separate from capability availability;
-- distinguish `Unavailable`, `TimedOut`, `Rejected`, and `UnknownOutcome`;
-- define significant transitions that cross Event1 without recording routine probe noise;
-- define aggregate Mind health without reducing it to the conjunction of organ `Ready()` values;
-- update IPC, ownership, failure, security, and migration contracts together.
-
-### Exit gate
-
-Codecs and transition tests prove fail-closed handling of unknown versions/states. A deficit names
-the affected capability, dependency, cause, detection time, last verified success, impact, recovery
-policy, and evidence/error reference where available.
-
-## P6.2 — Implement the dependency graph and health owner
-
-**Status: complete.** The initial dependency graph, aggregate policy, `cybou-healthd`, persistent
-snapshot owner, `Health1`, D-Bus/systemd activation, corrupt-state failure, exact restart recovery,
-explicit component recovery, and process-level optional-owner fault injection are implemented.
-Presence does not consume Health1 yet.
-
-### Work
-
-- classify identity continuity and accepted biography/commitments as required capabilities;
-- classify prediction, self-assessment, attention maintenance, and consolidation owners according
-  to the operation that needs them;
-- implement a dedicated `cybou-healthd` with versioned `Health1` rather than making Presence the
-  durable health owner;
-- observe D-Bus ownership and typed organ health without opening organ storage;
-- persist only policy state that must survive process recreation;
-- project an immutable capability snapshot to Presence1.
-
-### Initial capability matrix
-
-| Capability | Required dependencies | Expected partial-failure behavior |
-|---|---|---|
-| identity continuity | `identityd`, accepted Event1 history | fail closed; never invent identity |
-| commitment access | `intentiond`, accepted Event1 history | preserve accepted commitments or report unavailable |
-| prediction | `predictord` | prediction unavailable; independent capabilities remain usable |
-| self-assessment | `selfd` | assessment unavailable; identity and commitments remain usable |
-| attention/workspace | `workspaced` | attention limited; durable biography remains usable |
-| consolidation | `lifecycled` plus run-specific owners | run limited/failed/degraded by typed policy |
-| Presence presentation | `presenced` | UI unavailable; cognitive owners remain unchanged |
-
-### Exit gate
-
-Stopping an optional organ removes only dependent capabilities. Restart produces an explicit
-`Recovering` transition and verified return to `Available`; Presence recreation changes neither.
-
-## P6.3 — Add bounded asynchronous RPC resilience
-
-**Status: complete for the shared transport and first required consumer.** Typed outcomes,
-operation semantics, bounded deterministic backoff, retry eligibility, circuit breaking, and a
-common async D-Bus client are implemented. Plasma lifecycle interruption is migrated as a
-non-idempotent mutation: timeout becomes `UnknownOutcome` and is never retried. Legacy synchronous
-read paths remain for deliberate future migration.
-
-### Work
-
-- add common bounded async calls for paths that must not block an owner or shell;
-- define per-method timeout and idempotency metadata;
-- retry only when the operation contract permits replay;
-- add exponential backoff with jitter and a bounded circuit breaker;
-- preserve `UnknownOutcome` when a mutation may have committed but its response was lost;
-- reuse M5 operation keys for retryable durable work.
-
-### Exit gate
-
-Timeout cannot freeze Presence, exhaust the session bus, duplicate an Event1 effect, or turn an
-unknown mutation result into success. Unit tests use a deterministic clock/backoff source.
-
-## P6.4 — Introduce homeostatic signals without autonomous policy
-
-**Status: complete for typed observation.** Health1 now publishes schema-v1 measurements with
-source, units, observation/validity time, and explicit current, stale, unknown, or unsupported
-status. Schema v1 forbids scheduling authority. Backlog, storage growth, and calibration pressure
-remain explicitly unsupported until their owners expose typed contracts; no zero is fabricated.
-
-### Work
-
-- measure Event1 backlog, Journal/storage growth, RPC latency/error pressure, lifecycle backlog,
-  projection age, and calibration pressure;
-- attach units, observation time, freshness, source, and supported/unsupported status;
-- expose measurements before allowing them to schedule work;
-- define bounded thresholds and hysteresis separately from raw measurements.
-
-### Exit gate
-
-Every signal is typed, source-bearing, testable, and cannot silently trigger consolidation. Stale
-or unavailable measurements remain explicit instead of falling back to fabricated zero values.
-
-## P6.5 — Add capability-aware scheduling and metacognitive projection
-
-**Prerequisite hardening: implemented.** Health1 probes now use parallel, bounded read-only async
-RPC with a common deadline, D-Bus owner-change debounce, slow verification, and typed timeout
-mapping. Consolidation owners reconstruct their computed values only through the accepted
-high-water mark; lifecycle validation requires a cause for every missing capability; terminal
-Outcome evidence preserves completed and missing work. CapabilitySnapshot schema v2 now preserves
-each unhealthy `(capability, dependency)` pair and migrates persisted schema v1, completing the
-protocol prerequisite for detailed P6.5 recovery causes.
-
-**Slice 1: implemented.** Presence1 and its QML proxy now expose aggregate capability state,
-per-capability states, typed deficits, and observation time. Commands use explicit capability gates
-instead of one broad `awake` gate. Process integration proves predictor loss leaves identity,
-commitments, biography, and attention usable, then restores prediction after Health1 recovery.
-Presence readiness remains independent of Health1 to avoid the healthd→presenced probe cycle.
-
-**Slice 2: implemented.** Lifecycle1 owns a deterministic read-only scheduling evaluator and
-Presence projects its decision. It validates current capability/homeostasis evidence, blocks loss
-of accepted biography, preserves remaining optional consolidation workers, and computes Event1
-backlog hysteresis at 32/8. At that slice's boundary schema v1 still forbade scheduling authority,
-so evaluation deferred without changing lifecycle mode or creating a run.
-
-**Slice 3: implemented.** Event1 now owns atomically persisted, monotonic consumer offsets and an
-exact backlog projection. Lifecycled registers `lifecycle.consolidation`, advances it only after a
-durable completed run, and reconciles the same offset after restart. Consolidation-scoped owner and
-terminal contributions do not count toward their own backlog. Health1 consequently exposes a
-current Event1 backlog measurement instead of `Unsupported`.
-
-**Slice 4: implemented.** Homeostasis schema v2 replaces the global boolean guard with unique,
-bounded authorized policy IDs and migrates schema v1 strictly as observation-only. Health1 grants
-`event-backlog-v1` only with a current owner-backed backlog. Lifecycle1 still owns all capability,
-freshness, idleness, worker, and hysteresis gates. Process integration drives backlog to 32 and
-proves Lifecycle1 and Presence return `Run` without creating or mutating a lifecycle run.
-
-**Slice 5: implemented.** Lifecycle1 now exposes an explicit execution command that requires the
-exact capability/homeostasis snapshot IDs returned by evaluation and revalidates both immediately
-before mutation. It derives a deterministic run UUID from policy and evidence, making retries safe
-after timeout, completion, and even after a later run replaces the current projection. Stale
-evidence fails without changing lifecycle state. The accepted execution creates the existing
-bounded consolidation transaction; dispatch and terminal completion remain explicit owner steps.
-
-**Slice 6: implemented.** Lifecycled now runs the bounded orchestration cycle after a 100 ms
-Health1-change debounce and on a 30-second verification timer. `Block` and `Defer` are no-ops;
-`Run` invokes the evidence-bound idempotent command, dispatches owners, and commits completion.
-Recovery always continues an existing scheduled run before considering new evidence. A crash after
-durable run creation but before dispatch resumes and completes the same run with zero residual
-backlog. Tests can disable automatic triggers while invoking the identical production method.
-
-**Slice 7: implemented.** Presence command entry points now report explicit user activity to
-Lifecycle1. Lifecycle schema v2 durably stores the last activity time and scheduler cooldown end;
-evaluation and execution defer while the cooldown is active, including after lifecycled restart.
-Activity wakes `Idle` and atomically interrupts an active `event-backlog-v1:*` run, but never
-silently terminates a manually requested maintenance run. At this slice, synchronous owner
-dispatch remained the interruption boundary.
-
-**Slice 8: implemented.** Automatic owner dispatch is now a sequential asynchronous state machine
-using the shared idempotent-mutation retry and circuit-breaker policy. `RunSchedulingCycle` returns
-`started` after durable run creation and never blocks Lifecycle1 on an owner call. Every callback
-rechecks the original run identity and active state before accepting its durable contribution, so
-activity can persist `Interrupted` during an in-flight RPC and a late owner reply cannot resurrect
-or complete that run. The explicit synchronous `Dispatch` command remains for administrative
-compatibility; the production scheduler no longer uses it.
-
-**Slice 9: implemented.** Presence1 now groups Health1 evidence into a presentation-ready
-`capabilityDetails` map. Every known capability exposes its state, availability, typed causes,
-operational impacts, dependencies, last verification, recovery policies, and a compact recovery
-progress (`ready`, `waiting`, `verifying`, or `unknown`). QML no longer needs to interpret raw
-deficit records to explain partial availability. Process integration proves predictor loss keeps
-identity, commitments, attention, and biography useful, then projects verification and recovery.
-
-**Slice 10: implemented.** Presence1 publishes `commandAvailability`, the authoritative UI mapping
-from each command to required and currently missing capabilities, plus `canCommand(id)`. Backend
-methods retain their own fail-closed gates. Process integration proves prediction loss disables
-only Observe/Predict while promise, commitment, identity, and attention operations remain enabled.
-It also proves lifecycle and capability health are orthogonal by observing both `Awake + Limited`
-and `Recovering + Limited`. This completes the P6.5 exit gate.
-
-### Work
-
-No remaining P6.5 implementation work. Continue with P6.6 fault-injection coverage.
-
-### Exit gate
-
-The UI explains what is unavailable and what still works without interpreting owner storage or
-durable schemas. Language, confidence, and general epistemic claims remain outside M6.
-
-## P6.6 — Prove partial availability and recovery
-
-**Slice 1: implemented.** Real process fault injection now stops and restores predictord, selfd,
-and workspaced independently. Each loss produces only its mapped typed deficits and command gates;
-failed reflection and unavailable attention are rejected before any Event1 mutation, while
-unrelated identity, commitments, prediction, and presentation remain usable. Recovery is observed
-through `waiting → verifying → ready` rather than inferred from process existence.
-
-**Slice 2: implemented.** Lifecycled loss now proves lifecycle control and consolidation become
-unavailable without disabling identity or commitments and without creating an Event1 effect for a
-rejected interruption. Presenced loss makes an existing QML proxy explicitly unreachable while
-retaining its last cached projection; the same proxy reconnects after restart with unchanged
-identity, session count, Event1 count, and all owner PIDs. Lifecycled recovery is owner-verified.
-
-**Slice 3: implemented.** A real scheduled owner now remains on D-Bus while exceeding a bounded
-lifecycled deadline. The idempotent mutation is retried under the shared backoff/circuit policy;
-because the timed-out owner was required by the accepted decision, the run fails closed in
-`Recovering` and its consumer backlog is not advanced. Delayed replies converge on one deterministic
-owner contribution and cannot change the failed run. After owner recovery, a new evidence-bound
-run consumes the preserved backlog exactly once. The production deadline remains five seconds;
-tests use the bounded `CYBOU_LIFECYCLE_OWNER_TIMEOUT_MS` override.
-
-**Slice 4: implemented.** Scoped RPC fault injection crashes lifecycled both after the first
-retryable owner failure and after the circuit opens on exhausted failures. In both cases the
-durable scheduled run remains active, restart enters `Recovering`, and `RunSchedulingCycle`
-continues the same run ID. Deterministic owner contributions absorb abandoned/late calls, terminal
-completion occurs once, and consumer backlog reaches zero without a replacement run.
-
-**Slice 5: implemented.** Required-owner fault injection stops Event1 while every other process
-remains alive. Presence stays reachable but accepted biography, identity continuity, and commitment
-access fail closed; a Promise attempt creates no accepted contribution. Restart opens the same
-Journal with an unchanged count, UUID, session count, and existing commitment, and the rejected
-description is absent. Owner-verified refresh restores commands. This completes the process-level
-P6.6 matrix.
-
-**Slice 6: implemented.** The focused single-node KVM gate boots the shipped Plasma session,
-proves D-Bus/systemd activation of Presence without replacing plasmashell, and exercises a delayed
-lifecycle interruption without permitting a false durable transition. It then recovers the same
-service boundary, suspends the required Event1 owner, observes a fail-closed Promise with no Journal
-growth, resumes Event1, and verifies both owner and Plasma continuity. This completes P6.6.
-
-### Fault-injection matrix
-
-All process-level cases above and the focused system boundary are implemented with recovery and
-duplicate-effect assertions.
-
-Use process integration for the complete matrix and one focused KVM gate for D-Bus/systemd
-activation, timeout, recovery, and Plasma projection. Do not multiply the expensive two-node smoke
-test for cases already proven below the system boundary.
-
-### M6 exit gate
-
-Loss of every optional organ has an explicit capability deficit, useful remaining behavior,
-bounded retry/recovery rule, Presence projection, and test. Required-owner loss fails closed without
-identity replacement, commitment loss, false acceptance, or duplicate durable effects.
-
-**Status: satisfied.** The complete process matrix plus `m6-recovery-boundary` provide the M6 exit
-evidence.
-
-## P6.7 — Bound compound Presence commands
-
-**Slice 1: implemented.** EventClient now uses an explicitly timed asynchronous D-Bus pending call
-instead of relying on blocking-call timeout behavior. Promise validates its capability gates and
-required Event1 owner before notifying auxiliary owners, so an unresponsive Journal fails closed
-without accumulating the budgets of later steps. The KVM gate tightens its client deadline from 40
-to 8 seconds and observes rejection in under one second with no Journal growth.
-
-Next, introduce one command deadline context that propagates the remaining budget across compound
-commands involving several independent owners. This is post-M6 latency hardening, not a reason to
-weaken the completed M6 availability and continuity claims.
-
-**Slice 2: implemented for Promise.** RpcClient and EventClient accept a per-call timeout while
-preserving their five-second default. Promise creates one five-second `QDeadlineTimer`, reads one
-Health1 snapshot, and passes only the remaining budget through Event1 preflight, Lifecycle1 activity,
-the durable observation, and Intention1 formation. No later RPC is sent after exhaustion. The KVM
-gate runs presenced with a one-second command budget and requires its server-side rejection inside a
-three-second client deadline, followed by exact Journal and Plasma continuity.
-
-Next, reuse the same deadline context for Reflect, Observe/Predict, and commitment mutation commands,
-then remove the temporary per-command repetition behind a small shared helper.
-
-**Slice 3: implemented.** A shared `CommandDeadline` helper now supplies the monotonic remaining
-budget for Reflect, Observe, Predict, Fulfill, and Abandon as well as Promise. Each compound command
-reads one Health1 snapshot and forwards only the remaining time to every required Event1,
-Lifecycle1, Self1, Predictor1, and Intention1 call. Mutating paths preflight Event1 before auxiliary
-notifications; read-only Predict avoids an unnecessary Journal dependency. Expiry rejects the
-command before another RPC is sent. Process integration and the focused KVM gate preserve all M6
-continuity and recovery guarantees under the stricter transport behavior.
-
-Next, align the backend `InterruptLifecycle` compound path with the same server-side deadline model
-while preserving its shell-facing non-idempotent `unknown-outcome` contract, then audit remaining
-multi-owner orchestration for independently accumulated budgets.
-
-**Slice 4: implemented.** `InterruptLifecycle` now creates its server-side `CommandDeadline` before
-validation and passes the remaining budget through Lifecycle1 `State` and `FinishRun`. Expiry after
-validation prevents the terminal mutation from being sent. The test-only delay now exercises this
-deadline directly: Plasma remains responsive, its five-second non-idempotent transport timeout is
-still reported as `unknown-outcome`, and Lifecycle1 state remains byte-identical. Recovery performs
-one successful interruption through the same path.
-
-Next, bound the read-only Presence snapshot aggregation. It currently visits several independent
-owners sequentially and is the remaining visible source of accumulated default RPC budgets; the
-projection must stay structurally valid when its shared budget expires partway through collection.
-
-**Slice 5: implemented; P6.7 complete.** `Snapshot`, `Activity`, and `DetailedObligations` now each
-own one monotonic deadline. Snapshot forwards only the remaining budget to Self1, Lifecycle1,
-Intention1, Workspace1, Event1, Identity1, and Predictor1, skips later calls after expiry, and keeps
-every projection key present with a typed empty/default value. Organ health is derived from the one
-canonical Health1 snapshot instead of issuing another Ready/Health cascade. Process coverage
-suspends a still-registered selfd under a 500 ms server budget and proves Snapshot returns a valid
-partial projection in under 1.5 seconds without reaching later owners. The same remaining-budget
-contract now covers every compound Presence read and mutation.
-
-Next, close the substrate findings recorded in P6.8 before opening the first M7 vertical slice.
 
 ## P6.8 — Close the substrate audit findings
 
@@ -647,109 +156,83 @@ fixtures first would mean rebuilding them.
 A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
 unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
 
-## P7.0-ADR — Freeze the epistemic owner and ObservationV1
+## P7.0-scale — Journal fixtures and budgets
 
-**Status: complete. [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) is Accepted.**
-Every question it settles is one a perception adapter would otherwise have answered by accident.
+**Status: implemented for the Journal paths.** `journal-scale` builds a deterministic fixture and
+measures append, full replay, `Verify`, backlog counting, indexed lookup and size. It defaults to
+10k so it runs in the ordinary checks; 100k and 1m are the same code with
+`CYBOU_SCALE_CONTRIBUTIONS` set. Results and the budgets derived from them are in
+[Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md).
 
-Being Accepted, it outranks Current State: where an implementation and that ADR disagree, the
-implementation is wrong. **P7.1 is unblocked.**
+Every growth-sensitive path is linear across two orders of magnitude and indexed lookup is flat, so
+there is no hidden quadratic. The two thresholds that matter both land near half a million
+contributions: `Verify` consumes the entire 5 s Presence command budget at ~460k, which makes
+`Reflect` impossible, and organ cold reconstruction costs ~9 s per organ at 1m with three organs
+each replaying the whole history. Those are the numbers the paged-replay and incremental-verification
+packages exist to move.
 
-What it proposes: a separate `cybou-epistemicd` owning the derived projection, freshness,
-contradiction and reconciliation — and owning neither the Journal, nor any perception source, nor
-system-wide retention. Folding it into selfd or healthd was rejected because those project Mind's own
-state and component health, while an epistemic projection is a claim about the world; merging them
-would make one process the authority on two different kinds of assertion.
+Not yet measured, and the honest gaps: per-organ cold reconstruction end to end rather than just the
+Journal read under it, RSS, Presence and consolidation behaviour under a large journal, concurrent
+read/write pressure, and the growth rate of a real biography — without which the thresholds cannot be
+turned into a date.
 
-It separates `originOrgan` (who brought this into Mind, bound to the calling process since
-P7.0-trust) from `sourceId` (what was observed). Conflating them would mean replacing an adapter
-silently rewrote the provenance of everything it ever reported, and two adapters on one source would
-look independent — the exact condition under which a contradiction check agrees with itself.
+**A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
+biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that
+carries a cursor and an incremental `Verify` against a persisted checkpoint, so a partial result is
+reported as partial. Both are wire-contract changes and belong with the M7 scale fixtures that give
+them a budget to be measured against.
 
-Its budgets come from [Scale Budgets](mind/SCALE_BUDGETS.md) rather than intuition, and one of them
-has a direct consequence: an epistemic projection replaying the whole biography would exhaust the
-5 s Presence budget near 560k contributions, so `epistemicd` must consume Event1 through the paged
-`Replay` cursor with a persisted position. It is therefore the first real consumer of P7.0-replay,
-and the first place a projection checkpoint will be justified by measurement rather than anticipated.
+**A7 — fault-tier CI coverage.** None of the four KVM gates runs on a push. This is a maintainer
+policy decision — KVM-capable runner, scheduled run, or a documented pre-tag manual gate with a named
+owner — and not a code change.
 
-**Retention is deliberately not decided there**, and until a separate storage ADR covers expiry,
-tombstones, derived-data propagation, backups and possibly per-record keys, no sensitive observation
-may be ingested. The first source — NixOS system generation and build identity — is chosen so that
-constraint costs nothing: local, non-sensitive, and naturally contradictory, since the generation
-changes while an earlier observation still claims to be current.
+### Exit gate
 
-## P7.1 — One typed local perception envelope
+The fast Nix check set and both package builds pass from a clean tree, the Mind CTest suites pass
+including new coverage for the bounded read paths and the derived presenced health answer, and the
+four KVM gates pass on a KVM-capable host with no change to their continuity and recovery assertions.
 
-**Status: ObservationV1 frozen; the adapter is next.**
+Next, begin the first M7 vertical slice: one provenance-bearing local system perception adapter,
+typed freshness/retention policy, an accepted Event1 observation, and a read-only Presence
+projection. Keep contradiction handling explicit and do not add autonomous action authority.
 
-`ObservationV1` carries `sourceId`, `subject`, a typed `value`, `acquiredAt`, `freshnessUntil` and
-`provenance`, exactly as [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) requires. The
-schema landed before the adapter deliberately: an adapter written first would have defined the
-envelope by accident, in whatever shape its own source happened to need.
+## P7.0-replay — Paged Event1 replay
 
-Three properties are load-bearing and tested:
+**Status: API implemented, one organ migrated.** `Event1.Replay(afterSequence, limit)` answers a
+page as `{ok, from, to, head, hasMore, envelopes}`, capped server-side at 1000 so it cannot become
+`Recent(0)` wearing a cursor. `EventStore` gained `after()` and a `replayAll()` helper; `Journal` and
+`EventClient` both implement it. `Recent` is unchanged and stays what it should be — genuinely recent
+activity for the UI, not a replay protocol.
 
-- **Unknown schemas fail closed**, older and newer alike. There is one schema so far, so any other
-  number means the payload was written by something this build cannot interpret, and evidence read
-  under guessed rules is worse than no evidence.
-- **A valueless observation is invalid.** A failure to observe is not an observation of nothing, so
-  an adapter that cannot read its source must report a typed failure rather than contribute an empty
-  value. This is what makes the checkpoint's "source unavailability has a typed result" enforceable
-  rather than merely intended.
-- **Acquisition identity is deterministic** over source, subject and acquisition time, so
-  re-reporting one reading after a restart or retry resolves to the same contribution and Event1's
-  existing duplicate rejection makes it a durable no-op. The value is excluded on purpose: two
-  different values for one subject at one instant is a contradiction for the projection to surface,
-  not two contributions to record. Timezone does not affect identity, or every observation would
-  duplicate across a DST change.
+The page reports `ok` separately from being empty. Without that, a replay whose transport died
+halfway looks exactly like one that finished, and an organ rebuilds its state from a prefix while
+believing it has the whole history.
 
-`freshnessUntil` is declared by the adapter, which knows how fast its source changes, rather than
-inferred by whoever reads the observation later. `acquiredAt` stays distinct from the envelope's
-acceptance time throughout.
+**intentiond is migrated.** Two chronological passes, both paged, replacing one `recent(0)` that
+was walked three times. Two hazards had to be handled, and both are the reason the remaining organs
+are not done in the same change:
 
-### Remaining for P7.1
+- **Order is inverted.** `recent(0)` yields newest first; `replayAll` yields oldest first. The old
+  code ended with a `std::reverse` to correct for that, and keeping it would have inverted the order
+  Presence shows commitments in.
+- **Partial replay must fail closed.** If the first pass dies halfway, commitments whose closing
+  Outcome was not read look open. Returning a partial open set is worse than returning none.
 
-The adapter itself: read the NixOS current system generation, produce an `ObservationV1`, propose it
-through Event1. It needs its own reserved organ identity so Event1 can bind its provenance, and it
-must not become a Journal owner or mutate system configuration.
+**Not yet migrated: predictord, selfd, workspaced.** Each has its own order dependence and must be
+read before it is changed:
 
-## P7.0-registry — One capability and command declaration
+- `Predictor::samples` appends in newest-first order and downstream treats position as recency;
+  reversing it silently changes which samples a prediction is built from.
+- `Predictor::calibration` and `allCalibrations` sum and set-collect, so they are order-independent
+  and are the safe ones.
+- `SelfModel::subjects` already iterates `recent(0)` in reverse to get oldest-first, so it becomes
+  simpler, not harder.
+- `Workspace` uses `recent(m_capacity)` — bounded already, and not a replay at all. It may not need
+  migrating.
 
-**Status: implemented.** `CapabilityRegistry` in `cybou-protocol` is the single declaration of which
-capabilities exist, which components each rests on, and which capabilities each Presence command
-requires.
-
-The same knowledge had been written down four times: the dependency graph in `HealthPolicy`, the
-component list beside it, the command-to-capability map in the Presence projection, and again in the
-capability gate of every Presence mutation. They agreed by hand. The fourth copy was added during
-P6.8, which is the argument for doing this before M7 rather than after — perception, epistemic
-projection and retention each add capabilities to all of them at once.
-
-It is a policy declaration, not a state owner. It says nothing about whether anything is currently
-healthy; healthd remains the sole owner of that, and reading the registry makes no other process a
-second authority on capability health.
-
-`interruptLifecycle` is deliberately absent from the command table: it is gated on lifecycled being
-reachable rather than on a capability, because lifecycle mode is orthogonal to capability health and
-a run must stay interruptible while other capabilities are degraded.
-
-### Generated fault expectations
-
-`everyComponentLossProducesTheDeclaredDeficits` walks every component, marks it unavailable, and
-compares the resulting deficits against what the registry declares — in both directions, so a
-capability that should *not* have degraded is caught too. This addresses the checkpoint's risk that
-health tests sample representative failures rather than the whole graph, and adding a capability
-extends the matrix without anyone editing the test.
-
-`registryIsInternallyConsistent` rejects a capability resting on an unknown component, a command
-requiring a capability that does not exist, and a capability that does not say what its loss costs.
-Verified by deliberately breaking the registry: the check named the fault precisely, and healthd's
-own integration tests failed alongside it, which confirms the registry drives production rather than
-sitting beside it.
-
-Still hand-written: the process-level matrix, where components are really stopped rather than
-modelled. The policy-level matrix above covers the graph; the process level covers the wiring, and
-they are not substitutes.
+**What this does not fix.** Paged replay is not faster: 728 ms against 762 ms at 100k. It bounds
+memory and removes the single enormous D-Bus reply, both real failure modes, but the
+cold-reconstruction budget is unmoved. See [Scale Budgets](mind/SCALE_BUDGETS.md).
 
 ## P7.0-verify — Incremental verification
 
@@ -790,6 +273,179 @@ full rechain and a checkpoint-anchored check both leave `journalIntact` true, an
 says which evidence was actually gathered.
 
 **The 460k cliff is closed.** `Reflect` no longer scales with the length of the biography.
+
+## P7.0-registry — One capability and command declaration
+
+**Status: implemented.** `CapabilityRegistry` in `cybou-protocol` is the single declaration of which
+capabilities exist, which components each rests on, and which capabilities each Presence command
+requires.
+
+The same knowledge had been written down four times: the dependency graph in `HealthPolicy`, the
+component list beside it, the command-to-capability map in the Presence projection, and again in the
+capability gate of every Presence mutation. They agreed by hand. The fourth copy was added during
+P6.8, which is the argument for doing this before M7 rather than after — perception, epistemic
+projection and retention each add capabilities to all of them at once.
+
+It is a policy declaration, not a state owner. It says nothing about whether anything is currently
+healthy; healthd remains the sole owner of that, and reading the registry makes no other process a
+second authority on capability health.
+
+`interruptLifecycle` is deliberately absent from the command table: it is gated on lifecycled being
+reachable rather than on a capability, because lifecycle mode is orthogonal to capability health and
+a run must stay interruptible while other capabilities are degraded.
+
+### Generated fault expectations
+
+`everyComponentLossProducesTheDeclaredDeficits` walks every component, marks it unavailable, and
+compares the resulting deficits against what the registry declares — in both directions, so a
+capability that should *not* have degraded is caught too. This addresses the checkpoint's risk that
+health tests sample representative failures rather than the whole graph, and adding a capability
+extends the matrix without anyone editing the test.
+
+`registryIsInternallyConsistent` rejects a capability resting on an unknown component, a command
+requiring a capability that does not exist, and a capability that does not say what its loss costs.
+Verified by deliberately breaking the registry: the check named the fault precisely, and healthd's
+own integration tests failed alongside it, which confirms the registry drives production rather than
+sitting beside it.
+
+Still hand-written: the process-level matrix, where components are really stopped rather than
+modelled. The policy-level matrix above covers the graph; the process level covers the wiring, and
+they are not substitutes.
+
+## P7.0-ADR — Freeze the epistemic owner and ObservationV1
+
+**Status: complete. [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) is Accepted.**
+Every question it settles is one a perception adapter would otherwise have answered by accident.
+
+Being Accepted, it outranks Current State: where an implementation and that ADR disagree, the
+implementation is wrong. **P7.1 is unblocked.**
+
+What it proposes: a separate `cybou-epistemicd` owning the derived projection, freshness,
+contradiction and reconciliation — and owning neither the Journal, nor any perception source, nor
+system-wide retention. Folding it into selfd or healthd was rejected because those project Mind's own
+state and component health, while an epistemic projection is a claim about the world; merging them
+would make one process the authority on two different kinds of assertion.
+
+It separates `originOrgan` (who brought this into Mind, bound to the calling process since
+P7.0-trust) from `sourceId` (what was observed). Conflating them would mean replacing an adapter
+silently rewrote the provenance of everything it ever reported, and two adapters on one source would
+look independent — the exact condition under which a contradiction check agrees with itself.
+
+Its budgets come from [Scale Budgets](mind/SCALE_BUDGETS.md) rather than intuition, and one of them
+has a direct consequence: an epistemic projection replaying the whole biography would exhaust the
+5 s Presence budget near 560k contributions, so `epistemicd` must consume Event1 through the paged
+`Replay` cursor with a persisted position. It is therefore the first real consumer of P7.0-replay,
+and the first place a projection checkpoint will be justified by measurement rather than anticipated.
+
+**Retention is deliberately not decided there**, and until a separate storage ADR covers expiry,
+tombstones, derived-data propagation, backups and possibly per-record keys, no sensitive observation
+may be ingested. The first source — NixOS system generation and build identity — is chosen so that
+constraint costs nothing: local, non-sensitive, and naturally contradictory, since the generation
+changes while an earlier observation still claims to be current.
+
+## P7.1 blockers — contract defects found in review
+
+An external review found seven defects, five of them in work landed during this sequence. Each was
+verified against the code before being recorded. Two corrected claims this repository was making.
+
+**This section was lost once and is reconstructed.** The commit that claimed to record it anchored a
+scripted edit on a heading that did not yet exist; the edit silently did nothing and the commit
+message described content that was never written. Every later "closed" edit anchored on the same
+missing text and also did nothing. The code changes below are real and committed — only the record
+was absent. The lesson is narrow and worth keeping: a scripted documentation edit that cannot fail
+loudly will eventually claim work it did not do.
+
+### B1 — Origin binding defeated by a basename (P0) — CLOSED
+
+An organ identity was granted on the executable's basename, so a user ELF named `cybou-predictord`
+in `/tmp` could attribute contributions to the prediction organ. The caller's executable must now
+also sit in eventd's own directory, derived from `/proc/self/exe` rather than configured — a
+configured path would be settable by anyone able to restart the service. Proven by running the
+genuine predictord binary from elsewhere, and by deleting the check and watching that test fail.
+
+### B2 — A contradiction could not be recorded (P0) — CLOSED
+
+Acquisition identity excluded the value, justified by a comment claiming disagreement would surface
+as a contradiction. It could not: both values mapped to one `messageId` and Event1 rejected the
+second as a duplicate, so the contradicting evidence never arrived. The value now participates.
+
+### B3 — Identity key had a separator collision (P0) — CLOSED
+
+Fields were joined with a byte nothing forbade inside them, so `("a", "b<sep>c")` and
+`("a<sep>b", "c")` collided. The original collision test checked a pair that never collided. Identity
+is now a canonical CBOR array, and the test checks the genuinely ambiguous pair.
+
+### B4 — Freshness had no lower bound (P0) — CLOSED
+
+`isFreshAt` checked only the upper bound, so a reading taken at 09:00 reported fresh at 04:00.
+
+### B5 — `Observation` meant several things (P0) — CLOSED
+
+`ContributionKind::Observation` already carried unrelated payloads from predictord and presenced.
+Every `ObservationV1` now carries `@type: cybou.observation.v1`, checked before anything else is
+read. Landed before any adapter writes, because afterwards the ambiguity is in durable history.
+
+### B6 — `Reflect` scaled with biography times subjects (P0/P1) — CLOSED
+
+`SelfModel::measure` replayed to find subjects, then replayed again per subject through
+`Predictor::calibration`. `allCalibrations` now accumulates every subject in one pass and selfd
+consumes that projection. `allCalibrations` had no test coverage at all, which is how it kept the
+defect. The multiplication is gone; the remaining single replay is not.
+
+### B7 — `Intentions::open()` replayed twice (P1) — CLOSED
+
+Justified by a claim that a single chronological pass would meet some Outcomes before their
+Intentions. Causation makes that impossible, and the sentence stating so sat directly beneath the
+justification it contradicts. Now one pass.
+
+### Still open
+
+- **Incremental projections.** `open()` reconstructs on every call and predictord recomputes per
+  query. Both want an organ to hold derived state updated on `Accepted` rather than rebuilding on
+  demand — one piece of work, not two.
+- **ADR-0027 lists `privacy` on `ObservationV1`**; the implementation carries it in the envelope.
+  The implementation is right — duplicating privacy invites the copies to disagree — so the ADR
+  should be amended.
+- **The scale fixture is all root Observations.** A realistic mix with causation and evidence links
+  will cost more, because evidence is fetched per contribution.
+- **Typed acquisition failure exists but its durability is undecided**: whether a failed read is
+  ephemeral health state or durable Event1 evidence. Deciding it before the adapter stops the
+  adapter deciding it by accident.
+
+## P7.1 — One typed local perception envelope
+
+**Status: ObservationV1 frozen; the adapter is next.**
+
+`ObservationV1` carries `sourceId`, `subject`, a typed `value`, `acquiredAt`, `freshnessUntil` and
+`provenance`, exactly as [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) requires. The
+schema landed before the adapter deliberately: an adapter written first would have defined the
+envelope by accident, in whatever shape its own source happened to need.
+
+Three properties are load-bearing and tested:
+
+- **Unknown schemas fail closed**, older and newer alike. There is one schema so far, so any other
+  number means the payload was written by something this build cannot interpret, and evidence read
+  under guessed rules is worse than no evidence.
+- **A valueless observation is invalid.** A failure to observe is not an observation of nothing, so
+  an adapter that cannot read its source must report a typed failure rather than contribute an empty
+  value. This is what makes the checkpoint's "source unavailability has a typed result" enforceable
+  rather than merely intended.
+- **Acquisition identity is deterministic** over source, subject and acquisition time, so
+  re-reporting one reading after a restart or retry resolves to the same contribution and Event1's
+  existing duplicate rejection makes it a durable no-op. The value is excluded on purpose: two
+  different values for one subject at one instant is a contradiction for the projection to surface,
+  not two contributions to record. Timezone does not affect identity, or every observation would
+  duplicate across a DST change.
+
+`freshnessUntil` is declared by the adapter, which knows how fast its source changes, rather than
+inferred by whoever reads the observation later. `acquiredAt` stays distinct from the envelope's
+acceptance time throughout.
+
+### Remaining for P7.1
+
+The adapter itself: read the NixOS current system generation, produce an `ObservationV1`, propose it
+through Event1. It needs its own reserved organ identity so Event1 can bind its provenance, and it
+must not become a Journal owner or mutate system configuration.
 
 ## Scheduling flake — diagnosed and fixed
 
@@ -852,84 +508,6 @@ condition and fail immediately on anything else.
 failed" with nothing to act on. All three now print the reason. That is most of why this took two
 sightings to diagnose.
 
-## P7.0-replay — Paged Event1 replay
-
-**Status: API implemented, one organ migrated.** `Event1.Replay(afterSequence, limit)` answers a
-page as `{ok, from, to, head, hasMore, envelopes}`, capped server-side at 1000 so it cannot become
-`Recent(0)` wearing a cursor. `EventStore` gained `after()` and a `replayAll()` helper; `Journal` and
-`EventClient` both implement it. `Recent` is unchanged and stays what it should be — genuinely recent
-activity for the UI, not a replay protocol.
-
-The page reports `ok` separately from being empty. Without that, a replay whose transport died
-halfway looks exactly like one that finished, and an organ rebuilds its state from a prefix while
-believing it has the whole history.
-
-**intentiond is migrated.** Two chronological passes, both paged, replacing one `recent(0)` that
-was walked three times. Two hazards had to be handled, and both are the reason the remaining organs
-are not done in the same change:
-
-- **Order is inverted.** `recent(0)` yields newest first; `replayAll` yields oldest first. The old
-  code ended with a `std::reverse` to correct for that, and keeping it would have inverted the order
-  Presence shows commitments in.
-- **Partial replay must fail closed.** If the first pass dies halfway, commitments whose closing
-  Outcome was not read look open. Returning a partial open set is worse than returning none.
-
-**Not yet migrated: predictord, selfd, workspaced.** Each has its own order dependence and must be
-read before it is changed:
-
-- `Predictor::samples` appends in newest-first order and downstream treats position as recency;
-  reversing it silently changes which samples a prediction is built from.
-- `Predictor::calibration` and `allCalibrations` sum and set-collect, so they are order-independent
-  and are the safe ones.
-- `SelfModel::subjects` already iterates `recent(0)` in reverse to get oldest-first, so it becomes
-  simpler, not harder.
-- `Workspace` uses `recent(m_capacity)` — bounded already, and not a replay at all. It may not need
-  migrating.
-
-**What this does not fix.** Paged replay is not faster: 728 ms against 762 ms at 100k. It bounds
-memory and removes the single enormous D-Bus reply, both real failure modes, but the
-cold-reconstruction budget is unmoved. See [Scale Budgets](mind/SCALE_BUDGETS.md).
-
-## P7.0-scale — Journal fixtures and budgets
-
-**Status: implemented for the Journal paths.** `journal-scale` builds a deterministic fixture and
-measures append, full replay, `Verify`, backlog counting, indexed lookup and size. It defaults to
-10k so it runs in the ordinary checks; 100k and 1m are the same code with
-`CYBOU_SCALE_CONTRIBUTIONS` set. Results and the budgets derived from them are in
-[Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md).
-
-Every growth-sensitive path is linear across two orders of magnitude and indexed lookup is flat, so
-there is no hidden quadratic. The two thresholds that matter both land near half a million
-contributions: `Verify` consumes the entire 5 s Presence command budget at ~460k, which makes
-`Reflect` impossible, and organ cold reconstruction costs ~9 s per organ at 1m with three organs
-each replaying the whole history. Those are the numbers the paged-replay and incremental-verification
-packages exist to move.
-
-Not yet measured, and the honest gaps: per-organ cold reconstruction end to end rather than just the
-Journal read under it, RSS, Presence and consolidation behaviour under a large journal, concurrent
-read/write pressure, and the growth rate of a real biography — without which the thresholds cannot be
-turned into a date.
-
-**A4 remainder — scalable biography replay and verification.** Every organ rebuild pulls the full
-biography across D-Bus and every self-assessment rechains it. Closing this needs a replay API that
-carries a cursor and an incremental `Verify` against a persisted checkpoint, so a partial result is
-reported as partial. Both are wire-contract changes and belong with the M7 scale fixtures that give
-them a budget to be measured against.
-
-**A7 — fault-tier CI coverage.** None of the four KVM gates runs on a push. This is a maintainer
-policy decision — KVM-capable runner, scheduled run, or a documented pre-tag manual gate with a named
-owner — and not a code change.
-
-### Exit gate
-
-The fast Nix check set and both package builds pass from a clean tree, the Mind CTest suites pass
-including new coverage for the bounded read paths and the derived presenced health answer, and the
-four KVM gates pass on a KVM-capable host with no change to their continuity and recovery assertions.
-
-Next, begin the first M7 vertical slice: one provenance-bearing local system perception adapter,
-typed freshness/retention policy, an accepted Event1 observation, and a read-only Presence
-projection. Keep contradiction handling explicit and do not add autonomous action authority.
-
 ## Deferred behind gates
 
 ### M7
@@ -947,23 +525,6 @@ freshness, privacy, and deficits. Model absence/replacement must be an acceptanc
 
 No privileged executor work begins until proposal, criticism, value constraints, authorization,
 typed capability, observation, outcome, and rollback boundaries are independently represented.
-
-## Historical P6 PR decomposition
-
-| PR | Scope |
-|---|---|
-| 1 | P6 capability/health protocol, codec, transition tests, and accepted ownership ADR |
-| 2 | explicit dependency graph and aggregate-health policy |
-| 3 | `cybou-healthd`, `Health1`, systemd activation, and persistence/migration tests |
-| 4 | Presence1 capability projection without UI policy ownership |
-| 5 | bounded async RPC, idempotency metadata, backoff, and circuit breaker |
-| 6 | typed homeostatic measurements and freshness semantics |
-| 7 | capability-aware scheduling and degraded-mode UI |
-| 8 | process fault-injection matrix and focused M6 KVM gate |
-| 9 | synchronized docs and M6 evaluation evidence |
-
-Keep protocol/schema work separate from UI polish. Do not combine raw measurement collection with
-automatic scheduling policy, and do not begin M7 retention or epistemic ownership inside M6.
 
 ## Definition of done for every package
 

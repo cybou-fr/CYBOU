@@ -19,6 +19,7 @@ with [Current State](CURRENT_STATE.md).
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
+- [Historical Execution — P0 through P6.7](history/M5-M6.md) — the completed packages, kept out of the plan
 - [M5 Evaluation Evidence](M5_EVALUATION.md) — completed evaluation boundary, artifacts, and limitations
 - [Installation](INSTALLATION.md) — development artifacts and safety constraints
 

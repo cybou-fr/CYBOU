@@ -7,7 +7,10 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
+
+Enforced by identityd and proven by the headless reboot gate: the persisted identity and logical
+session semantics survive a real system transition.
 
 ## Context
 

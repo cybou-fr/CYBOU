@@ -7,7 +7,10 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
+
+Enforced by the Journal, which carries a unique index admitting one terminal Outcome per cause,
+and by lifecycled, which refuses to complete a run without one.
 
 ## Context
 

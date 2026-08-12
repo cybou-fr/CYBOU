@@ -7,7 +7,10 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
+
+Enforced by StatePaths and the per-owner state roots, including the legacy migration that moves
+state to the canonical location rather than leaving two.
 
 ## Context
 

@@ -101,6 +101,7 @@ def main(argv: list[str]) -> int:
         "security_index": repo / "docs/security/README.md",
         "threat_model": repo / "docs/security/THREAT_MODEL.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
+        "history": repo / "docs/history/M5-M6.md",
     }
 
     for path in paths.values():
@@ -406,6 +407,8 @@ def main(argv: list[str]) -> int:
     ):
         require(paths["epistemic"], label, needle)
 
+    # The completed packages now live in the history document; Next Steps holds only executable
+    # work. Checking them there keeps the record from being quietly dropped in the move.
     for label in (
         "## P0 — Restore a trustworthy green baseline",
         "## P1 — Freeze the M5 lifecycle contract",
@@ -416,7 +419,13 @@ def main(argv: list[str]) -> int:
         "## P6.1 — Freeze the capability and health contract",
         "## Historical P6 PR decomposition",
     ):
-        require(paths["next_steps"], label, label)
+        require(paths["history"], label, label)
+
+    require(
+        paths["next_steps"],
+        "link to the moved history",
+        "[Historical Execution](history/M5-M6.md)",
+    )
 
     require(
         paths["glossary"],
