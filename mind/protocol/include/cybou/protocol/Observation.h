@@ -14,6 +14,21 @@ namespace cybou {
 
 inline constexpr quint16 kCurrentObservationSchemaVersion = 1;
 
+/// Payload discriminator written into every ObservationV1 and required when reading one.
+///
+/// `ContributionKind::Observation` already carries unrelated payload shapes - predictord writes
+/// `{subject, actual}`, presenced writes `{event, ...}` - so kind alone cannot tell an epistemic
+/// observation from the rest of the biography. Without a discriminator, an epistemic projection
+/// scanning Observations would have to guess from the shape of each payload, and would eventually
+/// guess wrong about history that can no longer be changed.
+///
+/// The tag lives in the payload rather than in CognitiveEnvelope deliberately. An envelope field
+/// would be the more general answer for future payload families, but it changes the canonical hash
+/// and needs a schema migration; this closes the ambiguity now, before any adapter writes, without
+/// touching contributions that already exist. Existing Observation payloads simply lack the tag and
+/// are therefore correctly not ObservationV1.
+inline constexpr char kObservationPayloadType[] = "cybou.observation.v1";
+
 /// One typed observation of something outside Mind.
 ///
 /// This is the payload of an Observation contribution, not the contribution itself. The envelope

@@ -71,6 +71,42 @@ private Q_SLOTS:
         QVERIFY(!decodeObservation(QByteArray()).has_value());
     }
 
+    // ContributionKind::Observation already carries unrelated payload shapes, so kind alone cannot
+    // identify an epistemic observation. Without the discriminator, a projection scanning
+    // Observations would guess from each payload's shape - and would eventually guess wrong about
+    // history that can no longer be changed.
+    //
+    // The payloads below are the ones predictord and presenced actually write today.
+    void otherObservationPayloadsAreNotObservations()
+    {
+        QCborMap predictorOutcome;
+        predictorOutcome.insert(QStringLiteral("subject"), QStringLiteral("mood"));
+        predictorOutcome.insert(QStringLiteral("actual"), 0.5);
+
+        QString error;
+        QVERIFY(!decodeObservation(predictorOutcome.toCborValue().toCbor(), &error).has_value());
+        QVERIFY2(
+            error.contains(QStringLiteral("not an ObservationV1")),
+            qPrintable(QStringLiteral("wrong reason: %1").arg(error)));
+
+        QCborMap presenceUserObservation;
+        presenceUserObservation.insert(
+            QStringLiteral("event"), QStringLiteral("user-requested-intention"));
+        presenceUserObservation.insert(QStringLiteral("description"), QStringLiteral("call back"));
+        QVERIFY(!decodeObservation(presenceUserObservation.toCborValue().toCbor()).has_value());
+
+        // A payload that happens to carry every ObservationV1 field but does not claim the type is
+        // still not one. Claiming the type is what makes it readable as evidence, not resembling it.
+        QCborMap lookalike =
+            QCborValue::fromCbor(encodeObservation(systemGeneration())).toMap();
+        lookalike.remove(QStringLiteral("@type"));
+        QVERIFY(!decodeObservation(lookalike.toCborValue().toCbor()).has_value());
+
+        QCborMap wrongType = QCborValue::fromCbor(encodeObservation(systemGeneration())).toMap();
+        wrongType.insert(QStringLiteral("@type"), QStringLiteral("cybou.observation.v2"));
+        QVERIFY(!decodeObservation(wrongType.toCborValue().toCbor()).has_value());
+    }
+
     void structurallyIncompleteObservationsAreRejected()
     {
         const ObservationV1 valid = systemGeneration();

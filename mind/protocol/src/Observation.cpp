@@ -58,6 +58,8 @@ bool ObservationV1::isFreshAt(const QDateTime &at) const
 QByteArray encodeObservation(const ObservationV1 &observation)
 {
     QCborMap map;
+    map.insert(
+        QStringLiteral("@type"), QString::fromLatin1(kObservationPayloadType));
     map.insert(QStringLiteral("schemaVersion"), observation.schemaVersion);
     map.insert(QStringLiteral("sourceId"), observation.sourceId);
     map.insert(QStringLiteral("subject"), observation.subject);
@@ -82,6 +84,15 @@ std::optional<ObservationV1> decodeObservation(const QByteArray &encoded, QStrin
         return std::nullopt;
     }
     const QCborMap map = root.toMap();
+
+    // Checked before anything else. A payload without this tag is not a malformed observation, it
+    // is some other kind of Observation payload entirely, and reading further would be an attempt
+    // to interpret it as something it never claimed to be.
+    if (map.value(QStringLiteral("@type")).toString()
+        != QString::fromLatin1(kObservationPayloadType)) {
+        setError(error, QStringLiteral("payload is not an ObservationV1"));
+        return std::nullopt;
+    }
 
     const QCborValue version = map.value(QStringLiteral("schemaVersion"));
     if (!version.isInteger()) {
