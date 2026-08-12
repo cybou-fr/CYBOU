@@ -119,63 +119,95 @@ private Q_SLOTS:
         QVERIFY(!observation.isFreshAt(observation.freshnessUntil));
         QVERIFY(!observation.isFreshAt(observation.freshnessUntil.addSecs(1)));
         QVERIFY(!observation.isFreshAt(QDateTime()));
+
+        // Bounded below as well. An observation says nothing about a time before it was acquired,
+        // and an earlier version checked only the upper bound - so a reading taken at 09:00
+        // reported as fresh at 04:00 the same day.
+        QVERIFY(!observation.isFreshAt(observation.acquiredAt.addSecs(-1)));
+        QVERIFY(!observation.isFreshAt(observation.acquiredAt.addSecs(-18000)));
     }
 
     // Re-reporting one reading - after an adapter restart, a retry, or a replayed queue - must
     // resolve to the same contribution, so Event1's duplicate rejection makes it a durable no-op.
-    // Without this, "observed twice" and "observed once, reported twice" are indistinguishable.
     void repeatedAcquisitionHasOneIdentity()
     {
-        const ObservationV1 observation = systemGeneration();
-        const QUuid id = observationMessageId(
-            observation.sourceId, observation.subject, observation.acquiredAt);
+        const ObservationV1 o = systemGeneration();
+        const QUuid id = observationMessageId(o.sourceId, o.subject, o.acquiredAt, o.value);
 
         QVERIFY(!id.isNull());
+        QCOMPARE(observationMessageId(o.sourceId, o.subject, o.acquiredAt, o.value), id);
+
+        // Every component participates.
+        QVERIFY(
+            observationMessageId(
+                QStringLiteral("other.source"), o.subject, o.acquiredAt, o.value) != id);
+        QVERIFY(
+            observationMessageId(
+                o.sourceId, QStringLiteral("other-subject"), o.acquiredAt, o.value) != id);
+        QVERIFY(
+            observationMessageId(o.sourceId, o.subject, o.acquiredAt.addSecs(1), o.value) != id);
+
+        // One instant expressed in two zones is one acquisition. Otherwise every observation would
+        // duplicate across a DST change.
         QCOMPARE(
             observationMessageId(
-                observation.sourceId, observation.subject, observation.acquiredAt),
+                o.sourceId, o.subject, o.acquiredAt.toOffsetFromUtc(3600), o.value),
             id);
-
-        // The value is excluded on purpose: two different values for one subject at one instant is
-        // a contradiction for the projection to surface, not two contributions to record.
-        ObservationV1 disagreeing = observation;
-        disagreeing.value = QCborValue(999);
-        QCOMPARE(
-            observationMessageId(
-                disagreeing.sourceId, disagreeing.subject, disagreeing.acquiredAt),
-            id);
-
-        // Each of the three components genuinely participates.
-        QVERIFY(
-            observationMessageId(
-                QStringLiteral("other.source"), observation.subject, observation.acquiredAt)
-            != id);
-        QVERIFY(
-            observationMessageId(
-                observation.sourceId, QStringLiteral("other-subject"), observation.acquiredAt)
-            != id);
-        QVERIFY(
-            observationMessageId(
-                observation.sourceId, observation.subject, observation.acquiredAt.addSecs(1))
-            != id);
-
-        // Timezone must not change identity: the same instant expressed differently is one
-        // acquisition, and treating it as two would duplicate every observation across a DST change.
-        ObservationV1 shifted = observation;
-        shifted.acquiredAt = observation.acquiredAt.toOffsetFromUtc(3600);
-        QCOMPARE(
-            observationMessageId(shifted.sourceId, shifted.subject, shifted.acquiredAt), id);
     }
 
-    // A source that splits its subject on the separator must not be able to collide with another.
-    void identityComponentsCannotBeConfused()
+    // The value must participate, or a contradiction can never be recorded.
+    //
+    // An earlier version excluded it, reasoning that two different values for one subject at one
+    // instant should become a contradiction for the projection to reconcile. They could not: both
+    // mapped to one messageId, Event1 rejects a duplicate, and the second piece of evidence never
+    // reached the Journal for anything to reconcile.
+    void disagreeingValuesAreTwoContributions()
     {
+        const ObservationV1 o = systemGeneration();
+
+        ObservationV1 disagreeing = o;
+        disagreeing.value = QCborValue(QStringLiteral("a completely different system"));
+
+        QVERIFY(
+            observationMessageId(o.sourceId, o.subject, o.acquiredAt, o.value)
+            != observationMessageId(
+                disagreeing.sourceId,
+                disagreeing.subject,
+                disagreeing.acquiredAt,
+                disagreeing.value));
+
+        // Types must not collapse either: the string "142" is not the integer 142.
         QVERIFY(
             observationMessageId(
-                QStringLiteral("a"), QStringLiteral("b"), systemGeneration().acquiredAt)
+                o.sourceId, o.subject, o.acquiredAt, QCborValue(142))
             != observationMessageId(
-                QStringLiteral("a\x1f" "b"), QString(), systemGeneration().acquiredAt));
+                o.sourceId, o.subject, o.acquiredAt, QCborValue(QStringLiteral("142"))));
     }
+
+    // Field boundaries must come from the encoding, not from a byte the fields are trusted not to
+    // contain. The previous test here checked a pair that never collided, so it passed while the
+    // genuinely ambiguous pair below went uncovered.
+    void fieldBoundariesCannotBeForged()
+    {
+        const QDateTime at = systemGeneration().acquiredAt;
+        const QCborValue value(1);
+        const QChar unitSeparator(0x1f);
+
+        QVERIFY(
+            observationMessageId(QStringLiteral("a"), QStringLiteral("b") + unitSeparator + QStringLiteral("c"), at, value)
+            != observationMessageId(QStringLiteral("a") + unitSeparator + QStringLiteral("b"), QStringLiteral("c"), at, value));
+
+        // The same holds for any other byte someone might reach for.
+        QVERIFY(
+            observationMessageId(QStringLiteral("a"), QStringLiteral("b:c"), at, value)
+            != observationMessageId(QStringLiteral("a:b"), QStringLiteral("c"), at, value));
+
+        // And for the empty-field case, where a naive join loses the boundary entirely.
+        QVERIFY(
+            observationMessageId(QStringLiteral("ab"), QString(), at, value)
+            != observationMessageId(QStringLiteral("a"), QStringLiteral("b"), at, value));
+    }
+
 };
 
 QTEST_MAIN(TestObservation)

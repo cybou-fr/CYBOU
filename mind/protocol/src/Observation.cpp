@@ -3,6 +3,7 @@
 
 #include "cybou/protocol/Observation.h"
 
+#include <QCborArray>
 #include <QCborMap>
 
 namespace cybou {
@@ -48,7 +49,10 @@ bool ObservationV1::isValid() const
 
 bool ObservationV1::isFreshAt(const QDateTime &at) const
 {
-    return at.isValid() && freshnessUntil.isValid() && at < freshnessUntil;
+    if (!at.isValid() || !acquiredAt.isValid() || !freshnessUntil.isValid()) {
+        return false;
+    }
+    return acquiredAt <= at && at < freshnessUntil;
 }
 
 QByteArray encodeObservation(const ObservationV1 &observation)
@@ -117,13 +121,22 @@ std::optional<ObservationV1> decodeObservation(const QByteArray &encoded, QStrin
 QUuid observationMessageId(
     const QString &sourceId,
     const QString &subject,
-    const QDateTime &acquiredAt)
+    const QDateTime &acquiredAt,
+    const QCborValue &value)
 {
-    // Field separator is a character none of the inputs may contain, so two different triples
-    // cannot serialise to one string and collapse into the same identity.
-    const QString key = QStringLiteral("%1\x1f%2\x1f%3")
-                            .arg(sourceId, subject, acquiredAt.toUTC().toString(Qt::ISODateWithMs));
-    return QUuid::createUuidV5(kObservationNamespace, key.toUtf8());
+    // A CBOR array, not a delimited string. Each element carries its own length, so no content
+    // inside a field can be mistaken for the boundary between two fields. The separator this
+    // replaces was only sound if it could not occur inside sourceId or subject, and nothing forbade
+    // that: ("a", "b<sep>c") and ("a<sep>b", "c") serialised identically.
+    //
+    // Acquisition time is reduced to UTC milliseconds so one instant expressed in two zones is one
+    // acquisition; otherwise every observation would duplicate across a DST change.
+    QCborArray key;
+    key.append(sourceId);
+    key.append(subject);
+    key.append(acquiredAt.toUTC().toMSecsSinceEpoch());
+    key.append(value);
+    return QUuid::createUuidV5(kObservationNamespace, key.toCborValue().toCbor());
 }
 
 } // namespace cybou

@@ -85,11 +85,13 @@ private Q_SLOTS:
             observationMessageId(
                 before.observation.sourceId,
                 before.observation.subject,
-                before.observation.acquiredAt)
+                before.observation.acquiredAt,
+                before.observation.value)
             != observationMessageId(
                 after.observation.sourceId,
                 after.observation.subject,
-                after.observation.acquiredAt));
+                after.observation.acquiredAt,
+                after.observation.value));
     }
 
     // Reading the same unchanged system twice at one instant is one acquisition. This is what makes
@@ -113,11 +115,13 @@ private Q_SLOTS:
             observationMessageId(
                 first.observation.sourceId,
                 first.observation.subject,
-                first.observation.acquiredAt),
+                first.observation.acquiredAt,
+                first.observation.value),
             observationMessageId(
                 second.observation.sourceId,
                 second.observation.subject,
-                second.observation.acquiredAt));
+                second.observation.acquiredAt,
+                second.observation.value));
     }
 
     // An absent source is an ordinary answer, not an error, and never an observation.

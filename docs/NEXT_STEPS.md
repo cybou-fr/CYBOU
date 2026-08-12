@@ -810,6 +810,14 @@ its job. An ordinary race was indistinguishable from a defect.
 Isolated repeat runs never reproduced it; both real failures happened during full builds. The window
 between the two evaluations widens under load, which is why it only appeared there.
 
+**More of the same class remains.** After that fix a run still failed at two other places where
+`health.callBool("Refresh")` is asserted as a hard precondition. `Refresh` legitimately answers
+`false` while one is already in progress - it is a re-entrancy guard, not an error - so every such
+assertion is a race waiting to fire. Confirmed the same way: one red run and one green run of the
+same derivation. At least `tst_m4_process_integration.cpp:860` and `:1038` need the same treatment
+as the scheduling assertions, and a third failure at `:808` is a `QCOMPARE` that has not been
+diagnosed at all.
+
 **Fix.** A lost evidence race now answers `deferred` — which already means the run did not start and
 a later attempt may succeed — with a reason naming the supersession. The tests retry on exactly that
 condition and fail immediately on anything else.

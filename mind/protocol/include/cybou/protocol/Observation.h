@@ -51,11 +51,12 @@ struct ObservationV1 {
     /// believing - only that it is well formed enough to reason about.
     bool isValid() const;
 
-    /// Whether the declared freshness horizon still covers `at`.
+    /// Whether this observation speaks for the instant `at`.
     ///
-    /// Freshness is a property of the observation, not of the projection reading it. A projection
-    /// may still choose to present a fresh observation as disputed; it may not present a stale one
-    /// as current.
+    /// Bounded at both ends. An observation says nothing about a time before it was acquired, and
+    /// checking only the upper bound made a reading taken at 15:00 report as fresh at 10:00 the
+    /// same day. Distributed nodes will need an explicit clock-skew tolerance; that is a separate
+    /// decision and must not arrive by way of a missing check.
     bool isFreshAt(const QDateTime &at) const;
 };
 
@@ -69,18 +70,25 @@ std::optional<ObservationV1> decodeObservation(
     const QByteArray &encoded,
     QString *error = nullptr);
 
-/// Deterministic identity for one acquisition.
+/// Deterministic identity for one acquisition of one value.
 ///
-/// Derived from source, subject and acquisition time, so re-reporting the same reading - after an
-/// adapter restart, a retry, or a replayed queue - resolves to the same contribution and Event1's
-/// existing duplicate rejection makes it a durable no-op. Without this, "observed twice" and
-/// "observed once, reported twice" would be indistinguishable in the biography.
+/// Re-reporting the same reading - after an adapter restart, a retry, or a replayed queue - resolves
+/// to the same contribution, so Event1's existing duplicate rejection makes it a durable no-op.
+/// Without this, "observed twice" and "observed once, reported twice" would be indistinguishable.
 ///
-/// The value is deliberately excluded. Two different values acquired at the same instant from the
-/// same subject is a contradiction to be surfaced, not two contributions to be recorded separately.
+/// The value participates, and must. An earlier version excluded it on the reasoning that two
+/// different values for one subject at one instant should become a contradiction for the projection
+/// to reconcile. They could not: both mapped to one messageId, Event1 rejected the second as a
+/// duplicate, and the contradicting evidence never reached the Journal at all. Including the value
+/// keeps a repeat idempotent while letting a disagreement arrive as the second contribution it is.
+///
+/// The fields are hashed as a canonical CBOR array rather than joined with a separator. A separator
+/// only works if it cannot occur inside the fields, nothing here forbids that, and
+/// ("a", "b<sep>c") against ("a<sep>b", "c") would otherwise be one identity.
 QUuid observationMessageId(
     const QString &sourceId,
     const QString &subject,
-    const QDateTime &acquiredAt);
+    const QDateTime &acquiredAt,
+    const QCborValue &value);
 
 } // namespace cybou
