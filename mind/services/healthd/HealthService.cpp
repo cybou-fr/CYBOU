@@ -57,6 +57,7 @@ QList<QPair<QString, BusEndpoint>> endpoints()
         {QStringLiteral("selfd"), kSelfEndpoint},
         {QStringLiteral("workspaced"), kWorkspaceEndpoint},
         {QStringLiteral("presenced"), kPresenceEndpoint},
+        {QStringLiteral("perceptiond"), kPerceptionEndpoint},
     };
 }
 

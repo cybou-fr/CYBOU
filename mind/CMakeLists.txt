@@ -29,6 +29,7 @@ add_subdirectory(organs/intentiond)
 add_subdirectory(organs/predictord)
 add_subdirectory(organs/selfd)
 add_subdirectory(organs/workspaced)
+add_subdirectory(organs/perceptiond)
 add_subdirectory(organs/presenced)
 add_subdirectory(shell/qmlplugin)
 

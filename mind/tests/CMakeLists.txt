@@ -138,6 +138,15 @@ set_tests_properties(
     system-generation-source PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-perception-service tst_perception_service.cpp)
+target_link_libraries(
+    test-perception-service PRIVATE cybou-perception-service cybou-storage Qt6::Test
+)
+add_test(NAME perception-service COMMAND test-perception-service)
+set_tests_properties(
+    perception-service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-identity tst_identity.cpp)
 target_link_libraries(test-identity PRIVATE cybou-identity cybou-storage Qt6::Test)
 add_test(NAME identity COMMAND test-identity)

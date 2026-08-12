@@ -21,6 +21,13 @@ inline constexpr BusEndpoint kEventEndpoint{
     "cybou-eventd.service",
 };
 
+inline constexpr BusEndpoint kPerceptionEndpoint{
+    "org.cybou.Mind.Perception1",
+    "/org/cybou/Mind/Perception1",
+    "org.cybou.Mind.Perception1",
+    "cybou-perceptiond.service",
+};
+
 inline constexpr BusEndpoint kHealthEndpoint{
     "org.cybou.Mind.Health1",
     "/org/cybou/Mind/Health1",

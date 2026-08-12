@@ -100,6 +100,7 @@ in
         "cybou-selfd.service"
         "cybou-workspaced.service"
         "cybou-presenced.service"
+        "cybou-perceptiond.service"
       ];
       wants = [
         "cybou-eventd.service"
@@ -110,6 +111,7 @@ in
         "cybou-selfd.service"
         "cybou-workspaced.service"
         "cybou-presenced.service"
+        "cybou-perceptiond.service"
       ];
     };
 
@@ -161,6 +163,17 @@ in
         "cybou-intentiond.service"
         "cybou-predictord.service"
       ];
+    };
+
+    # Reads the identity of the running system and proposes it as an Observation. It contributes
+    # to biography and nothing else: it owns no state, mutates no configuration, and does not decide
+    # whether what it reported is still true.
+    cybou-perceptiond = mkService {
+      description = "Cybou local perception adapter";
+      binary = "cybou-perceptiond";
+      busName = "org.cybou.Mind.Perception1";
+      after = [ "cybou-eventd.service" ];
+      wants = [ "cybou-eventd.service" ];
     };
 
     cybou-presenced = mkService {

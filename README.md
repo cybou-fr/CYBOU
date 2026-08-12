@@ -31,12 +31,13 @@ typed homeostasis, automatic evidence-bound lifecycle scheduling, partial-availa
 a non-blocking Presence surface, durability enforced at commit, and continuity/fault gates across
 real processes and Plasma.
 
-M7 preparation is partly landed and partly not. Contribution origin is bound to the calling
+M7 has begun. Contribution origin is bound to the calling
 executable, Journal growth costs are measured against budgets, Event1 has paged replay and
 incremental verification, capability and command policy has one declaration, and `ObservationV1` is
-frozen with a first perception source available as a library. **No perception adapter runs**, so
-nothing produces observations in a running system, and there is no epistemic projection, language
-model, distributed Mind, or authorized external agency. See
+frozen, and `cybou-perceptiond` reads the identity of the running system and proposes it as a
+provenance-bearing observation. **Nothing consumes those observations yet**: there is no epistemic
+projection, so freshness, contradiction and supersession are recorded and unread, and there is no
+language model, distributed Mind, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -102,7 +103,7 @@ become a second cognitive owner.
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
 | One capability and command declaration | Implemented — P7.0 |
-| `ObservationV1` and the first perception source as a library | Implemented — P7.1 partial; no adapter runs |
+| Grounded local perception: `ObservationV1` and `cybou-perceptiond` | Implemented — P7.1; observations are produced, nothing consumes them yet |
 | Epistemic projection, contradiction, retention, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |

@@ -112,6 +112,10 @@ QStringList reservedOrganIdentities()
         QStringLiteral("selfd"),
         QStringLiteral("workspaced"),
         QStringLiteral("presenced"),
+        // The perception adapter. Reserved from the start: an identity that only becomes protected
+        // once something claims it leaves a window in which anything may claim it first, and
+        // provenance is the whole point of this organ.
+        QStringLiteral("perceptiond"),
     };
     return identities;
 }

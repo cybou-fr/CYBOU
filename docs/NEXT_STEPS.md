@@ -40,10 +40,8 @@ untyped RPC outcomes, unbounded compound reads — and all of it has since been 
 lists solved problems is worse than none: it makes the document unreadable as a statement of where
 the work actually is. What follows is the current set.
 
-- no perception adapter runs, so `ObservationV1` and the first source exist but nothing produces
-  observations in a running system;
-- no epistemic projection owner exists, so there is no freshness, contradiction or supersession
-  state for anything to consult;
+- observations are produced but nothing consumes them: no epistemic projection owner exists, so
+  freshness, contradiction and supersession are recorded and unread;
 - retention and erasure remain undecided, and [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md)
   forbids ingesting any sensitive observation until a storage ADR covers expiry, tombstones,
   derived-data propagation and backups;
@@ -440,11 +438,35 @@ Three properties are load-bearing and tested:
 inferred by whoever reads the observation later. `acquiredAt` stays distinct from the envelope's
 acceptance time throughout.
 
+### The adapter — implemented
+
+`cybou-perceptiond` is the tenth process. It reads the identity of the running system, proposes it
+as an `ObservationV1` through Event1 under its own reserved identity, and does nothing else: it owns
+no state, mutates no configuration, and does not decide whether what it reported is still true.
+
+`perceptiond` was added to the reserved identities *before* it existed. An identity that only becomes
+protected once something claims it leaves a window in which anything may claim it first, and
+provenance is the whole point of this organ.
+
+**Reading often and contributing every time are different things**, and the first version conflated
+them. Acquisition identity includes the instant, so an unchanged system polled every ten seconds
+produced one contribution per poll — over eight thousand restatements of one fact a day, exactly the
+noise the transition rule forbids for failures. The test written alongside caught it.
+
+Contributing only on change is the opposite error: within its declared horizon the previous
+observation speaks for the present, but once that lapses nothing does, and a projection would have to
+call the fact stale forever while the adapter sat watching it be true. So an unchanged value is
+re-affirmed at most once per freshness horizon — thirty times fewer contributions than per-poll, and
+a fact that stays true keeps saying so.
+
+`local-perception` is declared in the capability registry, so healthd graphs it and the generated
+fault matrix covers the new owner without a new test.
+
 ### Remaining for P7.1
 
-The adapter itself: read the NixOS current system generation, produce an `ObservationV1`, propose it
-through Event1. It needs its own reserved organ identity so Event1 can bind its provenance, and it
-must not become a Journal owner or mutate system configuration.
+A process-level test that the adapter's contribution survives the real D-Bus path with its
+provenance intact. The behaviour is proven against a real Journal in-process, and the origin binding
+is proven separately by the impostor test, but the two have not been proven together.
 
 ## Scheduling and refresh flakiness — fixed
 

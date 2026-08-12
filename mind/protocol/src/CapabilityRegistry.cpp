@@ -43,6 +43,10 @@ QList<CapabilityDeclaration> capabilities()
          {QStringLiteral("presenced")},
          false,
          QStringLiteral("Mind presentation is unavailable")},
+        {QStringLiteral("local-perception"),
+         {QStringLiteral("eventd"), QStringLiteral("perceptiond")},
+         false,
+         QStringLiteral("grounded observation of the local system is unavailable")},
     };
     return declarations;
 }
@@ -58,6 +62,7 @@ QStringList componentIds()
         QStringLiteral("selfd"),
         QStringLiteral("workspaced"),
         QStringLiteral("presenced"),
+        QStringLiteral("perceptiond"),
     };
     return components;
 }

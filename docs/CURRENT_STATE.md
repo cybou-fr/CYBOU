@@ -13,8 +13,8 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs twenty-three CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and nine-process integration. The process suite also proves a
+The Mind package runs twenty-four CTest suites, including Event1, lifecycle persistence/recovery,
+Lifecycle1 process restart, and multi-process integration across the ten Mind owners. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count, and that compound Presence reads and mutations obey one bounded deadline.
 
@@ -333,6 +333,15 @@ every waiter is answered from it, so one extra collection serves any number of w
 an answer derived from a run that began after it asked. The overlapping-collection guard is
 unchanged — two probes of one owner at once remains forbidden — but a busy owner no longer returns a
 bare false that a caller cannot distinguish from failure.
+
+`cybou-perceptiond` is the tenth process and the first grounded perception adapter. It reads the
+identity of the running NixOS system and proposes it as an `ObservationV1` under its own reserved
+origin, which Event1 binds to its executable. It owns no state, mutates no configuration, and makes
+no judgement about whether what it reported remains true. An unreadable source yields a typed
+failure and no observation; only a change between readable and unreadable is durable. An unchanged
+reading is re-affirmed at most once per declared freshness horizon rather than once per poll.
+`local-perception` is declared in the capability registry, so healthd graphs it like any other owner.
+No epistemic projection consumes these observations yet.
 
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls
