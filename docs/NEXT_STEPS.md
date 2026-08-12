@@ -339,6 +339,46 @@ may be ingested. The first source — NixOS system generation and build identity
 constraint costs nothing: local, non-sensitive, and naturally contradictory, since the generation
 changes while an earlier observation still claims to be current.
 
+## P7.2 — Reconstructible epistemic projection
+
+**Status: the projection is implemented as a library; the owning process is not.** The reasoning is
+separable from the plumbing that will carry it, and landing it first means the distinctions can be
+argued about on their own.
+
+`EpistemicProjection` derives, and decides nothing else. It holds no Journal, no transport and no
+clock: status is evaluated against an instant the caller supplies, so the same admitted history
+always yields the same answer for the same moment. A projection whose output depended on when it was
+asked could not be tested, and could not be compared against itself after a rebuild.
+
+The vocabulary is carried honestly rather than collapsed:
+
+- **`unknown`** — never observed. Answered for any subject rather than failing for an unfamiliar
+  one, because not knowing is a normal state of a mind, not an error.
+- **`stale`** — observed, horizon lapsed, *value kept*. Discarding it would lose evidence that was
+  actually gathered, and "was this, last checked then" is a more useful answer than silence.
+- **`superseded`** — attached to history, never to what is currently claimed. A source restating an
+  unchanged value is re-affirmation, not replacement; filing each restatement as a supersession
+  would make a still world look busy.
+- **`disputed`** — two sources currently claiming different things, left unresolved. Picking a
+  winner by recency or by source would be inventing knowledge the projection does not have. A lapsed
+  claim differing from a fresh one is not a dispute; it is the past, and the past does not argue
+  with the present.
+
+Ordering is by acquisition, not arrival: replay and restart deliver contributions in Journal order,
+and an older reading arriving late must not unseat a newer one.
+
+Anything that is not an `ObservationV1` passes through untouched — including the acquisition-state
+records the adapter itself writes. A source that went unreadable leaves what it last said unchanged,
+because no new evidence is not counter-evidence.
+
+### Remaining for P7.2
+
+`cybou-epistemicd` itself: consume Event1 through the paged `Replay` cursor with a persisted
+position, publish the projection over its own interface, and declare its capability. ADR-0027 has
+already settled that it must not replay from zero — at ~8.9 µs per contribution a full replay
+exhausts the Presence budget near 560k — so this is where a projection checkpoint will first be
+justified by measurement rather than anticipated.
+
 ## P7.1 blockers — contract defects found in review
 
 An external review found seven defects, five of them in work landed during this sequence. Each was

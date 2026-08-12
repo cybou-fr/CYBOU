@@ -13,7 +13,7 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs twenty-five CTest suites, including Event1, lifecycle persistence/recovery,
+The Mind package runs twenty-six CTest suites, including Event1, lifecycle persistence/recovery,
 Lifecycle1 process restart, and multi-process integration across the ten Mind owners. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count, and that compound Presence reads and mutations obey one bounded deadline.
@@ -343,8 +343,13 @@ reading is re-affirmed at most once per declared freshness horizon rather than o
 `local-perception` is declared in the capability registry, so healthd graphs it like any other owner.
 A process test runs the real
 adapter against real eventd over a real bus and confirms the contribution arrives with provenance
-eventd verified rather than accepted; a restart re-reads and records once, then falls silent. No
-epistemic projection consumes these observations yet.
+eventd verified rather than accepted; a restart re-reads and records once, then falls silent. The epistemic projection exists as a
+library: it derives `unknown`, `observed`, `stale`, `disputed` and `superseded` from accepted
+observations against a caller-supplied instant, keeps a stale value rather than discarding it,
+treats an unchanged restatement as re-affirmation rather than replacement, refuses to resolve a
+disagreement between sources, and orders by acquisition so a late-arriving older reading cannot
+unseat a newer one. No process owns it yet, so nothing consumes these observations in a running
+system.
 
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls

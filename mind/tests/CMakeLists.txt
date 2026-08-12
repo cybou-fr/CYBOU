@@ -165,6 +165,15 @@ set_tests_properties(
     perceptiond-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-epistemic-projection tst_epistemic_projection.cpp)
+target_link_libraries(
+    test-epistemic-projection PRIVATE cybou-epistemic cybou-protocol Qt6::Test
+)
+add_test(NAME epistemic-projection COMMAND test-epistemic-projection)
+set_tests_properties(
+    epistemic-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-identity tst_identity.cpp)
 target_link_libraries(test-identity PRIVATE cybou-identity cybou-storage Qt6::Test)
 add_test(NAME identity COMMAND test-identity)
