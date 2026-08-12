@@ -93,6 +93,39 @@ implementation was right and this document was wrong; the ADR is corrected rathe
 about Mind; acquisition time is a fact about the world, and a slow adapter must not be able to make
 a stale reading look recent.
 
+### A failed acquisition is ephemeral; only a change in it is durable
+
+An adapter that cannot read its source reports a typed failure rather than an observation — a
+valueless observation is structurally invalid precisely so that a failure cannot be smuggled in as a
+fact about the world. What remained undecided was whether that failure is ephemeral state or durable
+evidence, and an adapter written before the answer would have settled it by accident.
+
+**Decided: ephemeral, except at a transition.** The adapter's current ability to read its source is
+health state, observable through Health1 like any other component's. Only a *change* — readable to
+unreadable, or back — is written to Event1.
+
+Two reasons, and they point the same way:
+
+- **Volume.** At one acquisition per source per 10 s, a source unavailable for a day would write
+  more than eight thousand contributions recording that nothing happened, against a measured
+  ingestion ceiling near 800 per second shared by everything else. Repeating an unchanged failure is
+  not evidence; it is noise that makes the biography more expensive to replay for no gain.
+- **What is actually worth remembering.** "The source became unreadable at T" is a fact about the
+  world's availability. "It was still unreadable one poll later" is not a second fact. A projection
+  can derive "unreadable since T" from the transition, which is the same reasoning by which healthd
+  already records only significant transitions rather than every observation of unchanged health.
+
+**A transition record is not an `ObservationV1` and must not claim to be one.** It states something
+about the adapter's ability to observe, not about the subject it observes. It therefore carries its
+own payload type under the discriminator introduced with `ObservationV1`, and the epistemic
+projection reads it to distinguish `unknown` — never looked — from an observation that has aged out
+while the source was unreachable. Conflating the two would let a failure to look present itself as
+something looked at, which is the failure this ADR's separation of producer and source exists to
+prevent.
+
+The exact schema belongs to the adapter package. What is frozen here is that the failure is not an
+observation, that unchanged failure is not rewritten, and that the transition is.
+
 ### Epistemic status vocabulary
 
 `observed`, `stale`, `disputed`, `superseded`, `unknown`.

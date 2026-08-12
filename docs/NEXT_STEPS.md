@@ -52,7 +52,6 @@ the work actually is. What follows is the current set.
   biography;
 - cold reconstruction still costs a full replay per organ, which the measured budgets put at roughly
   nine seconds each at a million contributions;
-
 - the KVM gates run only locally, so the fault and recovery evidence — the substrate's most
   distinctive asset — is not exercised by any hosted check.
 
@@ -73,7 +72,7 @@ Presence remains read-only; lifecycle mode remains orthogonal to capability heal
 
 ## P6.8 — Close the substrate audit findings
 
-**Status: in progress.** The [Implementation Audit — 2026-08-10](CODE_AUDIT_2026-08-10.md) found
+**Status: complete.** The [Implementation Audit — 2026-08-10](CODE_AUDIT_2026-08-10.md) found
 four places where the shipped implementation does not support a stated invariant, plus two hygiene
 items. This package closes them before M7 raises event volume and adds a second projection, because
 each finding becomes more expensive to fix once a perception adapter depends on it.
@@ -406,9 +405,11 @@ justification it contradicts. Now one pass.
   where Event1 already enforces inheritance, and the ADR no longer lists it as a payload field.
 - **The scale fixture is all root Observations.** A realistic mix with causation and evidence links
   will cost more, because evidence is fetched per contribution.
-- **Typed acquisition failure exists but its durability is undecided**: whether a failed read is
-  ephemeral health state or durable Event1 evidence. Deciding it before the adapter stops the
-  adapter deciding it by accident.
+- ~~**Typed acquisition failure durability undecided.**~~ Decided in
+  [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md): ephemeral health state, except that
+  a change between readable and unreadable is durable. Repeating an unchanged failure would write
+  thousands of contributions recording that nothing happened; the transition is the fact. A
+  transition record carries its own payload type and is never an `ObservationV1`.
 
 ## P7.1 — One typed local perception envelope
 
