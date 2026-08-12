@@ -501,6 +501,23 @@ should mark the graph dirty and re-run once at the end, so a queue of owner chan
 explicit caller out for seconds. That is a change to healthd's core loop and should not be attempted
 against a suite too flaky to verify it — the fix and its evidence have to arrive together.
 
+A third attempt built the fix that analysis pointed to: a caller arriving mid-refresh gets a delayed
+reply, and one further collection after the running one answers every waiter. It was written
+test-first, and the test failed before the change as intended — but instrumentation showed the busy
+branch was never reached at all. The two concurrent calls did not overlap: with few organs running,
+a refresh finishes before the second request arrives, so the test failed for an unrelated reason and
+proved nothing. The fix may well be correct; there is no evidence that it is, and it touches
+healthd's core loop.
+
+Reverted. Three attempts, three wrong premises: that the assertions were the problem, that automatic
+refresh could be turned off, and that two concurrent D-Bus calls would overlap. Each was plausible
+and each was checked only after being built on.
+
+**What a fourth attempt needs before any code.** A way to make a refresh reliably slow — a probe
+delay knob, in the shape of the ones predictord and presenced already carry — so that overlap is
+constructed rather than hoped for. Without that the condition cannot be reproduced on demand, and a
+fix for it cannot be shown to work.
+
 Everything attempted was reverted. The suite is no better than before, and
 the diagnosis above is the whole of what this attempt produced.
 
