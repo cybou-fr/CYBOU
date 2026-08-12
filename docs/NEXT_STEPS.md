@@ -810,7 +810,32 @@ its job. An ordinary race was indistinguishable from a defect.
 Isolated repeat runs never reproduced it; both real failures happened during full builds. The window
 between the two evaluations widens under load, which is why it only appeared there.
 
-**More of the same class remains.** After that fix a run still failed at two other places where
+**Diagnosed further, not fixed. Attempted fixes were reverted.**
+
+Three things were established:
+
+- **The scheduling-outcome assertion appears six times, not three.** The earlier fix routed three of
+  them through the retrying helper and left `:483`, `:841`, `:901` and `:915` comparing the outcome
+  directly, so four sites kept the race the helper exists to absorb. Two of those then read `runId`
+  from the cycle, so the helper has to hand back the cycle that actually started, not merely verify
+  one did.
+- **`QTRY_VERIFY(Refresh)` is a barrier, not only an assertion.** It waits, and that wait is what
+  lets the system settle. Replacing those calls with unasserted ones — on the reasoning that a
+  refusal means a refresh is already running and the intent is met either way — removed the settling
+  and made the suite fail in *more* places. That reasoning is sound about the assertion and wrong
+  about the timing, which is why it must not be reapplied without replacing the wait.
+- **The real defect is in healthd, not the tests.** `Refresh` can refuse for more than five
+  continuous seconds under this suite's process churn: healthd refreshes on a 30 s timer and on
+  every bus owner-change (debounced 100 ms), each refresh runs to a 2 s deadline with 750 ms probes,
+  and a test that starts and stops nine processes keeps that queue saturated. No assertion-level
+  change can fix that; `Refresh` needs to either wait for the in-flight refresh and report its
+  result, or say plainly that one is already running so a caller can distinguish "refused" from
+  "failed".
+
+Everything attempted at the assertion level was reverted. The suite is no better than before, and
+the diagnosis above is the whole of what this attempt produced.
+
+**Remaining sites of the original class.** After that fix a run still failed at two other places where
 `health.callBool("Refresh")` is asserted as a hard precondition. `Refresh` legitimately answers
 `false` while one is already in progress - it is a re-entrancy guard, not an error - so every such
 assertion is a race waiting to fire. Confirmed the same way: one red run and one green run of the
