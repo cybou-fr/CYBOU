@@ -462,11 +462,24 @@ a fact that stays true keeps saying so.
 `local-perception` is declared in the capability registry, so healthd graphs it and the generated
 fault matrix covers the new owner without a new test.
 
-### Remaining for P7.1
+### Proven across the process boundary
 
-A process-level test that the adapter's contribution survives the real D-Bus path with its
-provenance intact. The behaviour is proven against a real Journal in-process, and the origin binding
-is proven separately by the impostor test, but the two have not been proven together.
+`perceptiond-integration` runs the real adapter against real eventd over a real bus. Two things had
+been proven separately and never together — that a reading becomes an `ObservationV1`, and that
+Event1 binds a claimed origin to the calling executable — and a contribution carrying correct
+provenance only when nothing checks it would be worth very little.
+
+It also settled a question the in-process tests could not ask. **A restart records once and then
+falls silent.** The test first asserted it should record nothing, reasoning that identity comes from
+the reading rather than from who read it; that is wrong, because identity includes the acquisition
+instant and a fresh instance has no memory of what it last contributed.
+
+The behaviour is right as it stands. Re-affirmation exists so a fact that stays true keeps saying
+so, and a session boundary is exactly when a fresh reading is worth having: "the system was still
+this at startup" is evidence, where "it was still this one poll later" is not. The rate is bounded
+by how often the process starts, and a crash loop is bounded further by systemd's restart limit.
+
+**P7.1 is complete.**
 
 ## Scheduling and refresh flakiness — fixed
 

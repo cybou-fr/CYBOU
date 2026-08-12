@@ -147,6 +147,24 @@ set_tests_properties(
     perception-service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-perceptiond-integration tst_perceptiond_integration.cpp)
+target_link_libraries(
+    test-perceptiond-integration
+    PRIVATE cybou-event-client cybou-fabric cybou-protocol Qt6::DBus Qt6::Test
+)
+add_test(
+    NAME perceptiond-integration
+    COMMAND
+        ${CYBOU_DBUS_TEST_RUNNER}
+        ${CMAKE_COMMAND} -E env
+        CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
+        CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
+        $<TARGET_FILE:test-perceptiond-integration>
+)
+set_tests_properties(
+    perceptiond-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-identity tst_identity.cpp)
 target_link_libraries(test-identity PRIVATE cybou-identity cybou-storage Qt6::Test)
 add_test(NAME identity COMMAND test-identity)
