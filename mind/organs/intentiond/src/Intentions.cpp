@@ -120,56 +120,79 @@ QList<Intention> Intentions::open() const
         return result;
     }
 
-    // One chronological pass, paged.
-    //
-    // This replaces two passes justified by the claim that an Outcome closing an Intention can only
-    // be recognised once that Intention has been seen, so a single pass would meet some Outcomes
-    // first. Causation makes that impossible: an Outcome names the Intention it closes, and the
-    // Intention was accepted before it, so in chronological order the Intention has always been
-    // seen by the time its Outcome arrives. The justification contradicted the guarantee written
-    // directly beneath it.
-    //
-    // So intentions are collected in order as they appear and closures are recorded alongside; the
-    // filter at the end walks the intentions, not the biography.
-    QList<Intention> formed;
-    QSet<QUuid> formedIds;
-    QSet<QUuid> closed;
-
-    const bool replayed = m_events->replayAll([&](const CognitiveEnvelope &e) {
-        if (e.kind == ContributionKind::Intention) {
-            const QCborMap payload = QCborValue::fromCbor(e.payloadCbor).toMap();
-            Intention i;
-            i.id = e.messageId;
-            i.description = payload[QStringLiteral("description")].toString();
-            i.trigger = payload[QStringLiteral("trigger")].toString();
-            i.formed = e.wallTime;
-            formed.append(i);
-            formedIds.insert(e.messageId);
-            return;
-        }
-        if (e.kind == ContributionKind::Outcome
-            && e.originOrgan == QLatin1String("intentiond")
-            && formedIds.contains(e.causationId)) {
-            closed.insert(e.causationId);
-        }
-    });
-
-    // A replay that failed halfway would leave commitments looking open because the Outcome that
-    // closed them was never read. Reporting a partial answer as the open set is worse than
-    // reporting none, so this fails closed.
-    if (!replayed) {
+    if (!catchUp()) {
         return {};
     }
 
-    for (const Intention &intention : formed) {
-        if (!closed.contains(intention.id)) {
+    for (const Intention &intention : m_formed) {
+        if (!m_closed.contains(intention.id)) {
             result.append(intention);
         }
     }
 
-    // Oldest first, as replayAll yields. The recent(0) version ended with a reverse because that
-    // call yields newest first; reversing here would invert the order Presence shows commitments in.
+    // Oldest first, which is the order contributions were accepted in and the order Presence shows
+    // commitments in.
     return result;
+}
+
+// One chronological pass, paged, resumed from a cursor.
+//
+// The two-pass version was justified by the claim that an Outcome closing an Intention can only be
+// recognised once that Intention has been seen, so a single pass would meet some Outcomes first.
+// Causation makes that impossible: an Outcome names the Intention it closes, and that Intention was
+// accepted before it, so in chronological order the Intention has always been seen already. The
+// justification contradicted the guarantee written directly beneath it.
+//
+// That same guarantee is what makes the cursor safe. Because closures never precede what they
+// close, state accumulated up to a sequence stays correct as later pages arrive; nothing already
+// read can be invalidated by something read afterwards.
+bool Intentions::catchUp() const
+{
+    if (!m_events) {
+        m_lastError = QStringLiteral("intentions need a journal to read");
+        return false;
+    }
+
+    constexpr int kPageSize = 1000;
+    for (;;) {
+        const ContributionPage page = m_events->after(m_cursor, kPageSize);
+        if (!page.ok) {
+            m_lastError = QStringLiteral("could not read contributions after %1").arg(m_cursor);
+            return false;
+        }
+        if (page.envelopes.isEmpty()) {
+            return true;
+        }
+
+        for (const CognitiveEnvelope &e : page.envelopes) {
+            if (e.kind == ContributionKind::Intention) {
+                const QCborMap payload = QCborValue::fromCbor(e.payloadCbor).toMap();
+                Intention i;
+                i.id = e.messageId;
+                i.description = payload[QStringLiteral("description")].toString();
+                i.trigger = payload[QStringLiteral("trigger")].toString();
+                i.formed = e.wallTime;
+                m_formed.append(i);
+                m_formedIds.insert(e.messageId);
+                continue;
+            }
+            if (e.kind == ContributionKind::Outcome
+                && e.originOrgan == QLatin1String("intentiond")
+                && m_formedIds.contains(e.causationId)) {
+                m_closed.insert(e.causationId);
+            }
+        }
+
+        if (page.lastSequence <= m_cursor) {
+            m_lastError = QStringLiteral("the journal did not advance past %1").arg(m_cursor);
+            return false;
+        }
+        m_cursor = page.lastSequence;
+
+        if (!page.hasMore) {
+            return true;
+        }
+    }
 }
 
 } // namespace cybou

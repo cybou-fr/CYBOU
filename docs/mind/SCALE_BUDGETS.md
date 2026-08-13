@@ -43,6 +43,8 @@ machine-specific; the per-contribution costs and their linearity are the transfe
 | Incremental `Verify`, 500 new | — | 4 ms | — | independent of history |
 | Predictor `allCalibrations`, first read | 94 ms | — | — | ~9.4 µs |
 | Predictor `allCalibrations`, second read | **0 ms** | — | — | independent of history |
+| `Intentions::open`, first read | 86 ms | — | — | ~8.6 µs |
+| `Intentions::open`, second read | **0 ms** | — | — | independent of history |
 | Consolidation backlog count | 1 ms | 13 ms | 130 ms | ~0.13 µs |
 | Indexed lookup (oldest / newest) | 5 / 5 ms | 5 / 4 ms | 5 / 5 ms | flat |
 | Journal size | 3.6 MiB | 34.6 MiB | 347 MiB | **~364 bytes** |
@@ -109,6 +111,32 @@ the heavy integrity gate.
 
 **Storage growth is modest.** ~364 bytes per contribution means a million contributions is ~350 MiB.
 That is not the pressing constraint; time is.
+
+## What a connected biography costs
+
+Every measurement above uses a fixture of root observations: no causation, no evidence, nothing to
+look up on the way in. Mind never writes that. A second fixture builds five-contribution episodes -
+root observation, prediction citing it, intention citing both, outcome settling the prediction,
+prediction citing the rest - so each append pays the reference lookups and privacy inheritance that
+Event1 actually performs.
+
+Measured in the same run, at 10k, so the two are comparable:
+
+| Measure | Flat | Connected |
+|---|---:|---:|
+| Fixture build (batched, 1000/commit) | 435 ms | **1,017 ms** |
+| Full replay `recent(0)` | 92 ms | 101 ms |
+| Full `Verify` | 122 ms | 140 ms |
+
+**The cost of connection is paid on the way in, not on the way out.** Building costs 2.3x more,
+because each non-root contribution resolves its cause and every evidence id and then checks that its
+privacy equals the most restrictive of them. Reading costs 10-15% more, which is the wider rows and
+the evidence join.
+
+Not reported as a result: per-contribution append came out at 0.935 ms connected against 1.790 ms
+flat in the same run. That ordering is backwards from what the build number implies, and both are
+fsync-bound at a scale where run-to-run variance exceeds the difference. It is noise, and recording
+it as a finding would be inventing one.
 
 ## Budgets
 

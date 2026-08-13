@@ -122,6 +122,58 @@ private Q_SLOTS:
         }
     }
 
+    // open() answers from a cursor now, so a read costs what arrived since the last one rather than
+    // the length of the biography. That is only safe if a later read still sees what happened in
+    // between, and every existing test here would pass against a cache that never advanced.
+    //
+    // The second instance is the case that matters: this one did not write the closure and has no
+    // way to learn of it except by reading the Journal again.
+    void aLaterReadSeesACommitmentClosedElsewhere()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope request = requestObservation();
+        QVERIFY(journal.append(request) > 0);
+
+        Intentions intentions(&journal);
+        const QUuid id = intentions.form(
+            QStringLiteral("water the plants"), QStringLiteral("daily"), request.messageId);
+        QVERIFY(!id.isNull());
+        QCOMPARE(intentions.open().size(), 1);
+
+        Intentions other(&journal);
+        QVERIFY(other.close(id, Resolution::Fulfilled));
+
+        QVERIFY(intentions.open().isEmpty());
+    }
+
+    // And a commitment formed elsewhere appears, for the same reason in the other direction.
+    void aLaterReadSeesACommitmentFormedElsewhere()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope request = requestObservation();
+        QVERIFY(journal.append(request) > 0);
+
+        Intentions intentions(&journal);
+        QVERIFY(intentions.open().isEmpty());
+
+        Intentions other(&journal);
+        QVERIFY(!other.form(
+                     QStringLiteral("call the dentist"),
+                     QStringLiteral("weekday"),
+                     request.messageId)
+                     .isNull());
+
+        const QList<Intention> open = intentions.open();
+        QCOMPARE(open.size(), 1);
+        QCOMPARE(open.first().description, QStringLiteral("call the dentist"));
+    }
+
     void oldestObligationComesFirst()
     {
         QTemporaryDir dir;

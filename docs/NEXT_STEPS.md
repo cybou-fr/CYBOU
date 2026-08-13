@@ -761,6 +761,56 @@ registered would still pass a direct call.
 
 **P7.5 is complete.**
 
+## P7.6 — the last per-query replay, and a fixture with a shape
+
+`Intentions::open()` was the last derived read that paid for the whole biography every time it was
+asked, and Presence asks on every Snapshot.
+
+It now carries a cursor, like epistemicd and predictord. **The reason it is safe is the same
+guarantee the old two-pass version misread**: an Outcome names the Intention it closes and is always
+accepted after it, so state accumulated up to a sequence can never be invalidated by a later page.
+That property was already written down; the earlier code contradicted it in the comment directly
+above the guarantee.
+
+Measured at 10k: first read 86 ms, second read 0 ms.
+
+Every existing test would have passed against a cache that never advanced its cursor, so two were
+added where a second instance forms or closes a commitment between two reads of the first. Freezing
+the cursor fails both — and also fails two process tests that already asserted an obligation formed
+in one process is visible from another, which is worth knowing: the D-Bus boundary was covering this
+by accident, and the library level is where the defect actually lives.
+
+### The fixture had no shape
+
+Every scale measurement to date used root observations: no causation, no evidence, nothing to look
+up on the way in. Mind never writes that, so every budget derived from it described a Journal that
+does not exist. A second fixture builds five-contribution episodes, so each append pays the
+reference lookups and privacy inheritance Event1 actually performs.
+
+Measured in the same run at 10k, which is what makes the comparison worth anything:
+
+| Measure | Flat | Connected |
+|---|---:|---:|
+| Fixture build (batched) | 435 ms | **1,017 ms** |
+| Full replay | 92 ms | 101 ms |
+| Full `Verify` | 122 ms | 140 ms |
+
+**Connection is paid on the way in.** Building costs 2.3x more, because each derived contribution
+resolves its cause and every evidence id and then checks its privacy against all of them. Reading
+costs 10–15% more.
+
+Deliberately not reported as a finding: per-contribution append measured *faster* connected than
+flat in the same run (0.935 ms against 1.790 ms). That contradicts the build number, and both are
+fsync-bound where variance exceeds the gap. It is noise, and dressing it up as a result would be
+inventing one.
+
+Two mistakes of mine are recorded in the test itself. An `Observation` is a root kind and may carry
+no references at all, and evidence may never repeat the `causationId` — the first fixture broke both
+and was refused as invalid. And `verify()` answers *where the chain broke*, so zero means intact
+rather than nothing verified; asserting it like a count made a healthy journal look wholly corrupt.
+
+**P7.6 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

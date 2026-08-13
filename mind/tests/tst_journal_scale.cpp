@@ -22,6 +22,7 @@
 
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include "cybou/intentions/Intentions.h"
 #include "cybou/predictor/Predictor.h"
 
 #include <QTemporaryDir>
@@ -315,6 +316,35 @@ private Q_SLOTS:
         // on, and the claim being pinned is absolute anyway. A read that answers from the cursor
         // does no work proportional to history, so it cannot take a meaningful number of
         // milliseconds no matter how slow the machine is.
+        QVERIFY2(
+            warmMs <= 50,
+            qPrintable(QStringLiteral("second read took %1 ms; it should do no work").arg(warmMs)));
+    }
+
+    // The obligation question, asked twice.
+    //
+    // Presence asks what Mind is committed to on every Snapshot, and open() used to replay the
+    // whole biography each time. The fixture holds no intentions at all, so this measures the
+    // traversal rather than the assembly - which is the part that grew with the length of a life.
+    void askingWhatIsCommittedPaysForTheBiographyOnlyOnce()
+    {
+        Journal journal(m_path);
+        QVERIFY(journal.isOpen());
+        Intentions intentions(&journal);
+
+        QElapsedTimer timer;
+        timer.start();
+        const QList<Intention> cold = intentions.open();
+        const qint64 coldMs = timer.elapsed();
+
+        timer.restart();
+        const QList<Intention> warm = intentions.open();
+        const qint64 warmMs = timer.elapsed();
+
+        QCOMPARE(warm.size(), cold.size());
+        reportMs(QStringLiteral("open() first read (whole biography)"), coldMs);
+        reportMs(QStringLiteral("open() second read (nothing new)"), warmMs);
+
         QVERIFY2(
             warmMs <= 50,
             qPrintable(QStringLiteral("second read took %1 ms; it should do no work").arg(warmMs)));
