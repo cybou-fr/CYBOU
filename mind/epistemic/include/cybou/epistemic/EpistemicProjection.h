@@ -7,13 +7,18 @@
 #include "cybou/protocol/Observation.h"
 
 #include <QDateTime>
+#include <QSet>
+#include <QUuid>
 #include <QHash>
 #include <QList>
 #include <QString>
 
 namespace cybou {
 
-inline constexpr quint16 kCurrentProjectionSchemaVersion = 1;
+// 2 added the contribution id and provenance to every claim. A v1 checkpoint would restore claims
+// that cannot name their evidence, which is weaker than the replay it stands in for, so it is
+// refused by version rather than silently accepted with the fields missing.
+inline constexpr quint16 kCurrentProjectionSchemaVersion = 2;
 
 /// What is known about a subject right now.
 ///
@@ -39,7 +44,21 @@ enum class EpistemicStatus {
 QString epistemicStatusToString(EpistemicStatus status);
 
 struct EpistemicClaim {
+    /// The Event1 contribution this claim was derived from.
+    ///
+    /// Without it a claim is an assertion the projection makes on its own authority: a reader can
+    /// see what is believed but cannot reach the evidence, and "perception is not truth" stops
+    /// being checkable. With it, any answer can be traced back to the canonical record - who
+    /// reported it, under what provenance, in what causal context - because the Journal still holds
+    /// all of that and the projection does not have to duplicate it.
+    QUuid contributionId;
+
     QString sourceId;
+
+    /// How the source established this, carried through from the observation rather than
+    /// reconstructed. `nixos.system` says which source spoke; this says what it actually did.
+    QString provenance;
+
     QString subject;
     QCborValue value;
     QDateTime acquiredAt;
@@ -109,6 +128,14 @@ private:
         /// while a source replacing its own earlier reading is supersession rather than a dispute.
         QHash<QString, EpistemicClaim> latestBySource;
         QList<EpistemicClaim> superseded;
+
+        /// Sources that have contradicted themselves at a single instant of acquisition.
+        ///
+        /// One entry per source is enough to say *what* is currently believed, but not enough to
+        /// notice that a source said two different things about the same moment. Keeping the
+        /// rejected readings is what lets that be reported rather than resolved by arrival order.
+        QSet<QString> contested;
+        QHash<QString, QList<EpistemicClaim>> selfContradiction;
     };
 
     QList<QString> m_order;

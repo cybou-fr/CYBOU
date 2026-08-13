@@ -131,7 +131,7 @@ explicitly deferred with reasons, and the remaining risks are M7's to carry.
 
 **Status: implemented.** `originOrgan` is provenance, and until now the caller simply asserted it.
 eventd resolves the calling connection to its executable, caches that per connection, and refuses
-any contribution claiming one of the nine organ identities unless the caller is that organ.
+any contribution claiming one of the reserved organ identities unless the caller is that organ.
 
 The binding is to the executable, not to D-Bus name ownership. identityd records its session to
 Event1 from its constructor, before `ServiceHost` publishes its name, so requiring ownership would
@@ -149,7 +149,7 @@ fixtures first would mean rebuilding them.
 
 ### Exit gate
 
-A process test that is not a Mind organ is refused all nine reserved identities, the Journal count is
+A process test that is not a Mind organ is refused every reserved identity, the Journal count is
 unchanged by the attempt, and a contribution under a non-reserved name still succeeds.
 
 ## P7.0-scale — Journal fixtures and budgets
@@ -766,7 +766,7 @@ registered would still pass a direct call.
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR
 covers expiry, tombstones, derived-data propagation, backups and possibly per-record keys. That is
 the only thing standing between the current tree and perception sources worth having, so
-[ADR-0028](../adr/ADR-0028-retention-and-erasure.md) is now **Proposed**. It is not Accepted:
+[ADR-0028](adr/ADR-0028-retention-and-erasure.md) is now **Proposed**. It is not Accepted:
 ADR-0027 was accepted explicitly, and this one should be too.
 
 The tension is structural, not incidental. `canonicalEnvelopeV2` includes `payloadCbor` **by

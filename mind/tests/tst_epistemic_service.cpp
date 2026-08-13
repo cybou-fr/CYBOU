@@ -51,6 +51,33 @@ QString statusIn(const QByteArray &encoded)
     return FabricCodec::decodeMap(encoded).value(QStringLiteral("status")).toString();
 }
 
+
+// A Journal that can be told to fail its paged reads.
+//
+// Everything else here drives a real Journal, which is right for behaviour but useless for this:
+// the one case that matters is the one where reading history does not work, and a healthy Journal
+// will not produce it.
+class UnreadableAfter : public Journal
+{
+public:
+    using Journal::Journal;
+
+    ContributionPage after(quint64 afterSequence, int limit) const override
+    {
+        if (m_readsFail) {
+            ContributionPage page;
+            page.ok = false;
+            return page;
+        }
+        return Journal::after(afterSequence, limit);
+    }
+
+    void failReads(bool fail) { m_readsFail = fail; }
+
+private:
+    bool m_readsFail{false};
+};
+
 } // namespace
 
 class TestEpistemicService : public QObject
@@ -171,6 +198,100 @@ private Q_SLOTS:
         const QVariantMap knowledge =
             FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")));
         QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
+    }
+
+
+    // A gap that cannot be read must not be stepped over.
+    //
+    // admitAccepted used to call catchUp() and discard the answer. When the read failed the cursor
+    // stayed put, which made the announced sequence still look admissible - so it was admitted, the
+    // cursor jumped past the unread stretch, and those contributions were skipped permanently. The
+    // projection would then be a function of what happened to be delivered, which is exactly what
+    // the cursor exists to prevent.
+    void anUnreadableGapIsNotSteppedOver()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        UnreadableAfter journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        QVERIFY(journal.append(observationOf(QStringLiteral("first"), now.addSecs(-300))) > 0);
+
+        EpistemicService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+        QCOMPARE(service.Cursor(), 1u);
+
+        // Four more accepted while nothing was listening, then the fifth announced.
+        for (int i = 2; i <= 5; ++i) {
+            QVERIFY(
+                journal.append(observationOf(
+                    QStringLiteral("value-%1").arg(i), now.addSecs(-300 + i * 10)))
+                > 0);
+        }
+        const auto announced = journal.atSequence(5);
+        QVERIFY(announced.has_value());
+
+        journal.failReads(true);
+        service.admitAccepted(*announced, 5);
+
+        // Behind is recoverable. Ahead of history it never read is not.
+        QCOMPARE(service.Cursor(), 1u);
+        QVERIFY(!service.LastError().isEmpty());
+
+        journal.failReads(false);
+        QVERIFY(service.catchUp());
+        QCOMPARE(service.Cursor(), 5u);
+
+        // And the skipped contributions really were admitted, in acquisition order, rather than
+        // merely counted: the newest value wins and the rest are filed as superseded.
+        const QVariantMap knowledge =
+            FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")));
+        QCOMPARE(
+            knowledge.value(QStringLiteral("current")).toList().at(0).toMap()
+                .value(QStringLiteral("value")).toString(),
+            QStringLiteral("value-5"));
+        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 4);
+    }
+
+    // A checkpoint whose cursor will not parse is not a checkpoint with a cursor of zero. Restoring
+    // the projection beside a zeroed cursor would claim nothing had been admitted while holding a
+    // projection that says otherwise.
+    void aCheckpointWithAnUnparseableCursorIsRefusedWhole()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString journalPath = dir.filePath(QStringLiteral("j.db"));
+        const QString checkpoint = dir.filePath(QStringLiteral("cp.cbor"));
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        Journal journal(journalPath);
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(QStringLiteral("aaa"), now.addSecs(-60))) > 0);
+
+        {
+            EpistemicService warm(&journal, checkpoint);
+            QVERIFY(warm.isReady());
+            QCOMPARE(warm.Cursor(), 1u);
+        }
+
+        QFile file(checkpoint);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCborMap stored = QCborValue::fromCbor(file.readAll()).toMap();
+        file.close();
+        stored.insert(QStringLiteral("cursor"), QStringLiteral("not-a-number"));
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write(stored.toCborValue().toCbor());
+        file.close();
+
+        // Rebuilt from the Journal rather than resumed from half a checkpoint, and it answers the
+        // same as a warm start would.
+        EpistemicService rebuilt(&journal, checkpoint);
+        QVERIFY2(rebuilt.isReady(), qPrintable(rebuilt.startupError()));
+        QCOMPARE(rebuilt.Cursor(), 1u);
+        QCOMPARE(
+            statusIn(rebuilt.KnowledgeOf(QStringLiteral("current-system"))),
+            QStringLiteral("observed"));
     }
 
     // The point of the checkpoint: a restart resumes rather than replaying from zero.

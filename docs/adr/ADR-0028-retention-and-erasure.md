@@ -49,38 +49,64 @@ of what, remains provable; what was *said* becomes unavailable.
 This keeps the biography's shape intact. A Mind that could forget that it once concluded something
 could not be audited, and could not later explain why it changed its mind.
 
-### Row hash v3 chains an envelope digest, not an envelope
+### Row hash v3 commits to an opaque value, not to a plaintext digest
 
 Introduce `hash_version = 3`:
 
 ```
-row_v3 = SHA256("CYBOU-JOURNAL-ROW-V3" ‖ u16(3) ‖ u64(seq) ‖ bytes(prev_hash) ‖ bytes(envelope_hash))
-envelope_hash = SHA256(canonicalEnvelopeV2(envelope))
+row_v3 = SHA256("CYBOU-JOURNAL-ROW-V3" ‖ u16(3) ‖ u64(seq) ‖ bytes(prev_hash) ‖ bytes(commitment))
 ```
 
-with `envelope_hash` stored in a new column. `canonicalEnvelopeV2` is unchanged, so the wire
-contract and every existing signature over an envelope are unaffected.
+with `commitment` stored in a new column. `canonicalEnvelopeV2` is unchanged, so the wire contract
+and every existing signature over an envelope are unaffected.
 
-The chain is then verifiable **without the payload**, because linkage is over stored digests. Two
-distinct checks replace today's single one:
+The chain is then verifiable **without the payload**, because linkage is over stored commitments.
 
-- **Chain integrity** — every row's `hash` follows from `prev_hash` and `envelope_hash`. Always
+**What the commitment is depends on whether the payload is sensitive, and that difference is the
+whole point of this section.** An earlier draft of this ADR used `SHA256(canonicalEnvelopeV2)` for
+everything and kept it after erasure. That is a permanent guessing oracle: for the payloads that
+most need erasing — a diagnosis, a boolean, a small enum, a name, one of a handful of known
+configurations — the search space is small enough to enumerate, so anyone holding the digest can
+confirm the erased value. Erasure that leaves behind a verifier for what was erased is not erasure.
+
+So:
+
+- **Non-sensitive payloads** commit to `SHA256(canonicalEnvelopeV2(envelope))`. The plaintext is not
+  secret, so an oracle for it costs nothing, and content integrity is checkable by anyone.
+- **Sensitive payloads** are encrypted with a randomized AEAD under a per-contribution key, and the
+  row commits to the **ciphertext**. Destroying the key leaves a commitment to a value that cannot
+  be recomputed from a guess, because the ciphertext depends on randomness the guesser does not
+  have.
+
+After erasure what survives is proof that a record existed, where it sat in the chain, and what it
+was caused by — never a means of testing a hypothesis about its content.
+
+Two distinct checks replace today's single one:
+
+- **Chain integrity** — every row's `hash` follows from `prev_hash` and `commitment`. Always
   checkable, erased or not.
-- **Content integrity** — `envelope_hash == SHA256(canonicalEnvelopeV2(envelope))`. Checkable only
-  where the payload is present; **reported as skipped, never as passed**, where it is not.
+- **Content integrity** — the stored commitment matches the payload actually held. Checkable only
+  where that payload survives; **reported as skipped, never as passed**, where it does not.
 
 `VerificationResult` gains that distinction. A verification that silently counted erased rows as
 verified would be the same defect as a replay that treats a failed page as the end of history.
 
 Existing rows keep `hash_version` 1 and 2 and remain verifiable as they are. Erasure is available
-only for rows written at v3, because a v1 or v2 row's hash cannot be recomputed without its payload.
-Nothing is rewritten in place: a hash chain that can be migrated retroactively is not a hash chain.
+only for rows written at v3, because a v1 or v2 row's hash covers its payload by value and cannot be
+recomputed without it. Nothing is rewritten in place: a hash chain that can be migrated
+retroactively is not a hash chain.
 
 ### An erasure is itself a contribution
 
 Erasure is requested by appending an `Erasure` contribution naming the target and the reason. The
 single writer then, **in one transaction**, nulls the target payload, sets its `erased_at`, and
 appends the record. Either both happen or neither does.
+
+**The reason is a closed set, never free text**: `UserRequested`, `RetentionExpired`,
+`ConsentWithdrawn`, `PolicyChange`, `SourceRevoked`. An erasure record is permanent, so a
+free-text reason would let the thing being forgotten be restated in the one place that can never be
+erased — "remove the record of diagnosis X" defeats the erasure it requests. A typed reason says why
+without saying what.
 
 So the fact of forgetting is itself remembered, and is auditable on the same terms as everything
 else. There is no side channel that mutates the Journal without leaving a trace in it — which is the
@@ -124,13 +150,22 @@ The limits are stated rather than glossed:
   from ordinary backup, and that exclusion is part of this decision rather than an operational
   detail left to whoever configures it.
 
-### Retention classes ride on privacy, not beside it
+### Retention is its own axis, propagated like privacy but not merged into it
 
-`PrivacyClass` already propagates to the most restrictive class across evidence. Retention attaches
-there rather than in a parallel table: a class carries a default lifetime, and a derived
-contribution inherits the shortest lifetime among its evidence for the same reason it inherits the
-most restrictive privacy. Two independent classification schemes over the same records would
-disagree, and the disagreement would be discovered by a leak.
+A contribution carries a `RetentionClass` alongside its `PrivacyClass`. They answer different
+questions — privacy asks *who may see this*, retention asks *how long may this exist at all* — and
+the answers do not correlate: an identity fact may be highly private and needed for years, while
+public telemetry may be worthless after ten minutes. An earlier draft attached lifetime to
+`PrivacyClass`, which would have forced those two into one ordering and made every future
+classification argument a fight about the wrong axis.
+
+Both propagate, by the same discipline and through the same code path:
+
+- derived privacy is the **most restrictive** class among a contribution's references;
+- derived expiry is the **earliest** among them.
+
+One mechanism, two axes. That is what keeps them checkable without pretending they are the same
+thing.
 
 ## Consequences
 
@@ -138,7 +173,8 @@ disagree, and the disagreement would be discovered by a leak.
   additive; no existing row changes.
 - Verification answers a third thing — how many rows could not be content-checked — and every caller
   of `VerifyIncremental` has to decide what that means to it. That is the intended cost.
-- Encrypting sensitive payloads makes them opaque to the Journal's own indices. Anything that needs
+- Sensitive payloads are opaque to the Journal's own indices, and now also to anyone verifying
+  content integrity without the key. Anything that needs
   to be searchable must live in the envelope's non-payload fields, which are never erased and
   therefore must never be sensitive. This constrains adapter design and is the main reason to accept
   this ADR *before* writing the adapters rather than after.

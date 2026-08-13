@@ -11,6 +11,7 @@
 
 #include <QCborArray>
 #include <QCborMap>
+#include <QSet>
 #include <QTest>
 
 using namespace cybou;
@@ -116,6 +117,121 @@ private Q_SLOTS:
     // A source replacing its own earlier reading is supersession, not disagreement. This is the
     // case ADR-0027 chose the first source for: the system is rebuilt while an earlier observation
     // still claims to be current.
+    // A source that says two different things about one instant of acquisition has contradicted
+    // itself, and that is not the same event as changing its mind.
+    //
+    // The projection used to let the later arrival replace the earlier one, so an arrival order
+    // that carries no meaning decided the answer and the contradiction disappeared. ObservationV1
+    // gives these distinct identities precisely so the Journal keeps both; keeping only one here
+    // threw away what the Journal was careful to preserve.
+    void oneSourceContradictingItselfAtOneInstantIsDisputed()
+    {
+        EpistemicProjection projection;
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const QDateTime acquired = now.addSecs(-30);
+
+        QVERIFY(projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(20), acquired)));
+        QVERIFY(projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(25), acquired)));
+
+        const SubjectKnowledge knowledge =
+            projection.knowledgeOf(QStringLiteral("temperature"), now);
+
+        // One source is enough. Requiring two would let a single unreliable source look certain,
+        // which is the opposite of what disputing exists for.
+        QCOMPARE(knowledge.status, EpistemicStatus::Disputed);
+
+        // Both readings are offered. A dispute a caller cannot see both sides of is an unexplained
+        // refusal rather than an answer.
+        QCOMPARE(knowledge.current.size(), 2);
+        QSet<int> values;
+        for (const EpistemicClaim &claim : knowledge.current) {
+            QCOMPARE(claim.status, EpistemicStatus::Disputed);
+            values.insert(claim.value.toInteger());
+        }
+        QVERIFY(values.contains(20));
+        QVERIFY(values.contains(25));
+
+        // And neither was filed as superseded: nothing happened between them to supersede.
+        QVERIFY(knowledge.superseded.isEmpty());
+    }
+
+    // The dispute is about one instant, so evidence about a later one settles it. Otherwise a
+    // source that stuttered once would be permanently distrusted, which no amount of subsequent
+    // good behaviour could repair.
+    void aLaterAcquisitionResolvesASourcesSelfContradiction()
+    {
+        EpistemicProjection projection;
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const QDateTime acquired = now.addSecs(-60);
+
+        projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(20), acquired));
+        projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(25), acquired));
+        QCOMPARE(
+            projection.knowledgeOf(QStringLiteral("temperature"), now).status,
+            EpistemicStatus::Disputed);
+
+        projection.admit(observationOf(
+            QStringLiteral("sensor"),
+            QStringLiteral("temperature"),
+            QCborValue(22),
+            now.addSecs(-10)));
+
+        const SubjectKnowledge knowledge =
+            projection.knowledgeOf(QStringLiteral("temperature"), now);
+        QCOMPARE(knowledge.status, EpistemicStatus::Observed);
+        QCOMPARE(knowledge.current.size(), 1);
+        QCOMPARE(knowledge.current.first().value.toInteger(), 22);
+    }
+
+    // A claim must be able to name the contribution it came from. Without it the projection asserts
+    // things on its own authority: a reader sees what is believed and cannot reach the evidence,
+    // and "perception is not truth" stops being something anyone can check.
+    void everyClaimNamesTheContributionAndProvenanceBehindIt()
+    {
+        EpistemicProjection projection;
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const CognitiveEnvelope envelope = observationOf(
+            QStringLiteral("nixos.system"),
+            QStringLiteral("current-system"),
+            QCborValue(QStringLiteral("abc")),
+            now.addSecs(-10));
+        QVERIFY(projection.admit(envelope));
+
+        const SubjectKnowledge knowledge =
+            projection.knowledgeOf(QStringLiteral("current-system"), now);
+        QCOMPARE(knowledge.current.size(), 1);
+        QCOMPARE(knowledge.current.first().contributionId, envelope.messageId);
+        QCOMPARE(knowledge.current.first().provenance, QStringLiteral("test"));
+    }
+
+    // And it must survive a checkpoint, because a restored projection may never be weaker than the
+    // replay it stands in for.
+    void evidenceSurvivesACheckpoint()
+    {
+        EpistemicProjection projection;
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const CognitiveEnvelope envelope = observationOf(
+            QStringLiteral("nixos.system"),
+            QStringLiteral("current-system"),
+            QCborValue(QStringLiteral("abc")),
+            now.addSecs(-10));
+        QVERIFY(projection.admit(envelope));
+
+        EpistemicProjection restored;
+        QString error;
+        QVERIFY2(restored.restore(projection.snapshot(), &error), qPrintable(error));
+
+        const SubjectKnowledge knowledge =
+            restored.knowledgeOf(QStringLiteral("current-system"), now);
+        QCOMPARE(knowledge.current.size(), 1);
+        QCOMPARE(knowledge.current.first().contributionId, envelope.messageId);
+        QCOMPARE(knowledge.current.first().provenance, QStringLiteral("test"));
+    }
+
     void oneSourceChangingItsMindSupersedes()
     {
         EpistemicProjection projection;

@@ -275,10 +275,10 @@ and was not altered.
 
 Event1 binds a contribution's claimed `originOrgan` to the process that submitted it. eventd resolves
 the calling connection to its executable, caches that per connection, and refuses any contribution
-claiming one of the nine organ identities unless the caller is that organ. The binding is to the
+claiming one of the reserved organ identities unless the caller is that organ. The binding is to the
 executable rather than to D-Bus name ownership because identityd records its session to Event1 from
 its constructor, before it publishes its name; requiring ownership would reject that and break
-identity continuity at startup. A process test proves all nine identities are refused to a non-organ
+identity continuity at startup. A process test proves every reserved identity is refused to a non-organ
 caller, that nothing forged reaches the Journal, and that a caller contributing under its own name
 still succeeds. This closes forged provenance; it is not a general authorization model, and what a
 non-organ caller may contribute under its own name is unchanged.
@@ -300,12 +300,17 @@ it only on a chain that held. `Event1.VerifyIncremental()` carries a typed resul
 `VerifiedThrough`, `InvalidAt`, `CheckpointMismatch` — and selfd reports it alongside
 `journalIntact`, so a check that trusted a prefix is never presented as a whole-history guarantee.
 At 100k, checking 500 new contributions costs 4 ms against 1,060 ms for the full walk. This removes
-verification as a limit on `Reflect`; it does not make `Reflect` independent of the biography, which
-an earlier version of this paragraph wrongly claimed. `SelfModel::measure` still builds its subject
-list with `recent(0)` and then replays the biography again inside `Predictor::calibration` for every
-subject, so that path remains roughly O(contributions x subjects) and is now the larger cost. A periodic
-full verification remains the heavy integrity gate, because corruption inside a trusted prefix is by
-construction invisible to the incremental check.
+verification as a limit on `Reflect`.
+
+`Reflect` is now independent of the biography as well. `SelfModel::measure` once built its subject
+list with `recent(0)` and then replayed the whole history again inside `Predictor::calibration` for
+every subject, which was roughly O(contributions x subjects); a single pass removed the
+multiplication, and a cursor-carrying projection in `Predictor` removed the remaining factor. At
+10k contributions the first read costs 94 ms and the second costs 0 ms, because a read now pays for
+what arrived since the last one rather than for the length of a life.
+
+A periodic full verification remains the heavy integrity gate, because corruption inside a trusted
+prefix is by construction invisible to the incremental check.
 
 Automatic scheduling distinguishes a lost race from a failure. Lifecycled evaluates its policy once
 to decide and again to execute, refusing to start a run whose health evidence was replaced in
@@ -379,7 +384,7 @@ or M9 authorized executor.
 
 ## Process topology
 
-Mind now has nine real user-session processes:
+Mind now has eleven real user-session processes:
 
 ```text
 cybou-eventd
@@ -391,6 +396,8 @@ cybou-predictord
 cybou-selfd
 cybou-workspaced
 cybou-presenced
+cybou-perceptiond
+cybou-epistemicd
 ```
 
 `plasmashell` no longer constructs Identity, Intentions, Predictor, SelfModel, Workspace, Journal,

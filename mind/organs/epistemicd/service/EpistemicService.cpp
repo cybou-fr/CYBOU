@@ -32,7 +32,10 @@ inline constexpr int kReplayPageSize = 1000;
 QVariantMap encodeClaim(const EpistemicClaim &claim)
 {
     QVariantMap map;
+    map.insert(
+        QStringLiteral("contributionId"), claim.contributionId.toString(QUuid::WithoutBraces));
     map.insert(QStringLiteral("sourceId"), claim.sourceId);
+    map.insert(QStringLiteral("provenance"), claim.provenance);
     map.insert(QStringLiteral("value"), claim.value.toVariant());
     map.insert(
         QStringLiteral("acquiredAt"), claim.acquiredAt.toUTC().toString(Qt::ISODateWithMs));
@@ -177,16 +180,38 @@ void EpistemicService::admitAccepted(const CognitiveEnvelope &envelope, quint64 
         return;
     }
 
-    // A gap means something was accepted that never reached us. Reading it now is cheap and keeps
-    // the projection a function of the whole history rather than of what happened to be delivered.
-    if (sequence > m_cursor + 1) {
-        catchUp();
+    // A gap means something was accepted that never reached us. Reading it now keeps the projection
+    // a function of the whole history rather than of what happened to be delivered.
+    //
+    // Whether that read succeeded is the whole point, and this used to discard it. A failed
+    // catch-up leaves the cursor where it was, so the announced sequence still looked admissible:
+    // admitting it moved the cursor past contributions that had never been read, and nothing
+    // downstream could ever discover them. That is the same defect catchUp() refuses one page at a
+    // time - treating an unread stretch of history as read - reintroduced at the caller.
+    //
+    // So a gap that cannot be closed means this announcement is not admitted at all. Staying behind
+    // is recoverable: the next catch-up, or the next announcement, reads from the same cursor.
+    // Skipping is not.
+    if (sequence > m_cursor + 1 && !catchUp()) {
+        return;
     }
 
     if (sequence <= m_cursor) {
         return;
     }
 
+    // Catch-up may have succeeded and still not reached this sequence - the contribution can be
+    // committed but not yet visible to the reader that just ran. Admitting it here would leave the
+    // same hole for a different reason.
+    if (sequence != m_cursor + 1) {
+        m_lastError =
+            QStringLiteral("a gap below %1 is still unread; not admitting it").arg(sequence);
+        return;
+    }
+
+    // Catch-up may have succeeded and still not reached this sequence - the contribution can be
+    // committed but not yet visible to the reader that just ran. Admitting it here would leave the
+    // same hole for a different reason.
     m_projection.admit(envelope);
     m_cursor = sequence;
     persist();
@@ -213,10 +238,20 @@ bool EpistemicService::load()
         return false;
     }
 
+    // A cursor that will not parse is not a cursor of zero. Falling back to zero alongside a
+    // restored projection would claim nothing had been admitted while holding a projection that
+    // says otherwise, and the replay that followed would re-admit everything against it.
+    bool cursorParsed = false;
+    const qulonglong cursor =
+        map.value(QStringLiteral("cursor")).toString().toULongLong(&cursorParsed);
+    if (!cursorParsed) {
+        return false;
+    }
+
     // Applied together or not at all. Half of this pair is worse than neither: a cursor without its
     // projection claims history was admitted that was not.
     m_projection = restored;
-    m_cursor = map.value(QStringLiteral("cursor")).toString().toULongLong();
+    m_cursor = cursor;
     return true;
 }
 

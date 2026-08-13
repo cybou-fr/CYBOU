@@ -78,7 +78,11 @@ private:
         // a fixture perceptiond reports the source unavailable and observes nothing, so anything
         // downstream of perception would be asserted against an empty projection forever.
         env.insert(QStringLiteral("CYBOU_PERCEPTION_SYSTEM_LINK"), m_systemLink);
-        env.insert(QStringLiteral("CYBOU_PERCEPTION_INTERVAL_MS"), QStringLiteral("200"));
+        // Deliberately slow. This suite runs eleven processes against five-second deadlines, and a
+        // perception adapter polling five times a second adds background work to all of them.
+        // Nothing here needs a fast poll: the freshness horizon records an unchanged system once
+        // regardless, and the test that waits for it allows thirty seconds.
+        env.insert(QStringLiteral("CYBOU_PERCEPTION_INTERVAL_MS"), QStringLiteral("2000"));
         return env;
     }
 

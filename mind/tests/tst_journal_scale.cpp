@@ -64,6 +64,60 @@ CognitiveEnvelope contributionAt(int index)
     return e;
 }
 
+// The same biography, shaped like one.
+//
+// Every contribution above is a root observation: no causation, no evidence, nothing to look up on
+// the way in. Mind never produces that. A prediction cites the observations it rests on, an outcome
+// settles a prediction, and Event1 checks each of those references and inherits privacy from them
+// before it accepts anything - work the flat fixture never pays for, and work that grows with how
+// densely a life is connected rather than with how long it is.
+//
+// Five-contribution episodes, deterministic like the flat fixture:
+//   +0 root observation      +1 prediction citing it     +2 intention citing both
+//   +3 outcome settling +1   +4 observation citing +0..+2
+//
+// Privacy is uniform, because Event1 requires a contribution's class to equal the most restrictive
+// of its references exactly. Mixing classes would measure rejection, not acceptance; the per-
+// reference lookup that dominates the cost is identical either way.
+CognitiveEnvelope graphContributionAt(int index)
+{
+    CognitiveEnvelope e = contributionAt(index);
+    const int offset = index % 5;
+    const int root = index - offset;
+    const auto idAt = [](int i) { return contributionAt(i).messageId; };
+
+    // Two rules shape this, and the first version broke both. An Observation is a root kind and may
+    // carry no causation and no evidence at all, so a derived contribution has to be some other
+    // kind. And evidence may never repeat the causationId - citing the thing you were caused by is
+    // a duplicate reference, not a second one.
+    switch (offset) {
+    case 0:
+        return e;
+    case 1:
+        e.kind = ContributionKind::Prediction;
+        e.evidence = {idAt(root)};
+        break;
+    case 2:
+        e.kind = ContributionKind::Intention;
+        e.causationId = idAt(root + 1);
+        e.evidence = {idAt(root)};
+        break;
+    case 3:
+        // Settles the prediction rather than the root: Event1 permits exactly one terminal Outcome
+        // per cause, so every episode has to settle a different one.
+        e.kind = ContributionKind::Outcome;
+        e.causationId = idAt(root + 1);
+        break;
+    default:
+        e.kind = ContributionKind::Prediction;
+        e.evidence = {idAt(root), idAt(root + 2)};
+        break;
+    }
+
+    e.correlationId = idAt(root);
+    return e;
+}
+
 void report(const QString &measure, const QString &value)
 {
     qInfo().noquote() << QStringLiteral("  %1 %2").arg(measure, -44, QLatin1Char('.')).arg(value);
@@ -264,6 +318,81 @@ private Q_SLOTS:
         QVERIFY2(
             warmMs <= 50,
             qPrintable(QStringLiteral("second read took %1 ms; it should do no work").arg(warmMs)));
+    }
+
+    // What the numbers above cost once the biography has a shape.
+    //
+    // This is not a variant of the same measurement: it is the honest one. The flat fixture
+    // measures a Journal nothing writes, and every budget derived from it is optimistic by whatever
+    // this difference turns out to be.
+    void aConnectedBiographyCostsMoreThanAFlatOne()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("graph.db"));
+
+        Journal journal(path);
+        QVERIFY2(journal.isOpen(), qPrintable(journal.lastError()));
+
+        constexpr int kBatch = 1000;
+        QElapsedTimer elapsed;
+        elapsed.start();
+        for (int start = 0; start < m_count; start += kBatch) {
+            QList<CognitiveEnvelope> batch;
+            const int end = std::min(start + kBatch, m_count);
+            batch.reserve(end - start);
+            for (int index = start; index < end; ++index) {
+                batch.append(graphContributionAt(index));
+            }
+            QVERIFY2(journal.appendBatch(batch) > 0, qPrintable(journal.lastError()));
+        }
+        const qint64 buildMs = elapsed.elapsed();
+        QCOMPARE(journal.count(), static_cast<quint64>(m_count));
+
+        // Appends past the fixture continue the same episode pattern, so an Outcome in the sample
+        // settles a prediction the sample itself wrote rather than one the fixture already settled.
+        constexpr int kSample = 200;
+        elapsed.restart();
+        for (int index = 0; index < kSample; ++index) {
+            QVERIFY2(
+                journal.append(graphContributionAt(m_count + index)) > 0,
+                qPrintable(journal.lastError()));
+        }
+        const qint64 appendMs = elapsed.elapsed();
+
+        elapsed.restart();
+        const auto all = journal.recent(0);
+        const qint64 replayMs = elapsed.elapsed();
+        QCOMPARE(all.size(), static_cast<int>(journal.count()));
+
+        elapsed.restart();
+        // verify() answers where the chain broke, so zero is the intact answer rather than a count
+        // of nothing verified. Asserting it like a count is a mistake this comment exists to stop.
+        const quint64 brokenAt = journal.verify();
+        const qint64 verifyMs = elapsed.elapsed();
+        QVERIFY2(
+            brokenAt == 0,
+            qPrintable(QStringLiteral("chain broken at %1 of %2")
+                           .arg(brokenAt)
+                           .arg(journal.count())));
+
+        // Evidence survived the round trip. Without this the graph could be silently flat and every
+        // number below would describe the fixture this test exists to stop measuring.
+        int withEvidence = 0;
+        for (const CognitiveEnvelope &e : all) {
+            if (!e.evidence.isEmpty()) {
+                ++withEvidence;
+            }
+        }
+        QVERIFY2(withEvidence > all.size() / 2, qPrintable(QStringLiteral(
+            "only %1 of %2 contributions carry evidence").arg(withEvidence).arg(all.size())));
+
+        reportMs(QStringLiteral("connected fixture build (batched)"), buildMs);
+        report(
+            QStringLiteral("connected append per contribution"),
+            QStringLiteral("%1 ms").arg(double(appendMs) / kSample, 0, 'f', 3));
+        reportMs(QStringLiteral("connected full replay recent(0)"), replayMs);
+        reportMs(QStringLiteral("connected full Verify"), verifyMs);
     }
 
     void indexedLookupDoesNotScaleWithHistory()

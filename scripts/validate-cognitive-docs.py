@@ -70,6 +70,33 @@ def check_relative_markdown_links(repo: Path, path: Path) -> None:
             )
 
 
+
+# The installed daemons are declared once, in the package's own install check. Counting them there
+# means the documentation is measured against what actually ships rather than against a number
+# somebody remembered to update.
+def count_installed_daemons(repo):
+    text = (repo / "packages/cybou-mind/default.nix").read_text(encoding="utf-8")
+    body = text.split("for daemon in", 1)[1].split("; do", 1)[0]
+    return len(re.findall("cybou-[a-z]+d", body))
+
+
+NUMBER_WORDS = {
+    9: "nine",
+    10: "ten",
+    11: "eleven",
+    12: "twelve",
+    13: "thirteen",
+}
+
+
+def number_word(value):
+    if value not in NUMBER_WORDS:
+        raise SystemExit(
+            f"validate-cognitive-docs: no spelled-out form for {value} daemons; add one"
+        )
+    return NUMBER_WORDS[value]
+
+
 def main(argv: list[str]) -> int:
     repo = Path(argv[1] if len(argv) > 1 else ".").resolve()
 
@@ -227,10 +254,18 @@ def main(argv: list[str]) -> int:
         "no current model owner",
         "There is currently no language-model process and no privileged action-executor process",
     )
+    # Derived, not hardcoded.
+    #
+    # This used to require the literal "nine-process Mind package". That did not merely go stale
+    # when the tenth and eleventh organs arrived - it actively held the drift in place, because
+    # correcting the documentation would have failed the check. A validator that pins the wrong
+    # answer is worse than no validator: it converts a documentation error into a build error for
+    # whoever tries to fix it.
+    daemon_count = count_installed_daemons(repo)
     require(
         paths["installation"],
         "current Mind process count",
-        "nine-process Mind package",
+        f"{number_word(daemon_count)}-process Mind package",
     )
     require(
         paths["installation"],

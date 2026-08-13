@@ -30,7 +30,9 @@ bool EpistemicProjection::admit(const CognitiveEnvelope &envelope)
     }
 
     EpistemicClaim claim;
+    claim.contributionId = envelope.messageId;
     claim.sourceId = observation->sourceId;
+    claim.provenance = observation->provenance;
     claim.subject = observation->subject;
     claim.value = observation->value;
     claim.acquiredAt = observation->acquiredAt;
@@ -55,6 +57,20 @@ bool EpistemicProjection::admit(const CognitiveEnvelope &envelope)
             return true;
         }
 
+        // Two different values from one source for the very same instant of acquisition are not a
+        // change of mind - nothing happened in between for it to be about. Later replacing earlier
+        // was the wrong reading twice over: it made an arrival order that carries no meaning decide
+        // the answer, and it hid the one case where a source has contradicted itself.
+        //
+        // ObservationV1 deliberately gives these distinct identities so the Journal keeps both. The
+        // projection has to keep both too, and say so.
+        if (existing->acquiredAt == claim.acquiredAt && existing->value != claim.value) {
+            history.contested.insert(claim.sourceId);
+            history.selfContradiction[claim.sourceId].append(claim);
+            ++m_admitted;
+            return true;
+        }
+
         // A source restating what it already said is re-affirmation, not replacement: the same
         // value observed again is one fact confirmed, and filing the earlier reading as superseded
         // would make an unchanging world look like a changing one.
@@ -62,6 +78,13 @@ bool EpistemicProjection::admit(const CognitiveEnvelope &envelope)
             EpistemicClaim previous = *existing;
             previous.status = EpistemicStatus::Superseded;
             history.superseded.append(previous);
+        }
+
+        // A source that moves on to a later acquisition has resolved its own contradiction: the
+        // dispute was about one instant, and this is evidence about a different one.
+        if (existing->acquiredAt < claim.acquiredAt) {
+            history.contested.remove(claim.sourceId);
+            history.selfContradiction.remove(claim.sourceId);
         }
     }
 
@@ -124,6 +147,28 @@ SubjectKnowledge EpistemicProjection::knowledgeOf(
             disagrees = true;
             break;
         }
+
+        // A source that contradicted itself about one instant is in dispute even when it is the
+        // only source, and even when every other source agrees with one of its readings. Requiring
+        // two sources to disagree would let a single unreliable source look certain.
+        if (found->contested.contains(claim.sourceId)
+            && claim.acquiredAt <= now && now < claim.freshUntil) {
+            disagrees = true;
+            break;
+        }
+    }
+
+    // The rejected readings are part of the answer: a dispute a caller cannot see both sides of is
+    // just an unexplained refusal.
+    if (disagrees) {
+        for (const QString &sourceId : found->contested) {
+            for (const EpistemicClaim &rejected : found->selfContradiction.value(sourceId)) {
+                EpistemicClaim contested = rejected;
+                contested.status = EpistemicStatus::Disputed;
+                fresh.append(contested);
+            }
+        }
+        std::sort(fresh.begin(), fresh.end(), byAcquisition);
     }
 
     if (disagrees) {
@@ -158,7 +203,10 @@ namespace {
 QCborMap encodeClaim(const EpistemicClaim &claim)
 {
     QCborMap map;
+    map.insert(
+        QStringLiteral("contributionId"), claim.contributionId.toString(QUuid::WithoutBraces));
     map.insert(QStringLiteral("sourceId"), claim.sourceId);
+    map.insert(QStringLiteral("provenance"), claim.provenance);
     map.insert(QStringLiteral("subject"), claim.subject);
     map.insert(QStringLiteral("value"), claim.value);
     map.insert(
@@ -177,7 +225,10 @@ bool decodeClaim(const QCborValue &encoded, EpistemicClaim *claim)
         return false;
     }
     const QCborMap map = encoded.toMap();
+    claim->contributionId =
+        QUuid::fromString(map.value(QStringLiteral("contributionId")).toString());
     claim->sourceId = map.value(QStringLiteral("sourceId")).toString();
+    claim->provenance = map.value(QStringLiteral("provenance")).toString();
     claim->subject = map.value(QStringLiteral("subject")).toString();
     claim->value = map.value(QStringLiteral("value"));
     claim->acquiredAt = QDateTime::fromString(
@@ -185,8 +236,11 @@ bool decodeClaim(const QCborValue &encoded, EpistemicClaim *claim)
     claim->freshUntil = QDateTime::fromString(
         map.value(QStringLiteral("freshUntil")).toString(), Qt::ISODateWithMs);
 
-    return !claim->sourceId.isEmpty() && !claim->subject.isEmpty()
-        && !claim->value.isNull() && !claim->value.isUndefined()
+    // The contribution id is required, not optional. A restored claim that could not name its
+    // evidence would be weaker than one rebuilt by replay, and a checkpoint is only ever allowed to
+    // be as good as the replay it stands in for.
+    return !claim->contributionId.isNull() && !claim->sourceId.isEmpty()
+        && !claim->subject.isEmpty() && !claim->value.isNull() && !claim->value.isUndefined()
         && claim->acquiredAt.isValid() && claim->freshUntil.isValid();
 }
 
