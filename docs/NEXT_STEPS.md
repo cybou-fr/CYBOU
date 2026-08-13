@@ -1054,6 +1054,57 @@ saying so is more useful than writing tests that assert today's agreement betwee
 
 **P7.11 is complete.**
 
+## P7.12 — the commitment erasure can actually survive
+
+A review of P7.11 found a P0 in it, and it was the kind that only shows up if you ask what happens
+*after* the feature it prepares for.
+
+v3 stored the combined `commitment` and not the `payloadCommitment` it was built from. While a
+payload exists that is invisible: the verifier recomputes both halves and compares. Once a payload
+is erased its commitment can never be recomputed — so the metadata half could no longer be checked
+either, and **the surviving metadata would stop being verifiable at exactly the moment forgetting
+made it unrecomputable.** That is precisely the property the metadata binding was added to obtain,
+lost in the case it was added for.
+
+Both halves are stored now. Verification recombines the recomputed metadata digest with the
+*stored* payload commitment, so an erased row still proves its author, causality, privacy and kind.
+No row was rehashed: the column is additive and every existing hash is unchanged.
+
+**Verification is genuinely two-axis now.** `status` and `brokenAt` describe the chain; a new
+`contentVerified`, `contentSkipped` and `contentBrokenAt` describe payloads. A tampered payload is a
+content failure at a known sequence with the chain intact — previously it was reported as a broken
+chain, which would have made every erased row look corrupted.
+
+That made **E2** writable before the erasure state machine exists, by redacting a payload directly:
+chain intact, metadata intact, one row skipped, two verified. An `erased_at` marker distinguishes a
+payload that is legitimately gone from one that is simply missing, so "skipped" can never become a
+way to hide damage.
+
+### The sabotage that found my own test
+
+Reverting the fix made only the payload-tamper test fail. E2 passed — and should not have.
+
+The reason: `observation()`, the fixture every journal test uses, leaves `payloadCbor` **empty**. My
+E2 erased a payload that was already empty, so nothing changed and a verifier that had lost the
+ability to check the row still agreed with itself. Erasure tests now use a fixture that carries real
+bytes, and under the same sabotage E2 fails as it must.
+
+Third time this session a test looked correct and proved nothing; every time, only sabotage found
+it.
+
+### Order changed on the review's argument
+
+Next is not the erasure state machine. Idempotent key destruction cannot be implemented
+meaningfully before a key lifecycle exists, so **E3 comes before E4–E6**: the sensitive storage
+primitive — AEAD, random nonce, per-contribution DEK, opaque key domain — then the proof that the
+same plaintext encrypted twice yields different commitments and that a guess cannot reproduce a
+surviving one. A state machine built on storage that only half survives erasure would pass its own
+tests and fail the thing it exists for.
+
+Gates covered: **E1**, **E2**.
+
+**P7.12 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

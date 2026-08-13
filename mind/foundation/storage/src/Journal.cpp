@@ -264,6 +264,17 @@ bool Journal::ensureSchema()
         m_lastError = QStringLiteral("could not add the commitment column");
         return false;
     }
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("payload_commitment"))
+        && !execSql(
+            QStringLiteral("ALTER TABLE contribution ADD COLUMN payload_commitment BLOB"))) {
+        m_lastError = QStringLiteral("could not add the payload commitment column");
+        return false;
+    }
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("erased_at"))
+        && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN erased_at TEXT"))) {
+        m_lastError = QStringLiteral("could not add the erasure marker column");
+        return false;
+    }
 
     return ensureV2Indexes();
 }
@@ -295,7 +306,9 @@ bool Journal::createSchemaV2()
             hash_version   INTEGER NOT NULL,
             prev_hash      BLOB,
             hash           BLOB    NOT NULL,
-            commitment     BLOB
+            commitment     BLOB,
+            payload_commitment BLOB,
+            erased_at      TEXT
         )
     )SQL"))
         || !execSql(QStringLiteral(R"SQL(
@@ -376,6 +389,9 @@ bool Journal::migrateV1ToV2()
         || !execSql(QStringLiteral(
             "ALTER TABLE contribution ADD COLUMN hash_version INTEGER NOT NULL DEFAULT 1"))
         || !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN commitment BLOB"))
+        || !execSql(QStringLiteral(
+            "ALTER TABLE contribution ADD COLUMN payload_commitment BLOB"))
+        || !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN erased_at TEXT"))
         || !execSql(QStringLiteral(R"SQL(
         CREATE TABLE contribution_evidence (
             contribution_id TEXT    NOT NULL,
@@ -521,12 +537,18 @@ QByteArray Journal::payloadCommitmentV3(const CognitiveEnvelope &envelope)
     return QCryptographicHash::hash(envelope.payloadCbor, QCryptographicHash::Sha256);
 }
 
-QByteArray Journal::commitmentV3(const CognitiveEnvelope &envelope)
+QByteArray Journal::commitmentFrom(
+    const QByteArray &metadataDigest, const QByteArray &payloadCommitment)
 {
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData(metadataDigestV3(envelope));
-    hash.addData(payloadCommitmentV3(envelope));
+    hash.addData(metadataDigest);
+    hash.addData(payloadCommitment);
     return hash.result();
+}
+
+QByteArray Journal::commitmentV3(const CognitiveEnvelope &envelope)
+{
+    return commitmentFrom(metadataDigestV3(envelope), payloadCommitmentV3(envelope));
 }
 
 QByteArray Journal::rowHashV3(
@@ -610,14 +632,16 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         previousHash = tail.value(1).toByteArray();
     }
 
-    const QByteArray commitment = commitmentV3(e);
+    const QByteArray payloadCommitment = payloadCommitmentV3(e);
+    const QByteArray commitment = commitmentFrom(metadataDigestV3(e), payloadCommitment);
     const QByteArray hash = rowHashV3(sequence, commitment, previousHash);
     QSqlQuery insert(m_db);
     insert.prepare(QStringLiteral(
         "INSERT INTO contribution (seq, message_id, correlation_id, causation_id, "
         "origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, "
         "confidence, evidence, payload, privacy, capability, schema_version, hash_version, "
-        "prev_hash, hash, commitment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "prev_hash, hash, commitment, payload_commitment) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
 
     insert.addBindValue(static_cast<qulonglong>(sequence));
     insert.addBindValue(e.messageId.toString(QUuid::WithoutBraces));
@@ -642,6 +666,7 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
     insert.addBindValue(previousHash);
     insert.addBindValue(hash);
     insert.addBindValue(commitment);
+    insert.addBindValue(payloadCommitment);
 
     if (!insert.exec()) {
         return fail(insert.lastError().text());
@@ -842,8 +867,10 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
     }
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral("SELECT seq, hash_version, %1, prev_hash, hash, commitment "
-                                 "FROM contribution WHERE seq > ? ORDER BY seq")
+    query.prepare(QStringLiteral(
+                      "SELECT seq, hash_version, %1, prev_hash, hash, commitment, "
+                      "payload_commitment, erased_at "
+                      "FROM contribution WHERE seq > ? ORDER BY seq")
                       .arg(envelopeColumns()));
     query.addBindValue(static_cast<qulonglong>(startAfter));
     if (!query.exec()) {
@@ -882,24 +909,36 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
             expectedHash = rowHashV2(sequence, e, storedPrevious);
         } else if (hashVersion == kCurrentJournalHashVersion
                    && e.schemaVersion == kCurrentEnvelopeSchemaVersion) {
-            // Chain integrity is checked against the stored commitment, so it holds whether or not
-            // the payload is still present. Content integrity is the separate question below.
             const QByteArray storedCommitment = query.value(18).toByteArray();
+            const QByteArray storedPayloadCommitment = query.value(19).toByteArray();
+            const bool erased = !query.value(20).isNull();
             expectedHash = rowHashV3(sequence, storedCommitment, storedPrevious);
 
             if (expectedHash == storedHash) {
-                // The commitment must still describe the row that carries it. Checking the metadata
-                // half always, and the payload half only while the payload is there, is what makes
-                // "this record is intact" and "this content is intact" two answers rather than one.
-                QCryptographicHash recomputed(QCryptographicHash::Sha256);
-                recomputed.addData(metadataDigestV3(e));
-                recomputed.addData(payloadCommitmentV3(e));
-                if (recomputed.result() != storedCommitment) {
+                // Metadata binding, checked against the *stored* payload commitment rather than a
+                // recomputed one. That is the whole reason the payload commitment is a column: once
+                // a payload is erased it can never be recomputed, and combining the two halves live
+                // would leave the surviving metadata unverifiable exactly when it matters most -
+                // which is the property committing to metadata was added to obtain.
+                if (commitmentFrom(metadataDigestV3(e), storedPayloadCommitment)
+                    != storedCommitment) {
                     result.status = VerificationStatus::InvalidAt;
                     result.brokenAt = sequence;
                     return result;
                 }
-                ++result.contentVerified;
+
+                // Content is the other axis. A payload that is gone is skipped, never counted as
+                // verified; a payload that is present and disagrees with its commitment is a
+                // content failure and not a broken chain.
+                if (erased) {
+                    ++result.contentSkipped;
+                } else if (payloadCommitmentV3(e) != storedPayloadCommitment) {
+                    if (result.contentBrokenAt == 0) {
+                        result.contentBrokenAt = sequence;
+                    }
+                } else {
+                    ++result.contentVerified;
+                }
             }
         } else {
             result.status = VerificationStatus::InvalidAt;

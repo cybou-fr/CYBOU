@@ -33,6 +33,18 @@ CognitiveEnvelope observation(
     return e;
 }
 
+// An observation whose payload is not empty.
+//
+// The default fixture leaves payloadCbor empty, which makes any test about erasing a payload
+// vacuous: erasing nothing changes nothing, and a verifier that had lost the ability to check the
+// row would still agree with itself. A sabotage run caught exactly that, so erasure tests use this.
+CognitiveEnvelope observationWithPayload(const QByteArray &payload)
+{
+    CognitiveEnvelope e = observation();
+    e.payloadCbor = payload;
+    return e;
+}
+
 CognitiveEnvelope derived(
     ContributionKind kind,
     const CognitiveEnvelope &cause,
@@ -355,7 +367,8 @@ private Q_SLOTS:
         QVERIFY(journal.isOpen());
 
         for (int i = 0; i < 5; ++i) {
-            QVERIFY(journal.append(observation()) > 0);
+            QVERIFY(journal.append(observationWithPayload(QByteArray("payload-") + char('0' + i)))
+                    > 0);
         }
 
         QCOMPARE(journal.verify(), 0u);
@@ -380,8 +393,8 @@ private Q_SLOTS:
         {
             Journal journal(path);
             QVERIFY(journal.isOpen());
-            QVERIFY(journal.append(observation()) > 0);
-            QVERIFY(journal.append(observation()) > 0);
+            QVERIFY(journal.append(observationWithPayload(QByteArray("first"))) > 0);
+            QVERIFY(journal.append(observationWithPayload(QByteArray("second"))) > 0);
             QCOMPARE(journal.verify(), 0u);
         }
 
@@ -394,17 +407,20 @@ private Q_SLOTS:
         QCOMPARE(reopened.verify(), 2u);
     }
 
-    // And the payload half is bound too, so tampering with content is caught while the content is
-    // still there. After erasure this row would report its content as unchecked rather than as
-    // verified - which is E2, and needs the erasure path to exist before it can be written.
-    void rewritingThePayloadOfAV3RowBreaksTheChain()
+    // Payload tampering is a content failure, not a broken chain, and the difference is the point.
+    //
+    // Folding it into InvalidAt would say the biography's structure is damaged when one record's
+    // contents are - and after erasure it would make every legitimately forgotten row look
+    // identical to a corrupted one.
+    void rewritingThePayloadOfAV3RowIsAContentFailureNotAChainFailure()
     {
         QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("j.db"));
         {
             Journal journal(path);
             QVERIFY(journal.isOpen());
-            QVERIFY(journal.append(observation()) > 0);
+            QVERIFY(journal.append(observationWithPayload(QByteArray("first"))) > 0);
+            QVERIFY(journal.append(observationWithPayload(QByteArray("second"))) > 0);
             QCOMPARE(journal.verify(), 0u);
         }
 
@@ -413,7 +429,84 @@ private Q_SLOTS:
 
         Journal reopened(path);
         QVERIFY(reopened.isOpen());
-        QCOMPARE(reopened.verify(), 1u);
+        const VerificationResult result = reopened.verifyFrom({});
+
+        QVERIFY2(result.intact(), "the chain is untouched; only one payload changed");
+        QCOMPARE(result.brokenAt, 0u);
+        QCOMPARE(result.contentBrokenAt, 1u);
+        QVERIFY(!result.contentIntact());
+        QCOMPARE(result.contentVerified, 1u);
+    }
+
+    // E2: an erased row verifies its chain and its metadata, and reports its content as skipped.
+    //
+    // Redacting the payload directly is what the erasure path will do; doing it here proves the
+    // storage semantics before the state machine that will drive them exists, which is the order
+    // the review argued for and it is the right one - a state machine built on storage that cannot
+    // survive erasure would pass its own tests and fail the thing it is for.
+    void anErasedRowKeepsItsChainAndReportsContentSkipped()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        {
+            Journal journal(path);
+            QVERIFY(journal.isOpen());
+            for (int i = 0; i < 3; ++i) {
+                QVERIFY(
+                    journal.append(observationWithPayload(QByteArray("payload-") + char('0' + i)))
+                    > 0);
+            }
+            QCOMPARE(journal.verify(), 0u);
+        }
+
+        QVERIFY(rawExec(
+            path,
+            QStringLiteral("UPDATE contribution SET payload = NULL, "
+                           "erased_at = '2026-08-14T00:00:00.000Z' WHERE seq = 2")));
+
+        Journal reopened(path);
+        QVERIFY(reopened.isOpen());
+        const VerificationResult result = reopened.verifyFrom({});
+
+        QVERIFY2(result.intact(), "erasing a payload must not break the chain");
+        QCOMPARE(result.brokenAt, 0u);
+        QCOMPARE(result.verifiedThrough, 3u);
+
+        // Skipped, never verified. The distinction is the whole reason for the second axis.
+        QCOMPARE(result.contentSkipped, 1u);
+        QCOMPARE(result.contentVerified, 2u);
+        QCOMPARE(result.contentBrokenAt, 0u);
+    }
+
+    // And the metadata of an erased row is still provably the metadata it committed to.
+    //
+    // This is what the separately stored payload commitment buys. Without it the surviving metadata
+    // could only be checked while the payload was there - so the provenance binding would evaporate
+    // at exactly the moment forgetting made it unrecomputable, and an erased row's author could be
+    // rewritten freely.
+    void anErasedRowStillProvesItsAuthor()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        {
+            Journal journal(path);
+            QVERIFY(journal.isOpen());
+            QVERIFY(journal.append(observationWithPayload(QByteArray("first"))) > 0);
+            QVERIFY(journal.append(observationWithPayload(QByteArray("secret"))) > 0);
+            QCOMPARE(journal.verify(), 0u);
+        }
+
+        QVERIFY(rawExec(
+            path,
+            QStringLiteral("UPDATE contribution SET payload = NULL, "
+                           "erased_at = '2026-08-14T00:00:00.000Z' WHERE seq = 2")));
+        QVERIFY(rawExec(
+            path,
+            QStringLiteral("UPDATE contribution SET origin_organ = 'impostor' WHERE seq = 2")));
+
+        Journal reopened(path);
+        QVERIFY(reopened.isOpen());
+        QCOMPARE(reopened.verify(), 2u);
     }
 
     void migratesV1WithoutRehashingHistory()

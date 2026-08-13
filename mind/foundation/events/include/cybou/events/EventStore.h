@@ -54,14 +54,24 @@ struct VerificationResult {
     /// First bad sequence, or 0 when nothing is known to be bad.
     quint64 brokenAt{0};
 
-    /// How many examined rows had their content checked, as opposed to only their place in the
-    /// chain.
+    /// Content integrity, reported on its own axis.
     ///
-    /// Reported rather than assumed. Once a payload can be erased, "the chain is intact" and "the
-    /// content is what it claims" stop being one answer, and a verification that quietly counted an
-    /// unverifiable row as verified would be the same defect as a replay that treats a failed page
-    /// as the end of history.
+    /// `status` and `brokenAt` describe the **chain**: whether each row follows from the one before
+    /// it, and whether the metadata it still carries is the metadata its commitment was built from.
+    /// Those stay checkable forever, because erasure never touches them.
+    ///
+    /// These three describe the **payload**, which does not. Folding a content mismatch into
+    /// `InvalidAt` would say the biography's structure is broken when only one record's contents
+    /// are, and after erasure it would make every legitimately forgotten row indistinguishable from
+    /// a corrupted one.
     quint64 contentVerified{0};
+    /// Rows whose payload is legitimately gone. Never counted as verified.
+    quint64 contentSkipped{0};
+    /// First row whose surviving payload does not match its commitment, or 0.
+    quint64 contentBrokenAt{0};
+
+    /// Whether every payload still present matched what was committed to.
+    bool contentIntact() const { return contentBrokenAt == 0; }
 
     bool intact() const
     {

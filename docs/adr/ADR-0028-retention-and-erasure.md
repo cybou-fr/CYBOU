@@ -86,6 +86,18 @@ quietly dropped it would have undone that work in the name of forgetting.
 `canonicalNonErasableEnvelopeV3` is exactly the fields erasure never touches. That is not a
 coincidence: what survives erasure is precisely what must stay verifiable afterwards.
 
+**Both halves are stored, not only their combination.** A row keeps `commitment` *and*
+`payload_commitment`, because after an erasure the payload commitment can never be recomputed — and
+a verifier that had to recompute it in order to check the metadata would lose the ability to check
+the metadata at exactly the moment forgetting made it unrecomputable. Storing it separately is what
+makes an erased row's author still provable.
+
+**The canonical field set is selected by envelope schema version, never extended in place.**
+Retention will add `retentionClass`, `retainUntil` and retention dependencies to the envelope, and
+appending them to the existing v3 encoding would change the digest of every row already written.
+So envelope schema 2 keeps today's field set and schema 3 adds the retention fields, both under
+journal `hash_version = 3`. A row is canonicalised by the schema it was written under.
+
 The chain is then verifiable **without the payload**, because linkage is over stored commitments.
 
 **What the payload commitment is depends on whether the payload is sensitive.** An earlier draft
@@ -111,8 +123,13 @@ Two distinct checks replace today's single one:
 
 - **Chain integrity** — every row's `hash` follows from `prev_hash` and `commitment`. Always
   checkable, erased or not.
-- **Content integrity** — the stored commitment matches the payload actually held. Checkable only
-  where that payload survives; **reported as skipped, never as passed**, where it does not.
+- **Content integrity** — the surviving payload matches its stored commitment. Checkable only where
+  that payload survives; **reported as skipped, never as passed**, where it does not.
+
+These are separate results, not one verdict. A payload that disagrees with its commitment is a
+content failure at a known sequence while the chain stays intact; folding it into a chain failure
+would say the biography's structure is damaged when one record's contents are, and after erasure
+would make every legitimately forgotten row indistinguishable from a corrupted one.
 
 `VerificationResult` gains that distinction. A verification that silently counted erased rows as
 verified would be the same defect as a replay that treats a failed page as the end of history.

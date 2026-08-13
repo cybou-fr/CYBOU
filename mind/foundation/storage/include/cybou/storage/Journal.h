@@ -132,6 +132,13 @@ private:
     static QByteArray metadataDigestV3(const CognitiveEnvelope &envelope);
     static QByteArray payloadCommitmentV3(const CognitiveEnvelope &envelope);
     static QByteArray commitmentV3(const CognitiveEnvelope &envelope);
+    /// Combine a metadata digest with an already-stored payload commitment.
+    ///
+    /// This is the form verification needs after an erasure: the payload is gone, so its commitment
+    /// can only be read back, but the metadata is still there and must still be proven to be the
+    /// metadata the row committed to.
+    static QByteArray commitmentFrom(
+        const QByteArray &metadataDigest, const QByteArray &payloadCommitment);
     QByteArray rowHashV3(
         quint64 seq, const QByteArray &commitment, const QByteArray &prev) const;
 
