@@ -39,6 +39,7 @@ class Presence : public QObject
     Q_PROPERTY(QString lastError READ lastError NOTIFY changed)
     Q_PROPERTY(QString narration READ narration NOTIFY changed)
     Q_PROPERTY(QStringList obligations READ obligations NOTIFY changed)
+    Q_PROPERTY(bool obligationsKnown READ obligationsKnown NOTIFY changed)
     Q_PROPERTY(QString attention READ attention NOTIFY changed)
     Q_PROPERTY(int contributions READ contributions NOTIFY changed)
     Q_PROPERTY(QVariantMap stats READ stats NOTIFY changed)
@@ -85,6 +86,13 @@ public:
     Q_INVOKABLE bool abandonIndex(int index);
     Q_INVOKABLE QVariantList detailedObligations() const;
     Q_INVOKABLE bool observe(const QString &subject, double value);
+
+    /// Whether the obligation list above was obtained at all.
+    ///
+    /// An empty list means nothing is outstanding only when this is true. When it is false Mind
+    /// could not assemble the set, and a surface that renders the two the same way is telling a
+    /// person the most comforting of two possible things.
+    Q_INVOKABLE bool obligationsKnown() const;
 
     Q_INVOKABLE QVariantMap stats() const;
     Q_INVOKABLE QVariantMap identityState() const;

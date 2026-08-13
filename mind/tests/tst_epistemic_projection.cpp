@@ -157,6 +157,105 @@ private Q_SLOTS:
         QVERIFY(knowledge.superseded.isEmpty());
     }
 
+    // checkpoint == replay, asserted over a whole population rather than one case at a time.
+    //
+    // The dispute-across-a-checkpoint defect existed because every individual behaviour had a test
+    // and the *property* had none: each new rule was checked live, and whether it survived being
+    // written down and read back was checked only for the rules someone thought to pair with a
+    // restart. This drives a deterministic mix of every rule the projection has - re-affirmation,
+    // supersession, late arrival, cross-source disagreement, self-contradiction, staleness - and
+    // asserts a restored projection answers identically at several instants.
+    //
+    // Any future rule carried in state that snapshot() does not write will fail here without anyone
+    // remembering to pair it with a checkpoint.
+    void aRestoredProjectionAnswersIdenticallyToTheOneItReplaces()
+    {
+        EpistemicProjection live;
+        const QDateTime base = QDateTime::currentDateTimeUtc().addSecs(-3600);
+
+        // Deterministic by construction: the same index always produces the same observation, so a
+        // failure here is reproducible rather than a story about one unlucky run.
+        for (int i = 0; i < 60; ++i) {
+            const QString subject = QStringLiteral("subject-%1").arg(i % 6);
+            const QString source = QStringLiteral("source-%1").arg(i % 3);
+            const int horizon = 60 + (i % 4) * 120;
+
+            // Every fifth pair shares an acquisition instant with a different value, which is the
+            // self-contradiction case; the rest advance in time, and every third repeats its value
+            // so re-affirmation is exercised too.
+            const QDateTime acquired = base.addSecs((i / 5) * 45);
+            const QCborValue value = QCborValue(
+                i % 3 == 0 ? QStringLiteral("steady") : QStringLiteral("value-%1").arg(i));
+
+            live.admit(observationOf(source, subject, value, acquired, horizon));
+
+        }
+
+        // Self-contradiction needs its own subjects, and getting here took two corrections the
+        // guard below forced. Varying subject by i%6 and source by i%3 inside five-entry time
+        // blocks makes two claims sharing a source, a subject *and* an instant arithmetically
+        // impossible. Injecting a contradicting claim alongside the loop fixed that and still
+        // produced no dispute, because a later acquisition for the same source and subject
+        // superseded the pair before the end - correctly, since the dispute was about one instant.
+        //
+        // So a contested subject is one nothing else touches: two values, one instant, one source.
+        for (int i = 0; i < 3; ++i) {
+            const QString subject = QStringLiteral("contested-%1").arg(i);
+            const QDateTime acquired = base.addSecs(30);
+            live.admit(observationOf(
+                QStringLiteral("source-0"), subject, QCborValue(QStringLiteral("a")), acquired,
+                600));
+            live.admit(observationOf(
+                QStringLiteral("source-0"), subject, QCborValue(QStringLiteral("b")), acquired,
+                600));
+        }
+
+        EpistemicProjection restored;
+        QString error;
+        QVERIFY2(restored.restore(live.snapshot(), &error), qPrintable(error));
+
+        // Asked at several instants, because status is derived from when the question is put and a
+        // checkpoint that agreed only at one moment would still be wrong at every other.
+        for (const int offset : {0, 120, 600, 3600, 7200}) {
+            const QDateTime at = base.addSecs(offset);
+            const QList<SubjectKnowledge> before = live.knowledgeAt(at);
+            const QList<SubjectKnowledge> after = restored.knowledgeAt(at);
+            QCOMPARE(after.size(), before.size());
+
+            for (int i = 0; i < before.size(); ++i) {
+                QCOMPARE(after.at(i).subject, before.at(i).subject);
+                QCOMPARE(after.at(i).status, before.at(i).status);
+                QCOMPARE(after.at(i).current.size(), before.at(i).current.size());
+                QCOMPARE(after.at(i).superseded.size(), before.at(i).superseded.size());
+
+                for (int c = 0; c < before.at(i).current.size(); ++c) {
+                    const EpistemicClaim &was = before.at(i).current.at(c);
+                    const EpistemicClaim &now = after.at(i).current.at(c);
+                    QCOMPARE(now.contributionId, was.contributionId);
+                    QCOMPARE(now.sourceId, was.sourceId);
+                    QCOMPARE(now.provenance, was.provenance);
+                    QCOMPARE(now.value, was.value);
+                    QCOMPARE(now.acquiredAt, was.acquiredAt);
+                    QCOMPARE(now.freshUntil, was.freshUntil);
+                    QCOMPARE(now.status, was.status);
+                }
+            }
+        }
+
+        // And the population actually exercised what it claims to: a checkpoint that agreed about
+        // nothing interesting would pass everything above.
+        int disputed = 0;
+        int superseded = 0;
+        for (const SubjectKnowledge &knowledge : restored.knowledgeAt(base.addSecs(120))) {
+            if (knowledge.status == EpistemicStatus::Disputed) {
+                ++disputed;
+            }
+            superseded += knowledge.superseded.size();
+        }
+        QVERIFY2(disputed > 0, "the fixture never produced a dispute");
+        QVERIFY2(superseded > 0, "the fixture never produced a supersession");
+    }
+
     // A dispute must survive a checkpoint, because a checkpoint may never be weaker than the replay
     // it stands in for.
     //

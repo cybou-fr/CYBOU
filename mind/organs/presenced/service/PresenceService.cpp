@@ -228,6 +228,7 @@ struct SnapshotRequest {
     QVariantList intentions;
     QVariantList calibrations;
     QVariantList knowledge;
+    bool obligationsKnown{false};
     QVariantList coalitions;
     QString attention;
     qulonglong contributions{0};
@@ -405,6 +406,7 @@ QVariantMap PresenceService::assembleSnapshot(const SnapshotRequest &request) co
     map[QStringLiteral("lifecycleScheduling")] = request.scheduling;
     map[QStringLiteral("narration")] = request.self.value(QStringLiteral("narration")).toString();
     map[QStringLiteral("obligations")] = obligations;
+    map[QStringLiteral("obligationsKnown")] = request.obligationsKnown;
     map[QStringLiteral("attention")] = request.attention;
     map[QStringLiteral("contributions")] = request.contributions;
     map[QStringLiteral("stats")] = request.self;
@@ -550,6 +552,11 @@ void PresenceService::gatherSnapshot(const std::shared_ptr<SnapshotRequest> &req
         [request, readBytes](const RpcResult &result) {
             QString error;
             request->intentions = FabricCodec::decodeList(readBytes(result), &error);
+            // intentiond errors rather than answering an empty set when it cannot assemble one, so
+            // success here is what separates "Mind owes nothing" from "Mind could not tell". A
+            // surface that showed both as an empty list would reassure a person at exactly the
+            // moment it knew least.
+            request->obligationsKnown = result.succeeded() && error.isEmpty();
         });
 
     issue(

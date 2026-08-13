@@ -52,6 +52,12 @@ private Q_SLOTS:
         // Knowing nothing is what a UI must show when the projection cannot be reached. The
         // property is read through the meta-object as well, because QML binds to it that way and a
         // Q_PROPERTY that was declared but never registered would still pass a direct call.
+        // With no backend at all, an empty obligation list must not read as "nothing outstanding".
+        QVERIFY(presence.obligations().isEmpty());
+        QVERIFY(!presence.obligationsKnown());
+        QVERIFY(!presence.property("obligationsKnown").toBool());
+        QVERIFY(presence.metaObject()->indexOfProperty("obligationsKnown") >= 0);
+
         QVERIFY(presence.knowledge().isEmpty());
         QVERIFY(presence.property("knowledge").toList().isEmpty());
         QVERIFY(presence.metaObject()->indexOfProperty("knowledge") >= 0);

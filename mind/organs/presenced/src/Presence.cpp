@@ -292,6 +292,13 @@ bool Presence::observe(
     return ok;
 }
 
+bool Presence::obligationsKnown() const
+{
+    return m_snapshot
+        .value(QStringLiteral("obligationsKnown"))
+        .toBool();
+}
+
 QVariantMap Presence::stats() const
 {
     return m_snapshot

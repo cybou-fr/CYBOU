@@ -901,6 +901,57 @@ at its new value twice would be tuning the measurement rather than the thing mea
 
 **P7.8 is complete.**
 
+## P7.9 — the invariants stop being prose
+
+Two of the three invariants were being upheld one test at a time, which is how the checkpoint P0
+survived: every individual behaviour had a test, and the *property* had none.
+
+**Invariant 2 now reaches the surface.** The organs stopped lying in P7.8, but Presence still
+rendered an unobtainable obligation set and an empty one identically. The Snapshot carries
+`obligationsKnown` now and the QML proxy exposes it as a bindable property, so an empty list means
+"nothing outstanding" only when Mind actually found out.
+
+**Invariant 1 is asserted over a population.** A deterministic fixture drives every rule the
+projection has — re-affirmation, supersession, late arrival, cross-source disagreement,
+self-contradiction, staleness — and compares a restored projection against the live one at five
+instants, field by field. Any future rule carried in state that `snapshot()` does not write fails
+here without anyone remembering to pair it with a restart. Sabotaging the checkpoint to drop
+co-current claims — the original defect in a new form — fails it.
+
+### The guard that kept being right
+
+The test ends by asserting the fixture actually produced disputes and supersessions, and that guard
+forced two corrections before the test was worth anything.
+
+The first fixture varied subject by `i % 6` and source by `i % 3` inside five-entry time blocks,
+which makes two claims sharing a source, a subject *and* an instant arithmetically impossible: it
+could not produce a dispute at all. Injecting a contradicting claim alongside the loop fixed that
+and still produced none, because a later acquisition for the same source and subject superseded the
+pair before the end — correctly, since a dispute is about one instant. Contested subjects are now
+ones nothing else touches.
+
+Both times the property test would have passed while proving nothing, which is the same failure
+mode as the defect it exists to catch.
+
+### An open gate, honestly labelled
+
+`p4-plasma-lifecycle` is flaky and I have not fixed it. It waits for the Presence applet to
+reappear in `appletsrc` after a plasmashell restart and times out at 120 seconds; across roughly ten
+observations it failed about four times, both inside a concurrent `nix flake check` and run alone
+immediately afterwards, passing on the next attempt each time.
+
+I twice explained it as contention from parallel VM gates. **That explanation is withdrawn**: it
+failed sequentially too. The timeout was raised from 30 to 120 seconds earlier and has since failed
+at the higher value, which suggests the wait is not merely slow. Raising it again would be tuning
+the measurement rather than the thing measured.
+
+What is actually unknown: whether plasmashell rewrites `appletsrc` without the applet on restart and
+re-adds it on a trigger the test does not provide, or whether the applet's re-registration is
+genuinely unreliable. That question is about the Plasma surface, not about Mind, and it wants
+instrumenting rather than guessing — which is what the last three timeout adjustments were.
+
+**P7.9 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR
