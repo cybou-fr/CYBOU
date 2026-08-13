@@ -15,7 +15,13 @@ namespace cybou {
 
 inline constexpr int kCurrentDatabaseSchemaVersion = 2;
 inline constexpr int kLegacyJournalHashVersion = 1;
-inline constexpr int kCurrentJournalHashVersion = 2;
+inline constexpr int kEnvelopeByValueJournalHashVersion = 2;
+
+/// v3 chains a split commitment: a digest of the fields erasure never touches, combined with a
+/// separate commitment to the payload. That separation is what lets a payload be erased while its
+/// row stays verifiable, and it is why erasure is only offered for rows written at this version -
+/// a v1 or v2 hash covers the payload by value and cannot be recomputed without it.
+inline constexpr int kCurrentJournalHashVersion = 3;
 
 /// SQLite `synchronous` level at or above which a returned COMMIT has reached storage. Below this,
 /// Event1 would publish acceptance for a commit that a power loss can still discard.
@@ -118,6 +124,17 @@ private:
 
     QByteArray rowHashV1(
         quint64 seq, const CognitiveEnvelope &envelope, const QByteArray &previousHash) const;
+    /// The metadata half of a v3 commitment, and the payload half, and the row hash over both.
+    ///
+    /// Kept separate rather than folded into one function because the two halves have different
+    /// lifetimes: the metadata digest is recomputable forever, the payload commitment only while
+    /// the payload survives.
+    static QByteArray metadataDigestV3(const CognitiveEnvelope &envelope);
+    static QByteArray payloadCommitmentV3(const CognitiveEnvelope &envelope);
+    static QByteArray commitmentV3(const CognitiveEnvelope &envelope);
+    QByteArray rowHashV3(
+        quint64 seq, const QByteArray &commitment, const QByteArray &prev) const;
+
     QByteArray rowHashV2(
         quint64 seq, const CognitiveEnvelope &envelope, const QByteArray &previousHash) const;
 

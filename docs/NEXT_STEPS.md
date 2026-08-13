@@ -1007,6 +1007,53 @@ working retention semantics; only the first exists. Journal v3 is the next large
 
 **P7.10 is complete.**
 
+## P7.11 — Journal v3, the format erasure will need
+
+The first implementation slice of ADR-0028, and deliberately the one that changes nothing
+observable: new rows are written at `hash_version = 3` with a split commitment, and verification
+answers two questions where it used to answer one.
+
+```
+metadataDigest    = SHA256(canonicalNonErasableEnvelopeV3)
+payloadCommitment = SHA256(payload)          — ciphertext, once sensitive payloads exist
+commitment        = SHA256(metadataDigest ‖ payloadCommitment)
+row_v3            = SHA256(domain ‖ 3 ‖ seq ‖ prev_hash ‖ commitment)
+```
+
+`canonicalNonErasableEnvelopeV3` is exactly the field set ADR-0028 declares non-erasable, and that
+is not a coincidence: **what survives erasure is precisely what must stay verifiable afterwards.**
+
+**Chain integrity and content integrity are now separate answers.** They agree on every row today,
+because nothing can erase a payload yet — which is the reason to separate them now rather than
+later. Once erasure exists, a bug that conflated them would look exactly like the feature working.
+`VerificationResult::contentVerified` reports how many rows were content-checked, so a row that
+cannot be checked can never be silently counted as verified.
+
+Existing rows keep hash versions 1 and 2 and verify exactly as before. The `commitment` column is
+additive and stays NULL for them. Nothing is rehashed: a chain that can be migrated retroactively
+is not a chain.
+
+### What the sabotage settled
+
+The review's third amendment — commit to metadata as well as payload — was the one I would have been
+most tempted to treat as belt-and-braces. Reverting `commitmentV3` to the payload-only form it had
+before that amendment makes `rewritingTheAuthorOfAV3RowBreaksTheChain` fail: a contribution's author
+could be rewritten from `perceptiond` to anything at all with every hash still intact. P7.0 exists
+to make provenance unforgeable at submission, and without this amendment forgetting would have
+bought that away.
+
+Two of my own mistakes are recorded here too. The v1 migration verifies the legacy chain
+immediately after migrating, so adding a column the verify path reads without adding it in the
+migration path broke every legacy journal at row 1 — caught by the migration test, which is what it
+is for. And renaming the old `kCurrentJournalHashVersion` to `kEnvelopeByValueJournalHashVersion`
+was necessary rather than cosmetic: leaving the name attached to v2 while v3 became current is how a
+verifier ends up checking the wrong rows with the wrong function.
+
+Gates covered: **E1**. E2 and E3 need the erasure path to exist before they can be written, and
+saying so is more useful than writing tests that assert today's agreement between the two answers.
+
+**P7.11 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

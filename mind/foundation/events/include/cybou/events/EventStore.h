@@ -54,6 +54,15 @@ struct VerificationResult {
     /// First bad sequence, or 0 when nothing is known to be bad.
     quint64 brokenAt{0};
 
+    /// How many examined rows had their content checked, as opposed to only their place in the
+    /// chain.
+    ///
+    /// Reported rather than assumed. Once a payload can be erased, "the chain is intact" and "the
+    /// content is what it claims" stop being one answer, and a verification that quietly counted an
+    /// unverifiable row as verified would be the same defect as a replay that treats a failed page
+    /// as the end of history.
+    quint64 contentVerified{0};
+
     bool intact() const
     {
         return status == VerificationStatus::FullyVerified

@@ -90,6 +90,43 @@ QByteArray canonicalEnvelopeV2(const CognitiveEnvelope &envelope)
     return out;
 }
 
+QByteArray canonicalNonErasableEnvelopeV3(const CognitiveEnvelope &envelope)
+{
+    QByteArray out;
+    out.reserve(256 + envelope.evidence.size() * 16);
+    out.append(QByteArray("CYBOU-ENVELOPE-NONERASABLE-V3"));
+
+    appendU16(out, envelope.schemaVersion);
+    appendUuid(out, envelope.messageId);
+    appendUuid(out, envelope.correlationId);
+    appendUuid(out, envelope.causationId);
+    appendString(out, envelope.originOrgan);
+    appendString(out, envelope.originNode);
+    appendU16(out, static_cast<quint16>(envelope.kind));
+    appendU64(out, static_cast<quint64>(envelope.wallTime.toUTC().toMSecsSinceEpoch()));
+    appendU64(out, envelope.monotonicTime);
+    appendU64(out, envelope.logicalClock);
+
+    const double normalizedConfidence = envelope.confidence == 0.0 ? 0.0 : envelope.confidence;
+    appendU64(out, std::bit_cast<quint64>(normalizedConfidence));
+
+    // Sorted, as in v2: evidence is a set, and two orderings of one set are one fact.
+    QList<QByteArray> sortedEvidence;
+    sortedEvidence.reserve(envelope.evidence.size());
+    for (const QUuid &id : envelope.evidence) {
+        sortedEvidence.append(id.toRfc4122());
+    }
+    std::sort(sortedEvidence.begin(), sortedEvidence.end());
+    appendU32(out, static_cast<quint32>(sortedEvidence.size()));
+    for (const QByteArray &id : sortedEvidence) {
+        out.append(id);
+    }
+
+    appendU8(out, static_cast<quint8>(envelope.privacy));
+    appendString(out, envelope.capabilityScope);
+    return out;
+}
+
 QByteArray canonicalJournalRowV2(
     quint64 sequence, const QByteArray &previousHash, const CognitiveEnvelope &envelope)
 {

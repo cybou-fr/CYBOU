@@ -255,6 +255,16 @@ bool Journal::ensureSchema()
         return false;
     }
 
+    // Additive, and additive on purpose. The commitment column only ever holds a value for rows
+    // written at hash v3; existing v1 and v2 rows keep NULL and keep verifying exactly as they did,
+    // because their hash covers the payload by value and nothing about them has changed. A hash
+    // chain that could be migrated retroactively would not be a hash chain.
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("commitment"))
+        && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN commitment BLOB"))) {
+        m_lastError = QStringLiteral("could not add the commitment column");
+        return false;
+    }
+
     return ensureV2Indexes();
 }
 
@@ -284,7 +294,8 @@ bool Journal::createSchemaV2()
             schema_version INTEGER NOT NULL,
             hash_version   INTEGER NOT NULL,
             prev_hash      BLOB,
-            hash           BLOB    NOT NULL
+            hash           BLOB    NOT NULL,
+            commitment     BLOB
         )
     )SQL"))
         || !execSql(QStringLiteral(R"SQL(
@@ -364,6 +375,7 @@ bool Journal::migrateV1ToV2()
             "ALTER TABLE contribution ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1"))
         || !execSql(QStringLiteral(
             "ALTER TABLE contribution ADD COLUMN hash_version INTEGER NOT NULL DEFAULT 1"))
+        || !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN commitment BLOB"))
         || !execSql(QStringLiteral(R"SQL(
         CREATE TABLE contribution_evidence (
             contribution_id TEXT    NOT NULL,
@@ -494,6 +506,44 @@ QByteArray Journal::rowHashV1(
     return hash.result();
 }
 
+QByteArray Journal::metadataDigestV3(const CognitiveEnvelope &envelope)
+{
+    return QCryptographicHash::hash(
+        canonicalNonErasableEnvelopeV3(envelope), QCryptographicHash::Sha256);
+}
+
+// Today every payload commits to its own bytes. When ADR-0028's sensitive path lands, a sensitive
+// payload will commit to `nonce || ciphertext || tag` instead, so that destroying the key leaves a
+// commitment nobody can test a guess against. The split exists now so that change is a change of
+// one function rather than of the chain format.
+QByteArray Journal::payloadCommitmentV3(const CognitiveEnvelope &envelope)
+{
+    return QCryptographicHash::hash(envelope.payloadCbor, QCryptographicHash::Sha256);
+}
+
+QByteArray Journal::commitmentV3(const CognitiveEnvelope &envelope)
+{
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(metadataDigestV3(envelope));
+    hash.addData(payloadCommitmentV3(envelope));
+    return hash.result();
+}
+
+QByteArray Journal::rowHashV3(
+    quint64 seq, const QByteArray &commitment, const QByteArray &prev) const
+{
+    QByteArray out;
+    out.append(QByteArray("CYBOU-JOURNAL-ROW-V3"));
+    out.append(static_cast<char>(0));
+    out.append(static_cast<char>(3));
+    for (int shift = 56; shift >= 0; shift -= 8) {
+        out.append(static_cast<char>((seq >> shift) & 0xff));
+    }
+    out.append(prev);
+    out.append(commitment);
+    return QCryptographicHash::hash(out, QCryptographicHash::Sha256);
+}
+
 QByteArray Journal::rowHashV2(
     quint64 seq, const CognitiveEnvelope &e, const QByteArray &prev) const
 {
@@ -560,13 +610,14 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         previousHash = tail.value(1).toByteArray();
     }
 
-    const QByteArray hash = rowHashV2(sequence, e, previousHash);
+    const QByteArray commitment = commitmentV3(e);
+    const QByteArray hash = rowHashV3(sequence, commitment, previousHash);
     QSqlQuery insert(m_db);
     insert.prepare(QStringLiteral(
         "INSERT INTO contribution (seq, message_id, correlation_id, causation_id, "
         "origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, "
         "confidence, evidence, payload, privacy, capability, schema_version, hash_version, "
-        "prev_hash, hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "prev_hash, hash, commitment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
 
     insert.addBindValue(static_cast<qulonglong>(sequence));
     insert.addBindValue(e.messageId.toString(QUuid::WithoutBraces));
@@ -590,6 +641,7 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
     insert.addBindValue(kCurrentJournalHashVersion);
     insert.addBindValue(previousHash);
     insert.addBindValue(hash);
+    insert.addBindValue(commitment);
 
     if (!insert.exec()) {
         return fail(insert.lastError().text());
@@ -790,7 +842,7 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
     }
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral("SELECT seq, hash_version, %1, prev_hash, hash "
+    query.prepare(QStringLiteral("SELECT seq, hash_version, %1, prev_hash, hash, commitment "
                                  "FROM contribution WHERE seq > ? ORDER BY seq")
                       .arg(envelopeColumns()));
     query.addBindValue(static_cast<qulonglong>(startAfter));
@@ -825,9 +877,30 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
         QByteArray expectedHash;
         if (hashVersion == kLegacyJournalHashVersion) {
             expectedHash = rowHashV1(sequence, e, storedPrevious);
-        } else if (hashVersion == kCurrentJournalHashVersion
+        } else if (hashVersion == kEnvelopeByValueJournalHashVersion
                    && e.schemaVersion == kCurrentEnvelopeSchemaVersion) {
             expectedHash = rowHashV2(sequence, e, storedPrevious);
+        } else if (hashVersion == kCurrentJournalHashVersion
+                   && e.schemaVersion == kCurrentEnvelopeSchemaVersion) {
+            // Chain integrity is checked against the stored commitment, so it holds whether or not
+            // the payload is still present. Content integrity is the separate question below.
+            const QByteArray storedCommitment = query.value(18).toByteArray();
+            expectedHash = rowHashV3(sequence, storedCommitment, storedPrevious);
+
+            if (expectedHash == storedHash) {
+                // The commitment must still describe the row that carries it. Checking the metadata
+                // half always, and the payload half only while the payload is there, is what makes
+                // "this record is intact" and "this content is intact" two answers rather than one.
+                QCryptographicHash recomputed(QCryptographicHash::Sha256);
+                recomputed.addData(metadataDigestV3(e));
+                recomputed.addData(payloadCommitmentV3(e));
+                if (recomputed.result() != storedCommitment) {
+                    result.status = VerificationStatus::InvalidAt;
+                    result.brokenAt = sequence;
+                    return result;
+                }
+                ++result.contentVerified;
+            }
         } else {
             result.status = VerificationStatus::InvalidAt;
             result.brokenAt = sequence;

@@ -343,6 +343,79 @@ private Q_SLOTS:
         QCOMPARE(journal.verify(), 3u);
     }
 
+    // E1: an untouched v3 row verifies both its place in the chain and its content.
+    //
+    // Two answers now, not one. Until a payload can be erased they always agree, which is exactly
+    // why this has to be asserted before erasure exists: afterwards, a bug that conflated them
+    // would look like the feature working.
+    void aV3RowVerifiesChainAndContent()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        for (int i = 0; i < 5; ++i) {
+            QVERIFY(journal.append(observation()) > 0);
+        }
+
+        QCOMPARE(journal.verify(), 0u);
+
+        const VerificationResult result = journal.verifyFrom({});
+        QVERIFY(result.intact());
+        QCOMPARE(result.verifiedThrough, 5u);
+        // Every row still holds its payload, so every row was content-checked. A number lower than
+        // this would mean something went unverified while the chain still passed.
+        QCOMPARE(result.contentVerified, 5u);
+    }
+
+    // The v3 commitment covers the fields erasure never touches, and this is what that buys.
+    //
+    // An earlier design committed to the payload alone. Under it, rewriting a contribution's author
+    // would leave every hash undisturbed - the provenance binding Event1 enforces at submission
+    // would survive exactly until someone edited the database. Forgetting must not cost that.
+    void rewritingTheAuthorOfAV3RowBreaksTheChain()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        {
+            Journal journal(path);
+            QVERIFY(journal.isOpen());
+            QVERIFY(journal.append(observation()) > 0);
+            QVERIFY(journal.append(observation()) > 0);
+            QCOMPARE(journal.verify(), 0u);
+        }
+
+        QVERIFY(rawExec(
+            path,
+            QStringLiteral("UPDATE contribution SET origin_organ = 'impostor' WHERE seq = 2")));
+
+        Journal reopened(path);
+        QVERIFY(reopened.isOpen());
+        QCOMPARE(reopened.verify(), 2u);
+    }
+
+    // And the payload half is bound too, so tampering with content is caught while the content is
+    // still there. After erasure this row would report its content as unchecked rather than as
+    // verified - which is E2, and needs the erasure path to exist before it can be written.
+    void rewritingThePayloadOfAV3RowBreaksTheChain()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        {
+            Journal journal(path);
+            QVERIFY(journal.isOpen());
+            QVERIFY(journal.append(observation()) > 0);
+            QCOMPARE(journal.verify(), 0u);
+        }
+
+        QVERIFY(rawExec(
+            path, QStringLiteral("UPDATE contribution SET payload = X'00' WHERE seq = 1")));
+
+        Journal reopened(path);
+        QVERIFY(reopened.isOpen());
+        QCOMPARE(reopened.verify(), 1u);
+    }
+
     void migratesV1WithoutRehashingHistory()
     {
         QTemporaryDir dir;
