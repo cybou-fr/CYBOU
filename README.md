@@ -37,8 +37,8 @@ incremental verification, capability and command policy has one declaration, and
 frozen, `cybou-perceptiond` reads the identity of the running system and proposes it as a
 provenance-bearing observation, `cybou-epistemicd` derives from those observations what is known,
 stale, disputed or superseded, and Presence carries that knowledge to the surface. **There is still
-no retention or erasure**: [ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md) is Proposed and
-binding until accepted, so no sensitive observation may be ingested — and there is no language
+no retention or erasure**: [ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md) is Accepted but
+not implemented, and no sensitive observation may be ingested until it is — and there is no language
 model, distributed Mind, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 

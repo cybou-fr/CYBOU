@@ -7,11 +7,22 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
 
 This is the storage ADR that [ADR-0027](ADR-0027-local-epistemic-projection-owner.md) names as the
-precondition for ingesting any sensitive observation. That constraint is binding, so until this is
-Accepted and implemented, perception stays on sources chosen to make the constraint costless.
+precondition for ingesting any sensitive observation.
+
+Accepted before implementation, deliberately. The point of this decision is to freeze the contract
+that Journal v3 will be written against; leaving it Proposed while the code is written would mean
+the format decided the ADR rather than the reverse.
+
+**Acceptance does not enable sensitive perception.** Sensitive observations remain prohibited until
+the storage, key-management, erasure-propagation, projection-invalidation and recovery gates at the
+end of this document are implemented and green. ADR-0027 requires both an accepted decision and
+working retention semantics, and only the first of those exists today.
+
+Being Accepted, this outranks [Current State](../CURRENT_STATE.md): where an implementation and this
+document disagree, the implementation is wrong.
 
 ## Context
 
@@ -54,32 +65,47 @@ could not be audited, and could not later explain why it changed its mind.
 Introduce `hash_version = 3`:
 
 ```
+metadataDigest    = SHA256(canonicalNonErasableEnvelopeV3(envelope))
+payloadCommitment = sensitive ? SHA256(nonce ‖ ciphertext ‖ tag)
+                              : SHA256(payloadCbor)
+commitment        = SHA256(metadataDigest ‖ payloadCommitment)
+
 row_v3 = SHA256("CYBOU-JOURNAL-ROW-V3" ‖ u16(3) ‖ u64(seq) ‖ bytes(prev_hash) ‖ bytes(commitment))
 ```
 
 with `commitment` stored in a new column. `canonicalEnvelopeV2` is unchanged, so the wire contract
 and every existing signature over an envelope are unaffected.
 
+**The commitment covers the metadata as well as the payload, and it must.** An earlier draft
+committed to the payload alone. That would have left `messageId`, `causationId`, `originOrgan`,
+`kind`, `wallTime`, `privacy`, `retention` and the evidence structure outside the chain, so a
+contribution's *author* could be rewritten from `perceptiond` to anything at all without disturbing
+a single hash. Provenance binding is the property P7.0 was built to obtain; a hash version that
+quietly dropped it would have undone that work in the name of forgetting.
+
+`canonicalNonErasableEnvelopeV3` is exactly the fields erasure never touches. That is not a
+coincidence: what survives erasure is precisely what must stay verifiable afterwards.
+
 The chain is then verifiable **without the payload**, because linkage is over stored commitments.
 
-**What the commitment is depends on whether the payload is sensitive, and that difference is the
-whole point of this section.** An earlier draft of this ADR used `SHA256(canonicalEnvelopeV2)` for
-everything and kept it after erasure. That is a permanent guessing oracle: for the payloads that
-most need erasing — a diagnosis, a boolean, a small enum, a name, one of a handful of known
-configurations — the search space is small enough to enumerate, so anyone holding the digest can
-confirm the erased value. Erasure that leaves behind a verifier for what was erased is not erasure.
+**What the payload commitment is depends on whether the payload is sensitive.** An earlier draft
+used `SHA256(canonicalEnvelopeV2)` for everything and kept it after erasure. That is a permanent
+guessing oracle: for the payloads that most need erasing — a diagnosis, a boolean, a small enum, a
+name, one of a handful of known configurations — the search space is small enough to enumerate, so
+anyone holding the digest can confirm the erased value. Erasure that leaves behind a verifier for
+what was erased is not erasure.
 
 So:
 
-- **Non-sensitive payloads** commit to `SHA256(canonicalEnvelopeV2(envelope))`. The plaintext is not
-  secret, so an oracle for it costs nothing, and content integrity is checkable by anyone.
+- **Non-sensitive payloads** commit to `SHA256(payloadCbor)`. The plaintext is not secret, so an
+  oracle for it costs nothing, and content integrity is checkable by anyone.
 - **Sensitive payloads** are encrypted with a randomized AEAD under a per-contribution key, and the
-  row commits to the **ciphertext**. Destroying the key leaves a commitment to a value that cannot
-  be recomputed from a guess, because the ciphertext depends on randomness the guesser does not
-  have.
+  row commits to the **ciphertext with its nonce and tag**. Destroying the key leaves a commitment
+  to a value that cannot be recomputed from a guess, because the ciphertext depends on randomness
+  the guesser does not have.
 
-After erasure what survives is proof that a record existed, where it sat in the chain, and what it
-was caused by — never a means of testing a hypothesis about its content.
+After erasure what survives is proof of who recorded it, when, of what kind, under what causality,
+privacy and retention — never a means of testing a hypothesis about its content.
 
 Two distinct checks replace today's single one:
 
@@ -96,25 +122,74 @@ only for rows written at v3, because a v1 or v2 row's hash covers its payload by
 recomputed without it. Nothing is rewritten in place: a hash chain that can be migrated
 retroactively is not a hash chain.
 
-### An erasure is itself a contribution
+### An erasure is itself a contribution, and it is a state machine
 
-Erasure is requested by appending an `Erasure` contribution naming the target and the reason. The
-single writer then, **in one transaction**, nulls the target payload, sets its `erased_at`, and
-appends the record. Either both happen or neither does.
+Erasure spans two systems that cannot be committed together: the SQLite transaction that redacts a
+payload, and the key store that destroys a DEK. A single "do both" step therefore has two crash
+windows, and each one produces a lie. Destroying the key first and crashing leaves data
+irrecoverably gone with no record of why. Committing the redaction first and crashing leaves Mind
+claiming it forgot something whose ciphertext is still decryptable.
+
+So erasure follows the discipline lifecycle already uses — **durable intent before irreversible side
+effect** — as three steps:
+
+```
+1. ErasureRequested          durable Event1 contribution; names target and typed reason
+2. destroy DEK + wrappings   idempotent, repeatable after a crash
+3. transaction:              redact payload, set erased_at,
+                             bump erasure_epoch, append ErasureApplied
+```
+
+Recovery is then a question the Journal can answer by itself: an `ErasureRequested` with no matching
+`ErasureApplied` is resumed from step 2, and step 2 is idempotent precisely so that resumption is
+always safe. No state in that sequence claims more than has happened.
 
 **The reason is a closed set, never free text**: `UserRequested`, `RetentionExpired`,
-`ConsentWithdrawn`, `PolicyChange`, `SourceRevoked`. An erasure record is permanent, so a
-free-text reason would let the thing being forgotten be restated in the one place that can never be
-erased — "remove the record of diagnosis X" defeats the erasure it requests. A typed reason says why
-without saying what.
+`ConsentWithdrawn`, `PolicyChange`, `SourceRevoked`. An erasure record is permanent, so a free-text
+reason would let the thing being forgotten be restated in the one place that can never be erased —
+"remove the record of diagnosis X" defeats the erasure it requests. A typed reason says why without
+saying what.
 
-So the fact of forgetting is itself remembered, and is auditable on the same terms as everything
-else. There is no side channel that mutates the Journal without leaving a trace in it — which is the
-property that makes the single-writer rule worth having.
+An erasure record is never itself erasable. A forgetting that could be forgotten would make the
+audit trail a suggestion.
 
-An erasure record is never itself erasable. It names a target and a reason and carries no
-observation content, and a forgetting that could be forgotten would make the audit trail a
-suggestion.
+### Submitting a contribution never authorizes an erasure
+
+`Event1.Submit` must **not** accept an `ErasureRequested` kind from an arbitrary caller. Erasure is
+a destructive storage operation, not a cognitive proposal, and the two travel different paths:
+`Event1.RequestErasure` exists so that destroying biography is never reachable by the same call that
+records a thought about it.
+
+This is the invariant the rest of the substrate already runs on — *a proposal is not permission to
+execute* — applied one step earlier than M9's authorization boundary. Stated here because the
+alternative is discovering later that a critical security policy became an implementation detail of
+`Submit()`, which is the kind of thing that is only ever found by someone exploiting it.
+
+### Erasure propagates through durable retention dependencies
+
+Invalidating caches is not enough, and treating it as sufficient was the largest hole in the earlier
+draft. Consider:
+
+```
+Observation A   diagnosis = X
+      ↓ evidence
+Learning B      "because X, expect Y"
+      ↓ evidence
+Conclusion C    derived judgement about X
+```
+
+Erasing A's payload leaves B and C intact — and B and C are not caches to be rebuilt, they are
+biography. Mind would have destroyed the record it was asked to forget and kept the reasoning that
+restates it.
+
+So a contribution carries **retention dependencies**, ordinarily derived from its causation and
+evidence references, and an erasure applies to the *dependency closure* of its target rather than to
+one row. `RetentionExpired` is already covered by inheriting the earliest expiry among references;
+this covers the reasons that arrive before any expiry — `UserRequested`, `ConsentWithdrawn`,
+`SourceRevoked` — which are exactly the ones a person cares about.
+
+The closure is over retention dependencies, not over the whole causal graph. A contribution that
+merely happened afterwards is not a descendant of what was erased.
 
 ### Derived state is invalidated by construction
 
@@ -149,11 +224,17 @@ So the decision is a key hierarchy rather than a flat store:
 
 ```
 per-contribution data key (DEK)   — one per sensitive payload, destroyed on erasure
-        ↓ wrapped by
-subject/retention-class key (KEK) — grouping keys by what they protect
+        ↓ optionally wrapped by
+key domain (KEK)                  — identified by an opaque keyDomainId and keyEpoch
         ↓ wrapped by
 recovery root                     — held by the user, backed up deliberately and separately
 ```
+
+**The intermediate layer is identified opaquely, never by what it protects.** Naming a key domain
+after its subject would put `medical`, `sexuality`, `politics` or `location` into key metadata that
+survives erasure — leaking the category of the thing being forgotten, which for many subjects is
+most of what there was to hide. `keyDomainId` is a UUID and `keyEpoch` an integer; neither says
+anything about the payload.
 
 Erasure destroys the DEK and every wrapping of it. Because a DEK is per contribution, destroying it
 reaches exactly one payload; because the wrappings are stored beside the ciphertext, a restored
@@ -169,7 +250,28 @@ keys going forward; it cannot reach into a snapshot of the past that already con
 rotation is therefore part of the retention guarantee rather than an operational detail, and a
 deployment that keeps backups indefinitely has weakened erasure to the age of its oldest backup.
 
-That is stated here so it is a decision, not a surprise.
+That is stated here so it is a decision, not a surprise — and it is why erasure reports a state
+rather than a boolean.
+
+### Erasure reports what it actually achieved
+
+"Erased" is too binary to be honest. Destroying a key and redacting a payload reaches the live
+database and every future backup; it does not reach a backup already taken. So an erasure carries a
+typed completion state:
+
+```
+ErasureStatus {
+    target
+    liveState:        Complete        payload redacted, DEK destroyed
+    projectionsState: Complete        epoch bumped, derived state rebuilt
+    backupState:      PendingRotation older backups may still hold a wrapped DEK
+}
+```
+
+A person asking whether something was forgotten must not be told "yes, completely" while a backup
+containing a recoverable copy is still in rotation. This is the substrate's own invariant applied to
+its most consequential operation: **partial is not the same as complete, and the reassuring reading
+is the one that must be justified.**
 
 ### Retention is its own axis, propagated like privacy but not merged into it
 
@@ -187,6 +289,21 @@ Both propagate, by the same discipline and through the same code path:
 
 One mechanism, two axes. That is what keeps them checkable without pretending they are the same
 thing.
+
+**A contribution stores an absolute `retainUntil`, not only a class.** A class alone is a pointer
+into a policy that will change: if `Short` means seven days today and twenty-four hours next year,
+every record written under the old meaning silently acquires the new one, and a contribution's
+retention would stop being a fact about that contribution. So a row carries `retentionClass`,
+`retentionPolicyVersion` and the resolved `retainUntil` instant, and the instant is what governs.
+
+Derived contributions resolve it the same way as privacy:
+
+```
+effectiveRetainUntil = min(own retainUntil, every referenced retainUntil)
+```
+
+A later policy change applies to what is written after it, which is the only direction a policy can
+honestly reach.
 
 ## Consequences
 
@@ -211,6 +328,32 @@ thing.
 - **Remote or replicated Journals.** ADR-0018 governs replication; erasure across nodes needs the
   distributed prototype to exist first, and the key-destruction mechanism is what will make it
   tractable when it does.
+
+## Acceptance gates
+
+Implementation is complete when these pass. They are listed here rather than in a test plan because
+several of them are the reason a paragraph above says what it says, and a gate kept beside its
+decision is harder to quietly drop than one kept elsewhere.
+
+| | Gate |
+|---|---|
+| **E1** | An untouched v3 row verifies both chain and content |
+| **E2** | An erased v3 row verifies its chain and reports content as **skipped** — never as verified |
+| **E3** | A guessed low-entropy plaintext cannot be tested against a surviving commitment |
+| **E4** | A crash after `ErasureRequested` recovers and completes |
+| **E5** | A crash after DEK destruction recovers and completes, with no silent-loss state |
+| **E6** | A crash before the terminal redaction never leaves a false "erased" claim |
+| **E7** | A durable descendant carrying derived sensitive content is erased with its ancestor |
+| **E8** | A projection whose epoch is behind the Journal's is refused and rebuilt |
+| **E9** | During a rebuild, readers see `known = false` rather than an empty success |
+| **E10** | A restored backup decrypts sensitive data that was never erased |
+| **E11** | A restored current or rotated backup cannot decrypt a record whose DEK was destroyed |
+| **E12** | A pre-erasure backup still in rotation is reported as outside the erasure guarantee |
+| **E13** | `checkpoint == replay` continues to hold across erasures |
+| **E14** | Every current projection stays bounded as erasures accumulate |
+
+E9 and E13 are the existing P7 invariants applied to this feature rather than new requirements, and
+E13 is checked by the property test P7.9 introduced rather than by a case written for erasure.
 
 ## Related documents
 

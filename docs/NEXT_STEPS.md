@@ -952,6 +952,61 @@ instrumenting rather than guessing — which is what the last three timeout adju
 
 **P7.9 is complete.**
 
+## P7.10 — ADR-0028 amended and Accepted
+
+Six amendments, then Accepted. The direction was right; two of the gaps were serious enough that
+accepting without them would have frozen a contract that could not be implemented honestly.
+
+**Crash-safe erasure.** The draft put "null the payload, append the record" in a transaction and
+destroyed the key separately — two systems that cannot commit together, so two crash windows, each
+producing a lie. Destroy the key and crash: data gone, no record why. Commit the redaction and
+crash: Mind claims it forgot something still decryptable. Erasure is now three steps with durable
+intent before the irreversible one — `ErasureRequested`, then idempotent key destruction, then the
+transaction that redacts, bumps the epoch and appends `ErasureApplied`. A request with no applied
+record is resumed. That is the discipline lifecycle already uses.
+
+**Erasure propagates through durable descendants.** The largest hole. Invalidating caches by epoch
+is right, but a Learning that says "because X" is not a cache — it is biography, and leaving it
+means Mind destroyed the record it was asked to forget and kept the reasoning that restates it.
+Contributions carry retention dependencies, and an erasure applies to their closure. Inheriting the
+earliest expiry only covers `RetentionExpired`; `UserRequested`, `ConsentWithdrawn` and
+`SourceRevoked` arrive before any expiry and are exactly the ones a person cares about.
+
+**The commitment covers metadata too.** Committing to the payload alone would have left
+`originOrgan`, causality, kind and privacy outside the chain — so a contribution's author could be
+rewritten from `perceptiond` to anything at all without disturbing a hash. That would have undone
+P7.0's provenance binding in the name of forgetting. The commitment is now
+`SHA256(metadataDigest ‖ payloadCommitment)`, where the metadata digest covers exactly the fields
+erasure never touches.
+
+**Retention is an absolute instant, not just a class.** A class is a pointer into a policy that will
+change; if `Short` means seven days today and a day next year, every old record silently acquires
+the new meaning. Rows carry `retainUntil` alongside the class and version, and derived contributions
+take the earliest among their references.
+
+**Erasure reports a state, not a boolean.** Destroying a key reaches the live database and every
+future backup, not one already taken. So `liveState`, `projectionsState` and `backupState` are
+separate, and a person is not told "completely erased" while a backup holding a wrapped key is still
+in rotation. This is the substrate's own invariant applied to its most consequential operation.
+
+**Submitting never authorizes erasure.** `Event1.Submit` must not accept an erasure kind;
+`RequestErasure` is a separate path. A proposal is not permission to execute — the same rule the
+substrate already runs on, applied one step earlier than M9's boundary, and stated now so that a
+critical security policy does not become an implementation detail of `Submit()` later.
+
+Also: key domains are identified by an opaque `keyDomainId` and `keyEpoch` rather than by subject.
+Naming a domain `medical` or `location` would put the category of the forgotten thing into metadata
+that survives erasure, which for many subjects is most of what there was to hide.
+
+Fourteen acceptance gates (E1–E14) are recorded in the ADR beside the decisions they justify. Two of
+them, E9 and E13, are the existing P7 invariants applied to this feature rather than new
+requirements — E13 is already checked by the property test P7.9 introduced.
+
+**Accepted does not enable sensitive perception.** ADR-0027 requires an accepted decision *and*
+working retention semantics; only the first exists. Journal v3 is the next large package.
+
+**P7.10 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR
