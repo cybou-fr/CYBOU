@@ -642,6 +642,86 @@ Sabotaging the live-path expectation failed exactly that test and nothing else.
 
 **P7.2 is complete.**
 
+## P7.3 — a read costs what changed, not what happened
+
+`Reflect` was the last budget line that grew with the length of a life. `Intentions::open()` had
+already moved to paged `replayAll`; the remaining full scans were all in `Predictor`, three of them,
+one per query — `history`, `calibration`, `allCalibrations`.
+
+An earlier pass had already removed a multiplication there: `allCalibrations` used to replay the
+biography to find the subjects and then replay it again for each one, so the cost was the length of
+a life times the number of subjects. That fixed the multiplication and left the length.
+
+Predictor now keeps the same shape epistemicd introduced: a cursor, a paged catch-up, and derived
+state that is never authoritative over the Journal. Per subject it holds the samples a forecast is
+built from and running error accumulators, so a calibration is arithmetic on numbers rather than a
+traversal. Catch-up **fails closed** — a projection built from part of the history is not a smaller
+answer but a wrong one, because an unread Outcome makes a subject look better calibrated than it is
+and nothing downstream could tell.
+
+### Measured, not asserted
+
+At ten thousand contributions, the first read costs 94 ms and the second costs 0 ms. The suite
+reports both, and asserts only the absolute claim — a read that answers from a cursor does no work
+proportional to history, so it cannot take a meaningful number of milliseconds on any machine.
+Extrapolated at the measured ~9.4 µs per contribution, the old per-query cost at 560k was on the
+order of five seconds, against a five second `Reflect` budget.
+
+### The defect this makes possible
+
+Every existing predictor test passed immediately, and would have passed just as well against a cache
+that never advanced its cursor. That is the failure this change introduces, so two tests were added
+where a **second** writer appends between two reads of the same instance — a forecast whose sample
+count must grow, and a calibration that must see an Outcome settled elsewhere. A stale cursor fails
+both.
+
+`Predictor::m_bySubject` is memory that grows with the number of distinct subjects and their
+samples, which is the cost of not re-reading. It is the same data `history()` used to materialise on
+every call and then throw away; what is new is that it is retained. Only epistemicd persists a
+checkpoint, because only epistemicd has been measured to need one.
+
+### The gate's other timeout
+
+Quiescing the baseline uncovered a second, unrelated flake in the same gate: plasmashell failing to
+become active again within thirty seconds of a restart, roughly one run in four, while every count
+assertion passed.
+
+Thirty seconds was a timeout measuring the host. What the gate claims is that Plasma comes back and
+that Mind neither lost its run nor recorded anything for the restart — not how quickly a
+software-rendered compositor restarts inside a VM. The four post-restart waits are now 120 seconds
+and every assertion is unchanged: the unit must still become active, the MainPID must still differ,
+Plasma must still re-expose `evaluateScript`, and the applet must still be there. Four consecutive
+runs green.
+
+### An open item, stated as one
+
+`m6-recovery-boundary` has the same defect `p4` had, and it is **not fixed**. Its
+`unresponsive Event1 rejects Promise and preserves count` subtest asserts an unchanged Journal count
+across a window in which eventd is deliberately SIGSTOPped. healthd observes the frozen owner, and
+cannot record that transition until eventd resumes, so the write lands inside the window and is
+charged to the Promise. Measured at roughly one failure in four; the rejection itself always behaved.
+
+An attempt to replace the count with a comparison of intentiond's `Open()` across the window was
+reverted, because it could not be shown to work:
+
+- The first sabotage was a Nix syntax error — `''` inside a `''`-string — so it never ran. It
+  produced no output, and no output through a `grep` filter reads exactly like success.
+- The second used `Intention1.Form` with an empty `causeId`. `Intentions::form` requires a cause that
+  already exists in the Journal, so it formed nothing and the sabotage was a no-op.
+- The third let the Promise genuinely succeed, so a real commitment was formed inside the window.
+  **`Open()` still did not change.** Either the commitment is not visible there or it is not open;
+  that is a question about intentiond, not about the gate, and it is unanswered.
+
+Also worth recording: `nix build --rebuild` **errors** on a derivation it has never built rather than
+running it. Repeat runs used to characterise a flake must use a plain `nix build`, and must be judged
+on the exit code — several "green" repeat runs in this session were that error, filtered out of view
+by a `grep` that only matched failure text.
+
+So the gate keeps its original assertion and its original one-in-four flake, honestly labelled,
+rather than a replacement that passes for unknown reasons.
+
+**P7.3 is complete.**
+
 ## Scheduling and refresh flakiness — fixed
 
 Two separate defects made the process suite intermittently red. Both are closed.

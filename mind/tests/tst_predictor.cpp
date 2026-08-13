@@ -70,6 +70,53 @@ private Q_SLOTS:
         QCOMPARE(predictor.allCalibrations().size(), 2);
     }
 
+    // The projection is incremental now: a read costs what has been accepted since the last read,
+    // not the length of the biography. That is only safe if a later read still sees what arrived in
+    // between - a cache that answers from a cursor it never advances is a cache that lies.
+    //
+    // The contribution here comes from a second writer against the same Journal, which is the case
+    // a per-instance cache would get wrong: this Predictor did not append it and has no other way
+    // to learn of it.
+    void aLaterReadSeesWhatArrivedAfterTheEarlierOne()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Predictor predictor(&journal);
+
+        QVERIFY(predictor.observe(QStringLiteral("latency"), 10.0));
+        const Forecast first = predictor.predict(QStringLiteral("latency"));
+        QCOMPARE(first.samples, 1);
+
+        Predictor other(&journal);
+        QVERIFY(other.observe(QStringLiteral("latency"), 20.0));
+
+        const Forecast second = predictor.predict(QStringLiteral("latency"));
+        QCOMPARE(second.samples, 2);
+        QCOMPARE(second.estimate, 15.0);
+    }
+
+    // Settling through one instance must be visible to a calibration read from another, for the
+    // same reason. selfd asks predictord over the bus while predictord is settling its own
+    // forecasts, so the two are genuinely different call paths into one Journal.
+    void calibrationSeesAnOutcomeSettledAfterTheFirstRead()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        Predictor predictor(&journal);
+
+        QVERIFY(predictor.observe(QStringLiteral("latency"), 10.0));
+        QCOMPARE(predictor.calibration(QStringLiteral("latency")).settled, 0);
+
+        Predictor other(&journal);
+        const Forecast forecast = other.predict(QStringLiteral("latency"));
+        QVERIFY(other.settle(forecast.id, 14.0));
+
+        const Calibration calibration = predictor.calibration(QStringLiteral("latency"));
+        QCOMPARE(calibration.settled, 1);
+        QCOMPARE(calibration.meanError, 4.0);
+        QCOMPARE(calibration.bias, 4.0);
+    }
+
     void withNoHistoryItSaysNothing()
     {
         QTemporaryDir dir;

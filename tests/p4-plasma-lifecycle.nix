@@ -100,24 +100,28 @@ pkgs.testers.runNixOSTest {
         "timeout 10s systemctl --user -M cybou@ restart --no-block "
         "plasma-plasmashell.service"
     )
+    # What is being tested is that Plasma comes back and that Mind neither lost its run nor
+    # recorded anything for the restart - not how fast a software-rendered compositor restarts in a
+    # VM. Thirty seconds turned out to be inside that spread: it failed roughly one run in four
+    # while the count assertions passed, which is a timeout measuring the host rather than the code.
     machine.wait_until_succeeds(
         "timeout 5s systemctl --user -M cybou@ is-active plasma-plasmashell.service",
-        timeout=30,
+        timeout=120,
     )
     machine.wait_until_succeeds(
         "test \"$(timeout 5s systemctl --user -M cybou@ show -p MainPID --value "
         f"plasma-plasmashell.service)\" != \"{plasma_pid}\"",
-        timeout=30,
+        timeout=120,
     )
     machine.wait_until_succeeds(
         f"timeout 5s {user_bus} introspect org.kde.plasmashell /PlasmaShell "
         "org.kde.PlasmaShell | grep -q evaluateScript",
-        timeout=30,
+        timeout=120,
     )
     machine.wait_until_succeeds(
         "grep -q org.cybou.presence "
         "/home/cybou/.config/plasma-org.kde.plasma.desktop-appletsrc",
-        timeout=30,
+        timeout=120,
     )
 
     assert machine.succeed(

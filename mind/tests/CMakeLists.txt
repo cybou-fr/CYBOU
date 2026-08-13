@@ -122,7 +122,7 @@ set_tests_properties(journal PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 # CYBOU_SCALE_CONTRIBUTIONS to 100000 or 1000000 for the separate scale gate and the manual
 # release benchmark. Its measurements are printed, so run ctest with --verbose to read them.
 qt_add_executable(test-journal-scale tst_journal_scale.cpp)
-target_link_libraries(test-journal-scale PRIVATE cybou-storage Qt6::Test)
+target_link_libraries(test-journal-scale PRIVATE cybou-storage cybou-predictor Qt6::Test)
 add_test(NAME journal-scale COMMAND test-journal-scale)
 set_tests_properties(journal-scale PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

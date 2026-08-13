@@ -41,6 +41,8 @@ machine-specific; the per-contribution costs and their linearity are the transfe
 | Paged replay, 1000/page | — | 728 ms | — | ~7.3 µs |
 | Full `Verify` | 109 ms | 1,036 ms | 10,915 ms | **~10.9 µs** |
 | Incremental `Verify`, 500 new | — | 4 ms | — | independent of history |
+| Predictor `allCalibrations`, first read | 94 ms | — | — | ~9.4 µs |
+| Predictor `allCalibrations`, second read | **0 ms** | — | — | independent of history |
 | Consolidation backlog count | 1 ms | 13 ms | 130 ms | ~0.13 µs |
 | Indexed lookup (oldest / newest) | 5 / 5 ms | 5 / 4 ms | 5 / 5 ms | flat |
 | Journal size | 3.6 MiB | 34.6 MiB | 347 MiB | **~364 bytes** |
@@ -116,8 +118,8 @@ contributions rather than seconds so they can be checked against a real journal.
 | Budget | Threshold | Consequence of crossing it |
 |---|---:|---|
 | `Verify` within the Presence command budget | ~~**~460k**~~ | Closed for verification. selfd verifies incrementally against a persisted checkpoint |
-| `Reflect` within the Presence command budget | **not measured** | Linear now, not multiplicative: one replay rather than one per subject. Making it independent of the biography needs an incremental subject index in predictord |
-| Organ cold reconstruction within a plausible session start | **~500k** | Three organs each spend ~5 s replaying before they are useful; needs paged replay with a cursor |
+| `Reflect` within the Presence command budget | ~~**not measured**~~ | Closed. predictord answers from a cursor-carrying projection, so a read costs what arrived since the last one rather than the length of a life |
+| Organ cold reconstruction within a plausible session start | **~500k** | Still binding at start, but paid once per process rather than once per question. intentiond replays paged, predictord and epistemicd carry cursors; only epistemicd persists a checkpoint across restarts |
 | Sustained ingestion | **~800/s** | Above this, Event1 acceptance becomes the bottleneck and a perception adapter must batch or drop |
 | Journal size on a normal disk | not binding below ~10m | ~3.5 GiB; time budgets bind long before storage does |
 

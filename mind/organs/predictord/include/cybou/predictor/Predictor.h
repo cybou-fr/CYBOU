@@ -5,6 +5,8 @@
 
 #include "cybou/events/EventStore.h"
 
+#include <QHash>
+
 namespace cybou {
 
 struct Forecast {
@@ -44,10 +46,35 @@ private:
         PrivacyClass privacy{PrivacyClass::Local};
     };
 
+    /// Everything this organ has derived about one subject, kept oldest first.
+    struct SubjectState {
+        QList<PredictionSample> samples;
+        int settled{0};
+        double absoluteError{0.0};
+        double signedError{0.0};
+    };
+
     QList<PredictionSample> history(const QString &subject) const;
 
+    /// Take in everything accepted since the cursor.
+    ///
+    /// Every read used to scan the whole biography, so answering cost the length of a life rather
+    /// than the length of what had changed since the last question - and selfd asks on the ordinary
+    /// self-assessment path, under a budget. This makes a read cost the new contributions only.
+    ///
+    /// Failing here is failing closed. A projection built from part of the history is not a smaller
+    /// answer, it is a wrong one: an unread Outcome makes a subject look better calibrated than it
+    /// is, and nothing downstream could tell.
+    bool catchUp() const;
+
     EventStore *m_events;
-    QString m_lastError;
+    mutable QString m_lastError;
+
+    // Derived state, rebuilt from the Journal and never authoritative over it. Mutable because
+    // answering a question may require reading what has been accepted since the last one, which is
+    // not a change to what this organ believes - only to how much of the Journal it has read.
+    mutable QHash<QString, SubjectState> m_bySubject;
+    mutable quint64 m_cursor{0};
 };
 
 } // namespace cybou

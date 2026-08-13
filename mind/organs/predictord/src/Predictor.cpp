@@ -8,7 +8,6 @@
 #include <QSet>
 
 #include <algorithm>
-#include <QMap>
 
 #include <cmath>
 
@@ -35,35 +34,77 @@ Predictor::Predictor(EventStore *journal)
 {
 }
 
+bool Predictor::catchUp() const
+{
+    if (!m_events) {
+        return false;
+    }
+
+    // One page at a time, so catching up after a long absence never holds the whole biography in
+    // memory at once. The common case is a page that comes back empty.
+    constexpr int kPageSize = 1000;
+    for (;;) {
+        const ContributionPage page = m_events->after(m_cursor, kPageSize);
+        if (!page.ok) {
+            m_lastError = QStringLiteral("could not read contributions after %1").arg(m_cursor);
+            return false;
+        }
+        if (page.envelopes.isEmpty()) {
+            return true;
+        }
+
+        for (const CognitiveEnvelope &e : page.envelopes) {
+            if (e.originOrgan != QLatin1String(kOrgan)) {
+                continue;
+            }
+            const QCborMap payload = payloadOf(e);
+            const QString subject = subjectOf(payload);
+            if (subject.isEmpty()) {
+                continue;
+            }
+
+            // A settled Outcome carries both: the value that was actually seen, which is a sample
+            // like any other, and the error against what was forecast, which is not.
+            const bool measured = e.kind == ContributionKind::Outcome
+                                  || e.kind == ContributionKind::Observation;
+            if (measured && payload.contains(QStringLiteral("actual"))) {
+                m_bySubject[subject].samples.append(PredictionSample{
+                    e.messageId,
+                    payload[QStringLiteral("actual")].toDouble(),
+                    e.privacy,
+                });
+            }
+
+            if (e.kind == ContributionKind::Outcome
+                && payload.contains(QStringLiteral("error"))) {
+                const double error = payload[QStringLiteral("error")].toDouble();
+                SubjectState &state = m_bySubject[subject];
+                state.absoluteError += std::fabs(error);
+                state.signedError += error;
+                ++state.settled;
+            }
+        }
+
+        if (page.lastSequence <= m_cursor) {
+            m_lastError = QStringLiteral("the journal did not advance past %1").arg(m_cursor);
+            return false;
+        }
+        m_cursor = page.lastSequence;
+
+        if (!page.hasMore) {
+            return true;
+        }
+    }
+}
+
 QList<Predictor::PredictionSample> Predictor::history(const QString &subject) const
 {
-    QList<PredictionSample> values;
-    if (!m_events) {
-        return values;
+    if (!catchUp()) {
+        return {};
     }
-
-    const auto all = m_events->recent(0);
-    for (const auto &e : all) {
-        const bool measured = e.kind == ContributionKind::Outcome
-                              || e.kind == ContributionKind::Observation;
-        if (!measured || e.originOrgan != QLatin1String(kOrgan)) {
-            continue;
-        }
-
-        const QCborMap payload = payloadOf(e);
-        if (subjectOf(payload) != subject || !payload.contains(QStringLiteral("actual"))) {
-            continue;
-        }
-
-        values.append(PredictionSample{
-            e.messageId,
-            payload[QStringLiteral("actual")].toDouble(),
-            e.privacy,
-        });
-    }
-
-    std::reverse(values.begin(), values.end());
-    return values;
+    // Accumulated oldest first, which is the order `after` yields and the order predictions are
+    // built in. The `recent(0)` version ended with a reverse because that call yields newest first.
+    return m_bySubject.value(subject).samples;
 }
 
 bool Predictor::observe(const QString &subject, double value)
@@ -211,31 +252,15 @@ Calibration Predictor::calibration(const QString &subject) const
 {
     Calibration calibration;
     calibration.subject = subject;
-    if (!m_events) {
+    if (!m_events || !catchUp()) {
         return calibration;
     }
 
-    double absolute = 0.0;
-    double signedSum = 0.0;
-
-    for (const auto &e : m_events->recent(0)) {
-        if (e.kind != ContributionKind::Outcome || e.originOrgan != QLatin1String(kOrgan)) {
-            continue;
-        }
-        const QCborMap payload = payloadOf(e);
-        if (subjectOf(payload) != subject || !payload.contains(QStringLiteral("error"))) {
-            continue;
-        }
-
-        const double error = payload[QStringLiteral("error")].toDouble();
-        absolute += std::fabs(error);
-        signedSum += error;
-        ++calibration.settled;
-    }
-
+    const SubjectState state = m_bySubject.value(subject);
+    calibration.settled = state.settled;
     if (calibration.settled > 0) {
-        calibration.meanError = absolute / calibration.settled;
-        calibration.bias = signedSum / calibration.settled;
+        calibration.meanError = state.absoluteError / calibration.settled;
+        calibration.bias = state.signedError / calibration.settled;
     }
     return calibration;
 }
@@ -243,51 +268,33 @@ Calibration Predictor::calibration(const QString &subject) const
 QList<Calibration> Predictor::allCalibrations() const
 {
     QList<Calibration> result;
-    if (!m_events) {
+    if (!m_events || !catchUp()) {
         return result;
     }
 
-    // One pass over the biography, accumulating every subject at once.
+    // Every subject at once, from state that was accumulated as the contributions arrived.
     //
-    // This used to replay the history to collect the subjects and then call calibration() for each
-    // of them, which replays it again - so the cost was the length of the biography multiplied by
-    // the number of subjects. selfd reaches this through Reflect under a five second budget, and
-    // the multiplication is what made that budget a function of two growing quantities rather than
-    // one. The per-subject arithmetic never needed more than a single read.
-    struct Accumulator {
-        int settled{0};
-        double absolute{0.0};
-        double signedSum{0.0};
-    };
-    QMap<QString, Accumulator> bySubject;
-
-    for (const auto &e : m_events->recent(0)) {
-        if (e.kind != ContributionKind::Outcome || e.originOrgan != QLatin1String(kOrgan)) {
+    // This used to replay the biography to collect the subjects and then replay it again for each
+    // of them, so the cost was the length of a life multiplied by the number of subjects. Reducing
+    // that to a single pass fixed the multiplication; keeping the pass incremental removes the
+    // length of the life as well. selfd reaches this through Reflect under a five second budget.
+    for (auto it = m_bySubject.cbegin(); it != m_bySubject.cend(); ++it) {
+        if (it.value().settled == 0) {
             continue;
         }
-        const QCborMap payload = payloadOf(e);
-        const QString subject = subjectOf(payload);
-        if (subject.isEmpty() || !payload.contains(QStringLiteral("error"))) {
-            continue;
-        }
-
-        const double error = payload[QStringLiteral("error")].toDouble();
-        Accumulator &accumulator = bySubject[subject];
-        accumulator.absolute += std::fabs(error);
-        accumulator.signedSum += error;
-        ++accumulator.settled;
-    }
-
-    for (auto it = bySubject.cbegin(); it != bySubject.cend(); ++it) {
         Calibration calibration;
         calibration.subject = it.key();
         calibration.settled = it.value().settled;
-        if (calibration.settled > 0) {
-            calibration.meanError = it.value().absolute / calibration.settled;
-            calibration.bias = it.value().signedSum / calibration.settled;
-        }
+        calibration.meanError = it.value().absoluteError / calibration.settled;
+        calibration.bias = it.value().signedError / calibration.settled;
         result.append(calibration);
     }
+
+    // Subject order was incidental to a QMap before and is incidental to a hash now, but a stable
+    // answer is worth more than a fast one here: callers compare successive readings.
+    std::sort(result.begin(), result.end(), [](const Calibration &a, const Calibration &b) {
+        return a.subject < b.subject;
+    });
     return result;
 }
 

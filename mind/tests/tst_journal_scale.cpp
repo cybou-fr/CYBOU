@@ -22,6 +22,8 @@
 
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include "cybou/predictor/Predictor.h"
+
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -230,6 +232,40 @@ private Q_SLOTS:
     // Indexed lookups must not care how much history precedes them. This is the one assertion that
     // is about shape rather than speed, and it is machine-independent: a scan would make the last
     // contribution dramatically more expensive to reach than the first.
+    // What a derived organ pays to answer a question, before and after it has read the biography.
+    //
+    // Predictor used to scan the whole Journal on every read, so a self-assessment cost the length
+    // of a life each time it was asked. It now advances a cursor, and the second read pays only for
+    // what arrived since the first. The fixture's contributions are all foreign to predictord, so
+    // this measures the traversal rather than the accumulation - which is the part that grew.
+    void aDerivedProjectionPaysForTheBiographyOnlyOnce()
+    {
+        Journal journal(m_path);
+        QVERIFY(journal.isOpen());
+        Predictor predictor(&journal);
+
+        QElapsedTimer timer;
+        timer.start();
+        const QList<Calibration> cold = predictor.allCalibrations();
+        const qint64 coldMs = timer.elapsed();
+
+        timer.restart();
+        const QList<Calibration> warm = predictor.allCalibrations();
+        const qint64 warmMs = timer.elapsed();
+
+        QCOMPARE(warm.size(), cold.size());
+        reportMs(QStringLiteral("predictor first read (whole biography)"), coldMs);
+        reportMs(QStringLiteral("predictor second read (nothing new)"), warmMs);
+
+        // Deliberately not a ratio against coldMs: this suite runs on whatever hardware it lands
+        // on, and the claim being pinned is absolute anyway. A read that answers from the cursor
+        // does no work proportional to history, so it cannot take a meaningful number of
+        // milliseconds no matter how slow the machine is.
+        QVERIFY2(
+            warmMs <= 50,
+            qPrintable(QStringLiteral("second read took %1 ms; it should do no work").arg(warmMs)));
+    }
+
     void indexedLookupDoesNotScaleWithHistory()
     {
         Journal journal(m_path);
