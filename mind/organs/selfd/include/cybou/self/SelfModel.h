@@ -20,6 +20,16 @@ struct SelfReport {
     int openIntentions{0};
     qint64 oldestObligationDays{0};
 
+    /// Whether the obligation count above means anything.
+    ///
+    /// Zero open intentions and an obligation set that could not be read are different facts, and
+    /// a self-assessment that reported the second as the first would be reassuring itself with a
+    /// number it never obtained.
+    bool obligationsKnown{false};
+
+    /// Whether the calibration figures below were obtained rather than defaulted.
+    bool calibrationsKnown{false};
+
     QList<Calibration> calibrations;
     int settledPredictions{0};
 

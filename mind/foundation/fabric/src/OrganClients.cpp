@@ -113,11 +113,16 @@ IntentionClient::IntentionClient()
 {
 }
 
-QVariantList IntentionClient::open(int timeoutMs) const
+QVariantList IntentionClient::open(int timeoutMs, bool *ok) const
 {
-    return decodeList(
-        m_rpc.callBytes(QStringLiteral("Open"), {}, timeoutMs),
-        &m_codecError);
+    const QByteArray encoded = m_rpc.callBytes(QStringLiteral("Open"), {}, timeoutMs);
+    if (ok) {
+        // An encoded fabric list always carries its version envelope, so it is never empty. Empty
+        // bytes therefore mean the call failed - which intentiond now reports explicitly rather
+        // than answering with an empty set.
+        *ok = !encoded.isEmpty();
+    }
+    return decodeList(encoded, &m_codecError);
 }
 
 QString IntentionClient::form(

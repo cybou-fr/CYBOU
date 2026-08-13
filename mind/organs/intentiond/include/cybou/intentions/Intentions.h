@@ -6,6 +6,8 @@
 #include "cybou/events/EventStore.h"
 
 #include <QSet>
+
+#include <optional>
 #include <QString>
 
 namespace cybou {
@@ -33,7 +35,12 @@ public:
 
     bool close(const QUuid &intentionId, Resolution resolution, const QString &note = QString());
 
-    QList<Intention> open() const;
+    /// What Mind is currently committed to, or nothing at all if that could not be assembled.
+    ///
+    /// An empty list and a failed read are different answers and must not share a representation.
+    /// This used to return an empty list for both, so a Journal that could not be read looked
+    /// exactly like a Mind with no obligations - the most reassuring possible way to fail.
+    std::optional<QList<Intention>> open() const;
 
     QString lastError() const { return m_lastError; }
 

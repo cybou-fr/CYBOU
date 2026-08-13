@@ -248,13 +248,14 @@ bool Predictor::settle(const QUuid &forecastId, double actual)
     return true;
 }
 
-Calibration Predictor::calibration(const QString &subject) const
+std::optional<Calibration> Predictor::calibration(const QString &subject) const
 {
+    if (!m_events || !catchUp()) {
+        return std::nullopt;
+    }
+
     Calibration calibration;
     calibration.subject = subject;
-    if (!m_events || !catchUp()) {
-        return calibration;
-    }
 
     const SubjectState state = m_bySubject.value(subject);
     calibration.settled = state.settled;
@@ -265,12 +266,13 @@ Calibration Predictor::calibration(const QString &subject) const
     return calibration;
 }
 
-QList<Calibration> Predictor::allCalibrations() const
+std::optional<QList<Calibration>> Predictor::allCalibrations() const
 {
-    QList<Calibration> result;
     if (!m_events || !catchUp()) {
-        return result;
+        return std::nullopt;
     }
+
+    QList<Calibration> result;
 
     // Every subject at once, from state that was accumulated as the contributions arrived.
     //

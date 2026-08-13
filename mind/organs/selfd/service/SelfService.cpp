@@ -107,7 +107,9 @@ SelfReport SelfService::measureReport() const
     report.architectureVersion =
         identity.value(QStringLiteral("architectureVersion")).toString();
 
-    const QVariantList intentions = m_intentions.open();
+    bool obligationsRead = false;
+    const QVariantList intentions = m_intentions.open(-1, &obligationsRead);
+    report.obligationsKnown = obligationsRead;
     report.openIntentions = intentions.size();
     if (!intentions.isEmpty()) {
         const QDateTime formed =
@@ -169,6 +171,10 @@ QVariantMap SelfService::reportMap(
         report.architectureVersion;
     map[QStringLiteral("openIntentions")] =
         report.openIntentions;
+    // Carried across the wire so a reader can tell a Mind with no obligations from one that could
+    // not find out. Without it the number is unfalsifiable.
+    map[QStringLiteral("obligationsKnown")] =
+        report.obligationsKnown;
     map[QStringLiteral("oldestObligationDays")] =
         report.oldestObligationDays;
     map[QStringLiteral("calibrations")] = calibrations;

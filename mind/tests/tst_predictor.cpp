@@ -12,6 +12,29 @@
 
 using namespace cybou;
 
+// A Journal whose paged reads can be made to fail. The only case that matters below is the one a
+// healthy Journal will not produce.
+class UnreadableAfter : public Journal
+{
+public:
+    using Journal::Journal;
+
+    ContributionPage after(quint64 afterSequence, int limit) const override
+    {
+        if (m_readsFail) {
+            ContributionPage page;
+            page.ok = false;
+            return page;
+        }
+        return Journal::after(afterSequence, limit);
+    }
+
+    void failReads(bool fail) { m_readsFail = fail; }
+
+private:
+    bool m_readsFail{false};
+};
+
 class TestPredictor : public QObject
 {
     Q_OBJECT
@@ -37,7 +60,7 @@ private Q_SLOTS:
         const Forecast boot = predictor.predict(QStringLiteral("boot"));
         QVERIFY(predictor.settle(boot.id, 18.0));
 
-        const QList<Calibration> all = predictor.allCalibrations();
+        const QList<Calibration> all = predictor.allCalibrations().value();
         QCOMPARE(all.size(), 2);
 
         // Each subject must carry its own arithmetic. A single-pass accumulator that shared state
@@ -54,7 +77,7 @@ private Q_SLOTS:
         // And must agree with what the single-subject query says, which is the contract the
         // refactor had to preserve.
         for (const QString &subject : {QStringLiteral("build"), QStringLiteral("boot")}) {
-            const Calibration direct = predictor.calibration(subject);
+            const Calibration direct = predictor.calibration(subject).value();
             QCOMPARE(bySubject[subject].settled, direct.settled);
             QCOMPARE(bySubject[subject].meanError, direct.meanError);
             QCOMPARE(bySubject[subject].bias, direct.bias);
@@ -67,7 +90,39 @@ private Q_SLOTS:
 
         // A subject that was never settled contributes nothing.
         QVERIFY(predictor.observe(QStringLiteral("unsettled"), 1.0));
-        QCOMPARE(predictor.allCalibrations().size(), 2);
+        QCOMPARE(predictor.allCalibrations().value().size(), 2);
+    }
+
+    // A calibration that could not be read is not a calibration of zero.
+    //
+    // Both of these used to return an empty value on a failed read, so a Journal that could not be
+    // read reported every subject as never settled and perfectly unbiased. That is the most
+    // flattering possible way to fail, and indistinguishable from a Mind that has simply not been
+    // wrong yet.
+    void anUnreadableJournalIsNotAPerfectRecord()
+    {
+        QTemporaryDir dir;
+        UnreadableAfter journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        Predictor predictor(&journal);
+        QVERIFY(predictor.observe(QStringLiteral("build"), 10.0));
+        const Forecast forecast = predictor.predict(QStringLiteral("build"));
+        QVERIFY(predictor.settle(forecast.id, 14.0));
+        QCOMPARE(predictor.calibration(QStringLiteral("build")).value().settled, 1);
+
+        Predictor cold(&journal);
+        journal.failReads(true);
+        QVERIFY2(
+            !cold.calibration(QStringLiteral("build")).has_value(),
+            "a failed read must not answer as an unsettled subject");
+        QVERIFY2(
+            !cold.allCalibrations().has_value(),
+            "a failed read must not answer as a Mind with no subjects");
+
+        journal.failReads(false);
+        QCOMPARE(cold.calibration(QStringLiteral("build")).value().settled, 1);
+        QCOMPARE(cold.allCalibrations().value().size(), 1);
     }
 
     // The projection is incremental now: a read costs what has been accepted since the last read,
@@ -105,13 +160,13 @@ private Q_SLOTS:
         Predictor predictor(&journal);
 
         QVERIFY(predictor.observe(QStringLiteral("latency"), 10.0));
-        QCOMPARE(predictor.calibration(QStringLiteral("latency")).settled, 0);
+        QCOMPARE(predictor.calibration(QStringLiteral("latency")).value().settled, 0);
 
         Predictor other(&journal);
         const Forecast forecast = other.predict(QStringLiteral("latency"));
         QVERIFY(other.settle(forecast.id, 14.0));
 
-        const Calibration calibration = predictor.calibration(QStringLiteral("latency"));
+        const Calibration calibration = predictor.calibration(QStringLiteral("latency")).value();
         QCOMPARE(calibration.settled, 1);
         QCOMPARE(calibration.meanError, 4.0);
         QCOMPARE(calibration.bias, 4.0);
@@ -171,7 +226,7 @@ private Q_SLOTS:
         QCOMPARE(latest.causationId, forecast.id);
         QVERIFY(latest.evidence.isEmpty());
 
-        const Calibration calibration = predictor.calibration(QStringLiteral("build"));
+        const Calibration calibration = predictor.calibration(QStringLiteral("build")).value();
         QCOMPARE(calibration.settled, 1);
         QCOMPARE(calibration.meanError, 3.0);
         QCOMPARE(calibration.bias, 3.0);

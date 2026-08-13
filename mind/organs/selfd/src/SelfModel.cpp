@@ -38,11 +38,15 @@ SelfReport SelfModel::measure() const
     report.sessions = identity.sessionCount;
     report.architectureVersion = identity.architectureVersion;
 
-    const QList<Intention> openIntentions = m_intentions->open();
-    report.openIntentions = static_cast<int>(openIntentions.size());
-    if (!openIntentions.isEmpty()) {
-        report.oldestObligationDays =
-            openIntentions.first().formed.daysTo(report.taken);
+    // A failed read leaves openIntentions at zero and obligationsKnown false, rather than letting
+    // "I could not tell" be reported as "nothing is outstanding".
+    if (const auto openIntentions = m_intentions->open()) {
+        report.obligationsKnown = true;
+        report.openIntentions = static_cast<int>(openIntentions->size());
+        if (!openIntentions->isEmpty()) {
+            report.oldestObligationDays =
+                openIntentions->first().formed.daysTo(report.taken);
+        }
     }
 
     // Ask the predictor for its whole calibration projection rather than discovering subjects here
@@ -50,10 +54,16 @@ SelfReport SelfModel::measure() const
     // per-subject question replayed it again, so self-assessment cost the length of the history
     // multiplied by the number of subjects. The predictor owns this knowledge and can produce all
     // of it in one read.
-    for (const Calibration &calibration : m_predictor->allCalibrations()) {
-        if (calibration.settled > 0) {
-            report.calibrations.append(calibration);
-            report.settledPredictions += calibration.settled;
+    // Same rule as the obligations above: a calibration set that could not be assembled is not a
+    // calibration set of zero, and settledPredictions must not be read as a measurement when none
+    // was taken.
+    if (const auto calibrations = m_predictor->allCalibrations()) {
+        report.calibrationsKnown = true;
+        for (const Calibration &calibration : *calibrations) {
+            if (calibration.settled > 0) {
+                report.calibrations.append(calibration);
+                report.settledPredictions += calibration.settled;
+            }
         }
     }
 

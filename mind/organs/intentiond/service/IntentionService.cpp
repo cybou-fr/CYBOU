@@ -5,6 +5,8 @@
 
 #include "cybou/fabric/FabricCodec.h"
 
+#include <QDBusError>
+
 namespace cybou {
 
 IntentionService::IntentionService(
@@ -36,10 +38,21 @@ QString IntentionService::LastError() const
     return m_events ? m_events->lastError() : QString();
 }
 
-QByteArray IntentionService::Open() const
+QByteArray IntentionService::Open()
 {
+    const auto commitments = m_intentions.open();
+    if (!commitments.has_value()) {
+        if (calledFromDBus()) {
+            sendErrorReply(
+                QDBusError::Failed,
+                QStringLiteral("the open set could not be assembled: %1")
+                    .arg(m_intentions.lastError()));
+        }
+        return {};
+    }
+
     QVariantList result;
-    for (const Intention &intention : m_intentions.open()) {
+    for (const Intention &intention : *commitments) {
         QVariantMap map;
         map[QStringLiteral("correlationId")] =
             intention.id.toString(QUuid::WithoutBraces);

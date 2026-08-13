@@ -59,7 +59,9 @@ public:
     bool ready() const { return m_rpc.ready(); }
     QString health() const { return m_rpc.health(); }
 
-    QVariantList open(int timeoutMs = -1) const;
+    /// The open set. `ok` distinguishes "nothing is outstanding" from "could not be read": a
+    /// successful fabric reply is never empty, so an empty one is always a failure.
+    QVariantList open(int timeoutMs = -1, bool *ok = nullptr) const;
     QString form(
         const QString &description,
         const QString &trigger,

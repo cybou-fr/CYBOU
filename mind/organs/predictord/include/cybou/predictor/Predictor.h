@@ -7,6 +7,8 @@
 
 #include <QHash>
 
+#include <optional>
+
 namespace cybou {
 
 struct Forecast {
@@ -34,8 +36,13 @@ public:
     Forecast predict(const QString &subject, const QUuid &correlationId = QUuid());
     bool settle(const QUuid &forecastId, double actual);
 
-    Calibration calibration(const QString &subject) const;
-    QList<Calibration> allCalibrations() const;
+    /// How well this organ has predicted a subject, or nothing if that could not be assembled.
+    ///
+    /// A zeroed Calibration and a failed read used to be the same value, so a Journal that could
+    /// not be read reported every subject as never settled and perfectly unbiased - flattering,
+    /// and indistinguishable from the truth.
+    std::optional<Calibration> calibration(const QString &subject) const;
+    std::optional<QList<Calibration>> allCalibrations() const;
 
     QString lastError() const { return m_lastError; }
 

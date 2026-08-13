@@ -5,11 +5,14 @@
 
 #include "cybou/intentions/Intentions.h"
 
+#include <QDBusContext>
 #include <QObject>
 
 namespace cybou {
 
-class IntentionService : public QObject
+class IntentionService
+    : public QObject
+    , protected QDBusContext
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.cybou.Mind.Intention1")
@@ -24,7 +27,13 @@ public Q_SLOTS:
     QString Health() const;
     QString LastError() const;
 
-    QByteArray Open() const;
+    /// The open set, or a D-Bus error if it could not be assembled.
+    ///
+    /// Erroring rather than answering an empty list is the point: every caller already treats a
+    /// failed call as a section it could not measure and leaves a typed default, whereas an empty
+    /// success is indistinguishable from "Mind owes nothing" - a comforting lie about the one thing
+    /// this organ exists to be sure about.
+    QByteArray Open();
 
     QString Form(
         const QString &description,

@@ -113,15 +113,15 @@ bool Intentions::close(
     return true;
 }
 
-QList<Intention> Intentions::open() const
+std::optional<QList<Intention>> Intentions::open() const
 {
-    QList<Intention> result;
     if (!m_events) {
-        return result;
+        m_lastError = QStringLiteral("intentions need a journal to read");
+        return std::nullopt;
     }
 
     if (!catchUp()) {
-        return {};
+        return std::nullopt;
     }
 
     // Already exactly the open set, in acceptance order. Nothing to filter and nothing to sort.

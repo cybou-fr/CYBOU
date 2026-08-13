@@ -863,6 +863,44 @@ pins the wrong number turns fixing the docs into a build failure.
 
 **P7.7 is complete.**
 
+## P7.8 — a failed read stops looking like a fact
+
+The three invariants were written down as acceptance conditions, and the second one — *partial or
+unavailable is not empty truth* — turned out not to hold in three places I had written myself.
+
+- `Intentions::open()` returned an empty list both when nothing was outstanding and when the
+  Journal could not be read.
+- `Predictor::calibration()` returned a zeroed Calibration for both "never settled" and "could not
+  tell".
+- `allCalibrations()` returned nothing for both "no subjects" and "no answer".
+
+Each collapse chose the most reassuring reading. A Mind that cannot read its own history would have
+reported no outstanding obligations, no prediction errors and a perfectly unbiased record — and
+Presence would have shown that as a complete projection.
+
+**The fix is a type, not a flag.** Both reads return `std::optional`, so the compiler enumerated
+every place the distinction had been discarded rather than leaving it to a search. The organs then
+send a D-Bus error instead of an empty success, which needs no new machinery: every caller already
+treats a failed call as a section it could not measure and leaves a typed default.
+
+It propagates the whole way. `IntentionClient::open` reports whether the call succeeded — a fabric
+reply always carries its version envelope, so empty bytes are unambiguously a failure — and
+`SelfReport` carries `obligationsKnown` and `calibrationsKnown` across the wire. A self-assessment
+can no longer report "nothing outstanding" when it never found out.
+
+Both new tests use a Journal whose paged reads can be made to fail, because the case only exists
+when reading history does not work and a healthy Journal will not produce it.
+
+### On the gates
+
+`p4-plasma-lifecycle` failed again inside a full `nix flake check`, waiting for the Presence applet
+to reappear in `appletsrc` after a plasmashell restart, and passed alone immediately afterwards.
+`nix flake check` runs four VM gates against one machine; run sequentially, all four pass. The
+timeout was **not** raised again — it was already raised once, and raising a limit that has failed
+at its new value twice would be tuning the measurement rather than the thing measured.
+
+**P7.8 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

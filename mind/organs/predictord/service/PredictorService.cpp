@@ -5,6 +5,8 @@
 
 #include "cybou/fabric/FabricCodec.h"
 
+#include <QDBusError>
+
 #include <QCborMap>
 #include <QDateTime>
 #include <QSet>
@@ -137,11 +139,21 @@ bool PredictorService::Settle(
         actual);
 }
 
-QByteArray PredictorService::Calibrations() const
+QByteArray PredictorService::Calibrations()
 {
+    const auto calibrations = m_predictor.allCalibrations();
+    if (!calibrations.has_value()) {
+        if (calledFromDBus()) {
+            sendErrorReply(
+                QDBusError::Failed,
+                QStringLiteral("calibrations could not be assembled: %1")
+                    .arg(m_predictor.lastError()));
+        }
+        return {};
+    }
+
     QVariantList result;
-    for (const Calibration &calibration :
-         m_predictor.allCalibrations()) {
+    for (const Calibration &calibration : *calibrations) {
         result.append(calibrationMap(calibration));
     }
     return FabricCodec::encodeList(result);

@@ -301,11 +301,11 @@ private Q_SLOTS:
 
         QElapsedTimer timer;
         timer.start();
-        const QList<Calibration> cold = predictor.allCalibrations();
+        const QList<Calibration> cold = predictor.allCalibrations().value();
         const qint64 coldMs = timer.elapsed();
 
         timer.restart();
-        const QList<Calibration> warm = predictor.allCalibrations();
+        const QList<Calibration> warm = predictor.allCalibrations().value();
         const qint64 warmMs = timer.elapsed();
 
         QCOMPARE(warm.size(), cold.size());
@@ -334,11 +334,11 @@ private Q_SLOTS:
 
         QElapsedTimer timer;
         timer.start();
-        const QList<Intention> cold = intentions.open();
+        const QList<Intention> cold = intentions.open().value();
         const qint64 coldMs = timer.elapsed();
 
         timer.restart();
-        const QList<Intention> warm = intentions.open();
+        const QList<Intention> warm = intentions.open().value();
         const qint64 warmMs = timer.elapsed();
 
         QCOMPARE(warm.size(), cold.size());

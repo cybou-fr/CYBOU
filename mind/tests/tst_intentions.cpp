@@ -26,6 +26,29 @@ CognitiveEnvelope requestObservation(const QString &description = QStringLiteral
 
 } // namespace
 
+// A Journal whose paged reads can be made to fail, so the one case that matters here - reading
+// history does not work - can actually be produced.
+class UnreadableAfter : public Journal
+{
+public:
+    using Journal::Journal;
+
+    ContributionPage after(quint64 afterSequence, int limit) const override
+    {
+        if (m_readsFail) {
+            ContributionPage page;
+            page.ok = false;
+            return page;
+        }
+        return Journal::after(afterSequence, limit);
+    }
+
+    void failReads(bool fail) { m_readsFail = fail; }
+
+private:
+    bool m_readsFail{false};
+};
+
 class TestIntentions : public QObject
 {
     Q_OBJECT
@@ -80,7 +103,7 @@ private Q_SLOTS:
         QVERIFY(!id.isNull());
         QVERIFY(intentions.close(id, Resolution::Fulfilled));
         QVERIFY(!intentions.close(id, Resolution::Abandoned));
-        QVERIFY(intentions.open().isEmpty());
+        QVERIFY(intentions.open().value().isEmpty());
 
         const auto outcome = journal.recent(1).first();
         QCOMPARE(outcome.kind, ContributionKind::Outcome);
@@ -111,7 +134,7 @@ private Q_SLOTS:
         {
             Journal journal(path, QStringLiteral("second"));
             Intentions intentions(&journal);
-            QCOMPARE(intentions.open().size(), 1);
+            QCOMPARE(intentions.open().value().size(), 1);
             QVERIFY(intentions.close(intentionId, Resolution::Obsolete));
 
             const auto episode = journal.episode(requestId);
@@ -141,12 +164,42 @@ private Q_SLOTS:
         const QUuid id = intentions.form(
             QStringLiteral("water the plants"), QStringLiteral("daily"), request.messageId);
         QVERIFY(!id.isNull());
-        QCOMPARE(intentions.open().size(), 1);
+        QCOMPARE(intentions.open().value().size(), 1);
 
         Intentions other(&journal);
         QVERIFY(other.close(id, Resolution::Fulfilled));
 
-        QVERIFY(intentions.open().isEmpty());
+        QVERIFY(intentions.open().value().isEmpty());
+    }
+
+    // A read that could not be assembled must not look like a Mind that owes nothing.
+    //
+    // open() used to return an empty list both when there were no obligations and when the Journal
+    // could not be read. Those are different answers, and collapsing them chose the most
+    // reassuring one: Presence would show "nothing outstanding" precisely when it had no idea.
+    void anUnreadableJournalIsNotAnEmptyObligationSet()
+    {
+        QTemporaryDir dir;
+        UnreadableAfter journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope request = requestObservation();
+        QVERIFY(journal.append(request) > 0);
+
+        Intentions intentions(&journal);
+        QVERIFY(!intentions
+                     .form(QStringLiteral("outstanding"), QStringLiteral("test"), request.messageId)
+                     .isNull());
+        QCOMPARE(intentions.open().value().size(), 1);
+
+        Intentions cold(&journal);
+        journal.failReads(true);
+        const auto answer = cold.open();
+        QVERIFY2(!answer.has_value(), "a failed read must not answer with an empty set");
+        QVERIFY(!cold.lastError().isEmpty());
+
+        journal.failReads(false);
+        QCOMPARE(cold.open().value().size(), 1);
     }
 
     // A closed commitment is not merely filtered out of the answer, it stops being carried at all.
@@ -173,24 +226,24 @@ private Q_SLOTS:
             QVERIFY(!id.isNull());
             ids.append(id);
         }
-        QCOMPARE(intentions.open().size(), 5);
+        QCOMPARE(intentions.open().value().size(), 5);
 
         for (const QUuid &id : ids) {
             QVERIFY(intentions.close(id, Resolution::Fulfilled));
         }
-        QVERIFY(intentions.open().isEmpty());
+        QVERIFY(intentions.open().value().isEmpty());
 
         // A fresh instance replays the same history and agrees. If closure were only a filter, the
         // two would still agree - so what this pins is that both are empty rather than that they
         // match, which they would either way.
         Intentions replayed(&journal);
-        QVERIFY(replayed.open().isEmpty());
+        QVERIFY(replayed.open().value().isEmpty());
 
         // And the order of what remains is still acceptance order after removals.
         const QUuid kept = intentions.form(
             QStringLiteral("still open"), QStringLiteral("test"), request.messageId);
         QVERIFY(!kept.isNull());
-        const QList<Intention> open = intentions.open();
+        const QList<Intention> open = intentions.open().value();
         QCOMPARE(open.size(), 1);
         QCOMPARE(open.first().description, QStringLiteral("still open"));
     }
@@ -206,7 +259,7 @@ private Q_SLOTS:
         QVERIFY(journal.append(request) > 0);
 
         Intentions intentions(&journal);
-        QVERIFY(intentions.open().isEmpty());
+        QVERIFY(intentions.open().value().isEmpty());
 
         Intentions other(&journal);
         QVERIFY(!other.form(
@@ -215,7 +268,7 @@ private Q_SLOTS:
                      request.messageId)
                      .isNull());
 
-        const QList<Intention> open = intentions.open();
+        const QList<Intention> open = intentions.open().value();
         QCOMPARE(open.size(), 1);
         QCOMPARE(open.first().description, QStringLiteral("call the dentist"));
     }
@@ -235,7 +288,7 @@ private Q_SLOTS:
             QVERIFY(!intentions.form(description, QString(), request.messageId).isNull());
         }
 
-        const auto open = intentions.open();
+        const auto open = intentions.open().value();
         QCOMPARE(open.size(), 3);
         QCOMPARE(open.at(0).description, QStringLiteral("first"));
         QCOMPARE(open.at(2).description, QStringLiteral("third"));
