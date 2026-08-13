@@ -693,32 +693,39 @@ and every assertion is unchanged: the unit must still become active, the MainPID
 Plasma must still re-expose `evaluateScript`, and the applet must still be there. Four consecutive
 runs green.
 
-### An open item, stated as one
+### The same defect in m6, and three sabotages that lied
 
-`m6-recovery-boundary` has the same defect `p4` had, and it is **not fixed**. Its
-`unresponsive Event1 rejects Promise and preserves count` subtest asserts an unchanged Journal count
-across a window in which eventd is deliberately SIGSTOPped. healthd observes the frozen owner, and
+`m6-recovery-boundary` had the defect `p4` had. Its
+`unresponsive Event1 rejects Promise and preserves count` subtest asserted an unchanged Journal count
+across a window in which eventd is deliberately SIGSTOPped. healthd observes the frozen owner and
 cannot record that transition until eventd resumes, so the write lands inside the window and is
-charged to the Promise. Measured at roughly one failure in four; the rejection itself always behaved.
+charged to the Promise — about one failure in four, while the rejection itself always behaved.
 
-An attempt to replace the count with a comparison of intentiond's `Open()` across the window was
-reverted, because it could not be shown to work:
+The count was a stand-in for the real claim: a rejected Promise leaves no commitment behind.
+intentiond's open set says that precisely and is unmoved by what other owners record about the
+outage, so the gate now compares it across the window, guarded by an assertion that the set is
+non-empty to begin with.
 
-- The first sabotage was a Nix syntax error — `''` inside a `''`-string — so it never ran. It
-  produced no output, and no output through a `grep` filter reads exactly like success.
-- The second used `Intention1.Form` with an empty `causeId`. `Intentions::form` requires a cause that
-  already exists in the Journal, so it formed nothing and the sabotage was a no-op.
-- The third let the Promise genuinely succeed, so a real commitment was formed inside the window.
-  **`Open()` still did not change.** Either the commitment is not visible there or it is not open;
-  that is a question about intentiond, not about the gate, and it is unanswered.
+**Getting there took three sabotages that all reported success for three different wrong reasons**,
+and on that evidence the change was briefly reverted as unprovable:
 
-Also worth recording: `nix build --rebuild` **errors** on a derivation it has never built rather than
-running it. Repeat runs used to characterise a flake must use a plain `nix build`, and must be judged
-on the exit code — several "green" repeat runs in this session were that error, filtered out of view
-by a `grep` that only matched failure text.
+- The first was a Nix syntax error — `''` inside a `''`-string — so Nix never built the VM. It
+  produced no output, and no output through a `grep` filter reads exactly like a passing run.
+- The second called `Intention1.Form` with an empty `causeId`. `Intentions::form` requires a cause
+  that already exists in the Journal, so it formed nothing; the sabotage was a no-op.
+- The third let the Promise run with eventd unfrozen but read its result through a flipped `grep`,
+  and its exit code was over-read as "the assertion did not fire".
 
-So the gate keeps its original assertion and its original one-in-four flake, honestly labelled,
-rather than a replacement that passes for unknown reasons.
+What settled it was measuring instead of inferring: a probe that printed the values showed a
+successful Promise takes the open set from **70 bytes to 604**, reproduced at 600 on a second run.
+The assertion then failed exactly as it should when the Promise was allowed to succeed — and failed
+at that assertion specifically, identifiable because it is the only one there without a message.
+Four consecutive runs green afterwards.
+
+Also worth recording, because it invalidated several verification runs in this session:
+`nix build --rebuild` **errors** on a derivation it has never built rather than running it. Repeat
+runs used to characterise a flake must use a plain `nix build` first, and must be judged on the exit
+code — not on the absence of a `grep` match.
 
 **P7.3 is complete.**
 

@@ -105,6 +105,23 @@ pkgs.testers.runNixOSTest {
         ).strip() != lifecycle_before_timeout
 
     with subtest("unresponsive Event1 rejects Promise and preserves count"):
+        # What this subtest claims is that a Promise rejected because Event1 was unreachable leaves
+        # no commitment behind. The Journal count was standing in for that and is not a faithful
+        # stand-in: healthd records a capability transition when it observes eventd frozen and
+        # cannot write it until eventd resumes, so that write lands inside the window and is
+        # charged to the Promise. Measured at roughly one failure in four, while the rejection
+        # itself always behaved.
+        #
+        # intentiond's open set says the same thing precisely and is unmoved by what other owners
+        # record about the outage. Measured directly: a Promise that succeeds takes this from 70
+        # bytes to 604, so a leaked commitment cannot hide in it.
+        commitments_before = machine.succeed(
+            f"{user_bus} call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 "
+            "org.cybou.Mind.Intention1 Open"
+        ).strip()
+        # Earlier subtests leave commitments open. Asserted rather than assumed, because comparing
+        # an empty set against an empty set would prove nothing at all.
+        assert len(commitments_before) > len("ay 0"), commitments_before
         count_before = int(machine.succeed(
             f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
             "org.cybou.Mind.Event1 Count | awk '{print $2}'"
@@ -136,11 +153,19 @@ pkgs.testers.runNixOSTest {
             f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
             "org.cybou.Mind.Event1 Ready | grep -q true"
         )
+        commitments_after = machine.succeed(
+            f"{user_bus} call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 "
+            "org.cybou.Mind.Intention1 Open"
+        ).strip()
+        assert commitments_after == commitments_before
+
         count_after = int(machine.succeed(
             f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
             "org.cybou.Mind.Event1 Count | awk '{print $2}'"
         ).strip())
-        assert count_after == count_before
+        # Only what is actually true across an outage: history is append-only, so it may grow while
+        # eventd is unreachable and must never shrink.
+        assert count_after >= count_before, f"count {count_before} -> {count_after}"
         assert int(machine.succeed(
             "systemctl --user -M cybou@ show -p MainPID --value plasma-plasmashell.service"
         ).strip()) == plasma_pid
