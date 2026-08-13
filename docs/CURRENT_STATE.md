@@ -13,8 +13,11 @@ This document is intentionally limited to implemented behavior and current limit
 
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
-The Mind package runs twenty-six CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and multi-process integration across the ten Mind owners. The process suite also proves a
+The Mind package runs twenty-eight CTest suites, including Event1, lifecycle persistence/recovery,
+Lifecycle1 process restart, and multi-process integration across the eleven Mind owners. Both counts
+are checked against the build rather than trusted: the documentation validator derives them from the
+package's daemon list and the tests CMakeLists, so a document that falls behind the code fails the
+build instead of quietly misdescribing it. The process suite also proves a
 simulated new login preserves identity and an accepted open intention while incrementing the
 logical session count, and that compound Presence reads and mutations obey one bounded deadline.
 
@@ -328,9 +331,13 @@ replacing the representative sample the checkpoint recorded as insufficient.
 `ObservationV1` is frozen as the typed perception payload: source, subject, typed value, acquisition
 time, declared freshness horizon and provenance. Unknown schema versions fail closed in both
 directions, a valueless observation is structurally invalid so a failure to observe cannot be
-contributed as one, and acquisition identity is deterministic over source, subject and acquisition
-time so a repeated report is a durable no-op rather than a second contribution. No perception
-adapter exists yet, so nothing produces these in the running system.
+contributed as one, and acquisition identity is deterministic over source, subject, acquisition time
+**and value**, so a repeated identical report is a durable no-op while two different values for one
+instant keep distinct identities and are both recorded. That last part is what lets a source be
+caught contradicting itself; an identity that excluded the value would have silently kept whichever
+arrived first.
+
+`cybou-perceptiond` produces these in the running system, and `cybou-epistemicd` consumes them.
 
 Health1 coalesces refreshes rather than refusing them. A caller arriving while a collection is
 running receives a delayed reply; when that collection finishes one further refresh is scheduled and

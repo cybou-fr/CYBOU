@@ -50,6 +50,14 @@ public Q_SLOTS:
     /// `unknown` rather than failing, because not knowing is a normal state.
     QByteArray KnowledgeOf(const QString &subject) const;
 
+    /// One page of what a subject's sources used to say, oldest first.
+    ///
+    /// Supersession is unbounded over a life, so it is never returned inline with the current
+    /// projection. A caller that wants to know why Mind changed its mind asks for it explicitly and
+    /// by the page; a caller that only wants to know what is true does not pay for it at all.
+    QByteArray KnowledgeHistory(
+        const QString &subject, qulonglong afterIndex, int limit) const;
+
     /// Highest Event1 sequence this projection has taken in.
     qulonglong Cursor() const;
 

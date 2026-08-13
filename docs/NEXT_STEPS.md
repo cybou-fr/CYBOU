@@ -40,16 +40,13 @@ untyped RPC outcomes, unbounded compound reads — and all of it has since been 
 lists solved problems is worse than none: it makes the document unreadable as a statement of where
 the work actually is. What follows is the current set.
 
-- observations are produced but nothing consumes them: no epistemic projection owner exists, so
-  freshness, contradiction and supersession are recorded and unread;
-- retention and erasure remain undecided, and [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md)
-  forbids ingesting any sensitive observation until a storage ADR covers expiry, tombstones,
-  derived-data propagation and backups;
-- organs rebuild derived state on demand rather than maintaining it: `Intentions::open()`
-  reconstructs on every call and predictord recomputes calibrations per query, both linear in the
-  biography;
+- retention and erasure are decided but not built: [ADR-0028](adr/ADR-0028-retention-and-erasure.md)
+  is Proposed, and until it is Accepted and implemented
+  [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) forbids ingesting any sensitive
+  observation;
 - cold reconstruction still costs a full replay per organ, which the measured budgets put at roughly
-  nine seconds each at a million contributions;
+  nine seconds each at a million contributions. Only epistemicd persists a checkpoint across
+  restarts; predictord and intentiond rebuild theirs on start;
 - the KVM gates run only locally, so the fault and recovery evidence — the substrate's most
   distinctive asset — is not exercised by any hosted check.
 
@@ -456,13 +453,13 @@ justification it contradicts. Now one pass.
 
 ### Still open
 
-- **Incremental projections.** `open()` reconstructs on every call and predictord recomputes per
-  query. Both want an organ to hold derived state updated on `Accepted` rather than rebuilding on
-  demand — one piece of work, not two.
+- ~~**Incremental projections.**~~ Done in P7.3 and P7.6: predictord and intentiond both carry
+  cursors, and a read costs what arrived since the last one. Measured at 10k: 94 ms then 0 ms for
+  calibrations, 86 ms then 0 ms for open commitments.
 - ~~**ADR-0027 lists `privacy` on `ObservationV1`.**~~ Amended: privacy travels on the envelope,
   where Event1 already enforces inheritance, and the ADR no longer lists it as a payload field.
-- **The scale fixture is all root Observations.** A realistic mix with causation and evidence links
-  will cost more, because evidence is fetched per contribution.
+- ~~**The scale fixture is all root Observations.**~~ Done in P7.6. A connected fixture costs 2.3x
+  more to build and only 10–15% more to read: causality is paid on the way in.
 - ~~**Typed acquisition failure durability undecided.**~~ Decided in
   [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md): ephemeral health state, except that
   a change between readable and unreadable is durable. Repeating an unchanged failure would write
@@ -471,7 +468,7 @@ justification it contradicts. Now one pass.
 
 ## P7.1 — One typed local perception envelope
 
-**Status: ObservationV1 frozen; the adapter is next.**
+**Status: complete. `ObservationV1` is frozen and `cybou-perceptiond` is the adapter that uses it.**
 
 `ObservationV1` carries `sourceId`, `subject`, a typed `value`, `acquiredAt`, `freshnessUntil` and
 `provenance`, exactly as [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) requires. The
@@ -810,6 +807,61 @@ and was refused as invalid. And `verify()` answers *where the chain broke*, so z
 rather than nothing verified; asserting it like a count made a healthy journal look wholly corrupt.
 
 **P7.6 is complete.**
+
+## P7.7 — three invariants, held on purpose
+
+A second external review found a P0 I had introduced myself, and it was the same class of mistake
+twice over.
+
+**A dispute did not survive a checkpoint.** Self-contradiction was carried in two side tables added
+when the rule was written, and `snapshot()` was never taught to write them. So a source that said
+two different things about one instant read as `Disputed` until the next restart and `Observed`
+afterwards. There were tests for the dispute and tests for the checkpoint, and none for the two
+together; `evidenceSurvivesACheckpoint` gave false comfort by proving something else survived.
+
+Fixed structurally rather than by serialising two more fields: a source's current state is one to
+many **co-current claims**. The contradiction becomes a property of the data instead of an
+annotation beside it, so it persists for free and both side tables are gone. That also fixed a
+freshness bug found in the same review — two readings of one instant may declare different horizons,
+and the lapsed one used to keep disputing forever. Each claim is aged by its own `freshUntil` now.
+
+**Presence had acquired a new unbounded read.** `Knowledge()` returned every superseded claim
+inline, and supersession grows for the life of the Journal, so P7.3's removal of the full-Journal
+scan had been traded for an ever-growing reply — the same cost moved somewhere less visible, and
+invisible entirely while there is only one source. The current projection now carries
+`supersededCount`, and history is paged through `KnowledgeHistory(subject, after, limit)`, capped
+like Event1's `Replay`.
+
+**`Intentions::open()` was still O(all formed).** The cursor stopped it re-reading the Journal but
+it kept every commitment ever made and filtered on each call — the same unbounded shape one level
+up. Closing removes now, so a read is proportional to what Mind currently carries.
+
+### The three invariants
+
+These three defects are one family, and the review named it better than the fixes do:
+
+- **checkpoint == replay** — a cache may never answer differently from the history it stands in for;
+- **partial or unavailable != empty truth** — a read that failed must not look like a fact;
+- **the current projection stays bounded** — what is true now cannot cost what has ever been true.
+
+Every P7 organ now holds derived state, so these are the acceptance conditions for anything added
+next, not observations about what happened to be fixed.
+
+### Also here
+
+ADR-0028 gained the disaster-recovery decision it was missing. Saying only that the key store must
+never be backed up has a consequence the draft never stated: a disk failure would lose the entire
+sensitive biography with no erasure ever requested. Keys are wrapped in a hierarchy now — per
+contribution, per retention class, under a recovery root the user holds and backs up separately —
+so a restored backup decrypts exactly the records whose keys survived. The remaining limit is stated
+rather than glossed: a backup predating an erasure, with a root that still unwraps it, defeats that
+erasure, so backup rotation is part of the retention guarantee.
+
+The documentation validator now derives the process count *and* the suite count from the build
+rather than matching remembered phrases. That is why the drift kept returning: a validator that
+pins the wrong number turns fixing the docs into a build failure.
+
+**P7.7 is complete.**
 
 ## P7.4 — the retention decision, written down
 

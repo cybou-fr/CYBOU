@@ -56,12 +56,18 @@ private:
     // answering may require reading what has been accepted since the last question, which changes
     // how much has been read rather than what is true.
     //
-    // Formed intentions are kept in the order they were accepted, because that is the order
-    // Presence shows obligations in. Closure is a set membership test rather than a removal, so an
-    // Outcome that arrives for an intention already seen never has to search the list.
-    mutable QList<Intention> m_formed;
-    mutable QSet<QUuid> m_formedIds;
-    mutable QSet<QUuid> m_closed;
+    // Only what is still open, in the order it was accepted, because that is the order Presence
+    // shows obligations in.
+    //
+    // An earlier version kept every intention ever formed and filtered the closed ones out on each
+    // call. That made a read cost the number of commitments a life has ever had rather than the
+    // number it currently carries - the same shape as the Journal replay it had just replaced, one
+    // level up. Closing removes here instead, so what is not open is not carried.
+    //
+    // m_openIds exists because an Outcome names its Intention: without it, closing would search the
+    // list, and a long-lived Mind closes as often as it opens.
+    mutable QList<Intention> m_open;
+    mutable QSet<QUuid> m_openIds;
     mutable quint64 m_cursor{0};
 };
 

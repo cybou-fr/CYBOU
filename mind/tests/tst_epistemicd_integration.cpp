@@ -278,7 +278,7 @@ private Q_SLOTS:
 
         // The earlier reading is not forgotten, it is outranked. Keeping what was superseded is how
         // the projection can later be asked why it changed its mind.
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
+        QCOMPARE(knowledge.value(QStringLiteral("supersededCount")).toULongLong(), 1u);
     }
 };
 

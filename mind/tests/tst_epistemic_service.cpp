@@ -197,7 +197,7 @@ private Q_SLOTS:
         // than being absent from history altogether.
         const QVariantMap knowledge =
             FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")));
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
+        QCOMPARE(knowledge.value(QStringLiteral("supersededCount")).toULongLong(), 1u);
     }
 
 
@@ -251,7 +251,7 @@ private Q_SLOTS:
             knowledge.value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("value")).toString(),
             QStringLiteral("value-5"));
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 4);
+        QCOMPARE(knowledge.value(QStringLiteral("supersededCount")).toULongLong(), 4u);
     }
 
     // A checkpoint whose cursor will not parse is not a checkpoint with a cursor of zero. Restoring
@@ -294,6 +294,66 @@ private Q_SLOTS:
             QStringLiteral("observed"));
     }
 
+    // Supersession grows for the life of the Journal, and Presence reads this projection on every
+    // Snapshot. Returning it inline would swap the full-Journal scan P7.3 removed for an
+    // ever-growing reply - the same unbounded cost moved somewhere less visible.
+    //
+    // So the current projection carries only a count, and the history is asked for by the page.
+    void whatWasSupersededIsPagedRatherThanReturnedInline()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        // Ten real changes, so ten supersessions.
+        for (int i = 0; i < 11; ++i) {
+            QVERIFY(
+                journal.append(observationOf(
+                    QStringLiteral("value-%1").arg(i), now.addSecs(-600 + i * 10)))
+                > 0);
+        }
+
+        EpistemicService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY2(service.isReady(), qPrintable(service.startupError()));
+
+        const QVariantMap knowledge =
+            FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")));
+        QVERIFY2(
+            !knowledge.contains(QStringLiteral("superseded")),
+            "the current projection must not carry the whole history");
+        QCOMPARE(knowledge.value(QStringLiteral("supersededCount")).toULongLong(), 10u);
+
+        // First page, oldest first, and it says there is more.
+        const QVariantMap first = FabricCodec::decodeMap(
+            service.KnowledgeHistory(QStringLiteral("current-system"), 0, 4));
+        QCOMPARE(first.value(QStringLiteral("superseded")).toList().size(), 4);
+        QCOMPARE(first.value(QStringLiteral("total")).toULongLong(), 10u);
+        QVERIFY(first.value(QStringLiteral("hasMore")).toBool());
+        QCOMPARE(
+            first.value(QStringLiteral("superseded")).toList().at(0).toMap()
+                .value(QStringLiteral("value")).toString(),
+            QStringLiteral("value-0"));
+
+        // Walking to the end reports no more, rather than looping on a cursor that never advances.
+        const QVariantMap last = FabricCodec::decodeMap(
+            service.KnowledgeHistory(QStringLiteral("current-system"), 8, 4));
+        QCOMPARE(last.value(QStringLiteral("superseded")).toList().size(), 2);
+        QVERIFY(!last.value(QStringLiteral("hasMore")).toBool());
+
+        // An asking-for-everything caller does not get to decide how large the reply is.
+        const QVariantMap capped = FabricCodec::decodeMap(
+            service.KnowledgeHistory(QStringLiteral("current-system"), 0, 0));
+        QCOMPARE(capped.value(QStringLiteral("superseded")).toList().size(), 10);
+
+        // Past the end answers empty rather than failing: there is simply nothing after there.
+        const QVariantMap beyond = FabricCodec::decodeMap(
+            service.KnowledgeHistory(QStringLiteral("current-system"), 99, 4));
+        QVERIFY(beyond.value(QStringLiteral("superseded")).toList().isEmpty());
+        QVERIFY(!beyond.value(QStringLiteral("hasMore")).toBool());
+    }
+
     // The point of the checkpoint: a restart resumes rather than replaying from zero.
     void aRestartResumesFromTheCheckpoint()
     {
@@ -330,7 +390,7 @@ private Q_SLOTS:
         const QVariantMap knowledge =
             FabricCodec::decodeMap(resumed.KnowledgeOf(QStringLiteral("current-system")));
         QCOMPARE(knowledge.value(QStringLiteral("status")).toString(), QStringLiteral("observed"));
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
+        QCOMPARE(knowledge.value(QStringLiteral("supersededCount")).toULongLong(), 1u);
     }
 
     // Losing the checkpoint costs a replay and nothing else. If it cost knowledge, the checkpoint

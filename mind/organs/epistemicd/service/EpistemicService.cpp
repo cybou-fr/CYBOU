@@ -5,6 +5,8 @@
 
 #include "cybou/fabric/FabricCodec.h"
 
+#include <algorithm>
+
 #include <QCborMap>
 #include <QCborValue>
 #include <QVariantList>
@@ -45,22 +47,28 @@ QVariantMap encodeClaim(const EpistemicClaim &claim)
     return map;
 }
 
+// The current projection only.
+//
+// `superseded` grows for the life of the Journal: every real change a source reports files the
+// previous reading there. Presence reads this on every Snapshot, so returning it inline would trade
+// the full-Journal scan that P7.3 removed for an ever-growing reply - the same unbounded cost in a
+// different place, and one that only becomes visible once there are more sources than one.
+//
+// What was superseded is still knowledge and is not discarded; it is asked for by the page, through
+// KnowledgeHistory, by the rare caller that wants to know why Mind changed its mind.
 QVariantMap encodeKnowledge(const SubjectKnowledge &knowledge)
 {
     QVariantList current;
     for (const EpistemicClaim &claim : knowledge.current) {
         current.append(encodeClaim(claim));
     }
-    QVariantList superseded;
-    for (const EpistemicClaim &claim : knowledge.superseded) {
-        superseded.append(encodeClaim(claim));
-    }
 
     QVariantMap map;
     map.insert(QStringLiteral("subject"), knowledge.subject);
     map.insert(QStringLiteral("status"), epistemicStatusToString(knowledge.status));
     map.insert(QStringLiteral("current"), current);
-    map.insert(QStringLiteral("superseded"), superseded);
+    map.insert(
+        QStringLiteral("supersededCount"), static_cast<qulonglong>(knowledge.superseded.size()));
     return map;
 }
 
@@ -126,6 +134,35 @@ QByteArray EpistemicService::KnowledgeOf(const QString &subject) const
 {
     return FabricCodec::encode(
         encodeKnowledge(m_projection.knowledgeOf(subject, QDateTime::currentDateTimeUtc())));
+}
+
+QByteArray EpistemicService::KnowledgeHistory(
+    const QString &subject, qulonglong afterIndex, int limit) const
+{
+    // Capped like Event1's Replay, and for the same reason: a caller asking for everything would
+    // otherwise decide how much memory this organ and the bus have to find.
+    constexpr int kMaxPage = 1000;
+    const int page = limit <= 0 || limit > kMaxPage ? kMaxPage : limit;
+
+    const SubjectKnowledge knowledge =
+        m_projection.knowledgeOf(subject, QDateTime::currentDateTimeUtc());
+
+    QVariantList superseded;
+    const int total = knowledge.superseded.size();
+    const int from = static_cast<int>(std::min<qulonglong>(afterIndex, total));
+    const int to = std::min(from + page, total);
+    for (int i = from; i < to; ++i) {
+        superseded.append(encodeClaim(knowledge.superseded.at(i)));
+    }
+
+    QVariantMap map;
+    map.insert(QStringLiteral("subject"), subject);
+    map.insert(QStringLiteral("from"), static_cast<qulonglong>(from));
+    map.insert(QStringLiteral("to"), static_cast<qulonglong>(to));
+    map.insert(QStringLiteral("total"), static_cast<qulonglong>(total));
+    map.insert(QStringLiteral("hasMore"), to < total);
+    map.insert(QStringLiteral("superseded"), superseded);
+    return FabricCodec::encode(map);
 }
 
 bool EpistemicService::catchUp()

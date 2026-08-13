@@ -124,15 +124,8 @@ QList<Intention> Intentions::open() const
         return {};
     }
 
-    for (const Intention &intention : m_formed) {
-        if (!m_closed.contains(intention.id)) {
-            result.append(intention);
-        }
-    }
-
-    // Oldest first, which is the order contributions were accepted in and the order Presence shows
-    // commitments in.
-    return result;
+    // Already exactly the open set, in acceptance order. Nothing to filter and nothing to sort.
+    return m_open;
 }
 
 // One chronological pass, paged, resumed from a cursor.
@@ -172,14 +165,23 @@ bool Intentions::catchUp() const
                 i.description = payload[QStringLiteral("description")].toString();
                 i.trigger = payload[QStringLiteral("trigger")].toString();
                 i.formed = e.wallTime;
-                m_formed.append(i);
-                m_formedIds.insert(e.messageId);
+                m_open.append(i);
+                m_openIds.insert(e.messageId);
                 continue;
             }
             if (e.kind == ContributionKind::Outcome
                 && e.originOrgan == QLatin1String("intentiond")
-                && m_formedIds.contains(e.causationId)) {
-                m_closed.insert(e.causationId);
+                && m_openIds.remove(e.causationId)) {
+                // Removing is what keeps a read proportional to what is open rather than to
+                // everything ever committed to. The membership check above is also what stops an
+                // Outcome for something never seen from removing anything.
+                const auto closed = std::find_if(
+                    m_open.begin(), m_open.end(), [&e](const Intention &candidate) {
+                        return candidate.id == e.causationId;
+                    });
+                if (closed != m_open.end()) {
+                    m_open.erase(closed);
+                }
             }
         }
 

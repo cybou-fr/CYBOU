@@ -74,6 +74,14 @@ def check_relative_markdown_links(repo: Path, path: Path) -> None:
 # The installed daemons are declared once, in the package's own install check. Counting them there
 # means the documentation is measured against what actually ships rather than against a number
 # somebody remembered to update.
+# Test suites are declared once, in the tests CMakeLists. Counting them there is the same discipline
+# as counting daemons in the package: the documentation is measured against what the build actually
+# registers rather than against a number somebody remembered to update.
+def count_test_suites(repo):
+    text = (repo / "mind/tests/CMakeLists.txt").read_text(encoding="utf-8")
+    return len(re.findall(r"add_test\(", text))
+
+
 def count_installed_daemons(repo):
     text = (repo / "packages/cybou-mind/default.nix").read_text(encoding="utf-8")
     body = text.split("for daemon in", 1)[1].split("; do", 1)[0]
@@ -86,6 +94,13 @@ NUMBER_WORDS = {
     11: "eleven",
     12: "twelve",
     13: "thirteen",
+    26: "twenty-six",
+    27: "twenty-seven",
+    28: "twenty-eight",
+    29: "twenty-nine",
+    30: "thirty",
+    31: "thirty-one",
+    32: "thirty-two",
 }
 
 
@@ -266,6 +281,16 @@ def main(argv: list[str]) -> int:
         paths["installation"],
         "current Mind process count",
         f"{number_word(daemon_count)}-process Mind package",
+    )
+    require(
+        paths["current"],
+        "current Mind owner count",
+        f"{number_word(daemon_count)} Mind owners",
+    )
+    require(
+        paths["current"],
+        "current test suite count",
+        f"{number_word(count_test_suites(repo))} CTest suites",
     )
     require(
         paths["installation"],

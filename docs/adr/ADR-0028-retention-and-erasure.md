@@ -133,22 +133,43 @@ an erasure when it happened to restart would serve erased content for an unbound
 
 ### Backups are addressed by key, not by deletion
 
-Erasure by nulling reaches the live database and nothing else. For sensitive payloads, that is not
-enough, so **sensitive payloads are encrypted per contribution** with a key held in a local key
-store, and erasure destroys the key as well as the ciphertext.
+Erasure by nulling reaches the live database and nothing else. For sensitive payloads that is not
+enough, so **sensitive payloads are encrypted per contribution** and erasure destroys the key as
+well as the ciphertext. A backup then retains ciphertext whose key no longer exists anywhere. This
+is the only mechanism here that reaches copies Mind does not control.
 
-A backup then retains ciphertext whose key no longer exists anywhere. This is the only mechanism
-here that reaches copies Mind does not control, and it is the reason it is worth its cost.
+**Keys are wrapped, not loose, and the wrapping is what makes backups recoverable.**
 
-The limits are stated rather than glossed:
+An earlier draft said only that the key store must never be backed up. That is a coherent position,
+but it has a consequence the draft never stated: after a disk failure, restoring the Journal would
+recover every sensitive ciphertext and no key at all. The entire sensitive biography would be lost
+without anyone ever requesting an erasure — data loss by design, arrived at silently.
 
-- It is **cryptographic** erasure. It assumes the cipher holds and the key was not separately
-  captured. It is not the same claim as overwriting a disk.
-- The key store becomes as sensitive as the payloads and must not itself be backed up alongside
-  them.
-- A backup of the key store taken before an erasure defeats it. The key store is therefore excluded
-  from ordinary backup, and that exclusion is part of this decision rather than an operational
-  detail left to whoever configures it.
+So the decision is a key hierarchy rather than a flat store:
+
+```
+per-contribution data key (DEK)   — one per sensitive payload, destroyed on erasure
+        ↓ wrapped by
+subject/retention-class key (KEK) — grouping keys by what they protect
+        ↓ wrapped by
+recovery root                     — held by the user, backed up deliberately and separately
+```
+
+Erasure destroys the DEK and every wrapping of it. Because a DEK is per contribution, destroying it
+reaches exactly one payload; because the wrappings are stored beside the ciphertext, a restored
+backup is decryptable **only** for records whose DEK survived.
+
+The recovery root is the one secret the user is responsible for, and it is deliberately not stored
+with the Journal or its backups: a backup that contains both the ciphertext and the means to unwrap
+everything is a plaintext backup with extra steps.
+
+The remaining honest limit: a backup taken *before* an erasure, together with a recovery root that
+still unwraps the DEK captured in that backup, defeats the erasure for that record. Erasure destroys
+keys going forward; it cannot reach into a snapshot of the past that already contains them. Backup
+rotation is therefore part of the retention guarantee rather than an operational detail, and a
+deployment that keeps backups indefinitely has weakened erasure to the age of its oldest backup.
+
+That is stated here so it is a decision, not a surprise.
 
 ### Retention is its own axis, propagated like privacy but not merged into it
 

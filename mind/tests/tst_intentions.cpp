@@ -149,6 +149,52 @@ private Q_SLOTS:
         QVERIFY(intentions.open().isEmpty());
     }
 
+    // A closed commitment is not merely filtered out of the answer, it stops being carried at all.
+    //
+    // The first cursor version kept every intention ever formed and filtered on each call, so a
+    // read cost the number of commitments a life had ever had rather than the number it currently
+    // holds - the same unbounded shape as the replay it replaced, one level up.
+    void closingACommitmentStopsCarryingIt()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope request = requestObservation();
+        QVERIFY(journal.append(request) > 0);
+
+        Intentions intentions(&journal);
+        QList<QUuid> ids;
+        for (int i = 0; i < 5; ++i) {
+            const QUuid id = intentions.form(
+                QStringLiteral("obligation %1").arg(i),
+                QStringLiteral("test"),
+                request.messageId);
+            QVERIFY(!id.isNull());
+            ids.append(id);
+        }
+        QCOMPARE(intentions.open().size(), 5);
+
+        for (const QUuid &id : ids) {
+            QVERIFY(intentions.close(id, Resolution::Fulfilled));
+        }
+        QVERIFY(intentions.open().isEmpty());
+
+        // A fresh instance replays the same history and agrees. If closure were only a filter, the
+        // two would still agree - so what this pins is that both are empty rather than that they
+        // match, which they would either way.
+        Intentions replayed(&journal);
+        QVERIFY(replayed.open().isEmpty());
+
+        // And the order of what remains is still acceptance order after removals.
+        const QUuid kept = intentions.form(
+            QStringLiteral("still open"), QStringLiteral("test"), request.messageId);
+        QVERIFY(!kept.isNull());
+        const QList<Intention> open = intentions.open();
+        QCOMPARE(open.size(), 1);
+        QCOMPARE(open.first().description, QStringLiteral("still open"));
+    }
+
     // And a commitment formed elsewhere appears, for the same reason in the other direction.
     void aLaterReadSeesACommitmentFormedElsewhere()
     {
