@@ -64,10 +64,32 @@ pkgs.testers.runNixOSTest {
         "sed -n 's/.*\"run\":\"\\([^\"]*\\)\".*/\\1/p' "
         "/home/cybou/.local/state/cybou/lifecycle/state.json"
     ).strip()
-    event_count = int(machine.succeed(
-        f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
-        "org.cybou.Mind.Event1 Count | awk '{print $2}'"
-    ).strip())
+    def journal_count():
+        return int(machine.succeed(
+            f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
+            "org.cybou.Mind.Event1 Count | awk '{print $2}'"
+        ).strip())
+
+    # The claim below is that restarting plasmashell contributes nothing. That is only a claim about
+    # the restart if the Journal was quiet when the baseline was taken. It is not: healthd records a
+    # capability transition the first time it observes each owner, and an owner that is still
+    # starting is observed later - so a baseline read early enough saw two of those transitions land
+    # during the restart window and blamed them on the restart. Adding an owner to the registry made
+    # this visible; it was always latent.
+    machine.wait_until_succeeds(
+        f"{user_bus} call org.cybou.Mind.Health1 /org/cybou/Mind/Health1 "
+        "org.cybou.Mind.Health1 Refresh | grep -q true"
+    )
+    settled = journal_count()
+    for _ in range(30):
+        machine.sleep(2)
+        again = journal_count()
+        if again == settled:
+            break
+        settled = again
+    else:
+        raise AssertionError("the Journal never went quiet before the baseline")
+    event_count = settled
     plasma_pid = int(machine.succeed(
         "timeout 10s systemctl --user -M cybou@ show -p MainPID --value "
         "plasma-plasmashell.service"
@@ -102,9 +124,7 @@ pkgs.testers.runNixOSTest {
         "sed -n 's/.*\"run\":\"\\([^\"]*\\)\".*/\\1/p' "
         "/home/cybou/.local/state/cybou/lifecycle/state.json"
     ).strip() == run_blob
-    assert int(machine.succeed(
-        f"{user_bus} call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 "
-        "org.cybou.Mind.Event1 Count | awk '{print $2}'"
-    ).strip()) == event_count
+    after = journal_count()
+    assert after == event_count, f"count {event_count} -> {after}"
   '';
 }

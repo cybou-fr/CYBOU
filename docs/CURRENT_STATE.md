@@ -350,8 +350,20 @@ treats an unchanged restatement as re-affirmation rather than replacement, refus
 disagreement between sources, and orders by acquisition so a late-arriving older reading cannot
 unseat a newer one. The projection is also persistable: a restored checkpoint answers exactly as a
 replay would, at any instant, because status is derived rather than stored, and a corrupt or
-unrecognised checkpoint is refused whole rather than partly applied. No process owns it yet, so
-nothing consumes these observations in a running system.
+unrecognised checkpoint is refused whole rather than partly applied.
+
+`cybou-epistemicd` is the eleventh process and the owner ADR-0027 requires. It reads accepted
+observations and answers what is known; it never writes to Event1, owns no perception source, and
+owns no retention policy. It is the first consumer of the cursor-carrying paged `Replay`: it catches
+up from its persisted cursor on start, and a live announcement whose sequence leaves a gap triggers a
+read of that gap rather than a skip over it, so the projection stays a function of the whole
+biography rather than of what happened to be delivered. The cursor and the projection are written as
+one value, because a cursor ahead of its checkpoint would claim history had been admitted that had
+not, and nothing downstream could ever discover it. Losing or corrupting the checkpoint costs a
+replay and nothing else — it is a cache of the Journal, never a rival to it — which the tests assert
+by comparing the cold answer against the warm one byte for byte. `epistemic-projection` is declared
+in the capability registry, so healthd graphs it and the generated fault matrix covers it. The
+projection is answered over D-Bus; no Presence view reads it yet.
 
 Two audit items are deliberately not closed. `Recent` is not capped and `Verify` is not bounded per
 call: `recent(0)` is how intentiond, predictord, and selfd replay their whole state, and selfd calls

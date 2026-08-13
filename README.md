@@ -34,10 +34,11 @@ real processes and Plasma.
 M7 has begun. Contribution origin is bound to the calling
 executable, Journal growth costs are measured against budgets, Event1 has paged replay and
 incremental verification, capability and command policy has one declaration, and `ObservationV1` is
-frozen, and `cybou-perceptiond` reads the identity of the running system and proposes it as a
-provenance-bearing observation. **Nothing consumes those observations yet**: there is no epistemic
-projection, so freshness, contradiction and supersession are recorded and unread, and there is no
-language model, distributed Mind, or authorized external agency. See
+frozen, `cybou-perceptiond` reads the identity of the running system and proposes it as a
+provenance-bearing observation, and `cybou-epistemicd` derives from those observations what is
+known, stale, disputed or superseded. **Nothing surfaces that knowledge to a person yet**: the
+projection answers over D-Bus and no Presence view reads it, and there is no retention or erasure
+policy, no language model, distributed Mind, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -103,8 +104,9 @@ become a second cognitive owner.
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
 | One capability and command declaration | Implemented — P7.0 |
-| Grounded local perception: `ObservationV1` and `cybou-perceptiond` | Implemented — P7.1; observations are produced, nothing consumes them yet |
-| Epistemic projection, contradiction, retention, distributed prototype | Planned — M7 |
+| Grounded local perception: `ObservationV1` and `cybou-perceptiond` | Implemented — P7.1 |
+| Epistemic projection owner: `cybou-epistemicd`, cursor and checkpoint | Implemented — P7.2; answered over D-Bus, not yet surfaced in Presence |
+| Retention and erasure, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |
 

@@ -45,6 +45,8 @@ private:
     QString m_lifecycledPath;
     QString m_healthdPath;
     QString m_presencedPath;
+    QString m_perceptiondPath;
+    QString m_epistemicdPath;
 
     std::unique_ptr<QProcess> m_eventd;
     std::unique_ptr<QProcess> m_identityd;
@@ -55,6 +57,8 @@ private:
     std::unique_ptr<QProcess> m_lifecycled;
     std::unique_ptr<QProcess> m_healthd;
     std::unique_ptr<QProcess> m_presenced;
+    std::unique_ptr<QProcess> m_perceptiond;
+    std::unique_ptr<QProcess> m_epistemicd;
 
     QProcessEnvironment environment() const
     {
@@ -127,6 +131,8 @@ private Q_SLOTS:
             qEnvironmentVariable("CYBOU_HEALTHD_PATH");
         m_presencedPath =
             qEnvironmentVariable("CYBOU_PRESENCED_PATH");
+        m_perceptiondPath = qEnvironmentVariable("CYBOU_PERCEPTIOND_PATH");
+        m_epistemicdPath = qEnvironmentVariable("CYBOU_EPISTEMICD_PATH");
 
         QVERIFY2(!m_eventdPath.isEmpty(), "CYBOU_EVENTD_PATH is not set");
         QVERIFY2(!m_identitydPath.isEmpty(), "CYBOU_IDENTITYD_PATH is not set");
@@ -160,12 +166,15 @@ private Q_SLOTS:
         };
         for (QString *path : {&m_eventdPath, &m_identitydPath, &m_intentiondPath,
                               &m_predictordPath, &m_selfdPath, &m_workspacedPath,
-                              &m_lifecycledPath, &m_healthdPath, &m_presencedPath}) {
+                              &m_lifecycledPath, &m_healthdPath, &m_presencedPath,
+                              &m_perceptiondPath, &m_epistemicdPath}) {
             stage(*path);
         }
         QVERIFY2(!m_lifecycledPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
         QVERIFY2(!m_healthdPath.isEmpty(), "CYBOU_HEALTHD_PATH is not set");
         QVERIFY2(!m_presencedPath.isEmpty(), "CYBOU_PRESENCED_PATH is not set");
+        QVERIFY2(!m_perceptiondPath.isEmpty(), "CYBOU_PERCEPTIOND_PATH is not set");
+        QVERIFY2(!m_epistemicdPath.isEmpty(), "CYBOU_EPISTEMICD_PATH is not set");
 
         m_root = std::make_unique<QTemporaryDir>();
         QVERIFY(m_root->isValid());
@@ -225,6 +234,15 @@ private Q_SLOTS:
         QVERIFY(m_presenced);
         PresenceClient presence;
         QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+
+        // Mind has eleven owners. A snapshot with two of them absent is not the healthy baseline
+        // these tests compare against, and adding a component to the registry changes what healthy
+        // means everywhere - which is the point of having one declaration rather than four.
+        m_perceptiond = start(m_perceptiondPath);
+        QVERIFY(m_perceptiond);
+        m_epistemicd = start(m_epistemicdPath);
+        QVERIFY(m_epistemicd);
+
         RpcClient healthRpc(kHealthEndpoint);
         QVERIFY(healthRpc.callBool(QStringLiteral("Refresh")));
     }

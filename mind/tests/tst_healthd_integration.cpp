@@ -214,6 +214,11 @@ private Q_SLOTS:
         m_workspaced = startDependency("CYBOU_WORKSPACED_PATH", kWorkspaceEndpoint);
         QVERIFY(m_workspaced);
         QVERIFY(startDependency("CYBOU_PRESENCED_PATH", kPresenceEndpoint));
+        // Mind has eleven owners; a snapshot with two of them absent is not the healthy baseline
+        // these tests are about. Adding a component to the registry changes what "healthy" means
+        // everywhere, which is the point of having one declaration rather than four.
+        QVERIFY(startDependency("CYBOU_PERCEPTIOND_PATH", kPerceptionEndpoint));
+        QVERIFY(startDependency("CYBOU_EPISTEMICD_PATH", kEpistemicEndpoint));
         startHealthd();
     }
 

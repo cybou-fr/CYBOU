@@ -43,6 +43,10 @@ QList<CapabilityDeclaration> capabilities()
          {QStringLiteral("presenced")},
          false,
          QStringLiteral("Mind presentation is unavailable")},
+        {QStringLiteral("epistemic-projection"),
+         {QStringLiteral("eventd"), QStringLiteral("epistemicd")},
+         false,
+         QStringLiteral("what is known, and how stale or disputed it is, cannot be told")},
         {QStringLiteral("local-perception"),
          {QStringLiteral("eventd"), QStringLiteral("perceptiond")},
          false,
@@ -63,6 +67,7 @@ QStringList componentIds()
         QStringLiteral("workspaced"),
         QStringLiteral("presenced"),
         QStringLiteral("perceptiond"),
+        QStringLiteral("epistemicd"),
     };
     return components;
 }

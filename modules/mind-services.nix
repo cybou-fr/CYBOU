@@ -101,6 +101,7 @@ in
         "cybou-workspaced.service"
         "cybou-presenced.service"
         "cybou-perceptiond.service"
+        "cybou-epistemicd.service"
       ];
       wants = [
         "cybou-eventd.service"
@@ -112,6 +113,7 @@ in
         "cybou-workspaced.service"
         "cybou-presenced.service"
         "cybou-perceptiond.service"
+        "cybou-epistemicd.service"
       ];
     };
 
@@ -172,6 +174,17 @@ in
       description = "Cybou local perception adapter";
       binary = "cybou-perceptiond";
       busName = "org.cybou.Mind.Perception1";
+      after = [ "cybou-eventd.service" ];
+      wants = [ "cybou-eventd.service" ];
+    };
+
+    # Derives what is known from accepted observations. It reads Event1 and never writes to it:
+    # perception proposes, this says what that amounts to, and the Journal remains the authority
+    # over both.
+    cybou-epistemicd = mkService {
+      description = "Cybou epistemic projection owner";
+      binary = "cybou-epistemicd";
+      busName = "org.cybou.Mind.Epistemic1";
       after = [ "cybou-eventd.service" ];
       wants = [ "cybou-eventd.service" ];
     };

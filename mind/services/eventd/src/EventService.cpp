@@ -116,6 +116,10 @@ QStringList reservedOrganIdentities()
         // once something claims it leaves a window in which anything may claim it first, and
         // provenance is the whole point of this organ.
         QStringLiteral("perceptiond"),
+        // Reserved although it never writes: the projection derives and does not contribute. An
+        // unreserved name is one anything may speak under, and a claim attributed to the organ that
+        // decides what is known would be worth forging.
+        QStringLiteral("epistemicd"),
     };
     return identities;
 }

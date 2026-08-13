@@ -58,6 +58,7 @@ QList<QPair<QString, BusEndpoint>> endpoints()
         {QStringLiteral("workspaced"), kWorkspaceEndpoint},
         {QStringLiteral("presenced"), kPresenceEndpoint},
         {QStringLiteral("perceptiond"), kPerceptionEndpoint},
+        {QStringLiteral("epistemicd"), kEpistemicEndpoint},
     };
 }
 

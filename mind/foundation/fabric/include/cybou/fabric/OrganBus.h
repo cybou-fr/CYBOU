@@ -28,6 +28,13 @@ inline constexpr BusEndpoint kPerceptionEndpoint{
     "cybou-perceptiond.service",
 };
 
+inline constexpr BusEndpoint kEpistemicEndpoint{
+    "org.cybou.Mind.Epistemic1",
+    "/org/cybou/Mind/Epistemic1",
+    "org.cybou.Mind.Epistemic1",
+    "cybou-epistemicd.service",
+};
+
 inline constexpr BusEndpoint kHealthEndpoint{
     "org.cybou.Mind.Health1",
     "/org/cybou/Mind/Health1",

@@ -541,6 +541,88 @@ by how often the process starts, and a crash loop is bounded further by systemd'
 
 **P7.1 is complete.**
 
+## P7.2 — the epistemic owner
+
+`cybou-epistemicd` is the eleventh process, and the owner ADR-0027 named before it existed. The
+projection had been a library since P7.1: it could already say `unknown`, `observed`, `stale`,
+`disputed` and `superseded`, and could already be checkpointed and restored. What was missing was
+someone whose job it is to hold it.
+
+**What it owns is narrower than what it knows.** It owns the derived projection — freshness,
+contradiction, reconciliation — and owns neither the Journal, nor any perception source, nor
+system-wide retention. It never writes to Event1. That asymmetry is the whole point: a component
+that both decides what is true and writes what is true has no one to check it.
+
+### The first real consumer of the cursor
+
+Paged `Replay(afterSequence, limit)` and the persisted verification checkpoint were built in P7.0
+against benchmarks. This is the first thing that needs them for its own reasons. epistemicd catches
+up from its persisted cursor on start and pages through in units of a thousand, so a long biography
+never sits in memory at once and never crosses the bus in one reply.
+
+A page that fails to read is not the end of history. Treating it as the end would leave a gap that
+nothing downstream could ever discover, so the cursor keeps whatever it reached and the failure is
+reported instead.
+
+The same reasoning covers live announcements. One whose sequence is behind the cursor is dropped —
+re-admitting is harmless because admission is idempotent, but moving the cursor backwards would
+claim history had not been read when it had. One whose sequence leaves a gap triggers a read of that
+gap rather than a skip over it.
+
+### The checkpoint is a cache, and is tested as one
+
+The cursor and the projection are written as **one** value. Half of that pair is worse than neither:
+a checkpoint ahead of its cursor merely re-admits contributions, but a cursor ahead of its
+checkpoint leaves a hole in what was admitted and nothing would ever notice.
+
+Three tests fix what the checkpoint may be. A restart resumes with the same answer *and* the
+supersession intact — which is what makes it a resumption rather than a fresh projection that
+happens to look similar. Deleting it costs a replay and nothing else, asserted by comparing the cold
+answer to the warm one byte for byte. Corrupting it discards the whole thing rather than trusting
+part, because a damaged cache quietly becoming what Mind believes is precisely the failure the
+Journal exists to prevent.
+
+Status is never serialised, only derived, which is why a restored projection answers correctly at an
+instant it was never asked about before.
+
+### What the eleventh owner cost elsewhere
+
+Adding `epistemic-projection` to the capability registry changed what *healthy* means, and four
+process tests that assert a fully-healthy Mind began failing — they were still starting nine or ten
+owners. That is the registry working as intended: one declaration, and every consumer of it moves
+together. Both process suites now start all eleven.
+
+**A test written alongside caught a defect in the test, not the code.** An early version dated the
+later of two acquisitions into the future and then reported `stale`. The projection was right: an
+observation says nothing about a time before it was acquired, so a future-dated reading does not
+speak for the present.
+
+The projection answers over D-Bus. No Presence view reads it yet — surfacing epistemic status to a
+person is P7.4, and it is deliberately after retention.
+
+### A gate that was measuring the wrong thing
+
+`p4-plasma-lifecycle` failed once in three runs after the eleventh owner arrived: `count 1 -> 3`.
+Its final assertion is that restarting plasmashell contributes nothing to the Journal, taken as a
+Journal count before and after.
+
+That is only a claim about the restart if the Journal was quiet when the baseline was read, and it
+was not. healthd records a capability transition the first time it observes each owner, and an owner
+still starting is observed later — so a baseline read early enough missed two transitions, which
+then landed during the restart window and were attributed to the restart. Two extra contributions,
+two newly registered owners.
+
+The bug was latent long before this change; adding an owner only widened the window enough to hit
+it. The fix is to establish the precondition the assertion depends on rather than to loosen the
+assertion: wait for a completed health refresh, then for two consecutive counts to agree, and only
+then take the baseline. A restart that genuinely contributed would still fail, because the
+quiescence only runs beforehand. Four consecutive runs green, then a full `nix flake check`.
+
+**Adding to the registry is how this was found.** One declaration means a new owner perturbs every
+consumer at once, and a test that was passing for a reason it did not state stops passing.
+
+**P7.2 is complete.**
+
 ## Scheduling and refresh flakiness — fixed
 
 Two separate defects made the process suite intermittently red. Both are closed.

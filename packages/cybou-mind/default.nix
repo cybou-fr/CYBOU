@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
-# P7.1: ten real process boundaries plus the QML Presence proxy.
+# P7.2: eleven real process boundaries plus the QML Presence proxy.
 {
   lib,
   stdenv,
@@ -60,7 +60,9 @@ stdenv.mkDerivation {
       cybou-predictord \
       cybou-selfd \
       cybou-workspaced \
-      cybou-presenced \n      cybou-perceptiond; do
+      cybou-presenced \
+      cybou-perceptiond \
+      cybou-epistemicd; do
       test -x "$out/bin/$daemon" || {
         echo "missing $out/bin/$daemon"
         exit 1
@@ -92,16 +94,20 @@ stdenv.mkDerivation {
     install_dbus_service org.cybou.Mind.Workspace1 cybou-workspaced cybou-workspaced.service
     install_dbus_service org.cybou.Mind.Presence1 cybou-presenced cybou-presenced.service
     install_dbus_service org.cybou.Mind.Perception1 cybou-perceptiond cybou-perceptiond.service
+    install_dbus_service org.cybou.Mind.Epistemic1 cybou-epistemicd cybou-epistemicd.service
 
     for name in \
       org.cybou.Mind.Event1 \
       org.cybou.Mind.Health1 \
+      org.cybou.Mind.Lifecycle1 \
       org.cybou.Mind.Identity1 \
       org.cybou.Mind.Intention1 \
       org.cybou.Mind.Predictor1 \
       org.cybou.Mind.Self1 \
       org.cybou.Mind.Workspace1 \
-      org.cybou.Mind.Presence1       org.cybou.Mind.Perception1; do
+      org.cybou.Mind.Presence1 \
+      org.cybou.Mind.Perception1 \
+      org.cybou.Mind.Epistemic1; do
       grep -q "^Name=$name$" \
         "$out/share/dbus-1/services/$name.service"
       grep -q '^SystemdService=cybou-.*d.service$' \

@@ -70,6 +70,8 @@ add_test(
         CYBOU_SELFD_PATH=$<TARGET_FILE:cybou-selfd>
         CYBOU_WORKSPACED_PATH=$<TARGET_FILE:cybou-workspaced>
         CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
+        CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
+        CYBOU_EPISTEMICD_PATH=$<TARGET_FILE:cybou-epistemicd>
         $<TARGET_FILE:test-healthd-integration>
 )
 set_tests_properties(
@@ -172,6 +174,15 @@ target_link_libraries(
 add_test(NAME epistemic-projection COMMAND test-epistemic-projection)
 set_tests_properties(
     epistemic-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+qt_add_executable(test-epistemic-service tst_epistemic_service.cpp)
+target_link_libraries(
+    test-epistemic-service PRIVATE cybou-epistemic-service cybou-storage Qt6::Test
+)
+add_test(NAME epistemic-service COMMAND test-epistemic-service)
+set_tests_properties(
+    epistemic-service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
 qt_add_executable(test-identity tst_identity.cpp)
@@ -291,6 +302,8 @@ add_test(
         CYBOU_LIFECYCLED_PATH=$<TARGET_FILE:cybou-lifecycled>
         CYBOU_HEALTHD_PATH=$<TARGET_FILE:cybou-healthd>
         CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
+        CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
+        CYBOU_EPISTEMICD_PATH=$<TARGET_FILE:cybou-epistemicd>
         $<TARGET_FILE:test-m4-process-integration>
 )
 set_tests_properties(
