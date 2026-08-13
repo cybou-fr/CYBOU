@@ -11,7 +11,7 @@ target_include_directories(cybou-epistemic-service
 )
 
 target_link_libraries(cybou-epistemic-service
-    PUBLIC Qt6::Core cybou-epistemic cybou-events cybou-protocol
+    PUBLIC Qt6::Core cybou-epistemic cybou-events cybou-fabric cybou-protocol
 )
 
 qt_add_executable(cybou-epistemicd service/main.cpp)

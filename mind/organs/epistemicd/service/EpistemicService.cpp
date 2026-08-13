@@ -3,8 +3,12 @@
 
 #include "EpistemicService.h"
 
-#include <QCborArray>
+#include "cybou/fabric/FabricCodec.h"
+
 #include <QCborMap>
+#include <QCborValue>
+#include <QVariantList>
+#include <QVariantMap>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -21,11 +25,15 @@ inline constexpr quint16 kCheckpointSchemaVersion = 1;
 // in a single reply. Matches the server-side cap; asking for more would simply be trimmed.
 inline constexpr int kReplayPageSize = 1000;
 
-QCborMap encodeClaim(const EpistemicClaim &claim)
+// Every other organ answers in the versioned fabric envelope, and this one answered in bare CBOR.
+// Nothing had consumed it yet, so nothing caught it - a projection nobody reads can be encoded any
+// way at all and still look correct. Presence is the first reader, and this is the cheapest moment
+// the wire could have been corrected.
+QVariantMap encodeClaim(const EpistemicClaim &claim)
 {
-    QCborMap map;
+    QVariantMap map;
     map.insert(QStringLiteral("sourceId"), claim.sourceId);
-    map.insert(QStringLiteral("value"), claim.value);
+    map.insert(QStringLiteral("value"), claim.value.toVariant());
     map.insert(
         QStringLiteral("acquiredAt"), claim.acquiredAt.toUTC().toString(Qt::ISODateWithMs));
     map.insert(
@@ -34,18 +42,18 @@ QCborMap encodeClaim(const EpistemicClaim &claim)
     return map;
 }
 
-QCborMap encodeKnowledge(const SubjectKnowledge &knowledge)
+QVariantMap encodeKnowledge(const SubjectKnowledge &knowledge)
 {
-    QCborArray current;
+    QVariantList current;
     for (const EpistemicClaim &claim : knowledge.current) {
         current.append(encodeClaim(claim));
     }
-    QCborArray superseded;
+    QVariantList superseded;
     for (const EpistemicClaim &claim : knowledge.superseded) {
         superseded.append(encodeClaim(claim));
     }
 
-    QCborMap map;
+    QVariantMap map;
     map.insert(QStringLiteral("subject"), knowledge.subject);
     map.insert(QStringLiteral("status"), epistemicStatusToString(knowledge.status));
     map.insert(QStringLiteral("current"), current);
@@ -103,20 +111,18 @@ qulonglong EpistemicService::Cursor() const
 
 QByteArray EpistemicService::Knowledge() const
 {
-    QCborArray all;
+    QVariantList all;
     for (const SubjectKnowledge &knowledge :
          m_projection.knowledgeAt(QDateTime::currentDateTimeUtc())) {
         all.append(encodeKnowledge(knowledge));
     }
-    return all.toCborValue().toCbor();
+    return FabricCodec::encode(all);
 }
 
 QByteArray EpistemicService::KnowledgeOf(const QString &subject) const
 {
-    return encodeKnowledge(
-               m_projection.knowledgeOf(subject, QDateTime::currentDateTimeUtc()))
-        .toCborValue()
-        .toCbor();
+    return FabricCodec::encode(
+        encodeKnowledge(m_projection.knowledgeOf(subject, QDateTime::currentDateTimeUtc())));
 }
 
 bool EpistemicService::catchUp()

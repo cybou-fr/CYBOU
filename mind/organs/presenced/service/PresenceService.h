@@ -149,6 +149,7 @@ private:
     mutable AsyncRpcClient m_identityRpc;
     mutable AsyncRpcClient m_predictorRpc;
     mutable AsyncRpcClient m_eventRpc;
+    mutable AsyncRpcClient m_epistemicRpc;
 
     // Retained only for their Changed subscriptions, which is how presenced learns to re-emit its
     // own Changed signal. They no longer carry any call.

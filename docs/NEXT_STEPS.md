@@ -729,6 +729,38 @@ code — not on the absence of a `grep` match.
 
 **P7.3 is complete.**
 
+## P7.5 — Presence shows what Mind knows
+
+Everything in P7 up to here produced knowledge or derived it. This is the first place a person could
+see it: the Snapshot carries a `knowledge` section, gated on `epistemic-projection` like every other
+section and gathered concurrently with them, and the QML proxy exposes it as a bindable property.
+
+**Wiring it up found a defect that nothing else could have.** epistemicd answered `Knowledge` and
+`KnowledgeOf` in **bare CBOR**, while every other organ answers in the versioned fabric envelope.
+Presence could not have decoded it. Nothing caught it in P7.2 because nothing consumed it — a
+projection nobody reads can be encoded any way at all and still look correct. It now speaks the
+shared wire, and both test suites decode through `FabricCodec` so a future drift off it fails rather
+than passing quietly. This was the cheapest moment the wire could have been corrected: no consumer
+existed to break.
+
+**The end-to-end test found a second gap.** It waits for real content rather than asserting the key
+exists, and it failed — because the process suite had no perception source at all. `/run/current-system`
+does not exist in a build sandbox, so perceptiond reported the source unavailable and observed
+nothing. Eleven organs were running and one of them could never do its job. The suite now stages a
+system-generation fixture, and the test walks the whole chain: perceptiond observes, Event1 accepts,
+epistemicd derives, presenced projects, across five processes.
+
+It checks the vocabulary a reader would act on rather than the shape of the reply — which subject,
+what status, and on whose authority. The source stays `nixos.system` rather than collapsing into the
+organ that carried it, two process boundaries from the adapter.
+
+A projection that cannot be read leaves an empty list, which reads exactly as knowing nothing. That
+is the honest projection of an owner that could not be asked, and the proxy test pins it, including
+through the meta-object — QML binds that way, and a `Q_PROPERTY` that was declared but never
+registered would still pass a direct call.
+
+**P7.5 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

@@ -227,6 +227,7 @@ struct SnapshotRequest {
     QVariantMap moment;
     QVariantList intentions;
     QVariantList calibrations;
+    QVariantList knowledge;
     QVariantList coalitions;
     QString attention;
     qulonglong contributions{0};
@@ -310,6 +311,7 @@ PresenceService::PresenceService(QObject *parent)
     , m_identityRpc(kIdentityEndpoint, projectionPolicy())
     , m_predictorRpc(kPredictorEndpoint, projectionPolicy())
     , m_eventRpc(kEventEndpoint, projectionPolicy())
+    , m_epistemicRpc(kEpistemicEndpoint, projectionPolicy())
 {
     connect(
         &m_workspace,
@@ -408,6 +410,7 @@ QVariantMap PresenceService::assembleSnapshot(const SnapshotRequest &request) co
     map[QStringLiteral("stats")] = request.self;
     map[QStringLiteral("identityState")] = request.identity;
     map[QStringLiteral("calibrations")] = request.calibrations;
+    map[QStringLiteral("knowledge")] = request.knowledge;
     map[QStringLiteral("coalitions")] = request.coalitions;
     map[QStringLiteral("moment")] = request.moment;
 
@@ -585,6 +588,19 @@ void PresenceService::gatherSnapshot(const std::shared_ptr<SnapshotRequest> &req
             if (result.succeeded() && !result.reply.arguments().isEmpty()) {
                 request->contributions = result.reply.arguments().first().toULongLong();
             }
+        });
+
+    // What Mind currently takes itself to know, and how sure it is of it. Gated like every other
+    // section: a projection that cannot be read leaves an empty list, which reads as "nothing
+    // known" - the same thing an unknown subject answers, and the honest projection of an owner
+    // that could not be asked.
+    issue(
+        m_epistemicRpc,
+        QStringLiteral("Knowledge"),
+        isAvailable(health, QStringLiteral("epistemic-projection")),
+        [request, readBytes](const RpcResult &result) {
+            QString error;
+            request->knowledge = FabricCodec::decodeList(readBytes(result), &error);
         });
 
     issue(

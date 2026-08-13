@@ -12,12 +12,12 @@
 
 #include "OrganStaging.h"
 
+#include "cybou/fabric/FabricCodec.h"
 #include "cybou/fabric/OrganBus.h"
 #include "cybou/ipc/EventClient.h"
 #include "cybou/protocol/Observation.h"
 
-#include <QCborMap>
-#include <QCborValue>
+#include <QVariantMap>
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusReply>
@@ -84,7 +84,7 @@ private:
             QDBusConnection::sessionBus());
     }
 
-    QCborMap knowledgeOf(const QString &subject) const
+    QVariantMap knowledgeOf(const QString &subject) const
     {
         QDBusInterface iface = epistemic();
         const QDBusReply<QByteArray> reply =
@@ -92,7 +92,9 @@ private:
         if (!reply.isValid()) {
             return {};
         }
-        return QCborValue::fromCbor(reply.value()).toMap();
+        // Decoded through the fabric codec, like every other organ's projection. A test that
+        // decoded raw CBOR would keep passing if this organ drifted off the shared envelope again.
+        return FabricCodec::decodeMap(reply.value());
     }
 
     QString statusOf(const QString &subject) const
@@ -167,10 +169,10 @@ private Q_SLOTS:
         QTRY_COMPARE_WITH_TIMEOUT(
             statusOf(QStringLiteral("current-system")), QStringLiteral("observed"), 10000);
 
-        const QCborMap knowledge = knowledgeOf(QStringLiteral("current-system"));
-        QCOMPARE(knowledge.value(QStringLiteral("current")).toArray().size(), 1);
+        const QVariantMap knowledge = knowledgeOf(QStringLiteral("current-system"));
+        QCOMPARE(knowledge.value(QStringLiteral("current")).toList().size(), 1);
         QCOMPARE(
-            knowledge.value(QStringLiteral("current")).toArray().at(0).toMap()
+            knowledge.value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("value")).toString(),
             QStringLiteral("abc-nixos-system-host-26.05"));
 
@@ -178,7 +180,7 @@ private Q_SLOTS:
         // not under the organ that carried it. Those are different fields and stay different across
         // two process boundaries.
         QCOMPARE(
-            knowledge.value(QStringLiteral("current")).toArray().at(0).toMap()
+            knowledge.value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("sourceId")).toString(),
             QStringLiteral("nixos.system"));
 
@@ -203,6 +205,9 @@ private Q_SLOTS:
         QDBusInterface iface = epistemic();
         const QDBusReply<QByteArray> all = iface.call(QStringLiteral("Knowledge"));
         QVERIFY(all.isValid());
+        QString decodeError;
+        FabricCodec::decodeList(all.value(), &decodeError);
+        QVERIFY2(decodeError.isEmpty(), qPrintable(decodeError));
         QTest::qWait(1000);
 
         QCOMPARE(events.count(), before);
@@ -216,7 +221,7 @@ private Q_SLOTS:
         QVERIFY(m_epistemicd);
         const qulonglong before = cursor();
         QVERIFY(before > 0);
-        const QCborMap knowledgeBefore = knowledgeOf(QStringLiteral("current-system"));
+        const QVariantMap knowledgeBefore = knowledgeOf(QStringLiteral("current-system"));
 
         stop(m_epistemicd);
         QTRY_VERIFY_WITH_TIMEOUT(!epistemic().isValid(), 5000);
@@ -228,9 +233,9 @@ private Q_SLOTS:
         QCOMPARE(cursor(), before);
         QCOMPARE(
             knowledgeOf(QStringLiteral("current-system"))
-                .value(QStringLiteral("current")).toArray().at(0).toMap()
+                .value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("value")).toString(),
-            knowledgeBefore.value(QStringLiteral("current")).toArray().at(0).toMap()
+            knowledgeBefore.value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("value")).toString());
     }
 
@@ -264,16 +269,16 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(epistemic().isValid(), 5000);
 
         QVERIFY(cursor() > before);
-        const QCborMap knowledge = knowledgeOf(QStringLiteral("current-system"));
+        const QVariantMap knowledge = knowledgeOf(QStringLiteral("current-system"));
         QCOMPARE(knowledge.value(QStringLiteral("status")).toString(), QStringLiteral("observed"));
         QCOMPARE(
-            knowledge.value(QStringLiteral("current")).toArray().at(0).toMap()
+            knowledge.value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("value")).toString(),
             QStringLiteral("def-nixos-system-host-26.11"));
 
         // The earlier reading is not forgotten, it is outranked. Keeping what was superseded is how
         // the projection can later be asked why it changed its mind.
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toArray().size(), 1);
+        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
     }
 };
 

@@ -197,7 +197,7 @@ set_tests_properties(
 
 qt_add_executable(test-epistemic-service tst_epistemic_service.cpp)
 target_link_libraries(
-    test-epistemic-service PRIVATE cybou-epistemic-service cybou-storage Qt6::Test
+    test-epistemic-service PRIVATE cybou-epistemic-service cybou-fabric cybou-storage Qt6::Test
 )
 add_test(NAME epistemic-service COMMAND test-epistemic-service)
 set_tests_properties(

@@ -10,6 +10,7 @@
 
 #include "EpistemicService.h"
 
+#include "cybou/fabric/FabricCodec.h"
 #include "cybou/protocol/Observation.h"
 #include "cybou/storage/Journal.h"
 
@@ -47,7 +48,7 @@ CognitiveEnvelope observationOf(const QString &value, const QDateTime &acquiredA
 
 QString statusIn(const QByteArray &encoded)
 {
-    return QCborValue::fromCbor(encoded).toMap().value(QStringLiteral("status")).toString();
+    return FabricCodec::decodeMap(encoded).value(QStringLiteral("status")).toString();
 }
 
 } // namespace
@@ -112,10 +113,10 @@ private Q_SLOTS:
         QCOMPARE(service.Cursor(), sequence);
         QVERIFY(service.Cursor() > before);
 
-        const QCborMap knowledge =
-            QCborValue::fromCbor(service.KnowledgeOf(QStringLiteral("current-system"))).toMap();
+        const QVariantMap knowledge =
+            FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")));
         QCOMPARE(
-            knowledge.value(QStringLiteral("current")).toArray().at(0).toMap()
+            knowledge.value(QStringLiteral("current")).toList().at(0).toMap()
                 .value(QStringLiteral("value")).toString(),
             QStringLiteral("bbb"));
     }
@@ -167,9 +168,9 @@ private Q_SLOTS:
         QCOMPARE(service.Cursor(), 2u);
         // The skipped contribution was read, so it appears as the superseded earlier value rather
         // than being absent from history altogether.
-        const QCborMap knowledge =
-            QCborValue::fromCbor(service.KnowledgeOf(QStringLiteral("current-system"))).toMap();
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toArray().size(), 1);
+        const QVariantMap knowledge =
+            FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")));
+        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
     }
 
     // The point of the checkpoint: a restart resumes rather than replaying from zero.
@@ -205,10 +206,10 @@ private Q_SLOTS:
         // Same answer as before the restart, and the supersession survived - which is what makes
         // this a resumption rather than a fresh projection that happens to look similar.
         QCOMPARE(resumed.Cursor(), 2u);
-        const QCborMap knowledge =
-            QCborValue::fromCbor(resumed.KnowledgeOf(QStringLiteral("current-system"))).toMap();
+        const QVariantMap knowledge =
+            FabricCodec::decodeMap(resumed.KnowledgeOf(QStringLiteral("current-system")));
         QCOMPARE(knowledge.value(QStringLiteral("status")).toString(), QStringLiteral("observed"));
-        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toArray().size(), 1);
+        QCOMPARE(knowledge.value(QStringLiteral("superseded")).toList().size(), 1);
     }
 
     // Losing the checkpoint costs a replay and nothing else. If it cost knowledge, the checkpoint

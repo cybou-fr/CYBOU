@@ -44,6 +44,7 @@ class Presence : public QObject
     Q_PROPERTY(QVariantMap stats READ stats NOTIFY changed)
     Q_PROPERTY(QVariantMap identityState READ identityState NOTIFY changed)
     Q_PROPERTY(QVariantList calibrations READ calibrations NOTIFY changed)
+    Q_PROPERTY(QVariantList knowledge READ knowledge NOTIFY changed)
     Q_PROPERTY(QVariantList coalitions READ coalitions NOTIFY changed)
     Q_PROPERTY(QVariantMap moment READ moment NOTIFY changed)
     Q_PROPERTY(QVariantMap organHealth READ organHealth NOTIFY changed)
@@ -88,6 +89,11 @@ public:
     Q_INVOKABLE QVariantMap stats() const;
     Q_INVOKABLE QVariantMap identityState() const;
     Q_INVOKABLE QVariantList calibrations() const;
+
+    /// What Mind currently takes itself to know, one entry per subject, each carrying its status
+    /// and the claims behind it. Empty when the projection could not be read, which reads the same
+    /// as knowing nothing - because an owner that could not be asked knows nothing it can offer.
+    Q_INVOKABLE QVariantList knowledge() const;
     Q_INVOKABLE QVariantMap predict(const QString &subject);
     Q_INVOKABLE QVariantList coalitions() const;
     Q_INVOKABLE QVariantMap moment() const;

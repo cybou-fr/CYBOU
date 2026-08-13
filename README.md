@@ -35,10 +35,11 @@ M7 has begun. Contribution origin is bound to the calling
 executable, Journal growth costs are measured against budgets, Event1 has paged replay and
 incremental verification, capability and command policy has one declaration, and `ObservationV1` is
 frozen, `cybou-perceptiond` reads the identity of the running system and proposes it as a
-provenance-bearing observation, and `cybou-epistemicd` derives from those observations what is
-known, stale, disputed or superseded. **Nothing surfaces that knowledge to a person yet**: the
-projection answers over D-Bus and no Presence view reads it, and there is no retention or erasure
-policy, no language model, distributed Mind, or authorized external agency. See
+provenance-bearing observation, `cybou-epistemicd` derives from those observations what is known,
+stale, disputed or superseded, and Presence carries that knowledge to the surface. **There is still
+no retention or erasure**: [ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md) is Proposed and
+binding until accepted, so no sensitive observation may be ingested — and there is no language
+model, distributed Mind, or authorized external agency. See
 [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
@@ -105,7 +106,8 @@ become a second cognitive owner.
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
 | One capability and command declaration | Implemented — P7.0 |
 | Grounded local perception: `ObservationV1` and `cybou-perceptiond` | Implemented — P7.1 |
-| Epistemic projection owner: `cybou-epistemicd`, cursor and checkpoint | Implemented — P7.2; answered over D-Bus, not yet surfaced in Presence |
+| Epistemic projection owner: `cybou-epistemicd`, cursor and checkpoint | Implemented — P7.2 |
+| Epistemic status in the Presence surface | Implemented — P7.5 |
 | Retention and erasure, distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |

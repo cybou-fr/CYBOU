@@ -45,6 +45,7 @@ private:
     QString m_lifecycledPath;
     QString m_healthdPath;
     QString m_presencedPath;
+    QString m_systemLink;
     QString m_perceptiondPath;
     QString m_epistemicdPath;
 
@@ -73,6 +74,11 @@ private:
         env.insert(
             QStringLiteral("CYBOU_LIFECYCLE_DISABLE_AUTO_SCHEDULING"),
             QStringLiteral("1"));
+        // The real source is /run/current-system, which does not exist in a build sandbox: without
+        // a fixture perceptiond reports the source unavailable and observes nothing, so anything
+        // downstream of perception would be asserted against an empty projection forever.
+        env.insert(QStringLiteral("CYBOU_PERCEPTION_SYSTEM_LINK"), m_systemLink);
+        env.insert(QStringLiteral("CYBOU_PERCEPTION_INTERVAL_MS"), QStringLiteral("200"));
         return env;
     }
 
@@ -174,10 +180,17 @@ private Q_SLOTS:
         QVERIFY2(!m_healthdPath.isEmpty(), "CYBOU_HEALTHD_PATH is not set");
         QVERIFY2(!m_presencedPath.isEmpty(), "CYBOU_PRESENCED_PATH is not set");
         QVERIFY2(!m_perceptiondPath.isEmpty(), "CYBOU_PERCEPTIOND_PATH is not set");
+
         QVERIFY2(!m_epistemicdPath.isEmpty(), "CYBOU_EPISTEMICD_PATH is not set");
 
         m_root = std::make_unique<QTemporaryDir>();
         QVERIFY(m_root->isValid());
+
+        const QString systemStore =
+            m_root->filePath(QStringLiteral("abc-nixos-system-host-26.05"));
+        QVERIFY(QDir().mkpath(systemStore));
+        m_systemLink = m_root->filePath(QStringLiteral("current-system"));
+        QVERIFY(QFile::link(systemStore, m_systemLink));
 
         QDir().mkpath(
             m_root->filePath(QStringLiteral("runtime")));
@@ -613,6 +626,49 @@ private Q_SLOTS:
             QStringLiteral("FinishRun"),
             {QStringLiteral("interrupted"), QStringLiteral("timeout test cleanup")}));
         QVERIFY(lifecycle.callBool(QStringLiteral("Transition"), {QStringLiteral("awake")}));
+    }
+
+    // Presence surfaces what Mind takes itself to know. Everything else in P7 produced or derived
+    // that knowledge; this is the first place a person could see it.
+    //
+    // The subject is deliberately the one perception already reports. Asserting the section exists
+    // would pass against an empty list forever, so this waits for real content and checks the
+    // vocabulary a reader would act on: which subject, how sure, and on whose authority.
+    void presenceProjectsWhatMindKnows()
+    {
+        PresenceClient presence;
+        QTRY_VERIFY_WITH_TIMEOUT(presence.ready(), 5000);
+
+        const auto knowledgeOfCurrentSystem = [&presence]() {
+            const QVariantList knowledge =
+                presence.snapshot().value(QStringLiteral("knowledge")).toList();
+            for (const QVariant &entry : knowledge) {
+                const QVariantMap subject = entry.toMap();
+                if (subject.value(QStringLiteral("subject")).toString()
+                    == QStringLiteral("current-system")) {
+                    return subject;
+                }
+            }
+            return QVariantMap();
+        };
+
+        // perceptiond contributes on its own timer and epistemicd admits on announcement, so the
+        // wait is for the whole chain rather than for one process.
+        QTRY_VERIFY_WITH_TIMEOUT(!knowledgeOfCurrentSystem().isEmpty(), 30000);
+
+        const QVariantMap subject = knowledgeOfCurrentSystem();
+        QCOMPARE(subject.value(QStringLiteral("status")).toString(), QStringLiteral("observed"));
+
+        const QVariantList current = subject.value(QStringLiteral("current")).toList();
+        QCOMPARE(current.size(), 1);
+        const QVariantMap claim = current.first().toMap();
+
+        // The source is what observed it, not the organ that carried it. Presence is two process
+        // boundaries away from the adapter and the distinction has to survive both.
+        QCOMPARE(claim.value(QStringLiteral("sourceId")).toString(), QStringLiteral("nixos.system"));
+        QVERIFY(!claim.value(QStringLiteral("value")).toString().isEmpty());
+        QVERIFY(!claim.value(QStringLiteral("acquiredAt")).toString().isEmpty());
+        QVERIFY(!claim.value(QStringLiteral("freshUntil")).toString().isEmpty());
     }
 
     void presenceSnapshotHasOneBoundedOwnerBudget()

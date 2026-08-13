@@ -313,6 +313,13 @@ QVariantList Presence::calibrations() const
         .toList();
 }
 
+QVariantList Presence::knowledge() const
+{
+    return m_snapshot
+        .value(QStringLiteral("knowledge"))
+        .toList();
+}
+
 QVariantMap Presence::predict(const QString &subject)
 {
     if (!hasCapability(QStringLiteral("prediction"))) {
