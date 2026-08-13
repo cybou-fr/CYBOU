@@ -15,10 +15,12 @@
 
 namespace cybou {
 
-// 2 added the contribution id and provenance to every claim. A v1 checkpoint would restore claims
-// that cannot name their evidence, which is weaker than the replay it stands in for, so it is
-// refused by version rather than silently accepted with the fields missing.
-inline constexpr quint16 kCurrentProjectionSchemaVersion = 2;
+// 2 added the contribution id and provenance to every claim. 3 made a source's current state a list
+// rather than a single claim, so a source contradicting itself is carried in the checkpoint instead
+// of in side tables that were never written to it. Older checkpoints are refused by version: a
+// restored projection that silently dropped a dispute would be weaker than the replay it stands in
+// for, which is the one thing a checkpoint may never be.
+inline constexpr quint16 kCurrentProjectionSchemaVersion = 3;
 
 /// What is known about a subject right now.
 ///
@@ -124,18 +126,20 @@ public:
 private:
     struct History {
         QString subject;
-        /// Latest observation per source, which is what makes disagreement between sources visible
-        /// while a source replacing its own earlier reading is supersession rather than a dispute.
-        QHash<QString, EpistemicClaim> latestBySource;
-        QList<EpistemicClaim> superseded;
 
-        /// Sources that have contradicted themselves at a single instant of acquisition.
+        /// What each source currently says — one entry per source, but **one to many claims each**.
         ///
-        /// One entry per source is enough to say *what* is currently believed, but not enough to
-        /// notice that a source said two different things about the same moment. Keeping the
-        /// rejected readings is what lets that be reported rather than resolved by arrival order.
-        QSet<QString> contested;
-        QHash<QString, QList<EpistemicClaim>> selfContradiction;
+        /// A single claim per source cannot represent a source that said two different things about
+        /// the same instant of acquisition, and an earlier version of this carried that case in two
+        /// side tables instead. Those tables were not part of the checkpoint, so a dispute survived
+        /// until the next restart and then quietly became agreement: checkpoint stopped equalling
+        /// replay in precisely the case the projection exists to report.
+        ///
+        /// Co-current claims make the contradiction a property of the data rather than an annotation
+        /// beside it. It is then persisted for free, and each claim is aged by its own freshness
+        /// horizon rather than by whichever one happened to be listed first.
+        QHash<QString, QList<EpistemicClaim>> currentBySource;
+        QList<EpistemicClaim> superseded;
     };
 
     QList<QString> m_order;

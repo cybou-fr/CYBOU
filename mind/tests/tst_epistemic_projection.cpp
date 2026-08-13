@@ -157,6 +157,73 @@ private Q_SLOTS:
         QVERIFY(knowledge.superseded.isEmpty());
     }
 
+    // A dispute must survive a checkpoint, because a checkpoint may never be weaker than the replay
+    // it stands in for.
+    //
+    // It did not. Self-contradiction was carried in side tables that snapshot() never wrote, so a
+    // dispute lasted until the next restart and then quietly became agreement - checkpoint stopped
+    // equalling replay in exactly the case the projection exists to report. There were tests for
+    // the dispute and tests for the checkpoint, and none for the two together.
+    void aSelfContradictionSurvivesACheckpoint()
+    {
+        EpistemicProjection projection;
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const QDateTime acquired = now.addSecs(-30);
+
+        projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(20), acquired));
+        projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(25), acquired));
+        QCOMPARE(
+            projection.knowledgeOf(QStringLiteral("temperature"), now).status,
+            EpistemicStatus::Disputed);
+
+        EpistemicProjection restored;
+        QString error;
+        QVERIFY2(restored.restore(projection.snapshot(), &error), qPrintable(error));
+
+        const SubjectKnowledge knowledge =
+            restored.knowledgeOf(QStringLiteral("temperature"), now);
+        QCOMPARE(knowledge.status, EpistemicStatus::Disputed);
+        QCOMPARE(knowledge.current.size(), 2);
+
+        QSet<int> values;
+        for (const EpistemicClaim &claim : knowledge.current) {
+            values.insert(claim.value.toInteger());
+        }
+        QVERIFY(values.contains(20));
+        QVERIFY(values.contains(25));
+    }
+
+    // Two readings of one instant may declare different freshness horizons, and each is aged by its
+    // own. Once the shorter one lapses the dispute is over: a claim that no longer speaks cannot
+    // argue with one that does, which is the same rule that stops a lapsed source disputing a
+    // fresh one.
+    void aLapsedHalfOfASelfContradictionStopsDisputing()
+    {
+        EpistemicProjection projection;
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const QDateTime acquired = now.addSecs(-120);
+
+        // Same source, same instant, different values - and deliberately different horizons.
+        projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(20), acquired, 60));
+        projection.admit(observationOf(
+            QStringLiteral("sensor"), QStringLiteral("temperature"), QCborValue(25), acquired, 600));
+
+        // At acquisition both spoke, so this was a dispute.
+        QCOMPARE(
+            projection.knowledgeOf(QStringLiteral("temperature"), acquired.addSecs(30)).status,
+            EpistemicStatus::Disputed);
+
+        // Now only the longer-lived reading still speaks, and it speaks alone.
+        const SubjectKnowledge knowledge =
+            projection.knowledgeOf(QStringLiteral("temperature"), now);
+        QCOMPARE(knowledge.status, EpistemicStatus::Observed);
+        QCOMPARE(knowledge.current.size(), 1);
+        QCOMPARE(knowledge.current.first().value.toInteger(), 25);
+    }
+
     // The dispute is about one instant, so evidence about a later one settles it. Otherwise a
     // source that stuttered once would be permanently distrusted, which no amount of subsequent
     // good behaviour could repair.

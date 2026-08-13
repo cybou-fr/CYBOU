@@ -43,52 +43,61 @@ bool EpistemicProjection::admit(const CognitiveEnvelope &envelope)
         m_bySubject[claim.subject].subject = claim.subject;
     }
     History &history = m_bySubject[claim.subject];
+    QList<EpistemicClaim> &current = history.currentBySource[claim.sourceId];
 
-    const auto existing = history.latestBySource.constFind(claim.sourceId);
-    if (existing != history.latestBySource.constEnd()) {
-        // Ordering is by acquisition, not by arrival. Contributions can reach a projection out of
-        // order after a replay or a restart, and an older reading must not be able to unseat a
-        // newer one merely by being admitted second.
-        if (existing->acquiredAt > claim.acquiredAt) {
-            EpistemicClaim late = claim;
-            late.status = EpistemicStatus::Superseded;
-            history.superseded.append(late);
-            ++m_admitted;
-            return true;
+    if (current.isEmpty()) {
+        current.append(claim);
+        ++m_admitted;
+        return true;
+    }
+
+    // Every claim held for one source shares an acquisition instant: they are what that source said
+    // about one moment. So comparing against the first is comparing against all of them.
+    const QDateTime heldAt = current.first().acquiredAt;
+
+    // Ordering is by acquisition, not by arrival. Contributions can reach a projection out of order
+    // after a replay or a restart, and an older reading must not unseat a newer one by being
+    // admitted second.
+    if (heldAt > claim.acquiredAt) {
+        EpistemicClaim late = claim;
+        late.status = EpistemicStatus::Superseded;
+        history.superseded.append(late);
+        ++m_admitted;
+        return true;
+    }
+
+    if (heldAt == claim.acquiredAt) {
+        // A source restating what it already said about that instant is re-affirmation. Recording
+        // it again would manufacture a contradiction out of a repetition.
+        for (const EpistemicClaim &held : current) {
+            if (held.value == claim.value) {
+                ++m_admitted;
+                return true;
+            }
         }
 
-        // Two different values from one source for the very same instant of acquisition are not a
-        // change of mind - nothing happened in between for it to be about. Later replacing earlier
-        // was the wrong reading twice over: it made an arrival order that carries no meaning decide
-        // the answer, and it hid the one case where a source has contradicted itself.
-        //
-        // ObservationV1 deliberately gives these distinct identities so the Journal keeps both. The
-        // projection has to keep both too, and say so.
-        if (existing->acquiredAt == claim.acquiredAt && existing->value != claim.value) {
-            history.contested.insert(claim.sourceId);
-            history.selfContradiction[claim.sourceId].append(claim);
-            ++m_admitted;
-            return true;
-        }
+        // Two different values from one source for the very same instant are not a change of mind:
+        // nothing happened in between for it to be about. Both are kept, and the disagreement is
+        // reported rather than settled by which arrived second.
+        current.append(claim);
+        ++m_admitted;
+        return true;
+    }
 
-        // A source restating what it already said is re-affirmation, not replacement: the same
-        // value observed again is one fact confirmed, and filing the earlier reading as superseded
-        // would make an unchanging world look like a changing one.
-        if (existing->value != claim.value) {
-            EpistemicClaim previous = *existing;
+    // A later acquisition speaks for a different moment, so it replaces everything held for the
+    // earlier one - and resolves a self-contradiction by moving past the instant it was about.
+    //
+    // An unchanged value is re-affirmation rather than replacement, so the earlier reading is not
+    // filed as superseded: that would make an unchanging world look like a changing one.
+    for (const EpistemicClaim &held : current) {
+        if (held.value != claim.value) {
+            EpistemicClaim previous = held;
             previous.status = EpistemicStatus::Superseded;
             history.superseded.append(previous);
         }
-
-        // A source that moves on to a later acquisition has resolved its own contradiction: the
-        // dispute was about one instant, and this is evidence about a different one.
-        if (existing->acquiredAt < claim.acquiredAt) {
-            history.contested.remove(claim.sourceId);
-            history.selfContradiction.remove(claim.sourceId);
-        }
     }
 
-    history.latestBySource.insert(claim.sourceId, claim);
+    current = {claim};
     ++m_admitted;
     return true;
 }
@@ -101,23 +110,29 @@ SubjectKnowledge EpistemicProjection::knowledgeOf(
     knowledge.subject = subject;
 
     const auto found = m_bySubject.constFind(subject);
-    if (found == m_bySubject.constEnd() || found->latestBySource.isEmpty()) {
+    if (found == m_bySubject.constEnd() || found->currentBySource.isEmpty()) {
         // Never observed. Distinct from stale, and the distinction is load-bearing: one says nobody
         // looked, the other says somebody looked and the answer has aged.
         knowledge.status = EpistemicStatus::Unknown;
         return knowledge;
     }
 
+    // Each claim is aged by its own freshness horizon, including two claims from one source about
+    // one instant. Two readings of the same moment can declare different horizons - a source may be
+    // more confident about one than the other - and treating them as one would keep a lapsed claim
+    // disputing a live one, which is the past arguing with the present.
     QList<EpistemicClaim> fresh;
     QList<EpistemicClaim> lapsed;
-    for (const EpistemicClaim &claim : found->latestBySource) {
-        EpistemicClaim resolved = claim;
-        if (claim.acquiredAt <= now && now < claim.freshUntil) {
-            resolved.status = EpistemicStatus::Observed;
-            fresh.append(resolved);
-        } else {
-            resolved.status = EpistemicStatus::Stale;
-            lapsed.append(resolved);
+    for (const QList<EpistemicClaim> &claims : found->currentBySource) {
+        for (const EpistemicClaim &claim : claims) {
+            EpistemicClaim resolved = claim;
+            if (claim.acquiredAt <= now && now < claim.freshUntil) {
+                resolved.status = EpistemicStatus::Observed;
+                fresh.append(resolved);
+            } else {
+                resolved.status = EpistemicStatus::Stale;
+                lapsed.append(resolved);
+            }
         }
     }
 
@@ -139,36 +154,15 @@ SubjectKnowledge EpistemicProjection::knowledgeOf(
         return knowledge;
     }
 
-    // Disagreement counts only among claims that currently speak. A lapsed reading differing from a
-    // fresh one is not a contradiction — it is the past.
+    // Disagreement counts only among claims that currently speak, and it does not matter whether
+    // they come from two sources or from one source contradicting itself. A lapsed reading
+    // differing from a fresh one is not a contradiction - it is the past.
     bool disagrees = false;
     for (const EpistemicClaim &claim : fresh) {
         if (claim.value != fresh.first().value) {
             disagrees = true;
             break;
         }
-
-        // A source that contradicted itself about one instant is in dispute even when it is the
-        // only source, and even when every other source agrees with one of its readings. Requiring
-        // two sources to disagree would let a single unreliable source look certain.
-        if (found->contested.contains(claim.sourceId)
-            && claim.acquiredAt <= now && now < claim.freshUntil) {
-            disagrees = true;
-            break;
-        }
-    }
-
-    // The rejected readings are part of the answer: a dispute a caller cannot see both sides of is
-    // just an unexplained refusal.
-    if (disagrees) {
-        for (const QString &sourceId : found->contested) {
-            for (const EpistemicClaim &rejected : found->selfContradiction.value(sourceId)) {
-                EpistemicClaim contested = rejected;
-                contested.status = EpistemicStatus::Disputed;
-                fresh.append(contested);
-            }
-        }
-        std::sort(fresh.begin(), fresh.end(), byAcquisition);
     }
 
     if (disagrees) {
@@ -254,9 +248,13 @@ QByteArray EpistemicProjection::snapshot() const
     for (const QString &subject : m_order) {
         const History &history = m_bySubject.value(subject);
 
+        // Flattened, because a claim already names its own source. Grouping is reconstructed on
+        // restore, and co-current claims land back in the same group because they share one.
         QCborArray current;
-        for (const EpistemicClaim &claim : history.latestBySource) {
-            current.append(encodeClaim(claim));
+        for (const QList<EpistemicClaim> &claims : history.currentBySource) {
+            for (const EpistemicClaim &claim : claims) {
+                current.append(encodeClaim(claim));
+            }
         }
         QCborArray superseded;
         for (const EpistemicClaim &claim : history.superseded) {
@@ -325,7 +323,7 @@ bool EpistemicProjection::restore(const QByteArray &encoded, QString *error)
             if (!decodeClaim(encodedClaim, &claim)) {
                 return fail(QStringLiteral("projection checkpoint has a malformed claim"));
             }
-            history.latestBySource.insert(claim.sourceId, claim);
+            history.currentBySource[claim.sourceId].append(claim);
         }
         for (const QCborValue &encodedClaim :
              subjectMap.value(QStringLiteral("superseded")).toArray()) {
