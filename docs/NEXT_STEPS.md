@@ -729,6 +729,50 @@ code — not on the absence of a `grep` match.
 
 **P7.3 is complete.**
 
+## P7.4 — the retention decision, written down
+
+ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR
+covers expiry, tombstones, derived-data propagation, backups and possibly per-record keys. That is
+the only thing standing between the current tree and perception sources worth having, so
+[ADR-0028](../adr/ADR-0028-retention-and-erasure.md) is now **Proposed**. It is not Accepted:
+ADR-0027 was accepted explicitly, and this one should be too.
+
+The tension is structural, not incidental. `canonicalEnvelopeV2` includes `payloadCbor` **by
+value**, so erasing a payload breaks the chain from that row onward; deleting the row is worse,
+because `contribution_evidence` holds `ON DELETE RESTRICT` edges precisely so evidence cannot be
+orphaned. And even a perfect fix to the live database reaches neither the projections that cached
+the content nor the backups already taken.
+
+What it decides:
+
+- **The unit of erasure is the payload, never the record.** Identity, causality, position and
+  evidence edges survive. What was thought, by whom, on the evidence of what, stays provable; what
+  was *said* becomes unavailable. A Mind that could forget having concluded something could not
+  explain why it changed its mind.
+- **Row hash v3 chains an envelope digest rather than an envelope**, so the chain verifies without
+  the payload. Verification splits into chain integrity, always checkable, and content integrity,
+  checkable only where the payload survives — and reported as **skipped**, never as passed, where it
+  does not. Counting an erased row as verified would be the same defect as treating a failed replay
+  page as the end of history. v1 and v2 rows stay as they are and are not erasable, because a hash
+  chain that can be migrated retroactively is not a hash chain.
+- **An erasure is itself a contribution**, written in the same transaction that nulls the payload.
+  There is no side channel that mutates the Journal without leaving a trace in it.
+- **Derived state is invalidated by an erasure epoch**, bluntly. Working out which derived value
+  depended on an erased payload needs exactly the payload that is gone, so precise invalidation is
+  not available and rebuilding is. epistemicd and predictord already have the machinery.
+- **Backups are addressed by key destruction**, because nulling reaches the live database and
+  nothing else. The limits are stated rather than glossed: it is cryptographic erasure, the key
+  store becomes as sensitive as the payloads, and a backup of the key store taken beforehand defeats
+  it — so excluding it from backup is part of the decision, not an operational footnote.
+- **Retention rides on `PrivacyClass`**, inheriting the shortest lifetime among evidence exactly as
+  privacy inherits the most restrictive class. Two classification schemes over the same records
+  would disagree, and the disagreement would be discovered by a leak.
+
+The consequence worth accepting deliberately: encrypted payloads are opaque to the Journal's own
+indices, so anything searchable must live in non-payload fields — which are never erased and must
+therefore never be sensitive. That constrains adapter design, and is the reason to settle this
+before writing the adapters rather than after.
+
 ## Scheduling and refresh flakiness — fixed
 
 Two separate defects made the process suite intermittently red. Both are closed.

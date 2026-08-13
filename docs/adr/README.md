@@ -34,11 +34,12 @@ SPDX-License-Identifier: MIT
 | [0025](ADR-0025-grounding-epistemics-and-cognitive-governance.md) | Grounding, Epistemics, and Cognitive Governance | Proposed |
 | [0026](ADR-0026-lifecycle-owner-and-wire-contract.md) | Lifecycle Owner and Wire Contract | Accepted |
 | [0027](ADR-0027-local-epistemic-projection-owner.md) | Local Epistemic Projection Owner | Accepted |
+| [0028](ADR-0028-retention-and-erasure.md) | Retention and Erasure in an Append-Only Journal | Proposed |
 
-## Why five remain Proposed
+## Why six remain Proposed
 
 Accepted outranks [Current State](../CURRENT_STATE.md), so a Proposed ADR describing behaviour the
-code already enforces leaves the record contradicting itself. These five do not:
+code already enforces leaves the record contradicting itself. These six do not:
 
 - **0021 Language Faculties**, **0022 Authorized Action** and **0025 Grounding and Epistemics**
   describe boundaries deliberately not implemented. Proposed is the accurate status, and accepting
@@ -48,6 +49,10 @@ code already enforces leaves the record contradicting itself. These five do not:
   contribution whose privacy is weaker than its references, so classification and inheritance are
   real; replication does not exist at all. It should be split before either half is accepted, rather
   than accepted as a whole and thereby overstating the second.
+- **0028 Retention and Erasure** decides a mechanism none of which is built: no row hash v3, no
+  erasure epoch, no per-record keys. It is written before the adapters that need it because it
+  constrains their design - anything searchable must live outside the payload - and accepting it
+  would claim a guarantee the Journal cannot currently make.
 - **0020 Presence Surface for v0.1** describes a surface that has since changed substantially — the
   whole of it is now non-blocking, and its command set is declared in the capability registry. It
   needs revising against what Presence actually is before its status means anything.
