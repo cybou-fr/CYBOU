@@ -167,6 +167,25 @@ set_tests_properties(
     perceptiond-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-epistemicd-integration tst_epistemicd_integration.cpp)
+target_link_libraries(
+    test-epistemicd-integration
+    PRIVATE cybou-event-client cybou-fabric cybou-protocol Qt6::DBus Qt6::Test
+)
+add_test(
+    NAME epistemicd-integration
+    COMMAND
+        ${CYBOU_DBUS_TEST_RUNNER}
+        ${CMAKE_COMMAND} -E env
+        CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
+        CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
+        CYBOU_EPISTEMICD_PATH=$<TARGET_FILE:cybou-epistemicd>
+        $<TARGET_FILE:test-epistemicd-integration>
+)
+set_tests_properties(
+    epistemicd-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-epistemic-projection tst_epistemic_projection.cpp)
 target_link_libraries(
     test-epistemic-projection PRIVATE cybou-epistemic cybou-protocol Qt6::Test

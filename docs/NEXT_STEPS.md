@@ -621,6 +621,25 @@ quiescence only runs beforehand. Four consecutive runs green, then a full `nix f
 **Adding to the registry is how this was found.** One declaration means a new owner perturbs every
 consumer at once, and a test that was passing for a reason it did not state stops passing.
 
+### Proven across the process boundary
+
+The projection's reasoning was covered in process, and the owner's cursor and checkpoint were
+covered against a Journal in the same process. Neither said anything about the parts only a real
+boundary shows, so `epistemicd-integration` runs eventd, perceptiond and epistemicd as three
+processes over a real bus.
+
+It proves four things that were previously assumed. A live acceptance announced by Event1 reaches
+the projection with no restart and no polling — the two organs are actually connected, and the
+subject and source survive two boundaries without collapsing into the carrying organ's name. The
+checkpoint under the real state root survives a restart, with perceptiond stopped so a non-zero
+cursor immediately after start can only have come from disk. What was accepted while the owner was
+down is taken in on the next start, so an organ that only learned from live announcements would be
+caught. And **the projection never contributes**: reading everything it can answer leaves the
+Journal count unchanged, which is the ADR-0027 boundary tested rather than asserted in prose.
+
+The suite passed in 1.4 seconds, which is fast enough for five process tests to be worth doubting.
+Sabotaging the live-path expectation failed exactly that test and nothing else.
+
 **P7.2 is complete.**
 
 ## Scheduling and refresh flakiness — fixed
