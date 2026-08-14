@@ -1268,6 +1268,43 @@ Gates covered: **E1**–**E8**.
 
 **P7.16 is complete.**
 
+## P7.17 — the last two gates that do not need encryption
+
+**E9**: the epistemic surface refuses when it cannot answer. `unknown` means nobody looked, and a
+projection that failed to catch up has not looked *yet*; returning the first for the second collapses
+the reassuring reading onto the least informative one, in the organ whose whole job is telling them
+apart. Erroring lets every caller do what it already does with a failed read.
+
+**E13**, re-checked with erasure underneath it. The property was established in P7.9, and erasure is
+the first thing that changes what a *replay* produces — therefore the first thing that could break
+checkpoint-equals-replay. A checkpoint predating an erasure is discarded, and what remains equals
+what a projection built from scratch says, compared byte for byte.
+
+**E14**: the current projection does not grow with supersession. Fifty real changes leave the reply
+the same size to within the width of a counter. Asserted against reply **bytes** rather than against
+the code, because the property is about what crosses the bus and an implementation could stay
+bounded in shape while growing what it serialises.
+
+### An over-inference worth recording
+
+The m4 process suite failed twice consecutively after the E14 test landed, and I concluded that was
+"not the intermittent rate — that's deterministic". It was the intermittent. At a rate near one in
+three, two consecutive failures happen about eleven percent of the time; three green runs with the
+same test restored settled it.
+
+The bisect itself was also nearly wasted: the first comparison run at HEAD was **cached**, so no
+tests executed and the green result meant nothing. Only `--rebuild` produced a real run.
+
+Both mistakes are the same shape as the one recorded in P7.16, arriving from the opposite direction.
+There the known flake made a real regression look familiar; here it made a familiar flake look real.
+The rate is the thing to compare against, and two samples cannot establish one.
+
+Gates covered: **E1**–**E9**, **E13**, **E14**. Remaining: **E10**–**E12**, which need sensitive
+payloads wired through the envelope's protection descriptor — envelope schema 3 — and the backup
+story.
+
+**P7.17 is complete.**
+
 ## M7.5 — associative memory, decided before it exists
 
 Two new ADRs and five amendments, no code. The point of writing them now is that a memory

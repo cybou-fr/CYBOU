@@ -471,6 +471,53 @@ private Q_SLOTS:
         QCOMPARE(resumed.Knowledge(), fromScratch.Knowledge());
     }
 
+    // E14: the current projection stays bounded as history accumulates.
+    //
+    // Presence reads this on every Snapshot, so a reply that grew with the length of a life would
+    // reintroduce the cost P7.3 removed - somewhere less visible, and invisible entirely while there
+    // is only one source. Asserted against reply *size* rather than against the code, because the
+    // property is about what crosses the bus.
+    void theCurrentProjectionDoesNotGrowWithSupersession()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime base = QDateTime::currentDateTimeUtc().addSecs(-6000);
+
+        EpistemicService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+
+        QVERIFY(journal.append(observationOf(QStringLiteral("value-0"), base)) > 0);
+        QVERIFY(service.catchUp());
+        const int afterFirst = service.Knowledge().size();
+        QVERIFY(afterFirst > 0);
+
+        // Fifty real changes, so fifty supersessions.
+        for (int i = 1; i <= 50; ++i) {
+            QVERIFY(
+                journal.append(observationOf(
+                    QStringLiteral("value-%1").arg(i), base.addSecs(i * 60)))
+                > 0);
+        }
+        QVERIFY(service.catchUp());
+
+        const int afterFifty = service.Knowledge().size();
+        QCOMPARE(
+            FabricCodec::decodeMap(service.KnowledgeOf(QStringLiteral("current-system")))
+                .value(QStringLiteral("supersededCount"))
+                .toULongLong(),
+            50u);
+
+        // The reply carries one current claim either way. A little slack for the count field
+        // growing from one digit to two; nothing proportional to fifty.
+        QVERIFY2(
+            afterFifty <= afterFirst + 16,
+            qPrintable(QStringLiteral("current projection grew from %1 to %2 bytes")
+                           .arg(afterFirst)
+                           .arg(afterFifty)));
+    }
+
     // The point of the checkpoint: a restart resumes rather than replaying from zero.
     void aRestartResumesFromTheCheckpoint()
     {
