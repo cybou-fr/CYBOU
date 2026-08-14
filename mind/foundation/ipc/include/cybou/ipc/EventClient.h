@@ -35,6 +35,7 @@ public:
     QByteArray head() const override;
     quint64 verify() const override;
     VerificationResult verifyIncremental() const override;
+    quint64 erasureEpoch() const override;
     bool ensureConsumer(const QString &consumerId, quint64 initialOffset = 0) const;
     bool advanceConsumer(const QString &consumerId, quint64 offset) const;
     std::optional<quint64> consumerBacklog(const QString &consumerId) const;

@@ -48,6 +48,10 @@ public Q_SLOTS:
     /// status, verifiedFrom, verifiedThrough, brokenAt.
     ///
     /// Not const: a successful verification advances the checkpoint, which is the whole point.
+    /// How many erasures have been applied, so a projection can tell whether its checkpoint
+    /// predates one.
+    qulonglong ErasureEpoch() const;
+
     QByteArray VerifyIncremental();
     bool EnsureConsumer(const QString &consumerId, qulonglong initialOffset);
     bool AdvanceConsumer(const QString &consumerId, qulonglong offset);

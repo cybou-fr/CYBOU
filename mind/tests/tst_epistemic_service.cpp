@@ -354,6 +354,49 @@ private Q_SLOTS:
         QVERIFY(!beyond.value(QStringLiteral("hasMore")).toBool());
     }
 
+    // E8: a checkpoint built before an erasure is discarded, not repaired.
+    //
+    // It may hold a claim whose evidence has since been redacted, and there is no way to find out
+    // which claim that is - establishing it would need exactly the payload that is gone. So the
+    // whole checkpoint goes and the projection rebuilds from the Journal, which is always available
+    // and always correct.
+    void aCheckpointFromBeforeAnErasureIsDiscardedAndRebuilt()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString journalPath = dir.filePath(QStringLiteral("j.db"));
+        const QString checkpoint = dir.filePath(QStringLiteral("cp.cbor"));
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        Journal journal(journalPath);
+        QVERIFY(journal.isOpen());
+        const CognitiveEnvelope observation =
+            observationOf(QStringLiteral("aaa"), now.addSecs(-60));
+        QVERIFY(journal.append(observation) > 0);
+
+        {
+            EpistemicService warm(&journal, checkpoint);
+            QVERIFY(warm.isReady());
+            QCOMPARE(
+                statusIn(warm.KnowledgeOf(QStringLiteral("current-system"))),
+                QStringLiteral("observed"));
+        }
+        QVERIFY(QFile::exists(checkpoint));
+        QCOMPARE(journal.erasureEpoch(), 0u);
+
+        // Forget the observation the projection was built from.
+        QVERIFY(journal.requestErasure(observation.messageId, QStringLiteral("UserRequested")) > 0);
+        QVERIFY(journal.applyErasure(observation.messageId));
+        QCOMPARE(journal.erasureEpoch(), 1u);
+
+        // The stale checkpoint would have answered "observed" from a claim whose evidence is gone.
+        EpistemicService rebuilt(&journal, checkpoint);
+        QVERIFY2(rebuilt.isReady(), qPrintable(rebuilt.startupError()));
+        QCOMPARE(
+            statusIn(rebuilt.KnowledgeOf(QStringLiteral("current-system"))),
+            QStringLiteral("unknown"));
+    }
+
     // The point of the checkpoint: a restart resumes rather than replaying from zero.
     void aRestartResumesFromTheCheckpoint()
     {

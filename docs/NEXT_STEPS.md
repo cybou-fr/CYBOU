@@ -1230,6 +1230,44 @@ P7 invariants, already checked, and will want re-checking once erasure can run u
 
 **P7.15 is complete.**
 
+## P7.16 — a projection that knows its checkpoint is stale
+
+**E8.** The erasure epoch is readable through `EventStore`, so both an in-process Journal and an
+out-of-process `EventClient` can answer it, and epistemicd's checkpoint records the epoch it was
+built under. A checkpoint whose epoch is behind the Journal's is discarded whole and the projection
+rebuilt.
+
+Discarded rather than repaired, deliberately. A stale checkpoint may hold a claim whose evidence has
+since been redacted, and finding out *which* claim would need exactly the payload that is gone.
+Rebuilding is always available and always correct; the measured budgets say it is affordable.
+
+The test is strong because the two outcomes differ visibly rather than subtly: a stale checkpoint
+answers `observed` from a claim whose evidence no longer exists, and a rebuilt one answers
+`unknown`.
+
+`EventClient::erasureEpoch()` returns zero when the call fails, which is the safe direction — a
+projection comparing epochs sees a mismatch against any non-zero stored value and rebuilds. Guessing
+high would let a stale checkpoint look current.
+
+### A regression I caused and nearly mislabelled
+
+The m4 process suite failed twice in three runs after this change, in the capability cluster that has
+been an unexplained intermittent all session. It would have been easy to charge it to that again.
+
+It was mine. `persist()` runs once per admitted contribution, and I had it call `erasureEpoch()` —
+which for an out-of-process store is a **synchronous D-Bus round trip to eventd on the hot path of
+every observation**. The epoch is now read once per catch-up instead, which still sees every change,
+because an erasure appends contributions of its own and therefore always triggers one. Four
+consecutive suite runs green afterwards.
+
+The lesson is about the cost of having a known flake: it makes a real regression look familiar.
+Twice in three runs was worse than the documented rate, and that discrepancy is what should have
+been — and eventually was — the signal to look rather than re-run.
+
+Gates covered: **E1**–**E8**.
+
+**P7.16 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

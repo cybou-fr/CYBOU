@@ -21,7 +21,9 @@ namespace cybou {
 
 namespace {
 
-inline constexpr quint16 kCheckpointSchemaVersion = 1;
+// 2 records the erasure epoch the checkpoint was built under. A v1 checkpoint cannot say whether it
+// predates an erasure, and a projection that cannot tell must rebuild rather than assume.
+inline constexpr quint16 kCheckpointSchemaVersion = 2;
 
 // One page at a time, so a long biography is never held in memory at once and never crosses the bus
 // in a single reply. Matches the server-side cap; asking for more would simply be trimmed.
@@ -173,6 +175,7 @@ bool EpistemicService::catchUp()
     }
 
     const quint64 startedAt = m_cursor;
+    m_erasureEpoch = m_events->erasureEpoch();
     for (;;) {
         const ContributionPage page = m_events->after(m_cursor, kReplayPageSize);
         if (!page.ok) {
@@ -285,6 +288,19 @@ bool EpistemicService::load()
         return false;
     }
 
+    // A checkpoint built before an erasure describes a world that no longer exists. It may hold a
+    // claim whose evidence has been redacted, and there is no way to find out which claim that is -
+    // establishing it would need exactly the payload that is gone. So the whole checkpoint is
+    // discarded and the projection rebuilt from the Journal, which is always available and always
+    // correct.
+    bool epochParsed = false;
+    const qulonglong storedEpoch =
+        map.value(QStringLiteral("erasureEpoch")).toString().toULongLong(&epochParsed);
+    if (!epochParsed || !m_events || storedEpoch != m_events->erasureEpoch()) {
+        return false;
+    }
+    m_erasureEpoch = storedEpoch;
+
     // Applied together or not at all. Half of this pair is worse than neither: a cursor without its
     // projection claims history was admitted that was not.
     m_projection = restored;
@@ -299,6 +315,7 @@ void EpistemicService::persist()
     QCborMap root;
     root.insert(QStringLiteral("schemaVersion"), kCheckpointSchemaVersion);
     root.insert(QStringLiteral("cursor"), QString::number(m_cursor));
+    root.insert(QStringLiteral("erasureEpoch"), QString::number(m_erasureEpoch));
     root.insert(QStringLiteral("projection"), m_projection.snapshot());
 
     QSaveFile file(m_checkpointPath);

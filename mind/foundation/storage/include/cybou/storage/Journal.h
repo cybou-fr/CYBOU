@@ -110,7 +110,7 @@ public:
 
     /// How many erasures have been applied. Every persisted projection records the epoch it was
     /// built under, and one that is behind is discarded rather than repaired.
-    quint64 erasureEpoch() const;
+    quint64 erasureEpoch() const override;
 
 
     /// The checkpoint describing the current head, suitable for persisting after a successful

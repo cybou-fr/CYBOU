@@ -77,6 +77,14 @@ private:
     QString m_checkpointPath;
     EpistemicProjection m_projection;
     quint64 m_cursor{0};
+
+    /// The erasure epoch this projection was built under, read once per catch-up.
+    ///
+    /// Not read inside persist(). For an out-of-process store that is a synchronous D-Bus call to
+    /// eventd, and persist() runs once per admitted contribution - so asking there put a blocking
+    /// round trip on the hot path of every observation. An erasure always appends contributions of
+    /// its own, so the cursor advances and a catch-up runs: refreshing here sees every change.
+    quint64 m_erasureEpoch{0};
     bool m_ready{false};
     QString m_startupError;
     mutable QString m_lastError;

@@ -144,6 +144,14 @@ public:
     /// assert a prefix was trusted when none was.
     virtual VerificationResult verifyIncremental() const = 0;
 
+    /// How many erasures the Journal has applied.
+    ///
+    /// Every persisted projection records the epoch it was built under, and one that is behind is
+    /// discarded rather than repaired. Working out which derived value depended on an erased payload
+    /// needs exactly the payload that is gone, so precise invalidation is not available - rebuilding
+    /// is, and the measured budgets say it is affordable.
+    virtual quint64 erasureEpoch() const = 0;
+
     /// Most recent contributions first, newest to oldest.
     ///
     /// A limit of 0 or less means the entire biography. That is how organs used to rebuild their

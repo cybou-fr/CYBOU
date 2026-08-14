@@ -376,6 +376,11 @@ void EventService::saveCheckpoint(const VerifiedCheckpoint &checkpoint)
     // it is deliberately not an error the caller has to handle.
 }
 
+qulonglong EventService::ErasureEpoch() const
+{
+    return static_cast<qulonglong>(m_journal.erasureEpoch());
+}
+
 QByteArray EventService::VerifyIncremental()
 {
     VerificationResult result = m_journal.verifyFrom(m_checkpoint);

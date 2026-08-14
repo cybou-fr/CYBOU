@@ -174,6 +174,16 @@ QByteArray EventClient::head() const
 // Asks eventd to verify against the checkpoint it owns. The typed status comes back untouched:
 // flattening verified-through into "intact" here would discard exactly the distinction the caller
 // needs to know whether a whole-history guarantee was established.
+quint64 EventClient::erasureEpoch() const
+{
+    m_lastError.clear();
+    const QDBusMessage reply = call(QStringLiteral("ErasureEpoch"));
+    if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
+        return 0;
+    }
+    return reply.arguments().first().toULongLong();
+}
+
 VerificationResult EventClient::verifyIncremental() const
 {
     m_lastError.clear();
