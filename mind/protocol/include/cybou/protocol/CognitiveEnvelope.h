@@ -53,6 +53,21 @@ enum class ContributionKind : quint16 {
     ErasureApplied,
 };
 
+/// How long a contribution may exist at all.
+///
+/// A separate axis from `PrivacyClass`, and deliberately so. Privacy asks *who may see this*;
+/// retention asks *how long may this exist*. The answers do not correlate - an identity fact may be
+/// highly private and needed for years, while public telemetry is worthless after ten minutes - and
+/// forcing them onto one ordering would make every future classification argument a fight about the
+/// wrong axis.
+enum class RetentionClass : quint8 {
+    Ephemeral = 0,
+    Short,
+    Standard,
+    Long,
+    Permanent,
+};
+
 enum class PrivacyClass : quint8 {
     Local = 0,
     Node,
@@ -120,6 +135,20 @@ struct CognitiveEnvelope {
     ///
     /// Present only on schema-3 envelopes, and part of the non-erasable metadata: which key sealed a
     /// payload is a fact about the record that must stay verifiable after the payload is gone.
+    /// When this contribution stops being allowed to exist, as an absolute instant.
+    ///
+    /// The class alone is a pointer into a policy that will change: if `Short` means seven days
+    /// today and a day next year, every record written under the old meaning silently acquires the
+    /// new one, and retention stops being a fact about the contribution. The resolved instant is
+    /// what governs; the class and policy version are recorded so a later reader can see how it was
+    /// arrived at.
+    ///
+    /// Null means unbounded, which is what every contribution written before retention existed
+    /// carries. Absence is not a short lifetime.
+    RetentionClass retentionClass{RetentionClass::Standard};
+    quint16 retentionPolicyVersion{0};
+    QDateTime retainUntil;
+
     struct Protection {
         bool sealed{false};
         QUuid keyDomainId;
@@ -132,6 +161,14 @@ struct CognitiveEnvelope {
     /// Structural validation only. Journal::append validates that referenced contributions
     /// already exist and that privacy is not weakened.
     bool isValid() const;
+
+    /// The earliest instant among this contribution and everything it was derived from.
+    ///
+    /// Retention propagates by the same discipline as privacy and through the same code path:
+    /// privacy takes the most restrictive class among references, retention takes the earliest
+    /// expiry. A conclusion may not outlive the evidence it rests on, or erasing the evidence on
+    /// expiry would leave the conclusion restating it.
+    QDateTime derivedRetainUntil(const QList<QDateTime> &referenceRetainUntil) const;
 
     PrivacyClass derivedPrivacy(const QList<PrivacyClass> &evidencePrivacy) const;
 };

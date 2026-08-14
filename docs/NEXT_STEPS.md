@@ -1401,6 +1401,41 @@ adapter decision, and each adapter still needs its own argument for why a source
 
 **P7.19 is complete.**
 
+## P7.20 — retention as a fact about a record
+
+The last decided-but-unbuilt piece of ADR-0028. A contribution carries `retentionClass`,
+`retentionPolicyVersion` and an absolute `retainUntil`, under envelope schema 3 alongside the
+protection descriptor.
+
+**The absolute instant is what governs**, and the class is recorded beside it rather than instead of
+it. A class alone is a pointer into a policy that will change: if `Short` means seven days today and
+a day next year, every record written under the old meaning silently acquires the new one, and
+retention stops being a fact about the contribution at all. The class and policy version stay so a
+later reader can see how the instant was arrived at.
+
+**Retention propagates like privacy, through the same code path and with the same discipline.**
+Privacy takes the most restrictive class among references; retention takes the earliest expiry. A
+contribution declaring a lifetime longer than its evidence is **refused**, not silently clamped —
+the same choice the privacy check makes, because quietly correcting a declaration leaves the caller
+believing something the Journal does not.
+
+That rule closes the same hole E7 closes, arriving through time instead of through a request. If a
+conclusion could outlive its evidence, expiring the evidence would leave the conclusion behind still
+restating it.
+
+**A null instant is unbounded, never immediate.** Every contribution written before this feature
+carries one, and treating "no lifetime recorded" as "expires now" would make anything derived from
+existing history expire the moment it was written. Absence of a bound is not a short bound.
+
+Sabotaging the check makes the propagation test fail, which matters here more than usual: it asserts
+a *refusal*, and refusals are the shape that has produced four vacuous tests this session.
+
+Retention is now recorded and propagated. **Nothing acts on it yet** — a policy engine that expires
+contributions is separate work, and ADR-0028 says acting on a lifetime is an erasure like any other,
+so it will run through the same three-step protocol rather than beside it.
+
+**P7.20 is complete.**
+
 ## M7.5 — associative memory, decided before it exists
 
 Two new ADRs and five amendments, no code. The point of writing them now is that a memory

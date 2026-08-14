@@ -101,6 +101,24 @@ bool CognitiveEnvelope::isValid() const
     return !causationId.isNull() || !evidence.isEmpty();
 }
 
+QDateTime CognitiveEnvelope::derivedRetainUntil(
+    const QList<QDateTime> &referenceRetainUntil) const
+{
+    QDateTime earliest = retainUntil;
+    for (const QDateTime &reference : referenceRetainUntil) {
+        // A null instant is unbounded rather than immediate, so it never wins the comparison. That
+        // asymmetry matters: treating "no lifetime recorded" as "expires now" would make every
+        // contribution derived from an older record expire the moment it was written.
+        if (!reference.isValid()) {
+            continue;
+        }
+        if (!earliest.isValid() || reference < earliest) {
+            earliest = reference;
+        }
+    }
+    return earliest;
+}
+
 PrivacyClass CognitiveEnvelope::derivedPrivacy(
     const QList<PrivacyClass> &evidencePrivacy) const
 {

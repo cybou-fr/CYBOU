@@ -920,6 +920,79 @@ private Q_SLOTS:
         QCOMPARE(journal.rotatedBackupEpoch(), 1u);
     }
 
+    // Retention propagates like privacy: a conclusion may not outlive the evidence it rests on.
+    //
+    // If it could, expiring the evidence would leave the conclusion behind still restating it -
+    // which is the same hole E7 closes for explicit erasure, arriving instead through the passage
+    // of time.
+    void aContributionMayNotOutliveItsEvidence()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        CognitiveEnvelope shortLived = observationWithPayload(QByteArrayLiteral("expires soon"));
+        shortLived.retentionClass = RetentionClass::Short;
+        shortLived.retainUntil = now.addDays(7);
+        QVERIFY(journal.append(shortLived) > 0);
+
+        // Derived, and claiming to outlive what it was derived from.
+        CognitiveEnvelope tooLong = derived(ContributionKind::Prediction, shortLived);
+        tooLong.causationId = QUuid();
+        tooLong.evidence = {shortLived.messageId};
+        tooLong.payloadCbor = QByteArrayLiteral("because that");
+        tooLong.retentionClass = RetentionClass::Long;
+        tooLong.retainUntil = now.addYears(1);
+        QCOMPARE(journal.append(tooLong), 0u);
+        QVERIFY(journal.lastError().contains(QStringLiteral("outlives")));
+
+        // The same contribution, declaring the inherited instant, is accepted.
+        CognitiveEnvelope honest = tooLong;
+        honest.messageId = QUuid::createUuid();
+        honest.correlationId = honest.messageId;
+        honest.retainUntil = now.addDays(7);
+        QVERIFY2(journal.append(honest) > 0, qPrintable(journal.lastError()));
+
+        const auto stored = journal.contribution(honest.messageId);
+        QVERIFY(stored.has_value());
+        QCOMPARE(stored->retainUntil.toUTC(), now.addDays(7).toUTC());
+        QCOMPARE(stored->retentionClass, RetentionClass::Long);
+        QCOMPARE(journal.verify(), 0u);
+    }
+
+    // An unrecorded lifetime is unbounded, not immediate.
+    //
+    // Every contribution written before retention existed carries a null instant, and treating that
+    // as "expires now" would make anything derived from history expire the moment it was written.
+    void anUnrecordedLifetimeIsUnboundedRatherThanImmediate()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        // No retainUntil at all, as everything written before this feature has.
+        const CognitiveEnvelope old = observationWithPayload(QByteArrayLiteral("from before"));
+        QVERIFY(!old.retainUntil.isValid());
+        QVERIFY(journal.append(old) > 0);
+
+        // A derived contribution may declare its own bounded lifetime against it.
+        CognitiveEnvelope bounded = derived(ContributionKind::Prediction, old);
+        bounded.causationId = QUuid();
+        bounded.evidence = {old.messageId};
+        bounded.payloadCbor = QByteArrayLiteral("derived");
+        bounded.retainUntil = now.addDays(30);
+        QVERIFY2(journal.append(bounded) > 0, qPrintable(journal.lastError()));
+
+        // And one that declares none is equally acceptable: unbounded from unbounded.
+        CognitiveEnvelope unbounded = derived(ContributionKind::Prediction, old);
+        unbounded.causationId = QUuid();
+        unbounded.evidence = {old.messageId};
+        unbounded.payloadCbor = QByteArrayLiteral("also derived");
+        QVERIFY2(journal.append(unbounded) > 0, qPrintable(journal.lastError()));
+    }
+
     void migratesV1WithoutRehashingHistory()
     {
         QTemporaryDir dir;

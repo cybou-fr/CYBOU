@@ -133,6 +133,17 @@ QByteArray canonicalNonErasableEnvelopeV3(const CognitiveEnvelope &envelope)
         appendU8(out, envelope.protection.sealed ? 1 : 0);
         appendUuid(out, envelope.protection.keyDomainId);
         appendU32(out, envelope.protection.keyEpoch);
+
+        // Retention is non-erasable metadata for the same reason provenance is: after a payload is
+        // gone, how long the record was allowed to exist is still a fact about it, and one an
+        // auditor may need precisely because the content cannot be inspected.
+        appendU8(out, static_cast<quint8>(envelope.retentionClass));
+        appendU16(out, envelope.retentionPolicyVersion);
+        appendU64(
+            out,
+            envelope.retainUntil.isValid()
+                ? static_cast<quint64>(envelope.retainUntil.toUTC().toMSecsSinceEpoch())
+                : 0);
     }
     return out;
 }
