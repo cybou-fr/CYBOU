@@ -36,11 +36,15 @@ executable, Journal growth costs are measured against budgets, Event1 has paged 
 incremental verification, capability and command policy has one declaration, and `ObservationV1` is
 frozen, `cybou-perceptiond` reads the identity of the running system and proposes it as a
 provenance-bearing observation, `cybou-epistemicd` derives from those observations what is known,
-stale, disputed or superseded, and Presence carries that knowledge to the surface. **There is still
-no retention or erasure**: [ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md) is Accepted but
-not implemented, and no sensitive observation may be ingested until it is — and there is no language
-model, distributed Mind, or authorized external agency. See
-[Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
+stale, disputed or superseded, and Presence carries that knowledge to the surface.
+
+**Mind can now forget.** A payload can be erased while its record stays provable, the protocol
+survives a crash at any point, and the erasure reaches what was derived from it rather than leaving
+the reasoning that restates it. What is missing is the sensitive half: no payload is encrypted and
+no perception source is sensitive, because
+[ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md) forbids ingesting one until the remaining
+gates are green. There is also no language model, no distributed Mind, and no authorized external
+agency. See [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
 
 ## Why this architecture
 
@@ -108,7 +112,11 @@ become a second cognitive owner.
 | Grounded local perception: `ObservationV1` and `cybou-perceptiond` | Implemented — P7.1 |
 | Epistemic projection owner: `cybou-epistemicd`, cursor and checkpoint | Implemented — P7.2 |
 | Epistemic status in the Presence surface | Implemented — P7.5 |
-| Retention and erasure, distributed prototype | Planned — M7 |
+| Journal v3, split commitment, two-axis verification | Implemented — P7.11–P7.12 |
+| Crash-safe erasure, transitive to derived contributions | Implemented — P7.14–P7.16; gates E1–E8 |
+| Sensitive payload storage and backup erasure | Decided — [ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md); gates E10–E12 open |
+| Associative context: `cybou-contextd`, transparent delivery | Decided — [ADR-0029](docs/adr/ADR-0029-associative-context-projection.md), [ADR-0030](docs/adr/ADR-0030-transparent-context-delivery.md) |
+| Distributed prototype | Planned — M7 |
 | Optional replaceable language faculty | Planned — M8 |
 | Policy-controlled authorized action boundary | Planned — M9 |
 

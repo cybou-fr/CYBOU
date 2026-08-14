@@ -484,6 +484,58 @@ command
 
 This is the implemented form of the `durable before visible` invariant.
 
+## Forgetting
+
+The Journal writes rows at `hash_version = 3`, whose chain covers a **split commitment**:
+
+```text
+metadataDigest    = SHA256(canonicalNonErasableEnvelopeV3)
+payloadCommitment = SHA256(payload)          ciphertext once sensitive payloads exist
+commitment        = SHA256(metadataDigest ‖ payloadCommitment)
+```
+
+Both halves are stored, not only their combination. After an erasure the payload commitment can
+never be recomputed, so a verifier that had to recompute it in order to check the metadata would
+lose the ability to check the metadata at exactly the moment forgetting made it unrecomputable. An
+erased row still proves its author, causality, kind and privacy.
+
+Verification therefore answers on two axes. `status` and `brokenAt` describe the chain and stay
+checkable forever; `contentVerified`, `contentSkipped` and `contentBrokenAt` describe payloads. A
+payload that disagrees with its commitment is a content failure at a known sequence with the chain
+intact, and an erased payload is **skipped, never counted as verified**. Rows at hash versions 1 and
+2 verify exactly as before and are not erasable, because their hash covers the payload by value.
+
+Erasure is a three-step protocol, because a database transaction and a key store cannot commit
+together:
+
+```text
+1. ErasureRequested        durable contribution, target and typed reason
+2. destroy DEK             idempotent, safe to repeat after any crash
+3. transaction:            redact payload, set erased_at, bump erasure_epoch,
+                           append ErasureApplied
+```
+
+A request with no application is the only state a crash can leave, and `incompleteErasures()` makes
+recovery a question the Journal answers by itself. The epoch lives in a table row rather than a
+pragma so it is bumped inside the redaction transaction: a projection must never see a redacted
+payload while believing its cached view is current.
+
+Erasure reaches what was derived from its target. `retentionDependents()` takes the transitive
+closure over causation and evidence edges, so a `Learning` that says "because X" is redacted with
+X — it is biography rather than a cache, and leaving it would destroy the record while keeping the
+reasoning that restates it. Erasure records are excluded from their own closure, and a contribution
+that merely happened afterwards is not a descendant.
+
+`Event1.Submit` refuses erasure kinds. Destroying biography is not reachable through the call that
+records a thought about it.
+
+`cybou-crypto` provides the primitive the sensitive path will use: randomized XChaCha20-Poly1305
+through libsodium, per-contribution data keys, key wrapping under the same primitive, and key
+domains identified by an opaque UUID and epoch rather than by what they protect. Sealing one
+plaintext twice yields two different commitments, and a guesser holding the plaintext *and* the key
+still cannot reproduce a surviving commitment. **No payload is encrypted yet and no perception
+source is sensitive.**
+
 ## Current cognitive substrate
 
 The present tree has implementation boundaries for:
@@ -506,12 +558,14 @@ These components are intentionally useful without any language model.
 
 The current tree does **not** yet implement:
 
-- in-place upgrade reconciliation beyond the tested schema-v0-to-v1 migration;
-- governed retention, forgetting, or epistemic temporal-freshness policy;
-- owner contracts for Journal growth and calibration pressure beyond the implemented Event1
-  backlog scheduling input, and general contradiction/evidence-freshness projection;
+- in-place upgrade reconciliation beyond the tested schema migrations;
+- **sensitive payload storage**: the AEAD primitive, key store and erasure protocol exist and are
+  tested, but no payload is encrypted and no perception source is sensitive. ADR-0027 still forbids
+  ingesting one until the remaining ADR-0028 gates are green;
+- automatic retention expiry: `retainUntil` is decided in ADR-0028 and not yet carried on the
+  envelope, so nothing acts on a lifetime;
+- associative memory: ADR-0029 and ADR-0030 are Accepted and `cybou-contextd` does not exist;
 - M7 inter-node transport, replication, or partition handling;
-- typed perception adapters, epistemic claims, contradiction reconciliation, or value constraints;
 - M8 optional language faculty;
 - M9 planning/authorization/executor pipeline for privileged external actions.
 
@@ -524,8 +578,9 @@ the corresponding milestone is implemented and gated.
   has one bounded monotonic request budget;
 - same-user IPC authorization is not yet a capability security boundary;
 - stronger in-place upgrade/reconciliation guarantees remain a hardening track;
-- Journal history is not yet consolidated into a governed epistemic projection;
-- privacy classification exists, but retention and erasure propagation are not implemented;
+- erasure is implemented for the live database and reaches derived state through the epoch, but the
+  backup story is decided and unbuilt: a backup taken before an erasure, with a recovery root that
+  still unwraps it, defeats that erasure;
 - no inter-node transport exists;
 - no model-selection/context policy for M8 exists;
 - no authorization policy or typed privileged executor for M9 exists.

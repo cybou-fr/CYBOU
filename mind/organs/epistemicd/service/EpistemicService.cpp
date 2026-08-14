@@ -7,6 +7,8 @@
 
 #include <algorithm>
 
+#include <QDBusError>
+
 #include <QCborMap>
 #include <QCborValue>
 #include <QVariantList>
@@ -122,8 +124,32 @@ qulonglong EpistemicService::Cursor() const
     return static_cast<qulonglong>(m_cursor);
 }
 
-QByteArray EpistemicService::Knowledge() const
+// A projection that cannot answer must say so rather than answer emptily.
+//
+// This is the substrate's second invariant applied to the epistemic surface: partial or unavailable
+// is not empty truth. "unknown" is a real epistemic state meaning nobody looked, and handing it back
+// for "I could not assemble the projection" would collapse the most reassuring reading onto the
+// least informative one - in the organ whose entire job is telling those apart.
+bool EpistemicService::refuseWhenUnready(const QString &method)
 {
+    if (m_ready) {
+        return true;
+    }
+    if (calledFromDBus()) {
+        sendErrorReply(
+            QDBusError::Failed,
+            QStringLiteral("%1 cannot answer: %2")
+                .arg(method, m_startupError.isEmpty() ? m_lastError : m_startupError));
+    }
+    return false;
+}
+
+QByteArray EpistemicService::Knowledge()
+{
+    if (!refuseWhenUnready(QStringLiteral("Knowledge"))) {
+        return {};
+    }
+
     QVariantList all;
     for (const SubjectKnowledge &knowledge :
          m_projection.knowledgeAt(QDateTime::currentDateTimeUtc())) {
@@ -132,15 +158,23 @@ QByteArray EpistemicService::Knowledge() const
     return FabricCodec::encode(all);
 }
 
-QByteArray EpistemicService::KnowledgeOf(const QString &subject) const
+QByteArray EpistemicService::KnowledgeOf(const QString &subject)
 {
+    if (!refuseWhenUnready(QStringLiteral("KnowledgeOf"))) {
+        return {};
+    }
+
     return FabricCodec::encode(
         encodeKnowledge(m_projection.knowledgeOf(subject, QDateTime::currentDateTimeUtc())));
 }
 
 QByteArray EpistemicService::KnowledgeHistory(
-    const QString &subject, qulonglong afterIndex, int limit) const
+    const QString &subject, qulonglong afterIndex, int limit)
 {
+    if (!refuseWhenUnready(QStringLiteral("KnowledgeHistory"))) {
+        return {};
+    }
+
     // Capped like Event1's Replay, and for the same reason: a caller asking for everything would
     // otherwise decide how much memory this organ and the bus have to find.
     constexpr int kMaxPage = 1000;

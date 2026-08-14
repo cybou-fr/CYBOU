@@ -397,6 +397,80 @@ private Q_SLOTS:
             QStringLiteral("unknown"));
     }
 
+    // E9: a projection that cannot answer must not answer "unknown".
+    //
+    // "unknown" means nobody looked. A projection that failed to catch up has not looked *yet*, and
+    // reporting the first for the second collapses the reassuring reading onto the least
+    // informative one - in the organ whose whole job is telling those apart.
+    void anUnreadyProjectionRefusesRatherThanReportingUnknown()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        UnreadableAfter journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(
+                    QStringLiteral("aaa"), QDateTime::currentDateTimeUtc().addSecs(-60)))
+                > 0);
+
+        journal.failReads(true);
+        EpistemicService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+
+        QVERIFY2(!service.isReady(), "a projection that could not catch up is not ready");
+        QVERIFY(!service.startupError().isEmpty());
+
+        // In process the guard returns an empty payload rather than a D-Bus error, and empty is
+        // exactly what a caller must not mistake for an answer: a fabric reply always carries its
+        // version envelope, so empty bytes are unambiguously a refusal.
+        QVERIFY2(
+            service.KnowledgeOf(QStringLiteral("current-system")).isEmpty(),
+            "an unready projection must not answer at all");
+        QVERIFY(service.Knowledge().isEmpty());
+
+        // And once reading works, it answers properly rather than staying stuck.
+        journal.failReads(false);
+        QVERIFY(service.catchUp());
+    }
+
+    // E13, re-checked with erasure underneath it: checkpoint still equals replay after payloads
+    // have been redacted. The property was established in P7.9; erasure is the first thing that
+    // changes what a replay produces, so it is the first thing that could break the equality.
+    void checkpointStillEqualsReplayAcrossAnErasure()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString journalPath = dir.filePath(QStringLiteral("j.db"));
+        const QString checkpoint = dir.filePath(QStringLiteral("cp.cbor"));
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        Journal journal(journalPath);
+        QVERIFY(journal.isOpen());
+        const CognitiveEnvelope first = observationOf(QStringLiteral("aaa"), now.addSecs(-300));
+        const CognitiveEnvelope second = observationOf(QStringLiteral("bbb"), now.addSecs(-120));
+        QVERIFY(journal.append(first) > 0);
+        QVERIFY(journal.append(second) > 0);
+
+        {
+            EpistemicService warm(&journal, checkpoint);
+            QVERIFY(warm.isReady());
+        }
+
+        QVERIFY(journal.requestErasure(first.messageId, QStringLiteral("UserRequested")) > 0);
+        QVERIFY(journal.applyErasure(first.messageId));
+
+        // Resumed from a checkpoint that predates the erasure: it must be discarded, and what
+        // remains must equal what a projection built from scratch would say.
+        EpistemicService resumed(&journal, checkpoint);
+        QVERIFY2(resumed.isReady(), qPrintable(resumed.startupError()));
+
+        EpistemicService fromScratch(&journal, dir.filePath(QStringLiteral("other.cbor")));
+        QVERIFY(fromScratch.isReady());
+
+        QCOMPARE(
+            resumed.KnowledgeOf(QStringLiteral("current-system")),
+            fromScratch.KnowledgeOf(QStringLiteral("current-system")));
+        QCOMPARE(resumed.Knowledge(), fromScratch.Knowledge());
+    }
+
     // The point of the checkpoint: a restart resumes rather than replaying from zero.
     void aRestartResumesFromTheCheckpoint()
     {

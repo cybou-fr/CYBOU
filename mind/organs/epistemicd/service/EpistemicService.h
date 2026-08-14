@@ -6,6 +6,7 @@
 #include "cybou/epistemic/EpistemicProjection.h"
 #include "cybou/events/EventStore.h"
 
+#include <QDBusContext>
 #include <QObject>
 #include <QString>
 
@@ -19,7 +20,9 @@ namespace cybou {
 ///
 /// The projection is a cache of the Journal, and the checkpoint below is a cache of the projection.
 /// Losing either costs a replay. Where any of them disagrees with the Journal, the Journal is right.
-class EpistemicService : public QObject
+class EpistemicService
+    : public QObject
+    , protected QDBusContext
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.cybou.Mind.Epistemic1")
@@ -44,19 +47,24 @@ public Q_SLOTS:
 
     /// Everything known, as a CBOR list. Status is evaluated at the moment of the call, because it
     /// is an answer about now rather than a stored property.
-    QByteArray Knowledge() const;
+    /// Everything known, or a D-Bus error if the projection is not in a state to say.
+    ///
+    /// `unknown` means nobody looked. A projection that failed to catch up, or that discarded a
+    /// checkpoint and could not rebuild, has not looked *yet* - and answering `unknown` for that
+    /// would report the most reassuring of two very different situations. Erroring lets every
+    /// caller do what it already does with a failed read: leave the section unmeasured.
+    QByteArray Knowledge();
 
     /// What is known about one subject, including when nothing is: an unfamiliar subject answers
     /// `unknown` rather than failing, because not knowing is a normal state.
-    QByteArray KnowledgeOf(const QString &subject) const;
+    QByteArray KnowledgeOf(const QString &subject);
 
     /// One page of what a subject's sources used to say, oldest first.
     ///
     /// Supersession is unbounded over a life, so it is never returned inline with the current
     /// projection. A caller that wants to know why Mind changed its mind asks for it explicitly and
     /// by the page; a caller that only wants to know what is true does not pay for it at all.
-    QByteArray KnowledgeHistory(
-        const QString &subject, qulonglong afterIndex, int limit) const;
+    QByteArray KnowledgeHistory(const QString &subject, qulonglong afterIndex, int limit);
 
     /// Highest Event1 sequence this projection has taken in.
     qulonglong Cursor() const;
@@ -65,6 +73,9 @@ Q_SIGNALS:
     void Changed();
 
 private:
+    /// Refuse a read when the projection is not in a state to answer. Returns true when it is.
+    bool refuseWhenUnready(const QString &method);
+
     bool load();
     /// Write the cursor and the projection as one value.
     ///

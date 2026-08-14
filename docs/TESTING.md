@@ -57,7 +57,7 @@ The graphical `vm-smoke` asks systemd directly for a non-blocking reboot because
 implementation of `reboot()` sends Ctrl+Alt+Delete, which Plasma treats as an interactive logout.
 This keeps shutdown non-interactive while preserving the normal state-flush path.
 
-`m4-process-integration` now launches all nine Mind daemons. It changes Lifecycle1 from `awake` to
+`m4-process-integration` now launches all eleven Mind daemons. It changes Lifecycle1 from `awake` to
 `idle` and back, then proves the signal-driven update reaches Presence1 and the QML-facing Presence
 proxy, including lifecycled health, without turning lifecycle mode into runtime availability.
 It also recreates the proxy three times around one active run and verifies unchanged run identity,
@@ -163,11 +163,11 @@ D-Bus surface, and compares the exact run blob and Event1 count across the UI-on
 
 ## Process integration
 
-`m4-process-integration` runs inside an isolated `dbus-run-session`, launches nine executables,
+`m4-process-integration` runs inside an isolated `dbus-run-session`, launches eleven executables,
 and verifies:
 
 ```text
-nine distinct process IDs
+eleven distinct process IDs
 all organ D-Bus services become ready
 two QML Presence proxies do not create another identity session
 Promise crosses presenced -> intentiond -> eventd
@@ -177,6 +177,30 @@ restarting identityd does not increment the same login session
 restarting presenced leaves the cognitive organs alive
 predictor loss limits only prediction and recovery restores it
 ```
+
+## Perception, epistemics and forgetting
+
+Six suites were added during M7, and each exists because a property could not be proven where the
+others live.
+
+| Suite | What only it can show |
+|---|---|
+| `system-generation-source` | reading the running system's identity, including a source that is absent or malformed |
+| `perception-service` | an unchanged reading is re-affirmed once per freshness horizon, not once per poll |
+| `perceptiond-integration` | a real adapter contributes over a real bus under an origin eventd verified rather than accepted |
+| `epistemic-projection` | the derivation rules, and `checkpoint == replay` asserted over a population rather than case by case |
+| `epistemic-service` | the cursor, the checkpoint, and a gap that cannot be read refusing to advance |
+| `epistemicd-integration` | live propagation across three processes, and that the projection never writes to Event1 |
+| `sealed-payload` | a surviving commitment cannot be reproduced from a guessed plaintext, given the key |
+
+`journal` also carries the erasure protocol: each crash window, the closure that reaches derived
+contributions, and an erased row that still proves its author.
+
+**Sabotage is part of running these.** Four tests in this set passed while proving nothing until a
+deliberately broken implementation was run against them — a fixture with an empty payload, a
+`causationId` that referenced nothing, a cache that never advanced, and a projection whose disputes
+were never written. Each asserted a *refusal*, and a refusal is satisfied by any reason at all. When
+a test asserts that something is refused or absent, break the thing it guards and confirm it fails.
 
 ## VM gate
 
