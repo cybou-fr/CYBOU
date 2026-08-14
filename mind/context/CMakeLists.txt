@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Stanislav Saveliev
+# SPDX-License-Identifier: MIT
+
+qt_add_library(cybou-context STATIC
+    src/AssociativeProjection.cpp
+    include/cybou/context/AssociativeProjection.h
+)
+
+target_include_directories(cybou-context
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+target_link_libraries(cybou-context
+    PUBLIC Qt6::Core cybou-protocol
+)

@@ -1436,6 +1436,51 @@ so it will run through the same three-step protocol rather than beside it.
 
 **P7.20 is complete.**
 
+## M7.5 — the associative projection
+
+First slice of [ADR-0029](adr/ADR-0029-associative-context-projection.md): the library that owns
+what is *related*, with no process around it yet.
+
+It holds a graph rather than a bag of vectors. An index that can rank but not explain is
+indistinguishable from one that made the answer up, and the whole reason this layer exists as its
+own thing is so that "why did you think of honey?" has a structural answer.
+
+Every association carries a closed-set `AssociationOrigin` — observed, user-declared, derived,
+model-suggested, statistical. `lemon → yellow` and `lemon → makes people kinder` may both exist and
+must never be indistinguishable, and this organ does not adjudicate between them: for epistemic
+force a caller asks epistemicd.
+
+### Gates covered
+
+**A1** — same graph, seeds and budget produce the same bundle, checked over repeated activations.
+Edges are sorted before they are walked, because hash iteration order is the usual way determinism
+is lost and a memory that answers differently each time cannot be audited.
+
+**A2** — every budget dimension is a hard stop: nodes, edges and depth each cut the search, and
+depth one provably does not reach what is two hops away.
+
+**A6** — a truncated retrieval reports `complete = false`. This is the substrate's recurring failure
+applied to relevance: returning a short list and calling it complete would say "nothing else is
+related" when the truth is "I stopped looking". An unknown seed answers empty *and complete*, which
+is the opposite fact and must not look the same.
+
+**A12** — every retrieved item carries the path that produced it, naming the relation and the
+association's origin. The answer to "why did you think of honey?" is a traversal rather than a
+sentence, and no model is involved in producing it.
+
+Also refused: an edge to a concept that does not exist, because it would produce a retrieval nobody
+could explain.
+
+### Not yet
+
+`cybou-contextd` does not exist — this is a library, not the twelfth process. Nothing reads the
+Journal to build the graph, no checkpoint is persisted, and the erasure-epoch and
+privacy/retention-inheritance gates (**A7**–**A9**) need that process before they mean anything.
+`ContextBundle` here is the in-process form; the wire form and ADR-0030's delivery boundary are
+separate work.
+
+**M7.5 has begun.**
+
 ## M7.5 — associative memory, decided before it exists
 
 Two new ADRs and five amendments, no code. The point of writing them now is that a memory

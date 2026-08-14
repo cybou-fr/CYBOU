@@ -16,10 +16,14 @@ Accepted before implementation, deliberately. The point of this decision is to f
 that Journal v3 will be written against; leaving it Proposed while the code is written would mean
 the format decided the ADR rather than the reverse.
 
-**Acceptance does not enable sensitive perception.** Sensitive observations remain prohibited until
-the storage, key-management, erasure-propagation, projection-invalidation and recovery gates at the
-end of this document are implemented and green. ADR-0027 requires both an accepted decision and
-working retention semantics, and only the first of those exists today.
+**Implemented.** Every gate at the end of this document is green, and retention is recorded and
+propagated on the envelope. ADR-0027 required both an accepted decision and working retention
+semantics before any sensitive observation could be ingested; both now exist, so that particular
+prohibition no longer binds.
+
+That is not permission to ingest anything. It removes a blocking constraint and leaves the ordinary
+one: each adapter still owes its own argument for why a source is worth reading, and no source is
+sensitive today.
 
 Being Accepted, this outranks [Current State](../CURRENT_STATE.md): where an implementation and this
 document disagree, the implementation is wrong.

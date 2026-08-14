@@ -175,6 +175,12 @@ The UI shows `unknown`, `stale` and `disputed` distinctly, and cannot resolve a 
   possibly per-record keys, **no sensitive observation may be ingested**. The first adapter is
   chosen to make that constraint costless.
 
+  **Satisfied.** [ADR-0028](ADR-0028-retention-and-erasure.md) is Accepted and implemented — payload
+  erasure with a split commitment, a crash-safe protocol, propagation to durable descendants, key
+  destruction, and retention recorded on the envelope. This constraint no longer blocks. It is left
+  in place rather than deleted because it explains why the first adapter was chosen the way it was,
+  and a constraint that vanishes once met leaves the record looking as though it never applied.
+
 ### Amendment: this owner does not own semantic association
 
 `contextd` may reference `SubjectKnowledge` and contribution ids, and **must preserve epistemic
