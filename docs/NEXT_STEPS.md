@@ -1305,6 +1305,55 @@ story.
 
 **P7.17 is complete.**
 
+## P7.18 — the sensitive path, and ADR-0028 implemented
+
+**Envelope schema 3** carries a protection descriptor: whether a payload is sealed, and under which
+opaque key domain and epoch. It is **not the default**. An envelope declares schema 3 only when it
+carries protection, so every ordinary contribution keeps the schema-2 canonical form and every hash
+already written stays exactly as it was — the first exercise of the rule ADR-0028 froze, that the
+canonical field set is *selected by* schema version rather than extended in place.
+
+The descriptor is part of the non-erasable metadata and round-trips through the database, because
+which key sealed a payload is a fact about the record that must stay verifiable after the payload is
+gone. A reloaded envelope that forgot how it was sealed would not rehash to what was stored, and
+every sealed row would verify as broken.
+
+**Sealing happens before hashing**, so the commitment is over what is actually stored: `nonce ‖
+ciphertext ‖ tag` for a sealed payload. A commitment over the plaintext would be the guessing oracle
+the ADR exists to remove.
+
+**A Journal without a key store refuses a sealed contribution** rather than storing it in the clear.
+Writing it unsealed because the key store was missing would produce a payload nobody could ever
+erase — a silent, permanent failure of the exact guarantee the descriptor was requesting.
+
+**E10 and E11 are one test**, deliberately. Separately each is satisfiable by a trivial
+implementation — decrypt everything, or decrypt nothing. Only together do they say erasure was
+*selective*: a backup taken after an erasure, restored with both the database and the key store,
+decrypts what was never erased and cannot decrypt what was. The erased row still says it was sealed,
+its chain verifies, and its content is skipped.
+
+Sabotaging the seal to store plaintext fails both tests.
+
+### The bug the column list was waiting to cause
+
+Adding three columns to `envelopeColumns()` broke four journal tests at once, because the reads that
+follow an envelope in the same query were positional integers — `query.value(16)` for `prev_hash`,
+and so on. They now derive from `kEnvelopeColumnCount`, declared beside the column list.
+
+Shifting the numbers by three would have fixed the symptom. The magic numbers were the defect: the
+next person to add a column would have hit exactly this, and the failure mode is a verifier
+comparing a hash against a key epoch.
+
+The v1 migration test caught its class of mistake for the third time — it verifies the legacy chain
+immediately after migrating, so any schema change the read path depends on surfaces there rather
+than in someone's journal.
+
+Gates covered: **E1**–**E11**, **E13**, **E14**. Only **E12** remains: a pre-erasure backup still in
+rotation must be reported as outside the erasure guarantee, which is the typed completion state
+rather than a storage mechanism.
+
+**P7.18 is complete.**
+
 ## M7.5 — associative memory, decided before it exists
 
 Two new ADRs and five amendments, no code. The point of writing them now is that a memory

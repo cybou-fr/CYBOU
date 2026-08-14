@@ -708,6 +708,135 @@ private Q_SLOTS:
         QCOMPARE(erasureRecords, 2);
     }
 
+    // A sealed payload is stored as ciphertext and reads back only through the key store.
+    void aSealedPayloadIsStoredAsCiphertext()
+    {
+        QTemporaryDir dir;
+        KeyStore keys(dir.filePath(QStringLiteral("keys")));
+        QVERIFY(keys.isUsable());
+        const QByteArray kek = Seal::generateKey();
+
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        journal.setKeyStore(&keys, kek, Seal::generateDomain());
+
+        CognitiveEnvelope secret = observationWithPayload(QByteArrayLiteral("diagnosis: private"));
+        secret.schemaVersion = kProtectedEnvelopeSchemaVersion;
+        secret.protection.sealed = true;
+        secret.protection.keyDomainId = QUuid::createUuid();
+        QVERIFY(journal.append(secret) > 0);
+
+        const auto stored = journal.contribution(secret.messageId);
+        QVERIFY(stored.has_value());
+        QVERIFY2(
+            !stored->payloadCbor.contains(QByteArrayLiteral("diagnosis")),
+            "the plaintext must not be in the database");
+        QVERIFY(stored->protection.sealed);
+
+        const auto opened = journal.unsealPayload(*stored);
+        QVERIFY(opened.has_value());
+        QCOMPARE(*opened, QByteArrayLiteral("diagnosis: private"));
+
+        QCOMPARE(journal.verify(), 0u);
+    }
+
+    // A journal with no key store refuses a sealed contribution rather than storing it in the
+    // clear. Writing it unsealed would produce a payload nobody could ever erase - a silent,
+    // permanent failure of the exact guarantee the descriptor was requesting.
+    void aJournalWithoutKeysRefusesToStoreASealedPayload()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        CognitiveEnvelope secret = observationWithPayload(QByteArrayLiteral("private"));
+        secret.schemaVersion = kProtectedEnvelopeSchemaVersion;
+        secret.protection.sealed = true;
+        secret.protection.keyDomainId = QUuid::createUuid();
+
+        QCOMPARE(journal.append(secret), 0u);
+        QCOMPARE(journal.count(), 0u);
+    }
+
+    // E10 and E11 together, which is the only way either means anything.
+    //
+    // A backup is the database file and the key store beside it. After an erasure, restoring both
+    // must still decrypt what was never erased and must not decrypt what was - otherwise erasure
+    // reaches the live database only, and ADR-0028's whole key-destruction argument is decoration.
+    void aRestoredBackupDecryptsOnlyWhatSurvivedErasure()
+    {
+        QTemporaryDir dir;
+        const QString journalPath = dir.filePath(QStringLiteral("j.db"));
+        const QString keyRoot = dir.filePath(QStringLiteral("keys"));
+        const QByteArray kek = Seal::generateKey();
+
+        QUuid keptId;
+        QUuid erasedId;
+        {
+            KeyStore keys(keyRoot);
+            QVERIFY(keys.isUsable());
+            Journal journal(journalPath);
+            QVERIFY(journal.isOpen());
+            journal.setKeyStore(&keys, kek, Seal::generateDomain());
+
+            CognitiveEnvelope kept = observationWithPayload(QByteArrayLiteral("keep me"));
+            kept.schemaVersion = kProtectedEnvelopeSchemaVersion;
+            kept.protection.sealed = true;
+            kept.protection.keyDomainId = QUuid::createUuid();
+            QVERIFY(journal.append(kept) > 0);
+            keptId = kept.messageId;
+
+            CognitiveEnvelope doomed = observationWithPayload(QByteArrayLiteral("forget me"));
+            doomed.schemaVersion = kProtectedEnvelopeSchemaVersion;
+            doomed.protection.sealed = true;
+            doomed.protection.keyDomainId = QUuid::createUuid();
+            QVERIFY(journal.append(doomed) > 0);
+            erasedId = doomed.messageId;
+
+            // The three-step protocol, with the key destruction between the two records.
+            QVERIFY(journal.requestErasure(erasedId, QStringLiteral("UserRequested")) > 0);
+            QVERIFY(keys.destroyKeyFor(erasedId));
+            QVERIFY(journal.applyErasure(erasedId));
+        }
+
+        // The backup: both halves, copied after the erasure.
+        const QString restoredJournal = dir.filePath(QStringLiteral("restored.db"));
+        const QString restoredKeys = dir.filePath(QStringLiteral("restored-keys"));
+        QVERIFY(QFile::copy(journalPath, restoredJournal));
+        QVERIFY(QDir().mkpath(restoredKeys));
+        for (const QString &name :
+             QDir(keyRoot).entryList(QDir::Files | QDir::NoDotAndDotDot)) {
+            QVERIFY(QFile::copy(QDir(keyRoot).filePath(name), QDir(restoredKeys).filePath(name)));
+        }
+
+        KeyStore keys(restoredKeys);
+        QVERIFY(keys.isUsable());
+        Journal restored(restoredJournal);
+        QVERIFY(restored.isOpen());
+        restored.setKeyStore(&keys, kek, Seal::generateDomain());
+
+        // E10: what was never erased still decrypts.
+        const auto kept = restored.contribution(keptId);
+        QVERIFY(kept.has_value());
+        const auto keptPlaintext = restored.unsealPayload(*kept);
+        QVERIFY2(keptPlaintext.has_value(), "a restored backup must decrypt what was not erased");
+        QCOMPARE(*keptPlaintext, QByteArrayLiteral("keep me"));
+
+        // E11: what was erased does not, and nothing about it survives to be tested against.
+        const auto erased = restored.contribution(erasedId);
+        QVERIFY(erased.has_value());
+        QVERIFY2(
+            !restored.unsealPayload(*erased).has_value(),
+            "a destroyed key must leave the ciphertext inert even in a restored backup");
+        QVERIFY(erased->payloadCbor.isEmpty());
+        QVERIFY2(erased->protection.sealed, "the record still says it was sealed");
+
+        // And the restored chain is whole, with the erased row's content skipped.
+        const VerificationResult result = restored.verifyFrom({});
+        QVERIFY(result.intact());
+        QCOMPARE(result.contentSkipped, 1u);
+    }
+
     void migratesV1WithoutRehashingHistory()
     {
         QTemporaryDir dir;

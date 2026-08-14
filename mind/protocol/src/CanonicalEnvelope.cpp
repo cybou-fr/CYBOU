@@ -124,6 +124,16 @@ QByteArray canonicalNonErasableEnvelopeV3(const CognitiveEnvelope &envelope)
 
     appendU8(out, static_cast<quint8>(envelope.privacy));
     appendString(out, envelope.capabilityScope);
+
+    // Selected by schema version, never extended in place. A schema-2 envelope stops here and
+    // therefore hashes exactly as it did before schema 3 existed; a schema-3 envelope continues
+    // with its protection descriptor. Appending these unconditionally would have changed the digest
+    // of every row already written, which is the one thing a hash chain may never do.
+    if (envelope.schemaVersion == kProtectedEnvelopeSchemaVersion) {
+        appendU8(out, envelope.protection.sealed ? 1 : 0);
+        appendUuid(out, envelope.protection.keyDomainId);
+        appendU32(out, envelope.protection.keyEpoch);
+    }
     return out;
 }
 

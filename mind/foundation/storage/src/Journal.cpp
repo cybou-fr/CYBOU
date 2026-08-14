@@ -29,12 +29,16 @@ QString defaultConnectionName()
         .arg(QUuid::createUuid().toString(QUuid::Id128));
 }
 
+// How many columns envelopeColumns() names. Every positional read after an envelope depends on it,
+// so it lives beside the list rather than in the heads of the people who write those reads.
+inline constexpr int kEnvelopeColumnCount = 17;
+
 QString envelopeColumns()
 {
     return QStringLiteral(
         "schema_version, message_id, correlation_id, causation_id, origin_organ, origin_node, "
         "kind, wall_time, monotonic_time, logical_clock, confidence, payload, privacy, "
-        "capability");
+        "capability, sealed, key_domain, key_epoch");
 }
 
 QString sqlStringLiteral(QString value)
@@ -273,6 +277,21 @@ bool Journal::ensureSchema()
         m_lastError = QStringLiteral("could not add the payload commitment column");
         return false;
     }
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("sealed"))
+        && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN sealed INTEGER NOT NULL DEFAULT 0"))) {
+        m_lastError = QStringLiteral("could not add the sealed column");
+        return false;
+    }
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("key_domain"))
+        && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN key_domain TEXT"))) {
+        m_lastError = QStringLiteral("could not add the key_domain column");
+        return false;
+    }
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("key_epoch"))
+        && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN key_epoch INTEGER NOT NULL DEFAULT 0"))) {
+        m_lastError = QStringLiteral("could not add the key_epoch column");
+        return false;
+    }
     if (!columnExists(QStringLiteral("contribution"), QStringLiteral("erased_at"))
         && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN erased_at TEXT"))) {
         m_lastError = QStringLiteral("could not add the erasure marker column");
@@ -324,7 +343,10 @@ bool Journal::createSchemaV2()
             hash           BLOB    NOT NULL,
             commitment     BLOB,
             payload_commitment BLOB,
-            erased_at      TEXT
+            erased_at      TEXT,
+            sealed         INTEGER NOT NULL DEFAULT 0,
+            key_domain     TEXT,
+            key_epoch      INTEGER NOT NULL DEFAULT 0
         )
     )SQL"))
         || !execSql(QStringLiteral(R"SQL(
@@ -415,6 +437,11 @@ bool Journal::migrateV1ToV2()
         || !execSql(QStringLiteral(
             "ALTER TABLE contribution ADD COLUMN payload_commitment BLOB"))
         || !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN erased_at TEXT"))
+        || !execSql(QStringLiteral(
+            "ALTER TABLE contribution ADD COLUMN sealed INTEGER NOT NULL DEFAULT 0"))
+        || !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN key_domain TEXT"))
+        || !execSql(QStringLiteral(
+            "ALTER TABLE contribution ADD COLUMN key_epoch INTEGER NOT NULL DEFAULT 0"))
         || !execSql(QStringLiteral(R"SQL(
         CREATE TABLE contribution_evidence (
             contribution_id TEXT    NOT NULL,
@@ -557,6 +584,9 @@ QByteArray Journal::metadataDigestV3(const CognitiveEnvelope &envelope)
 // one function rather than of the chain format.
 QByteArray Journal::payloadCommitmentV3(const CognitiveEnvelope &envelope)
 {
+    // Both branches hash the bytes that are stored. For a sealed payload those bytes are the nonce
+    // and ciphertext, which depend on randomness a guesser does not have - which is the entire
+    // reason a destroyed key leaves nothing testable behind.
     return QCryptographicHash::hash(envelope.payloadCbor, QCryptographicHash::Sha256);
 }
 
@@ -611,8 +641,9 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
     if (!e.isValid()) {
         return fail(QStringLiteral("refusing to append an invalid envelope"));
     }
-    if (e.schemaVersion != kCurrentEnvelopeSchemaVersion) {
-        return fail(QStringLiteral("new contributions must use envelope schema v2"));
+    if (e.schemaVersion != kCurrentEnvelopeSchemaVersion
+        && e.schemaVersion != kProtectedEnvelopeSchemaVersion) {
+        return fail(QStringLiteral("new contributions must use envelope schema v2 or v3"));
     }
     if (contains(e.messageId)) {
         return fail(QStringLiteral("messageId already exists"));
@@ -655,41 +686,70 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         previousHash = tail.value(1).toByteArray();
     }
 
-    const QByteArray payloadCommitment = payloadCommitmentV3(e);
-    const QByteArray commitment = commitmentFrom(metadataDigestV3(e), payloadCommitment);
+    // Sealing happens here, before anything is hashed, so the commitment is over what will actually
+    // be stored. A sealed contribution whose commitment covered the plaintext would be the guessing
+    // oracle ADR-0028 exists to remove.
+    CognitiveEnvelope stored = e;
+    if (e.protection.sealed) {
+        if (!m_keys || !m_keys->isUsable()) {
+            return fail(QStringLiteral(
+                "refusing a sealed contribution: this journal has no key store"));
+        }
+        const auto dataKey = m_keys->createKeyFor(e.messageId, m_keyEncryptionKey);
+        if (!dataKey.has_value()) {
+            return fail(QStringLiteral("could not create a data key for the payload"));
+        }
+        const auto sealedPayload = Seal::seal(e.payloadCbor, *dataKey);
+        if (!sealedPayload.has_value()) {
+            return fail(QStringLiteral("could not seal the payload"));
+        }
+        stored.payloadCbor = sealedPayload->nonce + sealedPayload->ciphertext;
+        stored.protection.keyDomainId = m_keyDomain.keyDomainId;
+        stored.protection.keyEpoch = m_keyDomain.keyEpoch;
+    }
+    const CognitiveEnvelope &e2 = stored;
+
+    const QByteArray payloadCommitment = payloadCommitmentV3(e2);
+    const QByteArray commitment = commitmentFrom(metadataDigestV3(e2), payloadCommitment);
     const QByteArray hash = rowHashV3(sequence, commitment, previousHash);
     QSqlQuery insert(m_db);
     insert.prepare(QStringLiteral(
         "INSERT INTO contribution (seq, message_id, correlation_id, causation_id, "
         "origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, "
         "confidence, evidence, payload, privacy, capability, schema_version, hash_version, "
-        "prev_hash, hash, commitment, payload_commitment) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "prev_hash, hash, commitment, payload_commitment, sealed, key_domain, key_epoch) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
 
     insert.addBindValue(static_cast<qulonglong>(sequence));
-    insert.addBindValue(e.messageId.toString(QUuid::WithoutBraces));
-    insert.addBindValue(e.correlationId.toString(QUuid::WithoutBraces));
-    insert.addBindValue(e.causationId.isNull()
+    insert.addBindValue(e2.messageId.toString(QUuid::WithoutBraces));
+    insert.addBindValue(e2.correlationId.toString(QUuid::WithoutBraces));
+    insert.addBindValue(e2.causationId.isNull()
                             ? QVariant()
                             : QVariant(e.causationId.toString(QUuid::WithoutBraces)));
-    insert.addBindValue(e.originOrgan);
+    insert.addBindValue(e2.originOrgan);
     insert.addBindValue(
         e.originNode.isNull() ? QStringLiteral("") : e.originNode);
     insert.addBindValue(static_cast<int>(e.kind));
-    insert.addBindValue(e.wallTime.toString(Qt::ISODateWithMs));
+    insert.addBindValue(e2.wallTime.toString(Qt::ISODateWithMs));
     insert.addBindValue(static_cast<qulonglong>(e.monotonicTime));
     insert.addBindValue(static_cast<qulonglong>(e.logicalClock));
-    insert.addBindValue(e.confidence);
+    insert.addBindValue(e2.confidence);
     insert.addBindValue(QVariant());
-    insert.addBindValue(e.payloadCbor);
+    insert.addBindValue(e2.payloadCbor);
     insert.addBindValue(static_cast<int>(e.privacy));
-    insert.addBindValue(e.capabilityScope);
+    insert.addBindValue(e2.capabilityScope);
     insert.addBindValue(static_cast<int>(e.schemaVersion));
     insert.addBindValue(kCurrentJournalHashVersion);
     insert.addBindValue(previousHash);
     insert.addBindValue(hash);
     insert.addBindValue(commitment);
     insert.addBindValue(payloadCommitment);
+    insert.addBindValue(e2.protection.sealed ? 1 : 0);
+    insert.addBindValue(
+        e2.protection.keyDomainId.isNull()
+            ? QVariant()
+            : QVariant(e2.protection.keyDomainId.toString(QUuid::WithoutBraces)));
+    insert.addBindValue(static_cast<uint>(e2.protection.keyEpoch));
 
     if (!insert.exec()) {
         return fail(insert.lastError().text());
@@ -793,6 +853,36 @@ quint64 Journal::appendBatch(const QList<CognitiveEnvelope> &envelopes)
 // chained and verifiable - because the fact that a forgetting was asked for is itself part of the
 // biography, and a side channel that mutated the Journal without leaving a trace in it would undo
 // the property the single-writer rule exists to provide.
+void Journal::setKeyStore(
+    KeyStore *keys, const QByteArray &keyEncryptionKey, const KeyDomain &domain)
+{
+    m_keys = keys;
+    m_keyEncryptionKey = keyEncryptionKey;
+    m_keyDomain = domain;
+}
+
+std::optional<QByteArray> Journal::unsealPayload(const CognitiveEnvelope &envelope) const
+{
+    if (!envelope.protection.sealed) {
+        return envelope.payloadCbor;
+    }
+    if (!m_keys || !m_keys->isUsable() || envelope.payloadCbor.size() <= kSealNonceBytes) {
+        return std::nullopt;
+    }
+
+    const auto dataKey = m_keys->keyFor(envelope.messageId, m_keyEncryptionKey);
+    if (!dataKey.has_value()) {
+        // The key is gone, so the payload is unreadable and stays that way. Not an error to report
+        // loudly: after an erasure this is the correct and expected answer.
+        return std::nullopt;
+    }
+
+    SealedPayload sealed;
+    sealed.nonce = envelope.payloadCbor.left(kSealNonceBytes);
+    sealed.ciphertext = envelope.payloadCbor.mid(kSealNonceBytes);
+    return Seal::unseal(sealed, *dataKey);
+}
+
 quint64 Journal::requestErasure(const QUuid &target, const QString &reason)
 {
     if (target.isNull() || !contribution(target).has_value()) {
@@ -1016,6 +1106,13 @@ CognitiveEnvelope Journal::envelopeFromQuery(const QSqlQuery &query, int offset)
     e.payloadCbor = query.value(offset + 11).toByteArray();
     e.privacy = static_cast<PrivacyClass>(query.value(offset + 12).toInt());
     e.capabilityScope = query.value(offset + 13).toString();
+
+    // The protection descriptor round-trips, because it is part of the non-erasable metadata the
+    // commitment covers: a reloaded envelope that forgot how it was sealed would not rehash to what
+    // was stored, and verification would report every sealed row as broken.
+    e.protection.sealed = query.value(offset + 14).toInt() != 0;
+    e.protection.keyDomainId = QUuid::fromString(query.value(offset + 15).toString());
+    e.protection.keyEpoch = static_cast<quint32>(query.value(offset + 16).toUInt());
     e.evidence = evidenceFor(e.messageId);
     return e;
 }
@@ -1099,8 +1196,13 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
 
         const int hashVersion = query.value(1).toInt();
         const CognitiveEnvelope e = envelopeFromQuery(query, 2);
-        const QByteArray storedPrevious = query.value(16).toByteArray();
-        const QByteArray storedHash = query.value(17).toByteArray();
+        // Positional, and therefore tied to envelopeColumns(): seq and hash_version take slots 0
+        // and 1, the envelope takes the next kEnvelopeColumnCount, and these follow. Adding a
+        // column to the envelope without moving these is how a verifier ends up comparing a hash
+        // against a key epoch.
+        const int trailing = 2 + kEnvelopeColumnCount;
+        const QByteArray storedPrevious = query.value(trailing).toByteArray();
+        const QByteArray storedHash = query.value(trailing + 1).toByteArray();
         if (storedPrevious != expectedPrevious) {
             result.status = VerificationStatus::InvalidAt;
             result.brokenAt = sequence;
@@ -1114,10 +1216,11 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
                    && e.schemaVersion == kCurrentEnvelopeSchemaVersion) {
             expectedHash = rowHashV2(sequence, e, storedPrevious);
         } else if (hashVersion == kCurrentJournalHashVersion
-                   && e.schemaVersion == kCurrentEnvelopeSchemaVersion) {
-            const QByteArray storedCommitment = query.value(18).toByteArray();
-            const QByteArray storedPayloadCommitment = query.value(19).toByteArray();
-            const bool erased = !query.value(20).isNull();
+                   && (e.schemaVersion == kCurrentEnvelopeSchemaVersion
+                       || e.schemaVersion == kProtectedEnvelopeSchemaVersion)) {
+            const QByteArray storedCommitment = query.value(trailing + 2).toByteArray();
+            const QByteArray storedPayloadCommitment = query.value(trailing + 3).toByteArray();
+            const bool erased = !query.value(trailing + 4).isNull();
             expectedHash = rowHashV3(sequence, storedCommitment, storedPrevious);
 
             if (expectedHash == storedHash) {

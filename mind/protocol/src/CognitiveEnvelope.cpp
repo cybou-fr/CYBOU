@@ -60,7 +60,16 @@ PrivacyClass privacyFromString(const QString &text)
 bool CognitiveEnvelope::isValid() const
 {
     if (schemaVersion != kLegacyEnvelopeSchemaVersion
-        && schemaVersion != kCurrentEnvelopeSchemaVersion) {
+        && schemaVersion != kCurrentEnvelopeSchemaVersion
+        && schemaVersion != kProtectedEnvelopeSchemaVersion) {
+        return false;
+    }
+
+    // A sealed payload must declare the schema that carries its descriptor, and a descriptor must
+    // name its key domain. Otherwise a row could claim protection that no canonical form covers, or
+    // carry a descriptor nothing can interpret.
+    if (protection.sealed
+        && (schemaVersion != kProtectedEnvelopeSchemaVersion || !protection.isValid())) {
         return false;
     }
 

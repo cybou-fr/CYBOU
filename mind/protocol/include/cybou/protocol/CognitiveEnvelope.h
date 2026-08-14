@@ -15,6 +15,15 @@ namespace cybou {
 inline constexpr quint16 kLegacyEnvelopeSchemaVersion = 1;
 inline constexpr quint16 kCurrentEnvelopeSchemaVersion = 2;
 
+/// Schema 3 adds the protection descriptor: whether a payload is sealed, and under which opaque key
+/// domain and epoch.
+///
+/// Not the default. An envelope declares schema 3 only when it carries protection, so an ordinary
+/// contribution keeps the schema-2 canonical form and every hash already written stays exactly as it
+/// was. ADR-0028 fixes that the canonical field set is selected by schema version rather than
+/// extended in place, and this is the first version to exercise that rule.
+inline constexpr quint16 kProtectedEnvelopeSchemaVersion = 3;
+
 enum class ContributionKind : quint16 {
     Observation = 1,
     BeliefRevision,
@@ -95,10 +104,30 @@ struct CognitiveEnvelope {
     double confidence{1.0};
 
     QList<QUuid> evidence;
+
+    /// The payload as stored: plaintext for an ordinary contribution, `nonce ‖ ciphertext ‖ tag` for
+    /// a sealed one. What it means is decided by `protection`, never guessed from its contents.
     QByteArray payloadCbor;
 
     PrivacyClass privacy{PrivacyClass::Local};
     QString capabilityScope;
+
+    /// How the payload is protected, if it is.
+    ///
+    /// The key domain is an opaque UUID and epoch, never a name: a domain called `medical` or
+    /// `location` would leak the category of an erased payload through metadata that survives
+    /// erasure, which for many subjects is most of what there was to hide.
+    ///
+    /// Present only on schema-3 envelopes, and part of the non-erasable metadata: which key sealed a
+    /// payload is a fact about the record that must stay verifiable after the payload is gone.
+    struct Protection {
+        bool sealed{false};
+        QUuid keyDomainId;
+        quint32 keyEpoch{0};
+
+        bool isValid() const { return !sealed || !keyDomainId.isNull(); }
+    };
+    Protection protection;
 
     /// Structural validation only. Journal::append validates that referenced contributions
     /// already exist and that privacy is not weakened.

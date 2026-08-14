@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "cybou/crypto/KeyStore.h"
 #include "cybou/events/EventStore.h"
 
 #include <QSqlDatabase>
@@ -81,6 +82,17 @@ public:
     /// ADR-0028's protocol is durable intent, then idempotent key destruction, then the redaction
     /// transaction. This is step one, and it is the only step a crash can leave alone: a request
     /// with no application claims nothing about what was destroyed, so resuming it is always safe.
+    /// Give this Journal the ability to seal payloads.
+    ///
+    /// Optional on purpose: a Journal without a key store accepts no sealed contribution at all,
+    /// rather than quietly storing a sensitive payload in the clear. Refusing is the only safe
+    /// failure - a payload written unsealed because the key store was missing would be a payload
+    /// nobody could later erase.
+    void setKeyStore(KeyStore *keys, const QByteArray &keyEncryptionKey, const KeyDomain &domain);
+
+    /// Read back a sealed payload, or nothing once its key is gone.
+    std::optional<QByteArray> unsealPayload(const CognitiveEnvelope &envelope) const;
+
     quint64 requestErasure(const QUuid &target, const QString &reason);
 
     /// Redact a payload and record that it happened, in one transaction with the epoch bump.
@@ -149,6 +161,10 @@ private:
     bool migrateV1ToV2();
     bool ensureV2Indexes();
     bool createMigrationBackup();
+
+    KeyStore *m_keys{nullptr};
+    QByteArray m_keyEncryptionKey;
+    KeyDomain m_keyDomain;
 
     bool beginImmediate();
     bool commitTransaction();
