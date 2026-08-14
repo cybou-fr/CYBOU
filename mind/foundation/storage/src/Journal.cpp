@@ -5,6 +5,8 @@
 
 #include "cybou/protocol/CanonicalEnvelope.h"
 
+#include <algorithm>
+
 #include <QCborMap>
 #include <QCborValue>
 
@@ -301,11 +303,20 @@ bool Journal::ensureSchema()
     // The epoch lives in its own row rather than in a pragma, because it is bumped inside the same
     // transaction as a redaction: a projection must never be able to see a redacted payload while
     // still believing its cached view is current.
+    if (tableExists(QStringLiteral("journal_meta"))
+        && !columnExists(QStringLiteral("journal_meta"), QStringLiteral("rotated_epoch"))
+        && !execSql(QStringLiteral(
+            "ALTER TABLE journal_meta ADD COLUMN rotated_epoch INTEGER NOT NULL DEFAULT 0"))) {
+        m_lastError = QStringLiteral("could not add the backup rotation column");
+        return false;
+    }
+
     if (!tableExists(QStringLiteral("journal_meta"))
         && (!execSql(QStringLiteral(
                 "CREATE TABLE journal_meta ("
                 "id INTEGER PRIMARY KEY CHECK (id = 1), "
-                "erasure_epoch INTEGER NOT NULL DEFAULT 0)"))
+                "erasure_epoch INTEGER NOT NULL DEFAULT 0, "
+                "rotated_epoch INTEGER NOT NULL DEFAULT 0)"))
             || !execSql(QStringLiteral("INSERT OR IGNORE INTO journal_meta (id) VALUES (1)")))) {
         m_lastError = QStringLiteral("could not create the journal metadata table");
         return false;
@@ -352,7 +363,8 @@ bool Journal::createSchemaV2()
         || !execSql(QStringLiteral(R"SQL(
         CREATE TABLE journal_meta (
             id             INTEGER PRIMARY KEY CHECK (id = 1),
-            erasure_epoch  INTEGER NOT NULL DEFAULT 0
+            erasure_epoch  INTEGER NOT NULL DEFAULT 0,
+            rotated_epoch  INTEGER NOT NULL DEFAULT 0
         )
     )SQL"))
         || !execSql(QStringLiteral("INSERT OR IGNORE INTO journal_meta (id) VALUES (1)"))
@@ -964,6 +976,11 @@ bool Journal::applyErasure(const QUuid &target)
 
     QCborMap payload;
     payload.insert(QStringLiteral("target"), target.toString(QUuid::WithoutBraces));
+    // The epoch this erasure will occupy once the bump below lands. Recorded here so the backup
+    // axis can later be answered by comparing against a declared rotation, without the Journal
+    // having to observe backups it cannot see.
+    payload.insert(
+        QStringLiteral("appliedAtEpoch"), QString::number(erasureEpoch() + 1));
     applied.payloadCbor = payload.toCborValue().toCbor();
 
     if (appendWithinTransaction(applied) == 0) {
@@ -1049,6 +1066,96 @@ QList<QUuid> Journal::incompleteErasures() const
         }
     }
     return pending;
+}
+
+bool Journal::declareBackupRotation(quint64 throughEpoch)
+{
+    // Clamped to what has actually happened. Declaring that backups through some future epoch are
+    // gone is a claim about backups that do not exist yet, and honouring it would make every
+    // erasure until that epoch report Complete the instant it was applied - the exact reassuring
+    // lie the third axis exists to prevent.
+    const quint64 declarable = std::min(throughEpoch, erasureEpoch());
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "UPDATE journal_meta SET rotated_epoch = ? WHERE rotated_epoch < ?"));
+    query.addBindValue(static_cast<qulonglong>(declarable));
+    query.addBindValue(static_cast<qulonglong>(declarable));
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+    // Monotonic on purpose: a declaration cannot be walked back. Claiming that older backups have
+    // reappeared would be a claim nobody could act on, and the interesting direction is the one
+    // where erasure becomes more complete rather than less.
+    return true;
+}
+
+quint64 Journal::rotatedBackupEpoch() const
+{
+    QSqlQuery query(m_db);
+    if (query.exec(QStringLiteral("SELECT rotated_epoch FROM journal_meta")) && query.next()) {
+        return query.value(0).toULongLong();
+    }
+    return 0;
+}
+
+Journal::ErasureStatus Journal::erasureStatus(const QUuid &target) const
+{
+    ErasureStatus status;
+    status.target = target;
+    if (target.isNull()) {
+        return status;
+    }
+
+    quint64 appliedAtEpoch = 0;
+    bool requested = false;
+    bool applied = false;
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT kind, payload FROM contribution WHERE causation_id = ? AND kind IN (?, ?)"));
+    query.addBindValue(target.toString(QUuid::WithoutBraces));
+    query.addBindValue(static_cast<int>(ContributionKind::ErasureRequested));
+    query.addBindValue(static_cast<int>(ContributionKind::ErasureApplied));
+    if (!query.exec()) {
+        return status;
+    }
+
+    while (query.next()) {
+        const auto kind = static_cast<ContributionKind>(query.value(0).toInt());
+        if (kind == ContributionKind::ErasureRequested) {
+            requested = true;
+            continue;
+        }
+        applied = true;
+        const QCborMap payload = QCborValue::fromCbor(query.value(1).toByteArray()).toMap();
+        appliedAtEpoch =
+            payload.value(QStringLiteral("appliedAtEpoch")).toString().toULongLong();
+    }
+
+    if (!requested && !applied) {
+        return status;
+    }
+    if (!applied) {
+        // Intent is durable and nothing irreversible has happened. Reporting this as any kind of
+        // completion would claim a forgetting that has not occurred.
+        status.liveState = ErasurePhase::Requested;
+        status.projectionsState = ErasurePhase::Requested;
+        status.backupState = ErasurePhase::Requested;
+        return status;
+    }
+
+    status.liveState = ErasurePhase::Complete;
+    status.projectionsState = ErasurePhase::Complete;
+
+    // The one axis the Journal cannot settle by itself. A backup taken before this erasure, with a
+    // recovery root that still unwraps its keys, defeats it - so until someone declares those
+    // backups gone, the honest answer is that this is not finished.
+    status.backupState = rotatedBackupEpoch() >= appliedAtEpoch && appliedAtEpoch > 0
+        ? ErasurePhase::Complete
+        : ErasurePhase::PendingRotation;
+    return status;
 }
 
 quint64 Journal::erasureEpoch() const

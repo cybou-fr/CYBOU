@@ -77,6 +77,45 @@ public:
     /// is the caller's decision, not the storage layer's.
     VerificationResult verifyFrom(const VerifiedCheckpoint &anchor) const;
 
+    /// What an erasure actually achieved, on three axes rather than as a boolean.
+    ///
+    /// "Erased" is too binary to be honest. Destroying a key and redacting a payload reaches the
+    /// live database and every future backup; it does not reach a backup already taken. A person
+    /// asking whether something was forgotten must not be told "yes, completely" while a backup
+    /// holding a wrapped key is still in rotation.
+    enum class ErasurePhase : quint8 {
+        NotRequested,
+        Requested,     ///< intent is durable; nothing irreversible has happened
+        Complete,      ///< done, on this axis
+        PendingRotation ///< out of reach until older backups are gone
+    };
+
+    struct ErasureStatus {
+        QUuid target;
+        ErasurePhase liveState{ErasurePhase::NotRequested};
+        ErasurePhase projectionsState{ErasurePhase::NotRequested};
+        ErasurePhase backupState{ErasurePhase::NotRequested};
+
+        /// True only when every axis is Complete. Deliberately not the default reading of the
+        /// struct: a caller that wants the reassuring summary has to ask for it explicitly.
+        bool completeEverywhere() const
+        {
+            return liveState == ErasurePhase::Complete
+                && projectionsState == ErasurePhase::Complete
+                && backupState == ErasurePhase::Complete;
+        }
+    };
+
+    ErasureStatus erasureStatus(const QUuid &target) const;
+
+    /// Declare that no backup predating this erasure epoch still exists.
+    ///
+    /// The Journal cannot observe backups, and pretending otherwise would be the dishonest part of
+    /// any answer it gave about them. So the fact is asserted from outside by whatever actually
+    /// rotates them, and until it is, every erasure reports its backup axis as PendingRotation.
+    bool declareBackupRotation(quint64 throughEpoch);
+    quint64 rotatedBackupEpoch() const;
+
     /// Record an intent to erase, before anything irreversible happens.
     ///
     /// ADR-0028's protocol is durable intent, then idempotent key destruction, then the redaction

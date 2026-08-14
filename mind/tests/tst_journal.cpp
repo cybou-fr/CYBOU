@@ -837,6 +837,89 @@ private Q_SLOTS:
         QCOMPARE(result.contentSkipped, 1u);
     }
 
+    // E12: a pre-erasure backup still in rotation is reported as outside the guarantee.
+    //
+    // "Erased" is too binary to be honest. Destroying a key reaches the live database and every
+    // future backup, not one already taken, and a person asking whether something was forgotten
+    // must not be told "yes, completely" while a backup holding a wrapped key still exists.
+    void erasureReportsWhatItActuallyAchieved()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope target = observationWithPayload(QByteArrayLiteral("secret"));
+        QVERIFY(journal.append(target) > 0);
+
+        // Nothing asked for yet.
+        QCOMPARE(
+            journal.erasureStatus(target.messageId).liveState,
+            Journal::ErasurePhase::NotRequested);
+
+        // Requested and not applied: durable intent, and no axis may claim completion.
+        QVERIFY(journal.requestErasure(target.messageId, QStringLiteral("ConsentWithdrawn")) > 0);
+        const Journal::ErasureStatus requested = journal.erasureStatus(target.messageId);
+        QCOMPARE(requested.liveState, Journal::ErasurePhase::Requested);
+        QCOMPARE(requested.projectionsState, Journal::ErasurePhase::Requested);
+        QCOMPARE(requested.backupState, Journal::ErasurePhase::Requested);
+        QVERIFY(!requested.completeEverywhere());
+
+        // Applied: the live database and the projections are finished. Backups are not, and saying
+        // so is the whole point of the third axis.
+        QVERIFY(journal.applyErasure(target.messageId));
+        const Journal::ErasureStatus applied = journal.erasureStatus(target.messageId);
+        QCOMPARE(applied.liveState, Journal::ErasurePhase::Complete);
+        QCOMPARE(applied.projectionsState, Journal::ErasurePhase::Complete);
+        QCOMPARE(applied.backupState, Journal::ErasurePhase::PendingRotation);
+        QVERIFY2(
+            !applied.completeEverywhere(),
+            "a redacted payload with old backups around is not completely forgotten");
+
+        // Only once someone who can see the backups says they are gone.
+        QVERIFY(journal.declareBackupRotation(journal.erasureEpoch()));
+        const Journal::ErasureStatus rotated = journal.erasureStatus(target.messageId);
+        QCOMPARE(rotated.backupState, Journal::ErasurePhase::Complete);
+        QVERIFY(rotated.completeEverywhere());
+    }
+
+    // A rotation cannot be declared for backups that do not exist yet.
+    //
+    // Writing this test is what found the flaw. Storing the requested epoch unclamped let a
+    // declaration through epoch 5, made before any erasure, mark every erasure up to epoch 5 as
+    // completely forgotten the instant it was applied - while backups taken between them were still
+    // sitting there. A claim about the future is not evidence about the present.
+    void aRotationCannotBeDeclaredForBackupsThatDoNotExistYet()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        // Nothing has been erased, so there is nothing whose backups could have been rotated.
+        QVERIFY(journal.declareBackupRotation(5));
+        QCOMPARE(journal.rotatedBackupEpoch(), 0u);
+
+        const CognitiveEnvelope target = observationWithPayload(QByteArrayLiteral("secret"));
+        QVERIFY(journal.append(target) > 0);
+        QVERIFY(journal.requestErasure(target.messageId, QStringLiteral("UserRequested")) > 0);
+        QVERIFY(journal.applyErasure(target.messageId));
+
+        // The premature declaration did not cover it.
+        QCOMPARE(
+            journal.erasureStatus(target.messageId).backupState,
+            Journal::ErasurePhase::PendingRotation);
+
+        // Declared again now that the erasure exists, it does.
+        QVERIFY(journal.declareBackupRotation(journal.erasureEpoch()));
+        QCOMPARE(
+            journal.erasureStatus(target.messageId).backupState,
+            Journal::ErasurePhase::Complete);
+
+        // And a declaration cannot be walked back, which would make an erasure look less finished
+        // than it was already reported to be.
+        QVERIFY(journal.declareBackupRotation(0));
+        QCOMPARE(journal.rotatedBackupEpoch(), 1u);
+    }
+
     void migratesV1WithoutRehashingHistory()
     {
         QTemporaryDir dir;

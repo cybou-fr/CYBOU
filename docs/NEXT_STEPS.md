@@ -1354,6 +1354,53 @@ rather than a storage mechanism.
 
 **P7.18 is complete.**
 
+## P7.19 — erasure that reports what it actually achieved
+
+**E12**, the last gate. ADR-0028 is implemented.
+
+"Erased" is too binary to be honest, so an erasure reports three axes: `liveState`,
+`projectionsState`, `backupState`. Destroying a key reaches the live database and every *future*
+backup; it does not reach one already taken. A person asking whether something was forgotten must
+not be told "yes, completely" while a backup holding a wrapped key still exists.
+
+The mechanism is built around something the Journal **cannot** observe. It has no way to see
+backups, and any answer it invented about them would be the dishonest part. So whatever actually
+rotates backups asserts the fact, and until it does every applied erasure reports its backup axis as
+`PendingRotation`. `completeEverywhere()` exists but is deliberately not the default reading: a
+caller who wants the reassuring summary has to ask for it by name.
+
+### Writing the test found a flaw in the design
+
+The second test began life asserting that an earlier rotation does not cover a later erasure — and
+its assertion said the opposite, because that is what the code did. A name and an assertion
+disagreeing is how I noticed.
+
+`declareBackupRotation(5)` before any erasure stored 5 outright. Every subsequent erasure up to
+epoch 5 would then report `Complete` the instant it was applied, while the backups taken between
+them sat untouched. A claim about the future was being accepted as evidence about the present.
+
+The declaration is clamped to the current erasure epoch now: you cannot declare that backups which
+do not exist yet are gone. It remains monotonic in the other direction, because walking a
+declaration back would make an erasure look less finished than it was already reported to be, and
+nobody could act on that.
+
+### ADR-0028 complete
+
+| Gates | |
+|---|---|
+| E1–E3 | v3 commitment, erased-row verification, no plaintext oracle |
+| E4–E6 | crash-safe three-step erasure |
+| E7 | propagation to durable descendants |
+| E8–E9 | projection invalidation, and no empty-success during rebuild |
+| E10–E12 | backup recovery, key destruction, honest completion state |
+| E13–E14 | checkpoint equals replay, projections stay bounded |
+
+**ADR-0027's constraint now lifts**: sensitive observation was prohibited until this ADR was
+accepted *and* implemented, and both are true. Nothing sensitive is ingested yet — that is an
+adapter decision, and each adapter still needs its own argument for why a source is worth reading.
+
+**P7.19 is complete.**
+
 ## M7.5 — associative memory, decided before it exists
 
 Two new ADRs and five amendments, no code. The point of writing them now is that a memory
