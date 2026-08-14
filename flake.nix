@@ -121,6 +121,7 @@
             pkgs.dbus
 
             # Qt 6. qtdeclarative brings QML; qttools brings Designer and the profiler.
+            pkgs.libsodium
             pkgs.qt6.qtbase
             pkgs.qt6.qtdeclarative
             pkgs.qt6.qtsvg

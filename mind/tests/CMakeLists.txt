@@ -121,6 +121,13 @@ set_tests_properties(journal PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 # Scale baseline. Defaults to 10k so it belongs in the ordinary run; raise
 # CYBOU_SCALE_CONTRIBUTIONS to 100000 or 1000000 for the separate scale gate and the manual
 # release benchmark. Its measurements are printed, so run ctest with --verbose to read them.
+qt_add_executable(test-sealed-payload tst_sealed_payload.cpp)
+target_link_libraries(test-sealed-payload PRIVATE cybou-crypto Qt6::Test)
+add_test(NAME sealed-payload COMMAND test-sealed-payload)
+set_tests_properties(
+    sealed-payload PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-journal-scale tst_journal_scale.cpp)
 target_link_libraries(
     test-journal-scale PRIVATE cybou-storage cybou-predictor cybou-intentions Qt6::Test

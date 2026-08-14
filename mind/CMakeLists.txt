@@ -14,6 +14,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core DBus Sql Qml)
 qt_standard_project_setup()
 
 add_subdirectory(protocol)
+add_subdirectory(foundation/crypto)
 add_subdirectory(foundation/events)
 add_subdirectory(foundation/runtime)
 add_subdirectory(foundation/storage)

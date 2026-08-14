@@ -1105,6 +1105,42 @@ Gates covered: **E1**, **E2**.
 
 **P7.12 is complete.**
 
+## P7.13 — the primitive erasure rests on
+
+ADR-0028's entire erasure guarantee reduces to one property: after a key is destroyed, what survives
+must not let anyone test a hypothesis about what was erased. That is a claim about a single
+primitive, so it is proven about that primitive before anything is built on top — a crash-safe
+protocol over storage that leaks would pass its own tests and fail the thing it exists for.
+
+`cybou-crypto` provides randomized AEAD (XChaCha20-Poly1305 via **libsodium**), per-contribution
+data keys, key wrapping under the same primitive, and opaque key domains. Qt has no authenticated
+encryption, and this is not a place to improvise one: the erasure guarantee rests on the cipher.
+
+**E3 is covered, and the test grants the attacker everything.** It hands over the exact plaintext
+*and* the key, then requires that a surviving commitment still cannot be reproduced — because the
+nonce is not derivable from either. Sealing a one-byte plaintext thirty-two times yields
+thirty-two distinct commitments; the one-byte case is deliberate, since a boolean or a small enum
+is exactly the shape whose plaintext digest would be trivially reversible by enumeration.
+
+Three further properties are pinned:
+
+- a destroyed key leaves inert ciphertext, and a wrong key answers exactly as a corrupted one does —
+  distinguishing them would tell an attacker which guess was closer;
+- a wrapped key is as opaque as the payload it protects, which is what makes a restored backup
+  decrypt only the records whose keys survived;
+- a key domain is a UUID and an epoch, never a name. A domain called `medical` or `location` would
+  leak the category of the forgotten thing through metadata that survives erasure, which for many
+  subjects is most of what there was to hide.
+
+Nothing here is wired into the Journal yet, and no perception source is sensitive. The primitive
+exists and is proven; connecting it needs the envelope's protection descriptor, which is envelope
+schema 3 — and the ADR already fixes that the canonical field set is chosen by schema version rather
+than extended in place, so adding it cannot disturb a hash already written.
+
+Gates covered: **E1**, **E2**, **E3**.
+
+**P7.13 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

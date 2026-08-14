@@ -5,6 +5,8 @@
 {
   lib,
   stdenv,
+  libsodium,
+  pkg-config,
   cmake,
   ninja,
   dbus,
@@ -20,10 +22,15 @@ stdenv.mkDerivation {
     cmake
     ninja
     dbus
+    pkg-config
     qt6.wrapQtAppsHook
   ];
 
+  # libsodium, for ADR-0028's randomized AEAD. Qt has no authenticated encryption, and this is not
+  # a place to improvise one: the erasure guarantee rests on the cipher, and a payload commitment
+  # that a guesser can reproduce is not erasure at all.
   buildInputs = [
+    libsodium
     qt6.qtbase
     qt6.qtdeclarative
   ];
