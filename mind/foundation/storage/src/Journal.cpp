@@ -830,20 +830,35 @@ bool Journal::applyErasure(const QUuid &target)
         return false;
     }
 
+    // Recomputed here rather than carried from the request, so a descendant derived *after* the
+    // request was recorded is still reached. A closure frozen at request time would let a race
+    // preserve exactly the restatement the erasure was asked to remove.
+    const QList<QUuid> closure = retentionDependents(target);
+    if (closure.isEmpty()) {
+        // The closure always contains the target itself, so an empty one means the query failed.
+        // Erasing nothing while reporting success would be the worst available outcome; erasing a
+        // subset would be the second worst.
+        m_lastError = QStringLiteral("could not determine what depends on the erasure target");
+        return false;
+    }
+
     if (!beginImmediate()) {
         return false;
     }
 
-    QSqlQuery redact(m_db);
-    redact.prepare(QStringLiteral(
-        "UPDATE contribution SET payload = NULL, erased_at = ? "
-        "WHERE message_id = ? AND erased_at IS NULL"));
-    redact.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
-    redact.addBindValue(target.toString(QUuid::WithoutBraces));
-    if (!redact.exec()) {
-        m_lastError = redact.lastError().text();
-        rollbackTransaction();
-        return false;
+    const QString erasedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+    for (const QUuid &id : closure) {
+        QSqlQuery redact(m_db);
+        redact.prepare(QStringLiteral(
+            "UPDATE contribution SET payload = NULL, erased_at = ? "
+            "WHERE message_id = ? AND erased_at IS NULL"));
+        redact.addBindValue(erasedAt);
+        redact.addBindValue(id.toString(QUuid::WithoutBraces));
+        if (!redact.exec()) {
+            m_lastError = redact.lastError().text();
+            rollbackTransaction();
+            return false;
+        }
     }
 
     CognitiveEnvelope applied;
@@ -879,6 +894,49 @@ bool Journal::applyErasure(const QUuid &target)
         return false;
     }
     return true;
+}
+
+QList<QUuid> Journal::retentionDependents(const QUuid &target) const
+{
+    QList<QUuid> closure;
+    if (target.isNull()) {
+        return closure;
+    }
+
+    // Transitive closure over both kinds of derivation edge, computed in SQLite rather than by
+    // repeated queries: the set can be large and a resumed erasure recomputes it from scratch.
+    //
+    // Erasure records are excluded. They name what was forgotten and carry no observation content,
+    // and an erasure that erased its own audit trail would make the trail a suggestion.
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(R"SQL(
+        WITH RECURSIVE dependents(id) AS (
+            SELECT ?
+            UNION
+            SELECT c.message_id FROM contribution c, dependents d
+              WHERE c.causation_id = d.id AND c.kind NOT IN (?, ?)
+            UNION
+            SELECT e.contribution_id FROM contribution_evidence e, dependents d
+              WHERE e.evidence_id = d.id
+        )
+        SELECT id FROM dependents
+    )SQL"));
+    query.addBindValue(target.toString(QUuid::WithoutBraces));
+    query.addBindValue(static_cast<int>(ContributionKind::ErasureRequested));
+    query.addBindValue(static_cast<int>(ContributionKind::ErasureApplied));
+    if (!query.exec()) {
+        // Deliberately silent about the cause here: this is a const read, and the caller that
+        // matters - applyErasure - fails closed on an empty closure rather than erasing a subset.
+        return {};
+    }
+
+    while (query.next()) {
+        const QUuid id = QUuid::fromString(query.value(0).toString());
+        if (!id.isNull() && !closure.contains(id)) {
+            closure.append(id);
+        }
+    }
+    return closure;
 }
 
 QList<QUuid> Journal::incompleteErasures() const

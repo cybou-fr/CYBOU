@@ -90,6 +90,18 @@ public:
     /// what the three-step protocol exists to avoid.
     bool applyErasure(const QUuid &target);
 
+    /// Everything whose retention depends on a target, including the target itself.
+    ///
+    /// ADR-0028: erasing a payload and leaving the contributions derived from it would destroy the
+    /// record Mind was asked to forget and keep the reasoning that restates it. A Learning that
+    /// says "because X" is not a cache to be rebuilt - it is biography, and it carries the content
+    /// forward.
+    ///
+    /// Dependencies are derived from causation and evidence, which is where derivation actually
+    /// travels. Deliberately not the whole causal graph: a contribution that merely happened
+    /// afterwards is not a descendant of what was erased.
+    QList<QUuid> retentionDependents(const QUuid &target) const;
+
     /// Targets whose erasure was requested and never applied.
     ///
     /// The only state a crash can produce, and the reason recovery is a question the Journal can

@@ -1192,6 +1192,44 @@ payloads to be wired through the envelope's protection descriptor, and a backup 
 
 **P7.14 is complete.**
 
+## P7.15 — forgetting that reaches what was derived
+
+**E7**, and the hole it closes was the largest in ADR-0028's first draft.
+
+Erasing a payload and leaving the contributions derived from it destroys the record Mind was asked
+to forget and keeps the reasoning that restates it. A `Learning` that says "because X" is not a
+cache to be rebuilt by an epoch bump — it is biography, and it carries the content forward.
+
+`retentionDependents()` computes the transitive closure over causation and evidence edges, which is
+where derivation actually travels, and `applyErasure` redacts the whole closure in one transaction.
+The ADR says retention dependencies are *ordinarily derived* from those references, so this needs no
+envelope change: the explicit field stays for the case where a contribution's dependencies are not
+its references, which is envelope schema 3.
+
+Three boundaries are deliberate:
+
+- **Not the whole causal graph.** A contribution that merely happened afterwards is not a
+  descendant of what was erased, and the test asserts an unrelated observation survives untouched.
+- **Erasure records are excluded from the closure.** They name their target, so a naive closure
+  would erase the audit trail along with the thing it audits — and a forgetting that could be
+  forgotten would make the trail a suggestion.
+- **The closure is recomputed at apply time**, not carried from the request, so a descendant
+  derived *after* the request was recorded is still reached. A frozen closure would let a race
+  preserve exactly the restatement the erasure was meant to remove.
+
+A compiler error turned out to be worth more than the fix it demanded. `retentionDependents` is
+const and could not set `m_lastError`, which forced the question of what a *failed* closure query
+means. An empty closure is impossible when the query works — the target is always in it — so
+`applyErasure` now refuses outright rather than erasing a subset and reporting success.
+
+Gates covered: **E1**–**E7**.
+
+Remaining: **E8–E9** need projections to read the erasure epoch; **E10–E12** need sensitive payloads
+wired through the envelope's protection descriptor and a backup story; **E13–E14** are the standing
+P7 invariants, already checked, and will want re-checking once erasure can run under them.
+
+**P7.15 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

@@ -621,6 +621,93 @@ private Q_SLOTS:
         QCOMPARE(result.contentSkipped, 1u);
     }
 
+    // E7: erasing a payload erases what was derived from it.
+    //
+    // The largest hole in the ADR's first draft. Invalidating caches by epoch is right, but a
+    // Learning that says "because X" is not a cache - it is biography, and leaving it would mean
+    // Mind destroyed the record it was asked to forget and kept the reasoning that restates it.
+    void erasurePropagatesToWhatWasDerivedFromIt()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        // observation -> prediction (evidence) -> outcome (causation), plus an unrelated record.
+        const CognitiveEnvelope root = observationWithPayload(QByteArrayLiteral("diagnosis"));
+        QVERIFY(journal.append(root) > 0);
+
+        CognitiveEnvelope derivedFromIt = derived(ContributionKind::Prediction, root);
+        derivedFromIt.causationId = QUuid();
+        derivedFromIt.evidence = {root.messageId};
+        derivedFromIt.payloadCbor = QByteArrayLiteral("because diagnosis");
+        QVERIFY(journal.append(derivedFromIt) > 0);
+
+        CognitiveEnvelope grandchild = derived(ContributionKind::Outcome, derivedFromIt);
+        grandchild.payloadCbor = QByteArrayLiteral("acted on it");
+        QVERIFY(journal.append(grandchild) > 0);
+
+        const CognitiveEnvelope unrelated = observationWithPayload(QByteArrayLiteral("weather"));
+        QVERIFY(journal.append(unrelated) > 0);
+
+        // The closure is transitive and does not sweep in what merely happened afterwards.
+        const QList<QUuid> closure = journal.retentionDependents(root.messageId);
+        QCOMPARE(closure.size(), 3);
+        QVERIFY(closure.contains(root.messageId));
+        QVERIFY(closure.contains(derivedFromIt.messageId));
+        QVERIFY(closure.contains(grandchild.messageId));
+        QVERIFY2(
+            !closure.contains(unrelated.messageId),
+            "a contribution that merely came later is not a descendant");
+
+        QVERIFY(journal.requestErasure(root.messageId, QStringLiteral("ConsentWithdrawn")) > 0);
+        QVERIFY(journal.applyErasure(root.messageId));
+
+        for (const QUuid &id : closure) {
+            const auto erased = journal.contribution(id);
+            QVERIFY2(erased.has_value(), "the records survive; only their payloads are gone");
+            QVERIFY2(
+                erased->payloadCbor.isEmpty(),
+                qPrintable(QStringLiteral("payload survived for %1")
+                               .arg(id.toString(QUuid::WithoutBraces))));
+        }
+
+        // The unrelated observation is untouched: erasure reaches derivation, not everything.
+        const auto kept = journal.contribution(unrelated.messageId);
+        QVERIFY(kept.has_value());
+        QCOMPARE(kept->payloadCbor, QByteArrayLiteral("weather"));
+
+        // And the chain still verifies, with three payloads skipped rather than broken.
+        const VerificationResult result = journal.verifyFrom({});
+        QVERIFY(result.intact());
+        QCOMPARE(result.contentSkipped, 3u);
+        QCOMPARE(result.contentBrokenAt, 0u);
+    }
+
+    // The erasure records themselves are never erased, even though they name the target and so
+    // depend on it. A forgetting that could be forgotten would make the audit trail a suggestion.
+    void anErasureRecordIsNotErasedByItsOwnClosure()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope root = observationWithPayload(QByteArrayLiteral("secret"));
+        QVERIFY(journal.append(root) > 0);
+        QVERIFY(journal.requestErasure(root.messageId, QStringLiteral("UserRequested")) > 0);
+        QVERIFY(journal.applyErasure(root.messageId));
+
+        int erasureRecords = 0;
+        for (const CognitiveEnvelope &e : journal.recent(0)) {
+            if (isErasureKind(e.kind)) {
+                ++erasureRecords;
+                QVERIFY2(
+                    !e.payloadCbor.isEmpty(),
+                    "an erasure record must keep naming what it erased");
+            }
+        }
+        QCOMPARE(erasureRecords, 2);
+    }
+
     void migratesV1WithoutRehashingHistory()
     {
         QTemporaryDir dir;
