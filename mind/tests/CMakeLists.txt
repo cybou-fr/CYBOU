@@ -121,6 +121,15 @@ set_tests_properties(journal PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 # Scale baseline. Defaults to 10k so it belongs in the ordinary run; raise
 # CYBOU_SCALE_CONTRIBUTIONS to 100000 or 1000000 for the separate scale gate and the manual
 # release benchmark. Its measurements are printed, so run ctest with --verbose to read them.
+qt_add_executable(test-context-service tst_context_service.cpp)
+target_link_libraries(
+    test-context-service PRIVATE cybou-context-service cybou-storage Qt6::Test
+)
+add_test(NAME context-service COMMAND test-context-service)
+set_tests_properties(
+    context-service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-associative-projection tst_associative_projection.cpp)
 target_link_libraries(test-associative-projection PRIVATE cybou-context Qt6::Test)
 add_test(NAME associative-projection COMMAND test-associative-projection)

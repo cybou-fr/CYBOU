@@ -1479,6 +1479,35 @@ privacy/retention-inheritance gates (**A7**–**A9**) need that process before t
 `ContextBundle` here is the in-process form; the wire form and ADR-0030's delivery boundary are
 separate work.
 
+### The associative owner
+
+`ContextService` builds the graph from the biography rather than being handed one, which is what
+makes association a projection of what happened rather than a second, unaccountable memory. It
+carries a cursor and a paged catch-up, fails closed, and refuses to answer when it cannot — the same
+shape as epistemicd, for the same reasons.
+
+**A9** — a concept inherits the privacy and retention of the contribution it was derived from. A
+concept more permissive than its evidence would be a way to launder a private observation into a
+retrievable one, which looks like a feature until someone notices what is in the results.
+
+**A3** — deleting the checkpoint and rebuilding answers identically. The checkpoint is a cache of a
+cache; losing it costs speed and nothing else.
+
+**A7** — an erasure discards the checkpoint and rebuilds. The graph is derived state and obeys the
+erasure epoch like every other projection. What makes the test worth having is the second half: the
+erased observation no longer decodes, so its concepts are simply absent from the rebuilt graph,
+while everything not erased is still there. That is what "no surviving index key may reveal erased
+content" looks like when it works.
+
+**A2 at the boundary** — a caller may ask for less than the activation budget and never for more. A
+limit a caller can raise is not a limit.
+
+**A6 at the boundary** — a service with nothing to derive from refuses rather than returning an
+empty bundle. Empty means nothing is related, and that is a fact this service does not have.
+
+Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
+ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
+
 **M7.5 has begun.**
 
 ## M7.5 — associative memory, decided before it exists
