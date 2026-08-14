@@ -219,6 +219,7 @@ private Q_SLOTS:
         // everywhere, which is the point of having one declaration rather than four.
         QVERIFY(startDependency("CYBOU_PERCEPTIOND_PATH", kPerceptionEndpoint));
         QVERIFY(startDependency("CYBOU_EPISTEMICD_PATH", kEpistemicEndpoint));
+        QVERIFY(startDependency("CYBOU_CONTEXTD_PATH", kContextEndpoint));
         startHealthd();
     }
 

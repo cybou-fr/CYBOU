@@ -1508,6 +1508,26 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### The twelfth process
+
+`cybou-contextd` is a real process now: its own endpoint, reserved organ identity, systemd unit,
+D-Bus activation entry, capability declaration and health probe. `associative-context` is declared
+once and healthd, the fault matrix and Presence all follow from that one declaration.
+
+Adding the capability before the component existed failed the registry consistency test with
+*"associative-context depends on unknown component contextd"*. That is the registry working: a
+capability naming a component nobody built is caught at the declaration rather than discovered as a
+gap in the health graph.
+
+`vm-smoke` enumerates twelve always-on units and asserts twelve distinct MainPIDs, which is what
+proves the process starts under systemd rather than only under a test harness. All four KVM gates
+pass.
+
+The `\` line continuations in the package's daemon list collapsed **again** while adding contextd —
+the third time in this session that a scripted edit mangled an escape sequence. The failure mode is
+identical each time: the file looks plausible, and the shell reads one token where two were meant.
+Explicit character codes rather than escape literals is the fix that actually holds.
+
 **M7.5 has begun.**
 
 ## M7.5 — associative memory, decided before it exists

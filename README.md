@@ -88,7 +88,7 @@ Plasma/QML Presence proxy
                  SQLite Journal v2
 ```
 
-All eleven Mind services are separate `systemd --user` D-Bus processes. `cybou-eventd` is the only
+All twelve Mind services are separate `systemd --user` D-Bus processes. `cybou-eventd` is the only
 canonical Journal writer. The Plasma component is a remote projection/cache and cannot silently
 become a second cognitive owner.
 

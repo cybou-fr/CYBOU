@@ -102,6 +102,7 @@ in
         "cybou-presenced.service"
         "cybou-perceptiond.service"
         "cybou-epistemicd.service"
+        "cybou-contextd.service"
       ];
       wants = [
         "cybou-eventd.service"
@@ -114,6 +115,7 @@ in
         "cybou-presenced.service"
         "cybou-perceptiond.service"
         "cybou-epistemicd.service"
+        "cybou-contextd.service"
       ];
     };
 
@@ -185,6 +187,14 @@ in
       description = "Cybou epistemic projection owner";
       binary = "cybou-epistemicd";
       busName = "org.cybou.Mind.Epistemic1";
+      after = [ "cybou-eventd.service" ];
+      wants = [ "cybou-eventd.service" ];
+    };
+
+    cybou-contextd = mkService {
+      description = "Cybou associative context owner";
+      binary = "cybou-contextd";
+      busName = "org.cybou.Mind.Context1";
       after = [ "cybou-eventd.service" ];
       wants = [ "cybou-eventd.service" ];
     };

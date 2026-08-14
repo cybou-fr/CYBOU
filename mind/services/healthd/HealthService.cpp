@@ -53,6 +53,7 @@ QList<QPair<QString, BusEndpoint>> endpoints()
         {QStringLiteral("lifecycled"), kLifecycleEndpoint},
         {QStringLiteral("identityd"), kIdentityEndpoint},
         {QStringLiteral("intentiond"), kIntentionEndpoint},
+        {QStringLiteral("contextd"), kContextEndpoint},
         {QStringLiteral("predictord"), kPredictorEndpoint},
         {QStringLiteral("selfd"), kSelfEndpoint},
         {QStringLiteral("workspaced"), kWorkspaceEndpoint},

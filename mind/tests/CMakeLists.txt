@@ -72,6 +72,7 @@ add_test(
         CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
         CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
         CYBOU_EPISTEMICD_PATH=$<TARGET_FILE:cybou-epistemicd>
+        CYBOU_CONTEXTD_PATH=$<TARGET_FILE:cybou-contextd>
         $<TARGET_FILE:test-healthd-integration>
 )
 set_tests_properties(
@@ -205,6 +206,7 @@ add_test(
         CYBOU_EVENTD_PATH=$<TARGET_FILE:cybou-eventd>
         CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
         CYBOU_EPISTEMICD_PATH=$<TARGET_FILE:cybou-epistemicd>
+        CYBOU_CONTEXTD_PATH=$<TARGET_FILE:cybou-contextd>
         $<TARGET_FILE:test-epistemicd-integration>
 )
 set_tests_properties(
@@ -348,6 +350,7 @@ add_test(
         CYBOU_PRESENCED_PATH=$<TARGET_FILE:cybou-presenced>
         CYBOU_PERCEPTIOND_PATH=$<TARGET_FILE:cybou-perceptiond>
         CYBOU_EPISTEMICD_PATH=$<TARGET_FILE:cybou-epistemicd>
+        CYBOU_CONTEXTD_PATH=$<TARGET_FILE:cybou-contextd>
         $<TARGET_FILE:test-m4-process-integration>
 )
 set_tests_properties(

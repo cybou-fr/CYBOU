@@ -48,6 +48,7 @@ private:
     QString m_systemLink;
     QString m_perceptiondPath;
     QString m_epistemicdPath;
+    QString m_contextdPath;
 
     std::unique_ptr<QProcess> m_eventd;
     std::unique_ptr<QProcess> m_identityd;
@@ -60,6 +61,7 @@ private:
     std::unique_ptr<QProcess> m_presenced;
     std::unique_ptr<QProcess> m_perceptiond;
     std::unique_ptr<QProcess> m_epistemicd;
+    std::unique_ptr<QProcess> m_contextd;
 
     QProcessEnvironment environment() const
     {
@@ -143,6 +145,7 @@ private Q_SLOTS:
             qEnvironmentVariable("CYBOU_PRESENCED_PATH");
         m_perceptiondPath = qEnvironmentVariable("CYBOU_PERCEPTIOND_PATH");
         m_epistemicdPath = qEnvironmentVariable("CYBOU_EPISTEMICD_PATH");
+        m_contextdPath = qEnvironmentVariable("CYBOU_CONTEXTD_PATH");
 
         QVERIFY2(!m_eventdPath.isEmpty(), "CYBOU_EVENTD_PATH is not set");
         QVERIFY2(!m_identitydPath.isEmpty(), "CYBOU_IDENTITYD_PATH is not set");
@@ -177,7 +180,7 @@ private Q_SLOTS:
         for (QString *path : {&m_eventdPath, &m_identitydPath, &m_intentiondPath,
                               &m_predictordPath, &m_selfdPath, &m_workspacedPath,
                               &m_lifecycledPath, &m_healthdPath, &m_presencedPath,
-                              &m_perceptiondPath, &m_epistemicdPath}) {
+                              &m_perceptiondPath, &m_epistemicdPath, &m_contextdPath}) {
             stage(*path);
         }
         QVERIFY2(!m_lifecycledPath.isEmpty(), "CYBOU_LIFECYCLED_PATH is not set");
@@ -186,6 +189,7 @@ private Q_SLOTS:
         QVERIFY2(!m_perceptiondPath.isEmpty(), "CYBOU_PERCEPTIOND_PATH is not set");
 
         QVERIFY2(!m_epistemicdPath.isEmpty(), "CYBOU_EPISTEMICD_PATH is not set");
+        QVERIFY2(!m_contextdPath.isEmpty(), "CYBOU_CONTEXTD_PATH is not set");
 
         m_root = std::make_unique<QTemporaryDir>();
         QVERIFY(m_root->isValid());
@@ -259,6 +263,8 @@ private Q_SLOTS:
         QVERIFY(m_perceptiond);
         m_epistemicd = start(m_epistemicdPath);
         QVERIFY(m_epistemicd);
+        m_contextd = start(m_contextdPath);
+        QVERIFY(m_contextd);
 
         RpcClient healthRpc(kHealthEndpoint);
         QVERIFY(healthRpc.callBool(QStringLiteral("Refresh")));

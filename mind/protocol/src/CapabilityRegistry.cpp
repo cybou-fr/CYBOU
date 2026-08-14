@@ -47,6 +47,10 @@ QList<CapabilityDeclaration> capabilities()
          {QStringLiteral("eventd"), QStringLiteral("epistemicd")},
          false,
          QStringLiteral("what is known, and how stale or disputed it is, cannot be told")},
+        {QStringLiteral("associative-context"),
+         {QStringLiteral("eventd"), QStringLiteral("contextd")},
+         false,
+         QStringLiteral("what is related to what cannot be retrieved")},
         {QStringLiteral("local-perception"),
          {QStringLiteral("eventd"), QStringLiteral("perceptiond")},
          false,
@@ -68,6 +72,7 @@ QStringList componentIds()
         QStringLiteral("presenced"),
         QStringLiteral("perceptiond"),
         QStringLiteral("epistemicd"),
+        QStringLiteral("contextd"),
     };
     return components;
 }

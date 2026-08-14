@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 # SPDX-License-Identifier: MIT
 #
-# P7.2: eleven real process boundaries plus the QML Presence proxy.
+# M7.5: twelve real process boundaries plus the QML Presence proxy.
 {
   lib,
   stdenv,
@@ -69,7 +69,8 @@ stdenv.mkDerivation {
       cybou-workspaced \
       cybou-presenced \
       cybou-perceptiond \
-      cybou-epistemicd; do
+      cybou-epistemicd \
+      cybou-contextd; do
       test -x "$out/bin/$daemon" || {
         echo "missing $out/bin/$daemon"
         exit 1
@@ -102,6 +103,7 @@ stdenv.mkDerivation {
     install_dbus_service org.cybou.Mind.Presence1 cybou-presenced cybou-presenced.service
     install_dbus_service org.cybou.Mind.Perception1 cybou-perceptiond cybou-perceptiond.service
     install_dbus_service org.cybou.Mind.Epistemic1 cybou-epistemicd cybou-epistemicd.service
+    install_dbus_service org.cybou.Mind.Context1 cybou-contextd cybou-contextd.service
 
     for name in \
       org.cybou.Mind.Event1 \
@@ -114,7 +116,8 @@ stdenv.mkDerivation {
       org.cybou.Mind.Workspace1 \
       org.cybou.Mind.Presence1 \
       org.cybou.Mind.Perception1 \
-      org.cybou.Mind.Epistemic1; do
+      org.cybou.Mind.Epistemic1 \
+      org.cybou.Mind.Context1; do
       grep -q "^Name=$name$" \
         "$out/share/dbus-1/services/$name.service"
       grep -q '^SystemdService=cybou-.*d.service$' \

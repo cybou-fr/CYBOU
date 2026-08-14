@@ -14,7 +14,7 @@ This document is intentionally limited to implemented behavior and current limit
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs thirty-one CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and multi-process integration across the eleven Mind owners. Both counts
+Lifecycle1 process restart, and multi-process integration across the twelve Mind owners. Both counts
 are checked against the build rather than trusted: the documentation validator derives them from the
 package's daemon list and the tests CMakeLists, so a document that falls behind the code fails the
 build instead of quietly misdescribing it. The process suite also proves a
@@ -391,7 +391,7 @@ or M9 authorized executor.
 
 ## Process topology
 
-Mind now has eleven real user-session processes:
+Mind now has twelve real user-session processes:
 
 ```text
 cybou-eventd
@@ -405,6 +405,7 @@ cybou-workspaced
 cybou-presenced
 cybou-perceptiond
 cybou-epistemicd
+cybou-contextd
 ```
 
 `plasmashell` no longer constructs Identity, Intentions, Predictor, SelfModel, Workspace, Journal,

@@ -162,6 +162,7 @@ pkgs.testers.runNixOSTest {
         "cybou-presenced.service",
         "cybou-perceptiond.service",
         "cybou-epistemicd.service",
+        "cybou-contextd.service",
     )
 
     with subtest("Mind organs are separate user services"):

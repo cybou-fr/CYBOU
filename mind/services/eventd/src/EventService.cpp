@@ -120,6 +120,7 @@ QStringList reservedOrganIdentities()
         // unreserved name is one anything may speak under, and a claim attributed to the organ that
         // decides what is known would be worth forging.
         QStringLiteral("epistemicd"),
+        QStringLiteral("contextd"),
     };
     return identities;
 }

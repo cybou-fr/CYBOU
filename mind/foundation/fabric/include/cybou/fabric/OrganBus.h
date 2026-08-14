@@ -28,6 +28,13 @@ inline constexpr BusEndpoint kPerceptionEndpoint{
     "cybou-perceptiond.service",
 };
 
+inline constexpr BusEndpoint kContextEndpoint{
+    "org.cybou.Mind.Context1",
+    "/org/cybou/Mind/Context1",
+    "org.cybou.Mind.Context1",
+    "cybou-contextd.service",
+};
+
 inline constexpr BusEndpoint kEpistemicEndpoint{
     "org.cybou.Mind.Epistemic1",
     "/org/cybou/Mind/Epistemic1",
