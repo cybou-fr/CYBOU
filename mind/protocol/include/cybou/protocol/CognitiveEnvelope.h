@@ -30,6 +30,18 @@ enum class ContributionKind : quint16 {
     Outcome,
     SelfAssessment,
     Learning,
+
+    /// The two halves of an erasure, from ADR-0028.
+    ///
+    /// They are separate kinds because they are separate durable facts. `ErasureRequested` records
+    /// an intent before anything irreversible happens; `ErasureApplied` records that it did. A
+    /// request with no matching application is the only state a crash can leave behind, and it is
+    /// resumable precisely because it claims nothing about what was destroyed.
+    ///
+    /// Appended rather than inserted: the numeric value of every existing kind is part of every
+    /// hash already written.
+    ErasureRequested,
+    ErasureApplied,
 };
 
 enum class PrivacyClass : quint8 {
@@ -47,6 +59,17 @@ constexpr PrivacyClass mostRestrictive(PrivacyClass a, PrivacyClass b) noexcept
 constexpr bool isRootKind(ContributionKind kind) noexcept
 {
     return kind == ContributionKind::Observation;
+}
+
+/// Whether a kind is a storage operation rather than a thought.
+///
+/// ADR-0028 forbids `Event1.Submit` from accepting these: destroying biography must never be
+/// reachable by the same call that records a thought about it. A proposal is not permission to
+/// execute, and this is the earliest point that rule can be enforced.
+constexpr bool isErasureKind(ContributionKind kind) noexcept
+{
+    return kind == ContributionKind::ErasureRequested
+        || kind == ContributionKind::ErasureApplied;
 }
 
 QString kindToString(ContributionKind kind);

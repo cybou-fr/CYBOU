@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
+#include "cybou/crypto/KeyStore.h"
 #include "cybou/storage/Journal.h"
 
 #include <QCryptographicHash>
@@ -507,6 +508,117 @@ private Q_SLOTS:
         Journal reopened(path);
         QVERIFY(reopened.isOpen());
         QCOMPARE(reopened.verify(), 2u);
+    }
+
+    // E4-E6: the three-step protocol, and each crash window it exists to survive.
+    //
+    // Erasure spans a database transaction and a key store, which cannot commit together. A single
+    // "do both" step therefore has two crash windows and each produces a different lie: destroy the
+    // key and crash, and data is gone with no record why; commit the redaction and crash, and Mind
+    // claims to have forgotten something still decryptable.
+    void erasureRecordsIntentBeforeItDestroysAnything()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope target = observationWithPayload(QByteArrayLiteral("secret"));
+        QVERIFY(journal.append(target) > 0);
+        QCOMPARE(journal.erasureEpoch(), 0u);
+
+        // Step one, alone. Nothing has been destroyed yet, and the payload is still there.
+        QVERIFY(journal.requestErasure(target.messageId, QStringLiteral("UserRequested")) > 0);
+        const auto stillThere = journal.contribution(target.messageId);
+        QVERIFY(stillThere.has_value());
+        QCOMPARE(stillThere->payloadCbor, QByteArrayLiteral("secret"));
+        QCOMPARE(journal.erasureEpoch(), 0u);
+
+        // E4: a crash here is visible and resumable, because the request outlives the process.
+        QCOMPARE(journal.incompleteErasures(), QList<QUuid>{target.messageId});
+    }
+
+    // E6: nothing claims an erasure happened until it has. Between the request and the application
+    // the payload is intact, the epoch has not moved, and no ErasureApplied exists to be believed.
+    void anInterruptedErasureIsResumedRatherThanAssumed()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("j.db"));
+        QUuid targetId;
+        {
+            Journal journal(path);
+            QVERIFY(journal.isOpen());
+            const CognitiveEnvelope target = observationWithPayload(QByteArrayLiteral("secret"));
+            QVERIFY(journal.append(target) > 0);
+            targetId = target.messageId;
+            QVERIFY(journal.requestErasure(targetId, QStringLiteral("ConsentWithdrawn")) > 0);
+        }
+
+        // Reopened as if after a crash between steps one and three.
+        Journal resumed(path);
+        QVERIFY(resumed.isOpen());
+        QCOMPARE(resumed.incompleteErasures(), QList<QUuid>{targetId});
+        QCOMPARE(resumed.erasureEpoch(), 0u);
+
+        // Step three completes it, and the pending list empties.
+        QVERIFY(resumed.applyErasure(targetId));
+        QVERIFY(resumed.incompleteErasures().isEmpty());
+        QCOMPARE(resumed.erasureEpoch(), 1u);
+
+        const auto erased = resumed.contribution(targetId);
+        QVERIFY2(erased.has_value(), "the record survives; only its payload is gone");
+        QVERIFY(erased->payloadCbor.isEmpty());
+
+        // And the chain is still whole, with the erased row's content skipped rather than verified.
+        const VerificationResult result = resumed.verifyFrom({});
+        QVERIFY(result.intact());
+        QCOMPARE(result.contentSkipped, 1u);
+        QCOMPARE(result.contentBrokenAt, 0u);
+    }
+
+    // E5: destroying a key is idempotent, so resuming after a crash in the middle step is safe.
+    //
+    // If destroying an absent key were an error, recovery would report a failure for having already
+    // succeeded - and the only way to avoid that would be to record the destruction somewhere,
+    // which is the transaction that cannot exist.
+    void destroyingAnAlreadyDestroyedKeySucceeds()
+    {
+        QTemporaryDir dir;
+        KeyStore keys(dir.filePath(QStringLiteral("keys")));
+        QVERIFY(keys.isUsable());
+
+        const QUuid contribution = QUuid::createUuid();
+        const QByteArray kek = Seal::generateKey();
+        QVERIFY(keys.createKeyFor(contribution, kek).has_value());
+        QVERIFY(keys.hasKeyFor(contribution));
+
+        QVERIFY(keys.destroyKeyFor(contribution));
+        QVERIFY(!keys.hasKeyFor(contribution));
+
+        // Twice, and a third time, exactly as a resumed recovery would.
+        QVERIFY(keys.destroyKeyFor(contribution));
+        QVERIFY(keys.destroyKeyFor(contribution));
+        QVERIFY(!keys.keyFor(contribution, kek).has_value());
+    }
+
+    // Applying an erasure twice does not double-count the epoch or re-redact, because the redaction
+    // is guarded on erased_at. A resumed recovery that ran step three twice would otherwise make
+    // every projection rebuild for a second time over nothing.
+    void applyingAnErasureTwiceIsHarmless()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        const CognitiveEnvelope target = observationWithPayload(QByteArrayLiteral("secret"));
+        QVERIFY(journal.append(target) > 0);
+        QVERIFY(journal.requestErasure(target.messageId, QStringLiteral("PolicyChange")) > 0);
+        QVERIFY(journal.applyErasure(target.messageId));
+        QCOMPARE(journal.erasureEpoch(), 1u);
+
+        QVERIFY(journal.applyErasure(target.messageId));
+        const VerificationResult result = journal.verifyFrom({});
+        QVERIFY2(result.intact(), "a repeated application must not corrupt the chain");
+        QCOMPARE(result.contentSkipped, 1u);
     }
 
     void migratesV1WithoutRehashingHistory()

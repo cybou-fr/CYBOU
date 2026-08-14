@@ -26,6 +26,8 @@ QString kindToString(ContributionKind kind)
     case ContributionKind::Outcome:            return QStringLiteral("outcome");
     case ContributionKind::SelfAssessment:     return QStringLiteral("self-assessment");
     case ContributionKind::Learning:           return QStringLiteral("learning");
+    case ContributionKind::ErasureRequested:   return QStringLiteral("erasure-requested");
+    case ContributionKind::ErasureApplied:     return QStringLiteral("erasure-applied");
     }
     return QStringLiteral("unknown");
 }

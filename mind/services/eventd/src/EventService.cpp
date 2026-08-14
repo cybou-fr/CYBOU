@@ -293,6 +293,19 @@ QByteArray EventService::Submit(const QByteArray &encodedEnvelope)
                 .arg(envelope->originOrgan));
     }
 
+    // ADR-0028: submitting a contribution never authorizes an erasure.
+    //
+    // Erasure is a destructive storage operation, not a cognitive proposal, and the two must not
+    // share a door. Refused here rather than deeper down because this is the door every organ
+    // already has a key to - a proposal is not permission to execute, and if that rule lived
+    // anywhere else it would eventually become an implementation detail of Submit().
+    if (isErasureKind(envelope->kind)) {
+        return submitReply(
+            0,
+            QStringLiteral("erasure is not a contribution; %1 must be requested explicitly")
+                .arg(kindToString(envelope->kind)));
+    }
+
     const quint64 sequence = m_journal.append(*envelope);
     return submitReply(
         sequence,

@@ -5,6 +5,9 @@
 
 #include "cybou/protocol/CanonicalEnvelope.h"
 
+#include <QCborMap>
+#include <QCborValue>
+
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -276,6 +279,19 @@ bool Journal::ensureSchema()
         return false;
     }
 
+    // The epoch lives in its own row rather than in a pragma, because it is bumped inside the same
+    // transaction as a redaction: a projection must never be able to see a redacted payload while
+    // still believing its cached view is current.
+    if (!tableExists(QStringLiteral("journal_meta"))
+        && (!execSql(QStringLiteral(
+                "CREATE TABLE journal_meta ("
+                "id INTEGER PRIMARY KEY CHECK (id = 1), "
+                "erasure_epoch INTEGER NOT NULL DEFAULT 0)"))
+            || !execSql(QStringLiteral("INSERT OR IGNORE INTO journal_meta (id) VALUES (1)")))) {
+        m_lastError = QStringLiteral("could not create the journal metadata table");
+        return false;
+    }
+
     return ensureV2Indexes();
 }
 
@@ -311,6 +327,13 @@ bool Journal::createSchemaV2()
             erased_at      TEXT
         )
     )SQL"))
+        || !execSql(QStringLiteral(R"SQL(
+        CREATE TABLE journal_meta (
+            id             INTEGER PRIMARY KEY CHECK (id = 1),
+            erasure_epoch  INTEGER NOT NULL DEFAULT 0
+        )
+    )SQL"))
+        || !execSql(QStringLiteral("INSERT OR IGNORE INTO journal_meta (id) VALUES (1)"))
         || !execSql(QStringLiteral(R"SQL(
         CREATE TABLE contribution_evidence (
             contribution_id TEXT    NOT NULL,
@@ -762,6 +785,131 @@ quint64 Journal::appendBatch(const QList<CognitiveEnvelope> &envelopes)
         Q_EMIT accepted(envelopes.at(i), sequences.at(i));
     }
     return sequences.last();
+}
+
+// ADR-0028 step one: durable intent.
+//
+// An ordinary append, deliberately. The request is a contribution like any other - it is hashed,
+// chained and verifiable - because the fact that a forgetting was asked for is itself part of the
+// biography, and a side channel that mutated the Journal without leaving a trace in it would undo
+// the property the single-writer rule exists to provide.
+quint64 Journal::requestErasure(const QUuid &target, const QString &reason)
+{
+    if (target.isNull() || !contribution(target).has_value()) {
+        m_lastError = QStringLiteral("cannot request erasure of a contribution that does not exist");
+        return 0;
+    }
+
+    CognitiveEnvelope e;
+    e.messageId = QUuid::createUuid();
+    e.correlationId = e.messageId;
+    e.causationId = target;
+    e.originOrgan = QStringLiteral("eventd");
+    e.originNode = QStringLiteral("local");
+    e.kind = ContributionKind::ErasureRequested;
+    e.wallTime = QDateTime::currentDateTimeUtc();
+    e.confidence = 1.0;
+    e.privacy = PrivacyClass::Local;
+
+    QCborMap payload;
+    payload.insert(QStringLiteral("target"), target.toString(QUuid::WithoutBraces));
+    // A closed set, never free text: an erasure record is permanent, so a reason that described
+    // what was being forgotten would restate it in the one place that can never be erased.
+    payload.insert(QStringLiteral("reason"), reason);
+    e.payloadCbor = payload.toCborValue().toCbor();
+
+    return append(e);
+}
+
+// ADR-0028 step three: redact, mark, bump, record - or none of it.
+bool Journal::applyErasure(const QUuid &target)
+{
+    const auto existing = contribution(target);
+    if (!existing.has_value()) {
+        m_lastError = QStringLiteral("cannot apply an erasure to a contribution that does not exist");
+        return false;
+    }
+
+    if (!beginImmediate()) {
+        return false;
+    }
+
+    QSqlQuery redact(m_db);
+    redact.prepare(QStringLiteral(
+        "UPDATE contribution SET payload = NULL, erased_at = ? "
+        "WHERE message_id = ? AND erased_at IS NULL"));
+    redact.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    redact.addBindValue(target.toString(QUuid::WithoutBraces));
+    if (!redact.exec()) {
+        m_lastError = redact.lastError().text();
+        rollbackTransaction();
+        return false;
+    }
+
+    CognitiveEnvelope applied;
+    applied.messageId = QUuid::createUuid();
+    applied.correlationId = applied.messageId;
+    applied.causationId = target;
+    applied.originOrgan = QStringLiteral("eventd");
+    applied.originNode = QStringLiteral("local");
+    applied.kind = ContributionKind::ErasureApplied;
+    applied.wallTime = QDateTime::currentDateTimeUtc();
+    applied.confidence = 1.0;
+    applied.privacy = PrivacyClass::Local;
+
+    QCborMap payload;
+    payload.insert(QStringLiteral("target"), target.toString(QUuid::WithoutBraces));
+    applied.payloadCbor = payload.toCborValue().toCbor();
+
+    if (appendWithinTransaction(applied) == 0) {
+        rollbackTransaction();
+        return false;
+    }
+
+    // The epoch is bumped inside the same transaction as the redaction, so a projection can never
+    // observe a redacted payload while still believing its cached view is current.
+    if (!execSql(QStringLiteral("UPDATE journal_meta SET erasure_epoch = erasure_epoch + 1"))) {
+        m_lastError = QStringLiteral("could not advance the erasure epoch");
+        rollbackTransaction();
+        return false;
+    }
+
+    if (!commitTransaction()) {
+        rollbackTransaction();
+        return false;
+    }
+    return true;
+}
+
+QList<QUuid> Journal::incompleteErasures() const
+{
+    QList<QUuid> pending;
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral(
+            "SELECT r.causation_id FROM contribution r "
+            "WHERE r.kind = %1 AND NOT EXISTS ("
+            "  SELECT 1 FROM contribution a "
+            "  WHERE a.kind = %2 AND a.causation_id = r.causation_id)")
+                        .arg(static_cast<int>(ContributionKind::ErasureRequested))
+                        .arg(static_cast<int>(ContributionKind::ErasureApplied)))) {
+        return pending;
+    }
+    while (query.next()) {
+        const QUuid target = QUuid::fromString(query.value(0).toString());
+        if (!target.isNull() && !pending.contains(target)) {
+            pending.append(target);
+        }
+    }
+    return pending;
+}
+
+quint64 Journal::erasureEpoch() const
+{
+    QSqlQuery query(m_db);
+    if (query.exec(QStringLiteral("SELECT erasure_epoch FROM journal_meta")) && query.next()) {
+        return query.value(0).toULongLong();
+    }
+    return 0;
 }
 
 quint64 Journal::count() const

@@ -11,5 +11,5 @@ target_include_directories(cybou-storage
 )
 
 target_link_libraries(cybou-storage
-    PUBLIC Qt6::Core Qt6::Sql cybou-events
+    PUBLIC Qt6::Core Qt6::Sql cybou-events cybou-crypto
 )

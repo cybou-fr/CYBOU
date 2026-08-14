@@ -6,7 +6,9 @@ pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 qt_add_library(cybou-crypto STATIC
     src/SealedPayload.cpp
+    src/KeyStore.cpp
     include/cybou/crypto/SealedPayload.h
+    include/cybou/crypto/KeyStore.h
 )
 
 target_include_directories(cybou-crypto

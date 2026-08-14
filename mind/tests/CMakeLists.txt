@@ -114,7 +114,7 @@ set_tests_properties(
 )
 
 qt_add_executable(test-journal tst_journal.cpp)
-target_link_libraries(test-journal PRIVATE cybou-storage Qt6::Test)
+target_link_libraries(test-journal PRIVATE cybou-storage cybou-crypto Qt6::Test)
 add_test(NAME journal COMMAND test-journal)
 set_tests_properties(journal PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

@@ -76,6 +76,31 @@ public:
     /// is the caller's decision, not the storage layer's.
     VerificationResult verifyFrom(const VerifiedCheckpoint &anchor) const;
 
+    /// Record an intent to erase, before anything irreversible happens.
+    ///
+    /// ADR-0028's protocol is durable intent, then idempotent key destruction, then the redaction
+    /// transaction. This is step one, and it is the only step a crash can leave alone: a request
+    /// with no application claims nothing about what was destroyed, so resuming it is always safe.
+    quint64 requestErasure(const QUuid &target, const QString &reason);
+
+    /// Redact a payload and record that it happened, in one transaction with the epoch bump.
+    ///
+    /// Step three. The caller must have destroyed the key first; this makes no attempt to check,
+    /// because a key store is not reachable from a database transaction and pretending otherwise is
+    /// what the three-step protocol exists to avoid.
+    bool applyErasure(const QUuid &target);
+
+    /// Targets whose erasure was requested and never applied.
+    ///
+    /// The only state a crash can produce, and the reason recovery is a question the Journal can
+    /// answer by itself rather than a flag someone has to remember to set.
+    QList<QUuid> incompleteErasures() const;
+
+    /// How many erasures have been applied. Every persisted projection records the epoch it was
+    /// built under, and one that is behind is discarded rather than repaired.
+    quint64 erasureEpoch() const;
+
+
     /// The checkpoint describing the current head, suitable for persisting after a successful
     /// verification. Empty when the journal is empty or unreadable.
     VerifiedCheckpoint checkpointAtHead() const;

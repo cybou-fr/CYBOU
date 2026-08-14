@@ -1141,6 +1141,57 @@ Gates covered: **E1**, **E2**, **E3**.
 
 **P7.13 is complete.**
 
+## P7.14 — forgetting that survives a crash
+
+The erasure state machine, and the door it is deliberately not reachable through.
+
+```
+1. ErasureRequested          durable Event1 contribution, named target and typed reason
+2. destroy DEK + wrappings   idempotent, safe to repeat after any crash
+3. transaction:              redact payload, set erased_at,
+                             bump erasure_epoch, append ErasureApplied
+```
+
+Erasure spans a database transaction and a key store, and those cannot commit together. A single
+"do both" step has two crash windows and each produces a different lie: destroy the key and crash,
+and data is gone with no record why; commit the redaction and crash, and Mind claims to have
+forgotten something still decryptable. Durable intent before the irreversible step removes both,
+and leaves exactly one state a crash can produce — a request with no application — which is
+resumable precisely because it claims nothing about what was destroyed.
+
+`incompleteErasures()` makes recovery a question the Journal answers by itself rather than a flag
+someone must remember to set. The epoch lives in a table row rather than a pragma so it can be
+bumped **inside** the redaction transaction: a projection must never see a redacted payload while
+still believing its cached view is current.
+
+`KeyStore` destruction is idempotent by contract, not by accident. Destroying an absent key
+succeeds, because step two is re-run after a crash and an error there would report a failure for
+having already succeeded — and the only way to avoid re-running it would be to record the
+destruction somewhere, which is the transaction that cannot exist.
+
+**Submitting a contribution never authorizes an erasure.** `Event1.Submit` refuses both erasure
+kinds. Every organ can already submit, so accepting them there would let any organ erase anything,
+and M9's authorization boundary would have been pre-empted by an enum value.
+
+### The sabotage caught a vacuous test again
+
+Disabling the erasure check left the suite green. The forged envelope carried a random
+`causationId`, so the Journal refused it for naming a cause that does not exist — the test had been
+passing for a reason unrelated to what it claimed. With a real cause appended first it fails under
+the same sabotage.
+
+Fourth time this session a test looked correct and proved nothing, and every time only sabotage
+found it. The pattern is consistent: each one asserted a *refusal*, and a refusal is satisfied by
+any reason at all, including the wrong one.
+
+Gates covered: **E1**, **E2**, **E3**, **E4**, **E5**, **E6**.
+
+Not yet: **E7** (erasure propagating to durable descendants) needs retention dependencies on the
+envelope, which is envelope schema 3. **E8–E14** need the projections to read the epoch, sensitive
+payloads to be wired through the envelope's protection descriptor, and a backup story.
+
+**P7.14 is complete.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

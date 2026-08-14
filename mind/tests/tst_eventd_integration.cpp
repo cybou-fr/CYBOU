@@ -108,6 +108,38 @@ private Q_SLOTS:
         QCOMPARE(accepted.count(), 1);
     }
 
+    // ADR-0028: Submit is not a door to destroying biography.
+    //
+    // Every organ can already submit contributions, so if an erasure kind were accepted here then
+    // any of them could erase anything, and the authorization boundary M9 is meant to build would
+    // have been pre-emptied by an enum value. A proposal is not permission to execute.
+    void submittingAnErasureKindIsRefused()
+    {
+        EventClient client;
+        QVERIFY(client.isOpen());
+        const quint64 before = client.count();
+
+        // A real cause, appended first. The first version of this test invented a random
+        // causationId, so every forged envelope was refused for naming a cause that does not exist
+        // - and the test passed with the erasure check disabled, proving nothing at all. It has to
+        // be an envelope the Journal would otherwise accept.
+        const CognitiveEnvelope cause = observation(QStringLiteral("integrationd"));
+        QVERIFY(client.append(cause) > 0);
+        const quint64 afterCause = client.count();
+
+        for (const ContributionKind kind :
+             {ContributionKind::ErasureRequested, ContributionKind::ErasureApplied}) {
+            CognitiveEnvelope forged = observation(QStringLiteral("integrationd"));
+            forged.kind = kind;
+            forged.causationId = cause.messageId;
+
+            QCOMPARE(client.append(forged), 0u);
+        }
+
+        QCOMPARE(client.count(), afterCause);
+        QVERIFY(afterCause > before);
+    }
+
     void queriesRoundTrip()
     {
         EventClient client;
