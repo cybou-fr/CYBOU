@@ -25,6 +25,18 @@ Workspace owns bounded transient context and deterministic salience. It does not
 Presentation observes Workspace1 `Changed` after admission rather than presenting a raw Event1
 signal directly.
 
+### Amendment: semantic activation is not Workspace admission
+
+Associative retrieval ([ADR-0029](ADR-0029-associative-context-projection.md)) may produce
+`AttentionCandidate` proposals. Activation itself never enters the Workspace.
+
+`contextd` is not `workspaced`. Relevance discovered by associative retrieval is not permission to
+displace the current focus, and the Workspace remains the single owner of bounded attention.
+
+Without this, the word *lemon* would activate fifty related things and admit all of them — a
+cognitive denial of service performed by Mind on itself, with every individual step looking
+reasonable.
+
 ## Consequences
 
 Attention follows accepted durable events, remains reconstructible from Event1 history, and has one

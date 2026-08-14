@@ -35,6 +35,8 @@ SPDX-License-Identifier: MIT
 | [0026](ADR-0026-lifecycle-owner-and-wire-contract.md) | Lifecycle Owner and Wire Contract | Accepted |
 | [0027](ADR-0027-local-epistemic-projection-owner.md) | Local Epistemic Projection Owner | Accepted |
 | [0028](ADR-0028-retention-and-erasure.md) | Retention and Erasure in an Append-Only Journal | Accepted |
+| [0029](ADR-0029-associative-context-projection.md) | Associative Context Projection and Semantic Activation | Accepted |
+| [0030](ADR-0030-transparent-context-delivery.md) | Transparent Context Selection and Prompt Delivery | Accepted |
 
 ## Why five remain Proposed
 

@@ -346,6 +346,24 @@ honestly reach.
   distributed prototype to exist first, and the key-destruction mechanism is what will make it
   tractable when it does.
 
+### Amendment: associative projections are derived state
+
+Associative indices, embeddings, graph edges and cached activation state obey the erasure epoch like
+every other projection, and **no surviving association, embedding or index key may reveal erased
+sensitive content**. An index that still answered "these two were related" about a redacted payload
+would be a smaller oracle, not an absent one.
+
+The distinction that decides which mechanism applies:
+
+```
+learned durable association   →  retention dependency closure (E7)
+derived association or index  →  epoch invalidation and rebuild (E8)
+```
+
+If Mind genuinely learned that the person prefers lemon with honey, that is biography: a durable
+typed contribution, with evidence, privacy and retention, erased transitively with what it rests on.
+If `contextd` merely computed a similarity to make retrieval fast, that is a cache and is rebuilt.
+
 ## Acceptance gates
 
 Implementation is complete when these pass. They are listed here rather than in a test plan because

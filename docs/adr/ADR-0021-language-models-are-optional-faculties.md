@@ -111,6 +111,26 @@ The prohibited shortcut is:
 language model → privileged shell
 ```
 
+## Amendment: a faculty consumes a ContextBundle and retrieves nothing
+
+The interface is fixed:
+
+```
+ContextQuery → contextd → ContextBundle → ContextPolicy → LanguageFaculty
+```
+
+A `LanguageFaculty` **must not** perform unrestricted associative retrieval against the Journal or
+context storage on its own, and the context supplied to a model **must** be representable as a
+`ContextBundle` and inspectable independently of that model.
+
+This is what makes a model replaceable. If a faculty could retrieve for itself, then swapping
+Mistral for llama.cpp — or removing the model entirely — would change what Mind remembers and how it
+recalls it, and the memory architecture would be a property of the current model rather than of
+Mind. With this rule, the model changes and the memory does not.
+
+Inspectable *independently of the model* also means an explanation of a retrieval is never generated
+by the thing being explained. See [ADR-0029](ADR-0029-associative-context-projection.md) gate A12.
+
 ## Acceptance direction
 
 M8 should demonstrate at least:

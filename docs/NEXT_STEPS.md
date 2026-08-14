@@ -1268,6 +1268,64 @@ Gates covered: **E1**–**E8**.
 
 **P7.16 is complete.**
 
+## M7.5 — associative memory, decided before it exists
+
+Two new ADRs and five amendments, no code. The point of writing them now is that a memory
+architecture is the kind of thing that gets decided by accident: a vector index beside the Journal,
+a context panel that assembles its own prompt, and a model that retrieves whatever it can reach are
+each a reasonable local decision, and together they leave no single answer to where Mind's memory
+lives. By the time that is visible it is load-bearing.
+
+**[ADR-0029](adr/ADR-0029-associative-context-projection.md)** puts a twelfth process,
+`cybou-contextd`, between epistemics and attention. Five distinctions carry it:
+
+```
+association ≠ truth      relevance ≠ evidence      activation ≠ attention
+context ≠ biography      embedding ≠ knowledge
+```
+
+It holds a graph rather than a bag of vectors, because an index that can rank but not explain is
+indistinguishable from one that made the answer up. Every association names its origin — observed,
+user-declared, derived, model-suggested, statistical — so `lemon → yellow` and
+`lemon → makes people kinder` can coexist without becoming the same kind of thing.
+
+The ranking formula is deliberately **not** frozen; the properties are: deterministic, bounded,
+inspectable, provenance-preserving, privacy- and retention-aware. Ranking is expected to improve and
+those are not.
+
+`ContextBundle` carries `complete`, so a retrieval that was cut short says so instead of returning a
+short list — the same invariant that P7.8 pushed through the obligation and calibration reads.
+
+**[ADR-0030](adr/ADR-0030-transparent-context-delivery.md)** is separate because it is a privacy
+boundary, and a privacy boundary buried inside a retrieval ADR is one nobody reads. Four sets —
+activated, available, selected, delivered — and **available and delivered must be independently
+inspectable**, because the gap between them is what every silent prompt assembler hides. A WebView
+renders the graph and is granted four intents, none of which act; policy removes items by producing
+a different delivered set rather than by editing what Mind considered.
+
+### What the amendments prevent
+
+- **0014**: activation is not admission. Otherwise the word *lemon* activates fifty things and admits
+  all of them — a cognitive denial of service Mind performs on itself, every step looking reasonable.
+- **0027**: retrieval preserves epistemic status. Otherwise `related ≈ true` becomes structural, which
+  is "perception is not truth" repeated one layer up.
+- **0028**: associative state is derived state, and no surviving index key may reveal erased content.
+  An index that still answered "these were related" about a redacted payload would be a smaller
+  oracle, not an absent one. The durable-association versus derived-index split maps exactly onto
+  E7 and E8, both already implemented.
+- **0025**: associative context is ordered *before* optional language. A faculty that arrived first
+  would answer by retrieving whatever it could reach, and the retrieval architecture would be
+  whatever that model happened to do.
+- **0021**: a faculty consumes a `ContextBundle` and retrieves nothing itself. This is what makes a
+  model replaceable — otherwise swapping or removing one changes what Mind remembers.
+
+Both new ADRs are Accepted before implementation, on the same reasoning as ADR-0028: the decision
+exists to fix ownership, and leaving it Proposed while code is written would let the code decide.
+
+Nothing here enables a language faculty. ADR-0021 stays Proposed and no model is consumed anywhere.
+
+**M7.5 is decided; implementation follows the remaining E-gates.**
+
 ## P7.4 — the retention decision, written down
 
 ADR-0027 made one constraint binding: no sensitive observation may be ingested until a storage ADR

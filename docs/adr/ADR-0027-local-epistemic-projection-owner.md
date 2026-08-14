@@ -175,6 +175,21 @@ The UI shows `unknown`, `stale` and `disputed` distinctly, and cannot resolve a 
   possibly per-record keys, **no sensitive observation may be ingested**. The first adapter is
   chosen to make that constraint costless.
 
+### Amendment: this owner does not own semantic association
+
+`contextd` may reference `SubjectKnowledge` and contribution ids, and **must preserve epistemic
+status** when it does:
+
+```
+Disputed → retrieved as Disputed
+Stale    → retrieved as Stale
+Unknown  → never becomes Observed by being retrieved
+```
+
+Retrieval is not evidence. Without this rule, `related ≈ true` becomes an architectural fact: a
+claim would gain standing by being associated with something relevant, which is precisely the
+"perception is not truth" error moved one layer up.
+
 ## First source
 
 Current NixOS system generation and build identity. Local, non-sensitive, cheaply verifiable, and

@@ -79,10 +79,24 @@ continuity and lifecycle
 → degraded modes and homeostasis
 → grounded perception and epistemic reconciliation
 → retention and cognitive governance
+→ associative context and semantic activation
 → distributed continuity
 → optional language
 → authorized action
 ```
+
+### Amendment: associative retrieval and semantic activation
+
+Mind **may** derive associations between concepts, episodes, preferences, claims and current tasks.
+
+**Associative relevance is not epistemic confidence.** An association may cause information to be
+considered; it may never upgrade an unknown, stale or disputed claim into knowledge. Associative
+projections are reconstructible and bounded, and their owner is fixed by
+[ADR-0029](ADR-0029-associative-context-projection.md).
+
+Associative context is placed before optional language deliberately. A language faculty that arrived
+first would answer questions by retrieving whatever it could reach, and the retrieval architecture
+would then be whatever that model happened to do — decided by default rather than by decision.
 
 ## Consequences
 
