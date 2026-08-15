@@ -1508,6 +1508,43 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### A gate that failed once and then not again
+
+`m6-recovery-boundary` failed once and passed four times afterwards, including three forced
+rebuilds. The one failure came from a batch where four VM gates ran back to back on a machine that
+has already shown it dislikes that; I could not reproduce it, and I have no diagnosis. Recording it
+as an unexplained single failure rather than deciding it was contention: `p4-plasma-lifecycle`
+started exactly this way, and calling it resolved is how a second flake gets to hide for a month.
+
+### Retention becomes consequential
+
+`retainUntil` has been durable and verified since ADR-0028 and acted on by nothing. `RetentionSweep`
+is what makes it mean something: it finds what has expired, resumes any erasure a crash left
+half-done, and runs the three-step protocol per target, descendants first.
+
+It lives outside `Journal` on purpose. A store that erased on its own schedule would be a store
+whose contents depend on when it was last opened, and `expiredBefore` is deliberately a query
+rather than an action — knowing what has expired and deciding to destroy it are different powers.
+
+Writing the tests found two defects that no amount of reading would have.
+
+The first was mine: the column is `seq`, not `sequence`, so the query silently returned nothing.
+Every sweep reported a clean, complete pass over an empty result. That is the exact failure the
+partial-is-not-empty invariant exists to catch, arriving from the one direction the invariant does
+not cover — a query that fails and an empty result are indistinguishable to the caller.
+
+The second was older and worse. `requestErasure` writes a record whose causation is the target, so
+the retention rule made every erasure record inherit the retention of the thing it erased and expire
+alongside it. A journal that forgot it had forgotten something cannot answer the question the
+protocol exists to answer. The code's own comment already said an erasure record is permanent; the
+code did not enforce it, and nothing noticed because every prior erasure test used contributions
+with no retention date at all. Erasure kinds are now exempt from the derivation rule and permanent
+by construction.
+
+All seven assertions were sabotaged and all seven mutations caught, including the boundary: "retain
+until T" now erases at T, because a date that kept the record past its own deadline would be
+advisory.
+
 ### What leaves the machine
 
 ADR-0030's four sets are one list, not four. `DeliveryPlan` holds a decision per activated item —

@@ -101,6 +101,10 @@ NUMBER_WORDS = {
     30: "thirty",
     31: "thirty-one",
     32: "thirty-two",
+    33: "thirty-three",
+    34: "thirty-four",
+    35: "thirty-five",
+    36: "thirty-six",
 }
 
 

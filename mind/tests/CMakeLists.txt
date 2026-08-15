@@ -138,6 +138,13 @@ set_tests_properties(
     associative-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-retention-sweep tst_retention_sweep.cpp)
+target_link_libraries(test-retention-sweep PRIVATE cybou-storage cybou-crypto Qt6::Test)
+add_test(NAME retention-sweep COMMAND test-retention-sweep)
+set_tests_properties(
+    retention-sweep PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-context-delivery tst_context_delivery.cpp)
 target_link_libraries(test-context-delivery PRIVATE cybou-context Qt6::Test)
 add_test(NAME context-delivery COMMAND test-context-delivery)

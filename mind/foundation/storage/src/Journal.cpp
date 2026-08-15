@@ -712,7 +712,12 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
     // A conclusion may not outlive the evidence it rests on. Refused rather than silently clamped,
     // exactly as a weaker privacy class is: the envelope's declaration is the contract, and quietly
     // correcting it would leave the caller believing something the Journal does not.
-    if (e.derivedRetainUntil(referenceRetainUntil) != e.retainUntil) {
+    // Erasure records are exempt, and must be: they name the target as their cause, so the rule
+    // would have every erasure inherit the retention of the thing it erased and expire with it.
+    // A journal that forgot that it had forgotten something could not answer the one question an
+    // erasure protocol exists to answer.
+    if (!isErasureKind(e.kind)
+        && e.derivedRetainUntil(referenceRetainUntil) != e.retainUntil) {
         return fail(QStringLiteral("contribution outlives the retention of its references"));
     }
 
@@ -953,6 +958,9 @@ quint64 Journal::requestErasure(const QUuid &target, const QString &reason)
     e.wallTime = QDateTime::currentDateTimeUtc();
     e.confidence = 1.0;
     e.privacy = PrivacyClass::Local;
+    e.schemaVersion = kProtectedEnvelopeSchemaVersion;
+    e.retentionClass = RetentionClass::Permanent;
+    e.retainUntil = QDateTime();
 
     QCborMap payload;
     payload.insert(QStringLiteral("target"), target.toString(QUuid::WithoutBraces));
@@ -1014,6 +1022,9 @@ bool Journal::applyErasure(const QUuid &target)
     applied.wallTime = QDateTime::currentDateTimeUtc();
     applied.confidence = 1.0;
     applied.privacy = PrivacyClass::Local;
+    applied.schemaVersion = kProtectedEnvelopeSchemaVersion;
+    applied.retentionClass = RetentionClass::Permanent;
+    applied.retainUntil = QDateTime();
 
     QCborMap payload;
     payload.insert(QStringLiteral("target"), target.toString(QUuid::WithoutBraces));
@@ -1085,6 +1096,37 @@ QList<QUuid> Journal::retentionDependents(const QUuid &target) const
         }
     }
     return closure;
+}
+
+QList<QUuid> Journal::expiredBefore(const QDateTime &instant, int limit) const
+{
+    QList<QUuid> expired;
+    if (!instant.isValid() || limit <= 0) {
+        return expired;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT c.message_id FROM contribution c "
+        "WHERE c.retain_until IS NOT NULL AND c.retain_until != '' AND c.retain_until <= :now "
+        "AND NOT EXISTS ("
+        "  SELECT 1 FROM contribution r "
+        "  WHERE r.kind = %1 AND r.causation_id = c.message_id) "
+        "ORDER BY c.seq ASC LIMIT :limit")
+                      .arg(static_cast<int>(ContributionKind::ErasureRequested)));
+    query.bindValue(QStringLiteral(":now"), instant.toUTC().toString(Qt::ISODateWithMs));
+    query.bindValue(QStringLiteral(":limit"), limit);
+    if (!query.exec()) {
+        return expired;
+    }
+
+    while (query.next()) {
+        const QUuid id = QUuid::fromString(query.value(0).toString());
+        if (!id.isNull()) {
+            expired.append(id);
+        }
+    }
+    return expired;
 }
 
 QList<QUuid> Journal::incompleteErasures() const

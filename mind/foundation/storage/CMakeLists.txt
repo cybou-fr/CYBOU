@@ -3,7 +3,9 @@
 
 qt_add_library(cybou-storage STATIC
     src/Journal.cpp
+    src/RetentionSweep.cpp
     include/cybou/storage/Journal.h
+    include/cybou/storage/RetentionSweep.h
 )
 
 target_include_directories(cybou-storage

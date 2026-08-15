@@ -153,6 +153,18 @@ public:
     /// afterwards is not a descendant of what was erased.
     QList<QUuid> retentionDependents(const QUuid &target) const;
 
+    /// Contributions whose retention window has closed, oldest first, bounded.
+    ///
+    /// A query, not an action. The Journal knowing what has expired and the Journal deciding to
+    /// destroy it are different powers, and ADR-0028's protocol only survives a crash because
+    /// intent is recorded before anything irreversible happens. Anything already requested for
+    /// erasure is excluded, so a sweep that is resumed does not request the same target twice.
+    ///
+    /// A contribution with no `retain_until` never expires. That is the whole meaning of the
+    /// Permanent retention class, and treating a missing date as "expired long ago" would erase
+    /// exactly the records that were marked to be kept.
+    QList<QUuid> expiredBefore(const QDateTime &instant, int limit) const;
+
     /// Targets whose erasure was requested and never applied.
     ///
     /// The only state a crash can produce, and the reason recovery is a question the Journal can
