@@ -1508,6 +1508,30 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### The delivery boundary gets a caller
+
+`Context1.Deliver` makes ADR-0030 reachable. Until now B1 through B7 held in a library nothing
+called, which is the state where an invariant is true and cannot protect anything.
+
+Two choices are load-bearing.
+
+**The wire carries every decision, not the delivered subset.** B6 would otherwise be an internal
+property of a library, with the RPC quietly reintroducing exactly the shape the one-list design
+exists to forbid — a caller able to render "what was sent" without holding what was withheld.
+
+**An unrecognised trust level is refused, never defaulted.** Defaulting upward would hand a caller
+full context by sending a number nobody implemented; defaulting downward would hide the caller's bug
+behind a silently narrowed answer. The nameless-destination case is refused for the same reason: a
+delivery nobody can name is one nobody can later inspect or hold to a policy.
+
+`Deliver` reports whether a record is owed and does not write one. contextd owns no writes, and a
+projection that could record a fact about the person's data would be a second writer whatever the
+ADRs said. The test asserts the Journal head is unchanged across four deliveries, so "reports but
+does not write" is measured rather than asserted in a comment.
+
+Four sabotages, four caught: sending only delivered items, defaulting unknown trust, accepting a
+nameless destination, and claiming every delivery owes a record.
+
 ### The turn away from models
 
 ADR-0031, 0032 and 0033 land as Proposed, ADR-0021 is rewritten, and ADR-0024, 0025, 0028, 0029,

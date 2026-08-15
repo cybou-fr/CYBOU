@@ -122,6 +122,79 @@ QByteArray ContextService::Activate(const QStringList &seeds, int maxNodes, int 
     return FabricCodec::encode(map);
 }
 
+QByteArray ContextService::Deliver(
+    const QStringList &seeds,
+    const QString &destinationId,
+    int trust,
+    bool retains,
+    bool externalBoundary,
+    const QStringList &selected,
+    const QStringList &excluded)
+{
+    if (!refuseWhenUnready(QStringLiteral("Deliver"))) {
+        return {};
+    }
+
+    if (destinationId.isEmpty()) {
+        if (calledFromDBus()) {
+            sendErrorReply(QDBusError::InvalidArgs,
+                           QStringLiteral("Deliver needs a named destination"));
+        }
+        return {};
+    }
+
+    // An unrecognised trust level is refused, never defaulted. Reading an unknown value as the most
+    // trusted would hand a caller full context by sending a number nobody implemented; reading it
+    // as the least would hide the caller's bug behind a silently narrowed answer.
+    if (trust < static_cast<int>(ConsumerTrust::Untrusted)
+        || trust > static_cast<int>(ConsumerTrust::Full)) {
+        if (calledFromDBus()) {
+            sendErrorReply(
+                QDBusError::InvalidArgs,
+                QStringLiteral("Deliver does not know trust level %1").arg(trust));
+        }
+        return {};
+    }
+
+    ActivationBudget budget;
+    const ContextBundle bundle
+        = m_projection.activate(QList<QString>(seeds.cbegin(), seeds.cend()), budget);
+
+    Destination destination;
+    destination.id = destinationId;
+    destination.trust = static_cast<ConsumerTrust>(trust);
+    destination.retains = retains;
+    destination.externalBoundary = externalBoundary;
+
+    const DeliveryPlan plan = DeliveryPlan::build(
+        bundle,
+        DeliveryPolicy(),
+        destination,
+        QSet<QString>(selected.cbegin(), selected.cend()),
+        QSet<QString>(excluded.cbegin(), excluded.cend()));
+
+    // Every decision crosses, not the delivered subset. A wire format that carried only what was
+    // sent would make B6 an internal property of a library nobody can see from here.
+    QVariantList decisions;
+    for (const DeliveryDecision &decision : plan.decisions()) {
+        QVariantMap entry;
+        entry.insert(QStringLiteral("concept"), decision.conceptId);
+        entry.insert(QStringLiteral("disposition"), dispositionToString(decision.disposition));
+        entry.insert(QStringLiteral("reason"), decision.reason);
+        decisions.append(entry);
+    }
+
+    QVariantMap map;
+    map.insert(QStringLiteral("decisions"), decisions);
+    map.insert(QStringLiteral("complete"), plan.complete());
+    map.insert(QStringLiteral("destination"), destination.id);
+    map.insert(QStringLiteral("trust"), consumerTrustToString(destination.trust));
+    // Reported, not written. The caller that performs the delivery owns that contribution, because
+    // this organ owns no writes at all.
+    map.insert(QStringLiteral("recordRequired"), requiresRecord(destination));
+    return FabricCodec::encode(map);
+}
+
 void ContextService::admitToGraph(const CognitiveEnvelope &envelope)
 {
     const auto observation = decodeObservation(envelope.payloadCbor);

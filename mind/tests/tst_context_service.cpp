@@ -11,6 +11,7 @@
 
 #include "cybou/fabric/FabricCodec.h"
 #include "cybou/protocol/Observation.h"
+#include "cybou/context/ContextDelivery.h"
 #include "cybou/storage/Journal.h"
 
 #include <QTemporaryDir>
@@ -242,6 +243,123 @@ private Q_SLOTS:
         QVERIFY2(
             generous.value(QStringLiteral("items")).toList().size() <= ActivationBudget{}.maxNodes,
             "asking for more than the default must not raise the ceiling");
+    }
+
+    // B6 across the wire. The reply carries a decision for every activated item, so a caller cannot
+    // render what was delivered without also holding what was withheld.
+    void deliverCarriesEveryDispositionNotJustTheDeliveredOnes()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        for (int i = 0; i < 4; ++i) {
+            QVERIFY(journal.append(observationOf(
+                        QStringLiteral("subject"), QStringLiteral("value-%1").arg(i),
+                        now.addSecs(-400 + i * 60)))
+                    > 0);
+        }
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+
+        const QVariantMap activated
+            = FabricCodec::decodeMap(service.Activate({QStringLiteral("subject")}, 0, 0));
+        const int activatedCount = activated.value(QStringLiteral("items")).toList().size();
+        QVERIFY2(activatedCount > 0, "the fixture must activate something to be worth asserting on");
+
+        // An untrusted consumer, selecting nothing.
+        const QVariantMap plan = FabricCodec::decodeMap(service.Deliver(
+            {QStringLiteral("subject")},
+            QStringLiteral("third-party-plugin"),
+            static_cast<int>(ConsumerTrust::Untrusted),
+            false,
+            false,
+            {},
+            {}));
+
+        const QVariantList decisions = plan.value(QStringLiteral("decisions")).toList();
+        QCOMPARE(decisions.size(), activatedCount);
+
+        for (const QVariant &entry : decisions) {
+            const QVariantMap decision = entry.toMap();
+            QVERIFY(!decision.value(QStringLiteral("concept")).toString().isEmpty());
+            QVERIFY(!decision.value(QStringLiteral("disposition")).toString().isEmpty());
+            QVERIFY(!decision.value(QStringLiteral("reason")).toString().isEmpty());
+        }
+
+        QCOMPARE(plan.value(QStringLiteral("destination")).toString(),
+                 QStringLiteral("third-party-plugin"));
+        QCOMPARE(plan.value(QStringLiteral("trust")).toString(), QStringLiteral("untrusted"));
+    }
+
+    // An unrecognised trust level is refused rather than defaulted. Defaulting upward would hand a
+    // caller full context by sending a number nobody implemented.
+    void deliverRefusesATrustLevelItDoesNotKnow()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(
+                    QStringLiteral("subject"), QStringLiteral("value"),
+                    QDateTime::currentDateTimeUtc()))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+
+        // A known level answers, which is what makes the refusals below mean something.
+        QVERIFY(!service
+                     .Deliver({QStringLiteral("subject")}, QStringLiteral("c"),
+                              static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                     .isEmpty());
+
+        for (int unknown : {-1, static_cast<int>(ConsumerTrust::Full) + 1, 99}) {
+            QVERIFY2(service
+                         .Deliver({QStringLiteral("subject")}, QStringLiteral("c"), unknown,
+                                  false, false, {}, {})
+                         .isEmpty(),
+                     qPrintable(QStringLiteral("trust %1 was answered").arg(unknown)));
+        }
+
+        // And a nameless destination is refused too: a delivery nobody can name is one nobody can
+        // later inspect or hold to a policy.
+        QVERIFY(service
+                    .Deliver({QStringLiteral("subject")}, QString(),
+                             static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                    .isEmpty());
+    }
+
+    // Whether a record is owed follows the consumer, and contextd reports it without writing it.
+    void deliverReportsWhetherARecordIsOwed()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(
+                    QStringLiteral("subject"), QStringLiteral("value"),
+                    QDateTime::currentDateTimeUtc()))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+        const QByteArray headBefore = journal.head();
+
+        const auto owed = [&](bool retains, bool external) {
+            return FabricCodec::decodeMap(service.Deliver(
+                       {QStringLiteral("subject")}, QStringLiteral("c"),
+                       static_cast<int>(ConsumerTrust::Bounded), retains, external, {}, {}))
+                .value(QStringLiteral("recordRequired"))
+                .toBool();
+        };
+
+        QVERIFY2(!owed(false, false), "an inspector that forgets owes nothing");
+        QVERIFY2(owed(true, false), "a local consumer that retains owes a record");
+        QVERIFY2(owed(false, true), "crossing an external boundary owes one on its own account");
+
+        // Reported, never written: contextd owns no writes, and four deliveries did not grow the
+        // Journal by a single contribution.
+        QCOMPARE(journal.head(), headBefore);
     }
 };
 

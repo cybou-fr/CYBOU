@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cybou/context/AssociativeProjection.h"
+#include "cybou/context/ContextDelivery.h"
 #include "cybou/events/EventStore.h"
 
 #include <QDBusContext>
@@ -56,6 +57,25 @@ public Q_SLOTS:
     /// Erroring rather than returning an empty bundle: an empty result means nothing is related,
     /// which is a fact, and a projection that could not be assembled has no facts to offer.
     QByteArray Activate(const QStringList &seeds, int maxNodes, int maxDepth);
+
+    /// Activate, apply a consumer's policy, and return the full disposition of every item.
+    ///
+    /// ADR-0030. The reply carries a decision per activated item rather than the delivered subset,
+    /// so a caller cannot render "what was sent" without also holding what was withheld. That is
+    /// B6, and it survives the wire only because the wire carries the same one list.
+    ///
+    /// This produces the plan and reports whether the delivery is owed a durable record. It does
+    /// not write one: contextd never writes to Event1, and a projection that could record a fact
+    /// about the person's data would be a second writer whatever the ADRs said. The caller that
+    /// actually performs the delivery owns that contribution.
+    QByteArray Deliver(
+        const QStringList &seeds,
+        const QString &destinationId,
+        int trust,
+        bool retains,
+        bool externalBoundary,
+        const QStringList &selected,
+        const QStringList &excluded);
 
     qulonglong Cursor() const;
 
