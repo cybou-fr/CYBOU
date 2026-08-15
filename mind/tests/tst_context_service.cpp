@@ -245,20 +245,27 @@ private Q_SLOTS:
             "asking for more than the default must not raise the ceiling");
     }
 
-    // B6 across the wire. The reply carries a decision for every activated item, so a caller
-    // cannot render what was delivered without also holding what was withheld.
-    void deliverCarriesEveryDispositionNotJustTheDeliveredOnes()
+    // Package C. What a consumer receives, and what it must not learn.
+    //
+    // The private item is held back, and its identity is absent from the consumer reply entirely --
+    // not present with a "held-back" label. That an episode exists is often the sensitive part, and
+    // announcing its identity while withholding its content discloses the fact of it to the party
+    // policy just refused.
+    void aConsumerNeverLearnsWhatWasHeldBackFromIt()
     {
         QTemporaryDir dir;
         Journal journal(dir.filePath(QStringLiteral("j.db")));
         QVERIFY(journal.isOpen());
         const QDateTime now = QDateTime::currentDateTimeUtc();
-        for (int i = 0; i < 4; ++i) {
-            QVERIFY(journal.append(observationOf(
-                        QStringLiteral("subject"), QStringLiteral("value-%1").arg(i),
-                        now.addSecs(-400 + i * 60)))
-                    > 0);
-        }
+
+        // One ordinary subject and one whose very name is the sensitive part.
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("ordinary"),
+                                             now.addSecs(-120), PrivacyClass::Public))
+                > 0);
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"),
+                                             QStringLiteral("medical-episode"), now.addSecs(-60),
+                                             PrivacyClass::Local))
+                > 0);
 
         ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
         QVERIFY(service.isReady());
@@ -266,30 +273,74 @@ private Q_SLOTS:
         const QVariantMap prepared
             = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0));
         const QString requestId = prepared.value(QStringLiteral("requestId")).toString();
-        const int activatedCount = prepared.value(QStringLiteral("items")).toList().size();
-        QVERIFY2(!requestId.isEmpty(), "a prepared request must carry an identity");
-        QVERIFY2(activatedCount > 0, "the fixture must activate something to assert on");
+        const int activated = prepared.value(QStringLiteral("items")).toList().size();
+        QVERIFY(activated > 1);
 
-        const QVariantMap plan = FabricCodec::decodeMap(service.Deliver(
+        const QVariantMap payload = FabricCodec::decodeMap(service.Deliver(
             requestId, QStringLiteral("third-party-plugin"),
             static_cast<int>(ConsumerTrust::Untrusted), false, false, {}, {}));
 
-        const QVariantList decisions = plan.value(QStringLiteral("decisions")).toList();
-        QCOMPARE(decisions.size(), activatedCount);
+        // Nothing in the consumer reply carries a held-back identity, and there is no dispositions
+        // list at all for one to hide in.
+        QVERIFY2(!payload.contains(QStringLiteral("decisions")),
+                 "the consumer reply must not carry the full plan");
+        QVERIFY2(!QString::fromUtf8(FabricCodec::encode(payload))
+                      .contains(QStringLiteral("medical-episode")),
+                 "a held-back concept id reached the consumer");
 
+        const int withheld = payload.value(QStringLiteral("withheldCount")).toInt();
+        QVERIFY2(withheld > 0, "the fixture must actually hold something back");
+
+        // The consumer is still owed the knowledge that its answer was narrowed: partial is not
+        // empty, and a consumer that believed it had everything would reason as though nothing was
+        // withheld. A count is that knowledge without the identities.
+        QCOMPARE(payload.value(QStringLiteral("delivered")).toList().size() + withheld, activated);
+
+        // The person sees all of it, through the inspector, with reasons.
+        const QVariantMap inspected = FabricCodec::decodeMap(service.Inspect(requestId));
+        const QVariantList decisions = inspected.value(QStringLiteral("decisions")).toList();
+        QCOMPARE(decisions.size(), activated);
+
+        bool sawHeldBack = false;
         for (const QVariant &entry : decisions) {
             const QVariantMap decision = entry.toMap();
-            QVERIFY(!decision.value(QStringLiteral("concept")).toString().isEmpty());
-            QVERIFY(!decision.value(QStringLiteral("disposition")).toString().isEmpty());
-            QVERIFY(!decision.value(QStringLiteral("reason")).toString().isEmpty());
-            // Whoever records the delivery has to name what it disclosed. Concept ids alone are
-            // not provenance.
-            QVERIFY2(!decision.value(QStringLiteral("evidence")).toList().isEmpty(),
-                     "a decision without evidence cannot support a delivery record");
+            if (decision.value(QStringLiteral("disposition")).toString()
+                == QStringLiteral("held-back-by-policy")) {
+                sawHeldBack = true;
+                QVERIFY(!decision.value(QStringLiteral("reason")).toString().isEmpty());
+            }
         }
+        QVERIFY2(sawHeldBack, "the person must be able to see what was withheld");
+    }
 
-        QCOMPARE(plan.value(QStringLiteral("requestId")).toString(), requestId);
-        QCOMPARE(plan.value(QStringLiteral("trust")).toString(), QStringLiteral("untrusted"));
+    // Inspection reports a delivery that happened, not a plan recomputed at inspection time.
+    void inspectRefusesARequestThatWasNeverDelivered()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("v"),
+                                             QDateTime::currentDateTimeUtc()))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+        const QString requestId
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0))
+                  .value(QStringLiteral("requestId"))
+                  .toString();
+
+        QVERIFY2(service.Inspect(requestId).isEmpty(),
+                 "there is no delivery to inspect yet");
+        QVERIFY(service.LastError().contains(QStringLiteral("no delivery")));
+
+        QVERIFY(!service
+                     .Deliver(requestId, QStringLiteral("c"),
+                              static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                     .isEmpty());
+        QVERIFY2(!service.Inspect(requestId).isEmpty(), "now there is");
+
+        QVERIFY(service.Inspect(QUuid::createUuid().toString(QUuid::WithoutBraces)).isEmpty());
     }
 
     // The request id is minted before activation, so the bundle actually carries one. A null id

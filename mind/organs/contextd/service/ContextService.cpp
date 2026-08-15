@@ -233,13 +233,79 @@ QByteArray ContextService::Deliver(
         QSet<QString>(selected.cbegin(), selected.cend()),
         QSet<QString>(excluded.cbegin(), excluded.cend()));
 
-    // Every decision crosses, not the delivered subset. A wire format that carried only what was
-    // sent would make B6 an internal property of a library nobody can see from here.
+    // Keep the plan for the person. Inspection must report what was actually acted on rather than
+    // recompute a plan that could differ from the one this delivery used.
+    PreparedRequest recorded = prepared;
+    recorded.plan = plan.decisions();
+    recorded.destination = destination;
+    recorded.delivered = true;
+    m_prepared.insert(id, recorded);
+
+    // Only the delivered items cross to the consumer. Naming a held-back concept here would
+    // disclose that it exists to the very party policy had just refused it, and the existence of
+    // an episode is frequently the sensitive part of it.
     //
-    // Evidence travels with each decision: whoever records the delivery has to name the provenance
-    // of what it disclosed, and it cannot reconstruct that from concept ids alone.
+    // Evidence travels with what was delivered: whoever records the disclosure has to name its
+    // provenance, and cannot reconstruct that from concept ids alone.
+    QVariantList delivered;
+    for (const DeliveryDecision &decision : plan.withDisposition(Disposition::Delivered)) {
+        QVariantList evidence;
+        for (const QUuid &source : decision.evidence) {
+            evidence.append(source.toString(QUuid::WithoutBraces));
+        }
+
+        QVariantMap entry;
+        entry.insert(QStringLiteral("concept"), decision.conceptId);
+        entry.insert(QStringLiteral("reason"), decision.reason);
+        entry.insert(QStringLiteral("evidence"), evidence);
+        delivered.append(entry);
+    }
+
+    QVariantMap map;
+    map.insert(QStringLiteral("requestId"), id.toString(QUuid::WithoutBraces));
+    map.insert(QStringLiteral("delivered"), delivered);
+    // A count, never identities. The consumer is owed the knowledge that its answer was narrowed --
+    // partial is not empty, and a consumer that believed it had everything would reason as though
+    // nothing had been withheld -- but it is not owed what was withheld or why.
+    map.insert(QStringLiteral("withheldCount"), plan.size() - delivered.size());
+    map.insert(QStringLiteral("complete"), plan.complete());
+    map.insert(QStringLiteral("destination"), destination.id);
+    map.insert(QStringLiteral("trust"), consumerTrustToString(destination.trust));
+    map.insert(QStringLiteral("sourceCursor"), static_cast<qulonglong>(prepared.cursor));
+    // Reported, not written. The caller that performs the delivery owns that contribution, because
+    // this organ owns no writes at all.
+    map.insert(QStringLiteral("recordRequired"), requiresRecord(destination));
+    return FabricCodec::encode(map);
+}
+
+QByteArray ContextService::Inspect(const QString &requestId)
+{
+    if (!refuseWhenUnready(QStringLiteral("Inspect"))) {
+        return {};
+    }
+
+    const QUuid id = QUuid::fromString(requestId);
+    if (id.isNull() || !m_prepared.contains(id)) {
+        m_lastError = QStringLiteral("Inspect has no prepared request %1").arg(requestId);
+        if (calledFromDBus()) {
+            sendErrorReply(QDBusError::InvalidArgs, m_lastError);
+        }
+        return {};
+    }
+
+    const PreparedRequest prepared = m_prepared.value(id);
+    if (!prepared.delivered) {
+        m_lastError = QStringLiteral("request %1 has no delivery to inspect").arg(requestId);
+        if (calledFromDBus()) {
+            sendErrorReply(QDBusError::Failed, m_lastError);
+        }
+        return {};
+    }
+
+    // Every disposition, including what was held back and why. This is the one surface where the
+    // gap between available and delivered is visible, which is the whole of B6.
     QVariantList decisions;
-    for (const DeliveryDecision &decision : plan.decisions()) {
+    for (const DeliveryDecision &decision : prepared.plan) {
         QVariantList evidence;
         for (const QUuid &source : decision.evidence) {
             evidence.append(source.toString(QUuid::WithoutBraces));
@@ -256,13 +322,9 @@ QByteArray ContextService::Deliver(
     QVariantMap map;
     map.insert(QStringLiteral("requestId"), id.toString(QUuid::WithoutBraces));
     map.insert(QStringLiteral("decisions"), decisions);
-    map.insert(QStringLiteral("complete"), plan.complete());
-    map.insert(QStringLiteral("destination"), destination.id);
-    map.insert(QStringLiteral("trust"), consumerTrustToString(destination.trust));
+    map.insert(QStringLiteral("destination"), prepared.destination.id);
+    map.insert(QStringLiteral("trust"), consumerTrustToString(prepared.destination.trust));
     map.insert(QStringLiteral("sourceCursor"), static_cast<qulonglong>(prepared.cursor));
-    // Reported, not written. The caller that performs the delivery owns that contribution, because
-    // this organ owns no writes at all.
-    map.insert(QStringLiteral("recordRequired"), requiresRecord(destination));
     return FabricCodec::encode(map);
 }
 

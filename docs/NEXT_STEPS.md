@@ -1508,6 +1508,31 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### The inspector and the consumer are different audiences
+
+`Deliver` used to hand every disposition to whoever called it, including the held-back ones. That
+conflated two roles that happen to share a wire. A plugin refused `medical-episode` still learned
+that `medical-episode` exists, and for an episode the existence is frequently the sensitive part --
+withholding the content while announcing the identity discloses the fact of it to precisely the
+party policy had just refused.
+
+`Deliver` now returns only what the consumer may have, plus a count of what was withheld. The count
+stays because the consumer is still owed the knowledge that its answer was narrowed: partial is not
+empty, and a consumer believing it had everything would reason as though nothing was withheld. A
+count carries that without carrying identities.
+
+`Inspect` is the person's view: every disposition with its reason, which is where B6 actually
+lives. It reports the plan of a delivery that happened rather than recomputing one, so what the
+person inspects is what was acted on. It refuses a request with no delivery behind it.
+
+**Who may call `Inspect` is not yet enforced.** Any process on the bus can ask, because nothing
+binds a caller to a verified identity. This package splits the two views; it does not defend the
+boundary between them, and the defence is the next package rather than something claimed here.
+Splitting first is still worth it -- the leak in `Deliver` reached every consumer unconditionally,
+while `Inspect` at least requires knowing a request id.
+
+Four sabotages, four caught, all by context tests rather than by flake noise this time.
+
 ### One request, one lineage
 
 `Deliver` used to activate again. A person could inspect one bundle and send another, which makes

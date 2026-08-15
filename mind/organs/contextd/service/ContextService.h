@@ -82,6 +82,11 @@ public Q_SLOTS:
     /// actually performs the delivery owns that contribution.
     /// Refuses a request it never prepared, and refuses one the projection has moved past. A
     /// silent re-activation would answer a different question than the one the person approved.
+    ///
+    /// The reply carries only what the consumer may have. A held-back item is named to the person
+    /// through `Inspect`, never to the consumer it was held back from: that an episode exists is
+    /// often the sensitive part, and withholding its content while announcing its identity
+    /// discloses the fact of it to exactly the party policy just refused.
     QByteArray Deliver(
         const QString &requestId,
         const QString &destinationId,
@@ -90,6 +95,17 @@ public Q_SLOTS:
         bool externalBoundary,
         const QStringList &selected,
         const QStringList &excluded);
+
+    /// The person-facing view of a delivery that has happened: every disposition, with reasons.
+    ///
+    /// This is where ADR-0030's B6 lives. The gap between what was available and what was sent is
+    /// the interesting part, and it is shown to the person rather than to the consumer.
+    ///
+    /// Who may call this is not yet enforced. Until a consumer registry binds a caller to a
+    /// verified identity, any process on the bus can ask -- so this splits the two views without
+    /// yet defending the boundary between them, and the defence is the next package rather than
+    /// something this one quietly claims.
+    QByteArray Inspect(const QString &requestId);
 
     qulonglong Cursor() const;
 
@@ -113,6 +129,13 @@ private:
         ContextBundle bundle;
         quint64 cursor{0};
         quint64 erasureEpoch{0};
+
+        /// The plan of the last delivery made against this request, kept for the person to
+        /// inspect. Inspection reports what actually happened rather than recomputing a plan that
+        /// might differ from the one that was acted on.
+        QList<DeliveryDecision> plan;
+        Destination destination;
+        bool delivered{false};
     };
 
     /// Bounded on purpose. An unbounded map of prepared requests would be a caller-controlled
