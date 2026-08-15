@@ -138,6 +138,13 @@ set_tests_properties(
     associative-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-context-delivery tst_context_delivery.cpp)
+target_link_libraries(test-context-delivery PRIVATE cybou-context Qt6::Test)
+add_test(NAME context-delivery COMMAND test-context-delivery)
+set_tests_properties(
+    context-delivery PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-sealed-payload tst_sealed_payload.cpp)
 target_link_libraries(test-sealed-payload PRIVATE cybou-crypto Qt6::Test)
 add_test(NAME sealed-payload COMMAND test-sealed-payload)

@@ -1508,6 +1508,28 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### What leaves the machine
+
+ADR-0030's four sets are one list, not four. `DeliveryPlan` holds a decision per activated item —
+`Delivered`, `HeldBackByPolicy`, `ExcludedByPerson`, `NotSelected` — with the reason attached. Four
+separate lists would have let a caller render the delivered one and call it the truth; one list of
+decisions cannot be rendered without rendering the held-back items alongside. B6 is a shape, not a
+convention.
+
+Policy takes the bundle by const reference, so B2 holds by construction: two policies over the same
+bundle produce two delivered sets and leave Mind's own view of relevance untouched. Local
+destinations are not filtered at all — policy is about what *leaves*, and filtering the inspector
+would hide from the person exactly what the inspector exists to show.
+
+Each of the seven assertions was sabotaged before being believed, and each mutation was caught:
+dropping held-back items, permitting everything, filtering local destinations, blaming policy for a
+person's own exclusion, forgetting incompleteness, naming withheld items in the record, and
+collapsing available into delivered. An eighth test covers `dispositionToString`, which nothing
+exercised: a swapped label there would defeat B6 in the one place a person actually reads it.
+
+B1, B2, B4 and B6 hold in the library. B3 (the view can request, not act) and B5 (the inspector
+works with no faculty) belong to the surface, which does not exist yet.
+
 ### The twelfth process
 
 `cybou-contextd` is a real process now: its own endpoint, reserved organ identity, systemd unit,

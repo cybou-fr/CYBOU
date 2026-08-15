@@ -3,7 +3,9 @@
 
 qt_add_library(cybou-context STATIC
     src/AssociativeProjection.cpp
+    src/ContextDelivery.cpp
     include/cybou/context/AssociativeProjection.h
+    include/cybou/context/ContextDelivery.h
 )
 
 target_include_directories(cybou-context
