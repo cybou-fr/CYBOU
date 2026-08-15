@@ -1508,6 +1508,22 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### Retention fails closed by shape, not by luck
+
+The `seq`/`sequence` typo was fixed and the shape that hid it was left behind. `expiredBefore`
+returned a bare `QList<QUuid>`, so a failed query, an exhausted budget and a database with nothing
+expired were the same value — and the sweep read that value as a clean, complete pass. Fixing the
+one wrong word left the next wrong word just as invisible.
+
+It now returns a typed page: `ok`, `ids`, `hasMore`, `error`. `ok` is set only after the table has
+actually been read, and the sweep stops and reports the error rather than treating an unanswerable
+question as an answer. `complete` is the page's own `hasMore` instead of a size comparison the
+caller has to get right.
+
+The test drops the `contribution` table under a live Journal and requires the sweep to refuse. That
+tests the property rather than whichever SQL happens to be wrong today — the previous tests all
+passed against a query that never ran. Three sabotages, three caught.
+
 ### The delivery boundary gets a caller
 
 `Context1.Deliver` makes ADR-0030 reachable. Until now B1 through B7 held in a library nothing

@@ -1098,11 +1098,12 @@ QList<QUuid> Journal::retentionDependents(const QUuid &target) const
     return closure;
 }
 
-QList<QUuid> Journal::expiredBefore(const QDateTime &instant, int limit) const
+Journal::ExpiredPage Journal::expiredBefore(const QDateTime &instant, int limit) const
 {
-    QList<QUuid> expired;
+    ExpiredPage page;
     if (!instant.isValid() || limit <= 0) {
-        return expired;
+        page.error = QStringLiteral("expiredBefore needs a valid instant and a positive limit");
+        return page;
     }
 
     QSqlQuery query(m_db);
@@ -1117,16 +1118,21 @@ QList<QUuid> Journal::expiredBefore(const QDateTime &instant, int limit) const
     query.bindValue(QStringLiteral(":now"), instant.toUTC().toString(Qt::ISODateWithMs));
     query.bindValue(QStringLiteral(":limit"), limit);
     if (!query.exec()) {
-        return expired;
+        page.error = query.lastError().text();
+        return page;
     }
 
     while (query.next()) {
         const QUuid id = QUuid::fromString(query.value(0).toString());
         if (!id.isNull()) {
-            expired.append(id);
+            page.ids.append(id);
         }
     }
-    return expired;
+
+    // Only here, having actually read the table, may the answer be called an answer.
+    page.ok = true;
+    page.hasMore = page.ids.size() >= limit;
+    return page;
 }
 
 QList<QUuid> Journal::incompleteErasures() const

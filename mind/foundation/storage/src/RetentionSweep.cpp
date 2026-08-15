@@ -64,11 +64,16 @@ SweepReport RetentionSweep::sweep(const QDateTime &instant, int budget)
         return report;
     }
 
-    const int page = remaining;
-    const QList<QUuid> expired = m_journal.expiredBefore(instant, page);
-    report.expiredFound = expired.size();
+    const Journal::ExpiredPage page = m_journal.expiredBefore(instant, remaining);
+    if (!page.ok) {
+        // The sweep stops and says so. Treating an unanswerable question as "nothing expired"
+        // would report a clean, complete pass over a database that was never read.
+        m_lastError = page.error;
+        return report;
+    }
+    report.expiredFound = page.ids.size();
 
-    for (const QUuid &target : expired) {
+    for (const QUuid &target : page.ids) {
         if (remaining <= 0) {
             return report;
         }
@@ -102,10 +107,9 @@ SweepReport RetentionSweep::sweep(const QDateTime &instant, int budget)
         }
     }
 
-    // Complete means the page came back short of its own limit: had more expired, the query would
-    // have filled it. Comparing against `budget` instead would call a sweep complete whenever
-    // resuming had already eaten part of the budget.
-    report.complete = expired.size() < page;
+    // Complete is now the page's own answer rather than a size comparison the caller has to get
+    // right, and it is only ever reached on a page that was successfully read.
+    report.complete = !page.hasMore;
     return report;
 }
 

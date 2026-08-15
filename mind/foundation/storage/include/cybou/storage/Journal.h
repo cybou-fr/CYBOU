@@ -153,6 +153,21 @@ public:
     /// afterwards is not a descendant of what was erased.
     QList<QUuid> retentionDependents(const QUuid &target) const;
 
+    /// One page of expired contributions, and whether the question could be answered at all.
+    ///
+    /// A bare list cannot distinguish a failed query from nothing having expired, and a caller
+    /// reading the second when the first happened reports a clean, complete sweep over a database
+    /// it never successfully read. That is exactly how the `seq`/`sequence` typo stayed invisible:
+    /// the bug was one word, but the shape is what hid it.
+    struct ExpiredPage {
+        bool ok{false};
+        QList<QUuid> ids;
+
+        /// True when the page filled its limit, so more may remain behind it.
+        bool hasMore{false};
+        QString error;
+    };
+
     /// Contributions whose retention window has closed, oldest first, bounded.
     ///
     /// A query, not an action. The Journal knowing what has expired and the Journal deciding to
@@ -163,7 +178,7 @@ public:
     /// A contribution with no `retain_until` never expires. That is the whole meaning of the
     /// Permanent retention class, and treating a missing date as "expired long ago" would erase
     /// exactly the records that were marked to be kept.
-    QList<QUuid> expiredBefore(const QDateTime &instant, int limit) const;
+    ExpiredPage expiredBefore(const QDateTime &instant, int limit) const;
 
     /// Targets whose erasure was requested and never applied.
     ///

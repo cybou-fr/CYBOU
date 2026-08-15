@@ -5,6 +5,8 @@
 #include "cybou/storage/RetentionSweep.h"
 
 #include <QCborMap>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -51,7 +53,53 @@ private slots:
     void anInterruptedErasureIsFinishedBeforeNewWorkStarts();
     void theBoundaryInstantIsInclusive();
     void theRecordOfAnErasureDoesNotItselfExpire();
+    void aSweepThatCannotReadTheJournalIsNotACleanSweep();
 };
+
+// The fail-closed shape, tested directly rather than through whichever SQL happens to be wrong
+// today. A query that cannot run and a database with nothing expired must not produce the same
+// report: one is an answer and the other is the absence of one.
+void TestRetentionSweep::aSweepThatCannotReadTheJournalIsNotACleanSweep()
+{
+    QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("j.db"));
+
+    Journal journal(path);
+    QVERIFY(journal.isOpen());
+    KeyStore keys(dir.filePath(QStringLiteral("keys")));
+    QVERIFY(keys.isUsable());
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    QVERIFY(journal.append(observation(now.addDays(-1))) > 0);
+
+    // A sweep works here, which is what makes the failure below mean something.
+    RetentionSweep working(journal, keys);
+    const SweepReport before = working.sweep(now);
+    QCOMPARE(before.erased, 1);
+    QVERIFY(before.complete);
+
+    QVERIFY(journal.append(observation(now.addDays(-1))) > 0);
+
+    // Now take the table out from under it, on a separate connection to the same file.
+    const QString connection = QStringLiteral("sabotage");
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        db.setDatabaseName(path);
+        QVERIFY(db.open());
+        QSqlQuery drop(db);
+        QVERIFY2(drop.exec(QStringLiteral("DROP TABLE contribution")), "the fixture must actually break the query");
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    RetentionSweep broken(journal, keys);
+    const SweepReport report = broken.sweep(now);
+
+    QCOMPARE(report.erased, 0);
+    QCOMPARE(report.expiredFound, 0);
+    QVERIFY2(!report.complete, "an unreadable journal must never report a finished pass");
+    QVERIFY2(!broken.lastError().isEmpty(), "and it must say why");
+}
 
 void TestRetentionSweep::theRecordOfAnErasureDoesNotItselfExpire()
 {

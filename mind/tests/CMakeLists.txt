@@ -139,7 +139,7 @@ set_tests_properties(
 )
 
 qt_add_executable(test-retention-sweep tst_retention_sweep.cpp)
-target_link_libraries(test-retention-sweep PRIVATE cybou-storage cybou-crypto Qt6::Test)
+target_link_libraries(test-retention-sweep PRIVATE cybou-storage cybou-crypto Qt6::Sql Qt6::Test)
 add_test(NAME retention-sweep COMMAND test-retention-sweep)
 set_tests_properties(
     retention-sweep PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
