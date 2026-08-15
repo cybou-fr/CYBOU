@@ -122,8 +122,50 @@ QByteArray ContextService::Activate(const QStringList &seeds, int maxNodes, int 
     return FabricCodec::encode(map);
 }
 
+QByteArray ContextService::Prepare(const QStringList &seeds, int maxNodes, int maxDepth)
+{
+    if (!refuseWhenUnready(QStringLiteral("Prepare"))) {
+        return {};
+    }
+
+    ActivationBudget budget;
+    budget.maxNodes = maxNodes > 0 ? std::min(maxNodes, budget.maxNodes) : budget.maxNodes;
+    budget.maxDepth = maxDepth > 0 ? std::min(maxDepth, budget.maxDepth) : budget.maxDepth;
+
+    // Identity before activation, so the bundle carries it. Minting it afterwards would leave every
+    // bundle with a null id, which is what a delivery record cannot be built from.
+    const QUuid requestId = QUuid::createUuid();
+    const ContextBundle bundle = m_projection.activate(
+        QList<QString>(seeds.cbegin(), seeds.cend()), budget, requestId);
+
+    PreparedRequest prepared;
+    prepared.bundle = bundle;
+    prepared.cursor = m_cursor;
+    prepared.erasureEpoch = m_erasureEpoch;
+
+    m_prepared.insert(requestId, prepared);
+    m_preparedOrder.append(requestId);
+    while (m_preparedOrder.size() > kMaxPreparedRequests) {
+        m_prepared.remove(m_preparedOrder.takeFirst());
+    }
+
+    QVariantList items;
+    for (const ContextItem &item : bundle.items) {
+        items.append(encodeItem(item));
+    }
+
+    QVariantMap map;
+    // Reported from the bundle, never from the local variable. Sending a parallel copy would let
+    // the bundle keep a null id while the wire looked correct, which is precisely the gap that
+    // made every runtime DeliveryRecord invalid while the library tests passed.
+    map.insert(QStringLiteral("requestId"), bundle.requestId.toString(QUuid::WithoutBraces));
+    map.insert(QStringLiteral("items"), items);
+    map.insert(QStringLiteral("complete"), bundle.complete);
+    return FabricCodec::encode(map);
+}
+
 QByteArray ContextService::Deliver(
-    const QStringList &seeds,
+    const QString &requestId,
     const QString &destinationId,
     int trust,
     bool retains,
@@ -135,12 +177,16 @@ QByteArray ContextService::Deliver(
         return {};
     }
 
-    if (destinationId.isEmpty()) {
+    const auto refuse = [this](QDBusError::ErrorType type, const QString &why) -> QByteArray {
         if (calledFromDBus()) {
-            sendErrorReply(QDBusError::InvalidArgs,
-                           QStringLiteral("Deliver needs a named destination"));
+            sendErrorReply(type, why);
         }
+        m_lastError = why;
         return {};
+    };
+
+    if (destinationId.isEmpty()) {
+        return refuse(QDBusError::InvalidArgs, QStringLiteral("Deliver needs a named destination"));
     }
 
     // An unrecognised trust level is refused, never defaulted. Reading an unknown value as the most
@@ -148,17 +194,31 @@ QByteArray ContextService::Deliver(
     // as the least would hide the caller's bug behind a silently narrowed answer.
     if (trust < static_cast<int>(ConsumerTrust::Untrusted)
         || trust > static_cast<int>(ConsumerTrust::Full)) {
-        if (calledFromDBus()) {
-            sendErrorReply(
-                QDBusError::InvalidArgs,
-                QStringLiteral("Deliver does not know trust level %1").arg(trust));
-        }
-        return {};
+        return refuse(QDBusError::InvalidArgs,
+                      QStringLiteral("Deliver does not know trust level %1").arg(trust));
     }
 
-    ActivationBudget budget;
-    const ContextBundle bundle
-        = m_projection.activate(QList<QString>(seeds.cbegin(), seeds.cend()), budget);
+    const QUuid id = QUuid::fromString(requestId);
+    if (id.isNull() || !m_prepared.contains(id)) {
+        return refuse(QDBusError::InvalidArgs,
+                      QStringLiteral("Deliver has no prepared request %1").arg(requestId));
+    }
+
+    const PreparedRequest prepared = m_prepared.value(id);
+
+    // The projection has moved: what was inspected is no longer what this organ holds. Refused
+    // rather than re-activated, because delivering a freshly computed bundle under an id the person
+    // approved for a different one is the substitution this whole flow exists to prevent.
+    if (prepared.cursor != m_cursor || prepared.erasureEpoch != m_erasureEpoch) {
+        return refuse(
+            QDBusError::Failed,
+            QStringLiteral("request %1 is stale: prepared at cursor %2 epoch %3, now %4 and %5")
+                .arg(requestId)
+                .arg(prepared.cursor)
+                .arg(prepared.erasureEpoch)
+                .arg(m_cursor)
+                .arg(m_erasureEpoch));
+    }
 
     Destination destination;
     destination.id = destinationId;
@@ -167,7 +227,7 @@ QByteArray ContextService::Deliver(
     destination.externalBoundary = externalBoundary;
 
     const DeliveryPlan plan = DeliveryPlan::build(
-        bundle,
+        prepared.bundle,
         DeliveryPolicy(),
         destination,
         QSet<QString>(selected.cbegin(), selected.cend()),
@@ -175,20 +235,31 @@ QByteArray ContextService::Deliver(
 
     // Every decision crosses, not the delivered subset. A wire format that carried only what was
     // sent would make B6 an internal property of a library nobody can see from here.
+    //
+    // Evidence travels with each decision: whoever records the delivery has to name the provenance
+    // of what it disclosed, and it cannot reconstruct that from concept ids alone.
     QVariantList decisions;
     for (const DeliveryDecision &decision : plan.decisions()) {
+        QVariantList evidence;
+        for (const QUuid &source : decision.evidence) {
+            evidence.append(source.toString(QUuid::WithoutBraces));
+        }
+
         QVariantMap entry;
         entry.insert(QStringLiteral("concept"), decision.conceptId);
         entry.insert(QStringLiteral("disposition"), dispositionToString(decision.disposition));
         entry.insert(QStringLiteral("reason"), decision.reason);
+        entry.insert(QStringLiteral("evidence"), evidence);
         decisions.append(entry);
     }
 
     QVariantMap map;
+    map.insert(QStringLiteral("requestId"), id.toString(QUuid::WithoutBraces));
     map.insert(QStringLiteral("decisions"), decisions);
     map.insert(QStringLiteral("complete"), plan.complete());
     map.insert(QStringLiteral("destination"), destination.id);
     map.insert(QStringLiteral("trust"), consumerTrustToString(destination.trust));
+    map.insert(QStringLiteral("sourceCursor"), static_cast<qulonglong>(prepared.cursor));
     // Reported, not written. The caller that performs the delivery owns that contribution, because
     // this organ owns no writes at all.
     map.insert(QStringLiteral("recordRequired"), requiresRecord(destination));

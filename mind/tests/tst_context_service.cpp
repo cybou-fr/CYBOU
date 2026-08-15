@@ -245,8 +245,8 @@ private Q_SLOTS:
             "asking for more than the default must not raise the ceiling");
     }
 
-    // B6 across the wire. The reply carries a decision for every activated item, so a caller cannot
-    // render what was delivered without also holding what was withheld.
+    // B6 across the wire. The reply carries a decision for every activated item, so a caller
+    // cannot render what was delivered without also holding what was withheld.
     void deliverCarriesEveryDispositionNotJustTheDeliveredOnes()
     {
         QTemporaryDir dir;
@@ -263,20 +263,16 @@ private Q_SLOTS:
         ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
         QVERIFY(service.isReady());
 
-        const QVariantMap activated
-            = FabricCodec::decodeMap(service.Activate({QStringLiteral("subject")}, 0, 0));
-        const int activatedCount = activated.value(QStringLiteral("items")).toList().size();
-        QVERIFY2(activatedCount > 0, "the fixture must activate something to be worth asserting on");
+        const QVariantMap prepared
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0));
+        const QString requestId = prepared.value(QStringLiteral("requestId")).toString();
+        const int activatedCount = prepared.value(QStringLiteral("items")).toList().size();
+        QVERIFY2(!requestId.isEmpty(), "a prepared request must carry an identity");
+        QVERIFY2(activatedCount > 0, "the fixture must activate something to assert on");
 
-        // An untrusted consumer, selecting nothing.
         const QVariantMap plan = FabricCodec::decodeMap(service.Deliver(
-            {QStringLiteral("subject")},
-            QStringLiteral("third-party-plugin"),
-            static_cast<int>(ConsumerTrust::Untrusted),
-            false,
-            false,
-            {},
-            {}));
+            requestId, QStringLiteral("third-party-plugin"),
+            static_cast<int>(ConsumerTrust::Untrusted), false, false, {}, {}));
 
         const QVariantList decisions = plan.value(QStringLiteral("decisions")).toList();
         QCOMPARE(decisions.size(), activatedCount);
@@ -286,11 +282,107 @@ private Q_SLOTS:
             QVERIFY(!decision.value(QStringLiteral("concept")).toString().isEmpty());
             QVERIFY(!decision.value(QStringLiteral("disposition")).toString().isEmpty());
             QVERIFY(!decision.value(QStringLiteral("reason")).toString().isEmpty());
+            // Whoever records the delivery has to name what it disclosed. Concept ids alone are
+            // not provenance.
+            QVERIFY2(!decision.value(QStringLiteral("evidence")).toList().isEmpty(),
+                     "a decision without evidence cannot support a delivery record");
         }
 
-        QCOMPARE(plan.value(QStringLiteral("destination")).toString(),
-                 QStringLiteral("third-party-plugin"));
+        QCOMPARE(plan.value(QStringLiteral("requestId")).toString(), requestId);
         QCOMPARE(plan.value(QStringLiteral("trust")).toString(), QStringLiteral("untrusted"));
+    }
+
+    // The request id is minted before activation, so the bundle actually carries one. A null id
+    // makes every DeliveryRecord built from it invalid, which no library test would notice.
+    void aPreparedBundleCarriesItsOwnRequestIdentity()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("v"),
+                                             QDateTime::currentDateTimeUtc()))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+
+        const QString first
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0))
+                  .value(QStringLiteral("requestId"))
+                  .toString();
+        const QString second
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0))
+                  .value(QStringLiteral("requestId"))
+                  .toString();
+
+        QVERIFY(!QUuid::fromString(first).isNull());
+        QVERIFY(!QUuid::fromString(second).isNull());
+        QVERIFY2(first != second, "two requests must not share one identity");
+
+        // The id on the wire is the bundle's own. Minting one for the reply while activating
+        // without it would leave every bundle null-identified and every delivery record invalid,
+        // with the wire looking perfectly correct.
+        const QVariantMap reply
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0));
+        const QString wireId = reply.value(QStringLiteral("requestId")).toString();
+        QVERIFY(!QUuid::fromString(wireId).isNull());
+        QVERIFY2(!service
+                      .Deliver(wireId, QStringLiteral("c"),
+                               static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                      .isEmpty(),
+                 "the id the caller was handed must name the bundle that was frozen");
+    }
+
+    // Package B. What was inspected is what gets delivered, or nothing is.
+    void deliverRefusesARequestTheProjectionHasMovedPast()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("first"),
+                                             now.addSecs(-60)))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+
+        const QString requestId
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0))
+                  .value(QStringLiteral("requestId"))
+                  .toString();
+
+        // Delivering against it works, which is what makes the refusal below mean something.
+        QVERIFY(!service
+                     .Deliver(requestId, QStringLiteral("c"),
+                              static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                     .isEmpty());
+
+        // The world moves on between inspection and delivery.
+        const CognitiveEnvelope later
+            = observationOf(QStringLiteral("subject"), QStringLiteral("second"), now);
+        const quint64 sequence = journal.append(later);
+        QVERIFY(sequence > 0);
+        service.admitAccepted(later, sequence);
+
+        QVERIFY2(service
+                     .Deliver(requestId, QStringLiteral("c"),
+                              static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                     .isEmpty(),
+                 "a stale request must be refused, never silently re-activated");
+        QVERIFY(service.LastError().contains(QStringLiteral("stale")));
+
+        // An id nobody prepared is refused, and refused *as unknown*. Asserting only that it was
+        // refused would pass on the staleness check instead: an unprepared id yields a default
+        // record whose cursor happens not to match, so the test would hold while the lookup itself
+        // was gone.
+        QVERIFY(service
+                    .Deliver(QUuid::createUuid().toString(QUuid::WithoutBraces),
+                             QStringLiteral("c"), static_cast<int>(ConsumerTrust::Full), false,
+                             false, {}, {})
+                    .isEmpty());
+        QVERIFY2(service.LastError().contains(QStringLiteral("no prepared request")),
+                 qPrintable(service.LastError()));
     }
 
     // An unrecognised trust level is refused rather than defaulted. Defaulting upward would hand a
@@ -300,24 +392,25 @@ private Q_SLOTS:
         QTemporaryDir dir;
         Journal journal(dir.filePath(QStringLiteral("j.db")));
         QVERIFY(journal.isOpen());
-        QVERIFY(journal.append(observationOf(
-                    QStringLiteral("subject"), QStringLiteral("value"),
-                    QDateTime::currentDateTimeUtc()))
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("value"),
+                                             QDateTime::currentDateTimeUtc()))
                 > 0);
 
         ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
         QVERIFY(service.isReady());
+        const QString requestId
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0))
+                  .value(QStringLiteral("requestId"))
+                  .toString();
 
-        // A known level answers, which is what makes the refusals below mean something.
         QVERIFY(!service
-                     .Deliver({QStringLiteral("subject")}, QStringLiteral("c"),
+                     .Deliver(requestId, QStringLiteral("c"),
                               static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
                      .isEmpty());
 
         for (int unknown : {-1, static_cast<int>(ConsumerTrust::Full) + 1, 99}) {
             QVERIFY2(service
-                         .Deliver({QStringLiteral("subject")}, QStringLiteral("c"), unknown,
-                                  false, false, {}, {})
+                         .Deliver(requestId, QStringLiteral("c"), unknown, false, false, {}, {})
                          .isEmpty(),
                      qPrintable(QStringLiteral("trust %1 was answered").arg(unknown)));
         }
@@ -325,8 +418,8 @@ private Q_SLOTS:
         // And a nameless destination is refused too: a delivery nobody can name is one nobody can
         // later inspect or hold to a policy.
         QVERIFY(service
-                    .Deliver({QStringLiteral("subject")}, QString(),
-                             static_cast<int>(ConsumerTrust::Full), false, false, {}, {})
+                    .Deliver(requestId, QString(), static_cast<int>(ConsumerTrust::Full), false,
+                             false, {}, {})
                     .isEmpty());
     }
 
@@ -336,18 +429,21 @@ private Q_SLOTS:
         QTemporaryDir dir;
         Journal journal(dir.filePath(QStringLiteral("j.db")));
         QVERIFY(journal.isOpen());
-        QVERIFY(journal.append(observationOf(
-                    QStringLiteral("subject"), QStringLiteral("value"),
-                    QDateTime::currentDateTimeUtc()))
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("value"),
+                                             QDateTime::currentDateTimeUtc()))
                 > 0);
 
         ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
         QVERIFY(service.isReady());
+        const QString requestId
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0))
+                  .value(QStringLiteral("requestId"))
+                  .toString();
         const QByteArray headBefore = journal.head();
 
         const auto owed = [&](bool retains, bool external) {
             return FabricCodec::decodeMap(service.Deliver(
-                       {QStringLiteral("subject")}, QStringLiteral("c"),
+                       requestId, QStringLiteral("c"),
                        static_cast<int>(ConsumerTrust::Bounded), retains, external, {}, {}))
                 .value(QStringLiteral("recordRequired"))
                 .toBool();
@@ -357,7 +453,7 @@ private Q_SLOTS:
         QVERIFY2(owed(true, false), "a local consumer that retains owes a record");
         QVERIFY2(owed(false, true), "crossing an external boundary owes one on its own account");
 
-        // Reported, never written: contextd owns no writes, and four deliveries did not grow the
+        // Reported, never written: contextd owns no writes, and these deliveries did not grow the
         // Journal by a single contribution.
         QCOMPARE(journal.head(), headBefore);
     }

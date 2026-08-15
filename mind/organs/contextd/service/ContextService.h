@@ -8,6 +8,7 @@
 #include "cybou/events/EventStore.h"
 
 #include <QDBusContext>
+#include <QHash>
 #include <QObject>
 #include <QString>
 
@@ -58,7 +59,18 @@ public Q_SLOTS:
     /// which is a fact, and a projection that could not be assembled has no facts to offer.
     QByteArray Activate(const QStringList &seeds, int maxNodes, int maxDepth);
 
-    /// Activate, apply a consumer's policy, and return the full disposition of every item.
+    /// Mint a request identity and freeze one activation under it.
+    ///
+    /// ADR-0030's four sets are one request's lineage. Activating again at delivery time would let
+    /// a person inspect one bundle and send another, which makes Activated -> Available ->
+    /// Selected -> Delivered four unrelated answers wearing the name of a sequence.
+    ///
+    /// The reply carries the request id so the caller can inspect, choose, and then deliver
+    /// against exactly what it saw.
+    QByteArray Prepare(const QStringList &seeds, int maxNodes, int maxDepth);
+
+    /// Apply a consumer's policy to a prepared request and return the full disposition of every
+    /// item.
     ///
     /// ADR-0030. The reply carries a decision per activated item rather than the delivered subset,
     /// so a caller cannot render "what was sent" without also holding what was withheld. That is
@@ -68,8 +80,10 @@ public Q_SLOTS:
     /// not write one: contextd never writes to Event1, and a projection that could record a fact
     /// about the person's data would be a second writer whatever the ADRs said. The caller that
     /// actually performs the delivery owns that contribution.
+    /// Refuses a request it never prepared, and refuses one the projection has moved past. A
+    /// silent re-activation would answer a different question than the one the person approved.
     QByteArray Deliver(
-        const QStringList &seeds,
+        const QString &requestId,
         const QString &destinationId,
         int trust,
         bool retains,
@@ -93,6 +107,21 @@ private:
     /// derived from something Mind never actually observed would be a relation with no evidence
     /// behind it, which is the one thing this graph may not contain.
     void admitToGraph(const CognitiveEnvelope &envelope);
+
+    /// One frozen activation, with the projection state it was taken from.
+    struct PreparedRequest {
+        ContextBundle bundle;
+        quint64 cursor{0};
+        quint64 erasureEpoch{0};
+    };
+
+    /// Bounded on purpose. An unbounded map of prepared requests would be a caller-controlled
+    /// allocation, and the current projection staying bounded is one of the three invariants this
+    /// organ was built around.
+    static constexpr int kMaxPreparedRequests = 16;
+
+    QHash<QUuid, PreparedRequest> m_prepared;
+    QList<QUuid> m_preparedOrder;
 
     EventStore *m_events{nullptr};
     QString m_checkpointPath;

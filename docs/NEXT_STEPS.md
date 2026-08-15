@@ -1508,6 +1508,38 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### One request, one lineage
+
+`Deliver` used to activate again. A person could inspect one bundle and send another, which makes
+Activated -> Available -> Selected -> Delivered four unrelated answers wearing the name of a
+sequence. `Prepare` now mints a request identity, freezes one activation under it with the cursor
+and erasure epoch it was taken from, and `Deliver` works only against that. A projection that has
+moved makes the request stale and refused, never silently recomputed.
+
+The same change fixed a defect the library tests could not see. `activate()` was called without a
+request id, so every runtime bundle carried a null UUID -- and `DeliveryRecord::isValid()` requires
+a non-null one. Every record the runtime could produce was invalid. The library test passed because
+its fixture minted a UUID itself: it tested the library and was read as testing the system.
+
+Evidence now travels with each decision, because whoever records a delivery has to name what it
+disclosed and cannot reconstruct provenance from concept ids.
+
+**Two sabotages were reported as caught and were not.** `TestM4Processes` flakes at roughly one run
+in three, and on those two runs its failures were the only ones -- no context test failed at all. A
+mutation "caught" by an unrelated flake is a miss with a passing label.
+
+Both were real gaps:
+
+- `Prepare` reported the request id from a local variable rather than from `bundle.requestId`, so
+  the bundle could stay null-identified while the wire looked correct. It now reports the bundle's
+  own id.
+- "an unknown request is refused" passed on the *staleness* check instead: an unprepared id yields
+  a default record whose cursor happens not to match. The assertion now pins the reason, not just
+  the refusal.
+
+The lesson is narrower than "flakes are bad": when a suite has a known flaky member, a sabotage
+result must be read for *which* test failed, never for whether any did.
+
 ### Retention fails closed by shape, not by luck
 
 The `seq`/`sequence` typo was fixed and the shape that hid it was left behind. `expiredBefore`
