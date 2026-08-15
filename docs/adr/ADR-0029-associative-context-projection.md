@@ -48,16 +48,17 @@ relevance    ≠ evidence
 activation   ≠ attention
 context      ≠ biography
 embedding    ≠ knowledge
+association  ≠ learning
 ```
 
 The layers that follow from them:
 
 ```
-Journal      what happened
-epistemicd   what is known, and with what epistemic force
-contextd     what is related, and what is relevant now
-workspaced   what gets bounded attention
-language     how a selected context is interpreted or expressed
+Journal          what happened
+epistemicd       what is known, and with what epistemic force
+contextd         what is related, and what is relevant now
+workspaced       what gets bounded attention
+meaning/language how a selected context is interpreted or expressed
 ```
 
 Each layer may read the one above it and may not overrule it.
@@ -227,6 +228,17 @@ derived association/index  → erasure epoch invalidation and rebuild (E8)
 
 A12 is the one to defend hardest. A memory that cannot explain a retrieval without asking a model to
 invent a reason has already given away the property this whole layer exists to keep.
+
+### Amendment: association may support learning; it does not promote it
+
+`contextd` **may** offer associations, repeated co-occurrence, activation paths and source evidence
+as inputs to a `LearningCandidate` under [ADR-0032](ADR-0032-layered-lifelong-learning.md). It
+**must not** promote an association into an epistemic fact, a preference, a reusable skill, a policy
+or a neural adaptation by itself.
+
+`ModelSuggested` stays a candidate origin, not a shortcut into learned or epistemic authority. It is
+already a closed set for exactly this reason: the field that keeps association from becoming
+knowledge is the same field that keeps it from becoming learning.
 
 ## Related documents
 

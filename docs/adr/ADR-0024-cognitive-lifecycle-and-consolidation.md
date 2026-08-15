@@ -90,6 +90,24 @@ Possible owned work includes:
 - retention review and privacy-preserving deletion proposals;
 - schema migration and compaction under explicit policy.
 
+### Learning work is scheduled, not owned, by lifecycle
+
+Consolidation **may** schedule bounded learning work under [ADR-0032](ADR-0032-layered-lifelong-learning.md)
+and [ADR-0033](ADR-0033-learned-artifact-governance.md): candidate extraction from accepted
+experience, replay and evaluation of proposed generalizations, procedural skill induction, bounded
+training or build snapshots, optional local adaptation, and promotion or rejection work.
+
+`lifecycled` owns none of those learned domains. It owns transition and orchestration semantics
+only, and any future mutable learning owner requires its own ownership and wire-contract decision
+before it is implemented.
+
+Candidate generation is ordinary interruptible work. **A completed training run is not a completed
+promotion** — the two are separate events precisely because a process that finished is the easiest
+thing to mistake for a decision that was made.
+
+A consolidation run that produces a candidate records the source high-water mark it used. Accepted
+observations beyond that mark belong to later learning work, not to a silent rebase of this one.
+
 Consolidation produces derived state. It never changes what historically happened.
 
 ## Triggers and interruption

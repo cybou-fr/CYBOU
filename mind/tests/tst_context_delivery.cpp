@@ -54,8 +54,11 @@ private slots:
     /// B1. Available and delivered are separately answerable, and differ.
     void availableAndDeliveredAreIndependentlyInspectable();
 
-    /// A local destination is not filtered: policy exists for what leaves the machine.
-    void localDeliveryIsNotFilteredByRemotePolicy();
+    /// B7. Being on the same machine is not a permission.
+    void aLocalConsumerIsNotTrustedForBeingLocal();
+
+    /// B4. An inspector that forgets leaves no durable trace; a consumer that retains does.
+    void recordingFollowsRetentionRatherThanDistance();
 
     /// B4. The record names what was sent and carries no content.
     void deliveryRecordCarriesProvenanceAndNoContent();
@@ -104,10 +107,10 @@ void TestContextDelivery::everyActivatedItemGetsExactlyOneDisposition()
     });
 
     DeliveryPolicy policy;
-    policy.maxPrivacyForRemote = PrivacyClass::Household;
+    policy.floorForUntrusted = PrivacyClass::Household;
 
     const DeliveryPlan plan = DeliveryPlan::build(
-        bundle, policy, {QStringLiteral("mistral"), true}, idsOf(bundle), {});
+        bundle, policy, {QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true}, idsOf(bundle), {});
 
     QCOMPARE(plan.size(), bundle.items.size());
 
@@ -134,11 +137,11 @@ void TestContextDelivery::policyNarrowsDeliveryWithoutAlteringTheBundle()
     const QList<ContextItem> before = bundle.items;
 
     DeliveryPolicy permissive;
-    permissive.maxPrivacyForRemote = PrivacyClass::Local;
+    permissive.floorForUntrusted = PrivacyClass::Local;
     DeliveryPolicy strict;
-    strict.maxPrivacyForRemote = PrivacyClass::Public;
+    strict.floorForUntrusted = PrivacyClass::Public;
 
-    const Destination remote{QStringLiteral("mistral"), true};
+    const Destination remote{QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true};
     const DeliveryPlan open
         = DeliveryPlan::build(bundle, permissive, remote, idsOf(bundle), {});
     const DeliveryPlan closed = DeliveryPlan::build(bundle, strict, remote, idsOf(bundle), {});
@@ -163,11 +166,11 @@ void TestContextDelivery::availableAndDeliveredAreIndependentlyInspectable()
     });
 
     DeliveryPolicy policy;
-    policy.maxPrivacyForRemote = PrivacyClass::Public;
+    policy.floorForUntrusted = PrivacyClass::Public;
 
     // The person selected only one of the two permitted items.
     const DeliveryPlan plan = DeliveryPlan::build(
-        bundle, policy, {QStringLiteral("mistral"), true}, {QStringLiteral("lemon")}, {});
+        bundle, policy, {QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true}, {QStringLiteral("lemon")}, {});
 
     const QList<QString> available = plan.availableIds();
     const QList<QString> delivered = plan.deliveredIds();
@@ -182,24 +185,57 @@ void TestContextDelivery::availableAndDeliveredAreIndependentlyInspectable()
     QVERIFY(available.size() > delivered.size());
 }
 
-void TestContextDelivery::localDeliveryIsNotFilteredByRemotePolicy()
+void TestContextDelivery::aLocalConsumerIsNotTrustedForBeingLocal()
 {
     const ContextBundle bundle = bundleOf({
         item(QStringLiteral("episode"), PrivacyClass::Local),
+        item(QStringLiteral("lemon"), PrivacyClass::Public),
     });
 
-    DeliveryPolicy strict;
-    strict.maxPrivacyForRemote = PrivacyClass::Public;
+    DeliveryPolicy policy;
 
-    const DeliveryPlan local = DeliveryPlan::build(
-        bundle, strict, {QStringLiteral("inspector"), false}, idsOf(bundle), {});
-    QCOMPARE(local.deliveredIds(), QList<QString>{QStringLiteral("episode")});
+    // A local plugin, on this machine, with no network anywhere in sight.
+    const Destination plugin{QStringLiteral("third-party-plugin"), ConsumerTrust::Untrusted, false, false};
+    const DeliveryPlan restricted
+        = DeliveryPlan::build(bundle, policy, plugin, idsOf(bundle), {});
 
-    // The same policy and the same item, going somewhere else.
-    const DeliveryPlan remote = DeliveryPlan::build(
-        bundle, strict, {QStringLiteral("mistral"), true}, idsOf(bundle), {});
-    QVERIFY(remote.deliveredIds().isEmpty());
-    QCOMPARE(remote.withDisposition(Disposition::HeldBackByPolicy).size(), 1);
+    QCOMPARE(restricted.deliveredIds(), QList<QString>{QStringLiteral("lemon")});
+    QCOMPARE(restricted.withDisposition(Disposition::HeldBackByPolicy).size(), 1);
+
+    // The same items, the same machine, a consumer the person actually trusts.
+    const Destination surface{QStringLiteral("inspector"), ConsumerTrust::Full, false, false};
+    QCOMPARE(DeliveryPlan::build(bundle, policy, surface, idsOf(bundle), {}).deliveredIds().size(), 2);
+
+    // Trust decided this, not distance: neither consumer is remote.
+    QVERIFY(!plugin.externalBoundary);
+    QVERIFY(!surface.externalBoundary);
+}
+
+void TestContextDelivery::recordingFollowsRetentionRatherThanDistance()
+{
+    const ContextBundle bundle = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)});
+    DeliveryPolicy policy;
+
+    // An inspector renders and forgets. Recording every render would grow the Journal with use and
+    // prove nothing about what the person's data is doing.
+    const Destination inspector{QStringLiteral("inspector"), ConsumerTrust::Full, false, false};
+    QVERIFY(!requiresRecord(inspector));
+    QVERIFY(!recordFor(DeliveryPlan::build(bundle, policy, inspector, idsOf(bundle), {})).has_value());
+
+    // A local model that learns from what it receives is the consequential case, ADR-0033's
+    // invalidation has nothing to follow without this record, and it never touches a network.
+    const Destination learner{QStringLiteral("local-model"), ConsumerTrust::Bounded, true, false};
+    QVERIFY(requiresRecord(learner));
+    const auto learned = recordFor(DeliveryPlan::build(bundle, policy, learner, idsOf(bundle), {}));
+    QVERIFY(learned.has_value());
+    QVERIFY(learned->retained);
+    QVERIFY(!learned->externalBoundary);
+    QCOMPARE(learned->deliveredConceptIds, QList<QString>{QStringLiteral("lemon")});
+
+    // Crossing an external boundary is recorded on its own account, retention or not.
+    const Destination external{QStringLiteral("remote"), ConsumerTrust::Untrusted, false, true};
+    QVERIFY(requiresRecord(external));
+    QVERIFY(recordFor(DeliveryPlan::build(bundle, policy, external, idsOf(bundle), {})).has_value());
 }
 
 void TestContextDelivery::deliveryRecordCarriesProvenanceAndNoContent()
@@ -211,16 +247,18 @@ void TestContextDelivery::deliveryRecordCarriesProvenanceAndNoContent()
         = bundleOf({lemon, item(QStringLiteral("episode"), PrivacyClass::Local)});
 
     DeliveryPolicy policy;
-    policy.maxPrivacyForRemote = PrivacyClass::Public;
+    policy.floorForUntrusted = PrivacyClass::Public;
 
     const DeliveryPlan plan = DeliveryPlan::build(
-        bundle, policy, {QStringLiteral("mistral"), true}, idsOf(bundle), {});
-    const DeliveryRecord record = recordFor(plan);
+        bundle, policy, {QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true}, idsOf(bundle), {});
+    const auto maybeRecord = recordFor(plan);
+    QVERIFY(maybeRecord.has_value());
+    const DeliveryRecord record = *maybeRecord;
 
     QVERIFY(record.isValid());
     QCOMPARE(record.requestId, bundle.requestId);
     QCOMPARE(record.destinationId, QStringLiteral("mistral"));
-    QVERIFY(record.remote);
+    QVERIFY(record.externalBoundary);
     QCOMPARE(record.deliveredConceptIds, QList<QString>{QStringLiteral("lemon")});
     QVERIFY(record.evidence.contains(lemonEvidence));
 
@@ -237,12 +275,12 @@ void TestContextDelivery::personalExclusionIsNotReportedAsPolicy()
     const ContextBundle bundle = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)});
 
     DeliveryPolicy policy;
-    policy.maxPrivacyForRemote = PrivacyClass::Public;
+    policy.floorForUntrusted = PrivacyClass::Public;
 
     const DeliveryPlan plan = DeliveryPlan::build(
         bundle,
         policy,
-        {QStringLiteral("mistral"), true},
+        {QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true},
         idsOf(bundle),
         {QStringLiteral("lemon")});
 
@@ -254,7 +292,8 @@ void TestContextDelivery::personalExclusionIsNotReportedAsPolicy()
     QCOMPARE(excluded.first().conceptId, QStringLiteral("lemon"));
 
     // Blaming policy for a person's own choice would make policy look stricter than it is.
-    QCOMPARE(recordFor(plan).heldBackCount, 0);
+    QVERIFY(recordFor(plan).has_value());
+    QCOMPARE(recordFor(plan)->heldBackCount, 0);
 }
 
 void TestContextDelivery::planOverIncompleteBundleReportsIncomplete()
@@ -263,7 +302,7 @@ void TestContextDelivery::planOverIncompleteBundleReportsIncomplete()
         = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)}, false);
 
     const DeliveryPlan plan = DeliveryPlan::build(
-        truncated, {}, {QStringLiteral("inspector"), false}, idsOf(truncated), {});
+        truncated, {}, {QStringLiteral("inspector"), ConsumerTrust::Full, false, false}, idsOf(truncated), {});
 
     QVERIFY(!plan.complete());
     QCOMPARE(plan.deliveredIds().size(), 1);
@@ -271,7 +310,7 @@ void TestContextDelivery::planOverIncompleteBundleReportsIncomplete()
     const ContextBundle whole
         = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)}, true);
     QVERIFY(DeliveryPlan::build(
-                whole, {}, {QStringLiteral("inspector"), false}, idsOf(whole), {})
+                whole, {}, {QStringLiteral("inspector"), ConsumerTrust::Full, false, false}, idsOf(whole), {})
                 .complete());
 }
 

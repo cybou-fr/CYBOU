@@ -20,14 +20,40 @@ QString dispositionToString(Disposition disposition)
     return QStringLiteral("unknown");
 }
 
+QString consumerTrustToString(ConsumerTrust trust)
+{
+    switch (trust) {
+    case ConsumerTrust::Untrusted:
+        return QStringLiteral("untrusted");
+    case ConsumerTrust::Bounded:
+        return QStringLiteral("bounded");
+    case ConsumerTrust::Full:
+        return QStringLiteral("full");
+    }
+    return QStringLiteral("unknown");
+}
+
+PrivacyClass DeliveryPolicy::floorFor(ConsumerTrust trust) const
+{
+    switch (trust) {
+    case ConsumerTrust::Untrusted:
+        return floorForUntrusted;
+    case ConsumerTrust::Bounded:
+        return floorForBounded;
+    case ConsumerTrust::Full:
+        return floorForFull;
+    }
+    return PrivacyClass::Public;
+}
+
 bool DeliveryPolicy::permits(const ContextItem &item, const Destination &destination) const
 {
-    if (!destination.remote) {
-        return true;
-    }
-    // PrivacyClass is ordered from most to least restrictive, so an item may go to a remote
-    // destination exactly when it is no more restrictive than the policy's floor.
-    return static_cast<int>(item.privacy) >= static_cast<int>(maxPrivacyForRemote);
+    // No early return for a local consumer. ADR-0030's B7: every destination is filtered by its own
+    // trust, and being on the same machine is not a permission.
+    //
+    // PrivacyClass is ordered from most to least restrictive, so an item may go to a consumer
+    // exactly when it is no more restrictive than that consumer's floor.
+    return static_cast<int>(item.privacy) >= static_cast<int>(floorFor(destination.trust));
 }
 
 DeliveryPlan DeliveryPlan::build(
@@ -54,7 +80,8 @@ DeliveryPlan DeliveryPlan::build(
             decision.reason = QStringLiteral("excluded by the person");
         } else if (!policy.permits(item, destination)) {
             decision.disposition = Disposition::HeldBackByPolicy;
-            decision.reason = QStringLiteral("policy for %1 does not permit privacy class %2")
+            decision.reason = QStringLiteral("%1 trust of %2 does not permit privacy class %3")
+                                  .arg(consumerTrustToString(destination.trust))
                                   .arg(destination.id)
                                   .arg(static_cast<int>(item.privacy));
         } else if (!selected.contains(item.conceptId)) {
@@ -104,12 +131,23 @@ QList<QString> DeliveryPlan::deliveredIds() const
     return out;
 }
 
-DeliveryRecord recordFor(const DeliveryPlan &plan)
+bool requiresRecord(const Destination &destination)
 {
+    return destination.retains || destination.externalBoundary;
+}
+
+std::optional<DeliveryRecord> recordFor(const DeliveryPlan &plan)
+{
+    const Destination destination = plan.destination();
+    if (!requiresRecord(destination)) {
+        return std::nullopt;
+    }
+
     DeliveryRecord record;
     record.requestId = plan.requestId();
-    record.destinationId = plan.destination().id;
-    record.remote = plan.destination().remote;
+    record.destinationId = destination.id;
+    record.externalBoundary = destination.externalBoundary;
+    record.retained = destination.retains;
 
     for (const DeliveryDecision &decision : plan.decisions()) {
         if (decision.disposition == Disposition::Delivered) {

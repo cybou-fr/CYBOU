@@ -163,30 +163,53 @@ M7 is intentionally a minimal vertical slice, not a claim to solve general knowl
 representation. Grounding/retention semantics precede replication so the system knows what a state
 means and whether it is allowed to move before transporting it.
 
-## M8 — Optional Language Faculty
+## M8 — Language and Meaning
 
 Engineering scope:
 
-- replaceable local/remote language faculty;
-- typed context selection;
-- request interpretation;
-- hypothesis/plan proposal;
-- explanation formulation;
-- model absence/replacement behavior.
+- a typed `MeaningInterpretation` and `CognitiveAct` boundary;
+- explicit reference resolution, with ambiguity that stays ambiguous;
+- correction semantics that append rather than rewrite;
+- context-delivery integration;
+- a semantic `ResponsePlan` before any surface realization;
+- replaceable language implementations;
+- operation with no generative model at all.
 
 System meaning:
 
-> Language becomes an optional capability attached to Mind, not the owner of identity, biography,
-> intentions, authorization, or execution.
+> Cybou understands and expresses meaning through inspectable typed state, without a language model
+> becoming the owner of cognition.
 
 Selected context carries provenance, epistemic status, freshness, privacy, and capability deficits;
-language fluency must not erase those qualifications.
+fluency must not erase those qualifications. A language implementation may be replaced or removed
+without creating a new Cybou identity.
 
-A model may be replaced or disabled without creating a new Cybou identity.
+See ADR-0021 and ADR-0031.
 
-See ADR-0021.
+## M9 — Lifelong Learning
 
-## M9 — Authorized Action Boundary
+Engineering scope:
+
+- learning candidates that cite accepted evidence;
+- fast reconstructible linguistic and behavioural adaptation;
+- procedural skill induction with replay and evaluation;
+- consolidation integration under ADR-0024;
+- learned-artifact lineage and immutable generations;
+- promotion, rejection and rollback;
+- retention and erasure propagation into learned state;
+- optional local neural adaptation.
+
+System meaning:
+
+> Cybou improves from experience while keeping facts, learning, parameters, skills and authority as
+> separate governed state.
+
+A completed training run is not a promotion, and an erased source does not become forgotten merely
+because the artifact it influenced is hard to read.
+
+See ADR-0032 and ADR-0033.
+
+## M10 — Authorized Action Boundary
 
 Engineering scope:
 
@@ -209,7 +232,8 @@ System meaning:
 > Cybou may affect its operating environment only through an explicit policy-controlled boundary,
 > and the observed result returns to cognition.
 
-The target is not `LLM → privileged shell`.
+The target is not `LLM → privileged shell`. A skill learned in M9 may instantiate a proposal here;
+it does not grant its own execution authority.
 
 Every attempted external action must become observable enough to determine what was attempted, what
 actually happened, and whether the intended outcome was reached.
@@ -231,11 +255,13 @@ M5  continuity gains lifecycle, consolidation, and recovery
  │
 M6  partial failure and internal pressure become explicit degraded cognition
  │
-M7  perception, knowledge, retention, values, and replication become governed
+M7  perception, knowledge, retention, values, association, and distribution become governed
  │
-M8  replaceable language attaches as a faculty
+M8  human language crosses an explicit meaning boundary
  │
-M9  external agency crosses authorization + observation
+M9  experience can become governed learned behaviour and skills
+ │
+M10 external agency crosses authorization + observation
 ```
 
 The milestone order is intentional: agency is added after memory, ownership, continuity,
@@ -244,3 +270,12 @@ model replaceability have explicit boundaries.
 
 ADR-0024 defines lifecycle/consolidation. ADR-0025 defines grounding, epistemics, retention,
 homeostasis, executive attention, and value constraints.
+
+A shorter product reading:
+
+```text
+M7  understand the world
+M8  understand the person
+M9  learn from experience
+M10 act under authority
+```

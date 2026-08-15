@@ -27,7 +27,7 @@ SPDX-License-Identifier: MIT
 | [0018](ADR-0018-privacy-classification-and-replication.md) | Privacy and Replication | Proposed |
 | [0019](ADR-0019-degraded-modes-and-capability-deficits.md) | Degraded Modes | Accepted |
 | [0020](ADR-0020-presence-surface-for-v0.1.md) | Presence Surface for v0.1 | Proposed |
-| [0021](ADR-0021-language-models-are-optional-faculties.md) | Optional Language Faculties | Proposed |
+| [0021](ADR-0021-language-models-are-optional-faculties.md) | Language and Models Are Optional Faculties | Proposed |
 | [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary | Proposed |
 | [0023](ADR-0023-mind-dock-discoverability-and-access.md) | Mind Dock Discoverability and Access | Accepted |
 | [0024](ADR-0024-cognitive-lifecycle-and-consolidation.md) | Cognitive Lifecycle and Consolidation | Accepted |
@@ -36,17 +36,24 @@ SPDX-License-Identifier: MIT
 | [0027](ADR-0027-local-epistemic-projection-owner.md) | Local Epistemic Projection Owner | Accepted |
 | [0028](ADR-0028-retention-and-erasure.md) | Retention and Erasure in an Append-Only Journal | Accepted |
 | [0029](ADR-0029-associative-context-projection.md) | Associative Context Projection and Semantic Activation | Accepted |
-| [0030](ADR-0030-transparent-context-delivery.md) | Transparent Context Selection and Prompt Delivery | Accepted |
+| [0030](ADR-0030-transparent-context-delivery.md) | Transparent Context Selection and Delivery | Accepted |
+| [0031](ADR-0031-structured-meaning-and-cognitive-acts.md) | Structured Meaning and Cognitive Acts | Proposed |
+| [0032](ADR-0032-layered-lifelong-learning.md) | Layered Lifelong Learning and Consolidation | Proposed |
+| [0033](ADR-0033-learned-artifact-governance.md) | Learned Artifact Provenance, Promotion, Rollback, and Erasure | Proposed |
 
-## Why five remain Proposed
+## Why some ADRs remain Proposed
 
 Accepted outranks [Current State](../CURRENT_STATE.md), so a Proposed ADR describing behaviour the
-code already enforces leaves the record contradicting itself. These five do not:
+code already enforces leaves the record contradicting itself. These do not:
 
 - **0021 Language Faculties**, **0022 Authorized Action** and **0025 Grounding and Epistemics**
   describe boundaries deliberately not implemented. Proposed is the accurate status, and accepting
   them would assert a commitment nothing yet honours. 0025 is now partly narrowed by the Accepted
   [0027](ADR-0027-local-epistemic-projection-owner.md), which settles the owner it left open.
+- **0031 Structured Meaning**, **0032 Layered Lifelong Learning** and **0033 Learned Artifact
+  Governance** describe boundaries that deliberately precede their implementation. Writing them
+  first is the point: they exist so the code can be reviewed against explicit invariants rather than
+  the invariants being reconstructed afterwards from whatever the code turned out to do.
 - **0018 Privacy and Replication** is half enforced and half absent. The Journal rejects a
   contribution whose privacy is weaker than its references, so classification and inheritance are
   real; replication does not exist at all. It should be split before either half is accepted, rather

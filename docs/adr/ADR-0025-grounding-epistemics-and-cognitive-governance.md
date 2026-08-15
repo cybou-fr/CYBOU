@@ -69,6 +69,14 @@ All durable derived contributions cross Event1 with causes/evidence and inherite
 Perception does not equal truth, epistemic confidence does not equal authorization, and value score
 does not equal permission to act.
 
+```text
+fluency            ≠ understanding
+interpretation     ≠ truth
+learning frequency ≠ epistemic force
+learned preference ≠ permission
+learned skill      ≠ authorization
+```
+
 ## Ordering
 
 The target progression is:
@@ -81,9 +89,26 @@ continuity and lifecycle
 → retention and cognitive governance
 → associative context and semantic activation
 → distributed continuity
-→ optional language
+→ structured language and meaning
+→ lifelong learning
 → authorized action
 ```
+
+### Amendment: meaning and learning governance
+
+Natural-language interpretation is derived state. What was uttered, what it likely meant, what
+epistemic force it carries and whether it is authorized are separate typed stages, and an ambiguous
+reference stays ambiguous rather than being resolved into mutating authority.
+[ADR-0031](ADR-0031-structured-meaning-and-cognitive-acts.md) fixes that boundary.
+
+Learning is layered and evidence-bearing rather than hidden adaptation. Repetition does not become
+truth, learned preference does not become permission, and a learned procedure does not become
+authorization. Candidates cite accepted evidence and promoted artifacts stay subordinate to
+epistemic and action authority. [ADR-0032](ADR-0032-layered-lifelong-learning.md) and
+[ADR-0033](ADR-0033-learned-artifact-governance.md) fix those.
+
+Both are placed after association for the same reason association was placed before language: a
+faculty that arrives first decides the architecture around it by default rather than by decision.
 
 ### Amendment: associative retrieval and semantic activation
 

@@ -168,10 +168,22 @@ Workspace is bounded, transient, reconstructible active context.
 `workspaced` may select a current focus or coalition from accepted history, but it does not become a
 second biography owner.
 
-### 5. Models are faculties
+### 5. Models are faculties, and language is a boundary
 
-A future language model may interpret language, retrieve typed context, propose hypotheses or plans,
-and formulate explanations.
+A future language implementation may interpret language, consume delivered typed context, propose
+hypotheses or plans, and formulate explanations. It may be a grammar, a semantic parser, a small
+classifier, a local generative model, or a hybrid; **no generative model is required**, and a Cybou
+with none is a supported configuration rather than a degraded one.
+
+```text
+utterance      ≠ meaning
+interpretation ≠ truth
+ambiguity      ≠ permission to guess
+request        ≠ authorization
+```
+
+Human language is a boundary representation. Mind operates on typed meaning and cognitive acts, and
+produces a response plan before any surface realization.
 
 It does not become:
 
@@ -184,6 +196,28 @@ It does not become:
 
 Replacing or disabling a language model must not, by itself, create a new Cybou identity or erase
 existing biography and commitments.
+
+### 5a. Learning is layered, and learned state outranks nothing
+
+```text
+memory update
+≠ association
+≠ linguistic and behavioural learning
+≠ procedural skill learning
+≠ neural adaptation
+```
+
+Facts stay owned by Mind. Learning may generalize future behaviour from accepted evidence without
+becoming a new truth authority:
+
+```text
+learned X          ≠ X is true
+learned preference ≠ permission
+learned procedure  ≠ authorization
+```
+
+Promoted learned artifacts carry lineage, evaluation, rollback, retention and erasure semantics. A
+learned artifact is never the only copy of the facts that produced it.
 
 ### 6. External actions return as observations
 
@@ -496,7 +530,7 @@ This is a target architecture, not a current implementation.
 ADR-0018 and ADR-0016 define the relevant privacy and continuity direction.
 ADR-0025 defines grounding and cognitive governance.
 
-## Future language faculty — M8
+## Future language and meaning — M8
 
 M8 connects language as a replaceable faculty.
 
@@ -535,7 +569,18 @@ constraints, and known capability deficits.
 
 ADR-0021 contains the normative model boundary.
 
-## Future authorized agency — M9
+## Future lifelong learning — M9
+
+Learning is layered across episodic, epistemic, associative, linguistic/behavioural, procedural and
+optional neural classes, defined by [ADR-0032](adr/ADR-0032-layered-lifelong-learning.md). Learned
+artifacts carry lineage, immutable generations, evaluation, promotion, rollback and erasure
+invalidation, defined by [ADR-0033](adr/ADR-0033-learned-artifact-governance.md).
+
+Consolidation schedules that work; it does not own it. A completed training run is not a promotion,
+and an artifact whose source evidence was erased is invalidated and rebuilt from a clean ancestor
+rather than declared clean because its contents are hard to read.
+
+## Future authorized agency — M10
 
 M9 is where Cybou may begin affecting the operating environment through a policy-controlled
 boundary.
@@ -619,9 +664,10 @@ The roadmap can be read as progressive cognitive capability:
 | M4 | cognitive responsibilities have process-level ownership and failure isolation |
 | M5 | continuity gains explicit lifecycle, consolidation, and recovery semantics |
 | M6 | organ failure and internal pressure become explicit capability/homeostatic state |
-| M7 | perception, epistemics, retention, values, and distributed movement become governed |
-| M8 | replaceable language faculty attaches without becoming identity, memory, or executor |
-| M9 | external action crosses an explicit authorization and observation boundary |
+| M7 | perception, epistemics, retention, values, association, and distributed movement become governed |
+| M8 | human language crosses an explicit meaning boundary without a model owning cognition |
+| M9 | experience becomes governed learned behaviour, skills, and artifacts with lineage |
+| M10 | external action crosses an explicit authorization and observation boundary |
 
 ## Design test for future features
 

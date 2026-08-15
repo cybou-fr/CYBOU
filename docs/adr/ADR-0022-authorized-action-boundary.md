@@ -43,7 +43,17 @@ No model or UI component invokes arbitrary privileged shell commands as the norm
 
 ### Proposal is not authorization
 
-A language/planning faculty may propose a mutation.
+A meaning or planning faculty, or any other proposal producer, may propose a mutation.
+
+```text
+learned preference ≠ authorization
+learned skill      ≠ authorization
+```
+
+A skill learned under [ADR-0032](ADR-0032-layered-lifelong-learning.md) may instantiate a proposal.
+It does not grant its own capability: a procedure that carried permission because it had worked
+before would make repetition into authority, which is the substitution this boundary exists to
+prevent.
 
 The proposal carries no inherent permission to perform it.
 
@@ -66,7 +76,7 @@ Higher-risk actions may require explicit confirmation.
 
 Destructive or forbidden actions may remain unavailable regardless of model confidence.
 
-The exact policy matrix belongs to M9 design.
+The exact policy matrix belongs to M10 design.
 
 ### Every attempted action returns to cognition
 
@@ -144,14 +154,14 @@ access.
 Executor failure must not be silently reported as achieved outcome.
 
 Partial application, failed validation, failed switch, missing confirmation, timeout, and rollback
-failure need explicit terminal or intermediate state in the final M9 protocol.
+failure need explicit terminal or intermediate state in the final M10 protocol.
 
 If the post-action environment cannot be observed reliably, the system should represent outcome as
 unknown/degraded rather than invent success.
 
 ## Acceptance direction
 
-M9 should demonstrate at least:
+M10 should demonstrate at least:
 
 - a model/UI cannot invoke arbitrary privileged shell through the intended action path;
 - proposal and authorization are distinct typed stages;

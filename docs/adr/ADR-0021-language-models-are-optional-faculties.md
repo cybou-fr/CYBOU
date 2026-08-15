@@ -3,162 +3,244 @@ SPDX-FileCopyrightText: 2026 Cybou contributors
 SPDX-License-Identifier: MIT
 -->
 
-# ADR-0021: Language Models Are Optional Faculties
+# ADR-0021: Language and Models Are Optional Faculties
 
 ## Status
 
 Proposed
 
+This revision replaces the earlier Proposed wording of ADR-0021. No Accepted decision is being
+silently rewritten: the prior ADR was deliberately Proposed because M8 had not been implemented.
+
 ## Context
 
-Future language support must not become identity, memory authority, authorization authority, or
-executor.
+Cybou is a persistent cognitive runtime, not a language model. Durable biography, identity,
+intentions, epistemic state, associative context, attention, lifecycle, and future authorization
+must remain meaningful when no generative model is installed or running.
 
-A central LLM agent would collapse multiple independent concerns into one replaceable model:
-identity, biography, intention ownership, explanation, planning, and privileged action. That would
-make model replacement equivalent to personality/memory replacement and would make hidden model
-context an accidental source of authority.
+The earlier wording already rejected a central LLM agent as the owner of memory, identity, planning,
+and action. It still treated a language model as the default implementation of future language
+support and allowed local or remote inference. That is too model-centric for the architecture we
+actually want.
 
-The M1–M4 architecture instead establishes explicit owners for durable history, identity,
-intentions, prediction/calibration, self projection, bounded attention, and presentation.
+Natural language is one representation used at the boundary between a person and Mind. It is not
+where Mind's meaning, memory, reasoning, or learning lives. A future implementation may use grammar,
+semantic parsing, small specialized neural models, a generative model, or a combination of them.
+None of those choices may redefine the cognitive substrate.
 
-Language should attach to that substrate as an optional faculty.
+Remote inference also creates an unnecessary hidden dependency on a provider, network availability,
+provider policy, and data egress. Core Cybou cognition must remain local and offline-capable.
 
 ## Decision
 
-A language model MAY:
+### Cognition does not depend on a generative model
 
-- parse or classify user requests;
-- transform natural language into candidate typed observations or proposals;
-- retrieve selected typed Mind context through explicit APIs;
-- propose hypotheses;
-- propose plans for later criticism/authorization;
-- formulate explanations from typed Mind state;
-- summarize or translate state without becoming its owner.
+The following distinctions are normative:
 
-A language model MUST NOT become:
+```text
+language          ≠ cognition
+utterance         ≠ meaning
+model context     ≠ memory
+generation        ≠ reasoning
+model output      ≠ knowledge
+model confidence  ≠ epistemic confidence
+model proposal    ≠ authorization
+```
+
+A supported Cybou installation may have **no generative model at all**.
+
+`NoModel` is therefore a valid configuration, not a degraded error state for core cognition.
+Specific language features may be unavailable or less fluent, but identity, biography, epistemics,
+context, intentions, lifecycle, learning, and authorization boundaries must continue to exist.
+
+### Language is a boundary capability
+
+The target relationship is:
+
+```text
+human expression
+      │
+      ▼
+Language / Meaning Interface
+      │
+      ▼
+structured meaning / CognitiveAct
+      │
+      ▼
+Mind
+      │
+      ▼
+ResponsePlan
+      │
+      ▼
+Language Realization
+      │
+      ▼
+human expression
+```
+
+The interface may be implemented by deterministic grammar, semantic parsers, classifiers, ranking
+models, local generative models, or other local techniques. The implementation is replaceable.
+
+Meaning objects and cognitive acts are specified separately by ADR-0031.
+
+### Models are optional local tools
+
+A local model MAY:
+
+- parse, classify, or rank candidate interpretations;
+- help resolve references when its output remains inspectable and non-authoritative;
+- transform selected typed context into candidate hypotheses or proposals;
+- assist planning under explicit criticism and authorization boundaries;
+- formulate or paraphrase a `ResponsePlan`;
+- summarize or translate typed state without becoming its owner;
+- participate in optional learned components under ADR-0032 and ADR-0033.
+
+A model MUST NOT become:
 
 - identity authority;
 - biography owner;
 - canonical Journal writer;
+- epistemic authority;
 - intention owner;
+- context owner;
 - authorization authority;
 - privileged executor;
-- the only location where commitments or continuity exist.
+- the only location where commitments, learned skills, or continuity exist.
 
-Model output that should influence durable cognition enters the typed protocol and is subject to the
-same causal/evidence/privacy rules as other derived contributions.
+Model-derived durable contributions enter the typed protocol and remain subject to the same
+causality, evidence, privacy, retention, and erasure rules as other derived contributions.
 
-A model does not directly write `journal.db`.
+### Remote inference is outside core Cybou cognition
 
-A model does not directly invoke arbitrary privileged shell commands.
+Core Cybou does not require or silently invoke remote inference.
 
-Replacing, upgrading, disabling, or switching a model MUST NOT, by itself:
+```text
+core cognition → local only
+```
+
+A future external plugin or integration may deliberately cross a network/trust boundary, but that is
+an external delivery/egress capability governed by its own policy. It is not a fallback model hidden
+inside Mind, and disabling it must not remove core cognition.
+
+The core language/meaning path must be testable with networking unavailable.
+
+### Context delivery remains explicit
+
+A language or model implementation does not perform unrestricted retrieval from Journal or context
+storage. It consumes only context explicitly supplied through Mind's context-selection and delivery
+boundaries.
+
+Conceptually:
+
+```text
+ContextQuery
+   ↓
+contextd
+   ↓
+ContextBundle
+   ↓
+DeliveryPlan / consumer policy
+   ↓
+optional language or model implementation
+```
+
+The implementation cannot gain memory ownership merely because it can process text.
+
+### Replacement does not change identity
+
+Replacing, upgrading, disabling, or removing any language/model implementation MUST NOT, by itself:
 
 - create a new Cybou identity;
 - erase accepted biography;
 - erase open commitments;
-- invalidate continuity that does not depend on that faculty.
-
-Selected context should be provided to a model deliberately. The model is not granted unrestricted
-database ownership merely because it can reason over text.
-
-## Faculty relationship
-
-Target relationship:
-
-```text
-typed Mind context
-      │
-      ▼
-language faculty
-      │
-interpretation / hypothesis / proposal / explanation
-      │
-      ▼
-typed protocol
-      │
-      ▼
-Mind
-```
-
-Language is therefore replaceable capability rather than the cognitive substrate itself.
-
-The first implementation is planned for M8.
+- change epistemic authority;
+- invalidate learned state that does not depend on that implementation;
+- grant or revoke execution authority.
 
 ## Consequences
 
-Cybou remains architecturally alive without language.
+Cybou can become useful before a generative model exists.
 
-Different local or remote models can be evaluated or replaced without redefining identity and
-biography.
+Language research and model technology may evolve independently from the storage, evidence,
+continuity, learning, and authorization architecture.
 
-Natural-language fluency can improve independently from the storage/causal model.
+A small semantic parser can coexist with a larger local model; either can later be replaced without
+moving memory into hidden model context.
 
-Model hallucination is prevented from automatically becoming authoritative biography: derived state
-still crosses typed contribution boundaries and their invariants.
+The design requires explicit meaning representation and response planning instead of treating a
+prompt and generated text as the cognitive protocol.
 
-The design requires explicit context-selection and protocol adaptation rather than passing the
-entire persistence layer directly to a model.
+Remote-model convenience is intentionally not a core feature. External egress remains possible only
+through a separate, visible integration boundary.
 
-## Relationship to future action
+## Relationship to learning
 
-A language model may propose an action or plan, but authorization/execution belongs to ADR-0022.
+Learning is not defined as changing model parameters. ADR-0032 defines layered lifelong learning,
+and ADR-0033 defines provenance and lifecycle rules for learned artifacts, including optional neural
+artifacts.
 
-The prohibited shortcut is:
+A language implementation may learn, but Mind's learning architecture does not depend on it.
+
+## Relationship to action
+
+A language or model implementation may interpret, propose, explain, or criticize. Authorization and
+execution remain separate under ADR-0022.
+
+The prohibited shortcut remains:
 
 ```text
-language model → privileged shell
+language/model implementation → privileged mutation
 ```
-
-## Amendment: a faculty consumes a ContextBundle and retrieves nothing
-
-The interface is fixed:
-
-```
-ContextQuery → contextd → ContextBundle → ContextPolicy → LanguageFaculty
-```
-
-A `LanguageFaculty` **must not** perform unrestricted associative retrieval against the Journal or
-context storage on its own, and the context supplied to a model **must** be representable as a
-`ContextBundle` and inspectable independently of that model.
-
-This is what makes a model replaceable. If a faculty could retrieve for itself, then swapping
-Mistral for llama.cpp — or removing the model entirely — would change what Mind remembers and how it
-recalls it, and the memory architecture would be a property of the current model rather than of
-Mind. With this rule, the model changes and the memory does not.
-
-Inspectable *independently of the model* also means an explanation of a retrieval is never generated
-by the thing being explained. See [ADR-0029](ADR-0029-associative-context-projection.md) gate A12.
 
 ## Acceptance direction
 
 M8 should demonstrate at least:
 
-- Mind starts and remains usable with the language faculty absent;
-- switching the configured model does not create a new identity/session by itself;
-- the model cannot directly open/write canonical Journal storage through the faculty interface;
-- model-derived durable contributions use the typed protocol;
-- model output does not bypass the future authorization boundary for privileged action.
+- Mind starts and remains cognitively usable with no generative model installed;
+- a natural-language implementation can be removed without changing identity, biography, or open
+  commitments;
+- a language/model implementation cannot directly own or write canonical Journal storage;
+- a language/model implementation receives explicit delivered context rather than unrestricted
+  retrieval access;
+- model-derived durable contributions use typed protocols and preserve provenance;
+- model output does not bypass epistemic or authorization boundaries;
+- the core meaning path is testable with network access disabled.
 
 ## Alternatives Considered
 
 ### Central LLM agent
 
-Rejected because it makes one probabilistic replaceable model the de facto owner of identity,
-memory, planning, and action.
+Rejected because one probabilistic replaceable model would become the de facto owner of memory,
+meaning, planning, and action.
 
-### LLM with direct Journal database access
+### Mandatory local LLM
 
-Rejected because it bypasses canonical write ownership and typed causal validation.
+Rejected because generative fluency is not a necessary condition for cognition. It would make model
+availability a hidden liveness dependency for Mind.
+
+### Remote-model fallback
+
+Rejected for core cognition because loss of network/provider access must not change whether Cybou can
+remember, understand structured state, learn, or reason over its own Mind.
+
+### LLM with direct Journal or context retrieval
+
+Rejected because it would make memory architecture an implementation detail of the current model.
 
 ### LLM with direct privileged shell access
 
-Rejected because interpretation/planning uncertainty must not equal execution authority.
+Rejected because uncertain interpretation or generation must never equal execution authority.
 
 ## Related documents
 
 - `../MIND_MODEL.md`
+- `../ROADMAP.md`
 - `ADR-0001-system-architecture.md`
 - `ADR-0002-cognitive-causality-and-journal-invariants.md`
 - `ADR-0022-authorized-action-boundary.md`
+- `ADR-0029-associative-context-projection.md`
+- `ADR-0030-transparent-context-delivery.md`
+- `ADR-0031-structured-meaning-and-cognitive-acts.md`
+- `ADR-0032-layered-lifelong-learning.md`
+- `ADR-0033-learned-artifact-governance.md`

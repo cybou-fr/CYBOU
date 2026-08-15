@@ -217,7 +217,8 @@ def main(argv: list[str]) -> int:
         "### 2. Causality over loose memory",
         "### 3. Identity is not a process",
         "### 4. Attention is not biography",
-        "### 5. Models are faculties",
+        "### 5. Models are faculties, and language is a boundary",
+        "### 5a. Learning is layered, and learned state outranks nothing",
         "### 6. External actions return as observations",
         "### 7. Consolidation derives; it does not rewrite",
         "### 8. Perception is not truth",
@@ -225,8 +226,9 @@ def main(argv: list[str]) -> int:
         "## Lifecycle and consolidation — M5 evaluated",
         "## Degraded cognition — M6 implemented",
         "## Future grounded and distributed cognition — M7",
-        "## Future language faculty — M8",
-        "## Future authorized agency — M9",
+        "## Future language and meaning — M8",
+        "## Future lifelong learning — M9",
+        "## Future authorized agency — M10",
         "## Design test for future features",
     ):
         require(paths["mind_model"], label, label)
@@ -347,12 +349,23 @@ def main(argv: list[str]) -> int:
     require(
         paths["adr21"],
         "model replacement continuity rule",
-        "Replacing, upgrading, disabling, or switching a model MUST NOT",
+        "Replacing, upgrading, disabling, or removing any language/model implementation MUST NOT",
     )
     require(
         paths["adr21"],
         "typed protocol boundary",
-        "Model output that should influence durable cognition enters the typed protocol",
+        "Model-derived durable contributions enter the typed protocol",
+    )
+
+    require(
+        paths["adr21"],
+        "no-model configuration is valid",
+        "`NoModel` is therefore a valid configuration",
+    )
+    require(
+        paths["adr21"],
+        "core cognition is local",
+        "core cognition → local only",
     )
 
     require(

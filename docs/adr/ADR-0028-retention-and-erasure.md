@@ -227,6 +227,32 @@ already have the machinery this needs.
 In-memory projections rebuild on the same signal rather than on restart. An organ that only noticed
 an erasure when it happened to restart would serve erased content for an unbounded time.
 
+### Learned artifacts are retention-dependent derived state
+
+A learned artifact that changes future behaviour because of accepted evidence participates in these
+dependency semantics whether it is a deterministic projection, a learned skill, a ranking model, an
+adapter or a fully fine-tuned descendant.
+
+The rebuild rule above assumes derived state can be reconstructed exactly. Opaque learned state
+cannot: **deleting a source payload does not prove its influence left the artifact.** So for those,
+erasure invalidates every dependent artifact before reuse, removes it from active selection, and
+requires a rebuild from a clean ancestor and the surviving source set. Cybou does not report opaque
+learned influence as erased merely because the training row is gone. Where exact removal is not
+demonstrable, rebuilding from an uncontaminated ancestor is the honest recovery path, and
+[ADR-0033](ADR-0033-learned-artifact-governance.md) carries the generation and promotion semantics
+that makes it possible.
+
+The dependency closure is the one this ADR already defines. `retentionDependents` derives it from
+causation and evidence, which is where derivation actually travels, and an artifact citing erased
+evidence is a dependent by the same rule as a Learning that says "because X".
+
+An artifact's own lineage records are permanent, for the reason erasure records are: a promotion
+record that inherited the retention of the evidence it cites would expire exactly when the artifact
+it justifies was invalidated, leaving the system unable to say why anything was rebuilt.
+
+Secrets, keys, credentials and tokens are not deliberate opaque-training targets under default
+policy.
+
 ### Backups are addressed by key, not by deletion
 
 Erasure by nulling reaches the live database and nothing else. For sensitive payloads that is not

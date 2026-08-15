@@ -6,6 +6,7 @@
 #include "cybou/context/AssociativeProjection.h"
 
 #include <QList>
+#include <optional>
 #include <QSet>
 #include <QString>
 #include <QUuid>
@@ -27,10 +28,34 @@ enum class Disposition : quint8 {
 
 QString dispositionToString(Disposition disposition);
 
-/// Where a request is going. `remote` is the only property that changes what policy permits.
+/// How much of the person's context a consumer is permitted to see.
+///
+/// ADR-0030's B7. A single `remote` bit was the original abstraction and it was too weak: once
+/// ADR-0021 moved cognition off remote models entirely, a policy that only filtered remote
+/// consumers filtered nothing that mattered. A parser, a local model and an inspector run in the
+/// same place and deserve different answers.
+enum class ConsumerTrust : quint8 {
+    Untrusted = 0, ///< a plugin or third-party consumer; sees only what was already public
+    Bounded,       ///< an ordinary faculty; sees up to the household class
+    Full,          ///< a first-party surface acting for the person
+};
+
+QString consumerTrustToString(ConsumerTrust trust);
+
+/// A named consumer, described by what it may see and what it does with what it gets.
 struct Destination {
     QString id;
-    bool remote{false};
+    ConsumerTrust trust{ConsumerTrust::Bounded};
+
+    /// Whether what it receives outlives the request -- stored, indexed, or learned from.
+    ///
+    /// This, not distance, is what makes a delivery consequential. A local model that adapts on
+    /// delivered context has written it into parameters ADR-0033 admits cannot be surgically
+    /// unlearned, and the delivery record is the only evidence of how that influence travelled.
+    bool retains{false};
+
+    /// Whether delivery crosses a network or trust boundary. Irreversible on its own account.
+    bool externalBoundary{false};
 
     bool isValid() const { return !id.isEmpty(); }
 };
@@ -41,11 +66,17 @@ struct Destination {
 /// the answer, which is what makes it a reviewable object rather than a filter buried in a request
 /// builder.
 struct DeliveryPolicy {
-    /// The most restrictive class a remote destination may see. PrivacyClass runs from most to
-    /// least restrictive, so a floor of `Local` permits everything and `Public` permits only what
-    /// was already public. A local destination is not filtered at all.
-    PrivacyClass maxPrivacyForRemote{PrivacyClass::Household};
+    /// The most restrictive class each trust level may see. PrivacyClass runs from most to least
+    /// restrictive, so a floor of `Local` permits everything and `Public` only what was already
+    /// public.
+    ///
+    /// Every level has a floor, including the most trusted one. There is no unfiltered case: a
+    /// consumer gains context by being permitted, never by being nearby.
+    PrivacyClass floorForUntrusted{PrivacyClass::Public};
+    PrivacyClass floorForBounded{PrivacyClass::Household};
+    PrivacyClass floorForFull{PrivacyClass::Local};
 
+    PrivacyClass floorFor(ConsumerTrust trust) const;
     bool permits(const ContextItem &item, const Destination &destination) const;
 };
 
@@ -105,7 +136,8 @@ private:
 struct DeliveryRecord {
     QUuid requestId;
     QString destinationId;
-    bool remote{false};
+    bool externalBoundary{false};
+    bool retained{false};
     QList<QString> deliveredConceptIds;
     QList<QUuid> evidence;
     int heldBackCount{0};
@@ -113,6 +145,16 @@ struct DeliveryRecord {
     bool isValid() const { return !destinationId.isEmpty() && !requestId.isNull(); }
 };
 
-DeliveryRecord recordFor(const DeliveryPlan &plan);
+/// Whether this delivery must leave a durable trace.
+///
+/// True when the consumer retains or adapts on what it receives, or when delivery crosses an
+/// external boundary. Recording every render of an inspector that forgets immediately would grow
+/// the Journal with use and prove nothing; recording nothing about a consumer that learned from the
+/// context would leave ADR-0033's erasure invalidation with no trail to follow.
+bool requiresRecord(const Destination &destination);
+
+/// The record, when one is required. Nothing otherwise, rather than an empty record that a caller
+/// could mistake for a delivery that happened to carry nothing.
+std::optional<DeliveryRecord> recordFor(const DeliveryPlan &plan);
 
 } // namespace cybou

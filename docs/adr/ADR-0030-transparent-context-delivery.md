@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Cybou contributors
 SPDX-License-Identifier: MIT
 -->
 
-# ADR-0030: Transparent Context Selection and Prompt Delivery
+# ADR-0030: Transparent Context Selection and Delivery
 
 ## Status
 
@@ -128,6 +128,79 @@ B6 is the one that decides whether this surface is honest. An item quietly dropp
 reasons and an item that was never relevant look identical unless the interface insists on the
 difference — and the whole point of building this before a model exists is that afterwards, nobody
 would notice which one they were looking at.
+
+### Amendment: a consumer is not trusted for being local
+
+The decision above was written around one question — *what left the machine?* — and answered it with
+one bit, `remote`. That was too weak, and the weakness became visible as soon as
+[ADR-0021](ADR-0021-language-models-are-optional-faculties.md) moved cognition off remote models
+entirely: once every consequential consumer is local, a policy that only filters remote ones filters
+nothing that matters.
+
+The question becomes:
+
+```text
+what did Mind supply to this consumer, and under what policy?
+```
+
+The four sets are unchanged. `Delivered` now means supplied to a named consumer, which does not
+necessarily mean network egress.
+
+**Locality does not imply unrestricted cognitive access.** A parser, a local model, a planner, an
+inspector and a future plugin have genuinely different trust, and one boolean cannot express that. A
+destination is described by what it is permitted to consume:
+
+```text
+Destination {
+    id,
+    trust,              // how much of the person's context this consumer may see
+    retains,            // whether what it receives outlives the request
+    externalBoundary    // whether delivery crosses a network or trust boundary
+}
+```
+
+The rule that local destinations are unfiltered is superseded. Every destination is filtered by its
+own trust, and a consumer gains context by being permitted, never by being nearby.
+
+### Amendment: recording follows retention, not distance
+
+The original B4 recorded every delivery. The tempting correction is to record only what crosses a
+network boundary, on the grounds that local use is cheap.
+
+That is the wrong axis, and this package is what shows it.
+[ADR-0032](ADR-0032-layered-lifelong-learning.md) and
+[ADR-0033](ADR-0033-learned-artifact-governance.md) make local consumption durable: a local model
+that adapts on delivered context has written it into parameters that ADR-0033 itself admits cannot
+be surgically unlearned. Under erasure, ADR-0033's A6 has to find every artifact a payload
+influenced — and the delivery record is the only evidence of how the contamination travelled.
+
+So the durable record follows **whether a consumer retains or adapts on what it receives**, not
+whether it is far away. An inspector that renders and forgets needs no contribution. A learning
+consumer needs one wherever it runs. A delivery crossing an external boundary is durably recorded
+regardless, because irreversibility is its own reason.
+
+```text
+DeliveryPlan            inspectable for every destination, always
+delivery contribution   when the consumer retains, adapts, or crosses an external boundary
+```
+
+The cost argument was real but it was an argument about which consumers are consequential, and
+distance is not what makes them so.
+
+### Amended acceptance gates
+
+| | Gate |
+|---|---|
+| **B1** | Available and delivered context are independently inspectable for a named consumer |
+| **B2** | Different destination policies narrow delivery without mutating the local `ContextBundle` |
+| **B3** | The view can request, and cannot act: no script path reaches the Journal or the network |
+| **B4** | A retaining, adapting or externally-bound delivery is durably recorded with destination and provenance, and no content copy |
+| **B5** | The inspector works with no language or generative model configured |
+| **B6** | A held-back item is shown as held back, never silently omitted |
+| **B7** | A local consumer does not gain unrestricted context solely because it is local |
+
+B6 still decides whether the surface is honest. B7 decides whether the policy is: a boundary that
+every consumer on the machine walks straight through is a boundary in name only.
 
 ## Related documents
 

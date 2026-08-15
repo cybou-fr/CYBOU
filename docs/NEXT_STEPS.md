@@ -1508,6 +1508,41 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### The turn away from models
+
+ADR-0031, 0032 and 0033 land as Proposed, ADR-0021 is rewritten, and ADR-0024, 0025, 0028, 0029,
+0030 and 0022 are amended. The milestones become M8 meaning, M9 learning, M10 authorized action.
+
+The substance is that `NoModel` becomes a supported configuration rather than a degraded one, and
+remote inference leaves core cognition entirely. Everything else follows from that: if no generative
+model is required, language has to be a typed boundary rather than the protocol, and learning has to
+be layered rather than "fine-tune the model".
+
+Two things in the package were amended rather than taken as given.
+
+**ADR-0030's B4 was proposed to record only what crosses a network.** The rest of the same package
+undercuts that: ADR-0033 admits that a local model which adapts on delivered context has written it
+into parameters that cannot be surgically unlearned, and A6 then requires finding every artifact an
+erased payload influenced. Distance is the wrong axis. Recording now follows whether a consumer
+**retains or adapts**, plus any external boundary on its own account. An inspector that renders and
+forgets leaves no contribution; a local learner leaves one.
+
+**ADR-0033's A9 and ADR-0032's L3 were flagged rather than accepted quietly.** A9 forbids secrets
+entering the training path, but nothing in the protocol expresses secrecy — `PrivacyClass` is a
+replication scope and `Local` is its default, not a danger marker. As written A9 would be satisfied
+by a refusal for any reason at all, which is the vacuous shape that caught me four times this
+session. L3 is the checkpoint-equals-replay invariant four projections already carry, and should
+name it rather than restate it.
+
+B7 is now real code. `DeliveryPolicy::permits` had an early return making every local consumer
+unfiltered, and `localDeliveryIsNotFilteredByRemotePolicy` asserted exactly that — the amendment
+made a passing, sabotage-verified test into a statement of the wrong rule. `Destination` now carries
+trust, retention and boundary instead of one `remote` bit. Four sabotages, four caught, including
+restoring the old local shortcut.
+
+The validator pinned three things this touched: two ADR-0021 sentences and two MIND_MODEL headings.
+Changing an invariant meant editing the check that guards it, which is the point of pinning them.
+
 ### A gate that failed once and then not again
 
 `m6-recovery-boundary` failed once and passed four times afterwards, including three forced
