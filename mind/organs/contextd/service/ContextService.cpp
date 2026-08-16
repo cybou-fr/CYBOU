@@ -3,6 +3,10 @@
 
 #include "ContextService.h"
 
+#include "cybou/ipc/CallerIdentity.h"
+
+#include <QDBusMessage>
+
 #include "cybou/fabric/FabricCodec.h"
 #include "cybou/protocol/Observation.h"
 
@@ -79,6 +83,14 @@ QString ContextService::LastError() const
 qulonglong ContextService::Cursor() const
 {
     return static_cast<qulonglong>(m_cursor);
+}
+
+ConsumerTrust ContextService::callerCeiling() const
+{
+    if (!calledFromDBus()) {
+        return ConsumerTrust::Full;
+    }
+    return ConsumerRegistry::ceilingFor(callerBinaryName(connection(), message().service()));
 }
 
 bool ContextService::refuseWhenUnready(const QString &method)
@@ -198,6 +210,19 @@ QByteArray ContextService::Deliver(
                       QStringLiteral("Deliver does not know trust level %1").arg(trust));
     }
 
+    // What the caller asked for is a request, not a fact about itself. The ceiling comes from its
+    // verified process, and asking above it is refused rather than quietly reduced: a consumer
+    // handed a narrowed answer to a request it believed was granted would reason as though nothing
+    // had been withheld.
+    const ConsumerTrust ceiling = callerCeiling();
+    if (!ConsumerRegistry::permitsRequest(ceiling, static_cast<ConsumerTrust>(trust))) {
+        return refuse(
+            QDBusError::AccessDenied,
+            QStringLiteral("this caller may request at most %1 trust, not %2")
+                .arg(consumerTrustToString(ceiling))
+                .arg(consumerTrustToString(static_cast<ConsumerTrust>(trust))));
+    }
+
     const QUuid id = QUuid::fromString(requestId);
     if (id.isNull() || !m_prepared.contains(id)) {
         return refuse(QDBusError::InvalidArgs,
@@ -289,6 +314,16 @@ QByteArray ContextService::Inspect(const QString &requestId)
         m_lastError = QStringLiteral("Inspect has no prepared request %1").arg(requestId);
         if (calledFromDBus()) {
             sendErrorReply(QDBusError::InvalidArgs, m_lastError);
+        }
+        return {};
+    }
+
+    // Inspection is the one surface that names held-back items. Granting it to anything less than
+    // a fully trusted caller would hand back through Inspect exactly what Deliver refuses to say.
+    if (ConsumerRegistry::permitsRequest(callerCeiling(), ConsumerTrust::Full) == false) {
+        m_lastError = QStringLiteral("this caller may not inspect a delivery plan");
+        if (calledFromDBus()) {
+            sendErrorReply(QDBusError::AccessDenied, m_lastError);
         }
         return {};
     }

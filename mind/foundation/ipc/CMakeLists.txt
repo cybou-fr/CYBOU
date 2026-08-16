@@ -3,7 +3,9 @@
 
 qt_add_library(cybou-event-client STATIC
     src/EventClient.cpp
+    src/CallerIdentity.cpp
     include/cybou/ipc/EventClient.h
+    include/cybou/ipc/CallerIdentity.h
 )
 
 target_include_directories(cybou-event-client

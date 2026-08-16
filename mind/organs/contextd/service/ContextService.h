@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cybou/context/AssociativeProjection.h"
+#include "cybou/context/ConsumerRegistry.h"
 #include "cybou/context/ContextDelivery.h"
 #include "cybou/events/EventStore.h"
 
@@ -114,6 +115,12 @@ Q_SIGNALS:
 
 private:
     bool refuseWhenUnready(const QString &method);
+
+    /// The most this caller may ever be granted, resolved from its process rather than its claims.
+    ///
+    /// An in-process caller is this service itself or a test constructing it directly; there is no
+    /// peer to resolve, and the owning process is not a consumer to be constrained.
+    ConsumerTrust callerCeiling() const;
     bool load();
     void persist();
 

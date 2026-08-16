@@ -11,7 +11,7 @@ target_include_directories(cybou-context-service
 )
 
 target_link_libraries(cybou-context-service
-    PUBLIC Qt6::Core Qt6::DBus cybou-context cybou-events cybou-fabric cybou-protocol
+    PUBLIC Qt6::Core Qt6::DBus cybou-context cybou-event-client cybou-events cybou-fabric cybou-protocol
 )
 
 qt_add_executable(cybou-contextd service/main.cpp)

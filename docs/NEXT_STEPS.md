@@ -1508,6 +1508,38 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### Trust stops being something a caller can claim
+
+`ConsumerTrust` was self-reported. Any process could call `Deliver` with `trust = Full` and be
+believed, which made the enum a description rather than an authorization however carefully it was
+named. The two previous packages were structure without enforcement, and this is the enforcement.
+
+The ceiling now comes from the caller's process. `callerBinaryName` resolves the D-Bus peer to a
+pid, the pid to its executable, and accepts the answer only when that executable sits in the
+directory Mind was installed into -- a directory a user cannot write to without already being able
+to replace Mind outright. Matching on a name alone would let anyone build an ELF, call it
+`cybou-contextd`, and inherit whatever that name is entitled to.
+
+This is deliberately the same binding Event1 already uses to stop one organ speaking as another,
+lifted out of eventd rather than reimplemented. A second, slightly different copy of a security
+check is how the two versions eventually disagree.
+
+Requests above a ceiling are refused, not quietly reduced. A consumer handed a narrowed answer to a
+request it believed was granted would reason as though nothing had been withheld -- the same
+mistake as an empty result standing in for a failed query.
+
+Nothing is granted `Full`. The person-facing inspector is the consumer that will need it, and it
+does not exist yet; naming it in the registry in advance would grant the level to whatever later
+happened to carry that name. Mind's own organs get `Bounded`, because no organ so far has a reason
+to see the person's most restricted material, and a `Full` handed out by default is a level that
+means nothing on the day something genuinely deserves it.
+
+This also closes the gap the previous package left open: `Inspect` is the one surface that names
+held-back items, so it now requires `Full` and therefore currently answers no bus caller at all.
+
+Five sabotages, five caught, including inverting the ceiling comparison and accepting any directory
+as the installed one.
+
 ### The inspector and the consumer are different audiences
 
 `Deliver` used to hand every disposition to whoever called it, including the held-back ones. That

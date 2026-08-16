@@ -138,6 +138,15 @@ set_tests_properties(
     associative-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-consumer-registry tst_consumer_registry.cpp)
+target_link_libraries(
+    test-consumer-registry PRIVATE cybou-context cybou-event-client Qt6::Test
+)
+add_test(NAME consumer-registry COMMAND test-consumer-registry)
+set_tests_properties(
+    consumer-registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-retention-sweep tst_retention_sweep.cpp)
 target_link_libraries(test-retention-sweep PRIVATE cybou-storage cybou-crypto Qt6::Sql Qt6::Test)
 add_test(NAME retention-sweep COMMAND test-retention-sweep)
