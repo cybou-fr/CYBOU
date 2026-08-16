@@ -20,7 +20,7 @@ namespace cybou {
 /// allowed to express "absent". Every activated item carries one of these, so absence is not a
 /// representable state.
 enum class Disposition : quint8 {
-    Delivered = 0,      ///< left the machine
+    Delivered = 0,      ///< supplied to the consumer
     HeldBackByPolicy,   ///< permitted set excluded it; the person still sees that it exists
     ExcludedByPerson,   ///< the person removed it
     NotSelected,        ///< available and permitted, but not chosen for this request
@@ -129,7 +129,11 @@ private:
     bool m_complete{false};
 };
 
-/// The durable fact that something left the machine.
+/// The durable fact that context was supplied to a named consumer.
+///
+/// Not "what left the machine": ADR-0030 was amended once cognition moved off remote models, and
+/// a local consumer that retains what it receives is the case that most needs a trail. Distance
+/// stopped being the axis.
 ///
 /// Item ids and evidence, never content. A record that copied what it recorded would make the
 /// Journal a second store of the material the delivery was already the risk of.

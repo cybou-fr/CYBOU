@@ -27,6 +27,14 @@ its own context is the memory architecture, whatever the documents say.
 
 ## Decision
 
+> **The subsections below are the original decision, and parts of them are superseded.** The
+> amendments at the end of this document are the current rule: `Delivered` means supplied to a
+> named consumer rather than sent off the machine, every destination is filtered by its own trust
+> rather than by locality, and durable recording follows whether a consumer retains or adapts.
+>
+> The original text is kept rather than rewritten. What was decided, and why it changed, is itself
+> part of the record â the same reason an erasure record is permanent.
+
 ### Four sets, and the person sees at least two of them
 
 ```
@@ -38,6 +46,10 @@ Selected Context      what the person and policy agreed on
         ↓
 Delivered Context     what actually left the machine
 ```
+
+**Available** and **Delivered** must be independently inspectable, and â by the amendment below â
+to the *person*, through an inspector. A consumer is not shown what was withheld from it: that a
+concept exists is frequently the sensitive part of it.
 
 **Available** and **Delivered** must be independently inspectable. Showing only what was retrieved
 tells a person what Mind thought about; showing only what was sent tells them nothing about what was
