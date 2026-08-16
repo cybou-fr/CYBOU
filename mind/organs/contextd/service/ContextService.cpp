@@ -5,6 +5,7 @@
 
 #include "cybou/ipc/CallerIdentity.h"
 
+#include <QCryptographicHash>
 #include <QDBusMessage>
 
 #include "cybou/fabric/FabricCodec.h"
@@ -266,14 +267,51 @@ QByteArray ContextService::Deliver(
     recorded.delivered = true;
     m_prepared.insert(id, recorded);
 
-    // Only the delivered items cross to the consumer. Naming a held-back concept here would
-    // disclose that it exists to the very party policy had just refused it, and the existence of
-    // an episode is frequently the sensitive part of it.
-    //
-    // Evidence travels with what was delivered: whoever records the disclosure has to name its
-    // provenance, and cannot reconstruct that from concept ids alone.
+    const int deliveredCount = plan.withDisposition(Disposition::Delivered).size();
+
+    QVariantMap map;
+    map.insert(QStringLiteral("requestId"), id.toString(QUuid::WithoutBraces));
+
+    if (requiresRecord(destination)) {
+        // The payload stays here until the disclosure is on record. Handing it over first and
+        // asking for the record afterwards makes the record optional in practice: the disclosure
+        // has happened either way, and only a well-behaved consumer produces the evidence.
+        recorded.disclosureDigest = deliveryDigest(plan.decisions());
+        m_prepared.insert(id, recorded);
+
+        map.insert(QStringLiteral("disclosurePending"), true);
+        map.insert(QStringLiteral("disclosureDigest"),
+                   QString::fromLatin1(recorded.disclosureDigest.toHex()));
+        map.insert(QStringLiteral("deliveredCount"), deliveredCount);
+    } else {
+        map.insert(QStringLiteral("disclosurePending"), false);
+        map.insert(QStringLiteral("delivered"), deliveredPayload(recorded));
+    }
+
+    // A count, never identities. The consumer is owed the knowledge that its answer was narrowed --
+    // partial is not empty, and a consumer that believed it had everything would reason as though
+    // nothing had been withheld -- but it is not owed what was withheld or why.
+    map.insert(QStringLiteral("withheldCount"), plan.size() - deliveredCount);
+    map.insert(QStringLiteral("complete"), plan.complete());
+    map.insert(QStringLiteral("destination"), destination.id);
+    map.insert(QStringLiteral("trust"), consumerTrustToString(destination.trust));
+    map.insert(QStringLiteral("sourceCursor"), static_cast<qulonglong>(prepared.cursor));
+    // Reported, not written. The caller that performs the delivery owns that contribution, because
+    // this organ owns no writes at all.
+    map.insert(QStringLiteral("recordRequired"), requiresRecord(destination));
+    return FabricCodec::encode(map);
+}
+
+QVariantList ContextService::deliveredPayload(const PreparedRequest &prepared) const
+{
+    // Evidence travels with what was delivered: whoever holds the disclosure has to be able to
+    // name its provenance, and cannot reconstruct that from concept ids alone.
     QVariantList delivered;
-    for (const DeliveryDecision &decision : plan.withDisposition(Disposition::Delivered)) {
+    for (const DeliveryDecision &decision : prepared.plan) {
+        if (decision.disposition != Disposition::Delivered) {
+            continue;
+        }
+
         QVariantList evidence;
         for (const QUuid &source : decision.evidence) {
             evidence.append(source.toString(QUuid::WithoutBraces));
@@ -285,21 +323,76 @@ QByteArray ContextService::Deliver(
         entry.insert(QStringLiteral("evidence"), evidence);
         delivered.append(entry);
     }
+    return delivered;
+}
+
+QByteArray ContextService::Release(const QString &requestId, const QString &disclosureId)
+{
+    if (!refuseWhenUnready(QStringLiteral("Release"))) {
+        return {};
+    }
+
+    const auto refuse = [this](QDBusError::ErrorType type, const QString &why) -> QByteArray {
+        m_lastError = why;
+        if (calledFromDBus()) {
+            sendErrorReply(type, why);
+        }
+        return {};
+    };
+
+    const QUuid id = QUuid::fromString(requestId);
+    if (id.isNull() || !m_prepared.contains(id)) {
+        return refuse(QDBusError::InvalidArgs,
+                      QStringLiteral("Release has no prepared request %1").arg(requestId));
+    }
+
+    const PreparedRequest prepared = m_prepared.value(id);
+    if (!prepared.delivered) {
+        return refuse(QDBusError::Failed,
+                      QStringLiteral("request %1 has no delivery to release").arg(requestId));
+    }
+    if (prepared.disclosureDigest.isEmpty()) {
+        return refuse(QDBusError::Failed,
+                      QStringLiteral("request %1 owes no disclosure record").arg(requestId));
+    }
+
+    if (!m_events) {
+        return refuse(QDBusError::Failed, QStringLiteral("no journal to verify a disclosure"));
+    }
+
+    const auto record = m_events->contribution(QUuid::fromString(disclosureId));
+    if (!record.has_value()) {
+        return refuse(QDBusError::InvalidArgs,
+                      QStringLiteral("no contribution %1").arg(disclosureId));
+    }
+    if (record->kind != ContributionKind::ContextDisclosed) {
+        return refuse(QDBusError::InvalidArgs,
+                      QStringLiteral("contribution %1 is not a disclosure").arg(disclosureId));
+    }
+
+    // The record must commit to this request, this consumer, and exactly what is about to be
+    // released. A disclosure naming a different digest records a different event than the one it
+    // would be used to authorise.
+    const QCborMap payload = QCborValue::fromCbor(record->payloadCbor).toMap();
+    const QString recordedRequest
+        = payload.value(QStringLiteral("requestId")).toString();
+    const QString recordedDestination
+        = payload.value(QStringLiteral("destination")).toString();
+    const QByteArray recordedDigest = QByteArray::fromHex(
+        payload.value(QStringLiteral("digest")).toString().toLatin1());
+
+    if (recordedRequest != id.toString(QUuid::WithoutBraces)
+        || recordedDestination != prepared.destination.id
+        || recordedDigest != prepared.disclosureDigest) {
+        return refuse(
+            QDBusError::AccessDenied,
+            QStringLiteral("disclosure %1 does not match this delivery").arg(disclosureId));
+    }
 
     QVariantMap map;
     map.insert(QStringLiteral("requestId"), id.toString(QUuid::WithoutBraces));
-    map.insert(QStringLiteral("delivered"), delivered);
-    // A count, never identities. The consumer is owed the knowledge that its answer was narrowed --
-    // partial is not empty, and a consumer that believed it had everything would reason as though
-    // nothing had been withheld -- but it is not owed what was withheld or why.
-    map.insert(QStringLiteral("withheldCount"), plan.size() - delivered.size());
-    map.insert(QStringLiteral("complete"), plan.complete());
-    map.insert(QStringLiteral("destination"), destination.id);
-    map.insert(QStringLiteral("trust"), consumerTrustToString(destination.trust));
-    map.insert(QStringLiteral("sourceCursor"), static_cast<qulonglong>(prepared.cursor));
-    // Reported, not written. The caller that performs the delivery owns that contribution, because
-    // this organ owns no writes at all.
-    map.insert(QStringLiteral("recordRequired"), requiresRecord(destination));
+    map.insert(QStringLiteral("delivered"), deliveredPayload(prepared));
+    map.insert(QStringLiteral("disclosure"), disclosureId);
     return FabricCodec::encode(map);
 }
 

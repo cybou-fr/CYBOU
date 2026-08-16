@@ -145,12 +145,23 @@ struct DeliveryRecord {
     bool isValid() const { return !destinationId.isEmpty() && !requestId.isNull(); }
 };
 
+/// A commitment to exactly what a plan would release, and to nothing else.
+///
+/// Covers the delivered items only. A digest over the whole plan would tie a permanent record to
+/// material the consumer never received -- and concept spaces are small enough to brute-force, so
+/// that record would become standing evidence about what was withheld, written into the one place
+/// that is never erased.
+///
+/// It lives here rather than inside the service because it is a property of a plan, and because a
+/// commitment nobody can test in isolation is a commitment nobody has checked.
+QByteArray deliveryDigest(const QList<DeliveryDecision> &plan);
+
 /// Whether this delivery must leave a durable trace.
 ///
 /// True when the consumer retains or adapts on what it receives, or when delivery crosses an
 /// external boundary. Recording every render of an inspector that forgets immediately would grow
-/// the Journal with use and prove nothing; recording nothing about a consumer that learned from the
-/// context would leave ADR-0033's erasure invalidation with no trail to follow.
+/// the Journal with use and prove nothing; recording nothing about a consumer that learned from
+/// the context would leave ADR-0033's erasure invalidation with no trail to follow.
 bool requiresRecord(const Destination &destination);
 
 /// The record, when one is required. Nothing otherwise, rather than an empty record that a caller

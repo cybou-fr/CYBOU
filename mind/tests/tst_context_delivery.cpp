@@ -71,6 +71,9 @@ private slots:
 
     /// The label a person reads distinguishes the dispositions the code distinguishes.
     void everyDispositionHasItsOwnLabel();
+
+    /// The commitment covers the delivered items and nothing else.
+    void theDigestCoversDeliveredItemsOnly();
 };
 
 void TestContextDelivery::everyDispositionHasItsOwnLabel()
@@ -312,6 +315,51 @@ void TestContextDelivery::planOverIncompleteBundleReportsIncomplete()
     QVERIFY(DeliveryPlan::build(
                 whole, {}, {QStringLiteral("inspector"), ConsumerTrust::Full, false, false}, idsOf(whole), {})
                 .complete());
+}
+
+
+// The commitment covers what was released and nothing else.
+//
+// Tested here, on plans built by hand, because through the service the property is invisible: a
+// concept held back and the same concept excluded by the person hash identically, so no pair of
+// deliveries can distinguish a digest that covers the whole plan from one that does not.
+void TestContextDelivery::theDigestCoversDeliveredItemsOnly()
+{
+    const QUuid shared = QUuid::createUuid();
+    const QUuid secret = QUuid::createUuid();
+
+    DeliveryDecision sent;
+    sent.conceptId = QStringLiteral("lemon");
+    sent.disposition = Disposition::Delivered;
+    sent.evidence = {shared};
+
+    DeliveryDecision held;
+    held.conceptId = QStringLiteral("medical-episode");
+    held.disposition = Disposition::HeldBackByPolicy;
+    held.evidence = {secret};
+
+    DeliveryDecision refused;
+    refused.conceptId = QStringLiteral("another-episode");
+    refused.disposition = Disposition::ExcludedByPerson;
+    refused.evidence = {QUuid::createUuid()};
+
+    const QByteArray alone = deliveryDigest({sent});
+    QVERIFY(!alone.isEmpty());
+
+    // Withheld material must not move the commitment, whatever it is or why it stayed.
+    QCOMPARE(deliveryDigest({sent, held}), alone);
+    QCOMPARE(deliveryDigest({held, sent, refused}), alone);
+
+    // And it must still commit to what was delivered: a digest that ignored everything would
+    // satisfy every assertion above.
+    DeliveryDecision other = sent;
+    other.conceptId = QStringLiteral("honey");
+    QVERIFY(deliveryDigest({other}) != alone);
+
+    DeliveryDecision reprovenanced = sent;
+    reprovenanced.evidence = {QUuid::createUuid()};
+    QVERIFY2(deliveryDigest({reprovenanced}) != alone,
+             "a commitment that ignored provenance would not identify what was disclosed");
 }
 
 QTEST_MAIN(TestContextDelivery)

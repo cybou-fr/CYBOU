@@ -1508,6 +1508,41 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### A disclosure is recorded before it happens
+
+ADR-0030 requires a retaining or externally-bound delivery to leave a record. Asking the consumer to
+write that record after it already holds the payload makes the record optional in practice: the
+disclosure has happened either way, and only good behaviour produces the evidence.
+
+So the exchange is ordered. `Deliver` withholds the payload and returns a digest; the caller appends
+a `ContextDisclosed` contribution committing to that digest; `Release` checks the Journal and hands
+over the items. contextd writes nothing -- it reads, and refuses until the fact is already there.
+
+`ContextDisclosed` is a root kind, like an observation. It records something that happened outside
+the Journal and no prior contribution caused it, and citing the disclosed material as evidence would
+require the recorder to know that material before the record existed -- the ordering this exchange
+exists to prevent. Its provenance is the digest instead.
+
+The digest covers the delivered items only. A commitment over the whole plan would tie a permanent
+record to material the consumer never received, and concept spaces are small enough to brute-force,
+so that record would become standing evidence about what was withheld -- in the one place that is
+never erased.
+
+**Three of five sabotages missed on the first run, and the reasons differ.** One mutation was
+malformed: `false && A || B || C` parses as `(false && A) || B || C`, so the checks I meant to
+disable stayed live. Reporting that as a gap would have been as wrong as reporting it as a pass.
+
+The other two were real. "An ordinary contribution is not a disclosure" passed on the payload-match
+check rather than the kind check, since an observation has no `requestId` in its payload and would
+fail the later comparison anyway; the assertion now pins the reason. And the digest's scope was
+untestable through the service at all -- a concept held back and the same concept excluded by the
+person hash identically, so no pair of deliveries can distinguish the two implementations. The
+digest moved to the context library as `deliveryDigest`, where a test builds plans by hand and
+checks the property directly. A commitment nobody can test in isolation is a commitment nobody has
+checked.
+
+Both then caught, along with the four service-level guards.
+
 ### Trust stops being something a caller can claim
 
 `ConsumerTrust` was self-reported. Any process could call `Deliver` with `trust = Full` and be

@@ -3,6 +3,8 @@
 
 #include "cybou/context/ContextDelivery.h"
 
+#include <QCryptographicHash>
+
 namespace cybou {
 
 QString dispositionToString(Disposition disposition)
@@ -129,6 +131,21 @@ QList<QString> DeliveryPlan::deliveredIds() const
         }
     }
     return out;
+}
+
+QByteArray deliveryDigest(const QList<DeliveryDecision> &plan)
+{
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    for (const DeliveryDecision &decision : plan) {
+        if (decision.disposition != Disposition::Delivered) {
+            continue;
+        }
+        hash.addData(decision.conceptId.toUtf8());
+        for (const QUuid &source : decision.evidence) {
+            hash.addData(source.toRfc4122());
+        }
+    }
+    return hash.result();
 }
 
 bool requiresRecord(const Destination &destination)

@@ -10,6 +10,7 @@
 
 #include <QDBusContext>
 #include <QHash>
+#include <QVariantList>
 #include <QObject>
 #include <QString>
 
@@ -97,6 +98,20 @@ public Q_SLOTS:
         const QStringList &selected,
         const QStringList &excluded);
 
+    /// Release the delivered items, once the disclosure has been durably recorded.
+    ///
+    /// ADR-0030 requires that a retaining or externally-bound delivery leave a record. Asking a
+    /// consumer to write that record after it already holds the payload makes the record optional
+    /// in practice: the disclosure has happened either way, and only good behaviour produces the
+    /// evidence.
+    ///
+    /// So `Deliver` returns a digest and withholds the items, the caller appends a
+    /// `ContextDisclosed` contribution committing to that digest, and this releases the payload
+    /// against it. contextd writes nothing -- it reads the Journal and checks that the fact is
+    /// already there. The ordering is the point: the durable record precedes the disclosure it
+    /// records, rather than describing one that already happened.
+    QByteArray Release(const QString &requestId, const QString &disclosureId);
+
     /// The person-facing view of a delivery that has happened: every disposition, with reasons.
     ///
     /// This is where ADR-0030's B6 lives. The gap between what was available and what was sent is
@@ -131,6 +146,7 @@ private:
     /// behind it, which is the one thing this graph may not contain.
     void admitToGraph(const CognitiveEnvelope &envelope);
 
+
     /// One frozen activation, with the projection state it was taken from.
     struct PreparedRequest {
         ContextBundle bundle;
@@ -143,7 +159,16 @@ private:
         QList<DeliveryDecision> plan;
         Destination destination;
         bool delivered{false};
+
+        /// What a disclosure record must commit to before the payload is released. Empty when the
+        /// consumer owes no record, in which case `Deliver` releases directly.
+        QByteArray disclosureDigest;
     };
+
+    /// The delivered items of a prepared request, encoded for a consumer.
+    QVariantList deliveredPayload(const PreparedRequest &prepared) const;
+
+
 
     /// Bounded on purpose. An unbounded map of prepared requests would be a caller-controlled
     /// allocation, and the current projection staying bounded is one of the three invariants this

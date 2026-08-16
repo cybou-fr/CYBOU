@@ -15,6 +15,7 @@
 #include "cybou/storage/Journal.h"
 
 #include <QTemporaryDir>
+#include <QCborMap>
 #include <QTest>
 
 using namespace cybou;
@@ -311,6 +312,215 @@ private Q_SLOTS:
             }
         }
         QVERIFY2(sawHeldBack, "the person must be able to see what was withheld");
+    }
+
+
+    // Concept ids from a prepared reply, for use as the person's selection. Delivering with an
+    // empty selection leaves every item NotSelected, which makes any assertion about delivered
+    // payload vacuously true.
+    static QStringList conceptsOf(const QVariantMap &prepared)
+    {
+        QStringList ids;
+        for (const QVariant &entry : prepared.value(QStringLiteral("items")).toList()) {
+            ids.append(entry.toMap().value(QStringLiteral("concept")).toString());
+        }
+        return ids;
+    }
+
+    // Package D. A recorded disclosure precedes the disclosure it records.
+    //
+    // The consumer never receives the payload until a ContextDisclosed contribution committing to
+    // it is already in the Journal. Handing the payload over first and asking for the record
+    // afterwards would make the record optional in practice: the disclosure has happened either
+    // way, and only a well-behaved consumer would produce the evidence.
+    void aRetainingConsumerGetsNothingUntilTheDisclosureIsRecorded()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("value"),
+                                             QDateTime::currentDateTimeUtc(),
+                                             PrivacyClass::Public))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+        const QVariantMap prepared
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0));
+        const QString requestId = prepared.value(QStringLiteral("requestId")).toString();
+
+        // A consumer that retains what it receives owes a record.
+        const QVariantMap pending = FabricCodec::decodeMap(service.Deliver(
+            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Bounded),
+            true, false, conceptsOf(prepared), {}));
+
+        QVERIFY(pending.value(QStringLiteral("disclosurePending")).toBool());
+        QVERIFY2(!pending.contains(QStringLiteral("delivered")),
+                 "the payload must not cross before the record exists");
+        QVERIFY(pending.value(QStringLiteral("deliveredCount")).toInt() > 0);
+
+        const QString digest = pending.value(QStringLiteral("disclosureDigest")).toString();
+        QVERIFY(!digest.isEmpty());
+
+        // Nothing recorded yet, so nothing is released.
+        QVERIFY(service.Release(requestId, QUuid::createUuid().toString(QUuid::WithoutBraces))
+                    .isEmpty());
+
+        // A record that commits to the wrong thing is refused, which is what stops the exchange
+        // being satisfied by any contribution at all.
+        const auto disclosure = [&](const QString &request, const QString &destination,
+                                    const QString &commitment) {
+            CognitiveEnvelope e;
+            e.messageId = QUuid::createUuid();
+            e.correlationId = e.messageId;
+            e.originOrgan = QStringLiteral("perceptiond");
+            e.originNode = QStringLiteral("local");
+            e.kind = ContributionKind::ContextDisclosed;
+            e.wallTime = QDateTime::currentDateTimeUtc();
+            e.privacy = PrivacyClass::Local;
+            QCborMap payload;
+            payload.insert(QStringLiteral("requestId"), request);
+            payload.insert(QStringLiteral("destination"), destination);
+            payload.insert(QStringLiteral("digest"), commitment);
+            e.payloadCbor = payload.toCborValue().toCbor();
+            return e;
+        };
+
+        const CognitiveEnvelope wrongDigest
+            = disclosure(requestId, QStringLiteral("local-model"), QStringLiteral("00"));
+        QVERIFY2(journal.append(wrongDigest) > 0, qPrintable(journal.lastError()));
+        QVERIFY2(service
+                     .Release(requestId,
+                              wrongDigest.messageId.toString(QUuid::WithoutBraces))
+                     .isEmpty(),
+                 "a record committing to something else must not release this payload");
+
+        const CognitiveEnvelope wrongConsumer
+            = disclosure(requestId, QStringLiteral("someone-else"), digest);
+        QVERIFY(journal.append(wrongConsumer) > 0);
+        QVERIFY(service
+                    .Release(requestId, wrongConsumer.messageId.toString(QUuid::WithoutBraces))
+                    .isEmpty());
+
+        // An ordinary contribution is not a disclosure, however convenient its id would be.
+        const CognitiveEnvelope notADisclosure = observationOf(
+            QStringLiteral("subject"), QStringLiteral("other"), QDateTime::currentDateTimeUtc());
+        QVERIFY(journal.append(notADisclosure) > 0);
+        QVERIFY(service
+                    .Release(requestId, notADisclosure.messageId.toString(QUuid::WithoutBraces))
+                    .isEmpty());
+        // Refused *as not a disclosure*. Asserting only that it was refused would pass on the
+        // payload-match check instead, leaving the kind check itself uncovered: an observation has
+        // no requestId in its payload, so it would fail the later comparison anyway.
+        QVERIFY2(service.LastError().contains(QStringLiteral("not a disclosure")),
+                 qPrintable(service.LastError()));
+
+        // The right record releases it.
+        const CognitiveEnvelope correct
+            = disclosure(requestId, QStringLiteral("local-model"), digest);
+        QVERIFY(journal.append(correct) > 0);
+        const QVariantMap released = FabricCodec::decodeMap(
+            service.Release(requestId, correct.messageId.toString(QUuid::WithoutBraces)));
+
+        const QVariantList delivered = released.value(QStringLiteral("delivered")).toList();
+        QCOMPARE(delivered.size(), pending.value(QStringLiteral("deliveredCount")).toInt());
+        QVERIFY(!delivered.isEmpty());
+        QVERIFY(!delivered.first().toMap().value(QStringLiteral("evidence")).toList().isEmpty());
+    }
+
+    // The commitment covers what was released and nothing else.
+    //
+    // A digest over the whole plan would tie a permanent record to material the consumer never
+    // received. Concept spaces are small enough to brute-force, so such a record would be standing
+    // evidence about what was withheld, written into the one place that is never erased.
+    //
+    // Both deliveries run against one journal and one prepared request, so the evidence identities
+    // are identical and the only thing that varies is why the private item did not travel. Two
+    // separate journals would mint different evidence uuids and the digests would differ for a
+    // reason that has nothing to do with withholding.
+    void theDisclosureDigestDoesNotDependOnWhatWasWithheld()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("shared"),
+                                             now.addSecs(-120), PrivacyClass::Public))
+                > 0);
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("private"),
+                                             now.addSecs(-60), PrivacyClass::Local))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+        const QVariantMap prepared
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0));
+        const QString requestId = prepared.value(QStringLiteral("requestId")).toString();
+        const QStringList all = conceptsOf(prepared);
+
+        // Held back by policy: an untrusted consumer may not have the private item.
+        const QVariantMap byPolicy = FabricCodec::decodeMap(service.Deliver(
+            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Untrusted),
+            true, false, all, {}));
+
+        QStringList selected = all;
+        QStringList excluded;
+        for (const QString &node : all) {
+            if (node.contains(QStringLiteral("private"))) {
+                excluded.append(node);
+                selected.removeAll(node);
+            }
+        }
+        QVERIFY2(!excluded.isEmpty(), "the fixture must contain a private concept");
+
+        // Same item absent, different reason: the person removed it, and the consumer is trusted
+        // enough that policy would have allowed it.
+        const QVariantMap byPerson = FabricCodec::decodeMap(service.Deliver(
+            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Bounded),
+            true, false, selected, excluded));
+
+        const QString first = byPolicy.value(QStringLiteral("disclosureDigest")).toString();
+        const QString second = byPerson.value(QStringLiteral("disclosureDigest")).toString();
+
+        QVERIFY2(!first.isEmpty(), "a pending disclosure must carry a commitment");
+        QVERIFY2(byPolicy.value(QStringLiteral("withheldCount")).toInt() > 0,
+                 "the fixture must actually withhold something");
+        QCOMPARE(byPolicy.value(QStringLiteral("deliveredCount")).toInt(),
+                 byPerson.value(QStringLiteral("deliveredCount")).toInt());
+
+        // Same delivered set, different reason for the absence, same commitment.
+        QCOMPARE(second, first);
+    }
+
+    // A consumer that owes no record is not made to invent one: an inspector that renders and
+    // forgets gets its answer directly.
+    void aConsumerThatOwesNoRecordIsNotMadeToWaitForOne()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("value"),
+                                             QDateTime::currentDateTimeUtc(),
+                                             PrivacyClass::Public))
+                > 0);
+
+        ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
+        QVERIFY(service.isReady());
+        const QVariantMap prepared
+            = FabricCodec::decodeMap(service.Prepare({QStringLiteral("subject")}, 0, 0));
+        const QString requestId = prepared.value(QStringLiteral("requestId")).toString();
+
+        const QVariantMap payload = FabricCodec::decodeMap(service.Deliver(
+            requestId, QStringLiteral("inspector"), static_cast<int>(ConsumerTrust::Bounded),
+            false, false, conceptsOf(prepared), {}));
+
+        QVERIFY(!payload.value(QStringLiteral("disclosurePending")).toBool());
+        QVERIFY(!payload.value(QStringLiteral("delivered")).toList().isEmpty());
+
+        // And there is nothing to release, because nothing was withheld pending a record.
+        QVERIFY(service.Release(requestId, QUuid::createUuid().toString(QUuid::WithoutBraces))
+                    .isEmpty());
+        QVERIFY(service.LastError().contains(QStringLiteral("owes no disclosure")));
     }
 
     // Inspection reports a delivery that happened, not a plan recomputed at inspection time.

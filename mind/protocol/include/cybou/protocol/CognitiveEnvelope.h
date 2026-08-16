@@ -51,6 +51,17 @@ enum class ContributionKind : quint16 {
     /// hash already written.
     ErasureRequested,
     ErasureApplied,
+
+    /// A durable record that context was supplied to a named consumer, from ADR-0030.
+    ///
+    /// Its own kind because it is its own fact: what Mind disclosed, to whom, and with what
+    /// provenance. It commits to a digest of what was released rather than copying it, so the
+    /// Journal does not become a second store of the material the disclosure was already the risk
+    /// of.
+    ///
+    /// Appended rather than inserted, like the erasure kinds: the numeric value of every existing
+    /// kind is part of every hash already written.
+    ContextDisclosed,
 };
 
 /// How long a contribution may exist at all.
@@ -82,7 +93,15 @@ constexpr PrivacyClass mostRestrictive(PrivacyClass a, PrivacyClass b) noexcept
 
 constexpr bool isRootKind(ContributionKind kind) noexcept
 {
-    return kind == ContributionKind::Observation;
+    // `ContextDisclosed` is rooted for the same reason an observation is: it records something
+    // that happened outside the Journal, and there is no prior contribution that caused it. The
+    // request it answers is not a contribution, and citing the disclosed material as evidence
+    // would require the recorder to know that material before the record exists -- which is the
+    // ordering ADR-0030's Release exchange is built to prevent.
+    //
+    // Its provenance is therefore in its payload: a digest committing to exactly what was
+    // released, verifiable afterwards against what the consumer received.
+    return kind == ContributionKind::Observation || kind == ContributionKind::ContextDisclosed;
 }
 
 /// Whether a kind is a storage operation rather than a thought.
