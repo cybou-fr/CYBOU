@@ -307,7 +307,7 @@ The owner decision for any future learning service must make that boundary expli
 | **A6** | Erasing source evidence invalidates every dependent opaque learned artifact before intended reuse |
 | **A7** | A rebuild/retrain after erasure demonstrably excludes erased evidence and its retention dependency closure |
 | **A8** | A clean valid ancestor remains available for rebuilding a personally fine-tuned neural artifact under the configured retention policy |
-| **A9** | Secrets/keys/tokens cannot enter the intended opaque-training target path under default policy |
+| **A9** | Secrets/keys/tokens cannot enter the intended opaque-training target path under default policy. Depends on the sensitivity axis of [ADR-0018](ADR-0018-privacy-classification-and-replication.md): until a payload can be typed as a credential, this gate is satisfiable by a refusal for any reason at all |
 | **A10** | Learned state cannot act as epistemic or execution authority through the intended interfaces |
 | **A11** | Core personal artifact training/evaluation does not require a remote service |
 
@@ -343,4 +343,5 @@ an immutable descendant with lineage, evaluation, promotion, and rebuild semanti
 - `ADR-0021-language-models-are-optional-faculties.md`
 - `ADR-0024-cognitive-lifecycle-and-consolidation.md`
 - `ADR-0028-retention-and-erasure.md`
+- `ADR-0018-privacy-classification-and-replication.md`
 - `ADR-0032-layered-lifelong-learning.md`

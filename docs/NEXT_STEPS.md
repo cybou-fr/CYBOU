@@ -1508,6 +1508,35 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### Three axes, decided before they are built
+
+`PrivacyClass` has been answering two questions. Its ordering is a replication scope -- where a
+contribution may exist -- and `Local` is the *default*, so a restricted scope says nothing about
+whether the content is dangerous. ADR-0030's delivery policy nevertheless reads it as a disclosure
+clearance. That works today only because nothing yet holds a credential.
+
+It breaks on ADR-0033's A9, which forbids secrets from entering an opaque training path while
+nothing in the protocol can say a payload *is* one. As written, A9 is satisfiable by a refusal for
+any reason at all -- the shape of an acceptance test that proves nothing, and the shape that has
+caught me repeatedly in this project.
+
+ADR-0018 now splits the three: `PrivacyScope` for where it may exist, `SensitivityClass` for who may
+be shown it, `RetentionClass` for how long. Sensitivity propagates like privacy, delivery policy
+reads sensitivity rather than scope, and an absent classification means `Personal` rather than
+`Ordinary` -- the alternative makes every unmigrated row look harmless, which is the wrong default
+when the point is to notice the dangerous ones. A9 is annotated in ADR-0033 as depending on it,
+rather than left reading as though it were already checkable.
+
+**The code is deliberately not written yet.** A new envelope field means a schema version, a
+canonical-form extension, a column with a migration, and history that must keep the hashes it was
+written with. Adding retention broke four tests on column-index arithmetic and broke the v1
+migration three separate times; each was caught by `migratesV1WithoutRehashingHistory`. That test is
+this amendment's acceptance gate, and the work wants a run of its own rather than the tail of one --
+an envelope left half-changed is worse than one not yet touched.
+
+This is the same sequencing the ADR-0029 work used: freeze the boundaries first, then write code
+against them.
+
 ### A disclosure is recorded before it happens
 
 ADR-0030 requires a retaining or externally-bound delivery to leave a record. Asking the consumer to
