@@ -1508,6 +1508,33 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### The classification vocabulary, before anything depends on it
+
+`SensitivityClass` and its propagation rule exist as protocol types with their own tests. Nothing
+carries the field yet: the envelope, canonical form and migration come next, and this is the piece
+that can be finished and proven without touching a hash.
+
+The rule most worth pinning early is the default. An unclassified contribution reads as `Personal`,
+not `Ordinary`. Every row written before this axis existed carries no classification, and reading
+absence as harmless would make the whole history look safe on precisely the day the point is to
+notice what is not. `Ordinary` also has to *stay* trainable -- a default so strong that everything
+unmigrated became untrainable would be a refusal for the wrong reason, and the test asserts both
+directions.
+
+`mayBeTrainingTarget` is A9 as a predicate over the type rather than a policy flag, because a flag
+can be cleared by whoever is doing the training. The case that matters is the derived one: nobody
+trains on the password, they train on something drawn from it, so the test requires a conclusion
+inheriting `Credential` to be refused too.
+
+Six sabotages, six caught. Two are worth noting for what they rule out: "nothing may be trained on"
+would satisfy both credential assertions while forbidding all learning, and it is caught by the
+assertion that ordinary material stays permitted. "Derivation takes the weakest source" is caught by
+the inheritance test *and* by the training test, which is the overlap that should exist when one
+rule protects two properties.
+
+The known `TestM4Processes` flake fired once during this work, in a suite the change does not touch.
+Confirmed as the flake by a clean rerun rather than assumed to be one.
+
 ### Three axes, decided before they are built
 
 `PrivacyClass` has been answering two questions. Its ordering is a replication scope -- where a

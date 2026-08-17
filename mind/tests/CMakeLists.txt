@@ -138,6 +138,13 @@ set_tests_properties(
     associative-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-sensitivity tst_sensitivity.cpp)
+target_link_libraries(test-sensitivity PRIVATE cybou-protocol Qt6::Test)
+add_test(NAME sensitivity COMMAND test-sensitivity)
+set_tests_properties(
+    sensitivity PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-consumer-registry tst_consumer_registry.cpp)
 target_link_libraries(
     test-consumer-registry PRIVATE cybou-context cybou-event-client Qt6::Test

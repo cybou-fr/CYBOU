@@ -6,6 +6,8 @@
 qt_add_library(cybou-protocol STATIC
     src/Observation.cpp
     include/cybou/protocol/Observation.h
+    src/Sensitivity.cpp
+    include/cybou/protocol/Sensitivity.h
     src/CapabilityRegistry.cpp
     include/cybou/protocol/CapabilityRegistry.h
     src/CanonicalEnvelope.cpp
