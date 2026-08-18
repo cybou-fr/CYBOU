@@ -45,7 +45,7 @@ The runtime identity marker prevents a daemon restart from being confused with a
 - opening another UI surface does not create another Mind;
 - process isolation does not introduce duplicate authoritative copies.
 
-## Current M6 extension and proposed M7–M9 ownership
+## Current M6 extension and proposed M7–M13 ownership
 
 | Resource | Target owner/boundary |
 |---|---|
@@ -57,7 +57,10 @@ The runtime identity marker prevents a daemon restart from being confused with a
 | retention policy and outstanding erasure obligations | dedicated policy owner to be selected before M7 |
 | homeostatic pressure projection | typed aggregation over owner metrics, not direct owner mutation |
 | executive focus/deferral state | evolution of `cybou-workspaced` unless a later ADR separates it |
-| authorization decision | future M9 policy boundary, never the value or language faculty |
+| authorization decision | future M10 policy boundary, never the value or language faculty |
+| worker or agent grant | future M11 actor runtime, never the actor itself |
+| model routing decision | future M11 broker, never the model |
+| security desired state | future M12 control plane, never an agent or a model |
 
 ADR-0024 and ADR-0025 deliberately do not assign new daemon names before persistence, failure, and
 privacy contracts justify process boundaries.

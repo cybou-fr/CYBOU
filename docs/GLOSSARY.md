@@ -113,10 +113,26 @@ axes: for example, Mind may be `Awake + Limited` or `Recovering + Limited`.
 
 **Node** — one device/runtime participating in a future distributed continuity topology.
 
-**Language faculty** — planned M8 model-backed capability for interpretation/proposal/explanation.
+**Language faculty** — planned M8 capability for interpretation, proposal and explanation. It may
+be a grammar, a parser, a classifier, a local or governed remote model, or a hybrid; no generative
+model is required.
+
+**Faculty** — a replaceable ability. Not an authority.
+
+**Worker** — a temporary actor created for one bounded task, holding only the context, capabilities,
+network destinations, budget and lifetime its grant names.
+
+**Agent** — a longer-lived actor responsible for a continuing domain. It does not own the state of
+that domain; Mind does.
+
+**Broker** — the mediated path between an actor and a model, tool or MCP server. Discovery is not
+authorization, so nothing becomes reachable merely by existing.
+
+**Standing authorization** — durable policy permitting a bounded unattended action in advance. Past
+approval, high confidence and a successful history are none of them standing authorization.
 It must not directly own Journal, identity, authorization, or privileged execution.
 
-**Authorized Action Boundary** — planned M9 policy boundary between uncertain cognition/planning and
+**Authorized Action Boundary** — planned M10 policy boundary between uncertain cognition/planning and
 typed external mutation.
 
 Terms such as **Mind**, **identity**, **self**, **attention**, and **cognitive** are software

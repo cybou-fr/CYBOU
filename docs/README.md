@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Cybou Documentation
 
-This documentation describes the repository at the M6 + P6.7 boundary. M7–M9 sections are target
+This documentation describes the repository at the M6 + P6.7 boundary. M7–M13 sections are target
 architecture unless a document explicitly says otherwise. For any implementation claim, begin
 with [Current State](CURRENT_STATE.md).
 
@@ -107,7 +107,7 @@ when repository gates and focused acceptance tests demonstrate it.
 - Update `CURRENT_STATE.md` in the same change that alters implemented capability.
 - Update the relevant contract before or with protocol/schema changes.
 - Record cross-owner or security-boundary changes in an ADR.
-- Label examples as current or future; do not present unfinished M7–M9 behavior as implemented.
+- Label examples as current or future; do not present unfinished M7–M13 behavior as implemented.
 - Replace milestone-relative phrases such as “current M5” when a later milestone implements the
   behavior; prefer capability names and explicit implementation boundaries.
 - Add new canonical documents to `scripts/validate-cognitive-docs.py`.

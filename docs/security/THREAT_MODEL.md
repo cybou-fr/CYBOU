@@ -18,7 +18,9 @@ backups, and future inter-node messages.
 - organ owner to lifecycle coordinator;
 - Journal history to derived epistemic projection;
 - local node to future trusted peer;
-- cognition/planning to M9 authorization and executor.
+- cognition/planning to M10 authorization and executor;
+- actors, models and tools to the M11 grant and broker boundaries;
+- unattended response to M12 standing policy, which must hold with models unavailable.
 
 ## Threats
 
@@ -63,7 +65,7 @@ backups, and future inter-node messages.
 - Journal hashing detects inconsistency but is not an external signature/trust anchor;
 - retention and replica erasure are design targets, not implemented controls;
 - lifecycle ownership, recovery, scheduling, and bounded transport are active enforcement paths;
-  epistemic governance and the M9 authorized-action boundary remain proposed;
+  epistemic governance and the M10 authorized-action boundary remain proposed;
 - user-service hardening does not yet define a least-privilege filesystem/network sandbox for
   every daemon;
 - Mind binaries retain environment-triggered fault-injection hooks, which the reboot and

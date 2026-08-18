@@ -40,6 +40,9 @@ SPDX-License-Identifier: MIT
 | [0031](ADR-0031-structured-meaning-and-cognitive-acts.md) | Structured Meaning and Cognitive Acts | Proposed |
 | [0032](ADR-0032-layered-lifelong-learning.md) | Layered Lifelong Learning and Consolidation | Proposed |
 | [0033](ADR-0033-learned-artifact-governance.md) | Learned Artifact Provenance, Promotion, Rollback, and Erasure | Proposed |
+| [0034](ADR-0034-governed-agents-workers-and-tools.md) | Governed Agents, Workers, and Tool Use | Proposed |
+| [0035](ADR-0035-governed-model-brokerage.md) | Governed Model Brokerage and External Inference | Proposed |
+| [0036](ADR-0036-autonomous-security-control-plane.md) | Autonomous Security and Operations Control Plane | Proposed |
 
 ## Why some ADRs remain Proposed
 
@@ -50,8 +53,9 @@ code already enforces leaves the record contradicting itself. These do not:
   describe boundaries deliberately not implemented. Proposed is the accurate status, and accepting
   them would assert a commitment nothing yet honours. 0025 is now partly narrowed by the Accepted
   [0027](ADR-0027-local-epistemic-projection-owner.md), which settles the owner it left open.
-- **0031 Structured Meaning**, **0032 Layered Lifelong Learning** and **0033 Learned Artifact
-  Governance** describe boundaries that deliberately precede their implementation. Writing them
+- **0031 Structured Meaning**, **0032 Layered Lifelong Learning**, **0033 Learned Artifact
+  Governance**, **0034 Governed Agents and Tools**, **0035 Governed Model Brokerage** and **0036
+  Autonomous Security** describe boundaries that deliberately precede their implementation. Writing them
   first is the point: they exist so the code can be reviewed against explicit invariants rather than
   the invariants being reconstructed afterwards from whatever the code turned out to do.
 - **0018 Privacy and Replication** is half enforced and half absent. The Journal rejects a

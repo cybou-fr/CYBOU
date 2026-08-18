@@ -386,8 +386,9 @@ same-user D-Bus authorization boundary, which remains open.
 
 The larger cognitive model and future agency architecture are described in `MIND_MODEL.md`.
 M1–M6 form the implemented process-isolated, continuity-preserving and degraded-mode substrate of
-that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 language faculty
-or M9 authorized executor.
+that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the planned M8 meaning boundary,
+the M9 learning runtime, the M10 authorized executor, the M11 agent, worker and model runtime, or
+the M12 security control plane.
 
 ## Process topology
 
@@ -567,8 +568,12 @@ The current tree does **not** yet implement:
   envelope, so nothing acts on a lifetime;
 - associative memory: ADR-0029 and ADR-0030 are Accepted and `cybou-contextd` does not exist;
 - M7 inter-node transport, replication, or partition handling;
-- M8 optional language faculty;
-- M9 planning/authorization/executor pipeline for privileged external actions.
+- M8 typed meaning boundary and language implementations;
+- M9 lifelong learning and learned-artifact governance;
+- M10 planning/authorization/executor pipeline for privileged external actions;
+- M11 agent, worker, model and tool runtime with grants and brokers;
+- M12 autonomous security and operations control plane;
+- M13 distributed perimeter governance.
 
 A UI or current organ method should not be described as providing those future capabilities unless
 the corresponding milestone is implemented and gated.
@@ -583,8 +588,11 @@ the corresponding milestone is implemented and gated.
   backup story is decided and unbuilt: a backup taken before an erasure, with a recovery root that
   still unwraps it, defeats that erasure;
 - no inter-node transport exists;
-- no model-selection/context policy for M8 exists;
-- no authorization policy or typed privileged executor for M9 exists.
+- no model-selection policy for M8 exists, though ADR-0030 delivery already governs what any
+  consumer may receive;
+- no authorization policy or typed privileged executor for M10 exists;
+- no agent, worker, model broker or tool broker for M11 exists;
+- no firewall, endpoint, credential or remediation control plane for M12 exists.
 
 ## Milestones
 

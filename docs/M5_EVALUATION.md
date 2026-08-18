@@ -8,8 +8,8 @@ SPDX-License-Identifier: MIT
 ## Scope
 
 This record describes the implemented M5 subset. It is evaluation evidence, not a stable-release
-claim. M6 degraded cognition, M7 retention/epistemic governance, M8 language, and M9 authorized
-action remain outside this candidate.
+claim. M6 degraded cognition, M7 retention/epistemic governance, M8 meaning, M9 learning, M10 authorized
+action, M11 governed actors, and M12 autonomous operations remain outside this candidate.
 
 ## Supported transition paths
 

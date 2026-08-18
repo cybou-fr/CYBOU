@@ -268,7 +268,7 @@ def main(argv: list[str]) -> int:
     require_regex(
         paths["current"],
         "current/future boundary",
-        r"tree does not yet contain the planned M8 language faculty\s+or M9 authorized executor",
+        r"tree does not yet contain the planned M8 meaning boundary,\s+the M9 learning runtime,\s+the M10 authorized executor,\s+the M11 agent, worker and model runtime,\s+or\s+the M12 security control plane",
     )
     require(
         paths["current"],

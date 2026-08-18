@@ -9,60 +9,72 @@ SPDX-License-Identifier: MIT
 
 # Cybou
 
-**A reproducible personal NixOS desktop with a persistent, typed cognitive runtime**
+**An experimental agent-native operating system with a persistent cognitive control plane**
 
-NixOS 26.05 · KDE Plasma 6 Wayland · C++20/Qt 6 · local-first · zero cloud dependency
+NixOS 26.05 · KDE Plasma 6 Wayland · C++20/Qt 6 · local-first · no required cloud service
 
 </div>
 
 ## What Cybou is
 
-Cybou is an experimental personal operating-system project built on NixOS and KDE Plasma. It
-combines a reproducible desktop, the Cybou Horizon visual system, and **Mind**: a local runtime for
-durable biography, identity continuity, commitments, prediction/calibration, self projection, and
-bounded attention.
+Cybou is an experimental operating-system project built on NixOS and KDE Plasma. Its long-term
+target is not "Linux with a chatbot". It is an **agent-native computing environment** in which a
+persistent **Mind** remembers and governs the system while models, agents, workers, tools, and user
+interfaces remain replaceable.
 
-Mind is deliberately not a chatbot or a single AI agent. Language models are planned as optional,
-replaceable faculties. They do not own identity, canonical memory, authorization, or privileged
-execution.
+Mind owns durable cognitive continuity: biography, identity, commitments, prediction/calibration,
+epistemic state, context, learning, policy inputs, and the future authorization boundary. The target
+extends that substrate into a cognitive **control plane** that can continuously observe, protect,
+and maintain the machine even when no person is present.
 
-The current repository implements the evaluated M1–M6 substrate through P6.8: capability health,
-typed homeostasis, automatic evidence-bound lifecycle scheduling, partial-availability recovery,
-a non-blocking Presence surface, durability enforced at commit, and continuity/fault gates across
-real processes and Plasma.
+The intended hierarchy is:
 
-M7 has begun. Contribution origin is bound to the calling
-executable, Journal growth costs are measured against budgets, Event1 has paged replay and
-incremental verification, capability and command policy has one declaration, and `ObservationV1` is
-frozen, `cybou-perceptiond` reads the identity of the running system and proposes it as a
-provenance-bearing observation, `cybou-epistemicd` derives from those observations what is known,
-stale, disputed or superseded, and Presence carries that knowledge to the surface.
+```text
+person / owner policy
+        ↓
+      Mind
+        ↓
+governed agents / workers / models
+        ↓
+capabilities / tools / executors
+        ↓
+       Body
+```
 
-**Mind can now forget.** A payload can be erased while its record stays provable, the protocol
-survives a crash at any point, and the erasure reaches what was derived from it rather than leaving
-the reasoning that restates it. What is missing is the sensitive half: no payload is encrypted and
-no perception source is sensitive, because
-[ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md) forbids ingesting one until the remaining
-gates are green. There is also no language model, no distributed Mind, and no authorized external
-agency. See [Current State](docs/CURRENT_STATE.md) for the exact implementation boundary.
+A model is not Mind. An agent is not Mind. A worker is not Mind. MCP or another tool protocol is not
+an authorization boundary.
+
+Local and remote models may both be used in the future, but only through explicit context-delivery,
+sensitivity, egress, cost, and capability policy. Cybou has no required cloud dependency: loss of
+remote inference may reduce capability, but it must not erase identity, biography, policy, or the
+minimum local control substrate.
+
+The current repository does **not** yet implement the future agent/worker runtime, model broker,
+MCP/tool broker, general authorized action executor, firewall/endpoint controller, credential
+broker, or autonomous remediation loop. `CURRENT_STATE.md` is authoritative for what exists today.
 
 ## Why this architecture
 
-Most assistants collapse language, memory, identity, planning, and execution into one model
-process. Cybou keeps those responsibilities explicit:
+Most assistants collapse language, memory, identity, planning, tool use, and execution into one
+model process. Cybou keeps those responsibilities explicit:
 
 ```text
 model ≠ identity
+agent ≠ Mind
+worker ≠ authority
+tool access ≠ permission
+MCP availability ≠ authorization
 UI ≠ Mind
 attention ≠ biography
 perception ≠ truth
 confidence ≠ authorization
 proposal ≠ permission to execute
+command sent ≠ observed outcome
 consolidation ≠ rewriting history
 ```
 
-This makes model replacement, process restart, degraded operation, privacy policy, and future
-actions independently testable.
+This makes model/agent replacement, process restart, degraded operation, disclosure, tool use, and
+future autonomous actions independently testable.
 
 ## Current architecture
 
@@ -101,31 +113,94 @@ become a second cognitive owner.
 | Single canonical Journal writer (`cybou-eventd`) | Implemented — M3 |
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
 | Restart/reboot continuity and lifecycle/consolidation core | Evaluation complete — M5 |
-| Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 P6.1–P6.4 |
-| Capability-aware Presence and interruptible automatic scheduling | Implemented — M6 P6.5 complete |
-| Partial-availability and recovery fault matrix | Implemented — M6 P6.6 complete, including focused KVM gate |
-| Bounded compound Presence commands and read aggregation | Implemented — post-M6 P6.7 complete |
-| Non-blocking Presence surface and enforced commit durability | Implemented — post-M6 P6.8 complete |
+| Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 |
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
-| One capability and command declaration | Implemented — P7.0 |
-| Grounded local perception: `ObservationV1` and `cybou-perceptiond` | Implemented — P7.1 |
-| Epistemic projection owner: `cybou-epistemicd`, cursor and checkpoint | Implemented — P7.2 |
-| Epistemic status in the Presence surface | Implemented — P7.5 |
-| Journal v3, split commitment, two-axis verification | Implemented — P7.11–P7.12 |
-| Crash-safe erasure, transitive to derived contributions | Implemented — P7.14–P7.16; gates E1–E8 |
-| Sensitive payload storage and backup erasure | Decided — [ADR-0028](docs/adr/ADR-0028-retention-and-erasure.md); gates E10–E12 open |
-| Associative context: `cybou-contextd`, transparent delivery | Decided — [ADR-0029](docs/adr/ADR-0029-associative-context-projection.md), [ADR-0030](docs/adr/ADR-0030-transparent-context-delivery.md) |
-| Distributed prototype | Planned — M7 |
-| Optional replaceable language faculty | Planned — M8 |
-| Policy-controlled authorized action boundary | Planned — M9 |
+| Grounded local perception and epistemic projection | Implemented — M7 slices |
+| Journal v3 commitments and crash-safe transitive erasure | Implemented — M7 slices |
+| Sensitivity as a durable schema axis | Implemented — M7 slices |
+| Associative context and transparent governed delivery | Implemented/advancing — ADR-0029/0030 |
+| Distributed Mind prototype | Planned — M7 |
+| Structured language and meaning boundary | Planned — M8 |
+| Lifelong learning and learned-artifact governance | Planned — M9 |
+| Governed action and remediation boundary | Planned — M10 |
+| Agent/worker runtime, model broker, and governed tool/MCP use | Planned — M11 |
+| Continuous autonomous security and system operations | Planned — M12 |
+| Distributed perimeter and multi-node governance | Planned — M13 |
 
 The milestone labels describe engineering capability, not consciousness or biological equivalence.
 
+## Target agent-native control plane
+
+```text
+                         PERSON
+                           │
+                    goals / policy
+                           │
+                           ▼
+                         MIND
+                           │
+          ┌────────────────┼─────────────────┐
+          │                │                 │
+       cognition        security         operations
+          │                │                 │
+          └────────────────┼─────────────────┘
+                           ▼
+                     CONTROL PLANE
+                           │
+        ┌──────────────────┼───────────────────┐
+        ▼                  ▼                   ▼
+      models             agents             workers
+ local / remote      long-lived scope    task-scoped
+        │                  │                   │
+        └──────────────────┼───────────────────┘
+                           ▼
+                    CAPABILITY BROKER
+                           │
+        ┌──────────────────┼───────────────────┐
+        ▼                  ▼                   ▼
+   filesystem/process    network/security     tools/APIs
+   services/packages     firewall/SSH/VPN     MCP/cloud
+                           │
+                           ▼
+                          BODY
+```
+
+### Faculty, worker, agent
+
+- **Faculty** — a replaceable ability such as language, vision, planning, or code analysis.
+- **Worker** — a temporary actor created for one bounded task, with task-scoped context,
+  capabilities, network access, resource budget, and lifetime.
+- **Agent** — a longer-lived actor responsible for a continuing domain or intention.
+- **Mind** — the persistent owner of continuity, evidence relationships, policy boundaries, and
+  durable cognitive state.
+
+### Continuous control
+
+```text
+Observe
+  ↓
+Assess
+  ↓
+Predict
+  ↓
+Decide
+  ↓
+Authorize
+  ↓
+Act
+  ↓
+Verify
+  ↓
+Learn
+  └──────────↺
+```
+
+Autonomous does not mean unrestricted.
+
 ## Cognitive lifecycle
 
-The implemented analogue of sleep is an explicit maintenance lifecycle rather than a biological
-simulation or a central `sleepd`:
+The implemented maintenance lifecycle remains the substrate for bounded background work:
 
 ```text
 Awake → Idle → Consolidating → Awake
@@ -134,67 +209,51 @@ failure   → Recovering
 session   → Suspended
 ```
 
-`cybou-lifecycled` orchestrates bounded, interruptible runs while existing organs retain state
-ownership. Predictor and Workspace create evidence-linked, idempotent Event1 results, and completed
-runs require an accepted terminal Outcome. Lifecycle projection and the reboot/split-commit
-fault-injection matrix are implemented. See
-[ADR-0024](docs/adr/ADR-0024-cognitive-lifecycle-and-consolidation.md).
+Future agent/security work may use lifecycle and homeostatic signals for scheduling, but lifecycle
+does not become the owner of security state, agents, or learned artifacts.
+
+## Model policy
+
+Cybou remains local-first, but **local-only inference is not the product boundary**.
+
+Future model use may include local and remote inference through a governed model broker. Context
+must cross the same named-consumer delivery boundary as any other disclosure. External inference is
+an external boundary; it may not silently retrieve Mind state or become the only place continuity
+exists.
+
+```text
+core cognitive ownership and minimum control → local
+optional inference capacity                  → local and/or remote
+```
+
+## Security direction
+
+Cybou aims to govern the whole managed computing environment, including:
+
+- firewall and network exposure;
+- endpoint/process and persistence state;
+- service/package integrity;
+- SSH identities and access grants;
+- credentials and delegated access;
+- AI agents and task workers;
+- local and remote model usage;
+- MCP/tool/server access;
+- network egress and cross-node trust.
+
+The security substrate must not depend on persuading an AI model to behave.
 
 ## Build and test
 
 Use Linux or WSL2 with Nix. The flake pins the complete toolchain and NixOS base.
 
-Build the Mind runtime and Presence applet:
-
 ```bash
 nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
 nix build .#packages.x86_64-linux.cybou-presence-applet --print-build-logs
-```
-
-Build and start the development VM:
-
-```bash
 nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
-./result/bin/run-cybou-vm
 ```
 
-Run the fast repository gates:
-
-```bash
-nix build --print-build-logs \
-  .#checks.x86_64-linux.formatting \
-  .#checks.x86_64-linux.reuse \
-  .#checks.x86_64-linux.package-metadata \
-  .#checks.x86_64-linux.cognitive-docs \
-  .#checks.x86_64-linux.mind-access \
-  .#checks.x86_64-linux.qml-api \
-  .#checks.x86_64-linux.ui-polish \
-  .#packages.x86_64-linux.cybou-mind \
-  .#packages.x86_64-linux.cybou-presence-applet
-
-nix fmt
-git diff --exit-code
-```
-
-The full `nix flake check` includes both the focused headless lifecycle reboot gate and the heavy
-two-node Plasma VM smoke test. Build details and the direct CMake workflow are in
-[Building](docs/BUILDING.md); test coverage is described in [Testing](docs/TESTING.md).
-
-## Flake outputs
-
-| Output | Purpose |
-|---|---|
-| `packages.x86_64-linux.cybou-mind` | Nine daemons plus the Presence QML proxy plugin |
-| `packages.x86_64-linux.cybou-presence-applet` | Plasma Presence and access-handle packages |
-| `packages.x86_64-linux.cybou-theme` | Combined Horizon Plasma theme |
-| `nixosConfigurations.cybou-vm` | QEMU/KVM development VM |
-| `nixosConfigurations.cybou-iso` | Live/installer ISO |
-| `nixosConfigurations.cybou-hyperv` | Hyper-V development image |
-| `checks.x86_64-linux.lifecycle-continuity` | Headless P2 identity/run reboot continuity gate |
-| `checks.x86_64-linux.m6-recovery-boundary` | Focused Plasma/Presence recovery and deadline gate |
-| `checks.x86_64-linux.vm-smoke` | Full NixOS/Plasma service-graph smoke test |
-
-Run `nix flake show` for the complete package list.
+Run the repository gates described in [Building](docs/BUILDING.md) and
+[Testing](docs/TESTING.md). `CURRENT_STATE.md` remains the authority for demonstrated behavior.
 
 ## Repository map
 
@@ -217,46 +276,39 @@ Choose a route:
 - **Understand the idea:** [Mind Model](docs/MIND_MODEL.md) →
   [Architecture](docs/ARCHITECTURE.md) → [Roadmap](docs/ROADMAP.md)
 - **Verify what exists:** [Current State](docs/CURRENT_STATE.md) →
-  [Project Checkpoint](docs/PROJECT_CHECKPOINT_2026-08-10.md) →
   [Testing](docs/TESTING.md) → [Failure Modes](docs/mind/FAILURE_MODES.md)
 - **Build or contribute:** [Building](docs/BUILDING.md) →
   [Development Workflow](docs/DEVELOPMENT_WORKFLOW.md) →
-  [Next Engineering Steps](docs/NEXT_STEPS.md) → [Release](docs/RELEASE.md)
-- **Review Mind contracts:** [Mind documentation](docs/mind/README.md)
+  [Next Engineering Steps](docs/NEXT_STEPS.md)
 - **Review trust boundaries:** [Security documentation](docs/security/README.md)
 - **Review decisions:** [ADR index](docs/adr/README.md)
-
-The complete navigation map is in the [documentation index](docs/README.md).
 
 ## Design principles
 
 - Local-first operation and no required cloud service.
+- Remote inference or external tools, when used, cross explicit policy and disclosure boundaries.
 - Reproducible Nix builds and explicit state transitions.
 - Durable state is accepted before it becomes visible.
 - One canonical writer for cognitive history.
-- UI, language, planning, authorization, and execution remain separate boundaries.
-- Unknown, stale, inferred, and disputed state must remain distinguishable.
-- Privacy includes retention and erasure, not only classification.
-- External actions must return observed outcomes to cognition.
+- UI, language, planning, authorization, execution, and security governance remain separate.
+- Unknown, stale, inferred, and disputed state remain distinguishable.
+- Privacy, sensitivity, retention, erasure, and egress are separate governed concerns.
+- Agents, workers, models, and tool servers never acquire authority merely by being available.
+- Managed MCP/tool access is capability-scoped rather than raw model-to-tool access.
+- External actions return observed outcomes to cognition.
+- Unattended autonomy is bounded by standing policy, risk, reversibility, and verification.
 
 ## Project maturity
 
-Cybou is pre-release research and engineering software. Images are development artifacts unless a
-specific release states otherwise. Do not use a development image as the only copy of important
-data, and do not treat planned M7–M9 behavior as implemented.
+Cybou is pre-release research and engineering software. Do not treat planned M8–M13 behavior as
+implemented. The current tree does not yet contain the general agent/worker runtime, model broker,
+MCP governance layer, privileged security control plane, or unattended remediation engine described
+by the future ADRs.
 
 ## Support and partnerships
 
-Cybou is independently developed. Partnership enquiries and the canonical donation details are
-published on [cybou.fr/partners.html](https://cybou.fr/partners.html). Always verify an address on
-that page before sending funds.
-
-| Network | Address |
-|---|---|
-| Solana (SOL) | `39iqkHNMqncEPp3p52zKwUHnYzk2MJbcaHyY4Hhg2fWC` |
-| Bitcoin (BTC) | `bc1q5a0yq9kflu755jz9a7juveelj3lrnaml6cnjur` |
-| Ethereum / USDT (ERC-20) | `0xf4B7fF998600617785ad7D4d0aad3D2Ea342526B` |
-| TRON / USDT (TRC-20) | `TCWmbxJXwes4GLZkVjpKpY3p34mjg4C6qo` |
+Cybou is independently developed. Partnership enquiries and canonical contact information are
+published at [cybou.fr](https://cybou.fr/).
 
 For collaboration, hardware enablement, distribution work, or security contact:
 [info@cybou.fr](mailto:info@cybou.fr).

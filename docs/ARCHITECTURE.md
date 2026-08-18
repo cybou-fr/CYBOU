@@ -194,7 +194,8 @@ Future presentation surfaces must preserve the same boundary.
 
 ## Future faculty boundary
 
-M8 adds optional language capability without moving identity or memory authority into a model.
+M8 adds an explicit meaning boundary without moving identity or memory authority into a model. No
+generative model is required to cross it.
 
 Target relationship:
 
@@ -278,7 +279,8 @@ failure, and privacy contracts are precise.
 
 ## Future action boundary
 
-M9 is intentionally outside the current M1–M6 organ topology.
+M10 is intentionally outside the current M1–M6 organ topology, as are the M11 agent, worker and
+model runtime and the M12 security control plane.
 
 No language model or UI component should become a privileged executor.
 
@@ -318,8 +320,9 @@ continuity, degraded operation, recovery, evidence-bound scheduling, and bounded
 M7 is next: add one local grounded-perception slice with provenance, epistemic/retention
 governance, and fault evidence before attempting inter-node transport.
 
-M8 adds replaceable language faculties.
+M8 adds a typed meaning boundary with replaceable language implementations.
 
-M9 adds policy-controlled external agency.
+M10 adds policy-controlled external agency; M11 governs the agents, workers, models and tools that
+propose it, and M12 makes bounded operation continuous under standing policy.
 
 See `MIND_MODEL.md` for the conceptual model and `ROADMAP.md` for milestone semantics.

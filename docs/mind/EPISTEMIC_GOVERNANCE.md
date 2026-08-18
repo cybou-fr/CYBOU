@@ -77,7 +77,7 @@ Workspace evolves into bounded interruption, deferral, return, and competition p
 are criticized against user authority, safety, privacy, reversibility, cost, urgency, evidence
 quality, and resource budget.
 
-Value constraints can reject or defer a proposal. They cannot grant execution permission; M9
+Value constraints can reject or defer a proposal. They cannot grant execution permission; M10
 authorization remains separate.
 
 ## M7 minimal vertical slice

@@ -63,7 +63,8 @@ Presence remains read-only; lifecycle mode remains orthogonal to capability heal
 2. Protocol/schema changes land before dependent UI behavior.
 3. Every persistent change includes migration, interruption, and recovery tests.
 4. `CURRENT_STATE.md` advances only with demonstrated implementation.
-5. M8 language and M9 action work do not begin before the M6 exit gate.
+5. M8 meaning and M10 action work do not begin before the M6 exit gate, and the M11 actor runtime
+   and M12 control plane follow the action boundary rather than preceding it.
 
 ## P6.8 — Close the substrate audit findings
 
