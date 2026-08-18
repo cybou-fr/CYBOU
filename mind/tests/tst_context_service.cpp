@@ -447,9 +447,15 @@ private Q_SLOTS:
         QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("shared"),
                                              now.addSecs(-120), PrivacyClass::Public))
                 > 0);
-        QVERIFY(journal.append(observationOf(QStringLiteral("subject"), QStringLiteral("private"),
-                                             now.addSecs(-60), PrivacyClass::Local))
-                > 0);
+        // Classified explicitly, because an unclassified contribution now reads as Personal and a
+        // bounded consumer may be shown that. Secret reaches no ceiling at all, so this item is
+        // held back from every consumer, which is what the comparison below needs.
+        CognitiveEnvelope secret = observationOf(QStringLiteral("subject"),
+                                                 QStringLiteral("private"), now.addSecs(-60),
+                                                 PrivacyClass::Local);
+        secret.schemaVersion = kClassifiedEnvelopeSchemaVersion;
+        secret.sensitivity = SensitivityClass::Secret;
+        QVERIFY2(journal.append(secret) > 0, qPrintable(journal.lastError()));
 
         ContextService service(&journal, dir.filePath(QStringLiteral("cp.cbor")));
         QVERIFY(service.isReady());
@@ -458,9 +464,9 @@ private Q_SLOTS:
         const QString requestId = prepared.value(QStringLiteral("requestId")).toString();
         const QStringList all = conceptsOf(prepared);
 
-        // Held back by policy: an untrusted consumer may not have the private item.
+        // Held back by policy: no ceiling reaches Secret, so this item travels to nobody.
         const QVariantMap byPolicy = FabricCodec::decodeMap(service.Deliver(
-            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Untrusted),
+            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Full),
             true, false, all, {}));
 
         QStringList selected = all;
@@ -476,7 +482,7 @@ private Q_SLOTS:
         // Same item absent, different reason: the person removed it, and the consumer is trusted
         // enough that policy would have allowed it.
         const QVariantMap byPerson = FabricCodec::decodeMap(service.Deliver(
-            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Bounded),
+            requestId, QStringLiteral("local-model"), static_cast<int>(ConsumerTrust::Full),
             true, false, selected, excluded));
 
         const QString first = byPolicy.value(QStringLiteral("disclosureDigest")).toString();

@@ -66,17 +66,22 @@ struct Destination {
 /// the answer, which is what makes it a reviewable object rather than a filter buried in a request
 /// builder.
 struct DeliveryPolicy {
-    /// The most restrictive class each trust level may see. PrivacyClass runs from most to least
-    /// restrictive, so a floor of `Local` permits everything and `Public` only what was already
-    /// public.
+    /// The most sensitive classification each trust level may be shown.
     ///
-    /// Every level has a floor, including the most trusted one. There is no unfiltered case: a
-    /// consumer gains context by being permitted, never by being nearby.
-    PrivacyClass floorForUntrusted{PrivacyClass::Public};
-    PrivacyClass floorForBounded{PrivacyClass::Household};
-    PrivacyClass floorForFull{PrivacyClass::Local};
+    /// ADR-0018: disclosure is decided on the sensitivity axis, not the replication scope. Scope
+    /// answers *where a thing may exist*, and `Local` is its default, so reading it as a clearance
+    /// made almost every ordinary contribution look restricted and a credential look ordinary.
+    ///
+    /// Every level has a ceiling, including the most trusted one. There is no unfiltered case.
+    SensitivityClass ceilingForUntrusted{SensitivityClass::Ordinary};
+    SensitivityClass ceilingForBounded{SensitivityClass::Personal};
+    SensitivityClass ceilingForFull{SensitivityClass::Sensitive};
 
-    PrivacyClass floorFor(ConsumerTrust trust) const;
+    /// The scope a consumer may reach when delivery crosses a device or network boundary. Scope
+    /// keeps its own job: sensitivity says who may be shown a thing, scope says where it may go.
+    PrivacyClass scopeForExternal{PrivacyClass::Household};
+
+    SensitivityClass ceilingFor(ConsumerTrust trust) const;
     bool permits(const ContextItem &item, const Destination &destination) const;
 };
 

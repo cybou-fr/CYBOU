@@ -1508,6 +1508,31 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### Delivery decides on sensitivity, and A9 becomes a property
+
+`DeliveryPolicy` now reads `SensitivityClass`. Trust maps to a ceiling rather than a privacy floor,
+and no ceiling reaches `Secret` or `Credential` -- so those classifications travel to no consumer at
+all, including the most trusted one and including a purely local consumer with no boundary to cross.
+ADR-0033's A9 stops being a rule a training pipeline must remember and becomes a property of the
+path the material would have to move along.
+
+Scope keeps its own job. Sensitivity says who may be shown a thing; `PrivacyClass` says where it may
+go, and it is checked when delivery crosses a device boundary. Both, not either -- which is the
+whole point of splitting the axes.
+
+Unclassified contributions reach the graph as `Personal`, so an untrusted consumer now receives
+nothing from unmigrated history. That is intended and it changed a passing test: the disclosure-digest
+fixture had used an untrusted consumer to force a hold-back, and now everything is held back from
+one. It classifies its private item explicitly instead.
+
+Four sabotages, three caught immediately. The fourth -- deleting the external-scope rule entirely --
+was missed, and for a reason worth keeping: every other fixture pins privacy to `Public` so that a
+refusal can only be about classification, which meant the scope branch was never exercised. The new
+test is the deliberate opposite case: ordinary material, fully trusted consumer, refused because it
+must not leave the device. Without it the scope rule could have been deleted with the suite green.
+
+That closes the last of the nine review findings.
+
 ### Sensitivity becomes a durable field
 
 Envelope schema 4 carries `sensitivity`. A new version rather than an extension of schema 3, because

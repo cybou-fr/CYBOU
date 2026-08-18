@@ -477,6 +477,9 @@ void ContextService::admitToGraph(const CognitiveEnvelope &envelope)
     subjectNode.kind = ConceptKind::Subject;
     subjectNode.evidence = {envelope.messageId};
     subjectNode.privacy = envelope.privacy;
+    subjectNode.sensitivity = envelope.schemaVersion == kClassifiedEnvelopeSchemaVersion
+        ? envelope.sensitivity
+        : kUnclassifiedSensitivity;
     subjectNode.retentionClass = envelope.retentionClass;
     subjectNode.retainUntil = envelope.retainUntil;
     m_projection.addConcept(subjectNode);

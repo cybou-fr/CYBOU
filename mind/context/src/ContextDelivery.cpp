@@ -35,17 +35,17 @@ QString consumerTrustToString(ConsumerTrust trust)
     return QStringLiteral("unknown");
 }
 
-PrivacyClass DeliveryPolicy::floorFor(ConsumerTrust trust) const
+SensitivityClass DeliveryPolicy::ceilingFor(ConsumerTrust trust) const
 {
     switch (trust) {
     case ConsumerTrust::Untrusted:
-        return floorForUntrusted;
+        return ceilingForUntrusted;
     case ConsumerTrust::Bounded:
-        return floorForBounded;
+        return ceilingForBounded;
     case ConsumerTrust::Full:
-        return floorForFull;
+        return ceilingForFull;
     }
-    return PrivacyClass::Public;
+    return SensitivityClass::Ordinary;
 }
 
 bool DeliveryPolicy::permits(const ContextItem &item, const Destination &destination) const
@@ -53,10 +53,22 @@ bool DeliveryPolicy::permits(const ContextItem &item, const Destination &destina
     // No early return for a local consumer. ADR-0030's B7: every destination is filtered by its own
     // trust, and being on the same machine is not a permission.
     //
-    // PrivacyClass is ordered from most to least restrictive, so an item may go to a consumer
-    // exactly when it is no more restrictive than that consumer's floor.
-    return static_cast<int>(item.privacy) >= static_cast<int>(floorFor(destination.trust));
+    // Disclosure is decided on sensitivity. No ceiling reaches Secret or Credential, so those
+    // never travel to any consumer at all, which makes ADR-0033 A9 a property of the delivery path
+    // rather than a rule a training pipeline has to remember.
+    if (static_cast<int>(item.sensitivity) > static_cast<int>(ceilingFor(destination.trust))) {
+        return false;
+    }
+
+    // Scope still governs distance: a contribution this consumer may be shown can still be one
+    // that must not leave the device.
+    if (destination.externalBoundary
+        && static_cast<int>(item.privacy) < static_cast<int>(scopeForExternal)) {
+        return false;
+    }
+    return true;
 }
+
 
 DeliveryPlan DeliveryPlan::build(
     const ContextBundle &bundle,
@@ -82,10 +94,10 @@ DeliveryPlan DeliveryPlan::build(
             decision.reason = QStringLiteral("excluded by the person");
         } else if (!policy.permits(item, destination)) {
             decision.disposition = Disposition::HeldBackByPolicy;
-            decision.reason = QStringLiteral("%1 trust of %2 does not permit privacy class %3")
+            decision.reason = QStringLiteral("%1 trust of %2 does not permit %3 material")
                                   .arg(consumerTrustToString(destination.trust))
                                   .arg(destination.id)
-                                  .arg(static_cast<int>(item.privacy));
+                                  .arg(sensitivityToString(item.sensitivity));
         } else if (!selected.contains(item.conceptId)) {
             decision.disposition = Disposition::NotSelected;
             decision.reason = QStringLiteral("available, not selected for this request");

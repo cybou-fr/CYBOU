@@ -171,6 +171,7 @@ ContextBundle AssociativeProjection::activate(
         item.relevance = relevance.value(id);
         item.evidence = node.evidence;
         item.privacy = node.privacy;
+        item.sensitivity = node.sensitivity;
         item.activationReason = reason.value(id);
         bundle.items.append(item);
     }

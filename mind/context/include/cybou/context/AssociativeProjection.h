@@ -57,6 +57,7 @@ struct ConceptNode {
     QList<QUuid> evidence;
 
     PrivacyClass privacy{PrivacyClass::Local};
+    SensitivityClass sensitivity{kUnclassifiedSensitivity};
     RetentionClass retentionClass{RetentionClass::Standard};
     QDateTime retainUntil;
 
@@ -88,6 +89,7 @@ struct ContextItem {
     double relevance{0.0};
     QList<QUuid> evidence;
     PrivacyClass privacy{PrivacyClass::Local};
+    SensitivityClass sensitivity{kUnclassifiedSensitivity};
     QString activationReason;
 };
 

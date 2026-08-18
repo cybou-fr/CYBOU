@@ -9,12 +9,13 @@ using namespace cybou;
 
 namespace {
 
-ContextItem item(const QString &id, PrivacyClass privacy)
+ContextItem item(const QString &id, SensitivityClass sensitivity)
 {
     ContextItem it;
     it.conceptId = id;
     it.relevance = 0.5;
-    it.privacy = privacy;
+    it.privacy = PrivacyClass::Public;
+    it.sensitivity = sensitivity;
     it.activationReason = QStringLiteral("seed");
     it.evidence = {QUuid::createUuid()};
     return it;
@@ -74,6 +75,12 @@ private slots:
 
     /// The commitment covers the delivered items and nothing else.
     void theDigestCoversDeliveredItemsOnly();
+
+    /// ADR-0033 A9 as a property of the delivery path.
+    void secretsAndCredentialsReachNoConsumerAtAll();
+
+    /// Scope keeps its own job at the device boundary.
+    void scopeStillDecidesWhatMayLeaveTheDevice();
 };
 
 void TestContextDelivery::everyDispositionHasItsOwnLabel()
@@ -104,13 +111,13 @@ void TestContextDelivery::everyDispositionHasItsOwnLabel()
 void TestContextDelivery::everyActivatedItemGetsExactlyOneDisposition()
 {
     const ContextBundle bundle = bundleOf({
-        item(QStringLiteral("lemon"), PrivacyClass::Public),
-        item(QStringLiteral("episode"), PrivacyClass::Local),
-        item(QStringLiteral("honey"), PrivacyClass::Household),
+        item(QStringLiteral("lemon"), SensitivityClass::Ordinary),
+        item(QStringLiteral("episode"), SensitivityClass::Secret),
+        item(QStringLiteral("honey"), SensitivityClass::Personal),
     });
 
     DeliveryPolicy policy;
-    policy.floorForUntrusted = PrivacyClass::Household;
+    policy.ceilingForUntrusted = SensitivityClass::Personal;
 
     const DeliveryPlan plan = DeliveryPlan::build(
         bundle, policy, {QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true}, idsOf(bundle), {});
@@ -134,15 +141,15 @@ void TestContextDelivery::everyActivatedItemGetsExactlyOneDisposition()
 void TestContextDelivery::policyNarrowsDeliveryWithoutAlteringTheBundle()
 {
     const ContextBundle bundle = bundleOf({
-        item(QStringLiteral("lemon"), PrivacyClass::Public),
-        item(QStringLiteral("episode"), PrivacyClass::Local),
+        item(QStringLiteral("lemon"), SensitivityClass::Ordinary),
+        item(QStringLiteral("episode"), SensitivityClass::Secret),
     });
     const QList<ContextItem> before = bundle.items;
 
     DeliveryPolicy permissive;
-    permissive.floorForUntrusted = PrivacyClass::Local;
+    permissive.ceilingForUntrusted = SensitivityClass::Credential;
     DeliveryPolicy strict;
-    strict.floorForUntrusted = PrivacyClass::Public;
+    strict.ceilingForUntrusted = SensitivityClass::Ordinary;
 
     const Destination remote{QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true};
     const DeliveryPlan open
@@ -156,20 +163,20 @@ void TestContextDelivery::policyNarrowsDeliveryWithoutAlteringTheBundle()
     QCOMPARE(bundle.items.size(), before.size());
     for (int i = 0; i < before.size(); ++i) {
         QCOMPARE(bundle.items.at(i).conceptId, before.at(i).conceptId);
-        QCOMPARE(bundle.items.at(i).privacy, before.at(i).privacy);
+        QCOMPARE(bundle.items.at(i).sensitivity, before.at(i).sensitivity);
     }
 }
 
 void TestContextDelivery::availableAndDeliveredAreIndependentlyInspectable()
 {
     const ContextBundle bundle = bundleOf({
-        item(QStringLiteral("lemon"), PrivacyClass::Public),
-        item(QStringLiteral("honey"), PrivacyClass::Public),
-        item(QStringLiteral("episode"), PrivacyClass::Local),
+        item(QStringLiteral("lemon"), SensitivityClass::Ordinary),
+        item(QStringLiteral("honey"), SensitivityClass::Ordinary),
+        item(QStringLiteral("episode"), SensitivityClass::Secret),
     });
 
     DeliveryPolicy policy;
-    policy.floorForUntrusted = PrivacyClass::Public;
+    policy.ceilingForUntrusted = SensitivityClass::Ordinary;
 
     // The person selected only one of the two permitted items.
     const DeliveryPlan plan = DeliveryPlan::build(
@@ -190,9 +197,11 @@ void TestContextDelivery::availableAndDeliveredAreIndependentlyInspectable()
 
 void TestContextDelivery::aLocalConsumerIsNotTrustedForBeingLocal()
 {
+    // Personal rather than Secret: no ceiling reaches Secret, so a secret item would be refused
+    // to every consumer alike and could not show that trust is what differs here.
     const ContextBundle bundle = bundleOf({
-        item(QStringLiteral("episode"), PrivacyClass::Local),
-        item(QStringLiteral("lemon"), PrivacyClass::Public),
+        item(QStringLiteral("episode"), SensitivityClass::Personal),
+        item(QStringLiteral("lemon"), SensitivityClass::Ordinary),
     });
 
     DeliveryPolicy policy;
@@ -216,7 +225,7 @@ void TestContextDelivery::aLocalConsumerIsNotTrustedForBeingLocal()
 
 void TestContextDelivery::recordingFollowsRetentionRatherThanDistance()
 {
-    const ContextBundle bundle = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)});
+    const ContextBundle bundle = bundleOf({item(QStringLiteral("lemon"), SensitivityClass::Ordinary)});
     DeliveryPolicy policy;
 
     // An inspector renders and forgets. Recording every render would grow the Journal with use and
@@ -243,14 +252,14 @@ void TestContextDelivery::recordingFollowsRetentionRatherThanDistance()
 
 void TestContextDelivery::deliveryRecordCarriesProvenanceAndNoContent()
 {
-    ContextItem lemon = item(QStringLiteral("lemon"), PrivacyClass::Public);
+    ContextItem lemon = item(QStringLiteral("lemon"), SensitivityClass::Ordinary);
     const QUuid lemonEvidence = lemon.evidence.first();
 
     const ContextBundle bundle
-        = bundleOf({lemon, item(QStringLiteral("episode"), PrivacyClass::Local)});
+        = bundleOf({lemon, item(QStringLiteral("episode"), SensitivityClass::Secret)});
 
     DeliveryPolicy policy;
-    policy.floorForUntrusted = PrivacyClass::Public;
+    policy.ceilingForUntrusted = SensitivityClass::Ordinary;
 
     const DeliveryPlan plan = DeliveryPlan::build(
         bundle, policy, {QStringLiteral("mistral"), ConsumerTrust::Untrusted, false, true}, idsOf(bundle), {});
@@ -275,10 +284,10 @@ void TestContextDelivery::deliveryRecordCarriesProvenanceAndNoContent()
 
 void TestContextDelivery::personalExclusionIsNotReportedAsPolicy()
 {
-    const ContextBundle bundle = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)});
+    const ContextBundle bundle = bundleOf({item(QStringLiteral("lemon"), SensitivityClass::Ordinary)});
 
     DeliveryPolicy policy;
-    policy.floorForUntrusted = PrivacyClass::Public;
+    policy.ceilingForUntrusted = SensitivityClass::Ordinary;
 
     const DeliveryPlan plan = DeliveryPlan::build(
         bundle,
@@ -302,7 +311,7 @@ void TestContextDelivery::personalExclusionIsNotReportedAsPolicy()
 void TestContextDelivery::planOverIncompleteBundleReportsIncomplete()
 {
     const ContextBundle truncated
-        = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)}, false);
+        = bundleOf({item(QStringLiteral("lemon"), SensitivityClass::Ordinary)}, false);
 
     const DeliveryPlan plan = DeliveryPlan::build(
         truncated, {}, {QStringLiteral("inspector"), ConsumerTrust::Full, false, false}, idsOf(truncated), {});
@@ -311,7 +320,7 @@ void TestContextDelivery::planOverIncompleteBundleReportsIncomplete()
     QCOMPARE(plan.deliveredIds().size(), 1);
 
     const ContextBundle whole
-        = bundleOf({item(QStringLiteral("lemon"), PrivacyClass::Public)}, true);
+        = bundleOf({item(QStringLiteral("lemon"), SensitivityClass::Ordinary)}, true);
     QVERIFY(DeliveryPlan::build(
                 whole, {}, {QStringLiteral("inspector"), ConsumerTrust::Full, false, false}, idsOf(whole), {})
                 .complete());
@@ -360,6 +369,75 @@ void TestContextDelivery::theDigestCoversDeliveredItemsOnly()
     reprovenanced.evidence = {QUuid::createUuid()};
     QVERIFY2(deliveryDigest({reprovenanced}) != alone,
              "a commitment that ignored provenance would not identify what was disclosed");
+}
+
+// ADR-0033's A9, enforced where the material actually moves.
+//
+// No trust level has a ceiling that reaches Secret or Credential, so those classifications are
+// refused to every consumer -- including the most trusted one, and including a purely local
+// consumer with no boundary to cross. A training pipeline cannot receive them to begin with, which
+// is a stronger guarantee than asking it to remember not to use them.
+void TestContextDelivery::secretsAndCredentialsReachNoConsumerAtAll()
+{
+    const ContextBundle bundle = bundleOf({
+        item(QStringLiteral("password"), SensitivityClass::Credential),
+        item(QStringLiteral("diagnosis"), SensitivityClass::Secret),
+        item(QStringLiteral("preference"), SensitivityClass::Personal),
+    });
+
+    const DeliveryPolicy policy;
+    for (const ConsumerTrust trust :
+         {ConsumerTrust::Untrusted, ConsumerTrust::Bounded, ConsumerTrust::Full}) {
+        for (const bool external : {false, true}) {
+            const Destination destination{QStringLiteral("any"), trust, true, external};
+            const DeliveryPlan plan
+                = DeliveryPlan::build(bundle, policy, destination, idsOf(bundle), {});
+
+            const QList<QString> delivered = plan.deliveredIds();
+            QVERIFY2(!delivered.contains(QStringLiteral("password")),
+                     qPrintable(consumerTrustToString(trust)));
+            QVERIFY2(!delivered.contains(QStringLiteral("diagnosis")),
+                     qPrintable(consumerTrustToString(trust)));
+        }
+    }
+
+    // And the rule is not "refuse everything": a fully trusted consumer still receives ordinary
+    // personal material, or the assertions above would hold for the wrong reason.
+    const Destination trusted{QStringLiteral("inspector"), ConsumerTrust::Full, false, false};
+    const DeliveryPlan plan = DeliveryPlan::build(bundle, policy, trusted, idsOf(bundle), {});
+    QCOMPARE(plan.deliveredIds(), QList<QString>{QStringLiteral("preference")});
+
+    // The person is still told what was withheld, and why.
+    const QList<DeliveryDecision> held = plan.withDisposition(Disposition::HeldBackByPolicy);
+    QCOMPARE(held.size(), 2);
+    for (const DeliveryDecision &decision : held) {
+        QVERIFY(decision.reason.contains(QStringLiteral("does not permit")));
+    }
+}
+
+// Sensitivity says who may be shown a thing; scope says where it may go. Both, not either.
+//
+// Every other fixture here pins privacy to Public so that a refusal can only be about
+// classification. This one is the opposite case, and without it the scope rule could be deleted
+// with the whole suite still green.
+void TestContextDelivery::scopeStillDecidesWhatMayLeaveTheDevice()
+{
+    ContextItem homebound = item(QStringLiteral("thermostat"), SensitivityClass::Ordinary);
+    homebound.privacy = PrivacyClass::Local;
+    const ContextBundle bundle = bundleOf({homebound});
+
+    const DeliveryPolicy policy;
+
+    // Ordinary material, fully trusted consumer, and it still may not cross the boundary.
+    const Destination away{QStringLiteral("remote"), ConsumerTrust::Full, false, true};
+    const DeliveryPlan crossing = DeliveryPlan::build(bundle, policy, away, idsOf(bundle), {});
+    QVERIFY2(crossing.deliveredIds().isEmpty(), "a Local-scoped item must not leave the device");
+    QCOMPARE(crossing.withDisposition(Disposition::HeldBackByPolicy).size(), 1);
+
+    // The same item, the same consumer, staying here.
+    const Destination here{QStringLiteral("inspector"), ConsumerTrust::Full, false, false};
+    QCOMPARE(DeliveryPlan::build(bundle, policy, here, idsOf(bundle), {}).deliveredIds(),
+             QList<QString>{QStringLiteral("thermostat")});
 }
 
 QTEST_MAIN(TestContextDelivery)
