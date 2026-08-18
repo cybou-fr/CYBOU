@@ -10,6 +10,7 @@
     "cursor",
     "observedAt",
     "freshness",
+    "knowledge",
     "capabilities"
   ],
   "properties": {
@@ -18,6 +19,7 @@
     "cursor": { "type": "string", "minLength": 1 },
     "observedAt": { "type": "string", "format": "date-time" },
     "freshness": { "enum": ["current", "stale", "unknown"] },
+    "knowledge": { "enum": ["known", "unknown"] },
     "capabilities": {
       "type": "array",
       "items": {
@@ -35,4 +37,3 @@
     }
   }
 }
-

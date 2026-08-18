@@ -4,6 +4,7 @@
   "cursor": "fixture:presence:42",
   "observedAt": "2026-08-18T12:00:00Z",
   "freshness": "current",
+  "knowledge": "known",
   "capabilities": [
     {
       "id": "mind.identity.read",
@@ -21,4 +22,3 @@
     }
   ]
 }
-

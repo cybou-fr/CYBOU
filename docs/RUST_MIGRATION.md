@@ -7,12 +7,12 @@ SPDX-License-Identifier: MIT
 
 ## Mandate and current truth
 
-ADR-0038 declares the target: all authored executable product code moves to Rust, including the
-Rust/WASM Living Canvas. R0 and the first W0 seam are now present: a locked workspace, shared typed
-contracts, deterministic fixtures, CI/Nix entry points, and a browser-compiling UI shell. Mind is
-still C++/Qt/CMake, installed Presence is QML/Plasma, and project automation still includes Python
-and shell. Until each replacement gate passes, `CURRENT_STATE.md` and the existing binaries remain
-authoritative.
+ADR-0038 declares the target: all authored executable product code moves to Rust on Debian 13,
+including the Rust/WASM Living Canvas. The active public deployment is Rust but fixture-backed; no
+complete Mind is deployed there yet. C++/Qt/CMake and NixOS are frozen reference implementations
+used to extract behavioral, wire, persistence, and recovery evidence. They are not active product
+targets. A Rust owner becomes authoritative only after its replacement gates pass; two canonical
+writers never run against the same state.
 
 ## Non-negotiable invariants
 
@@ -31,7 +31,7 @@ outranks these properties.
 | protocols | Serde domain types, CBOR/JSON adapters | golden C++ fixtures and canonical bytes |
 | persistence | evaluated SQLx/rusqlite adapter | existing SQLite schemas, hashes, backups |
 | services/organs | one binary crate per existing owner | D-Bus contract and black-box behavior |
-| packaging | Cargo workspace built and pinned by Nix | parallel CMake package during transition |
+| packaging | locked Cargo workspace and Debian/systemd packages | frozen CMake oracle during replacement |
 
 Exact libraries must survive a spike and security review; the architectural boundaries are stable.
 
@@ -96,10 +96,18 @@ and the frozen 300-second default freshness horizon. It cannot write Event1 or o
 D-Bus name. The C++ service remains authoritative until observation/envelope byte oracles, Event1
 client behavior, process integration, shadow comparison, and rollback packaging all pass.
 
-### R6 — lifecycle and canonical Journal owners
+The first real protocol differential gate is also active. Debian recompiles the predecessor's
+actual `Observation.cpp`, regenerates one Observation v1 payload and its UUID-v5 message identity,
+and compares both with checked-in fixtures before Rust tests run. `cybou-protocol::observation`
+emits byte-identical bare CBOR, derives identity from the same CBOR tuple and namespace, preserves
+typed values and field boundaries, and rejects null evidence, malformed time, and non-forward
+freshness horizons.
 
-Migrate `lifecycled` and `eventd` last. They have the highest continuity and persistence blast
-radius. Require existing-database replay, canonical hash equality, concurrent-writer refusal,
+### R6 — lifecycle and canonical Journal cutover
+
+Implement storage, crypto, and Rust `eventd` early because every Rust owner depends on Event1.
+Cut their production ownership over late because they have the highest continuity and persistence
+blast radius. Require existing-database replay, canonical hash equality, concurrent-writer refusal,
 split-commit recovery, migration interruption, rollback, scale, and multi-version fixtures.
 
 ### R7 — desktop replacement and legacy removal

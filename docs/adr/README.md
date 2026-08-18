@@ -43,8 +43,8 @@ SPDX-License-Identifier: MIT
 | [0034](ADR-0034-governed-agents-workers-and-tools.md) | Governed Agents, Workers, and Tool Use | Proposed |
 | [0035](ADR-0035-governed-model-brokerage.md) | Governed Model Brokerage and External Inference | Proposed |
 | [0036](ADR-0036-autonomous-security-control-plane.md) | Autonomous Security and Operations Control Plane | Proposed |
-| [0037](ADR-0037-web-first-presence-and-desktop.md) | Web-First Presence and Chromium Desktop | Proposed |
-| [0038](ADR-0038-rust-first-codebase.md) | Rust-First Product Codebase | Proposed |
+| [0037](ADR-0037-web-first-presence-and-desktop.md) | Web-First Presence and Chromium Desktop | Accepted |
+| [0038](ADR-0038-rust-first-codebase.md) | Rust-First Product Codebase | Accepted |
 
 ## Why some ADRs remain Proposed
 
@@ -60,10 +60,10 @@ code already enforces leaves the record contradicting itself. These do not:
   Autonomous Security** describe boundaries that deliberately precede their implementation. Writing them
   first is the point: they exist so the code can be reviewed against explicit invariants rather than
   the invariants being reconstructed afterwards from whatever the code turned out to do.
-- **0037 Web-First Presence** proposes a replacement presentation and desktop delivery boundary.
+- **0037 Web-First Presence** accepts the replacement presentation and desktop delivery boundary.
   The current tree still ships Plasma/QML, so accepting it would overstate implementation and would
   prematurely supersede the proven v0.1 surface decisions.
-- **0038 Rust-First Codebase** declares the implementation destination and contract-preserving
+- **0038 Rust-First Codebase** accepts the implementation destination and contract-preserving
   rewrite policy. The shipped owners remain C++/Qt today, so the decision stays Proposed until the
   migration gates demonstrate the target rather than merely naming it.
 - **0018 Privacy and Replication** is half enforced and half absent. The Journal rejects a

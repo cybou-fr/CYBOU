@@ -116,6 +116,7 @@ mod tests {
                 cursor: "fixture:1".into(),
                 observed_at: "2026-08-18T12:00:00Z".into(),
                 freshness: Freshness::Unknown,
+                knowledge: KnowledgeState::Unknown,
                 capabilities: vec![CapabilityProjection {
                     id: "mind.context.read".into(),
                     state: CapabilityState::Unknown,

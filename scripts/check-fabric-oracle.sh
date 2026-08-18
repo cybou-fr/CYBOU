@@ -23,3 +23,18 @@ sed -n 's/^list=//p' "$work/oracle.txt" >"$work/list.hex"
 cmp "$work/map.hex" "$root/fixtures/fabric/v1/map.hex"
 cmp "$work/list.hex" "$root/fixtures/fabric/v1/list.hex"
 echo "fabric-v1-oracle: Qt and Rust fixtures are byte-identical"
+
+c++ -std=c++20 \
+  "$root/migration/oracles/observation_v1_fixture.cpp" \
+  "$root/mind/protocol/src/Observation.cpp" \
+  -I"$root/mind/protocol/include" \
+  $(pkg-config --cflags --libs Qt6Core) \
+  -o "$work/observation-v1-oracle"
+
+"$work/observation-v1-oracle" >"$work/observation-oracle.txt"
+sed -n 's/^payload=//p' "$work/observation-oracle.txt" >"$work/observation.hex"
+sed -n 's/^message-id=//p' "$work/observation-oracle.txt" >"$work/message-id.txt"
+
+cmp "$work/observation.hex" "$root/fixtures/protocol/observation-v1.hex"
+cmp "$work/message-id.txt" "$root/fixtures/protocol/observation-v1-message-id.txt"
+echo "observation-v1-oracle: Qt payload and identity match Rust fixtures"

@@ -5,17 +5,18 @@ SPDX-License-Identifier: MIT
 
 # Current State
 
-> Rust-first owner migration remains proposed. Its additive R0/W0 foundation now exists: a pinned
-> Cargo workspace, protocol/web-contract crates, deterministic web fixtures, and a Rust/WASM Living
-> Canvas shell. The authoritative installed runtime described below is still C++/Qt/QML; no owner,
-> gateway, or default desktop has been replaced. See [Rust Migration Plan](RUST_MIGRATION.md) and
-> [ADR-0038](adr/ADR-0038-rust-first-codebase.md) for the target and cutover gates.
+> Debian 13 and Rust are the active production target. The deployed Rust gateway and Living Canvas
+> are real but remain fixture-backed; no Rust Mind owner or complete desktop has cut over yet. The
+> C++/Qt/NixOS implementation is retained as a frozen behavioral and compatibility reference, not
+> as an active deployment target. See [Rust Migration Plan](RUST_MIGRATION.md) and
+> [ADR-0038](adr/ADR-0038-rust-first-codebase.md) for replacement gates.
 
 ## Rust/Web foundation status
 
 The repository builds `cybou-protocol`, `cybou-web-contracts`, and `living-canvas` from one locked
 workspace. Native tests verify typed knowledge/capability/failure vocabulary, versioned local
-session and nominal snapshot fixtures, JSON round trips, and `MockMindClient`. CI checks formatting,
+session and nominal snapshot fixtures, aggregate known-versus-unknown state, JSON round trips, and
+`MockMindClient`. CI checks formatting,
 tests, strict clippy, `wasm32-unknown-unknown` compilation, and a release Trunk build. Trunk produces
 a content-hashed browser artifact from the same Rust frontend source.
 
@@ -44,12 +45,19 @@ name ownership. Missing paths and regular files yield `source-unavailable` with 
 valid symlinks yield the same `nixos.system` / `current-system` identity, target basename, provenance,
 and freshness semantics as the predecessor. This is replacement preparation, not a cutover.
 
+`cybou-protocol` now owns the first byte-proven cognitive payload: Observation v1. The Debian gate
+compiles the actual Qt `Observation.cpp` and requires both its bare-CBOR payload and deterministic
+UUID-v5 acquisition identity to match Rust fixtures. Rust validates RFC3339 instants, a strictly
+forward freshness horizon, non-null typed evidence, and non-empty provenance before encoding; UUID
+identity is derived from the validated acquisition time rather than a second caller-supplied clock.
+
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
 no-store and browser-security headers, enforces an outer projection timeout, and has no generic RPC
 or mutation route. Its Linux zbus adapter calls the existing `Presence1.Snapshot`, validates the Qt
-CBOR fabric envelope, and maps capability states into the separately versioned web contract. An
-opt-in NixOS user module exists but remains disabled by default. When `CYBOU_WEB_ROOT` names a
+CBOR fabric envelope, and maps capability states into the separately versioned web contract. Legacy
+Nix expressions remain only until Debian-native checks and packaging replace their evidence. When
+`CYBOU_WEB_ROOT` names a
 Trunk output directory, the gateway serves that artifact from the same origin as the API. Living
 Canvas uses the async `GatewayMindClient` for its production browser build; `MockMindClient` remains
 only as the deterministic test boundary.

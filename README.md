@@ -11,15 +11,15 @@ SPDX-License-Identifier: MIT
 
 **An experimental agent-native operating system with a persistent cognitive control plane**
 
-NixOS 26.05 · Rust/WebAssembly · one web-first UI for browser and desktop shell · local-first
+Debian 13 · Rust/WebAssembly · Wayland/Chromium · one frontend for web and desktop · local-first
 
 </div>
 
 ## What Cybou is
 
-Cybou is an experimental agent-native environment built on NixOS. The active transition replaces
-the KDE/Qt product shell with one Rust/WebAssembly frontend shared by ordinary browsers and a
-lightweight desktop web shell. KDE/Qt remains migration-era code, not the target architecture. Its long-term
+Cybou is an experimental agent-native environment targeting Debian 13. The active replacement
+builds one Rust/WebAssembly frontend shared by ordinary browsers and a lightweight Chromium/Wayland
+desktop. The C++/Qt/NixOS tree is retained as migration evidence, not as the target platform. Its long-term
 target is not "Linux with a chatbot". It is an **agent-native computing environment** in which a
 persistent **Mind** remembers and governs the system while models, agents, workers, tools, and user
 interfaces remain replaceable.

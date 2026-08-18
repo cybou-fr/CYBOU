@@ -18,7 +18,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
-repository = "https://github.com/cybou-project/cybou"
+repository = "https://github.com/cybou-fr/CYBOU"
 
 [workspace.dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
@@ -30,11 +30,11 @@ http-body-util = "0.1.5"
 futures-core = "0.3.31"
 futures-util = "0.3.34"
 thiserror = "2.0.20"
-time = { version = "0.3.55", features = ["formatting"] }
+time = { version = "0.3.55", features = ["formatting", "parsing"] }
 tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "test-util", "time"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.0", features = ["fs", "set-header", "trace"] }
-uuid = { version = "1.24.1", features = ["serde"] }
+uuid = { version = "1.24.1", features = ["serde", "v5"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

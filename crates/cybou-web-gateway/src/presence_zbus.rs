@@ -139,6 +139,7 @@ impl ZbusPresenceSource {
             cursor: format!("presence:{projection_version}"),
             observed_at,
             freshness: Freshness::Current,
+            knowledge: KnowledgeState::Known,
             capabilities,
         })
     }

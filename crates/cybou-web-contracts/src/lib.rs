@@ -80,6 +80,8 @@ pub struct SnapshotProjection {
     pub observed_at: String,
     /// Whether the aggregate projection is fresh.
     pub freshness: Freshness,
+    /// Whether the aggregate projection is known; distinguishes known-empty from unavailable.
+    pub knowledge: KnowledgeState,
     /// Current capability rows; an empty list is meaningful only when the projection is known.
     pub capabilities: Vec<CapabilityProjection>,
 }
@@ -112,6 +114,7 @@ mod tests {
         assert_eq!(decoded, projection);
         assert_eq!(projection.schema_version, WEB_SCHEMA_V1);
         assert!(!projection.cursor.is_empty());
+        assert_eq!(projection.knowledge, cybou_protocol::KnowledgeState::Known);
     }
 
     #[test]
