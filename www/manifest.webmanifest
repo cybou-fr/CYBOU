@@ -1,7 +1,7 @@
 {
   "name": "Cybou",
   "short_name": "Cybou",
-  "description": "A calmer operating system built on NixOS and KDE Plasma.",
+  "description": "An agent-native operating environment with a persistent local Mind and a Rust/WebAssembly interface.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0A0D12",

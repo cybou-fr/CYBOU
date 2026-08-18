@@ -1,16 +1,19 @@
 # Cybou
 
-> Cybou is an experimental, reproducible personal operating system built on NixOS 26.05 and KDE Plasma 6 Wayland. It combines a calm desktop with Mind, a local typed runtime for durable cognitive state. Created by Stanislav Saveliev.
+> Cybou is an experimental agent-native operating environment. A persistent local runtime called Mind owns durable cognitive state — biography, identity, commitments, prediction, health, lifecycle, and evidence — while models, agents, tools, and user interfaces remain replaceable around it. Created by Stanislav Saveliev.
 
 ## Current Product Boundary
 
-- Reproducible NixOS desktop with locked Flakes, atomic generation rollback, KDE Plasma 6 Wayland, and the Cybou Horizon visual system.
-- Twelve isolated Mind user services with explicit ownership and typed local IPC.
+- Twelve isolated Mind user services with explicit ownership and typed local IPC. A model is not Mind, an agent is not Mind, and a tool protocol is not an authorization boundary.
 - Durable causal history, identity continuity, intentions, prediction, self projection, bounded attention, health, lifecycle, recovery, grounded perception, epistemic projection, associative context, and governed context delivery.
 - Journal v3 with crash-safe transitive erasure and independently verifiable causal metadata.
+- A reproducible system foundation with locked Flakes, atomic generations, and rollback; Debian 13 is the active build and verification environment for Linux gates.
+- One Rust/WebAssembly frontend, Living Canvas, shared by an ordinary browser and a lightweight desktop web shell. It reads through a Rust gateway that binds to loopback, is read-only by construction, and exposes typed session, snapshot, and resumable event routes with no mutation route.
 - Local-first operation with no required cloud account, API key, hosted AI service, or telemetry.
 
-Cybou does not currently ship a language model, general agent runtime, privileged action executor, autonomous security control plane, or distributed Mind. These are planned capabilities and must not be described as implemented.
+Cybou does not currently ship a language model, general agent or worker runtime, model or tool broker, privileged action executor, autonomous security control plane, or distributed Mind. Desktop bootstrap authentication is also not implemented. These are planned capabilities and must not be described as implemented.
+
+The KDE/Qt desktop shell is migration-era code retained during the transition, not the target architecture.
 
 ## Key Links
 
@@ -23,11 +26,12 @@ Cybou does not currently ship a language model, general agent runtime, privilege
 
 ## Technical Details
 
-- Base: NixOS 26.05 stable, locked by `flake.lock`.
-- Desktop: KDE Plasma 6 on Wayland with SDDM.
-- Runtime: C++20, Qt 6, systemd user services, typed D-Bus contracts, and SQLite.
+- Base: NixOS 26.05 stable, locked by `flake.lock`. Debian 13 is the active build and verification host.
+- Mind runtime: C++20, Qt 6, systemd user services, typed D-Bus contracts, and SQLite.
+- Interface: a locked Cargo workspace of five Rust crates — protocol, fabric codec, web contracts, read-only web gateway, and the Living Canvas WebAssembly frontend. The gateway binds only to `127.0.0.1`, applies no-store and browser-security headers, and enforces a bounded projection timeout.
 - Canonical history: `cybou-eventd` is the sole Journal writer.
-- Current maturity: pre-release research and engineering software; M1–M6 are complete and M7 is advancing in verified slices.
+- Verification: thirty-seven CTest suites, reproducible repository policy gates, and focused reboot, fault-injection, and KVM continuity gates.
+- Current maturity: pre-release research and engineering software. M1–M6 are complete, M7 is advancing in verified slices, and the Rust/WebAssembly interface migration is additive and separately gated.
 - Telemetry: no telemetry is implemented by Cybou.
 - Contact: info@cybou.fr
 - Licenses: MIT for code and most documentation; CC BY-SA 4.0 for declared original visual assets.
@@ -36,7 +40,11 @@ Cybou does not currently ship a language model, general agent runtime, privilege
 
 ### What is Cybou?
 
-Cybou is an experimental personal operating system that pairs a reproducible NixOS/Plasma desktop with Mind, a local typed runtime for durable memory, identity, commitments, lifecycle, health, grounded evidence, and bounded context.
+Cybou is an experimental agent-native operating environment. A persistent local runtime called Mind owns durable memory, identity, commitments, lifecycle, health, grounded evidence, and bounded context, while models, agents, tools, and interfaces stay replaceable around it.
+
+### How is this different from adding a chatbot to Linux?
+
+Cybou makes memory, identity, health, lifecycle, and recovery explicit system services with named owners. No model, agent, user interface, or coordinator may become the owner of continuity or authority.
 
 ### Does Cybou include an AI model?
 
@@ -44,12 +52,16 @@ No. The current runtime is useful without a language model. Future language or m
 
 ### Does Cybou require cloud services or send telemetry?
 
-No cloud account, API key, or hosted AI service is required for the current desktop and Mind runtime. Cybou implements no telemetry. Future external inference or tools, if added, must cross explicit policy and disclosure boundaries.
+No cloud account, API key, or hosted AI service is required for the current runtime or interface. Cybou implements no telemetry. Future external inference or tools, if added, must cross explicit context, sensitivity, egress, and cost policy boundaries.
+
+### What is the interface built with?
+
+One Rust/WebAssembly frontend serves both an ordinary browser and a lightweight desktop web shell, reading through a read-only gateway bound to loopback. The interface is a projection of Mind and never a second owner of state, which is what makes it replaceable.
 
 ### How does Cybou support recovery?
 
-NixOS provides declarative configuration, locked dependencies, atomic generations, and rollback. Mind adds explicit persistent ownership, bounded RPC behavior, typed health deficits, lifecycle recovery, and tested fault boundaries.
+The system foundation provides declarative configuration, locked dependencies, atomic generations, and rollback. Mind adds explicit persistent ownership, bounded RPC behavior, typed health deficits, lifecycle recovery, and tested fault and reboot boundaries.
 
 ### What remains planned?
 
-M8–M13 cover structured language and meaning, lifelong learning, governed action, agent and worker runtimes, model and tool brokerage, autonomous security operations, and distributed perimeter governance. These are not currently shipped.
+Bootstrap authentication for the desktop surface, and M8–M13: structured language and meaning, lifelong learning, governed action, agent and worker runtimes, model and tool brokerage, autonomous security operations, and distributed perimeter governance. These are not currently shipped.

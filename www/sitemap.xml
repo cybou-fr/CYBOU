@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://cybou.fr/index.html</loc>
-    <lastmod>2026-08-04</lastmod>
+    <lastmod>2026-08-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://cybou.fr/index.html#lang=en"/>
@@ -15,7 +15,7 @@ SPDX-License-Identifier: MIT
   </url>
   <url>
     <loc>https://cybou.fr/blueprint.html</loc>
-    <lastmod>2026-08-04</lastmod>
+    <lastmod>2026-08-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://cybou.fr/blueprint.html#lang=en"/>
@@ -24,7 +24,7 @@ SPDX-License-Identifier: MIT
   </url>
   <url>
     <loc>https://cybou.fr/partners.html</loc>
-    <lastmod>2026-08-04</lastmod>
+    <lastmod>2026-08-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://cybou.fr/partners.html#lang=en"/>
