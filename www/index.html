@@ -8,11 +8,12 @@ SPDX-License-Identifier: MIT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0D12">
-  <meta name="description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory, identity and recovery, with one Rust/WebAssembly interface for browser and desktop shell. Local-first, zero telemetry.">
+  <meta name="description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory and recovery, with one Rust/WebAssembly interface.">
   <meta property="og:title" content="Cybou — An agent-native operating environment">
-  <meta property="og:description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory, identity and recovery, with one Rust/WebAssembly interface for browser and desktop shell. Local-first, zero telemetry.">
+  <meta property="og:description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory and recovery, with one Rust/WebAssembly interface.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="assets/cybou-mark.svg">
+  <meta property="og:image" content="https://cybou.fr/assets/cybou-mark.svg">
+  <meta property="og:url" content="https://cybou.fr/index.html">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://cybou.fr/index.html">
   <link rel="alternate" hreflang="en" href="https://cybou.fr/index.html#lang=en">
@@ -21,14 +22,14 @@ SPDX-License-Identifier: MIT
   <title>Cybou — An agent-native operating environment</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=20260819-1">
+  <link rel="stylesheet" href="styles.css?v=20260819-2">
   <script type="application/ld+json">
   [
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "Cybou",
-      "operatingSystem": "Linux (reproducible NixOS foundation, Wayland)",
+      "operatingSystem": "Linux (Wayland)",
       "applicationCategory": "OperatingSystem",
       "author": {
         "@type": "Person",
@@ -52,7 +53,7 @@ SPDX-License-Identifier: MIT
         },
         {
           "@type": "Question",
-          "name": "How is Cybou different from adding a chatbot to Linux?",
+          "name": "How is that different from adding a chatbot to Linux?",
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "A model is not Mind. An agent is not Mind. A tool protocol is not an authorization boundary. Cybou makes memory, identity, health, lifecycle, and recovery explicit system services with named owners, so no model can become the owner of continuity or authority."
@@ -68,7 +69,7 @@ SPDX-License-Identifier: MIT
         },
         {
           "@type": "Question",
-          "name": "What is the Cybou interface built with?",
+          "name": "What is the interface built with?",
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "One Rust/WebAssembly frontend called Living Canvas serves both an ordinary browser and a lightweight desktop web shell. It reads through a read-only Rust gateway bound to loopback that exposes typed session, snapshot, and event streams and has no mutation route. The earlier KDE/Qt shell is migration-era code, not the target."
@@ -79,7 +80,7 @@ SPDX-License-Identifier: MIT
           "name": "What is not implemented yet?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou ships no language model, no agent or worker runtime, no model or tool broker, no privileged action executor, and no autonomous security control plane. Desktop bootstrap authentication is also still open."
+            "text": "Cybou ships no language model, no agent or worker runtime, no model or tool broker, no privileged action executor, and no autonomous security control plane. Desktop bootstrap authentication is also still open. These are planned boundaries and are never described as done."
           }
         },
         {
@@ -87,7 +88,7 @@ SPDX-License-Identifier: MIT
           "name": "What open-source licenses apply?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou code and Nix expressions are licensed under MIT. Original visual assets are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev."
+            "text": "Cybou code and Nix expressions are licensed under MIT. Original visual assets (wallpapers, desktop themes, SVGs) are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev."
           }
         }
       ]
@@ -323,7 +324,7 @@ SPDX-License-Identifier: MIT
           <div><strong>Generation 145</strong><p data-i18n="gen145_desc">Before graphics configuration</p></div>
           <time data-i18n="gen_aug2">Aug 2</time>
         </div>
-        <div class="console-command"><span>$</span><code>nixos-rebuild switch --flake .#cybou</code><i></i></div>
+        <div class="console-command"><span>$</span><code>nix flake check</code><i></i></div>
       </div>
     </section>
 
@@ -349,8 +350,8 @@ SPDX-License-Identifier: MIT
         </div>
 
         <div class="progress-card">
-          <div class="card-metric" data-i18n="metric_v_crates">5 Rust crates</div>
-          <p class="card-label" data-i18n="metric_contrast">Five Rust crates: protocol, fabric, web contracts, gateway, Living Canvas</p>
+          <div class="card-metric" data-i18n="metric_v_crates">Rust workspace</div>
+          <p class="card-label" data-i18n="metric_contrast">One locked Cargo workspace: protocol and codec crates, runtime and storage paths, the read-only gateway, and Living Canvas</p>
           <div class="status-indicator"><span></span><b data-i18n="status_verified">Migration in progress</b></div>
         </div>
       </div>
@@ -503,6 +504,6 @@ SPDX-License-Identifier: MIT
     <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners_footer">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
-  <script src="script.js?v=20260819-1"></script>
+  <script src="script.js?v=20260819-2"></script>
 </body>
 </html>

@@ -8,11 +8,12 @@ SPDX-License-Identifier: MIT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0D12">
-  <meta name="description" content="Current Cybou technical whitepaper: the twelve-service typed Mind runtime, its ownership and failure model, the verified M1–M6 substrate, the additive Rust/WebAssembly interface migration, and the M7–M13 roadmap.">
+  <meta name="description" content="Cybou technical whitepaper: the twelve-service typed Mind runtime, its ownership and failure model, the Rust/WebAssembly interface, and the roadmap.">
   <meta property="og:title" content="Cybou — Technical Blueprint & Architecture">
   <meta property="og:description" content="Current Cybou technical whitepaper covering the twelve-service typed Mind runtime, verified boundaries, the Rust/WebAssembly interface migration, and the roadmap.">
   <meta property="og:type" content="article">
-  <meta property="og:image" content="assets/cybou-mark.svg">
+  <meta property="og:image" content="https://cybou.fr/assets/cybou-mark.svg">
+  <meta property="og:url" content="https://cybou.fr/blueprint.html">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://cybou.fr/blueprint.html">
   <link rel="alternate" hreflang="en" href="https://cybou.fr/blueprint.html#lang=en">
@@ -21,7 +22,7 @@ SPDX-License-Identifier: MIT
   <title>Cybou — Technical Blueprint & Architecture</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=20260819-1">
+  <link rel="stylesheet" href="styles.css?v=20260819-2">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -283,7 +284,7 @@ SPDX-License-Identifier: MIT
         The current whitepaper for Cybou’s twelve-service Mind runtime, its ownership and failure model, the verified M1–M6 substrate, the additive Rust/WebAssembly interface migration, and the M7–M13 roadmap.
       </p>
       <div class="bp-meta">
-        <span><strong data-i18n="bp_meta_foundation">Foundation:</strong> <span data-i18n="bp_meta_foundation_v">Reproducible NixOS 26.05, locked Flakes</span></span>
+        <span><strong data-i18n="bp_meta_foundation">Foundation:</strong> <span data-i18n="bp_meta_foundation_v">Locked dependencies, atomic generations, rollback</span></span>
         <span><strong data-i18n="bp_meta_interface">Interface:</strong> <span data-i18n="bp_meta_interface_v">Rust / WebAssembly (Living Canvas)</span></span>
         <span><strong data-i18n="bp_meta_status">Status:</strong> <span data-i18n="bp_meta_status_v">M1–M6 verified · M7 and Rust migration advancing</span></span>
         <span><strong data-i18n="bp_meta_updated">Updated:</strong> <span data-i18n="bp_meta_updated_v">August 2026</span></span>
@@ -328,7 +329,7 @@ SPDX-License-Identifier: MIT
         <div class="bp-card">
           <h3 data-i18n="bp_layer3_title">Layer 3: Replaceable Interface</h3>
           <p data-i18n="bp_layer3_desc">
-            A Rust workspace carries the protocol, fabric codec, and web contracts. A read-only gateway on loopback projects Presence into typed JSON and a bounded event stream, and Living Canvas renders it as WebAssembly in a browser or desktop shell.
+            A Rust workspace carries the protocol, fabric codec, runtime and storage paths, and web contracts. A read-only gateway on loopback projects Presence into typed JSON and a bounded event stream, and Living Canvas renders it as WebAssembly in a browser or desktop shell.
           </p>
         </div>
       </div>
@@ -343,7 +344,7 @@ SPDX-License-Identifier: MIT
         <h3 data-i18n="bp_stack_title">Core System Stack</h3>
         <ul>
           <li data-i18n="bp_stack1"><strong>Base System:</strong> NixOS 26.05 locked via Nix Flakes; Debian 13 is the active build and verification host for Linux gates.</li>
-          <li data-i18n="bp_stack2"><strong>Interface Layer:</strong> A Rust workspace of five crates — protocol, fabric codec, web contracts, read-only gateway, and the Living Canvas WebAssembly frontend.</li>
+          <li data-i18n="bp_stack2"><strong>Rust Workspace:</strong> One locked Cargo workspace holding the protocol and fabric codec, runtime and storage paths, replacement organ slices, web contracts, the read-only gateway, and the Living Canvas WebAssembly frontend.</li>
           <li data-i18n="bp_stack3"><strong>Delivery:</strong> The gateway binds to loopback, serves the content-hashed frontend from its own origin, and exposes typed session, snapshot, and bounded event-stream routes with no mutation route.</li>
           <li data-i18n="bp_stack4"><strong>Session:</strong> An opt-in Wayland session gives the frontend a single surface through a minimal compositor and an ephemeral browser runtime profile. The KDE/Qt shell remains migration-era code and the current fallback.</li>
           <li data-i18n="bp_stack5"><strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, and one coherent visual grammar across login, windows, and wallpaper.</li>
@@ -453,7 +454,7 @@ SPDX-License-Identifier: MIT
               <td>W0–W1</td>
               <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
               <td data-i18n="row_w01_cap">Rust foundation and read-only web boundary</td>
-              <td data-i18n="row_w01_bound">Locked Cargo workspace, protocol and web-contract crates, loopback gateway with typed session, snapshot, and resumable event stream</td>
+              <td data-i18n="row_w01_bound">Locked Cargo workspace, protocol, fabric, runtime and web-contract crates, loopback gateway with typed session, snapshot, and resumable event stream</td>
               <td data-i18n="row_w01_ev">Native tests, strict lints, WebAssembly build and release frontend gates</td>
             </tr>
             <tr>
@@ -568,6 +569,6 @@ SPDX-License-Identifier: MIT
     <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners_footer">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
-  <script src="script.js?v=20260819-1"></script>
+  <script src="script.js?v=20260819-2"></script>
 </body>
 </html>

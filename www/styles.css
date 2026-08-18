@@ -205,7 +205,7 @@ main, footer { position:relative; z-index:1; }
 .app-dock svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.55; stroke-linecap:round; stroke-linejoin:round; }
 .desktop-panel__right { gap:10px; color:#d3dce4; font-size:9px; }
 .status-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border-radius:999px; color:#9bacb9; background:rgba(var(--fg-rgb),.035); }
-.status-pill span { width:4px; height:4px; border-radius:50%; background:var(--success); box-shadow:0 0 7px rgba(110,213,155,.65); }
+.status-pill > span:first-child { width:4px; height:4px; border-radius:50%; background:var(--success); box-shadow:0 0 7px rgba(110,213,155,.65); }
 .status-icon { width:13px; height:13px; fill:none; stroke:#aab6c1; stroke-width:1.55; stroke-linecap:round; stroke-linejoin:round; }
 .desktop-panel time { font-variant-numeric:tabular-nums; }
 .desktop-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:translateY(18px); text-align:center; }

@@ -28,7 +28,7 @@ The KDE/Qt desktop shell is migration-era code retained during the transition, n
 
 - Base: NixOS 26.05 stable, locked by `flake.lock`. Debian 13 is the active build and verification host.
 - Mind runtime: C++20, Qt 6, systemd user services, typed D-Bus contracts, and SQLite.
-- Interface: a locked Cargo workspace of five Rust crates — protocol, fabric codec, web contracts, read-only web gateway, and the Living Canvas WebAssembly frontend. The gateway binds only to `127.0.0.1`, applies no-store and browser-security headers, and enforces a bounded projection timeout.
+- Interface: one locked Cargo workspace holding the protocol and fabric codec, runtime and storage paths, web contracts, the read-only web gateway, and the Living Canvas WebAssembly frontend. The gateway binds only to `127.0.0.1`, applies no-store and browser-security headers, and enforces a bounded projection timeout.
 - Canonical history: `cybou-eventd` is the sole Journal writer.
 - Verification: thirty-seven CTest suites, reproducible repository policy gates, and focused reboot, fault-injection, and KVM continuity gates.
 - Current maturity: pre-release research and engineering software. M1–M6 are complete, M7 is advancing in verified slices, and the Rust/WebAssembly interface migration is additive and separately gated.
