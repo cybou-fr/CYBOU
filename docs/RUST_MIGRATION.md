@@ -119,6 +119,10 @@ required tables and every contribution column needed by the predecessor row cont
 only row count and erasure/rotation epochs. It never creates, migrates, changes pragmas, or writes;
 tests compare the database bytes before and after inspection. Row decoding, canonical hash replay,
 crypto, and every writer operation remain intentionally absent.
+The inspector also walks every stored link and fails on non-contiguous sequence numbers, a
+`prev_hash` mismatch, non-SHA-256-sized row hashes, unsupported hash versions, or absent/malformed
+v3 commitment material. This proves chain shape only; cryptographic recomputation remains the next
+gate and is not implied by structural acceptance.
 
 ### R7 — desktop replacement and legacy removal
 

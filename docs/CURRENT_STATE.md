@@ -60,6 +60,10 @@ required tables and contribution columns, and reports row count plus erasure/rot
 cannot create or migrate a database and contains no write API. Tests prove a missing path stays
 missing, future and partial schemas fail closed, and a compatible database is byte-identical after
 inspection.
+Inspection now walks the complete chain shape: sequence numbers must be contiguous, each
+`prev_hash` must equal the preceding stored hash, hash versions must be 1–3, hashes must be 32
+bytes, and v3 rows must carry both 32-byte commitments. This is deliberately not yet canonical hash
+verification; stored hashes can be structurally linked and still cryptographically wrong.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
