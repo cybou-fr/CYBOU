@@ -1,22 +1,28 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# Archived OVH settings retained for history only; the active build path is NixOS on WSL2.
+# Active Debian 13 build and deployment target. WSL and NixOS are not build environments.
 #
 # Every value can be overridden from the environment so the same scripts can address a second
 # host without editing them - the default is the only host currently in use.
 
 CYBOU_VPS_HOST="${CYBOU_VPS_HOST:-debian@vps-d0669a91.vps.ovh.net}"
-CYBOU_VPS_FLAKE_ATTR="${CYBOU_VPS_FLAKE_ATTR:-cybou-vps}"
 CYBOU_VPS_SRC="${CYBOU_VPS_SRC:-/home/debian/cybou-src}"
 
 # BatchMode keeps a missing key an immediate error instead of an interactive prompt that a
 # CI shell would hang on. ControlMaster reuses one connection for the sync plus the build.
-CYBOU_SSH_OPTS="${CYBOU_SSH_OPTS:--o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10}"
+CYBOU_SSH_OPTS="${CYBOU_SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10}"
+if [ -x /c/Windows/System32/OpenSSH/ssh.exe ]; then
+  CYBOU_SSH_BIN="${CYBOU_SSH_BIN:-/c/Windows/System32/OpenSSH/ssh.exe}"
+elif [ -x /mnt/c/Windows/System32/OpenSSH/ssh.exe ]; then
+  CYBOU_SSH_BIN="${CYBOU_SSH_BIN:-/mnt/c/Windows/System32/OpenSSH/ssh.exe}"
+else
+  CYBOU_SSH_BIN="${CYBOU_SSH_BIN:-ssh}"
+fi
 
 cybou_ssh() {
   # shellcheck disable=SC2086 # word splitting of the option list is intended
-  ssh $CYBOU_SSH_OPTS "$CYBOU_VPS_HOST" "$@"
+  "$CYBOU_SSH_BIN" $CYBOU_SSH_OPTS "$CYBOU_VPS_HOST" "$@"
 }
 
 # The working tree is pushed, not the last commit: a deployment that only ever matched HEAD

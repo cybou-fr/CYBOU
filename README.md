@@ -24,9 +24,9 @@ target is not "Linux with a chatbot". It is an **agent-native computing environm
 persistent **Mind** remembers and governs the system while models, agents, workers, tools, and user
 interfaces remain replaceable.
 
-Development and Linux/Nix validation run in the local `NixOS` WSL2 distribution through
-`scripts/wsl-checks.sh`. The former OVH Debian-to-NixOS conversion and VPS deployment path are
-retired after SSH access was lost; see [Build and Deployment Environments](docs/DEPLOYMENT.md).
+All Linux builds, tests, and deployments run on the Debian 13 OVH target through
+`scripts/vps-checks.sh` and `scripts/deploy-vps.sh`. WSL and NixOS are not active build targets;
+see [Debian Build and Deployment](docs/DEPLOYMENT.md).
 
 Mind owns durable cognitive continuity: biography, identity, commitments, prediction/calibration,
 epistemic state, context, learning, policy inputs, and the future authorization boundary. The target
@@ -250,12 +250,11 @@ The security substrate must not depend on persuading an AI model to behave.
 
 ## Build and test
 
-Use Linux or WSL2 with Nix. The flake pins the complete toolchain and NixOS base.
+Push the working tree to the sole Debian 13 builder and run the Rust/WASM gates there:
 
 ```bash
-nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
-nix build .#packages.x86_64-linux.cybou-presence-applet --print-build-logs
-nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
+bash scripts/vps-checks.sh fast
+bash scripts/vps-checks.sh release
 ```
 
 Run the repository gates described in [Building](docs/BUILDING.md) and

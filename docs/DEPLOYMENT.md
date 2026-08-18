@@ -3,52 +3,43 @@ SPDX-FileCopyrightText: 2026 Cybou contributors
 SPDX-License-Identifier: MIT
 -->
 
-# Build and Deployment Environments
+# Debian Build and Deployment
 
-## Active environment: NixOS on WSL2
+## Sole active environment
 
-The active Linux/Nix build and evaluation environment is the local `NixOS` WSL2 distribution.
-Windows remains the editing host; Nix evaluation and Linux packages run inside WSL2. The working
-tree is copied from `/mnt/c` into a temporary Linux filesystem so NTFS permissions and path behavior
-do not become build inputs.
+The only active Linux build and deployment environment is Debian 13 at
+`debian@vps-d0669a91.vps.ovh.net`. Windows is an editing and Git workstation only. WSL and NixOS
+are not valid build, test, packaging, or deployment evidence.
 
-Run the normal gate from PowerShell:
+The target is Debian 13, systemd, D-Bus, Wayland, Chromium, SQLite, libsodium, Rust, and WASM.
+Never attempt another in-place Debian-to-NixOS conversion on this host.
 
-```powershell
-wsl -d NixOS -- bash /mnt/c/Users/cybou/Documents/CYBOU/scripts/wsl-checks.sh fast
+Bootstrap the clean server once:
+
+```bash
+bash scripts/bootstrap-debian-builder.sh
 ```
 
-Focused checks accept the same names as flake checks:
+Push the current working tree and run normal gates remotely:
 
-```powershell
-wsl -d NixOS -- bash /mnt/c/Users/cybou/Documents/CYBOU/scripts/wsl-checks.sh web-ui desktop-shell rust-foundation
+```bash
+bash scripts/vps-checks.sh fast
+bash scripts/vps-checks.sh release
 ```
 
-`full` includes KVM-backed NixOS VM gates and is valid only when `/dev/kvm` is present inside WSL2.
-A green local run is developer evidence; tag CI and the release process remain authoritative.
+Build and install the current release artifacts on that same host:
 
-## Retired environment: OVH
+```bash
+bash scripts/deploy-vps.sh
+```
 
-The former OVH VPS and `nixosConfigurations.cybou-vps` are retired and are not an active build, deployment, or
-evaluation target. An attempted in-place conversion from Debian 13 to NixOS ended with SSH becoming
-unavailable. The configuration remains in the repository only as historical and recovery input.
+`vps-checks.sh` and `deploy-vps.sh` always transfer the unfinished working tree, excluding local
+build outputs. Builds never happen on Windows or WSL. The remote source root defaults to
+`/home/debian/cybou-src` and may be overridden with `CYBOU_VPS_SRC`.
 
-The following entry points deliberately refuse to execute:
+## Safety boundary
 
-- `scripts/vps-checks.sh`;
-- `scripts/deploy-vps.sh`;
-- `scripts/prepare-vps-nixos.sh`.
-
-Do not repeat an in-place NixOS conversion on a replacement OVH Debian installation. If OVH is used
-again later, treat Debian as a fresh independent host, install only the Nix package manager, and
-introduce a new reviewed deployment design. No listener, gateway, session, credential, or personal
-Journal is authorized there by the archived configuration.
-
-## Boundaries
-
-- WSL checks may build repository artifacts but do not activate the Windows host or an external
-  server.
-- `nix build` is distinct from `nixos-rebuild switch`.
-- A desktop VM gate requires KVM and visible interaction evidence before it can establish W2 parity.
-- Remote Living Canvas remains W4 work and requires TLS, authentication, revocation, origin policy,
-  rate limits, and a separately reviewed deployment boundary.
+- `scripts/prepare-vps-nixos.sh` remains permanently retired and refuses to run.
+- Deployment does not modify the bootloader or replace Debian.
+- Package/service activation will be added as part of the Debian hard cutover.
+- Remote browser access requires a separately reviewed TLS and authentication boundary.

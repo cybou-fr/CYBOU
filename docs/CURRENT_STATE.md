@@ -45,11 +45,10 @@ This document is intentionally limited to implemented behavior and current limit
 
 ## Build and evaluation environment
 
-The active Linux/Nix environment is the local `NixOS` WSL2 distribution. Working-tree checks use
-`scripts/wsl-checks.sh`, which stages sources onto its Linux filesystem before Nix evaluation. The
-former OVH configuration remains in the flake only as archived recovery/history input: the failed
-in-place Debian-to-NixOS conversion made SSH unavailable, so OVH deploy, conversion, and evaluation
-scripts now refuse to run. KVM-backed VM claims require `/dev/kvm` to be verified inside WSL2.
+The sole active Linux build and deployment environment is Debian 13 at
+`debian@vps-d0669a91.vps.ovh.net`. `scripts/vps-checks.sh` transfers the unfinished working tree and
+runs Cargo, Clippy, and WASM gates remotely. WSL and NixOS are not active targets. The old in-place
+Debian-to-NixOS conversion remains permanently forbidden.
 
 ## Repository gate status
 

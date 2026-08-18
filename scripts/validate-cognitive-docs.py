@@ -200,22 +200,21 @@ def main(argv: list[str]) -> int:
         "deployment documentation entry",
         "[Build and Deployment Environments](DEPLOYMENT.md)",
     )
-    # The active build path must remain local WSL2; the failed OVH conversion is retained only as
-    # explicit history so it cannot silently become an operational runbook again.
+    # Debian 13 on OVH is the sole build/deploy target; the old NixOS conversion stays forbidden.
     require(
         paths["deployment"],
-        "active WSL distribution",
-        "NixOS` WSL2",
+        "active Debian target",
+        "debian@vps-d0669a91.vps.ovh.net",
     )
     require(
         paths["deployment"],
-        "retired OVH path",
-        "retired",
+        "forbidden NixOS conversion",
+        "Never attempt another in-place Debian-to-NixOS conversion",
     )
     require(
         paths["deployment"],
-        "WSL check entry point",
-        "scripts/wsl-checks.sh",
+        "Debian check entry point",
+        "scripts/vps-checks.sh",
     )
     require(
         paths["docs_index"],

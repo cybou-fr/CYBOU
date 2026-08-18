@@ -2,38 +2,28 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# RETIRED: OVH is no longer a Cybou deployment or evaluation target.
-#
-# This file remains only to fail old commands clearly.
-#
-# The build runs on the target rather than locally: the development workstation is Windows, and
-# a NixOS closure cannot be built there. `test` activates without touching the bootloader,
-# `boot` does the opposite, `switch` does both. Rolling back is a NixOS generation switch, not
-# a re-deploy - see docs/DEPLOYMENT.md.
+# Build on Debian 13, then install the current Rust gateway and shared WASM frontend.
 set -euo pipefail
-
-echo "deploy-vps: retired; OVH is no longer a Cybou Nix evaluation target" >&2
-exit 2
-
-action="${1:-switch}"
-case "$action" in
-  switch | boot | test | build | dry-activate) ;;
-  *)
-    echo "usage: $0 [switch|boot|test|build|dry-activate]" >&2
-    exit 2
-    ;;
-esac
 
 # shellcheck source=scripts/vps-env.sh
 . "$(dirname "$0")/vps-env.sh"
 
 cybou_push_source
 
-echo "==> nixos-rebuild $action --flake $CYBOU_VPS_SRC#$CYBOU_VPS_FLAKE_ATTR"
 cybou_ssh "
   set -eu
-  sudo nixos-rebuild $action --flake '$CYBOU_VPS_SRC#$CYBOU_VPS_FLAKE_ATTR' --print-build-logs
+  . \"\$HOME/.cargo/env\"
+  cd '$CYBOU_VPS_SRC'
+  cargo test --workspace --locked
+  cargo build --workspace --release --locked
+  cd crates/living-canvas
+  trunk build --release
+  cd ../..
+
+  sudo install -d -m 0755 /usr/libexec/cybou /usr/share/cybou/web
+  sudo install -m 0755 target/release/cybou-web-gateway /usr/libexec/cybou/cybou-web-gateway
+  sudo cp -a target/living-canvas/. /usr/share/cybou/web/
+  sudo chown -R root:root /usr/libexec/cybou /usr/share/cybou
 "
 
-echo "==> active generation"
-cybou_ssh "readlink -f /run/current-system; systemctl --failed --no-legend || true"
+echo "==> Debian artifacts installed on $CYBOU_VPS_HOST"

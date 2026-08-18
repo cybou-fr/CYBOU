@@ -217,19 +217,15 @@ primarily the heavy service-graph and renderer gate.
 
 ## Where the gates run
 
-CI runs the cheap checks on every push and the full matrix on a tag. Between those, the local
-`NixOS` WSL2 distribution runs the same gates on an unfinished working tree. The four VM tests
-additionally require `/dev/kvm` to be available inside WSL2:
+The active development gate runs on the sole Debian 13 builder using the unfinished working tree:
 
 ```bash
-scripts/wsl-checks.sh fast
-scripts/wsl-checks.sh full
-scripts/wsl-checks.sh lifecycle-continuity
+scripts/vps-checks.sh fast
+scripts/vps-checks.sh release
 ```
 
-A green run there is evidence about that WSL kernel, KVM support, and Nix store. It is
-developer evidence, not release evidence; the tag matrix recorded by CI remains authoritative for
-[Release Process](RELEASE.md).
+A green run is evidence about the Debian/Rust target itself. NixOS VM gates remain legacy evidence
+until the hard cutover replaces them with Debian service and reboot integration tests.
 
 ## Build order
 

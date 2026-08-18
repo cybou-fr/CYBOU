@@ -40,7 +40,7 @@ with [Current State](CURRENT_STATE.md).
 - [Next Engineering Steps](NEXT_STEPS.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
 - [Upgrading](UPGRADING.md)
-- [Build and Deployment Environments](DEPLOYMENT.md) — active NixOS/WSL2 workflow and retired OVH history
+- [Build and Deployment Environments](DEPLOYMENT.md) — sole Debian 13 OVH build/deploy workflow
 - [Release Process](RELEASE.md)
 
 ## Document roles
@@ -52,7 +52,7 @@ PROJECT_CHECKPOINT_2026-08-10.md  immutable assessment of one named source revis
 ARCHITECTURE.md   current topology plus explicit future boundaries
 WEB_UI_ARCHITECTURE.md  proposed web-first Presence, gateway, desktop, and migration blueprint
 RUST_MIGRATION.md       proposed Rust-first codebase, sequencing, cutover, and completion gates
-DEPLOYMENT.md     active NixOS/WSL2 build environment and archived OVH deployment path
+DEPLOYMENT.md     active Debian 13 OVH build and deployment environment
 ROADMAP.md        sequencing and acceptance meaning of milestones
 mind/*            protocol and component contracts
 security/*        threat, privacy, and trust boundaries

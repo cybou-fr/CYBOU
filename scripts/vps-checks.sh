@@ -2,43 +2,33 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# RETIRED: repository gates now run through scripts/wsl-checks.sh.
-#
-# This file remains only to fail old commands clearly.
-#
-# `fast` is the set CI runs on every push. `full` adds the NixOS VM tests, which need /dev/kvm;
-# the host has it, but a VM gate still costs minutes and a lot of store space, so it is not the
-# default. The checks run on the target because the workstation is Windows and cannot evaluate
-# a NixOS test.
+# Push the unfinished working tree to the active Debian 13 builder and run Rust/Web gates there.
 set -euo pipefail
-
-echo "vps-checks: retired; use scripts/wsl-checks.sh in the NixOS WSL2 distribution" >&2
-exit 2
-
-fast_checks=(formatting reuse package-metadata cognitive-docs mind-access qml-api ui-polish rust-foundation web-ui desktop-shell)
-full_checks=("${fast_checks[@]}" vm-smoke p4-plasma-lifecycle lifecycle-continuity m6-recovery-boundary)
-
-case "${1:-fast}" in
-  fast) checks=("${fast_checks[@]}") ;;
-  full) checks=("${full_checks[@]}") ;;
-  *) checks=("$@") ;;
-esac
 
 # shellcheck source=scripts/vps-env.sh
 . "$(dirname "$0")/vps-env.sh"
 
+profile="${1:-fast}"
+case "$profile" in
+  fast | release) ;;
+  *) echo "usage: $0 [fast|release]" >&2; exit 2 ;;
+esac
+
 cybou_push_source
 
-targets=""
-for check in "${checks[@]}"; do
-  targets="$targets '$CYBOU_VPS_SRC#checks.x86_64-linux.$check'"
-done
-
-echo "==> nix build ${checks[*]}"
-# shellcheck disable=SC2029 # $targets must expand here, not on the remote shell
 cybou_ssh "
   set -eu
+  . \"\$HOME/.cargo/env\"
   cd '$CYBOU_VPS_SRC'
-  nix build --no-link --print-build-logs $targets
+  cargo fmt --all -- --check
+  cargo test --workspace --locked
+  cargo clippy --workspace --all-targets --locked -- -D warnings
+  cargo check -p living-canvas --target wasm32-unknown-unknown --locked
+  if [ '$profile' = release ]; then
+    cargo build --workspace --release --locked
+    cd crates/living-canvas
+    trunk build --release
+  fi
 "
-echo "==> checks passed: ${checks[*]}"
+
+echo "==> Debian 13 $profile checks passed on $CYBOU_VPS_HOST"

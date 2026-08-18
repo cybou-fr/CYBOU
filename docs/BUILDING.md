@@ -49,7 +49,7 @@ fallback session during W2 evaluation:
 nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
 ```
 
-Use Linux or WSL2 with Nix. Do not install a separate Windows Qt SDK for Linux/NixOS builds.
+Do not build on Windows or WSL. Use `scripts/vps-checks.sh` to build on the Debian 13 target.
 
 ## C++ development build
 
@@ -117,17 +117,18 @@ git diff --check
 VM smoke check. A normal GitHub push does not run that full matrix; the workflow reserves it for
 the tag-only full job.
 
-## WSL2 build and test environment
+## Debian 13 build and test environment
 
-The active Linux/Nix environment is the local `NixOS` WSL2 distribution. The helper copies the
-working tree from the Windows mount into a temporary Linux filesystem before invoking Nix:
+The sole active build environment is `debian@vps-d0669a91.vps.ovh.net`. The helper transfers the
+unfinished working tree and runs Rust/WASM gates on Debian 13:
 
 ```bash
-wsl -d NixOS -- bash /mnt/c/Users/cybou/Documents/CYBOU/scripts/wsl-checks.sh fast
+bash scripts/vps-checks.sh fast
+bash scripts/vps-checks.sh release
 ```
 
-Use `full` only when `/dev/kvm` is available inside WSL2. The former OVH path and its in-place
-Debian-to-NixOS conversion are retired after loss of SSH access; see [Deployment](DEPLOYMENT.md).
+WSL and NixOS are not build or deployment evidence. The failed in-place Debian-to-NixOS conversion
+must never be repeated; the server remains Debian 13. See [Deployment](DEPLOYMENT.md).
 
 ## Clean local outputs
 

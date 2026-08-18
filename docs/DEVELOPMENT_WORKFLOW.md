@@ -40,11 +40,10 @@ ctest --test-dir build/dev --output-on-failure
 Then run the reproducible package gates from [Building](BUILDING.md). Do not treat a host-only CMake
 build as proof that Nix packaging, D-Bus activation, or Plasma integration works.
 
-On Windows, run the gates through the local `NixOS` WSL2 distribution. The helper stages the
-working tree on its Linux filesystem before evaluating the flake:
+From Windows, use the repository helper to send the current working tree to the Debian 13 builder:
 
 ```bash
-wsl -d NixOS -- bash /mnt/c/Users/cybou/Documents/CYBOU/scripts/wsl-checks.sh fast
+bash scripts/vps-checks.sh fast
 ```
 
 ## Documentation rules
