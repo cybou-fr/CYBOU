@@ -1509,6 +1509,35 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+## M8: a response exists before it is prose
+
+`ResponsePlan` and `realize()` land. The plan carries the goal, the claims with their evidence, the
+references still unresolved, and the qualifications; realization renders it into English or Russian.
+
+C6 holds by construction rather than by inspection. `realize()` takes the plan and nothing else --
+no journal, no context, no free text from a caller -- so a renderer cannot add an authoritative
+claim because there is no argument through which one could arrive. Removing a claim from the plan
+removes it from the prose, and that is the whole of the guarantee.
+
+`planFor()` is where C2 stops being a property of an act and becomes something a person reads. An
+act with an unresolved reference produces a `Clarify` plan carrying the candidates, and the answer
+about the guessed target is not in the plan at all -- so it cannot reach the rendered text either.
+The question names the options, because "which did you mean?" without them is unanswerable.
+
+Qualifications are rendered rather than summarised away: fluency that drops a hedge asserts
+something stronger than the plan does. A claim with no evidence cannot become prose, because a
+sentence Mind cannot source is not one it should be saying.
+
+Five sabotages, five caught. Two are worth recording. "An unresolved act still answers" was caught
+by the clarification test *and* by the bilingual one, which is the overlap that should exist when a
+single rule protects the same property on two paths. "Both languages render identically" is caught
+because the test asserts the surfaces differ while the claims match -- two languages that render
+the same way are one language, and a C7 test that only checked the claims would have passed.
+
+ADR-0031's C1, C2, C5, C6 and C7 now hold in the library. C3 (corrections append rather than
+rewrite) and C4 (the act survives its parser) come next, and C8 is satisfied throughout: nothing in
+this path involves a generative model.
+
 ## M8 begins: the meaning vocabulary
 
 `CognitiveAct` and `ReferenceResolution` exist as protocol types with their own tests. No parser yet

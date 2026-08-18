@@ -138,6 +138,13 @@ set_tests_properties(
     associative-projection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+qt_add_executable(test-response-plan tst_response_plan.cpp)
+target_link_libraries(test-response-plan PRIVATE cybou-meaning Qt6::Test)
+add_test(NAME response-plan COMMAND test-response-plan)
+set_tests_properties(
+    response-plan PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 qt_add_executable(test-cognitive-act tst_cognitive_act.cpp)
 target_link_libraries(test-cognitive-act PRIVATE cybou-meaning Qt6::Test)
 add_test(NAME cognitive-act COMMAND test-cognitive-act)

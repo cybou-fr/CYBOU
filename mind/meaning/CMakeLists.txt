@@ -3,7 +3,9 @@
 
 qt_add_library(cybou-meaning STATIC
     src/CognitiveAct.cpp
+    src/ResponsePlan.cpp
     include/cybou/meaning/CognitiveAct.h
+    include/cybou/meaning/ResponsePlan.h
 )
 
 target_include_directories(cybou-meaning
