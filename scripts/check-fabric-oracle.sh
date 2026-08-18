@@ -38,3 +38,17 @@ sed -n 's/^message-id=//p' "$work/observation-oracle.txt" >"$work/message-id.txt
 cmp "$work/observation.hex" "$root/fixtures/protocol/observation-v1.hex"
 cmp "$work/message-id.txt" "$root/fixtures/protocol/observation-v1-message-id.txt"
 echo "observation-v1-oracle: Qt payload and identity match Rust fixtures"
+
+c++ -std=c++20 \
+  "$root/migration/oracles/canonical_envelope_fixture.cpp" \
+  "$root/mind/protocol/src/CanonicalEnvelope.cpp" \
+  -I"$root/mind/protocol/include" \
+  $(pkg-config --cflags --libs Qt6Core) \
+  -o "$work/canonical-envelope-oracle"
+
+"$work/canonical-envelope-oracle" >"$work/canonical-oracle.txt"
+for key in envelope-v2 nonerasable-v3 journal-row-v2 envelope-v2-sha256 nonerasable-v3-sha256; do
+  sed -n "s/^$key=//p" "$work/canonical-oracle.txt" >"$work/$key.hex"
+  cmp "$work/$key.hex" "$root/fixtures/protocol/$key.hex"
+done
+echo "canonical-envelope-oracle: Qt canonical bytes and digests match Rust fixtures"

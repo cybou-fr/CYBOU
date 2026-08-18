@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod canonical;
 pub mod observation;
 
 /// Version of a serialized contract schema.
