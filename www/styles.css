@@ -47,6 +47,12 @@
   --fg-rgb: 255,255,255;       /* light-on-dark veils */
   --shadow-rgb: 0,0,0;
 
+  /* Resolved forms of the two tokens the blueprint and partner pages ask for by
+     name. Both derive from the rgb tokens above, so a theme that redefines those
+     redefines these with it. */
+  --line: rgba(var(--line-rgb), .16);
+  --accent-border: rgba(var(--accent-rgb), .32);
+
   --max: 1260px;
   --ease: cubic-bezier(.2,.8,.2,1);
 }

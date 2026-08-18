@@ -26,7 +26,7 @@ SPDX-License-Identifier: MIT
   <title>Cybou — Partners, Support & Contact</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=20260819-2">
+  <link rel="stylesheet" href="styles.css?v=20260819-3">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -98,6 +98,31 @@ SPDX-License-Identifier: MIT
       color: var(--accent-text);
       width: fit-content;
       margin-top: 8px;
+    }
+    .donate-subhead {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 28px 0 8px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--ink-1);
+    }
+    .donate-subhead svg {
+      color: var(--accent-text);
+      flex-shrink: 0;
+    }
+    .crypto-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .crypto-list strong {
+      font-size: 0.85rem;
+      color: var(--ink-1);
     }
     .crypto-address {
       font-family: monospace;
@@ -206,7 +231,7 @@ SPDX-License-Identifier: MIT
         </a>
       </article>
 
-      <!-- Card 2: Support & Donations -->
+      <!-- Card 2: Support, donations and the addresses that receive them -->
       <article class="partner-card reveal reveal-delay-1">
         <h3>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.72-8.72 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -215,32 +240,29 @@ SPDX-License-Identifier: MIT
         <p data-i18n="part_donate_text">
           Cybou is an independent open-source project. Your support funds reproducible builds, the Rust/WebAssembly interface, Mind runtime engineering, and fault-recovery testing.
         </p>
-      </article>
 
-      <!-- Card 3: Crypto Donations -->
-      <article class="partner-card reveal reveal-delay-2">
-        <h3>
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v2m0 8v2"/></svg>
+        <h4 class="donate-subhead">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v2m0 8v2"/></svg>
           <span data-i18n="part_crypto_head">Crypto Donations</span>
-        </h3>
+        </h4>
         <p data-i18n="part_crypto_text">
           Support Stanislav Saveliev directly via cryptocurrency:
         </p>
-        <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+        <div class="crypto-list">
           <div>
-            <strong style="font-size:0.85rem; color:var(--ink-1);">Solana (SOL):</strong>
+            <strong>Solana (SOL):</strong>
             <div class="crypto-address">39iqkHNMqncEPp3p52zKwUHnYzk2MJbcaHyY4Hhg2fWC</div>
           </div>
           <div>
-            <strong style="font-size:0.85rem; color:var(--ink-1);">Bitcoin (BTC):</strong>
+            <strong>Bitcoin (BTC):</strong>
             <div class="crypto-address">bc1q5a0yq9kflu755jz9a7juveelj3lrnaml6cnjur</div>
           </div>
           <div>
-            <strong style="font-size:0.85rem; color:var(--ink-1);">Ethereum / USDT (ERC-20):</strong>
+            <strong>Ethereum / USDT (ERC-20):</strong>
             <div class="crypto-address">0xf4B7fF998600617785ad7D4d0aad3D2Ea342526B</div>
           </div>
           <div>
-            <strong style="font-size:0.85rem; color:var(--ink-1);">TRON / USDT (TRC-20):</strong>
+            <strong>TRON / USDT (TRC-20):</strong>
             <div class="crypto-address">TCWmbxJXwes4GLZkVjpKpY3p34mjg4C6qo</div>
           </div>
         </div>
@@ -254,6 +276,6 @@ SPDX-License-Identifier: MIT
     <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
-  <script src="script.js?v=20260819-2"></script>
+  <script src="script.js?v=20260819-3"></script>
 </body>
 </html>
