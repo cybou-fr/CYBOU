@@ -50,6 +50,9 @@ compiles the actual Qt `Observation.cpp` and requires both its bare-CBOR payload
 UUID-v5 acquisition identity to match Rust fixtures. Rust validates RFC3339 instants, a strictly
 forward freshness horizon, non-null typed evidence, and non-empty provenance before encoding; UUID
 identity is derived from the validated acquisition time rather than a second caller-supplied clock.
+The Rust system-generation adapter converts successful acquisition directly into this protocol
+type, including Qt-compatible UTC millisecond timestamp spelling. It still has no Event1 write
+capability and remains safe to run as a non-authoritative comparison.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies

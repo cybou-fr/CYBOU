@@ -11,6 +11,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ciborium.workspace = true
+cybou-protocol = { path = "../cybou-protocol" }
 serde.workspace = true
 thiserror.workspace = true
 time.workspace = true

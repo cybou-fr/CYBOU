@@ -6,7 +6,9 @@
 use std::{fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use time::{Duration, OffsetDateTime};
+use time::{Duration, OffsetDateTime, UtcOffset, format_description};
+
+use cybou_protocol::observation::ObservationV1;
 
 /// Stable identity of the first non-sensitive local source.
 pub const SYSTEM_SOURCE_ID: &str = "nixos.system";
@@ -53,6 +55,32 @@ pub struct SystemObservation {
     pub freshness_until: OffsetDateTime,
     /// Human-readable local provenance.
     pub provenance: String,
+}
+
+impl SystemObservation {
+    /// Convert the acquired value into the byte-proven protocol payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formatting error only when the frozen timestamp format cannot be applied.
+    pub fn into_protocol(self) -> Result<ObservationV1, time::error::Format> {
+        Ok(ObservationV1 {
+            source_id: self.source_id.into(),
+            subject: self.subject.into(),
+            value: ciborium::Value::Text(self.value),
+            acquired_at: qt_utc_milliseconds(self.acquired_at)?,
+            freshness_until: qt_utc_milliseconds(self.freshness_until)?,
+            provenance: self.provenance,
+        })
+    }
+}
+
+fn qt_utc_milliseconds(value: OffsetDateTime) -> Result<String, time::error::Format> {
+    let format = format_description::parse_borrowed::<2>(
+        "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z",
+    )
+    .expect("frozen timestamp format is valid");
+    value.to_offset(UtcOffset::UTC).format(&format)
 }
 
 /// Typed result that never turns inability to observe into an observed empty value.
@@ -166,6 +194,13 @@ mod tests {
         assert_eq!(observation.subject, SYSTEM_SUBJECT);
         assert_eq!(observation.value, "abc-nixos-system-host-26.05");
         assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
+
+        let protocol = observation.into_protocol().expect("protocol observation");
+        assert_eq!(protocol.source_id, SYSTEM_SOURCE_ID);
+        assert_eq!(protocol.subject, SYSTEM_SUBJECT);
+        assert_eq!(protocol.acquired_at, "2026-08-18T21:53:20.000Z");
+        assert!(protocol.encode().is_ok());
+        assert!(protocol.message_id().is_ok());
     }
 
     #[test]

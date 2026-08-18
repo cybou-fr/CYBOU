@@ -391,6 +391,8 @@ dependencies = [
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [
+ "ciborium",
+ "cybou-protocol",
  "serde",
  "tempfile",
  "thiserror 2.0.20",

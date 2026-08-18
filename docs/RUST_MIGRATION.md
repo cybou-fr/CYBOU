@@ -102,6 +102,9 @@ and compares both with checked-in fixtures before Rust tests run. `cybou-protoco
 emits byte-identical bare CBOR, derives identity from the same CBOR tuple and namespace, preserves
 typed values and field boundaries, and rejects null evidence, malformed time, and non-forward
 freshness horizons.
+`cybou-perception::SystemObservation` converts directly into that proven protocol type using the
+predecessor's UTC millisecond spelling; acquisition cannot bypass the compatible payload and
+identity path when the future Event1 client is attached.
 
 ### R6 — lifecycle and canonical Journal cutover
 
