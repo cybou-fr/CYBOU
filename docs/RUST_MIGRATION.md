@@ -139,6 +139,10 @@ The `cybou-journal-inspect` binary makes a single page available for operator-dr
 checks on Debian. Its machine-readable key/value output contains ranges, counters, `has_more`, and
 the next checkpoint but no payload data. It is an inspection probe, not a recovery or migration
 tool.
+A 513-row deterministic v3 fixture proves that a 64-row budget is never exceeded, continuation is
+monotonic, and the paged final checkpoint equals full replay. No real Journal exists on the current
+fixture-backed Debian host, so captured predecessor-database differential evidence remains an open
+R6 gate rather than a simulated claim.
 
 ### R7 — desktop replacement and legacy removal
 

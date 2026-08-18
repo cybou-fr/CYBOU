@@ -559,6 +559,10 @@ mod tests {
     ";
 
     fn populate_valid_chain(connection: &Connection) {
+        populate_chain(connection, 2);
+    }
+
+    fn populate_chain(connection: &Connection, row_count: u64) {
         use cybou_protocol::canonical::{
             CanonicalEnvelope, canonical_journal_row_v3, commitment_v3, sha256,
         };
@@ -566,9 +570,9 @@ mod tests {
         use uuid::Uuid;
 
         let mut previous = Vec::new();
-        for sequence in 1_u64..=2 {
+        for sequence in 1_u64..=row_count {
             let id = Uuid::from_u128(sequence.into());
-            let wall_time = format!("2026-08-19T00:00:0{}.000Z", sequence - 1);
+            let wall_time = "2026-08-19T00:00:00.000Z".to_owned();
             let envelope = CanonicalEnvelope {
                 schema_version: 4,
                 message_id: id,
@@ -582,7 +586,7 @@ mod tests {
                 logical_clock: sequence,
                 confidence: 1.0,
                 evidence: Vec::new(),
-                payload: vec![u8::try_from(sequence).expect("fixture payload")],
+                payload: sequence.to_be_bytes().to_vec(),
                 privacy: 0,
                 capability_scope: String::new(),
                 sealed: false,
@@ -810,5 +814,39 @@ mod tests {
             verify_journal_from(&path, Some(&stale)),
             Err(StorageError::CheckpointMismatch { sequence: 2 })
         ));
+    }
+
+    #[test]
+    fn paged_replay_respects_its_row_budget_across_a_larger_chain() {
+        const ROWS: u64 = 513;
+        const PAGE_SIZE: u64 = 64;
+
+        let root = tempdir().expect("temporary root");
+        let path = root.path().join("scale.db");
+        let connection = Connection::open(&path).expect("fixture database");
+        connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_chain(&connection, ROWS);
+        drop(connection);
+
+        let full = verify_journal_from(&path, None).expect("full verification");
+        let mut checkpoint = None;
+        let mut verified = 0_u64;
+        let mut pages = 0_u64;
+        loop {
+            let page = verify_journal_page(&path, checkpoint.as_ref(), PAGE_SIZE)
+                .expect("bounded verification page");
+            let page_rows = page.verified_through - page.verified_from;
+            assert!(page_rows <= PAGE_SIZE);
+            assert_eq!(page.content_verified, page_rows);
+            verified += page_rows;
+            pages += 1;
+            checkpoint = Some(page.checkpoint);
+            if !page.has_more {
+                break;
+            }
+        }
+        assert_eq!(verified, ROWS);
+        assert_eq!(pages, ROWS.div_ceil(PAGE_SIZE));
+        assert_eq!(checkpoint, Some(full.checkpoint));
     }
 }

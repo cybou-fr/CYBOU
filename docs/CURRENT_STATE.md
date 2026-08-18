@@ -87,6 +87,12 @@ unbounded suffix scan while preserving the identical hash and commitment checks.
 existing database path, positive row budget, and optional sequence/hash checkpoint; it prints only
 verification counters and the next checkpoint, never contribution payloads. The tool performs no
 copy, checkpoint persistence, repair, migration, or write.
+A deterministic 513-row v3 chain now exercises the page boundary at 64 rows: every page stays
+within the declared budget, checkpoints advance monotonically, nine pages cover the exact history,
+and the final checkpoint equals a full replay. This is a correctness/complexity regression gate,
+not yet a production latency SLO. The current Debian public host contains no Journal in the
+canonical XDG paths and remains fixture-backed, so a real predecessor-database differential run is
+still pending.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
