@@ -20,27 +20,45 @@ struct Point {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct CanvasLayout {
     artifact: Point,
+    collaborators: Point,
     release: Point,
+    sources: Point,
     suggestion: Point,
+    commitments: Point,
 }
 
 impl Default for CanvasLayout {
     fn default() -> Self {
         Self {
             artifact: Point {
-                x: 165.0,
-                y: 90.0,
+                x: 70.0,
+                y: 65.0,
                 z: 1,
             },
+            collaborators: Point {
+                x: 55.0,
+                y: 335.0,
+                z: 2,
+            },
             release: Point {
-                x: 480.0,
-                y: 140.0,
+                x: 445.0,
+                y: 105.0,
+                z: 6,
+            },
+            sources: Point {
+                x: 880.0,
+                y: 70.0,
                 z: 3,
             },
             suggestion: Point {
                 x: 900.0,
-                y: 360.0,
-                z: 2,
+                y: 335.0,
+                z: 5,
+            },
+            commitments: Point {
+                x: 470.0,
+                y: 400.0,
+                z: 4,
             },
         }
     }
@@ -49,8 +67,11 @@ impl Default for CanvasLayout {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Panel {
     Artifact,
+    Collaborators,
     Release,
+    Sources,
     Suggestion,
+    Commitments,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -66,21 +87,38 @@ impl CanvasLayout {
     const fn point(self, panel: Panel) -> Point {
         match panel {
             Panel::Artifact => self.artifact,
+            Panel::Collaborators => self.collaborators,
             Panel::Release => self.release,
+            Panel::Sources => self.sources,
             Panel::Suggestion => self.suggestion,
+            Panel::Commitments => self.commitments,
         }
     }
 
     fn set_point(&mut self, panel: Panel, point: Point) {
         match panel {
             Panel::Artifact => self.artifact = point,
+            Panel::Collaborators => self.collaborators = point,
             Panel::Release => self.release = point,
+            Panel::Sources => self.sources = point,
             Panel::Suggestion => self.suggestion = point,
+            Panel::Commitments => self.commitments = point,
         }
     }
 
     fn bring_forward(&mut self, panel: Panel) {
-        let next = self.artifact.z.max(self.release.z).max(self.suggestion.z) + 1;
+        let next = [
+            self.artifact.z,
+            self.collaborators.z,
+            self.release.z,
+            self.sources.z,
+            self.suggestion.z,
+            self.commitments.z,
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or_default()
+            + 1;
         self.set_point(
             panel,
             Point {
@@ -216,6 +254,23 @@ pub fn App() -> impl IntoView {
                 </button>
 
                 <button
+                    class:selected=move || selected.get() == "collaborators"
+                    class="object collaborators"
+                    style=move || panel_style(layout.get(), Panel::Collaborators)
+                    aria-label="Collaborators panel. Drag to reposition; use arrow keys for keyboard movement."
+                    on:pointerdown=move |event| start_drag(event, Panel::Collaborators, layout, dragging)
+                    on:keydown=move |event| keyboard_move(event, Panel::Collaborators, layout)
+                    on:click=move |_| set_selected.set("collaborators")
+                >
+                    <small>"Collaborators"</small>
+                    <strong>"Release team"</strong>
+                    <span class="row"><b>"Ari N."</b><i>"Owner"</i></span>
+                    <span class="row"><b>"Mina K."</b><i>"Release lead"</i></span>
+                    <span class="row"><b>"Jonas L."</b><i>"QA lead"</i></span>
+                    <span class="row"><b>"Priya S."</b><i>"Security"</i></span>
+                </button>
+
+                <button
                     class:selected=move || selected.get() == "release"
                     class="object release"
                     style=move || panel_style(layout.get(), Panel::Release)
@@ -233,6 +288,23 @@ pub fn App() -> impl IntoView {
                 </button>
 
                 <button
+                    class:selected=move || selected.get() == "sources"
+                    class="object sources"
+                    style=move || panel_style(layout.get(), Panel::Sources)
+                    aria-label="Sources panel. Drag to reposition; use arrow keys for keyboard movement."
+                    on:pointerdown=move |event| start_drag(event, Panel::Sources, layout, dragging)
+                    on:keydown=move |event| keyboard_move(event, Panel::Sources, layout)
+                    on:click=move |_| set_selected.set("sources")
+                >
+                    <small>"Sources"</small>
+                    <strong>"Validated inputs"</strong>
+                    <span class="row"><b>"Design doc"</b><i>"v4"</i></span>
+                    <span class="row"><b>"Changelog"</b><i>"v3"</i></span>
+                    <span class="row"><b>"Test results"</b><i>"128"</i></span>
+                    <span class="row"><b>"Threat model"</b><i>"v2"</i></span>
+                </button>
+
+                <button
                     class:selected=move || selected.get() == "suggestion"
                     class="object suggestion"
                     style=move || panel_style(layout.get(), Panel::Suggestion)
@@ -245,6 +317,27 @@ pub fn App() -> impl IntoView {
                     <strong>"Verify rollback path"</strong>
                     <span>"Proposed · not authorized"</span>
                 </button>
+
+                <button
+                    class:selected=move || selected.get() == "commitments"
+                    class="object commitments"
+                    style=move || panel_style(layout.get(), Panel::Commitments)
+                    aria-label="Commitments panel. Drag to reposition; use arrow keys for keyboard movement."
+                    on:pointerdown=move |event| start_drag(event, Panel::Commitments, layout, dragging)
+                    on:keydown=move |event| keyboard_move(event, Panel::Commitments, layout)
+                    on:click=move |_| set_selected.set("commitments")
+                >
+                    <small>"3 commitments"</small>
+                    <span class="check-row"><b>"Complete test matrix"</b><i>"May 20"</i></span>
+                    <span class="check-row"><b>"Security review"</b><i>"May 22"</i></span>
+                    <span class="check-row"><b>"Docs & migration guide"</b><i>"May 26"</i></span>
+                    <span class="panel-link">"View commitments"</span>
+                </button>
+
+                <label class="command-bar" aria-label="Search or act">
+                    <input type="search" placeholder="Search or act…" />
+                    <kbd>"Ctrl K"</kbd>
+                </label>
 
                 <aside class="system-state" aria-label="System state">
                     <span class="status-dot" aria-hidden="true"></span>

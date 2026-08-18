@@ -23,8 +23,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 44%, rgba(37, 112, 109, 0.18), transparent 27rem),
-    linear-gradient(145deg, #0b1118, #070a0e 60%, #0c1117);
+    linear-gradient(rgba(3, 8, 13, 0.18), rgba(3, 7, 12, 0.42)),
+    url("/cybou_bg.png") center / cover no-repeat,
+    #05090e;
 }
 
 .topbar {
@@ -45,14 +46,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .runtime small { grid-column: 2; color: var(--muted); }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px rgba(112, 225, 200, 0.8); }
 
-.canvas { position: relative; min-height: calc(100vh - 64px); }
+.canvas { position: relative; min-height: calc(100vh - 64px); isolation: isolate; }
 .ambient { position: absolute; inset: 16% 26%; border: 1px solid rgba(112, 225, 200, 0.08); border-radius: 50%; filter: blur(1px); }
-.object { position: absolute; display: flex; flex-direction: column; text-align: left; gap: 9px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.32); backdrop-filter: blur(24px); cursor: grab; touch-action: none; user-select: none; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.object { position: absolute; display: flex; flex-direction: column; text-align: left; gap: 9px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, rgba(19, 28, 38, 0.94), rgba(10, 16, 23, 0.9)); box-shadow: 0 22px 65px rgba(0, 0, 0, 0.4), inset 0 1px rgba(255,255,255,0.035); backdrop-filter: blur(24px); cursor: grab; touch-action: none; user-select: none; transition: border-color 160ms ease, box-shadow 160ms ease; }
 .object:active { cursor: grabbing; }
-.object.selected { border-color: rgba(112, 225, 200, 0.76); box-shadow: 0 0 0 1px rgba(112, 225, 200, 0.12), 0 24px 70px rgba(0, 0, 0, 0.38); }
+.object.selected { border-color: rgba(112, 225, 200, 0.82); box-shadow: 0 0 0 1px rgba(112, 225, 200, 0.15), 0 0 36px rgba(62, 206, 178, 0.17), 0 24px 70px rgba(0, 0, 0, 0.42); }
 .object small { color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
 .object span, .object p { color: var(--muted); }
 .artifact { width: 220px; padding: 19px; }
+.collaborators { width: 240px; padding: 20px; }
 .release { width: 390px; padding: 30px; }
 .release h1 { margin: 5px 0 0; font-size: 30px; font-weight: 560; }
 .release p { margin: 0; line-height: 1.55; }
@@ -61,6 +63,17 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .progress span { display: block; width: 68%; height: 100%; background: var(--accent); }
 .nominal { color: var(--accent) !important; }
 .suggestion { width: 245px; padding: 20px; }
+.sources { width: 245px; padding: 20px; }
+.commitments { width: 310px; padding: 22px; }
+.row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
+.row b, .check-row b { color: #dfe8ed; font-weight: 500; }
+.row i, .check-row i { color: var(--muted); font-style: normal; white-space: nowrap; }
+.check-row b { margin-right: auto; }
+.panel-link { margin-top: 7px; padding-top: 12px; border-top: 1px solid rgba(154,167,184,.16); color: var(--accent) !important; }
+.command-bar { position: absolute; z-index: 1000; left: 50%; bottom: 24px; width: min(360px, calc(100% - 48px)); transform: translateX(-50%); display: flex; align-items: center; padding: 5px 8px 5px 18px; border: 1px solid rgba(154,167,184,.27); border-radius: 22px; background: rgba(8,13,20,.91); box-shadow: 0 18px 55px rgba(0,0,0,.38); backdrop-filter: blur(22px); }
+.command-bar input { min-width: 0; flex: 1; border: 0; outline: 0; padding: 8px 0; background: transparent; color: #edf4f6; font: inherit; }
+.command-bar input::placeholder { color: #81909f; }
+.command-bar kbd { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.06); color: #8f9daa; font: 11px/1 Inter, sans-serif; }
 .system-state { position: absolute; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 16px; background: rgba(8, 12, 17, 0.76); color: var(--muted); font-size: 11px; }
 
 @media (max-width: 760px) {
@@ -70,6 +83,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   .ambient, .system-state { display: none; }
   .object, .release, .release:hover { position: static; width: 100%; transform: none; }
   .release { order: -1; }
+  .command-bar { position: fixed; }
 }
 
 @media (prefers-reduced-motion: reduce) {
