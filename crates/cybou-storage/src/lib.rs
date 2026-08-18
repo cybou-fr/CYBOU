@@ -5,8 +5,14 @@
 
 use std::path::Path;
 
+use cybou_protocol::canonical::{
+    CanonicalEnvelope, canonical_journal_row_v2, canonical_journal_row_v3,
+    canonical_nonerasable_v3, sha256,
+};
 use rusqlite::{Connection, OpenFlags};
 use thiserror::Error;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use uuid::Uuid;
 
 /// Current predecessor `SQLite` schema version.
 pub const JOURNAL_SCHEMA_V2: i64 = 2;
@@ -140,7 +146,7 @@ pub fn inspect_journal(path: &Path) -> Result<JournalInspection, StorageError> {
     let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM contribution", [], |row| row.get(0))
         .map_err(StorageError::Query)?;
-    inspect_chain_shape(&connection)?;
+    inspect_chain(&connection)?;
     let (erasure_epoch, rotated_epoch): (i64, i64) = connection
         .query_row(
             "SELECT erasure_epoch, rotated_epoch FROM journal_meta WHERE id=1",
@@ -156,10 +162,14 @@ pub fn inspect_journal(path: &Path) -> Result<JournalInspection, StorageError> {
     })
 }
 
-fn inspect_chain_shape(connection: &Connection) -> Result<(), StorageError> {
+fn inspect_chain(connection: &Connection) -> Result<(), StorageError> {
     let mut statement = connection
         .prepare(
-            "SELECT seq, hash_version, prev_hash, hash, commitment, payload_commitment \
+            "SELECT seq, hash_version, schema_version, message_id, correlation_id, causation_id, \
+             origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, confidence, \
+             payload, privacy, capability, sealed, key_domain, key_epoch, retention_class, \
+             retention_policy, retain_until, sensitivity, prev_hash, hash, commitment, \
+             payload_commitment, erased_at \
              FROM contribution ORDER BY seq ASC",
         )
         .map_err(StorageError::Query)?;
@@ -170,15 +180,16 @@ fn inspect_chain_shape(connection: &Connection) -> Result<(), StorageError> {
         let raw_sequence: i64 = row.get(0).map_err(StorageError::Query)?;
         let sequence = u64::try_from(raw_sequence).map_err(|_| StorageError::InvalidCounter)?;
         let hash_version: i64 = row.get(1).map_err(StorageError::Query)?;
-        let stored_previous: Option<Vec<u8>> = row.get(2).map_err(StorageError::Query)?;
-        let hash: Vec<u8> = row.get(3).map_err(StorageError::Query)?;
-        let commitment: Option<Vec<u8>> = row.get(4).map_err(StorageError::Query)?;
-        let payload_commitment: Option<Vec<u8>> = row.get(5).map_err(StorageError::Query)?;
+        let stored_previous: Option<Vec<u8>> = row.get(23).map_err(StorageError::Query)?;
+        let hash: Vec<u8> = row.get(24).map_err(StorageError::Query)?;
+        let commitment: Option<Vec<u8>> = row.get(25).map_err(StorageError::Query)?;
+        let payload_commitment: Option<Vec<u8>> = row.get(26).map_err(StorageError::Query)?;
+        let erased_at: Option<String> = row.get(27).map_err(StorageError::Query)?;
         let invalid = |reason| StorageError::InvalidChain { sequence, reason };
         if sequence != expected_sequence {
             return Err(invalid("sequence is not contiguous"));
         }
-        if stored_previous.unwrap_or_default() != previous_hash {
+        if stored_previous.as_deref().unwrap_or_default() != previous_hash {
             return Err(invalid("previous hash does not match the preceding row"));
         }
         if hash.len() != 32 {
@@ -187,18 +198,159 @@ fn inspect_chain_shape(connection: &Connection) -> Result<(), StorageError> {
         if !(1..=3).contains(&hash_version) {
             return Err(invalid("hash version is unsupported"));
         }
-        if hash_version == 3
-            && (commitment.as_deref().is_none_or(|value| value.len() != 32)
-                || payload_commitment
+        let envelope = decode_envelope(connection, row, sequence)?;
+        let previous = stored_previous.unwrap_or_default();
+        let expected = match hash_version {
+            1 => legacy_row_hash(
+                sequence,
+                &previous,
+                &envelope,
+                &row.get::<_, String>(9).map_err(StorageError::Query)?,
+            ),
+            2 if envelope.schema_version == 2 => {
+                sha256(&canonical_journal_row_v2(sequence, &previous, &envelope))
+            }
+            3 if (2..=4).contains(&envelope.schema_version) => {
+                let commitment = commitment
                     .as_deref()
-                    .is_none_or(|value| value.len() != 32))
-        {
-            return Err(invalid("v3 commitment material is missing or malformed"));
+                    .filter(|value| value.len() == 32)
+                    .ok_or_else(|| invalid("v3 commitment is missing or malformed"))?;
+                let payload_commitment = payload_commitment
+                    .as_deref()
+                    .filter(|value| value.len() == 32)
+                    .ok_or_else(|| invalid("v3 payload commitment is missing or malformed"))?;
+                let metadata = sha256(&canonical_nonerasable_v3(&envelope));
+                let mut joined = [0_u8; 64];
+                joined[..32].copy_from_slice(&metadata);
+                joined[32..].copy_from_slice(payload_commitment);
+                if sha256(&joined).as_slice() != commitment {
+                    return Err(invalid("v3 metadata commitment does not match"));
+                }
+                if erased_at.is_none() && sha256(&envelope.payload).as_slice() != payload_commitment
+                {
+                    return Err(invalid("v3 payload commitment does not match"));
+                }
+                sha256(&canonical_journal_row_v3(sequence, &previous, commitment))
+            }
+            _ => return Err(invalid("hash and envelope versions are incompatible")),
+        };
+        if expected.as_slice() != hash {
+            return Err(invalid("stored hash does not match canonical row"));
         }
         previous_hash = hash;
         expected_sequence = expected_sequence.saturating_add(1);
     }
     Ok(())
+}
+
+fn decode_envelope(
+    connection: &Connection,
+    row: &rusqlite::Row<'_>,
+    sequence: u64,
+) -> Result<CanonicalEnvelope, StorageError> {
+    let invalid = |reason| StorageError::InvalidChain { sequence, reason };
+    let integer =
+        |index| -> Result<i64, StorageError> { row.get(index).map_err(StorageError::Query) };
+    let text =
+        |index| -> Result<String, StorageError> { row.get(index).map_err(StorageError::Query) };
+    let optional_text = |index| -> Result<Option<String>, StorageError> {
+        row.get(index).map_err(StorageError::Query)
+    };
+    let uuid = |index| -> Result<Uuid, StorageError> {
+        optional_text(index)?
+            .filter(|value| !value.is_empty())
+            .map_or(Ok(Uuid::nil()), |value| {
+                Uuid::parse_str(&value).map_err(|_| invalid("UUID is malformed"))
+            })
+    };
+    let non_negative = |index| -> Result<u64, StorageError> {
+        u64::try_from(integer(index)?).map_err(|_| invalid("numeric field is negative"))
+    };
+    let wall_time = text(9)?;
+    let wall_time_ms = parse_millis(&wall_time).ok_or_else(|| invalid("wall time is malformed"))?;
+    let retain_until = optional_text(21)?;
+    let message_id = uuid(3)?;
+    let mut evidence_statement = connection
+        .prepare(
+            "SELECT evidence_id FROM contribution_evidence \
+             WHERE contribution_id=?1 ORDER BY ordinal",
+        )
+        .map_err(StorageError::Query)?;
+    let evidence = evidence_statement
+        .query_map([message_id.hyphenated().to_string()], |evidence_row| {
+            evidence_row.get::<_, String>(0)
+        })
+        .map_err(StorageError::Query)?
+        .map(|value| {
+            value.map_err(StorageError::Query).and_then(|value| {
+                Uuid::parse_str(&value).map_err(|_| invalid("evidence UUID is malformed"))
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(CanonicalEnvelope {
+        schema_version: u16::try_from(integer(2)?)
+            .map_err(|_| invalid("schema version is invalid"))?,
+        message_id,
+        correlation_id: uuid(4)?,
+        causation_id: uuid(5)?,
+        origin_organ: text(6)?,
+        origin_node: text(7)?,
+        kind: u16::try_from(integer(8)?).map_err(|_| invalid("kind is invalid"))?,
+        wall_time_ms,
+        monotonic_time: non_negative(10)?,
+        logical_clock: non_negative(11)?,
+        confidence: row.get(12).map_err(StorageError::Query)?,
+        evidence,
+        payload: row
+            .get::<_, Option<Vec<u8>>>(13)
+            .map_err(StorageError::Query)?
+            .unwrap_or_default(),
+        privacy: u8::try_from(integer(14)?).map_err(|_| invalid("privacy is invalid"))?,
+        capability_scope: optional_text(15)?.unwrap_or_default(),
+        sealed: integer(16)? != 0,
+        key_domain_id: uuid(17)?,
+        key_epoch: u32::try_from(integer(18)?).map_err(|_| invalid("key epoch is invalid"))?,
+        retention_class: u8::try_from(integer(19)?)
+            .map_err(|_| invalid("retention class is invalid"))?,
+        retention_policy_version: u16::try_from(integer(20)?)
+            .map_err(|_| invalid("retention policy is invalid"))?,
+        retain_until_ms: retain_until
+            .filter(|value| !value.is_empty())
+            .map_or(Ok(0), |value| {
+                parse_millis(&value)
+                    .and_then(|value| u64::try_from(value).ok())
+                    .ok_or_else(|| invalid("retention time is malformed"))
+            })?,
+        sensitivity: u8::try_from(integer(22)?).map_err(|_| invalid("sensitivity is invalid"))?,
+    })
+}
+
+fn parse_millis(value: &str) -> Option<i64> {
+    let instant = OffsetDateTime::parse(value, &Rfc3339).ok()?;
+    i64::try_from(instant.unix_timestamp_nanos() / 1_000_000).ok()
+}
+
+fn legacy_row_hash(
+    sequence: u64,
+    previous: &[u8],
+    envelope: &CanonicalEnvelope,
+    wall_time: &str,
+) -> [u8; 32] {
+    let mut input = previous.to_vec();
+    input.extend_from_slice(sequence.to_string().as_bytes());
+    for id in [
+        envelope.message_id,
+        envelope.correlation_id,
+        envelope.causation_id,
+    ] {
+        input.extend_from_slice(format!("{{{id}}}").as_bytes());
+    }
+    input.extend_from_slice(envelope.origin_organ.as_bytes());
+    input.extend_from_slice(envelope.kind.to_string().as_bytes());
+    input.extend_from_slice(wall_time.as_bytes());
+    input.extend_from_slice(envelope.logical_clock.to_string().as_bytes());
+    input.extend_from_slice(&envelope.payload);
+    sha256(&input)
 }
 
 #[cfg(test)]
@@ -223,21 +375,74 @@ mod tests {
         CREATE TABLE contribution_evidence (contribution_id TEXT, evidence_id TEXT, ordinal INTEGER);
         CREATE TABLE journal_meta (id INTEGER PRIMARY KEY, erasure_epoch INTEGER, rotated_epoch INTEGER);
         INSERT INTO journal_meta VALUES (1, 4, 3);
-        INSERT INTO contribution
-          (seq, message_id, correlation_id, origin_organ, origin_node, kind, wall_time,
-           monotonic_time, logical_clock, confidence, privacy, schema_version, hash_version,
-           prev_hash, hash, commitment, payload_commitment, sealed, key_epoch,
-           retention_class, retention_policy, sensitivity)
-        VALUES
-          (1, '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001',
-           'fixture', '', 1, '2026-08-19T00:00:00.000Z', 0, 1, 1.0, 0, 4, 3,
-           X'', zeroblob(32), zeroblob(32), zeroblob(32), 0, 0, 2, 0, 1),
-          (2, '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000002',
-           'fixture', '', 1, '2026-08-19T00:00:01.000Z', 0, 2, 1.0, 0, 4, 3,
-           zeroblob(32), X'0101010101010101010101010101010101010101010101010101010101010101',
-           zeroblob(32), zeroblob(32), 0, 0, 2, 0, 1);
         PRAGMA user_version=2;
     ";
+
+    fn populate_valid_chain(connection: &Connection) {
+        use cybou_protocol::canonical::{
+            CanonicalEnvelope, canonical_journal_row_v3, commitment_v3, sha256,
+        };
+        use rusqlite::params;
+        use uuid::Uuid;
+
+        let mut previous = Vec::new();
+        for sequence in 1_u64..=2 {
+            let id = Uuid::from_u128(sequence.into());
+            let wall_time = format!("2026-08-19T00:00:0{}.000Z", sequence - 1);
+            let envelope = CanonicalEnvelope {
+                schema_version: 4,
+                message_id: id,
+                correlation_id: id,
+                causation_id: Uuid::nil(),
+                origin_organ: "fixture".into(),
+                origin_node: String::new(),
+                kind: 1,
+                wall_time_ms: super::parse_millis(&wall_time).expect("fixture time"),
+                monotonic_time: 0,
+                logical_clock: sequence,
+                confidence: 1.0,
+                evidence: Vec::new(),
+                payload: vec![u8::try_from(sequence).expect("fixture payload")],
+                privacy: 0,
+                capability_scope: String::new(),
+                sealed: false,
+                key_domain_id: Uuid::nil(),
+                key_epoch: 0,
+                retention_class: 2,
+                retention_policy_version: 0,
+                retain_until_ms: 0,
+                sensitivity: 1,
+            };
+            let (_, payload, commitment) = commitment_v3(&envelope);
+            let hash = sha256(&canonical_journal_row_v3(sequence, &previous, &commitment));
+            let stored_sequence = i64::try_from(sequence).expect("fixture sequence");
+            connection
+                .execute(
+                    "INSERT INTO contribution (
+                       seq, message_id, correlation_id, origin_organ, origin_node, kind, wall_time,
+                       monotonic_time, logical_clock, confidence, payload, privacy, capability,
+                       schema_version, hash_version, prev_hash, hash, commitment,
+                       payload_commitment, sealed, key_epoch, retention_class, retention_policy,
+                       sensitivity
+                     ) VALUES (
+                       ?1, ?2, ?2, 'fixture', '', 1, ?3, 0, ?1, 1.0, ?8, 0, '', 4, 3,
+                       ?4, ?5, ?6, ?7, 0, 0, 2, 0, 1
+                     )",
+                    params![
+                        stored_sequence,
+                        id.hyphenated().to_string(),
+                        wall_time,
+                        previous,
+                        hash,
+                        commitment,
+                        payload,
+                        envelope.payload
+                    ],
+                )
+                .expect("valid contribution");
+            previous = hash.to_vec();
+        }
+    }
 
     #[test]
     fn missing_database_is_not_created() {
@@ -253,6 +458,7 @@ mod tests {
         let path = root.path().join("journal.db");
         let connection = Connection::open(&path).expect("fixture database");
         connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_valid_chain(&connection);
         drop(connection);
         let before = fs::read(&path).expect("database bytes");
 
@@ -297,6 +503,7 @@ mod tests {
         let path = root.path().join("broken.db");
         let connection = Connection::open(&path).expect("fixture database");
         connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_valid_chain(&connection);
         connection
             .execute(
                 "UPDATE contribution SET prev_hash=zeroblob(31) WHERE seq=2",
@@ -308,5 +515,58 @@ mod tests {
             inspect_journal(&path),
             Err(StorageError::InvalidChain { sequence: 2, .. })
         ));
+    }
+
+    #[test]
+    fn canonical_hash_and_live_payload_tampering_fail_closed() {
+        let root = tempdir().expect("temporary root");
+        let hash_path = root.path().join("hash.db");
+        let connection = Connection::open(&hash_path).expect("fixture database");
+        connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_valid_chain(&connection);
+        connection
+            .execute("UPDATE contribution SET hash=zeroblob(32) WHERE seq=1", [])
+            .expect("break canonical hash");
+        drop(connection);
+        assert!(matches!(
+            inspect_journal(&hash_path),
+            Err(StorageError::InvalidChain { sequence: 1, .. })
+        ));
+
+        let payload_path = root.path().join("payload.db");
+        let connection = Connection::open(&payload_path).expect("fixture database");
+        connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_valid_chain(&connection);
+        connection
+            .execute("UPDATE contribution SET payload=X'ff' WHERE seq=2", [])
+            .expect("break payload commitment");
+        drop(connection);
+        assert!(matches!(
+            inspect_journal(&payload_path),
+            Err(StorageError::InvalidChain { sequence: 2, .. })
+        ));
+    }
+
+    #[test]
+    fn erased_payload_is_skipped_but_surviving_metadata_is_verified() {
+        let root = tempdir().expect("temporary root");
+        let path = root.path().join("erased.db");
+        let connection = Connection::open(&path).expect("fixture database");
+        connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_valid_chain(&connection);
+        connection
+            .execute(
+                "UPDATE contribution SET payload=X'', erased_at='2026-08-20T00:00:00.000Z' \
+                 WHERE seq=2",
+                [],
+            )
+            .expect("erase payload bytes");
+        drop(connection);
+        assert_eq!(
+            inspect_journal(&path)
+                .expect("verifiable erasure")
+                .contribution_count,
+            2
+        );
     }
 }

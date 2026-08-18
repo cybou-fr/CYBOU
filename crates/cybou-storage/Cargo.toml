@@ -11,8 +11,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+cybou-protocol = { path = "../cybou-protocol" }
 rusqlite.workspace = true
 thiserror.workspace = true
+time.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tempfile = "3.23.0"

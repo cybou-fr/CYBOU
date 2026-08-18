@@ -466,9 +466,12 @@ dependencies = [
 name = "cybou-storage"
 version = "0.1.0"
 dependencies = [
+ "cybou-protocol",
  "rusqlite",
  "tempfile",
  "thiserror 2.0.20",
+ "time",
+ "uuid",
 ]
 
 [[package]]

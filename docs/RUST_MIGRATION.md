@@ -117,17 +117,19 @@ split-commit recovery, migration interruption, rollback, scale, and multi-versio
 **Status: read-only storage preflight started.** `cybou-storage` can open only an existing SQLite
 file with explicit read-only/no-follow flags. It accepts only Journal schema v2, verifies the three
 required tables and every contribution column needed by the predecessor row contract, and reads
-only row count and erasure/rotation epochs. It never creates, migrates, changes pragmas, or writes;
-tests compare the database bytes before and after inspection. Row decoding, canonical hash replay,
-crypto, and every writer operation remain intentionally absent.
+row count and erasure/rotation epochs. It never creates, migrates, changes pragmas, or writes;
+tests compare the database bytes before and after inspection. Every writer operation remains
+intentionally absent.
 The inspector also walks every stored link and fails on non-contiguous sequence numbers, a
 `prev_hash` mismatch, non-SHA-256-sized row hashes, unsupported hash versions, or absent/malformed
 v3 commitment material. Separately, `cybou-protocol` emits byte-identical canonical envelope v2,
 non-erasable envelope v3, Journal-row v2, split-commitment v3, and Journal-row v3 inputs and
 matching SHA-256 digests. The Debian gate
-rebuilds the predecessor Qt encoder for every run. Storage replay does not consume those primitives
-yet, so cryptographic recomputation remains the next gate and is not implied by structural
-acceptance.
+rebuilds the predecessor Qt encoder for every run. The inspector now consumes those primitives:
+it decodes stored envelopes and evidence, recomputes hash versions 1–3, verifies the v3 metadata
+and live-payload commitments independently, and skips erased content without skipping its surviving
+metadata. Canonical-hash and payload-tampering tests fail closed. Existing-database differential
+fixtures, interruption/recovery, scale, and all writer behavior remain subsequent gates.
 
 ### R7 — desktop replacement and legacy removal
 

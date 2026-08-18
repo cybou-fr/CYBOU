@@ -66,9 +66,13 @@ bytes, and v3 rows must carry both 32-byte commitments. The protocol crate now a
 predecessor's canonical envelope v2, non-erasable v3, Journal-row v2, split-commitment v3, and
 Journal-row v3 byte streams plus their SHA-256 digests. Every Debian gate compiles the actual Qt
 canonical encoder and compares these artifacts byte-for-byte. These proven primitives are not yet
-connected to database replay; the
-storage inspector can therefore still accept a structurally linked row whose stored hash is
-cryptographically wrong.
+connected to any writer, but the read-only inspector now decodes persisted envelopes and evidence
+and uses them for full hash replay. Hash v1 uses the frozen legacy concatenation, hash v2 uses the
+canonical by-value row, and hash v3 verifies the row hash, surviving metadata commitment, and every
+non-erased payload commitment. Erased payload bytes are skipped exactly as in the predecessor while
+their surviving metadata remains verified. Tests sabotage chain links, canonical hashes, and live
+payload bytes independently. Writer behavior, recovery, migrations, and production ownership are
+still absent.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
