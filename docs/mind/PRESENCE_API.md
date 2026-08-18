@@ -104,3 +104,9 @@ preserving:
 
 The web schema is defined and tested independently so internal D-Bus evolution does not become a
 public network protocol by accident.
+
+The initial read-only implementation uses zbus on Linux to call only `Snapshot`. It validates the
+fabric CBOR envelope version before mapping capability states into web schema v1. The gateway
+assigns a process-local projection version and cursor because current `Presence1` does not expose a
+durable web cursor. A gateway restart therefore forces a fresh snapshot; it cannot claim event
+resumption yet. No browser route maps the existing mutation methods.

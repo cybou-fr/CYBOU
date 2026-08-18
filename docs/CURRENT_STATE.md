@@ -16,25 +16,40 @@ SPDX-License-Identifier: MIT
 The repository builds `cybou-protocol`, `cybou-web-contracts`, and `living-canvas` from one locked
 workspace. Native tests verify typed knowledge/capability/failure vocabulary, versioned local
 session and nominal snapshot fixtures, JSON round trips, and `MockMindClient`. CI checks formatting,
-tests, strict clippy, and `wasm32-unknown-unknown` compilation. Trunk produces a content-hashed
-browser artifact from the same Rust frontend source.
+tests, strict clippy, `wasm32-unknown-unknown` compilation, and a release Trunk build. Trunk produces
+a content-hashed browser artifact from the same Rust frontend source.
 
-This is contract and renderer evidence only. There is no `cybou-web-gateway`, zbus adapter, browser
-authentication, resumable event stream, remote access, desktop compositor package, or projection
-from live `Presence1` yet.
+The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
+`127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
+no-store and browser-security headers, enforces an outer projection timeout, and has no generic RPC
+or mutation route. Its Linux zbus adapter calls the existing `Presence1.Snapshot`, validates the Qt
+CBOR fabric envelope, and maps capability states into the separately versioned web contract. An
+opt-in NixOS user module exists but remains disabled by default. When `CYBOU_WEB_ROOT` names a
+Trunk output directory, the gateway serves that artifact from the same origin as the API. Living
+Canvas uses the async `GatewayMindClient` for its production browser build; `MockMindClient` remains
+only as the deterministic test boundary.
 
-Status date: 2026-08-10.
+This is not yet a complete W1 delivery path. The static artifact is not yet a reproducible Nix
+package, and the gateway does not subscribe to `Presence1.Changed`, expose resumable events, or
+authenticate a desktop bootstrap exchange. There is no remote access.
+The repository now also contains independently buildable `cybou-web-ui` and
+`cybou-desktop-shell` derivations. The development VM offers an opt-in `Cybou Living Canvas`
+Wayland session: Cage owns the single surface, Chromium/Ozone opens the loopback application origin,
+and an ephemeral runtime profile is used. This is W2 preview plumbing, not desktop parity or the
+default session; Plasma remains the fallback, and lock screen, multi-display, input-method,
+accessibility, renderer recovery, and navigation-policy gates are still open.
+
+Status date: 2026-08-18.
 
 This document is intentionally limited to implemented behavior and current limitations.
 
-## Deployment and evaluation host
+## Build and evaluation environment
 
-`nixosConfigurations.cybou-vps` builds the OVH host `vps-d0669a91.vps.ovh.net`, described in
-[Deployment](DEPLOYMENT.md). It is headless: `modules/base.nix`, the Mind user services, the Nix
-toolchain, and one nginx listener serving the committed `www/` site over plain HTTP. Plasma, SDDM,
-and branding are deliberately not imported, and no gateway, TLS, session, or authentication exists
-there. `/dev/kvm` is present, so the KVM-backed VM gates can run on the host; a green run there is
-developer evidence about that machine, not release evidence.
+The active Linux/Nix environment is the local `NixOS` WSL2 distribution. Working-tree checks use
+`scripts/wsl-checks.sh`, which stages sources onto its Linux filesystem before Nix evaluation. The
+former OVH configuration remains in the flake only as archived recovery/history input: the failed
+in-place Debian-to-NixOS conversion made SSH unavailable, so OVH deploy, conversion, and evaluation
+scripts now refuse to run. KVM-backed VM claims require `/dev/kvm` to be verified inside WSL2.
 
 ## Repository gate status
 

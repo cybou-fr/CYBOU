@@ -151,6 +151,7 @@ def main(argv: list[str]) -> int:
         "homeostasis": repo / "docs/mind/HOMEOSTASIS.md",
         "organ_contracts": repo / "docs/mind/ORGAN_CONTRACTS.md",
         "process_model": repo / "docs/mind/PROCESS_MODEL.md",
+        "presence_api": repo / "docs/mind/PRESENCE_API.md",
         "failure_modes": repo / "docs/mind/FAILURE_MODES.md",
         "data_ownership": repo / "docs/mind/DATA_OWNERSHIP.md",
         "epistemic": repo / "docs/mind/EPISTEMIC_GOVERNANCE.md",
@@ -197,26 +198,24 @@ def main(argv: list[str]) -> int:
     require(
         paths["docs_index"],
         "deployment documentation entry",
-        "[Deployment and the Remote Evaluation Host](DEPLOYMENT.md)",
+        "[Build and Deployment Environments](DEPLOYMENT.md)",
     )
-    # The deployment document names one host and one configuration. If either moves without the
-    # other, the runbook stops describing the machine it claims to prepare.
+    # The active build path must remain local WSL2; the failed OVH conversion is retained only as
+    # explicit history so it cannot silently become an operational runbook again.
     require(
         paths["deployment"],
-        "deployment SSH target",
-        "debian@vps-d0669a91.vps.ovh.net",
+        "active WSL distribution",
+        "NixOS` WSL2",
     )
     require(
         paths["deployment"],
-        "deployment system configuration",
-        "systems/vps.nix",
+        "retired OVH path",
+        "retired",
     )
-    # An evaluation host reachable over plain HTTP must keep saying so; the sentence is the only
-    # thing standing between "preview surface" and "somewhere a real session got introduced".
     require(
         paths["deployment"],
-        "absent web gateway boundary",
-        "TLS, sessions, cookies, and authentication",
+        "WSL check entry point",
+        "scripts/wsl-checks.sh",
     )
     require(
         paths["docs_index"],
@@ -332,6 +331,16 @@ def main(argv: list[str]) -> int:
         paths["building"],
         "Rust build migration notice",
         "The commands below describe the current C++/Qt implementation.",
+    )
+    require(
+        paths["current"],
+        "read-only Rust gateway status",
+        "The additive W1 gateway seam is also present.",
+    )
+    require(
+        paths["presence_api"],
+        "initial zbus web mapping",
+        "The initial read-only implementation uses zbus on Linux",
     )
     require(
         paths["architecture"],

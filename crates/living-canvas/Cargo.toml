@@ -11,17 +11,26 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+async-trait.workspace = true
 cybou-protocol = { path = "../cybou-protocol" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
 serde_json.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+tokio.workspace = true
 uuid.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
+gloo-net = "0.6.0"
 leptos = { version = "0.8.15", features = ["csr"] }
+# Keep the generated bindings aligned with the exact CLI shipped by pinned nixpkgs-26.05.
+js-sys = "=0.3.103"
+wasm-bindgen = "=0.2.126"
+wasm-bindgen-futures = "=0.4.76"
+web-sys = "=0.3.103"
 
 [lints]
 workspace = true

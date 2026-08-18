@@ -60,6 +60,11 @@ Build the Rust gateway with hostile-input budgets, local bootstrap sessions, rem
 origin/CSRF enforcement, snapshots, resumable events, and typed mutations. Initially consume the
 existing `Presence1` service through zbus; do not migrate Mind owners merely to unblock the UI.
 
+**Status: read-only seam implemented.** The loopback Axum service, typed session/snapshot routes,
+outer timeout, refusal responses, security headers, fixture adapter, and Linux zbus snapshot decoder
+exist. Desktop bootstrap authentication, static asset delivery, changed-event/cursor resumption,
+remote sessions, and every mutation remain absent by design.
+
 ### R4 — shared foundation
 
 Migrate protocol, crypto adapter, state paths, IPC/fabric, event clients, resilience, and common

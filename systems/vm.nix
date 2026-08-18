@@ -6,6 +6,10 @@
 {
   imports = [ ./common.nix ];
 
+  # W2 preview: SDDM offers this as a separate session; Plasma remains the default/fallback until
+  # renderer, compositor, input, and recovery gates pass.
+  cybou.desktopWeb.enable = true;
+
   users.users.cybou = {
     isNormalUser = true;
     description = "Cybou test user";

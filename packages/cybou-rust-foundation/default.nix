@@ -27,6 +27,14 @@ rustPlatform.buildRustPackage {
   # owner. The browser target is checked separately in CI until the final WASM package is added.
   doCheck = true;
 
+  installPhase = ''
+    runHook preInstall
+    gateway=$(find target -type f -path '*/release/cybou-web-gateway' -print -quit)
+    test -n "$gateway"
+    install -Dm755 "$gateway" $out/bin/cybou-web-gateway
+    runHook postInstall
+  '';
+
   meta = {
     description = "Cybou Rust protocol, web-contract, and Living Canvas foundation";
     license = lib.licenses.mit;

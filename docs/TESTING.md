@@ -217,17 +217,17 @@ primarily the heavy service-graph and renderer gate.
 
 ## Where the gates run
 
-CI runs the cheap checks on every push and the full matrix on a tag. Between those, the OVH
-evaluation host in [Deployment](DEPLOYMENT.md) runs the same gates on an unfinished working tree,
-including the four VM tests that need `/dev/kvm`:
+CI runs the cheap checks on every push and the full matrix on a tag. Between those, the local
+`NixOS` WSL2 distribution runs the same gates on an unfinished working tree. The four VM tests
+additionally require `/dev/kvm` to be available inside WSL2:
 
 ```bash
-scripts/vps-checks.sh fast
-scripts/vps-checks.sh full
-scripts/vps-checks.sh lifecycle-continuity
+scripts/wsl-checks.sh fast
+scripts/wsl-checks.sh full
+scripts/wsl-checks.sh lifecycle-continuity
 ```
 
-A green run there is evidence about that host's kernel, KVM support, and store contents. It is
+A green run there is evidence about that WSL kernel, KVM support, and Nix store. It is
 developer evidence, not release evidence; the tag matrix recorded by CI remains authoritative for
 [Release Process](RELEASE.md).
 

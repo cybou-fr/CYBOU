@@ -2,15 +2,18 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# Deploy this working tree to the remote evaluation host (docs/DEPLOYMENT.md).
+# RETIRED: OVH is no longer a Cybou deployment or evaluation target.
 #
-# Usage: scripts/deploy-vps.sh [switch|boot|test|build|dry-activate]
+# This file remains only to fail old commands clearly.
 #
 # The build runs on the target rather than locally: the development workstation is Windows, and
 # a NixOS closure cannot be built there. `test` activates without touching the bootloader,
 # `boot` does the opposite, `switch` does both. Rolling back is a NixOS generation switch, not
 # a re-deploy - see docs/DEPLOYMENT.md.
 set -euo pipefail
+
+echo "deploy-vps: retired; OVH is no longer a Cybou Nix evaluation target" >&2
+exit 2
 
 action="${1:-switch}"
 case "$action" in

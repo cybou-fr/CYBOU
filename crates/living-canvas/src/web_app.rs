@@ -2,19 +2,62 @@
 // SPDX-License-Identifier: MIT
 
 use leptos::prelude::*;
-use living_canvas::{MindClient, MockMindClient};
+use leptos::task::spawn_local;
+use living_canvas::{GatewayMindClient, MindClient};
+
+#[derive(Clone, Debug)]
+enum RuntimeState {
+    Loading,
+    Ready {
+        mode: cybou_web_contracts::SessionMode,
+        projection_version: u64,
+    },
+    Error(String),
+}
 
 #[component]
 pub fn App() -> impl IntoView {
     let (selected, set_selected) = signal("release");
-    let fixture = MockMindClient::nominal_fixture().expect("checked W0 fixtures");
-    let session = fixture.session().expect("fixture session");
-    let snapshot = fixture.snapshot().expect("fixture snapshot");
-    let mode = match session.mode {
-        cybou_web_contracts::SessionMode::LocalDesktop => "Local",
-        cybou_web_contracts::SessionMode::RemoteBrowser => "Remote",
+    let runtime = RwSignal::new(RuntimeState::Loading);
+    spawn_local(async move {
+        let client = GatewayMindClient;
+        let result = async {
+            let session = client.session().await?;
+            let snapshot = client.snapshot().await?;
+            Ok::<_, living_canvas::ClientError>((session.mode, snapshot.projection_version))
+        }
+        .await;
+        runtime.set(match result {
+            Ok((mode, projection_version)) => RuntimeState::Ready {
+                mode,
+                projection_version,
+            },
+            Err(error) => RuntimeState::Error(error.to_string()),
+        });
+    });
+
+    let runtime_label = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting".to_owned(),
+        RuntimeState::Ready { mode, .. } => match mode {
+            cybou_web_contracts::SessionMode::LocalDesktop => "Local".to_owned(),
+            cybou_web_contracts::SessionMode::RemoteBrowser => "Remote".to_owned(),
+        },
+        RuntimeState::Error(_) => "Unavailable".to_owned(),
     };
-    let fixture_status = format!("Fixture · projection {}", snapshot.projection_version);
+    let projection_label = move || match runtime.get() {
+        RuntimeState::Loading => "Loading projection…".into(),
+        RuntimeState::Ready {
+            projection_version, ..
+        } => format!("Gateway · projection {projection_version}"),
+        RuntimeState::Error(error) => error,
+    };
+    let system_label = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting to local gateway…".into(),
+        RuntimeState::Ready {
+            projection_version, ..
+        } => format!("System nominal · projection {projection_version}"),
+        RuntimeState::Error(_) => "Gateway unavailable · canvas remains read-only".into(),
+    };
 
     view! {
         <main class="app-shell">
@@ -24,10 +67,10 @@ pub fn App() -> impl IntoView {
                     <span>"Living Canvas"</span>
                 </a>
                 <p class="path">"Cybou Workspace / Programs / Cybou 0.8 release"</p>
-                <div class="runtime" aria-label="Runtime connection">
+                <div class="runtime" aria-label="Runtime connection" aria-live="polite">
                     <span class="status-dot" aria-hidden="true"></span>
-                    <strong>{mode}</strong>
-                    <small>{fixture_status}</small>
+                    <strong>{runtime_label}</strong>
+                    <small>{projection_label}</small>
                 </div>
             </header>
 
@@ -68,7 +111,7 @@ pub fn App() -> impl IntoView {
 
                 <aside class="system-state" aria-label="System state">
                     <span class="status-dot" aria-hidden="true"></span>
-                    "System nominal · deterministic fixture"
+                    {system_label}
                 </aside>
             </section>
         </main>

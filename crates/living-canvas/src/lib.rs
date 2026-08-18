@@ -3,8 +3,14 @@
 
 //! Runtime-independent client boundary for Living Canvas.
 
+use async_trait::async_trait;
 use cybou_web_contracts::{SessionProjection, SnapshotProjection};
 use thiserror::Error;
+
+#[cfg(target_arch = "wasm32")]
+mod gateway_client;
+#[cfg(target_arch = "wasm32")]
+pub use gateway_client::GatewayMindClient;
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -18,23 +24,27 @@ pub enum ClientError {
     /// A deterministic fixture violates the typed web contract.
     #[error("invalid deterministic fixture: {0}")]
     InvalidFixture(String),
+    /// The same-origin gateway request or typed response failed.
+    #[error("gateway request failed: {0}")]
+    GatewayRequest(String),
 }
 
 /// Only data boundary used by the frontend. Browser code never receives D-Bus or native handles.
+#[async_trait(?Send)]
 pub trait MindClient {
     /// Return the server-established trust context.
     ///
     /// # Errors
     ///
     /// Returns [`ClientError`] when no accepted gateway session can be established.
-    fn session(&self) -> Result<SessionProjection, ClientError>;
+    async fn session(&self) -> Result<SessionProjection, ClientError>;
 
     /// Return one atomic projection snapshot.
     ///
     /// # Errors
     ///
     /// Returns [`ClientError`] when the projection cannot be obtained as a typed atomic value.
-    fn snapshot(&self) -> Result<SnapshotProjection, ClientError>;
+    async fn snapshot(&self) -> Result<SnapshotProjection, ClientError>;
 }
 
 /// Deterministic client for component, visual, and state-vocabulary tests.
@@ -69,12 +79,13 @@ impl MockMindClient {
     }
 }
 
+#[async_trait(?Send)]
 impl MindClient for MockMindClient {
-    fn session(&self) -> Result<SessionProjection, ClientError> {
+    async fn session(&self) -> Result<SessionProjection, ClientError> {
         Ok(self.session.clone())
     }
 
-    fn snapshot(&self) -> Result<SnapshotProjection, ClientError> {
+    async fn snapshot(&self) -> Result<SnapshotProjection, ClientError> {
         Ok(self.snapshot.clone())
     }
 }
@@ -89,8 +100,8 @@ mod tests {
 
     use super::{MindClient, MockMindClient};
 
-    #[test]
-    fn mock_client_preserves_server_established_mode_and_unknown_state() {
+    #[tokio::test]
+    async fn mock_client_preserves_server_established_mode_and_unknown_state() {
         let client = MockMindClient::new(
             SessionProjection {
                 schema_version: SchemaVersion(1),
@@ -116,25 +127,31 @@ mod tests {
         );
 
         assert_eq!(
-            client.session().expect("fixture session").mode,
+            client.session().await.expect("fixture session").mode,
             SessionMode::RemoteBrowser
         );
         assert_eq!(
-            client.snapshot().expect("fixture snapshot").capabilities[0].state,
+            client
+                .snapshot()
+                .await
+                .expect("fixture snapshot")
+                .capabilities[0]
+                .state,
             CapabilityState::Unknown
         );
     }
 
-    #[test]
-    fn nominal_repository_fixtures_are_usable_by_the_frontend_boundary() {
+    #[tokio::test]
+    async fn nominal_repository_fixtures_are_usable_by_the_frontend_boundary() {
         let client = MockMindClient::nominal_fixture().expect("valid repository fixtures");
         assert_eq!(
-            client.session().expect("fixture session").mode,
+            client.session().await.expect("fixture session").mode,
             SessionMode::LocalDesktop
         );
         assert_eq!(
             client
                 .snapshot()
+                .await
                 .expect("fixture snapshot")
                 .projection_version,
             42

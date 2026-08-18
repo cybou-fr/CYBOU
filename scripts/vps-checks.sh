@@ -2,9 +2,9 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# Run repository gates on the remote evaluation host (docs/DEPLOYMENT.md).
+# RETIRED: repository gates now run through scripts/wsl-checks.sh.
 #
-# Usage: scripts/vps-checks.sh [fast|full|<flake check name> ...]
+# This file remains only to fail old commands clearly.
 #
 # `fast` is the set CI runs on every push. `full` adds the NixOS VM tests, which need /dev/kvm;
 # the host has it, but a VM gate still costs minutes and a lot of store space, so it is not the
@@ -12,7 +12,10 @@
 # a NixOS test.
 set -euo pipefail
 
-fast_checks=(formatting reuse package-metadata cognitive-docs mind-access qml-api ui-polish rust-foundation)
+echo "vps-checks: retired; use scripts/wsl-checks.sh in the NixOS WSL2 distribution" >&2
+exit 2
+
+fast_checks=(formatting reuse package-metadata cognitive-docs mind-access qml-api ui-polish rust-foundation web-ui desktop-shell)
 full_checks=("${fast_checks[@]}" vm-smoke p4-plasma-lifecycle lifecycle-continuity m6-recovery-boundary)
 
 case "${1:-fast}" in

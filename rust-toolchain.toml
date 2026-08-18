@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 [toolchain]
-channel = "1.96.0"
+channel = "1.95.0"
 components = ["clippy", "rustfmt"]
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"

@@ -8,5 +8,7 @@
     ../modules/desktop-plasma.nix
     ../modules/branding.nix
     ../modules/mind-services.nix
+    ../modules/web-gateway.nix
+    ../modules/desktop-web.nix
   ];
 }

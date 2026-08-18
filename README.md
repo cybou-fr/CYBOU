@@ -11,16 +11,22 @@ SPDX-License-Identifier: MIT
 
 **An experimental agent-native operating system with a persistent cognitive control plane**
 
-NixOS 26.05 · KDE Plasma 6 Wayland · C++20/Qt 6 · local-first · no required cloud service
+NixOS 26.05 · Rust/WebAssembly · one web-first UI for browser and desktop shell · local-first
 
 </div>
 
 ## What Cybou is
 
-Cybou is an experimental operating-system project built on NixOS and KDE Plasma. Its long-term
+Cybou is an experimental agent-native environment built on NixOS. The active transition replaces
+the KDE/Qt product shell with one Rust/WebAssembly frontend shared by ordinary browsers and a
+lightweight desktop web shell. KDE/Qt remains migration-era code, not the target architecture. Its long-term
 target is not "Linux with a chatbot". It is an **agent-native computing environment** in which a
 persistent **Mind** remembers and governs the system while models, agents, workers, tools, and user
 interfaces remain replaceable.
+
+Development and Linux/Nix validation run in the local `NixOS` WSL2 distribution through
+`scripts/wsl-checks.sh`. The former OVH Debian-to-NixOS conversion and VPS deployment path are
+retired after SSH access was lost; see [Build and Deployment Environments](docs/DEPLOYMENT.md).
 
 Mind owns durable cognitive continuity: biography, identity, commitments, prediction/calibration,
 epistemic state, context, learning, policy inputs, and the future authorization boundary. The target

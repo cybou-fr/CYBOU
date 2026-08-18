@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# Shared settings for the remote evaluation host (docs/DEPLOYMENT.md). Sourced, not executed.
+# Archived OVH settings retained for history only; the active build path is NixOS on WSL2.
 #
 # Every value can be overridden from the environment so the same scripts can address a second
 # host without editing them - the default is the only host currently in use.

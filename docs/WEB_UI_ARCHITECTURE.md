@@ -102,8 +102,11 @@ packages/
 ```
 
 The current React `living-canvas/` prototype remains visual evidence and interaction exploration.
-The production Rust/WASM shell lives in `crates/living-canvas` and consumes deterministic typed W0
-fixtures through `MockMindClient`. It has no live gateway or Presence connection yet.
+The production Rust/WASM shell lives in `crates/living-canvas`. Its production browser adapter is
+`GatewayMindClient`, which reads the typed session and atomic snapshot from the same-origin gateway;
+`MockMindClient` is retained for deterministic contract tests. The first read-only Presence
+connection and same-origin static delivery are implemented; subscriptions and mutations remain
+future gates.
 
 ## Frontend architecture
 
@@ -401,6 +404,12 @@ when distinctions are removed.
   as Living Canvas objects;
 - keep Plasma as the default surface.
 
+Implementation status: the read-only Rust gateway binary, fixture adapter, Linux zbus
+`Presence1.Snapshot` adapter, outer request budget, security headers, same-origin static delivery,
+live `GatewayMindClient`, immutable frontend derivation, and disabled-by-default NixOS user module
+exist. Authenticated bootstrap and resumable changed-event delivery remain before the W1 exit gate
+can pass.
+
 Exit: browser read parity, ordered refresh, degraded-owner matrix, deadline budgets, and gateway
 restart continuity pass.
 
@@ -411,6 +420,11 @@ restart continuity pass.
 - implement launcher bootstrap, isolated profile, renderer crash recovery, keyboard access, scaling,
   and one-display behavior;
 - preserve Plasma session as fallback.
+
+Implementation status: the first opt-in development session package exists. It composes Cage with
+Chromium/Ozone application mode, starts the loopback gateway, waits for the typed session endpoint,
+uses an ephemeral isolated browser profile, and stops the gateway on session exit. It is selectable
+beside Plasma and is deliberately not the default. The W2 exit gates listed below remain open.
 
 Exit: renderer/gateway/compositor recreation preserves Mind owners and accepted state; VM screenshot
 and interaction gates pass.

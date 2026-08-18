@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 {
-  description = "Cybou - a calm, reproducible KDE Plasma desktop on NixOS";
+  description = "Cybou - a Rust/WebAssembly agent-native environment for web and desktop";
 
   inputs = {
     # Frozen base: NixOS 26.05 stable (ADR-0006). Do not move to unstable without
@@ -37,7 +37,18 @@
 
       # Package boundaries remain explicit so each visual/runtime output can be validated
       # independently (docs/ARCHITECTURE.md and docs/TESTING.md).
-      packages = forAllSystems (pkgs: rec {
+      packages = forAllSystems (
+        pkgs:
+        let
+          wasmPkgs = import nixpkgs {
+            system = pkgs.stdenv.hostPlatform.system;
+            crossSystem = nixpkgs.lib.systems.examples."wasm32-unknown-none";
+            # wasm32-none is a valid Rust static-artifact target but is not in nixpkgs' generic
+            # package platform allowlist. Scope the exception to this cross package set only.
+            config.allowUnsupportedSystem = true;
+          };
+        in
+        rec {
         horizon-colors = pkgs.callPackage ./packages/horizon-colors { };
         horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
         horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
@@ -54,6 +65,12 @@
         cybou-presence-applet = pkgs.callPackage ./packages/cybou-presence-applet { };
         cybou-layout-templates = pkgs.callPackage ./packages/cybou-layout-templates { };
         cybou-rust-foundation = pkgs.callPackage ./packages/cybou-rust-foundation { };
+        # Compatibility alias until the native workspace derivation is split by binary output.
+        cybou-web-gateway = cybou-rust-foundation;
+        cybou-web-ui = wasmPkgs.callPackage ./packages/cybou-web-ui {
+          inherit (pkgs) trunk wasm-bindgen-cli_0_2_126;
+        };
+        cybou-desktop-shell = pkgs.callPackage ./packages/cybou-desktop-shell { };
 
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
@@ -77,7 +94,8 @@
         # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
         # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
         default = cybou-theme;
-      });
+        }
+      );
 
       nixosConfigurations = {
         cybou-vm = nixpkgs.lib.nixosSystem {
@@ -93,8 +111,8 @@
           modules = [ ./systems/iso.nix ];
         };
 
-        # Remote evaluation host: OVH VPS vps-d0669a91.vps.ovh.net (docs/DEPLOYMENT.md).
-        # Headless on purpose - it deploys, builds, and tests; it does not run Plasma.
+        # Archived OVH configuration retained as historical recovery input. It is no longer an
+        # active deploy/evaluation target; local Linux/Nix validation runs in NixOS on WSL2.
         cybou-vps = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           specialArgs.cybouPackages = self.packages.x86_64-linux;
@@ -162,6 +180,8 @@
 
       checks = forAllSystems (pkgs: {
         rust-foundation = self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-rust-foundation;
+        web-ui = self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-web-ui;
+        desktop-shell = self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-desktop-shell;
 
         formatting =
           pkgs.runCommand "check-formatting"

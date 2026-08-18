@@ -34,11 +34,11 @@ jobs:
 
       - name: Install pinned Rust foundation toolchain
         run: |
-          rustup toolchain install 1.96.0 \
+          rustup toolchain install 1.95.0 \
             --profile minimal \
             --component clippy,rustfmt \
             --target wasm32-unknown-unknown
-          rustup default 1.96.0
+          rustup default 1.95.0
 
       - name: Check Rust native and WASM contracts
         run: |
@@ -46,6 +46,12 @@ jobs:
           cargo test --workspace --locked
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo check -p living-canvas --target wasm32-unknown-unknown --locked
+
+      - name: Build the shared Rust/WASM frontend artifact
+        run: |
+          cargo install trunk --version 0.21.14 --locked
+          cd crates/living-canvas
+          trunk build --release
 
       - uses: cachix/install-nix-action@v27
         with:
@@ -62,8 +68,10 @@ jobs:
             .#checks.x86_64-linux.cognitive-docs \
             .#checks.x86_64-linux.mind-access \
             .#checks.x86_64-linux.qml-api \
-            .#checks.x86_64-linux.ui-polish
-            .#checks.x86_64-linux.rust-foundation
+            .#checks.x86_64-linux.ui-polish \
+            .#checks.x86_64-linux.rust-foundation \
+            .#checks.x86_64-linux.web-ui \
+            .#checks.x86_64-linux.desktop-shell
 
       # Build C++ packages to ensure they compile correctly
       - run: |

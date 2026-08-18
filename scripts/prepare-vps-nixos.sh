@@ -2,9 +2,9 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
 #
-# Convert the remote evaluation host from its stock Debian image to NixOS running this flake.
+# RETIRED: do not repeat the failed in-place OVH Debian-to-NixOS conversion.
 #
-# Usage: scripts/prepare-vps-nixos.sh <preflight|nix|build|convert|reboot|verify>
+# This file remains only to fail old commands clearly.
 #
 # The procedure is the one documented by NixOS itself for installing from a running Linux
 # distribution: install Nix, build the target system closure, set it as the system profile, and
@@ -24,6 +24,9 @@
 # `convert` requires CYBOU_VPS_CONFIRM=I-UNDERSTAND in the environment. After it runs, the
 # machine boots NixOS; recovering the Debian image means reinstalling it from the OVH panel.
 set -euo pipefail
+
+echo "prepare-vps-nixos: retired after the failed in-place conversion; do not install NixOS over OVH Debian" >&2
+exit 2
 
 # shellcheck source=scripts/vps-env.sh
 . "$(dirname "$0")/vps-env.sh"
@@ -124,7 +127,8 @@ stage_convert() {
     system=\$(readlink -f /home/debian/cybou-system)
     [ -x \"\$system/bin/switch-to-configuration\" ] || { echo 'convert: run the build stage first' >&2; exit 1; }
 
-    sudo nix-env -p /nix/var/nix/profiles/system --set \"\$system\"
+    # Debian's sudo resets PATH to secure_path, which does not include the Nix profile.
+    sudo /nix/var/nix/profiles/default/bin/nix-env -p /nix/var/nix/profiles/system --set \"\$system\"
 
     # NIXOS_LUSTRATE tells NixOS stage 2 to move the inherited filesystem into /old-root on the
     # next boot, keeping only /nix, /boot, and the paths listed here. The SSH host keys are kept

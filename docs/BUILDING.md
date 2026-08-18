@@ -19,13 +19,34 @@ cargo fmt --all -- --check
 cargo test --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo check -p living-canvas --target wasm32-unknown-unknown --locked
+cargo check -p cybou-web-gateway --target x86_64-unknown-linux-gnu --locked
+cd crates/living-canvas && trunk build --release
 ```
 
-The pinned toolchain and WASM target are declared in `rust-toolchain.toml`. On NixOS/Linux, build
+The pinned Rust 1.95 toolchain matches nixpkgs-26.05, and the WASM target is declared in
+`rust-toolchain.toml`. On NixOS/Linux, build
 the native reproducibility seam with:
 
 ```bash
 nix build .#checks.x86_64-linux.rust-foundation
+nix build .#packages.x86_64-linux.cybou-web-ui
+nix build .#packages.x86_64-linux.cybou-web-gateway
+nix build .#packages.x86_64-linux.cybou-desktop-shell
+```
+
+For a same-origin local integration run without D-Bus, build the frontend, set
+`CYBOU_GATEWAY_FIXTURE=1`, point `CYBOU_WEB_ROOT` at the absolute `target/living-canvas` directory,
+and run `cargo run -p cybou-web-gateway --locked`. Open `http://127.0.0.1:8787/`; the page and its
+typed `/api/v1/*` reads are served by the same loopback process. Fixture mode is deterministic test
+infrastructure, not a production fallback. On Linux without that variable, the gateway fails closed
+unless it can connect to the existing user-session `Presence1` service.
+
+The development VM exposes `Cybou Living Canvas` as a separate SDDM Wayland session. It starts the
+same gateway/frontend closure under Cage and Chromium/Ozone; Plasma remains installed as the
+fallback session during W2 evaluation:
+
+```bash
+nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
 ```
 
 Use Linux or WSL2 with Nix. Do not install a separate Windows Qt SDK for Linux/NixOS builds.
@@ -96,19 +117,17 @@ git diff --check
 VM smoke check. A normal GitHub push does not run that full matrix; the workflow reserves it for
 the tag-only full job.
 
-## Remote build and test host
+## WSL2 build and test environment
 
-A Windows workstation cannot build a NixOS closure or run a KVM-backed VM test. The OVH host
-described in [Deployment](DEPLOYMENT.md) does both, from the working tree rather than from `HEAD`:
+The active Linux/Nix environment is the local `NixOS` WSL2 distribution. The helper copies the
+working tree from the Windows mount into a temporary Linux filesystem before invoking Nix:
 
 ```bash
-scripts/deploy-vps.sh switch
-scripts/vps-checks.sh fast
+wsl -d NixOS -- bash /mnt/c/Users/cybou/Documents/CYBOU/scripts/wsl-checks.sh fast
 ```
 
-`scripts/vps-checks.sh full` adds the four NixOS VM gates, which the host can run because
-`/dev/kvm` is present. Preparing the machine itself is a separate, staged procedure in the same
-document.
+Use `full` only when `/dev/kvm` is available inside WSL2. The former OVH path and its in-place
+Debian-to-NixOS conversion are retired after loss of SSH access; see [Deployment](DEPLOYMENT.md).
 
 ## Clean local outputs
 
