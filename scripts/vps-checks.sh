@@ -20,6 +20,7 @@ cybou_ssh "
   set -eu
   . \"\$HOME/.cargo/env\"
   cd '$CYBOU_VPS_SRC'
+  export CARGO_TARGET_DIR='$CYBOU_VPS_TARGET'
   cargo fmt --all -- --check
   cargo test --workspace --locked
   cargo clippy --workspace --all-targets --locked -- -D warnings

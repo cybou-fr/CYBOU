@@ -29,9 +29,13 @@ Trunk output directory, the gateway serves that artifact from the same origin as
 Canvas uses the async `GatewayMindClient` for its production browser build; `MockMindClient` remains
 only as the deterministic test boundary.
 
-This is not yet a complete W1 delivery path. The static artifact is not yet a reproducible Nix
-package, and the gateway does not subscribe to `Presence1.Changed`, expose resumable events, or
-authenticate a desktop bootstrap exchange. There is no remote access.
+This is not yet a complete W1 delivery path. The gateway does not subscribe to
+`Presence1.Changed`, expose resumable events, or authenticate a desktop bootstrap exchange.
+An operational preview is deployed at `https://vps-d0669a91.vps.ovh.net` and directly at
+`https://51.255.46.58`: Caddy terminates public TLS while the Rust gateway remains bound to
+loopback. The preview is deliberately public only while it is fixture-backed and contains no
+Journal or live Mind state; authentication is a hard gate before either is connected. It proves
+the shared Rust/WASM frontend delivery path, not production identity or desktop parity.
 The repository now also contains independently buildable `cybou-web-ui` and
 `cybou-desktop-shell` derivations. The development VM offers an opt-in `Cybou Living Canvas`
 Wayland session: Cage owns the single surface, Chromium/Ozone opens the loopback application origin,

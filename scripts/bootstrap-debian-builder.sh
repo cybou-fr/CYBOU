@@ -19,7 +19,9 @@ cybou_ssh '
   sudo apt-get update
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential ca-certificates clang curl dbus-user-session git lld \
-    libdbus-1-dev libsodium-dev libsqlite3-dev pkg-config sqlite3
+    libdbus-1-dev libsodium-dev libsqlite3-dev openssl pkg-config sqlite3
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    -t trixie-backports caddy
 
   if ! command -v rustup >/dev/null 2>&1; then
     curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs \

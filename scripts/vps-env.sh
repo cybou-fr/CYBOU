@@ -8,6 +8,7 @@
 
 CYBOU_VPS_HOST="${CYBOU_VPS_HOST:-debian@vps-d0669a91.vps.ovh.net}"
 CYBOU_VPS_SRC="${CYBOU_VPS_SRC:-/home/debian/cybou-src}"
+CYBOU_VPS_TARGET="${CYBOU_VPS_TARGET:-/home/debian/cybou-target}"
 
 # BatchMode keeps a missing key an immediate error instead of an interactive prompt that a
 # CI shell would hang on. ControlMaster reuses one connection for the sync plus the build.
