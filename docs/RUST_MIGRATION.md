@@ -113,6 +113,13 @@ Cut their production ownership over late because they have the highest continuit
 blast radius. Require existing-database replay, canonical hash equality, concurrent-writer refusal,
 split-commit recovery, migration interruption, rollback, scale, and multi-version fixtures.
 
+**Status: read-only storage preflight started.** `cybou-storage` can open only an existing SQLite
+file with explicit read-only/no-follow flags. It accepts only Journal schema v2, verifies the three
+required tables and every contribution column needed by the predecessor row contract, and reads
+only row count and erasure/rotation epochs. It never creates, migrates, changes pragmas, or writes;
+tests compare the database bytes before and after inspection. Row decoding, canonical hash replay,
+crypto, and every writer operation remain intentionally absent.
+
 ### R7 — desktop replacement and legacy removal
 
 Boot the Rust/WASM UI through the minimal Chromium desktop session. After web parity, Mind parity,

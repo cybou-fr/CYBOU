@@ -54,6 +54,13 @@ The Rust system-generation adapter converts successful acquisition directly into
 type, including Qt-compatible UTC millisecond timestamp spelling. It still has no Event1 write
 capability and remains safe to run as a non-authoritative comparison.
 
+The first Rust storage boundary is `cybou-storage`, currently inspection-only. It opens an existing
+Journal with explicit SQLite read-only and no-follow flags, requires `user_version=2`, verifies the
+required tables and contribution columns, and reports row count plus erasure/rotation epochs. It
+cannot create or migrate a database and contains no write API. Tests prove a missing path stays
+missing, future and partial schemas fail closed, and a compatible database is byte-identical after
+inspection.
+
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
 no-store and browser-security headers, enforces an outer projection timeout, and has no generic RPC
