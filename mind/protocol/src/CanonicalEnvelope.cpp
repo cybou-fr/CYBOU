@@ -129,7 +129,8 @@ QByteArray canonicalNonErasableEnvelopeV3(const CognitiveEnvelope &envelope)
     // therefore hashes exactly as it did before schema 3 existed; a schema-3 envelope continues
     // with its protection descriptor. Appending these unconditionally would have changed the digest
     // of every row already written, which is the one thing a hash chain may never do.
-    if (envelope.schemaVersion == kProtectedEnvelopeSchemaVersion) {
+    if (envelope.schemaVersion == kProtectedEnvelopeSchemaVersion
+        || envelope.schemaVersion == kClassifiedEnvelopeSchemaVersion) {
         appendU8(out, envelope.protection.sealed ? 1 : 0);
         appendUuid(out, envelope.protection.keyDomainId);
         appendU32(out, envelope.protection.keyEpoch);
@@ -144,6 +145,13 @@ QByteArray canonicalNonErasableEnvelopeV3(const CognitiveEnvelope &envelope)
             envelope.retainUntil.isValid()
                 ? static_cast<quint64>(envelope.retainUntil.toUTC().toMSecsSinceEpoch())
                 : 0);
+    }
+
+    // Schema 4 appends one byte, and only for schema 4, so every schema-3 row keeps the digest it
+    // was written with. Sensitivity is non-erasable metadata: after a payload is gone, who was
+    // allowed to be shown it remains a fact about the record.
+    if (envelope.schemaVersion == kClassifiedEnvelopeSchemaVersion) {
+        appendU8(out, static_cast<quint8>(envelope.sensitivity));
     }
     return out;
 }

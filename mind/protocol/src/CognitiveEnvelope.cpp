@@ -61,7 +61,8 @@ bool CognitiveEnvelope::isValid() const
 {
     if (schemaVersion != kLegacyEnvelopeSchemaVersion
         && schemaVersion != kCurrentEnvelopeSchemaVersion
-        && schemaVersion != kProtectedEnvelopeSchemaVersion) {
+        && schemaVersion != kProtectedEnvelopeSchemaVersion
+        && schemaVersion != kClassifiedEnvelopeSchemaVersion) {
         return false;
     }
 
@@ -69,7 +70,9 @@ bool CognitiveEnvelope::isValid() const
     // name its key domain. Otherwise a row could claim protection that no canonical form covers, or
     // carry a descriptor nothing can interpret.
     if (protection.sealed
-        && (schemaVersion != kProtectedEnvelopeSchemaVersion || !protection.isValid())) {
+        && ((schemaVersion != kProtectedEnvelopeSchemaVersion
+             && schemaVersion != kClassifiedEnvelopeSchemaVersion)
+            || !protection.isValid())) {
         return false;
     }
 

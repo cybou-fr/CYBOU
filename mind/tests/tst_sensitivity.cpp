@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Stanislav Saveliev
 // SPDX-License-Identifier: MIT
 
+#include "cybou/protocol/CanonicalEnvelope.h"
+#include "cybou/protocol/CognitiveEnvelope.h"
 #include "cybou/protocol/Sensitivity.h"
 
 #include <QSet>
@@ -17,7 +19,44 @@ private slots:
     void anUnclassifiedContributionIsNotAssumedHarmless();
     void secretsAndCredentialsAreNeverTrainingTargets();
     void everyClassificationHasItsOwnLabel();
+    void schemaFourAddsOneByteAndSchemaThreeKeepsItsOwn();
 };
+
+void TestSensitivity::schemaFourAddsOneByteAndSchemaThreeKeepsItsOwn()
+{
+    CognitiveEnvelope e;
+    e.messageId = QUuid::createUuid();
+    e.correlationId = e.messageId;
+    e.originOrgan = QStringLiteral("perceptiond");
+    e.originNode = QStringLiteral("local");
+    e.wallTime = QDateTime::currentDateTimeUtc();
+    e.kind = ContributionKind::Observation;
+    e.sensitivity = SensitivityClass::Credential;
+
+    e.schemaVersion = kProtectedEnvelopeSchemaVersion;
+    const QByteArray three = canonicalNonErasableEnvelopeV3(e);
+
+    e.schemaVersion = kClassifiedEnvelopeSchemaVersion;
+    const QByteArray four = canonicalNonErasableEnvelopeV3(e);
+
+    // Exactly one byte more, and only for schema 4. Hashing the byte unconditionally would grow the
+    // schema-3 form and rewrite the digest of every row already written; never hashing it would
+    // leave the classification outside the chain entirely. Writing and verifying both change
+    // together under either mistake, so neither can be caught by a round trip -- only by measuring
+    // the canonical form itself.
+    QCOMPARE(four.size(), three.size() + 1);
+
+    // Not a prefix relation: the schema version is itself part of the canonical bytes, so the two
+    // forms differ at that field as well as in length. The size and the trailing byte are what
+    // carry the property.
+    QCOMPARE(static_cast<quint8>(four.at(four.size() - 1)),
+             static_cast<quint8>(SensitivityClass::Credential));
+
+    // And the classification actually reaches the digest: a form that ignored it would make two
+    // differently-classified contributions hash alike.
+    e.sensitivity = SensitivityClass::Ordinary;
+    QVERIFY(canonicalNonErasableEnvelopeV3(e) != four);
+}
 
 void TestSensitivity::aConclusionInheritsTheStrongestClassificationItRestsOn()
 {

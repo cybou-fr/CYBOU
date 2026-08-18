@@ -1319,6 +1319,81 @@ private Q_SLOTS:
         QCOMPARE(episode.at(1).causationId, root.messageId);
         QCOMPARE(episode.at(2).causationId, hypothesis.messageId);
     }
+
+    // ADR-0018: sensitivity is a fourth schema version, and adding it must not disturb what came
+    // before it.
+    void schemaFourCarriesSensitivityWithoutDisturbingSchemaThree()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        CognitiveEnvelope three = observationWithPayload(QByteArray("three"));
+        three.schemaVersion = kProtectedEnvelopeSchemaVersion;
+        QVERIFY2(journal.append(three) > 0, qPrintable(journal.lastError()));
+
+        CognitiveEnvelope four = observationWithPayload(QByteArray("four"));
+        four.schemaVersion = kClassifiedEnvelopeSchemaVersion;
+        // Credential (4) collides with none of the neighbouring columns: retention_class here is
+        // Standard (2) and key_epoch is 0, so reading an adjacent column cannot return this value
+        // by accident. The first version of this test used Sensitive (2) and passed against a
+        // deliberately wrong column index.
+        four.sensitivity = SensitivityClass::Credential;
+        QVERIFY2(journal.append(four) > 0, qPrintable(journal.lastError()));
+
+        const auto storedFour = journal.contribution(four.messageId);
+        QVERIFY(storedFour.has_value());
+        QCOMPARE(storedFour->sensitivity, SensitivityClass::Credential);
+        QCOMPARE(storedFour->retentionClass, RetentionClass::Standard);
+
+        // The schema-3 row keeps its own schema and the chain still verifies: its hash was computed
+        // before schema 4 existed, and appending the new byte unconditionally would have changed it.
+        const auto storedThree = journal.contribution(three.messageId);
+        QVERIFY(storedThree.has_value());
+        QCOMPARE(storedThree->schemaVersion, kProtectedEnvelopeSchemaVersion);
+        QVERIFY(journal.verifyFrom({}).intact());
+    }
+
+    // A conclusion may not be less sensitive than what it rests on.
+    void aContributionMayNotUnderstateTheSensitivityOfItsReferences()
+    {
+        QTemporaryDir dir;
+        Journal journal(dir.filePath(QStringLiteral("j.db")));
+        QVERIFY(journal.isOpen());
+
+        CognitiveEnvelope secret = observationWithPayload(QByteArray("secret"));
+        secret.schemaVersion = kClassifiedEnvelopeSchemaVersion;
+        secret.sensitivity = SensitivityClass::Credential;
+        QVERIFY2(journal.append(secret) > 0, qPrintable(journal.lastError()));
+
+        // Derived from a credential and declaring itself ordinary. Refused rather than corrected:
+        // the declaration is the contract, and silently raising it would leave the caller believing
+        // something the Journal does not.
+        CognitiveEnvelope laundered;
+        laundered.messageId = QUuid::createUuid();
+        laundered.correlationId = laundered.messageId;
+        laundered.causationId = secret.messageId;
+        laundered.originOrgan = QStringLiteral("selfd");
+        laundered.originNode = QStringLiteral("test-node");
+        laundered.wallTime = QDateTime::currentDateTimeUtc();
+        laundered.kind = ContributionKind::Learning;
+        laundered.privacy = secret.privacy;
+        laundered.schemaVersion = kClassifiedEnvelopeSchemaVersion;
+        laundered.sensitivity = SensitivityClass::Ordinary;
+        QCOMPARE(journal.append(laundered), 0ull);
+        QVERIFY2(journal.lastError().contains(QStringLiteral("less sensitive")),
+                 qPrintable(journal.lastError()));
+
+        // Declaring the inherited classification is accepted, so the refusal above is about the
+        // classification rather than about anything else in the envelope.
+        laundered.sensitivity = SensitivityClass::Credential;
+        QVERIFY2(journal.append(laundered) > 0, qPrintable(journal.lastError()));
+
+        // And a schema-3 contribution is not held to a rule its envelope cannot express.
+        CognitiveEnvelope older = observationWithPayload(QByteArray("older"));
+        older.schemaVersion = kProtectedEnvelopeSchemaVersion;
+        QVERIFY2(journal.append(older) > 0, qPrintable(journal.lastError()));
+    }
 };
 
 QTEST_MAIN(TestJournal)

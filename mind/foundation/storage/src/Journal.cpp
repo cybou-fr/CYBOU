@@ -33,7 +33,7 @@ QString defaultConnectionName()
 
 // How many columns envelopeColumns() names. Every positional read after an envelope depends on it,
 // so it lives beside the list rather than in the heads of the people who write those reads.
-inline constexpr int kEnvelopeColumnCount = 20;
+inline constexpr int kEnvelopeColumnCount = 21;
 
 QString envelopeColumns()
 {
@@ -41,7 +41,7 @@ QString envelopeColumns()
         "schema_version, message_id, correlation_id, causation_id, origin_organ, origin_node, "
         "kind, wall_time, monotonic_time, logical_clock, confidence, payload, privacy, "
         "capability, sealed, key_domain, key_epoch, retention_class, retention_policy, "
-        "retain_until");
+        "retain_until, sensitivity");
 }
 
 QString sqlStringLiteral(QString value)
@@ -305,6 +305,13 @@ bool Journal::ensureSchema()
         m_lastError = QStringLiteral("could not add the retention_policy column");
         return false;
     }
+    if (!columnExists(QStringLiteral("contribution"), QStringLiteral("sensitivity"))
+        && !execSql(QStringLiteral(
+            "ALTER TABLE contribution ADD COLUMN sensitivity INTEGER NOT NULL DEFAULT 1"))) {
+        m_lastError = QStringLiteral("could not add the sensitivity column");
+        return false;
+    }
+
     if (!columnExists(QStringLiteral("contribution"), QStringLiteral("retain_until"))
         && !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN retain_until TEXT"))) {
         m_lastError = QStringLiteral("could not add the retain_until column");
@@ -376,7 +383,8 @@ bool Journal::createSchemaV2()
             key_epoch      INTEGER NOT NULL DEFAULT 0,
             retention_class INTEGER NOT NULL DEFAULT 2,
             retention_policy INTEGER NOT NULL DEFAULT 0,
-            retain_until   TEXT
+            retain_until   TEXT,
+            sensitivity    INTEGER NOT NULL DEFAULT 1
         )
     )SQL"))
         || !execSql(QStringLiteral(R"SQL(
@@ -478,6 +486,8 @@ bool Journal::migrateV1ToV2()
         || !execSql(QStringLiteral(
             "ALTER TABLE contribution ADD COLUMN retention_policy INTEGER NOT NULL DEFAULT 0"))
         || !execSql(QStringLiteral("ALTER TABLE contribution ADD COLUMN retain_until TEXT"))
+        || !execSql(QStringLiteral(
+            "ALTER TABLE contribution ADD COLUMN sensitivity INTEGER NOT NULL DEFAULT 1"))
         || !execSql(QStringLiteral(R"SQL(
         CREATE TABLE contribution_evidence (
             contribution_id TEXT    NOT NULL,
@@ -678,8 +688,9 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         return fail(QStringLiteral("refusing to append an invalid envelope"));
     }
     if (e.schemaVersion != kCurrentEnvelopeSchemaVersion
-        && e.schemaVersion != kProtectedEnvelopeSchemaVersion) {
-        return fail(QStringLiteral("new contributions must use envelope schema v2 or v3"));
+        && e.schemaVersion != kProtectedEnvelopeSchemaVersion
+        && e.schemaVersion != kClassifiedEnvelopeSchemaVersion) {
+        return fail(QStringLiteral("new contributions must use envelope schema v2, v3 or v4"));
     }
     if (contains(e.messageId)) {
         return fail(QStringLiteral("messageId already exists"));
@@ -687,6 +698,7 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
 
     QList<PrivacyClass> referencePrivacy;
     QList<QDateTime> referenceRetainUntil;
+    QList<SensitivityClass> referenceSensitivity;
     if (!e.causationId.isNull()) {
         const auto cause = contribution(e.causationId);
         if (!cause) {
@@ -694,6 +706,7 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         }
         referencePrivacy.append(cause->privacy);
         referenceRetainUntil.append(cause->retainUntil);
+        referenceSensitivity.append(cause->sensitivity);
     }
 
     for (const QUuid &evidenceId : e.evidence) {
@@ -703,6 +716,7 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         }
         referencePrivacy.append(evidenceEnvelope->privacy);
         referenceRetainUntil.append(evidenceEnvelope->retainUntil);
+        referenceSensitivity.append(evidenceEnvelope->sensitivity);
     }
 
     if (e.derivedPrivacy(referencePrivacy) != e.privacy) {
@@ -719,6 +733,14 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
     if (!isErasureKind(e.kind)
         && e.derivedRetainUntil(referenceRetainUntil) != e.retainUntil) {
         return fail(QStringLiteral("contribution outlives the retention of its references"));
+    }
+
+    // Sensitivity propagates like privacy: a conclusion that restated its evidence at a weaker
+    // classification would launder it. Checked only for schema 4, because earlier envelopes do not
+    // carry the field and would all declare Ordinary against evidence read back as Personal.
+    if (e.schemaVersion == kClassifiedEnvelopeSchemaVersion
+        && derivedSensitivity(e.sensitivity, referenceSensitivity) != e.sensitivity) {
+        return fail(QStringLiteral("contribution is less sensitive than its references"));
     }
 
     if (e.kind == ContributionKind::Outcome && hasOutcomeFor(e.causationId)) {
@@ -769,8 +791,8 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         "origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, "
         "confidence, evidence, payload, privacy, capability, schema_version, hash_version, "
         "prev_hash, hash, commitment, payload_commitment, sealed, key_domain, key_epoch, "
-        "retention_class, retention_policy, retain_until) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "retention_class, retention_policy, retain_until, sensitivity) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
 
     insert.addBindValue(static_cast<qulonglong>(sequence));
     insert.addBindValue(e2.messageId.toString(QUuid::WithoutBraces));
@@ -808,6 +830,7 @@ quint64 Journal::appendWithinTransaction(const CognitiveEnvelope &e)
         e2.retainUntil.isValid()
             ? QVariant(e2.retainUntil.toUTC().toString(Qt::ISODateWithMs))
             : QVariant());
+    insert.addBindValue(static_cast<int>(e2.sensitivity));
 
     if (!insert.exec()) {
         return fail(insert.lastError().text());
@@ -1312,6 +1335,7 @@ CognitiveEnvelope Journal::envelopeFromQuery(const QSqlQuery &query, int offset)
 
     e.retentionClass = static_cast<RetentionClass>(query.value(offset + 17).toInt());
     e.retentionPolicyVersion = static_cast<quint16>(query.value(offset + 18).toUInt());
+    e.sensitivity = static_cast<SensitivityClass>(query.value(offset + 20).toInt());
     const QString retainUntil = query.value(offset + 19).toString();
     e.retainUntil = retainUntil.isEmpty()
         ? QDateTime()
@@ -1420,7 +1444,8 @@ VerificationResult Journal::verifyFrom(const VerifiedCheckpoint &anchor) const
             expectedHash = rowHashV2(sequence, e, storedPrevious);
         } else if (hashVersion == kCurrentJournalHashVersion
                    && (e.schemaVersion == kCurrentEnvelopeSchemaVersion
-                       || e.schemaVersion == kProtectedEnvelopeSchemaVersion)) {
+                       || e.schemaVersion == kProtectedEnvelopeSchemaVersion
+                       || e.schemaVersion == kClassifiedEnvelopeSchemaVersion)) {
             const QByteArray storedCommitment = query.value(trailing + 2).toByteArray();
             const QByteArray storedPayloadCommitment = query.value(trailing + 3).toByteArray();
             const bool erased = !query.value(trailing + 4).isNull();

@@ -1508,6 +1508,37 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+### Sensitivity becomes a durable field
+
+Envelope schema 4 carries `sensitivity`. A new version rather than an extension of schema 3, because
+every schema-3 row has already been hashed over its own canonical form: the byte is appended for
+schema 4 only. Journal validation refuses a contribution that declares less than its references,
+exactly as privacy and retention are refused rather than silently corrected, and only for schema 4 --
+earlier envelopes cannot express the field and would all fail against evidence read back as
+`Personal`. The column defaults to `Personal`, so unmigrated history reads as unclassified rather
+than harmless.
+
+One real defect: the verification branch for hash v3 accepted schema 2 or 3 only, so a schema-4 row
+matched no branch and verified against an empty expected hash. Caught by the round-trip test on the
+first build.
+
+**Three of five sabotages missed, and all three were the test's fault rather than the code's.**
+
+`sensitivity read from the wrong column` passed because offset+17 is `retention_class`, whose value
+`Standard` is 2, and the fixture had chosen `Sensitive`, which is also 2. The wrong column returned
+the right answer by coincidence. The fixture now uses `Credential` (4), which collides with no
+neighbouring column, and asserts the retention class alongside it.
+
+The two canonical-form mutations -- hashing the byte for every schema, and never hashing it -- were
+invisible to every test in the suite. Writing and verifying use the same function, so under either
+mistake the whole system stays self-consistent and every round trip passes. The property is about
+the *form*, not about any round trip through it, and it needed a test that measures the canonical
+bytes directly: schema 4 is exactly one byte longer than schema 3, that byte is the classification,
+and two differently-classified envelopes do not encode alike.
+
+That is the same lesson as `deliveryDigest` one package earlier. A rule that both sides of a system
+apply identically cannot be checked by running the system.
+
 ### The classification vocabulary, before anything depends on it
 
 `SensitivityClass` and its propagation rule exist as protocol types with their own tests. Nothing

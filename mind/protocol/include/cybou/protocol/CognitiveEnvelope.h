@@ -4,6 +4,8 @@
 #pragma once
 
 #include <QByteArray>
+#include "cybou/protocol/Sensitivity.h"
+
 #include <QDateTime>
 #include <QList>
 #include <QMetaType>
@@ -23,6 +25,10 @@ inline constexpr quint16 kCurrentEnvelopeSchemaVersion = 2;
 /// was. ADR-0028 fixes that the canonical field set is selected by schema version rather than
 /// extended in place, and this is the first version to exercise that rule.
 inline constexpr quint16 kProtectedEnvelopeSchemaVersion = 3;
+
+/// Adds the sensitivity axis of ADR-0018. A new version rather than an extension of schema 3,
+/// because every schema-3 row has already been hashed over its own canonical form.
+inline constexpr quint16 kClassifiedEnvelopeSchemaVersion = 4;
 
 enum class ContributionKind : quint16 {
     Observation = 1,
@@ -190,6 +196,10 @@ struct CognitiveEnvelope {
     QDateTime derivedRetainUntil(const QList<QDateTime> &referenceRetainUntil) const;
 
     PrivacyClass derivedPrivacy(const QList<PrivacyClass> &evidencePrivacy) const;
+
+    /// Who may be shown this. Carried only by schema 4 and later; earlier rows read back as
+    /// `kUnclassifiedSensitivity`, which is Personal rather than Ordinary.
+    SensitivityClass sensitivity{SensitivityClass::Ordinary};
 };
 
 } // namespace cybou
