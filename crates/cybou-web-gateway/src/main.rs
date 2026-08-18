@@ -5,7 +5,9 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
-use cybou_web_gateway::{PresenceSource, fixture::FixturePresenceSource, router_with_assets};
+use cybou_web_gateway::{
+    PresenceSource, SessionContext, fixture::FixturePresenceSource, router_with_assets_and_session,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,8 +15,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = SocketAddr::from(([127, 0, 0, 1], 8787));
     let listener = tokio::net::TcpListener::bind(address).await?;
     let web_root = std::env::var_os("CYBOU_WEB_ROOT").map(std::path::PathBuf::from);
+    let session_context = match std::env::var("CYBOU_SESSION_MODE") {
+        Ok(value) if value == "public-preview" => SessionContext::public_preview(),
+        Ok(value) if value == "local-desktop" => SessionContext::local_desktop(),
+        Err(std::env::VarError::NotPresent) => SessionContext::local_desktop(),
+        Ok(value) => return Err(format!("unsupported CYBOU_SESSION_MODE: {value}").into()),
+        Err(error) => return Err(error.into()),
+    };
     println!("cybou-web-gateway listening on http://{address}");
-    axum::serve(listener, router_with_assets(presence, web_root)).await?;
+    axum::serve(
+        listener,
+        router_with_assets_and_session(presence, web_root, session_context),
+    )
+    .await?;
     Ok(())
 }
 

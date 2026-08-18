@@ -404,6 +404,8 @@ dependencies = [
  "ciborium",
  "cybou-protocol",
  "cybou-web-contracts",
+ "futures-core",
+ "futures-util",
  "http-body-util",
  "serde",
  "serde_json",

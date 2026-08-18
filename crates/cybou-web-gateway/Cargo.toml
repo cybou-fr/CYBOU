@@ -16,6 +16,8 @@ axum.workspace = true
 ciborium.workspace = true
 cybou-protocol = { path = "../cybou-protocol" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
+futures-core.workspace = true
+futures-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

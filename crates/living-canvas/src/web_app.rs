@@ -4,6 +4,8 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use living_canvas::{GatewayMindClient, MindClient};
+use wasm_bindgen::{JsCast, closure::Closure};
+use web_sys::{EventSource, MessageEvent};
 
 #[derive(Clone, Debug)]
 enum RuntimeState {
@@ -36,10 +38,40 @@ pub fn App() -> impl IntoView {
         });
     });
 
+    if let Ok(events) = EventSource::new("/api/v1/events") {
+        let on_snapshot = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
+            let Some(data) = event.data().as_string() else {
+                return;
+            };
+            let Ok(snapshot) =
+                serde_json::from_str::<cybou_web_contracts::SnapshotProjection>(&data)
+            else {
+                return;
+            };
+            runtime.update(|state| {
+                if let RuntimeState::Ready {
+                    projection_version, ..
+                } = state
+                {
+                    *projection_version = snapshot.projection_version;
+                }
+            });
+        });
+        if events
+            .add_event_listener_with_callback("snapshot", on_snapshot.as_ref().unchecked_ref())
+            .is_ok()
+        {
+            // App is the page root and is mounted once; keep the browser stream for that lifetime.
+            on_snapshot.forget();
+            std::mem::forget(events);
+        }
+    }
+
     let runtime_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting".to_owned(),
         RuntimeState::Ready { mode, .. } => match mode {
             cybou_web_contracts::SessionMode::LocalDesktop => "Local".to_owned(),
+            cybou_web_contracts::SessionMode::PublicPreview => "Preview".to_owned(),
             cybou_web_contracts::SessionMode::RemoteBrowser => "Remote".to_owned(),
         },
         RuntimeState::Error(_) => "Unavailable".to_owned(),

@@ -24,6 +24,8 @@ async-trait = "0.1.92"
 axum = "0.8.9"
 ciborium = "0.2.2"
 http-body-util = "0.1.5"
+futures-core = "0.3.31"
+futures-util = "0.3.34"
 thiserror = "2.0.20"
 time = { version = "0.3.55", features = ["formatting"] }
 tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "test-util", "time"] }

@@ -3,14 +3,17 @@
 
 //! Bounded, read-only HTTP boundary between Living Canvas and Presence.
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use axum::{
     Json, Router,
     extract::State,
-    http::{HeaderName, HeaderValue, StatusCode},
-    response::{IntoResponse, Response},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
+    response::{
+        IntoResponse, Response,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::{any, get},
 };
 use cybou_web_contracts::{SessionMode, SessionProjection, SnapshotProjection, WEB_SCHEMA_V1};
@@ -29,6 +32,11 @@ pub mod presence_zbus;
 
 /// Maximum time the gateway permits one Presence projection request to occupy.
 pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(1_500);
+
+/// Interval used until Presence exposes a native changed-event subscription.
+pub const EVENT_POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+const MAX_CURSOR_BYTES: usize = 256;
 
 /// Typed read-only source behind the HTTP boundary.
 #[async_trait]
@@ -54,6 +62,9 @@ pub enum GatewayError {
     /// Presence returned data that cannot satisfy the web contract.
     #[error("presence projection is incompatible with the web contract")]
     InvalidProjection,
+    /// A resume cursor is malformed or exceeds the bounded header budget.
+    #[error("event resume cursor is invalid")]
+    InvalidCursor,
 }
 
 #[derive(Serialize)]
@@ -72,6 +83,7 @@ impl IntoResponse for GatewayError {
             Self::InvalidProjection => {
                 (StatusCode::BAD_GATEWAY, "invalidPresenceProjection", false)
             }
+            Self::InvalidCursor => (StatusCode::BAD_REQUEST, "invalidEventCursor", false),
         };
         (
             status,
@@ -91,6 +103,35 @@ struct GatewayState {
     session: SessionProjection,
 }
 
+/// Server-established browser trust context.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionContext {
+    /// Trust mode presented to the frontend.
+    pub mode: SessionMode,
+    /// Stable named consumer used by projection policy.
+    pub consumer_id: String,
+}
+
+impl SessionContext {
+    /// Device-bound context used by the desktop shell.
+    #[must_use]
+    pub fn local_desktop() -> Self {
+        Self {
+            mode: SessionMode::LocalDesktop,
+            consumer_id: "living-canvas:local-desktop".into(),
+        }
+    }
+
+    /// Unauthenticated context permitted only for deterministic, non-personal fixtures.
+    #[must_use]
+    pub fn public_preview() -> Self {
+        Self {
+            mode: SessionMode::PublicPreview,
+            consumer_id: "living-canvas:public-preview".into(),
+        }
+    }
+}
+
 /// Build the read-only v1 router around a typed Presence source.
 pub fn router(presence: Arc<dyn PresenceSource>) -> Router {
     router_with_assets(presence, None)
@@ -98,6 +139,15 @@ pub fn router(presence: Arc<dyn PresenceSource>) -> Router {
 
 /// Build the read-only v1 router and optionally serve a Living Canvas build from the same origin.
 pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<PathBuf>) -> Router {
+    router_with_assets_and_session(presence, web_root, SessionContext::local_desktop())
+}
+
+/// Build the v1 router with an explicit server-established trust context.
+pub fn router_with_assets_and_session(
+    presence: Arc<dyn PresenceSource>,
+    web_root: Option<PathBuf>,
+    session_context: SessionContext,
+) -> Router {
     let now = OffsetDateTime::now_utc();
     let expires_at = (now + TimeDuration::hours(8))
         .format(&Rfc3339)
@@ -107,8 +157,8 @@ pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<Pa
         session: SessionProjection {
             schema_version: WEB_SCHEMA_V1,
             session_id: Uuid::new_v4(),
-            mode: SessionMode::LocalDesktop,
-            consumer_id: "living-canvas:local-desktop".into(),
+            mode: session_context.mode,
+            consumer_id: session_context.consumer_id,
             expires_at,
         },
     };
@@ -116,6 +166,7 @@ pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<Pa
     let app = Router::new()
         .route("/api/v1/session", get(session))
         .route("/api/v1/snapshot", get(snapshot))
+        .route("/api/v1/events", get(events))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -162,6 +213,85 @@ async fn snapshot(
         .map(Json)
 }
 
+fn resume_cursor(headers: &HeaderMap) -> Result<Option<String>, GatewayError> {
+    let Some(value) = headers.get("last-event-id") else {
+        return Ok(None);
+    };
+    let value = value.to_str().map_err(|_| GatewayError::InvalidCursor)?;
+    if value.is_empty() || value.len() > MAX_CURSOR_BYTES || value.chars().any(char::is_control) {
+        return Err(GatewayError::InvalidCursor);
+    }
+    Ok(Some(value.to_owned()))
+}
+
+async fn events(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+) -> Result<Sse<impl futures_core::Stream<Item = Result<Event, Infallible>>>, GatewayError> {
+    let initial_cursor = resume_cursor(&headers)?;
+    let stream = futures_util::stream::unfold(
+        (state, initial_cursor),
+        |(state, mut last_cursor)| async move {
+            loop {
+                let result = tokio::time::timeout(SNAPSHOT_BUDGET, state.presence.snapshot()).await;
+                match result {
+                    Ok(Ok(snapshot))
+                        if last_cursor.as_deref() != Some(snapshot.cursor.as_str()) =>
+                    {
+                        let cursor = snapshot.cursor.clone();
+                        if let Ok(data) = serde_json::to_string(&snapshot) {
+                            let event = Event::default()
+                                .event("snapshot")
+                                .id(cursor.clone())
+                                .data(data);
+                            last_cursor = Some(cursor);
+                            return Some((Ok::<_, Infallible>(event), (state, last_cursor)));
+                        }
+                        let data = serde_json::json!({
+                            "schemaVersion": WEB_SCHEMA_V1,
+                            "error": "invalidPresenceProjection",
+                            "retryable": false
+                        });
+                        let event = Event::default()
+                            .event("projection-error")
+                            .data(data.to_string());
+                        return Some((Ok(event), (state, last_cursor)));
+                    }
+                    Ok(Ok(_)) => {}
+                    Ok(Err(error)) => {
+                        let data = serde_json::json!({
+                            "schemaVersion": WEB_SCHEMA_V1,
+                            "error": error.to_string(),
+                            "retryable": !matches!(error, GatewayError::InvalidProjection | GatewayError::InvalidCursor)
+                        });
+                        let event = Event::default()
+                            .event("projection-error")
+                            .data(data.to_string());
+                        return Some((Ok(event), (state, last_cursor)));
+                    }
+                    Err(_) => {
+                        let data = serde_json::json!({
+                            "schemaVersion": WEB_SCHEMA_V1,
+                            "error": "presenceTimeout",
+                            "retryable": true
+                        });
+                        let event = Event::default()
+                            .event("projection-error")
+                            .data(data.to_string());
+                        return Some((Ok(event), (state, last_cursor)));
+                    }
+                }
+                tokio::time::sleep(EVENT_POLL_INTERVAL).await;
+            }
+        },
+    );
+    Ok(Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("presence-stream"),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{sync::Arc, time::Duration};
@@ -175,7 +305,10 @@ mod tests {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
-    use super::{GatewayError, PresenceSource, router, router_with_assets};
+    use super::{
+        GatewayError, PresenceSource, SessionContext, router, router_with_assets,
+        router_with_assets_and_session,
+    };
     use crate::fixture::FixturePresenceSource;
 
     #[tokio::test]
@@ -200,6 +333,73 @@ mod tests {
             .to_bytes();
         let session: SessionProjection = serde_json::from_slice(&bytes).expect("typed session");
         assert_eq!(session.mode, SessionMode::LocalDesktop);
+    }
+
+    #[tokio::test]
+    async fn public_preview_never_claims_local_desktop_trust() {
+        let response = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::public_preview(),
+        )
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/session")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+        let bytes = response
+            .into_body()
+            .collect()
+            .await
+            .expect("session body")
+            .to_bytes();
+        let session: SessionProjection = serde_json::from_slice(&bytes).expect("typed session");
+        assert_eq!(session.mode, SessionMode::PublicPreview);
+        assert_eq!(session.consumer_id, "living-canvas:public-preview");
+    }
+
+    #[tokio::test]
+    async fn event_stream_emits_snapshot_with_resumable_cursor() {
+        let response = router(Arc::new(FixturePresenceSource::nominal()))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/events")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("router response");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], "text/event-stream");
+        let mut body = response.into_body();
+        let frame = tokio::time::timeout(Duration::from_millis(100), body.frame())
+            .await
+            .expect("initial event budget")
+            .expect("initial event frame")
+            .expect("valid event frame");
+        let data = frame.into_data().expect("event data");
+        let event = String::from_utf8_lossy(&data);
+        assert!(event.contains("event: snapshot"));
+        assert!(event.contains("id: fixture:presence:42"));
+        assert!(event.contains("\"projectionVersion\":42"));
+    }
+
+    #[tokio::test]
+    async fn event_stream_rejects_unbounded_resume_cursor() {
+        let response = router(Arc::new(FixturePresenceSource::nominal()))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/events")
+                    .header("last-event-id", "x".repeat(257))
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("router response");
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

@@ -39,6 +39,8 @@ a login. The IP endpoint uses a renewable Let's Encrypt `shortlived` certificate
 Presence owner is implemented, the public preview uses the explicit non-personal fixture
 projection; it does not publish a Journal or live Mind state. Authentication must be restored
 before any personal or live state is connected.
+The systemd unit sets `CYBOU_SESSION_MODE=public-preview`; the gateway exposes that trust context as
+`publicPreview` rather than falsely claiming `localDesktop` or authenticated `remoteBrowser`.
 
 `vps-checks.sh` and `deploy-vps.sh` always transfer the unfinished working tree, excluding local
 build outputs. Builds never happen on Windows or WSL. The remote source root defaults to

@@ -8,9 +8,8 @@
   "properties": {
     "schemaVersion": { "const": 1 },
     "sessionId": { "type": "string", "format": "uuid" },
-    "mode": { "enum": ["localDesktop", "remoteBrowser"] },
+    "mode": { "enum": ["localDesktop", "publicPreview", "remoteBrowser"] },
     "consumerId": { "type": "string", "minLength": 1 },
     "expiresAt": { "type": "string", "format": "date-time" }
   }
 }
-

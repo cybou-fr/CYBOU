@@ -16,6 +16,8 @@ pub const WEB_SCHEMA_V1: SchemaVersion = SchemaVersion(1);
 pub enum SessionMode {
     /// Device-bound loopback session created by the desktop shell.
     LocalDesktop,
+    /// Explicitly unauthenticated, non-personal demonstration surface.
+    PublicPreview,
     /// Authenticated browser session crossing the external network boundary.
     RemoteBrowser,
 }

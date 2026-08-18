@@ -12,6 +12,7 @@ User=cybou
 Group=cybou
 Environment=CYBOU_WEB_ROOT=/usr/share/cybou/web
 Environment=CYBOU_GATEWAY_FIXTURE=1
+Environment=CYBOU_SESSION_MODE=public-preview
 ExecStart=/usr/libexec/cybou/cybou-web-gateway
 Restart=on-failure
 RestartSec=1
