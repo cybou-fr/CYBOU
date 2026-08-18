@@ -43,11 +43,11 @@
       faq_a4: 'Through declarative NixOS Flakes (flake.lock) and atomic generation rollbacks. If any package update fails or breaks, you can instantly select a previous working generation at boot time.',
       faq_q5: 'What open-source licenses apply?',
       faq_a5: 'Cybou code and Nix expressions are licensed under MIT. Original visual assets (wallpapers, desktop themes, SVGs) are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev.',
-      hero_eyebrow: 'Visual foundation · v0.1',
-      hero_h1_1: 'A calmer,',
-      hero_h1_2: 'smarter Linux OS.',
-      hero_lead: 'Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma — designed around clarity, reproducibility, zero telemetry and calm, deliberate design.',
-      hero_btn_explore: 'Explore Cybou',
+      hero_eyebrow: 'Pre-release · M7 advancing',
+      hero_h1_1: 'A reproducible desktop.',
+      hero_h1_2: 'A typed local Mind.',
+      hero_lead: 'Cybou is an experimental personal operating system built on NixOS and KDE Plasma, with twelve local services for durable cognitive state — no shipped AI model and no required cloud.',
+      hero_btn_explore: 'Build Cybou',
       hero_btn_blueprint: 'Read Technical Blueprint',
       tag_nixos: 'Built on NixOS',
       tag_plasma: 'KDE Plasma 6',
@@ -89,10 +89,16 @@
       gen_aug2: 'Aug 2',
       prog_h2_1: 'Measured execution.',
       prog_h2_2: 'Verified milestones.',
-      prog_lead: 'The current repository has completed the M1–M6 runtime substrate and P6.7 latency hardening, with process, continuity, recovery, and Plasma KVM gates.',
-      metric_gate_a: 'M6 recovery boundary passed in a real Plasma KVM session',
-      metric_tasks: 'Nine isolated Mind daemons with typed D-Bus ownership',
-      metric_contrast: 'Twenty CTest suites plus repository policy checks',
+      prog_lead: 'The repository now extends the verified M1–M6 substrate with grounded perception, epistemic projection, crash-safe erasure, associative context, and governed delivery.',
+      metric_gate_a: 'Grounded perception, epistemics, retention, and context delivery implemented in verified slices',
+      metric_tasks: 'Twelve isolated Mind services with explicit typed ownership',
+      metric_contrast: 'Thirty-five CTest suites plus repository policy checks',
+      evidence_state: 'Current State',
+      evidence_state_desc: 'Implemented behavior and limitations',
+      evidence_tests: 'Testing evidence',
+      evidence_tests_desc: 'Process, reboot, fault and KVM gates',
+      evidence_source: 'Source repository',
+      evidence_source_desc: 'Inspect the code and development history',
       design_sub: 'A visual system shaped by depth, negative space and a single line of light.',
       mark_desc: 'An open arc around a focused center: a system with room to evolve.',
       type_head: 'Calm, precise, human.',
@@ -111,8 +117,8 @@
       road_h2_2: 'Then grow the mind.',
       rm1_title: 'Desktop foundation',
       rm2_title: 'Mind substrate',
-      rm3_title: 'Grounded perception',
-      rm4_title: 'Optional faculties and action',
+      rm3_title: 'Grounded cognition',
+      rm4_title: 'Faculties and governed action',
       bp_banner_kicker: 'The project starts here',
       bp_banner_h2_1: 'A real operating system,',
       bp_banner_h2_2: 'built one trusted layer at a time.',
@@ -122,7 +128,7 @@
       footer_sub: 'Visual foundation · Built on NixOS and KDE Plasma.',
       bp_badge: 'Technical Blueprint · Current Architecture & Roadmap',
       bp_title: 'Cybou: A Reproducible Desktop with a Typed Cognitive Runtime',
-      bp_lead: 'The current whitepaper for Cybou’s NixOS/Plasma desktop, nine-process Mind runtime, ownership model, verified M1–M6 substrate, P6.7 hardening, and M7–M9 roadmap.',
+      bp_lead: 'The current whitepaper for Cybou’s NixOS/Plasma desktop, twelve-service Mind runtime, ownership model, verified M1–M6 substrate, advancing M7 cognition, and M8–M13 roadmap.',
       btn_print_pdf: 'Export to PDF / Print',
       btn_explore_landing: 'Explore Web Landing',
       bp_sec1_title: '1. Executive Summary & Core Vision',
@@ -130,7 +136,7 @@
       bp_layer1_title: 'Layer 1: Reproducible Body',
       bp_layer1_desc: 'NixOS 26.05, locked Flakes, KDE Plasma 6 Wayland, Horizon packages, VM/ISO/Hyper-V outputs, atomic generations, and explicit build and recovery gates.',
       bp_layer2_title: 'Layer 2: Typed Mind Runtime',
-      bp_layer2_desc: 'Nine isolated systemd user services communicate through typed Qt/D-Bus contracts. Event1 is the canonical Journal boundary; Presence is a projection, not a second owner. Language and privileged execution remain absent.',
+      bp_layer2_desc: 'Twelve isolated systemd user services communicate through typed Qt/D-Bus contracts. Event1 is the canonical Journal boundary; Presence is a projection, not a second owner. Language models and privileged execution remain absent.',
       bp_sec2_title: '2. Architecture & Technical Stack',
       bp_sec2_p1: 'Cybou separates Body, Mind, and Presence. Durable state belongs to explicit owners; the shell is a remote cache and presentation boundary. Cross-owner commands are bounded and fail closed.',
       bp_stack_title: 'Core System Stack',
@@ -139,7 +145,7 @@
       bp_ai_point1: '<strong>Ownership before intelligence:</strong> model ≠ identity, UI ≠ Mind, attention ≠ biography, and proposal ≠ authorization.',
       bp_ai_point2: '<strong>Durability before visibility:</strong> state is projected only after its owner commits it; consolidation adds evidence-linked outcomes and never rewrites history.',
       bp_ai_point3: '<strong>Bounded degradation:</strong> Health1 publishes typed deficits and recovery progress; compound Presence reads and mutations share one monotonic deadline.',
-      bp_ai_point4: '<strong>No hidden agency:</strong> M8 language is optional and replaceable; M9 planning, authorization, execution, and observed outcomes remain separate boundaries.',
+      bp_ai_point4: '<strong>No hidden agency:</strong> M8 language is optional and replaceable; M9 learning, M10 action, and M11 agents remain separate governed boundaries.',
       bp_sec4_title: '4. Implementation Status & Progress Matrix',
       bp_sec4_p1: 'Development progress is tracked rigorously across milestone phases and verified against automated acceptance gates.',
       bp_sec5_title: '5. Security, Privacy & Licensing',
@@ -177,11 +183,11 @@
       faq_a4: 'Grâce à la gestion déclarative NixOS Flakes (flake.lock) et aux retours en arrière atomiques. En cas de problème lors d’une mise à jour, vous pouvez revenir instantanément à une génération antérieure au démarrage.',
       faq_q5: 'Quelles sont les licences open source applicables ?',
       faq_a5: 'Le code source et les expressions Nix sont sous licence MIT. Les ressources visuelles d’origine sont sous CC BY-SA 4.0. Droits d’auteur (c) 2026 Stanislav Saveliev.',
-      hero_eyebrow: 'Fondation visuelle · v0.1',
-      hero_h1_1: 'Un système Linux',
-      hero_h1_2: 'plus calme et intelligent.',
-      hero_lead: 'Cybou est un bureau Linux personnel plus intelligent, bâti sur NixOS et KDE Plasma — pensé pour la clarté, la reproductibilité, zéro télémétrie et un design calme et délibéré.',
-      hero_btn_explore: 'Explorer Cybou',
+      hero_eyebrow: 'Préversion · M7 en cours',
+      hero_h1_1: 'Un bureau reproductible.',
+      hero_h1_2: 'Un Mind local typé.',
+      hero_lead: 'Cybou est un système d’exploitation personnel expérimental sur NixOS et KDE Plasma, avec douze services locaux pour un état cognitif durable — sans modèle IA livré ni cloud requis.',
+      hero_btn_explore: 'Construire Cybou',
       hero_btn_blueprint: 'Lire le blueprint technique',
       tag_nixos: 'Basé sur NixOS',
       tag_plasma: 'KDE Plasma 6',
@@ -223,10 +229,16 @@
       gen_aug2: '2 Août',
       prog_h2_1: 'Exécution mesurée.',
       prog_h2_2: 'Jalons vérifiés.',
-      prog_lead: 'Le dépôt actuel a terminé le socle M1–M6 et le durcissement P6.7, avec des gates processus, continuité, reprise et Plasma KVM.',
-      metric_gate_a: 'Gate de reprise M6 validée dans une session Plasma KVM réelle',
-      metric_tasks: 'Neuf démons Mind isolés avec ownership D-Bus typé',
-      metric_contrast: 'Vingt suites CTest et contrôles de politique du dépôt',
+      prog_lead: 'Le dépôt étend désormais le socle M1–M6 vérifié avec perception fondée, projection épistémique, effacement résistant aux pannes, contexte associatif et livraison gouvernée.',
+      metric_gate_a: 'Perception, épistémique, rétention et livraison de contexte implémentées par tranches vérifiées',
+      metric_tasks: 'Douze services Mind isolés avec propriété typée explicite',
+      metric_contrast: 'Trente-cinq suites CTest et contrôles de politique du dépôt',
+      evidence_state: 'État actuel',
+      evidence_state_desc: 'Fonctionnement implémenté et limites',
+      evidence_tests: 'Preuves de test',
+      evidence_tests_desc: 'Gates processus, redémarrage, panne et KVM',
+      evidence_source: 'Dépôt source',
+      evidence_source_desc: 'Inspecter le code et son historique',
       design_sub: 'Un système visuel façonné par la profondeur, l’espace négatif et une ligne de lumière.',
       mark_desc: 'Un arc ouvert autour d’un centre focalisé : un système prêt à évoluer.',
       type_head: 'Calme, précis, humain.',
@@ -245,8 +257,8 @@
       road_h2_2: 'Puis éveiller l’esprit.',
       rm1_title: 'Fondation du bureau',
       rm2_title: 'Socle Mind',
-      rm3_title: 'Perception fondée',
-      rm4_title: 'Facultés et action optionnelles',
+      rm3_title: 'Cognition fondée',
+      rm4_title: 'Facultés et action gouvernée',
       bp_banner_kicker: 'Le projet commence ici',
       bp_banner_h2_1: 'Un véritable système d’exploitation,',
       bp_banner_h2_2: 'construit couche par couche.',
@@ -256,7 +268,7 @@
       footer_sub: 'Fondation visuelle · Bâti sur NixOS et KDE Plasma.',
       bp_badge: 'Blueprint technique · Architecture actuelle & Feuille de route',
       bp_title: 'Cybou : un bureau reproductible avec un runtime cognitif typé',
-      bp_lead: 'Le livre blanc actuel du bureau NixOS/Plasma, du runtime Mind à neuf processus, de son modèle de propriété, du socle M1–M6 vérifié, du durcissement P6.7 et de la feuille de route M7–M9.',
+      bp_lead: 'Le livre blanc actuel du bureau NixOS/Plasma, du runtime Mind à douze services, de son modèle de propriété, du socle M1–M6 vérifié, de M7 en cours et de la feuille de route M8–M13.',
       btn_print_pdf: 'Exporter en PDF / Imprimer',
       btn_explore_landing: 'Explorer la présentation',
       bp_sec1_title: '1. Résumé exécutif & Vision',
@@ -264,7 +276,7 @@
       bp_layer1_title: 'Couche 1 : Corps reproductible',
       bp_layer1_desc: 'NixOS 26.05, Flakes verrouillés, KDE Plasma 6 Wayland, paquets Horizon, sorties VM/ISO/Hyper-V, générations atomiques et gates de build et de reprise.',
       bp_layer2_title: 'Couche 2 : Runtime Mind typé',
-      bp_layer2_desc: 'Neuf services utilisateur systemd isolés communiquent par contrats Qt/D-Bus typés. Event1 est la frontière canonique du Journal ; Presence reste une projection. Le langage et l’exécution privilégiée sont absents.',
+      bp_layer2_desc: 'Douze services utilisateur systemd isolés communiquent par contrats Qt/D-Bus typés. Event1 est la frontière canonique du Journal ; Presence reste une projection. Les modèles de langage et l’exécution privilégiée sont absents.',
       bp_sec2_title: '2. Architecture & Stack technique',
       bp_sec2_p1: 'Cybou sépare Body, Mind et Presence. L’état durable appartient à des propriétaires explicites ; le shell est un cache distant et une frontière de présentation. Les commandes multi-propriétaires sont bornées et échouent fermées.',
       bp_stack_title: 'Stack système principal',
@@ -273,7 +285,7 @@
       bp_ai_point1: '<strong>La propriété avant l’intelligence :</strong> modèle ≠ identité, UI ≠ Mind, attention ≠ biographie, proposition ≠ autorisation.',
       bp_ai_point2: '<strong>La durabilité avant la visibilité :</strong> un état n’est projeté qu’après validation par son propriétaire ; la consolidation ne réécrit jamais l’histoire.',
       bp_ai_point3: '<strong>Dégradation bornée :</strong> Health1 publie les déficits et la reprise ; les lectures et mutations composées de Presence partagent un délai monotone.',
-      bp_ai_point4: '<strong>Aucune agence cachée :</strong> le langage M8 reste optionnel ; planification, autorisation, exécution et résultat observé M9 restent séparés.',
+      bp_ai_point4: '<strong>Aucune agence cachée :</strong> le langage M8 reste optionnel ; l’apprentissage M9, l’action M10 et les agents M11 restent des frontières gouvernées séparées.',
       bp_sec4_title: '4. Matrice de progrès & État d’avancement',
       bp_sec4_p1: 'Le développement est suivi rigoureusement à travers des jalons vérifiés par des tests automatisés.',
       bp_sec5_title: '5. Sécurité, Vie privée & Licences',
@@ -311,11 +323,11 @@
       faq_a4: 'Благодаря декларативной конфигурации NixOS Flakes (flake.lock) и атомарным откатам поколений. Если обновление содержит ошибку, при загрузке можно мгновенно выбрать заведомо рабочее состояние.',
       faq_q5: 'Под какими лицензиями распространяется проект?',
       faq_a5: 'Исходный код и Nix-файлы лицензированы под MIT. Оригинальные визуальные артефакты — под CC BY-SA 4.0. Авторские права (c) 2026 Stanislav Saveliev.',
-      hero_eyebrow: 'Визуальный фундамент · v0.1',
-      hero_h1_1: 'Спокойный и умный',
-      hero_h1_2: 'дистрибутив Linux.',
-      hero_lead: 'Cybou — это более умный персональный рабочий стол Linux на NixOS и KDE Plasma, построенный вокруг ясности, воспроизводимости, отсутствия телеметрии и спокойного продуманного дизайна.',
-      hero_btn_explore: 'Исследовать Cybou',
+      hero_eyebrow: 'Предрелиз · M7 развивается',
+      hero_h1_1: 'Воспроизводимый рабочий стол.',
+      hero_h1_2: 'Локальный типизированный Mind.',
+      hero_lead: 'Cybou — экспериментальная персональная ОС на NixOS и KDE Plasma с двенадцатью локальными сервисами долговечного когнитивного состояния — без поставляемой модели ИИ и обязательного облака.',
+      hero_btn_explore: 'Собрать Cybou',
       hero_btn_blueprint: 'Читать спецификацию',
       tag_nixos: 'На базе NixOS',
       tag_plasma: 'KDE Plasma 6',
@@ -357,10 +369,16 @@
       gen_aug2: '2 авг',
       prog_h2_1: 'Точное исполнение.',
       prog_h2_2: 'Проверенные этапы.',
-      prog_lead: 'В репозитории завершены фундамент M1–M6 и hardening P6.7, включая process-, continuity-, recovery- и Plasma KVM-gates.',
-      metric_gate_a: 'M6 recovery gate пройден в реальной Plasma KVM-сессии',
-      metric_tasks: 'Девять изолированных Mind-демонов с типизированным D-Bus ownership',
-      metric_contrast: 'Двадцать наборов CTest и policy-проверки репозитория',
+      prog_lead: 'Проверенный фундамент M1–M6 дополнен обоснованным восприятием, эпистемической проекцией, crash-safe удалением, ассоциативным контекстом и управляемой доставкой.',
+      metric_gate_a: 'Восприятие, эпистемика, хранение и доставка контекста реализованы проверенными этапами',
+      metric_tasks: 'Двенадцать изолированных сервисов Mind с явным типизированным ownership',
+      metric_contrast: 'Тридцать пять наборов CTest и policy-проверки репозитория',
+      evidence_state: 'Текущее состояние',
+      evidence_state_desc: 'Реализованное поведение и ограничения',
+      evidence_tests: 'Доказательства тестирования',
+      evidence_tests_desc: 'Process-, reboot-, fault- и KVM-gates',
+      evidence_source: 'Исходный код',
+      evidence_source_desc: 'Изучить код и историю разработки',
       design_sub: 'Визуальная система, сформированная глубиной, пространством и тонкой линией света.',
       mark_desc: 'Открытая дуга вокруг фокусного центра — система, готовая развиваться.',
       type_head: 'Спокойная, точная, человечная.',
@@ -379,8 +397,8 @@
       road_h2_2: 'Затем выстроить разум.',
       rm1_title: 'Фундамент рабочего стола',
       rm2_title: 'Фундамент Mind',
-      rm3_title: 'Обоснованное восприятие',
-      rm4_title: 'Необязательные функции и действия',
+      rm3_title: 'Обоснованное познание',
+      rm4_title: 'Функции и управляемые действия',
       bp_banner_kicker: 'Проект начинается здесь',
       bp_banner_h2_1: 'Настоящая операционная система,',
       bp_banner_h2_2: 'создаваемая слой за слоем.',
@@ -390,7 +408,7 @@
       footer_sub: 'Визуальная основа · На базе NixOS и KDE Plasma.',
       bp_badge: 'Технический Blueprint · Текущая архитектура и план',
       bp_title: 'Cybou: воспроизводимый рабочий стол и типизированный когнитивный runtime',
-      bp_lead: 'Актуальный whitepaper рабочего стола NixOS/Plasma, девятипроцессного runtime Mind, модели ownership, проверенного фундамента M1–M6, hardening P6.7 и плана M7–M9.',
+      bp_lead: 'Актуальный whitepaper рабочего стола NixOS/Plasma, двенадцати сервисов Mind, модели ownership, проверенного фундамента M1–M6, развивающегося M7 и плана M8–M13.',
       btn_print_pdf: 'Экспорт в PDF / Печать',
       btn_explore_landing: 'Открыть главную страницу',
       bp_sec1_title: '1. Концепция и ключевое видение',
@@ -398,7 +416,7 @@
       bp_layer1_title: 'Слой 1: Воспроизводимое тело',
       bp_layer1_desc: 'NixOS 26.05, зафиксированные Flakes, KDE Plasma 6 Wayland, пакеты Horizon, VM/ISO/Hyper-V, атомарные поколения и явные gates сборки и восстановления.',
       bp_layer2_title: 'Слой 2: Типизированный runtime Mind',
-      bp_layer2_desc: 'Девять изолированных пользовательских systemd-сервисов общаются через типизированные Qt/D-Bus контракты. Event1 — каноническая граница Journal, а Presence — только проекция. Язык и привилегированное исполнение отсутствуют.',
+      bp_layer2_desc: 'Двенадцать изолированных пользовательских systemd-сервисов общаются через типизированные Qt/D-Bus контракты. Event1 — каноническая граница Journal, а Presence — только проекция. Языковые модели и привилегированное исполнение отсутствуют.',
       bp_sec2_title: '2. Архитектура и стек технологий',
       bp_sec2_p1: 'Cybou разделяет Body, Mind и Presence. Долговечным состоянием владеют явные owners; shell остаётся удалённым кэшем и presentation boundary. Составные команды ограничены и fail closed.',
       bp_stack_title: 'Основной стек системы',
@@ -407,7 +425,7 @@
       bp_ai_point1: '<strong>Ownership раньше intelligence:</strong> model ≠ identity, UI ≠ Mind, attention ≠ biography, proposal ≠ authorization.',
       bp_ai_point2: '<strong>Durability раньше visibility:</strong> состояние проецируется только после commit его owner; consolidation не переписывает историю.',
       bp_ai_point3: '<strong>Ограниченная деградация:</strong> Health1 публикует deficits и recovery; составные чтения и mutations Presence используют один монотонный deadline.',
-      bp_ai_point4: '<strong>Никакой скрытой agency:</strong> язык M8 необязателен; planning, authorization, execution и observed outcome M9 остаются раздельными.',
+      bp_ai_point4: '<strong>Никакой скрытой agency:</strong> язык M8 необязателен; обучение M9, действия M10 и агенты M11 остаются отдельными управляемыми границами.',
       bp_sec4_title: '4. Прогресс разработки и матрица задач',
       bp_sec4_p1: 'Ход разработки строго фиксируется по этапам и проверяется авто-тестами.',
       bp_sec5_title: '5. Безопасность, приватность и лицензии',
@@ -481,11 +499,16 @@
 
   // Interactive FAQ Accordion
   document.querySelectorAll('.faq-question').forEach((button) => {
+    button.setAttribute('aria-expanded', 'false');
     button.addEventListener('click', () => {
       const item = button.closest('.faq-item');
       const open = !item?.classList.contains('open');
-      document.querySelectorAll('.faq-item').forEach((el) => el.classList.remove('open'));
+      document.querySelectorAll('.faq-item').forEach((el) => {
+        el.classList.remove('open');
+        el.querySelector('.faq-question')?.setAttribute('aria-expanded', 'false');
+      });
       item?.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', String(open));
     });
   });
 
@@ -496,12 +519,14 @@
   menuButton?.addEventListener('click', () => {
     const open = !mobileNav.classList.contains('open');
     mobileNav.classList.toggle('open', open);
+    document.body.classList.toggle('menu-open', open);
     menuButton.setAttribute('aria-expanded', String(open));
   });
 
   mobileNav?.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', () => {
       mobileNav.classList.remove('open');
+      document.body.classList.remove('menu-open');
       menuButton?.setAttribute('aria-expanded', 'false');
     });
   });
@@ -522,7 +547,12 @@
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') setLauncher(false);
+    if (event.key === 'Escape') {
+      setLauncher(false);
+      mobileNav?.classList.remove('open');
+      document.body.classList.remove('menu-open');
+      menuButton?.setAttribute('aria-expanded', 'false');
+    }
   });
 
   const updateClock = () => {
@@ -605,4 +635,3 @@
     });
   });
 })();
-

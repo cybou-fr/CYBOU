@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0D12">
-  <meta name="description" content="Current Cybou technical whitepaper: NixOS/Plasma desktop, nine-process Mind architecture, ownership, M1–M6 evidence, P6.7 resilience, and M7–M9 roadmap.">
+  <meta name="description" content="Current Cybou technical whitepaper: NixOS/Plasma desktop, twelve-service Mind architecture, verified M1–M6 substrate, advancing M7 cognition, and M8–M13 roadmap.">
   <meta property="og:title" content="Cybou — Technical Blueprint & Architecture">
   <meta property="og:description" content="Current Cybou technical whitepaper covering the reproducible desktop, typed Mind runtime, verified boundaries, and roadmap.">
   <meta property="og:type" content="article">
@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT
   <title>Cybou — Technical Blueprint & Architecture</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260818-3">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -31,7 +31,7 @@ SPDX-License-Identifier: MIT
       "@type": "Person",
       "name": "Stanislav Saveliev"
     },
-    "description": "Current Cybou technical whitepaper covering its NixOS and Plasma desktop, nine-process typed Mind runtime, verified M1–M6 substrate, P6.7 resilience, and M7–M9 roadmap.",
+    "description": "Current Cybou technical whitepaper covering its NixOS and Plasma desktop, twelve-service typed Mind runtime, verified M1–M6 substrate, advancing M7 cognition, and M8–M13 roadmap.",
     "inLanguage": ["en", "fr", "ru"],
     "url": "https://cybou.fr/blueprint.html"
   }
@@ -279,12 +279,12 @@ SPDX-License-Identifier: MIT
       </div>
       <h1 class="bp-title" data-i18n="bp_title">Cybou: A Reproducible Desktop with a Typed Cognitive Runtime</h1>
       <p class="bp-lead" data-i18n="bp_lead">
-        The current whitepaper for Cybou’s NixOS/Plasma desktop, nine-process Mind runtime, ownership model, verified M1–M6 substrate, P6.7 hardening, and M7–M9 roadmap.
+        The current whitepaper for Cybou’s NixOS/Plasma desktop, twelve-service Mind runtime, ownership model, verified M1–M6 substrate, advancing M7 cognition, and M8–M13 roadmap.
       </p>
       <div class="bp-meta">
         <span><strong>Base:</strong> NixOS 26.05 Stable</span>
         <span><strong>Desktop:</strong> KDE Plasma 6 (Wayland)</span>
-        <span><strong>Status:</strong> M6 + P6.7 verified</span>
+        <span><strong>Status:</strong> M1–M6 verified · M7 advancing</span>
         <span><strong>Updated:</strong> August 2026</span>
       </div>
 
@@ -293,9 +293,18 @@ SPDX-License-Identifier: MIT
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 3 0 0 1-2-2v-5a2 2 3 0 0 1 2-2h16a2 2 3 0 0 1 2 2v5a2 2 3 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
           Export to PDF / Print
         </button>
-        <a class="button button--ghost" href="index.html" data-i18n="btn_explore_landing">Explore Web Landing</a>
+        <a class="button button--ghost" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener">View Current State</a>
       </div>
     </header>
+
+    <nav class="bp-toc" aria-label="Blueprint contents">
+      <a href="#summary">01 <span>Vision</span></a>
+      <a href="#architecture">02 <span>Architecture</span></a>
+      <a href="#cognitive">03 <span>Safety boundaries</span></a>
+      <a href="#progress">04 <span>Implementation</span></a>
+      <a href="#licensing">05 <span>Security & licensing</span></a>
+      <a href="#faq">06 <span>FAQ</span></a>
+    </nav>
 
     <section class="bp-section reveal" id="summary">
       <h2 data-i18n="bp_sec1_title">1. Executive Summary & Core Vision</h2>
@@ -312,7 +321,7 @@ SPDX-License-Identifier: MIT
         <div class="bp-card">
           <h3 data-i18n="bp_layer2_title">Layer 2: Typed Mind Runtime</h3>
           <p data-i18n="bp_layer2_desc">
-        Nine isolated systemd user services communicate through typed Qt/D-Bus contracts. Event1 is the single canonical Journal boundary; Presence is a projection, not a second owner. Language and privileged execution remain absent.
+        Twelve isolated systemd user services communicate through typed Qt/D-Bus contracts. Event1 is the single canonical Journal boundary; Presence is a projection, not a second owner. Language models and privileged execution remain absent.
       </p>
         </div>
       </div>
@@ -331,8 +340,8 @@ SPDX-License-Identifier: MIT
           <li><strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, custom Aurorae window decorations, and single floating top horizon panel.</li>
           <li><strong>Audio & Networking:</strong> PipeWire audio graph server + NetworkManager for declarative network profiles.</li>
           <li><strong>Build Output:</strong> Bootable NixOS ISO, qemu/KVM virtual machine targets, and Hyper-V development images.</li>
-          <li><strong>Mind Runtime:</strong> Nine C++20/Qt 6 user services activated by systemd and addressed through typed D-Bus interfaces.</li>
-          <li><strong>Canonical Memory:</strong> <code>cybou-eventd</code> is the only Journal v2 writer; accepted Event1 envelopes preserve causality, evidence, privacy, and canonical hashes.</li>
+          <li><strong>Mind Runtime:</strong> Twelve C++20/Qt 6 user services activated by systemd and addressed through typed D-Bus interfaces.</li>
+          <li><strong>Canonical Memory:</strong> <code>cybou-eventd</code> is the only Journal writer; Journal v3 preserves causal metadata verification while supporting crash-safe payload erasure.</li>
           <li><strong>Continuity:</strong> Identity, intentions, lifecycle runs, health snapshots, and Event1 consumer progress persist under versioned schemas and atomic writes.</li>
           <li><strong>Failure Model:</strong> Optional-owner loss degrades only dependent capabilities; required-owner loss fails mutations closed without inventing state.</li>
         </ul>
@@ -350,7 +359,10 @@ SPDX-License-Identifier: MIT
        ├─ Workspace1  → cybou-workspaced
        ├─ Lifecycle1  → cybou-lifecycled
        ├─ Health1     → cybou-healthd
-       └─ Event1      → cybou-eventd → SQLite Journal v2</code></pre>
+       ├─ Perception  → cybou-perceptiond
+       ├─ Epistemics  → cybou-epistemicd
+       ├─ Context     → cybou-contextd
+       └─ Event1      → cybou-eventd → SQLite Journal v3</code></pre>
       </div>
     </section>
 
@@ -363,7 +375,7 @@ SPDX-License-Identifier: MIT
         <li data-i18n="bp_ai_point1"><strong>Ownership before intelligence:</strong> model ≠ identity, UI ≠ Mind, attention ≠ biography, and proposal ≠ authorization.</li>
         <li data-i18n="bp_ai_point2"><strong>Durability before visibility:</strong> state is projected only after its owner commits it; consolidation adds evidence-linked outcomes and never rewrites history.</li>
         <li data-i18n="bp_ai_point3"><strong>Bounded degradation:</strong> Health1 publishes typed deficits and recovery progress; compound Presence reads and mutations share one monotonic deadline.</li>
-        <li data-i18n="bp_ai_point4"><strong>No hidden agency:</strong> M8 language is optional and replaceable; M9 planning, authorization, execution, and observed outcomes remain separate boundaries.</li>
+        <li data-i18n="bp_ai_point4"><strong>No hidden agency:</strong> M8 language is optional and replaceable; M9 learning, M10 action, and M11 agents remain separate governed boundaries.</li>
       </ul>
     </section>
 
@@ -395,7 +407,7 @@ SPDX-License-Identifier: MIT
               <td>M1–M4</td>
               <td><span class="status-tag done">DONE</span></td>
               <td>Accepted memory and isolated organs</td>
-              <td>Journal v2, single Event1 writer, nine real services, remote Presence proxy</td>
+              <td>Single Event1 writer, isolated services, remote Presence proxy</td>
               <td>Protocol, process, Event1, QML API and VM tests</td>
             </tr>
             <tr>
@@ -417,14 +429,14 @@ SPDX-License-Identifier: MIT
               <td><span class="status-tag done">DONE</span></td>
               <td>Bounded Presence orchestration</td>
               <td>One monotonic budget for every compound Presence read and mutation</td>
-              <td>20/20 CTest, suspended-owner process test and KVM continuity</td>
+              <td>Bounded RPC, suspended-owner process tests and KVM continuity</td>
             </tr>
             <tr>
               <td>M7</td>
-              <td><span class="status-tag inprogress">NEXT</span></td>
-              <td>Grounded perception and epistemics</td>
-              <td>Provenance, freshness, retention and contradiction handling; no action authority</td>
-              <td>First local perception vertical slice and fault tests</td>
+              <td><span class="status-tag inprogress">IN PROGRESS</span></td>
+              <td>Grounded cognition and governed context</td>
+              <td>Perception, epistemics, Journal v3 erasure, sensitivity, associative projection, and governed delivery</td>
+              <td>Focused unit, process, scale, retention and disclosure gates</td>
             </tr>
             <tr>
               <td>M8</td>
@@ -434,11 +446,11 @@ SPDX-License-Identifier: MIT
               <td>No model is shipped today</td>
             </tr>
             <tr>
-              <td>M9</td>
+              <td>M9–M13</td>
               <td><span class="status-tag todo">PLANNED</span></td>
-              <td>Authorized external action</td>
-              <td>Planning, policy, consent, executor and observed outcome remain separate</td>
-              <td>No privileged executor exists today</td>
+              <td>Learning, governed action, agents and security</td>
+              <td>Learned artifacts, authorization, execution, agents, tools, and security remain separate governed boundaries</td>
+              <td>None of these future runtimes is shipped today</td>
             </tr>
           </tbody>
         </table>
@@ -454,7 +466,7 @@ SPDX-License-Identifier: MIT
         <li><strong>Code License:</strong> MIT License for all Nix code, build scripts, web assets, and core logic.</li>
         <li><strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0) for logos, wallpapers, and desktop themes.</li>
         <li><strong>Trust Boundaries:</strong> Same-user D-Bus is not treated as a complete capability-security boundary; future privileged action requires a separate authorization layer.</li>
-        <li><strong>Privacy:</strong> Event envelopes carry explicit privacy classes. Governed retention, erasure propagation, and replication remain M7 work and are not claimed as implemented.</li>
+        <li><strong>Privacy:</strong> Event envelopes carry explicit privacy and sensitivity axes. Crash-safe transitive erasure and governed disclosure are implemented; sensitive payload storage, automatic expiry, backups, and replication remain open.</li>
         <li><strong>Current Cloud Boundary:</strong> The desktop and Mind runtime require no hosted AI service or API key, and no language model is shipped today.</li>
         <li><strong>Security Documents:</strong> The repository maintains explicit threat and privacy models under <code>docs/security/</code>.</li>
       </ul>
@@ -465,7 +477,7 @@ SPDX-License-Identifier: MIT
           <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener">Current State</a> — authoritative implemented boundary.</li>
           <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a> and <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/MIND_MODEL.md" target="_blank" rel="noopener">Mind Model</a> — topology, ownership, and long-term model.</li>
           <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener">Testing</a> — process, reboot, fault, and KVM evidence.</li>
-          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/NEXT_STEPS.md" target="_blank" rel="noopener">Next Engineering Steps</a> — completed P6.7 record and next M7 slice.</li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/NEXT_STEPS.md" target="_blank" rel="noopener">Next Engineering Steps</a> — detailed implementation record and current M7 work.</li>
         </ul>
       </div>
     </section>
@@ -522,6 +534,6 @@ SPDX-License-Identifier: MIT
     <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=20260818-2"></script>
 </body>
 </html>

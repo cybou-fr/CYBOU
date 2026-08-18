@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT
   <title>Cybou — A calmer, smarter operating system</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260818-3">
   <script type="application/ld+json">
   [
     {
@@ -162,14 +162,14 @@ SPDX-License-Identifier: MIT
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy reveal">
-        <div class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="hero_eyebrow">Visual foundation · v0.1</span></div>
-        <h1><span data-i18n="hero_h1_1">A calmer,</span><br><span data-i18n="hero_h1_2">smarter Linux OS.</span></h1>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="hero_eyebrow">Pre-release · M7 advancing</span></div>
+        <h1><span data-i18n="hero_h1_1">A reproducible desktop.</span><br><span data-i18n="hero_h1_2">A typed local Mind.</span></h1>
         <p class="hero-lead" data-i18n="hero_lead">
-        Cybou is a smarter personal Linux desktop built on NixOS and KDE Plasma — designed around clarity, reproducibility, zero telemetry and calm, deliberate design.
+        Cybou is an experimental personal operating system built on NixOS and KDE Plasma, with twelve local services for durable cognitive state — no shipped AI model and no required cloud.
       </p>
         <div class="hero-actions">
-          <a class="button button--primary" href="#experience" data-i18n="hero_btn_explore">
-            Explore Cybou
+          <a class="button button--primary" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/BUILDING.md" target="_blank" rel="noopener" data-i18n="hero_btn_explore">
+            Build Cybou
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg>
           </a>
           <a class="button button--ghost" href="blueprint.html" data-i18n="hero_btn_blueprint">Read Technical Blueprint</a>
@@ -322,27 +322,32 @@ SPDX-License-Identifier: MIT
       <div class="progress-heading">
         <p class="section-kicker">03 · Live Implementation Progress</p>
         <h2><span data-i18n="prog_h2_1">Measured execution.</span><br><em data-i18n="prog_h2_2">Verified milestones.</em></h2>
-        <p data-i18n="prog_lead">The current repository has completed the M1–M6 runtime substrate and P6.7 latency hardening, with process, continuity, recovery, and Plasma KVM gates.</p>
+        <p data-i18n="prog_lead">The repository now extends the verified M1–M6 substrate with grounded perception, epistemic projection, crash-safe erasure, associative context, and governed delivery.</p>
       </div>
 
       <div class="progress-dashboard">
         <div class="progress-card">
-          <div class="card-metric">M6 Gate Passed</div>
-          <p class="card-label" data-i18n="metric_gate_a">M6 recovery boundary passed in a real Plasma KVM session</p>
+          <div class="card-metric">M7 Advancing</div>
+          <p class="card-label" data-i18n="metric_gate_a">Grounded perception, epistemics, retention, and context delivery implemented in verified slices</p>
           <div class="bar-container"><div class="bar-fill" style="width: 100%;"></div></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric">9 Mind Daemons</div>
-          <p class="card-label" data-i18n="metric_tasks">Nine isolated Mind daemons with typed D-Bus ownership</p>
+          <div class="card-metric">12 Mind Services</div>
+          <p class="card-label" data-i18n="metric_tasks">Twelve isolated Mind services with explicit typed ownership</p>
           <div class="bar-container"><div class="bar-fill" style="width: 100%;"></div></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric">20 / 20 CTest</div>
-          <p class="card-label" data-i18n="metric_contrast">Twenty CTest suites plus repository policy checks</p>
+          <div class="card-metric">35 CTest Suites</div>
+          <p class="card-label" data-i18n="metric_contrast">Thirty-five CTest suites plus repository policy checks</p>
           <div class="bar-container"><div class="bar-fill" style="width: 100%;"></div></div>
         </div>
+      </div>
+      <div class="evidence-links" aria-label="Implementation evidence">
+        <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener"><strong data-i18n="evidence_state">Current State</strong><span data-i18n="evidence_state_desc">Implemented behavior and limitations</span></a>
+        <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener"><strong data-i18n="evidence_tests">Testing evidence</strong><span data-i18n="evidence_tests_desc">Process, reboot, fault and KVM gates</span></a>
+        <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener"><strong data-i18n="evidence_source">Source repository</strong><span data-i18n="evidence_source_desc">Inspect the code and development history</span></a>
       </div>
     </section>
 
@@ -397,15 +402,15 @@ SPDX-License-Identifier: MIT
         </article>
         <article class="roadmap-item active">
           <div class="roadmap-node"><span></span></div>
-          <p>Complete</p><h3 data-i18n="rm2_title">Mind substrate</h3><span>M1–M6 · P6.7 · Recovery</span>
+          <p>Complete</p><h3 data-i18n="rm2_title">Mind substrate</h3><span>M1–M6 · P6.8 · Recovery</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p>Next · M7</p><h3 data-i18n="rm3_title">Grounded perception</h3><span>Provenance · Freshness · Epistemics</span>
+          <p>In progress · M7</p><h3 data-i18n="rm3_title">Grounded cognition</h3><span>Perception · Epistemics · Erasure · Context</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p>M8–M9</p><h3 data-i18n="rm4_title">Optional faculties and action</h3><span>Language · Policy · Authorization</span>
+          <p>Planned · M8–M13</p><h3 data-i18n="rm4_title">Faculties and governed action</h3><span>Language · Learning · Agents · Security</span>
         </article>
       </div>
     </section>
@@ -480,6 +485,6 @@ SPDX-License-Identifier: MIT
     <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=20260818-2"></script>
 </body>
 </html>

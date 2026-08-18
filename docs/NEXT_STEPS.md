@@ -1509,6 +1509,30 @@ empty bundle. Empty means nothing is related, and that is a fact this service do
 Still outstanding for M7.5: the daemon itself and its endpoint, capability registration, and
 ADR-0030's delivery boundary. `contextd` is a service class today, not yet the twelfth process.
 
+## M8 begins: the meaning vocabulary
+
+`CognitiveAct` and `ReferenceResolution` exist as protocol types with their own tests. No parser yet
+and no language implementation -- this is the vocabulary an interpretation has to produce, proven
+before anything produces one, on the same reasoning as the sensitivity axis.
+
+The rule that matters is ADR-0031's C2, and it is expressed as a property of the act rather than a
+check a caller performs. `resolveIfUnambiguous` refuses to pick a leader that is not clearly ahead:
+0.52 against 0.48 is a question, not an answer. `mayProceed()` then refuses a *mutating* act whose
+references are unresolved, while leaving an ambiguous question perfectly legitimate -- asking about
+a thing you cannot yet name is ordinary, acting on it is not.
+
+Two details are deliberate. The candidates survive resolution, because a resolution that discarded
+its alternatives would be indistinguishable from one that never had any, and the difference is
+exactly what a person needs in order to correct it. And `resolveByPerson` accepts only a candidate
+that was actually surfaced: a correction may choose among what was considered, not introduce a
+target the interpretation never saw, which would be a different act wearing this one's name.
+
+Five sabotages, five caught. Two are worth noting. "Nothing counts as mutating" would make every
+refusal vacuous, and is caught because the test also counts the mutating kinds -- if that set ever
+grows, it is noticed here rather than discovered by something acting when it should have asked.
+"Only the first reference is checked" is caught by an act with one resolved and one unresolved
+reference, which is the case a caller who checked `isResolved()` once would get wrong.
+
 ### Delivery decides on sensitivity, and A9 becomes a property
 
 `DeliveryPolicy` now reads `SensitivityClass`. Trust maps to a ceiling rather than a privacy floor,

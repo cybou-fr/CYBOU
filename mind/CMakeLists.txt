@@ -15,6 +15,7 @@ qt_standard_project_setup()
 
 add_subdirectory(protocol)
 add_subdirectory(context)
+add_subdirectory(meaning)
 add_subdirectory(foundation/crypto)
 add_subdirectory(foundation/events)
 add_subdirectory(foundation/runtime)
