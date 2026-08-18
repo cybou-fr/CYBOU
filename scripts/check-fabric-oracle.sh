@@ -47,7 +47,8 @@ c++ -std=c++20 \
   -o "$work/canonical-envelope-oracle"
 
 "$work/canonical-envelope-oracle" >"$work/canonical-oracle.txt"
-for key in envelope-v2 nonerasable-v3 journal-row-v2 envelope-v2-sha256 nonerasable-v3-sha256; do
+for key in envelope-v2 nonerasable-v3 journal-row-v2 envelope-v2-sha256 nonerasable-v3-sha256 \
+  payload-v3-sha256 commitment-v3 journal-row-v3 journal-row-v3-sha256; do
   sed -n "s/^$key=//p" "$work/canonical-oracle.txt" >"$work/$key.hex"
   cmp "$work/$key.hex" "$root/fixtures/protocol/$key.hex"
 done

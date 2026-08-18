@@ -102,6 +102,28 @@ pub fn canonical_journal_row_v2(
     out
 }
 
+/// Split metadata/payload commitment used by Journal hash v3.
+#[must_use]
+pub fn commitment_v3(envelope: &CanonicalEnvelope) -> ([u8; 32], [u8; 32], [u8; 32]) {
+    let metadata = sha256(&canonical_nonerasable_v3(envelope));
+    let payload = sha256(&envelope.payload);
+    let mut joined = [0_u8; 64];
+    joined[..32].copy_from_slice(&metadata);
+    joined[32..].copy_from_slice(&payload);
+    (metadata, payload, sha256(&joined))
+}
+
+/// Stable Journal row v3 representation over a split commitment.
+#[must_use]
+pub fn canonical_journal_row_v3(sequence: u64, previous_hash: &[u8], commitment: &[u8]) -> Vec<u8> {
+    let mut out = b"CYBOU-JOURNAL-ROW-V3".to_vec();
+    out.extend_from_slice(&3_u16.to_be_bytes());
+    out.extend_from_slice(&sequence.to_be_bytes());
+    out.extend_from_slice(previous_hash);
+    out.extend_from_slice(commitment);
+    out
+}
+
 /// SHA-256 digest used by the predecessor Journal.
 #[must_use]
 pub fn sha256(value: &[u8]) -> [u8; 32] {
@@ -148,7 +170,7 @@ mod tests {
 
     use super::{
         CanonicalEnvelope, canonical_envelope_v2, canonical_journal_row_v2,
-        canonical_nonerasable_v3, sha256,
+        canonical_journal_row_v3, canonical_nonerasable_v3, commitment_v3, sha256,
     };
 
     fn envelope() -> CanonicalEnvelope {
@@ -188,6 +210,10 @@ mod tests {
             "row" => include_str!("../../../fixtures/protocol/journal-row-v2.hex"),
             "v2-hash" => include_str!("../../../fixtures/protocol/envelope-v2-sha256.hex"),
             "v3-hash" => include_str!("../../../fixtures/protocol/nonerasable-v3-sha256.hex"),
+            "payload-hash" => include_str!("../../../fixtures/protocol/payload-v3-sha256.hex"),
+            "commitment" => include_str!("../../../fixtures/protocol/commitment-v3.hex"),
+            "row-v3" => include_str!("../../../fixtures/protocol/journal-row-v3.hex"),
+            "row-v3-hash" => include_str!("../../../fixtures/protocol/journal-row-v3-sha256.hex"),
             _ => unreachable!(),
         };
         raw.trim()
@@ -210,6 +236,13 @@ mod tests {
         );
         assert_eq!(sha256(&v2).as_slice(), bytes("v2-hash"));
         assert_eq!(sha256(&v3).as_slice(), bytes("v3-hash"));
+        let (metadata, payload, commitment) = commitment_v3(&envelope);
+        assert_eq!(metadata.as_slice(), bytes("v3-hash"));
+        assert_eq!(payload.as_slice(), bytes("payload-hash"));
+        assert_eq!(commitment.as_slice(), bytes("commitment"));
+        let row_v3 = canonical_journal_row_v3(9, &[0x5a; 32], &commitment);
+        assert_eq!(row_v3, bytes("row-v3"));
+        assert_eq!(sha256(&row_v3).as_slice(), bytes("row-v3-hash"));
     }
 
     #[test]

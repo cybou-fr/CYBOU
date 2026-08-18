@@ -123,7 +123,8 @@ crypto, and every writer operation remain intentionally absent.
 The inspector also walks every stored link and fails on non-contiguous sequence numbers, a
 `prev_hash` mismatch, non-SHA-256-sized row hashes, unsupported hash versions, or absent/malformed
 v3 commitment material. Separately, `cybou-protocol` emits byte-identical canonical envelope v2,
-non-erasable envelope v3, and Journal-row v2 inputs and matching SHA-256 digests. The Debian gate
+non-erasable envelope v3, Journal-row v2, split-commitment v3, and Journal-row v3 inputs and
+matching SHA-256 digests. The Debian gate
 rebuilds the predecessor Qt encoder for every run. Storage replay does not consume those primitives
 yet, so cryptographic recomputation remains the next gate and is not implied by structural
 acceptance.

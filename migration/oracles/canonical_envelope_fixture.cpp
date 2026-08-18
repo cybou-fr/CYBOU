@@ -41,6 +41,19 @@ int main()
     const QByteArray v2 = cybou::canonicalEnvelopeV2(envelope);
     const QByteArray v3 = cybou::canonicalNonErasableEnvelopeV3(envelope);
     const QByteArray row = cybou::canonicalJournalRowV2(9, QByteArray(32, '\x5a'), envelope);
+    const QByteArray metadata = QCryptographicHash::hash(v3, QCryptographicHash::Sha256);
+    const QByteArray payload =
+        QCryptographicHash::hash(envelope.payloadCbor, QCryptographicHash::Sha256);
+    const QByteArray commitment =
+        QCryptographicHash::hash(metadata + payload, QCryptographicHash::Sha256);
+    QByteArray rowV3("CYBOU-JOURNAL-ROW-V3");
+    rowV3.append('\0');
+    rowV3.append('\3');
+    for (int shift = 56; shift >= 0; shift -= 8) {
+        rowV3.append(static_cast<char>((quint64(9) >> shift) & 0xff));
+    }
+    rowV3.append(QByteArray(32, '\x5a'));
+    rowV3.append(commitment);
     QTextStream out(stdout);
     out << "envelope-v2=" << v2.toHex() << '\n';
     out << "nonerasable-v3=" << v3.toHex() << '\n';
@@ -48,6 +61,11 @@ int main()
     out << "envelope-v2-sha256="
         << QCryptographicHash::hash(v2, QCryptographicHash::Sha256).toHex() << '\n';
     out << "nonerasable-v3-sha256="
-        << QCryptographicHash::hash(v3, QCryptographicHash::Sha256).toHex() << '\n';
+        << metadata.toHex() << '\n';
+    out << "payload-v3-sha256=" << payload.toHex() << '\n';
+    out << "commitment-v3=" << commitment.toHex() << '\n';
+    out << "journal-row-v3=" << rowV3.toHex() << '\n';
+    out << "journal-row-v3-sha256="
+        << QCryptographicHash::hash(rowV3, QCryptographicHash::Sha256).toHex() << '\n';
     return 0;
 }
