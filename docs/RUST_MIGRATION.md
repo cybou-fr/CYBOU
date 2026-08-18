@@ -132,7 +132,9 @@ metadata. Canonical-hash and payload-tampering tests fail closed. Existing-datab
 fixtures, interruption/recovery, scale, and all writer behavior remain subsequent gates. A typed
 checkpoint API now validates the anchor row and cryptographically replays only its suffix, reporting
 the verified range plus checked and erased-content counts. The library does not persist or assign
-trust to checkpoints; that remains Event-owner policy.
+trust to checkpoints; that remains Event-owner policy. A row-bounded page variant rejects a zero
+budget, verifies at most the requested number of rows, reports whether more remain, and resumes from
+the returned checkpoint without weakening any per-row check.
 
 ### R7 — desktop replacement and legacy removal
 

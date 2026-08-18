@@ -79,6 +79,10 @@ then queries and verifies rows strictly after that position. Results distinguish
 range, intact live payloads, skipped erased payloads, and the next checkpoint. A head checkpoint
 therefore performs one anchor lookup and no history scan. Checkpoint persistence and trust policy
 belong to a future Rust Event owner and are not implied by this library API.
+For large histories the same verifier has a row-bounded page API. `max_rows` must be positive;
+each result states whether more rows remain and returns the exact verified checkpoint from which the
+next page continues. The bound applies to canonical rows replayed per call, preventing an accidental
+unbounded suffix scan while preserving the identical hash and commitment checks.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies

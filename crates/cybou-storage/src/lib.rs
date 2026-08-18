@@ -83,6 +83,8 @@ pub struct JournalVerification {
     pub content_verified: u64,
     /// Erased v3 payloads skipped while their metadata remained verified.
     pub content_skipped: u64,
+    /// Whether rows remain after this bounded page.
+    pub has_more: bool,
     /// Checkpoint suitable for the next incremental verification.
     pub checkpoint: JournalCheckpoint,
 }
@@ -122,6 +124,9 @@ pub enum StorageError {
         /// Sequence whose stored hash differs or no longer exists.
         sequence: u64,
     },
+    /// A paged replay must always make forward progress.
+    #[error("Journal verification page size must be greater than zero")]
+    InvalidPageSize,
 }
 
 /// Open an existing database strictly read-only and verify its v2 structural boundary.
@@ -176,7 +181,7 @@ pub fn inspect_journal(path: &Path) -> Result<JournalInspection, StorageError> {
     let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM contribution", [], |row| row.get(0))
         .map_err(StorageError::Query)?;
-    inspect_chain(&connection, None)?;
+    inspect_chain(&connection, None, None)?;
     let (erasure_epoch, rotated_epoch): (i64, i64) = connection
         .query_row(
             "SELECT erasure_epoch, rotated_epoch FROM journal_meta WHERE id=1",
@@ -217,12 +222,44 @@ pub fn verify_journal_from(
             received: schema_version,
         });
     }
-    inspect_chain(&connection, checkpoint)
+    inspect_chain(&connection, checkpoint, None)
+}
+
+/// Verify at most `max_rows` after a trusted checkpoint.
+///
+/// # Errors
+///
+/// Fails on a zero page size or under the same fail-closed conditions as [`verify_journal_from`].
+pub fn verify_journal_page(
+    path: &Path,
+    checkpoint: Option<&JournalCheckpoint>,
+    max_rows: u64,
+) -> Result<JournalVerification, StorageError> {
+    if max_rows == 0 {
+        return Err(StorageError::InvalidPageSize);
+    }
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(StorageError::Open)?;
+    let schema_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(StorageError::Query)?;
+    if schema_version != JOURNAL_SCHEMA_V2 {
+        return Err(StorageError::UnsupportedSchema {
+            received: schema_version,
+        });
+    }
+    inspect_chain(&connection, checkpoint, Some(max_rows))
 }
 
 fn inspect_chain(
     connection: &Connection,
     checkpoint: Option<&JournalCheckpoint>,
+    max_rows: Option<u64>,
 ) -> Result<JournalVerification, StorageError> {
     let (start_after, mut previous_hash) = anchor_state(connection, checkpoint)?;
     let mut statement = connection
@@ -232,11 +269,15 @@ fn inspect_chain(
              payload, privacy, capability, sealed, key_domain, key_epoch, retention_class, \
              retention_policy, retain_until, sensitivity, prev_hash, hash, commitment, \
              payload_commitment, erased_at \
-             FROM contribution WHERE seq > ?1 ORDER BY seq ASC",
+             FROM contribution WHERE seq > ?1 ORDER BY seq ASC LIMIT ?2",
         )
         .map_err(StorageError::Query)?;
+    let row_limit = max_rows.map_or(i64::MAX, |value| i64::try_from(value).unwrap_or(i64::MAX));
     let mut rows = statement
-        .query([i64::try_from(start_after).map_err(|_| StorageError::InvalidCounter)?])
+        .query(rusqlite::params![
+            i64::try_from(start_after).map_err(|_| StorageError::InvalidCounter)?,
+            row_limit
+        ])
         .map_err(StorageError::Query)?;
     let mut expected_sequence = start_after.saturating_add(1);
     let mut content_verified = 0_u64;
@@ -311,14 +352,40 @@ fn inspect_chain(
         expected_sequence = expected_sequence.saturating_add(1);
     }
     let verified_through = expected_sequence.saturating_sub(1);
+    finish_verification(
+        connection,
+        start_after,
+        verified_through,
+        previous_hash,
+        content_verified,
+        content_skipped,
+    )
+}
+
+fn finish_verification(
+    connection: &Connection,
+    verified_from: u64,
+    verified_through: u64,
+    hash: Vec<u8>,
+    content_verified: u64,
+    content_skipped: u64,
+) -> Result<JournalVerification, StorageError> {
+    let has_more: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM contribution WHERE seq > ?1)",
+            [i64::try_from(verified_through).map_err(|_| StorageError::InvalidCounter)?],
+            |row| row.get(0),
+        )
+        .map_err(StorageError::Query)?;
     Ok(JournalVerification {
-        verified_from: start_after,
+        verified_from,
         verified_through,
         content_verified,
         content_skipped,
+        has_more,
         checkpoint: JournalCheckpoint {
             sequence: verified_through,
-            hash: previous_hash,
+            hash,
         },
     })
 }
@@ -472,6 +539,7 @@ mod tests {
 
     use super::{
         JOURNAL_SCHEMA_V2, JournalCheckpoint, StorageError, inspect_journal, verify_journal_from,
+        verify_journal_page,
     };
 
     const SCHEMA: &str = "
@@ -700,6 +768,22 @@ mod tests {
         assert_eq!(full.verified_from, 0);
         assert_eq!(full.verified_through, 2);
         assert_eq!(full.content_verified, 2);
+        assert!(!full.has_more);
+
+        let first_page = verify_journal_page(&path, None, 1).expect("first page");
+        assert_eq!(first_page.verified_through, 1);
+        assert_eq!(first_page.content_verified, 1);
+        assert!(first_page.has_more);
+        let second_page =
+            verify_journal_page(&path, Some(&first_page.checkpoint), 1).expect("second page");
+        assert_eq!(second_page.verified_from, 1);
+        assert_eq!(second_page.verified_through, 2);
+        assert_eq!(second_page.content_verified, 1);
+        assert!(!second_page.has_more);
+        assert!(matches!(
+            verify_journal_page(&path, None, 0),
+            Err(StorageError::InvalidPageSize)
+        ));
 
         let suffix = verify_journal_from(
             &path,
