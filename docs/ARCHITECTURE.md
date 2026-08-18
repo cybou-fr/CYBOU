@@ -205,10 +205,12 @@ remote HTTPS browser ─┘
 ```
 
 The gateway is a transport, session, schema, and browser-security boundary. It is not a cognitive
-owner and does not expose generic D-Bus, Journal, shell, or filesystem access to JavaScript. The
+owner and does not expose generic D-Bus, Journal, shell, or filesystem access to frontend WASM. The
 same frontend artifact may be used locally and remotely, but the two sessions have different trust,
 delivery, and capability policies. See the full
-[Web UI Integration Architecture](WEB_UI_ARCHITECTURE.md).
+[Web UI Integration Architecture](WEB_UI_ARCHITECTURE.md). ADR-0038 and the
+[Rust Migration Plan](RUST_MIGRATION.md) define Rust/WASM for this surface and the incremental Rust
+replacement of native owners without changing their architectural ownership.
 
 ## Future faculty boundary
 

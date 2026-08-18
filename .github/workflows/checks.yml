@@ -32,6 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install pinned Rust foundation toolchain
+        run: |
+          rustup toolchain install 1.96.0 \
+            --profile minimal \
+            --component clippy,rustfmt \
+            --target wasm32-unknown-unknown
+          rustup default 1.96.0
+
+      - name: Check Rust native and WASM contracts
+        run: |
+          cargo fmt --all -- --check
+          cargo test --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo check -p living-canvas --target wasm32-unknown-unknown --locked
+
       - uses: cachix/install-nix-action@v27
         with:
           extra_nix_config: |
@@ -48,6 +63,7 @@ jobs:
             .#checks.x86_64-linux.mind-access \
             .#checks.x86_64-linux.qml-api \
             .#checks.x86_64-linux.ui-polish
+            .#checks.x86_64-linux.rust-foundation
 
       # Build C++ packages to ensure they compile correctly
       - run: |

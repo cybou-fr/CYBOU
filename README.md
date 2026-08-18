@@ -280,6 +280,7 @@ Choose a route:
 - **Build or contribute:** [Building](docs/BUILDING.md) →
   [Development Workflow](docs/DEVELOPMENT_WORKFLOW.md) →
   [Next Engineering Steps](docs/NEXT_STEPS.md)
+- **Deploy and test off the workstation:** [Deployment](docs/DEPLOYMENT.md)
 - **Review trust boundaries:** [Security documentation](docs/security/README.md)
 - **Review decisions:** [ADR index](docs/adr/README.md)
 

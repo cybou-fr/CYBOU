@@ -53,6 +53,7 @@
         cybou-mind = pkgs.callPackage ./packages/cybou-mind { };
         cybou-presence-applet = pkgs.callPackage ./packages/cybou-presence-applet { };
         cybou-layout-templates = pkgs.callPackage ./packages/cybou-layout-templates { };
+        cybou-rust-foundation = pkgs.callPackage ./packages/cybou-rust-foundation { };
 
         # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
         # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
@@ -92,6 +93,14 @@
           modules = [ ./systems/iso.nix ];
         };
 
+        # Remote evaluation host: OVH VPS vps-d0669a91.vps.ovh.net (docs/DEPLOYMENT.md).
+        # Headless on purpose - it deploys, builds, and tests; it does not run Plasma.
+        cybou-vps = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs.cybouPackages = self.packages.x86_64-linux;
+          modules = [ ./systems/vps.nix ];
+        };
+
         # Development image for Hyper-V; build system.build.hypervImage.
         cybou-hyperv = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
@@ -120,6 +129,14 @@
             pkgs.pkg-config
             pkgs.dbus
 
+            # Parallel R0 Rust foundation. The C++ owners remain installed until their individual
+            # contract-preserving cutover gates pass (ADR-0038).
+            pkgs.cargo
+            pkgs.clippy
+            pkgs.rustc
+            pkgs.rustfmt
+            pkgs.trunk
+
             # Qt 6. qtdeclarative brings QML; qttools brings Designer and the profiler.
             pkgs.libsodium
             pkgs.qt6.qtbase
@@ -144,6 +161,8 @@
       });
 
       checks = forAllSystems (pkgs: {
+        rust-foundation = self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-rust-foundation;
+
         formatting =
           pkgs.runCommand "check-formatting"
             {

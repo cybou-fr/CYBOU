@@ -5,9 +5,36 @@ SPDX-License-Identifier: MIT
 
 # Current State
 
+> Rust-first owner migration remains proposed. Its additive R0/W0 foundation now exists: a pinned
+> Cargo workspace, protocol/web-contract crates, deterministic web fixtures, and a Rust/WASM Living
+> Canvas shell. The authoritative installed runtime described below is still C++/Qt/QML; no owner,
+> gateway, or default desktop has been replaced. See [Rust Migration Plan](RUST_MIGRATION.md) and
+> [ADR-0038](adr/ADR-0038-rust-first-codebase.md) for the target and cutover gates.
+
+## Rust/Web foundation status
+
+The repository builds `cybou-protocol`, `cybou-web-contracts`, and `living-canvas` from one locked
+workspace. Native tests verify typed knowledge/capability/failure vocabulary, versioned local
+session and nominal snapshot fixtures, JSON round trips, and `MockMindClient`. CI checks formatting,
+tests, strict clippy, and `wasm32-unknown-unknown` compilation. Trunk produces a content-hashed
+browser artifact from the same Rust frontend source.
+
+This is contract and renderer evidence only. There is no `cybou-web-gateway`, zbus adapter, browser
+authentication, resumable event stream, remote access, desktop compositor package, or projection
+from live `Presence1` yet.
+
 Status date: 2026-08-10.
 
 This document is intentionally limited to implemented behavior and current limitations.
+
+## Deployment and evaluation host
+
+`nixosConfigurations.cybou-vps` builds the OVH host `vps-d0669a91.vps.ovh.net`, described in
+[Deployment](DEPLOYMENT.md). It is headless: `modules/base.nix`, the Mind user services, the Nix
+toolchain, and one nginx listener serving the committed `www/` site over plain HTTP. Plasma, SDDM,
+and branding are deliberately not imported, and no gateway, TLS, session, or authentication exists
+there. `/dev/kvm` is present, so the KVM-backed VM gates can run on the host; a green run there is
+developer evidence about that machine, not release evidence.
 
 ## Repository gate status
 

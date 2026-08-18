@@ -17,6 +17,7 @@ Build/
 out/
 dist/
 target/
+node_modules/
 cmake-build-*/
 
 # CMake

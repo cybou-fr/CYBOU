@@ -30,6 +30,7 @@ with [Current State](CURRENT_STATE.md).
 - [Glossary](GLOSSARY.md) — normative vocabulary
 - [ADR index](adr/README.md) — decisions and their acceptance status
 - [Living Canvas Web UI Architecture](WEB_UI_ARCHITECTURE.md) — proposed single-frontend local/remote integration and migration plan
+- [Rust Migration Plan](RUST_MIGRATION.md) — Rust/WASM frontend and contract-preserving migration of all product code
 
 ### Build, test, and release
 
@@ -39,6 +40,7 @@ with [Current State](CURRENT_STATE.md).
 - [Next Engineering Steps](NEXT_STEPS.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
 - [Upgrading](UPGRADING.md)
+- [Deployment and the Remote Evaluation Host](DEPLOYMENT.md) — the OVH NixOS host used to deploy, build, and test
 - [Release Process](RELEASE.md)
 
 ## Document roles
@@ -49,6 +51,8 @@ CURRENT_STATE.md  what the repository actually implements today
 PROJECT_CHECKPOINT_2026-08-10.md  immutable assessment of one named source revision
 ARCHITECTURE.md   current topology plus explicit future boundaries
 WEB_UI_ARCHITECTURE.md  proposed web-first Presence, gateway, desktop, and migration blueprint
+RUST_MIGRATION.md       proposed Rust-first codebase, sequencing, cutover, and completion gates
+DEPLOYMENT.md     the remote NixOS evaluation host, how it is prepared, deployed to, and tested
 ROADMAP.md        sequencing and acceptance meaning of milestones
 mind/*            protocol and component contracts
 security/*        threat, privacy, and trust boundaries
@@ -61,6 +65,7 @@ adr/*             normative decisions; status matters
 | What does a wire/state owner promise? | The relevant [Mind contract](mind/README.md) plus accepted ADRs |
 | Why was an architectural boundary chosen? | [ADR index](adr/README.md) |
 | What evidence proves a claim? | [Testing](TESTING.md) and milestone evaluation records |
+| Where is a change deployed and tested outside a workstation? | [Deployment](DEPLOYMENT.md) |
 | What is next, but not implemented? | [Next Engineering Steps](NEXT_STEPS.md) and [Roadmap](ROADMAP.md) |
 
 ## Mind contracts

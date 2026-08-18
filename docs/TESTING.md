@@ -215,6 +215,22 @@ separate processes. Healthd behavior has its own process integration and focused
 The gate repeats the continuity assertions in the desktop system composition, but remains
 primarily the heavy service-graph and renderer gate.
 
+## Where the gates run
+
+CI runs the cheap checks on every push and the full matrix on a tag. Between those, the OVH
+evaluation host in [Deployment](DEPLOYMENT.md) runs the same gates on an unfinished working tree,
+including the four VM tests that need `/dev/kvm`:
+
+```bash
+scripts/vps-checks.sh fast
+scripts/vps-checks.sh full
+scripts/vps-checks.sh lifecycle-continuity
+```
+
+A green run there is evidence about that host's kernel, KVM support, and store contents. It is
+developer evidence, not release evidence; the tag matrix recorded by CI remains authoritative for
+[Release Process](RELEASE.md).
+
 ## Build order
 
 ```bash

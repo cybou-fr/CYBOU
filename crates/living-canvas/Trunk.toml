@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[build]
+target = "index.html"
+dist = "../../target/living-canvas"
+public_url = "/"
+
+[watch]
+ignore = ["../../target"]

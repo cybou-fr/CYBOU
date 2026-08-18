@@ -130,7 +130,10 @@ def main(argv: list[str]) -> int:
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
         "web_ui_architecture": repo / "docs/WEB_UI_ARCHITECTURE.md",
+        "rust_migration": repo / "docs/RUST_MIGRATION.md",
         "current": repo / "docs/CURRENT_STATE.md",
+        "building": repo / "docs/BUILDING.md",
+        "deployment": repo / "docs/DEPLOYMENT.md",
         "installation": repo / "docs/INSTALLATION.md",
         "roadmap": repo / "docs/ROADMAP.md",
         "glossary": repo / "docs/GLOSSARY.md",
@@ -141,6 +144,7 @@ def main(argv: list[str]) -> int:
         "adr25": repo / "docs/adr/ADR-0025-grounding-epistemics-and-cognitive-governance.md",
         "adr26": repo / "docs/adr/ADR-0026-lifecycle-owner-and-wire-contract.md",
         "adr37": repo / "docs/adr/ADR-0037-web-first-presence-and-desktop.md",
+        "adr38": repo / "docs/adr/ADR-0038-rust-first-codebase.md",
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
         "health": repo / "docs/mind/HEALTH.md",
         "rpc_resilience": repo / "docs/mind/RPC_RESILIENCE.md",
@@ -189,6 +193,30 @@ def main(argv: list[str]) -> int:
         paths["docs_index"],
         "executable next-steps entry",
         "[Next Engineering Steps](NEXT_STEPS.md)",
+    )
+    require(
+        paths["docs_index"],
+        "deployment documentation entry",
+        "[Deployment and the Remote Evaluation Host](DEPLOYMENT.md)",
+    )
+    # The deployment document names one host and one configuration. If either moves without the
+    # other, the runbook stops describing the machine it claims to prepare.
+    require(
+        paths["deployment"],
+        "deployment SSH target",
+        "debian@vps-d0669a91.vps.ovh.net",
+    )
+    require(
+        paths["deployment"],
+        "deployment system configuration",
+        "systems/vps.nix",
+    )
+    # An evaluation host reachable over plain HTTP must keep saying so; the sentence is the only
+    # thing standing between "preview surface" and "somewhere a real session got introduced".
+    require(
+        paths["deployment"],
+        "absent web gateway boundary",
+        "TLS, sessions, cookies, and authentication",
     )
     require(
         paths["docs_index"],
@@ -277,6 +305,34 @@ def main(argv: list[str]) -> int:
         ("web acceptance gates", "## Acceptance gates"),
     ):
         require(paths["adr37"], label, needle)
+
+    for label, needle in (
+        ("Rust product language", "### Rust is the product implementation language"),
+        ("single Cargo workspace", "### One Cargo workspace"),
+        ("Rust WASM frontend", "### Frontend is Rust/WASM"),
+        ("contract-preserving replacement", "### Migration is contract-preserving replacement"),
+        ("Rust migration gates", "## Migration gates"),
+    ):
+        require(paths["adr38"], label, needle)
+
+    for label, needle in (
+        ("Rust migration invariants", "## Non-negotiable invariants"),
+        ("Rust target stack", "## Target stack"),
+        ("Rust workstreams", "## Workstreams"),
+        ("component cutover", "## Cutover protocol for every component"),
+        ("Rust completion definition", "## Definition of done"),
+    ):
+        require(paths["rust_migration"], label, needle)
+    require(
+        paths["current"],
+        "Rust target versus current implementation",
+        "Rust-first owner migration remains proposed.",
+    )
+    require(
+        paths["building"],
+        "Rust build migration notice",
+        "The commands below describe the current C++/Qt implementation.",
+    )
     require(
         paths["architecture"],
         "future faculty boundary",

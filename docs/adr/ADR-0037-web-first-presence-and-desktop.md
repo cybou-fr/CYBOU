@@ -32,7 +32,7 @@ boundary; it does not change Mind ownership.
 
 Cybou has one versioned web frontend artifact, called **Living Canvas**.
 
-The same content-hashed HTML, CSS, JavaScript, fonts, and raster assets are served in local and
+The same content-hashed HTML, Rust-generated WebAssembly and loader, CSS, fonts, and raster assets are served in local and
 remote modes. Mode-specific behavior comes from a negotiated session contract, never from a forked
 UI implementation.
 
@@ -54,7 +54,7 @@ UI implementation.
 
 ### The browser is a renderer and untrusted client
 
-JavaScript does not become a Mind owner, Journal client, D-Bus peer, authorization authority, or
+Frontend WebAssembly does not become a Mind owner, Journal client, D-Bus peer, authorization authority, or
 privileged executor.
 
 ```text
@@ -66,6 +66,9 @@ HTTP success     ≠ observed outcome
 
 The frontend talks only to `cybou-web-gateway`. It never receives a generic D-Bus bridge, shell
 bridge, filesystem bridge, or unrestricted native IPC object.
+
+ADR-0038 defines both frontend and gateway as Rust. Generated WASM loader code is packaging output,
+not an authored JavaScript application or a privileged native bridge.
 
 ### A dedicated gateway owns the browser/network boundary
 
@@ -349,3 +352,4 @@ processes.
 - [ADR-0022](ADR-0022-authorized-action-boundary.md)
 - [ADR-0023](ADR-0023-mind-dock-discoverability-and-access.md)
 - [ADR-0030](ADR-0030-transparent-context-delivery.md)
+- [ADR-0038](ADR-0038-rust-first-codebase.md)

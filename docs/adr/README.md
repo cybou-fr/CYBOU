@@ -44,6 +44,7 @@ SPDX-License-Identifier: MIT
 | [0035](ADR-0035-governed-model-brokerage.md) | Governed Model Brokerage and External Inference | Proposed |
 | [0036](ADR-0036-autonomous-security-control-plane.md) | Autonomous Security and Operations Control Plane | Proposed |
 | [0037](ADR-0037-web-first-presence-and-desktop.md) | Web-First Presence and Chromium Desktop | Proposed |
+| [0038](ADR-0038-rust-first-codebase.md) | Rust-First Product Codebase | Proposed |
 
 ## Why some ADRs remain Proposed
 
@@ -62,6 +63,9 @@ code already enforces leaves the record contradicting itself. These do not:
 - **0037 Web-First Presence** proposes a replacement presentation and desktop delivery boundary.
   The current tree still ships Plasma/QML, so accepting it would overstate implementation and would
   prematurely supersede the proven v0.1 surface decisions.
+- **0038 Rust-First Codebase** declares the implementation destination and contract-preserving
+  rewrite policy. The shipped owners remain C++/Qt today, so the decision stays Proposed until the
+  migration gates demonstrate the target rather than merely naming it.
 - **0018 Privacy and Replication** is half enforced and half absent. The Journal rejects a
   contribution whose privacy is weaker than its references, so classification and inheritance are
   real; replication does not exist at all. It should be split before either half is accepted, rather

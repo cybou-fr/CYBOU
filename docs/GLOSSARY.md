@@ -12,6 +12,10 @@ hosted browser surface. It is Presence, not Mind, and is not an authorization au
 the frontend, validates versioned web requests, enforces transport policy, and maps only explicit
 operations to local Presence/Mind APIs. It is not a cognitive state owner.
 
+**Rust-first** — Target policy that Cybou-authored executable product components, including Living
+Canvas compiled to WebAssembly, are implemented in Rust. It does not describe the current C++/Qt
+tree or exempt a rewrite from compatibility and continuity gates.
+
 **Body** — NixOS, Plasma, hardware, processes, and system/external state that Cybou can observe or
 eventually affect through explicit capabilities.
 

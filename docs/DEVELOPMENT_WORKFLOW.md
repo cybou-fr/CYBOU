@@ -40,6 +40,14 @@ ctest --test-dir build/dev --output-on-failure
 Then run the reproducible package gates from [Building](BUILDING.md). Do not treat a host-only CMake
 build as proof that Nix packaging, D-Bus activation, or Plasma integration works.
 
+On Windows there is no local Nix and no KVM. Push the working tree to the remote NixOS host
+instead and run the same gates there — see [Deployment](DEPLOYMENT.md):
+
+```bash
+scripts/deploy-vps.sh test
+scripts/vps-checks.sh fast
+```
+
 ## Documentation rules
 
 - `CURRENT_STATE.md` changes with implemented capability, never ahead of it.

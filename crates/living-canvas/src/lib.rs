@@ -1,0 +1,143 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+//! Runtime-independent client boundary for Living Canvas.
+
+use cybou_web_contracts::{SessionProjection, SnapshotProjection};
+use thiserror::Error;
+
+/// Error returned by a typed Mind client operation.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum ClientError {
+    /// No accepted gateway session is available.
+    #[error("gateway session is unavailable")]
+    SessionUnavailable,
+    /// The current fixture/client cannot supply the requested projection.
+    #[error("projection is unavailable: {0}")]
+    ProjectionUnavailable(String),
+    /// A deterministic fixture violates the typed web contract.
+    #[error("invalid deterministic fixture: {0}")]
+    InvalidFixture(String),
+}
+
+/// Only data boundary used by the frontend. Browser code never receives D-Bus or native handles.
+pub trait MindClient {
+    /// Return the server-established trust context.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when no accepted gateway session can be established.
+    fn session(&self) -> Result<SessionProjection, ClientError>;
+
+    /// Return one atomic projection snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the projection cannot be obtained as a typed atomic value.
+    fn snapshot(&self) -> Result<SnapshotProjection, ClientError>;
+}
+
+/// Deterministic client for component, visual, and state-vocabulary tests.
+#[derive(Clone, Debug)]
+pub struct MockMindClient {
+    session: SessionProjection,
+    snapshot: SnapshotProjection,
+}
+
+impl MockMindClient {
+    /// Construct a mock from explicit typed projections.
+    #[must_use]
+    pub const fn new(session: SessionProjection, snapshot: SnapshotProjection) -> Self {
+        Self { session, snapshot }
+    }
+
+    /// Load the repository's nominal W0 fixture pair.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError::InvalidFixture`] if either checked-in fixture drifts from the typed
+    /// web contract.
+    pub fn nominal_fixture() -> Result<Self, ClientError> {
+        let session =
+            serde_json::from_str(include_str!("../../../fixtures/web/v1/session-local.json"))
+                .map_err(|error| ClientError::InvalidFixture(error.to_string()))?;
+        let snapshot = serde_json::from_str(include_str!(
+            "../../../fixtures/web/v1/snapshot-nominal.json"
+        ))
+        .map_err(|error| ClientError::InvalidFixture(error.to_string()))?;
+        Ok(Self::new(session, snapshot))
+    }
+}
+
+impl MindClient for MockMindClient {
+    fn session(&self) -> Result<SessionProjection, ClientError> {
+        Ok(self.session.clone())
+    }
+
+    fn snapshot(&self) -> Result<SnapshotProjection, ClientError> {
+        Ok(self.snapshot.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cybou_protocol::{CapabilityState, KnowledgeState, SchemaVersion};
+    use cybou_web_contracts::{
+        CapabilityProjection, Freshness, SessionMode, SessionProjection, SnapshotProjection,
+    };
+    use uuid::Uuid;
+
+    use super::{MindClient, MockMindClient};
+
+    #[test]
+    fn mock_client_preserves_server_established_mode_and_unknown_state() {
+        let client = MockMindClient::new(
+            SessionProjection {
+                schema_version: SchemaVersion(1),
+                session_id: Uuid::nil(),
+                mode: SessionMode::RemoteBrowser,
+                consumer_id: "fixture:remote".into(),
+                expires_at: "2026-08-18T12:30:00Z".into(),
+            },
+            SnapshotProjection {
+                schema_version: SchemaVersion(1),
+                projection_version: 1,
+                cursor: "fixture:1".into(),
+                observed_at: "2026-08-18T12:00:00Z".into(),
+                freshness: Freshness::Unknown,
+                capabilities: vec![CapabilityProjection {
+                    id: "mind.context.read".into(),
+                    state: CapabilityState::Unknown,
+                    knowledge: KnowledgeState::Unknown,
+                    freshness: Freshness::Unknown,
+                    reason: Some("bounded request timed out".into()),
+                }],
+            },
+        );
+
+        assert_eq!(
+            client.session().expect("fixture session").mode,
+            SessionMode::RemoteBrowser
+        );
+        assert_eq!(
+            client.snapshot().expect("fixture snapshot").capabilities[0].state,
+            CapabilityState::Unknown
+        );
+    }
+
+    #[test]
+    fn nominal_repository_fixtures_are_usable_by_the_frontend_boundary() {
+        let client = MockMindClient::nominal_fixture().expect("valid repository fixtures");
+        assert_eq!(
+            client.session().expect("fixture session").mode,
+            SessionMode::LocalDesktop
+        );
+        assert_eq!(
+            client
+                .snapshot()
+                .expect("fixture snapshot")
+                .projection_version,
+            42
+        );
+    }
+}

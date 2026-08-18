@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cybou.org/schemas/web/v1/snapshot.schema.json",
+  "title": "Cybou atomic Presence snapshot projection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectionVersion",
+    "cursor",
+    "observedAt",
+    "freshness",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "projectionVersion": { "type": "integer", "minimum": 0 },
+    "cursor": { "type": "string", "minLength": 1 },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "freshness": { "enum": ["current", "stale", "unknown"] },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "state", "knowledge", "freshness", "reason"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "state": { "enum": ["available", "unavailable", "unknown"] },
+          "knowledge": { "enum": ["known", "unknown"] },
+          "freshness": { "enum": ["current", "stale", "unknown"] },
+          "reason": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}
+

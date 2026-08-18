@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "projectionVersion": 42,
+  "cursor": "fixture:presence:42",
+  "observedAt": "2026-08-18T12:00:00Z",
+  "freshness": "current",
+  "capabilities": [
+    {
+      "id": "mind.identity.read",
+      "state": "available",
+      "knowledge": "known",
+      "freshness": "current",
+      "reason": null
+    },
+    {
+      "id": "mind.lifecycle.command",
+      "state": "unavailable",
+      "knowledge": "known",
+      "freshness": "current",
+      "reason": "authorization boundary not implemented"
+    }
+  ]
+}
+

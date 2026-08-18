@@ -12,7 +12,7 @@ This document is the implementation blueprint for the Proposed
 current behavior. [Current State](CURRENT_STATE.md) remains authoritative until each migration gate
 is demonstrated.
 
-The objective is not to port the Plasma dock to HTML. It is to make Living Canvas the complete
+The objective is not to port the Plasma dock to HTML. It is to make the Rust/WASM Living Canvas the complete
 web-first Cybou environment while preserving the ownership, continuity, failure, privacy, and
 authorization properties already proved by Mind.
 
@@ -76,24 +76,20 @@ gateway requires a separate authority and routing decision; it is not implied by
 
 ## Repository and package target
 
-Recommended target layout:
+Recommended target layout under the ADR-0038 Cargo workspace:
 
 ```text
-web/
-  ui/                    Living Canvas frontend
+crates/
+  living-canvas/         Rust/WASM Living Canvas frontend
     src/
       app/               composition and routing
       canvas/            spatial objects, selection, viewport
       features/          commitments, evidence, health, lifecycle
       platform/          session/API/cache abstractions
       design-system/     tokens, typography, components, icons
-    public/
-    tests/
-  contracts/             generated OpenAPI/JSON Schema and event types
-
-gateway/
-  src/                    web boundary and Presence adapters
-  tests/
+  web-contracts/         shared HTTP/event DTOs and schema generation
+  web-gateway/           Axum browser boundary and zbus Presence adapters
+  desktop-shell/         Chromium/session policy launcher
 
 modules/
   web-gateway.nix
@@ -105,15 +101,15 @@ packages/
   cybou-desktop-shell/
 ```
 
-The current `living-canvas/` prototype is visual evidence and interaction exploration. It should
-not become the production source tree by gradual accident. Production initialization happens only
-after the API/session contracts are accepted.
+The current React `living-canvas/` prototype remains visual evidence and interaction exploration.
+The production Rust/WASM shell lives in `crates/living-canvas` and consumes deterministic typed W0
+fixtures through `MockMindClient`. It has no live gateway or Presence connection yet.
 
 ## Frontend architecture
 
 ### Runtime adapter
 
-The frontend depends on one interface:
+The Rust frontend depends on one trait:
 
 ```text
 MindClient
@@ -336,7 +332,7 @@ The web target adds:
 - browser storage violating erasure/retention;
 - clickjacking and deceptive confirmation;
 - frontend/gateway schema downgrade;
-- supply-chain compromise in JavaScript dependencies.
+- supply-chain compromise in Rust/WASM, generated-loader, or browser dependencies.
 
 ## Desktop composition beyond the canvas
 
@@ -514,29 +510,33 @@ Each refusal test is sabotaged so it cannot pass for an unrelated reason. Minimu
 
 ## Decision points still open
 
-These are explicit choices, not implementation details to smuggle into the first patch:
+ADR-0038 settles the implementation language, initial frontend framework, and gateway baseline.
+The remaining explicit choices are:
 
-1. gateway implementation language and HTTP library;
-2. public API schema toolchain;
-3. exact maintained Wayland compositor;
-4. local bootstrap/session binding mechanism;
-5. OIDC provider deployment model;
-6. whether canvas layout preferences remain browser-local or gain a Mind owner;
-7. bounded offline projection policy;
-8. multi-node routing when one browser manages several Cybou nodes;
-9. how the installer and recovery console work after KDE retirement.
+1. public API schema emission and compatibility toolchain;
+2. exact maintained Wayland compositor;
+3. local bootstrap/session binding mechanism;
+4. OIDC provider deployment model;
+5. whether canvas layout preferences remain browser-local or gain a Mind owner;
+6. bounded offline projection policy;
+7. multi-node routing when one browser manages several Cybou nodes;
+8. how the installer and recovery console work after KDE retirement.
 
 ## Immediate engineering package
 
-The next safe package is **W0 — contracts and fixtures**, not desktop replacement.
+The active safe package is **W0 — contracts and fixtures**, not desktop replacement.
 
 Deliverables:
 
 - `/api/v1` OpenAPI/JSON Schema draft;
 - deterministic current Presence snapshot fixture;
-- TypeScript `MindClient` interface and `MockMindClient`;
+- Rust `MindClient` trait and `MockMindClient` in the WASM crate;
 - state vocabulary tests for known/empty/stale/unavailable/unknown;
 - gateway threat-model test plan;
 - Nix package skeletons without enabling the new session by default.
 
-This creates a reviewable seam before any network-facing daemon or desktop replacement is trusted.
+The initial Rust types, fixtures, mock client, and browser shell now create that reviewable seam.
+W0 is not complete until current `Presence1` projections and canonical cross-language values are
+captured and checked against the Rust representation.
+The wider native migration and component cutover rules are defined in
+[Rust Migration Plan](RUST_MIGRATION.md).

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cybou.org/schemas/web/v1/session.schema.json",
+  "title": "Cybou browser session projection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sessionId", "mode", "consumerId", "expiresAt"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "mode": { "enum": ["localDesktop", "remoteBrowser"] },
+    "consumerId": { "type": "string", "minLength": 1 },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}
+
