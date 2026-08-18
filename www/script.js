@@ -825,12 +825,24 @@
     });
 
     document.documentElement.setAttribute('lang', lang);
+
+    // A language variant that canonicalises to another URL is dropped from the index,
+    // so each one points at itself: the bare page for English, ?lang= for the rest.
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) {
+      const base = canonical.href.split('?')[0];
+      const self = lang === 'en' ? base : `${base}?lang=${lang}`;
+      canonical.href = self;
+      document.querySelector('meta[property="og:url"]')?.setAttribute('content', self);
+    }
   };
 
-  // Check URL hash for #lang=fr or #lang=ru
-  const hashMatch = window.location.hash.match(/lang=(en|fr|ru)/);
-  if (hashMatch) {
-    currentLang = hashMatch[1];
+  // ?lang= is the canonical form, because a query string makes a distinct URL that
+  // search engines can index per language; #lang= stays honoured for older links.
+  const requested = new URLSearchParams(window.location.search).get('lang')
+    || (window.location.hash.match(/lang=(en|fr|ru)/) || [])[1];
+  if (requested && translations[requested]) {
+    currentLang = requested;
   }
 
   setLanguage(currentLang);
