@@ -4,8 +4,92 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use living_canvas::{GatewayMindClient, MindClient};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
-use web_sys::{EventSource, MessageEvent};
+use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
+
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v1";
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+struct Point {
+    x: f64,
+    y: f64,
+    z: u32,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+struct CanvasLayout {
+    artifact: Point,
+    release: Point,
+    suggestion: Point,
+}
+
+impl Default for CanvasLayout {
+    fn default() -> Self {
+        Self {
+            artifact: Point {
+                x: 165.0,
+                y: 90.0,
+                z: 1,
+            },
+            release: Point {
+                x: 480.0,
+                y: 140.0,
+                z: 3,
+            },
+            suggestion: Point {
+                x: 900.0,
+                y: 360.0,
+                z: 2,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Panel {
+    Artifact,
+    Release,
+    Suggestion,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DragState {
+    panel: Panel,
+    offset_x: f64,
+    offset_y: f64,
+    width: f64,
+    height: f64,
+}
+
+impl CanvasLayout {
+    const fn point(self, panel: Panel) -> Point {
+        match panel {
+            Panel::Artifact => self.artifact,
+            Panel::Release => self.release,
+            Panel::Suggestion => self.suggestion,
+        }
+    }
+
+    fn set_point(&mut self, panel: Panel, point: Point) {
+        match panel {
+            Panel::Artifact => self.artifact = point,
+            Panel::Release => self.release = point,
+            Panel::Suggestion => self.suggestion = point,
+        }
+    }
+
+    fn bring_forward(&mut self, panel: Panel) {
+        let next = self.artifact.z.max(self.release.z).max(self.suggestion.z) + 1;
+        self.set_point(
+            panel,
+            Point {
+                z: next,
+                ..self.point(panel)
+            },
+        );
+    }
+}
 
 #[derive(Clone, Debug)]
 enum RuntimeState {
@@ -20,6 +104,8 @@ enum RuntimeState {
 #[component]
 pub fn App() -> impl IntoView {
     let (selected, set_selected) = signal("release");
+    let layout = RwSignal::new(load_layout());
+    let dragging = RwSignal::new(None::<DragState>);
     let runtime = RwSignal::new(RuntimeState::Loading);
     spawn_local(async move {
         let client = GatewayMindClient;
@@ -106,11 +192,22 @@ pub fn App() -> impl IntoView {
                 </div>
             </header>
 
-            <section id="canvas" class="canvas" aria-label="Cybou living canvas">
+            <section
+                id="canvas"
+                class="canvas"
+                aria-label="Cybou living canvas"
+                on:pointermove=move |event: PointerEvent| move_drag(event, layout, dragging)
+                on:pointerup=move |_| finish_drag(layout, dragging)
+                on:pointercancel=move |_| finish_drag(layout, dragging)
+            >
                 <div class="ambient" aria-hidden="true"></div>
                 <button
                     class:selected=move || selected.get() == "artifact"
                     class="object artifact"
+                    style=move || panel_style(layout.get(), Panel::Artifact)
+                    aria-label="Artifact panel. Drag to reposition; use arrow keys for keyboard movement."
+                    on:pointerdown=move |event| start_drag(event, Panel::Artifact, layout, dragging)
+                    on:keydown=move |event| keyboard_move(event, Panel::Artifact, layout)
                     on:click=move |_| set_selected.set("artifact")
                 >
                     <small>"Artifact"</small>
@@ -121,6 +218,10 @@ pub fn App() -> impl IntoView {
                 <button
                     class:selected=move || selected.get() == "release"
                     class="object release"
+                    style=move || panel_style(layout.get(), Panel::Release)
+                    aria-label="Release plan panel. Drag to reposition; use arrow keys for keyboard movement."
+                    on:pointerdown=move |event| start_drag(event, Panel::Release, layout, dragging)
+                    on:keydown=move |event| keyboard_move(event, Panel::Release, layout)
                     on:click=move |_| set_selected.set("release")
                 >
                     <small>"Release plan"</small>
@@ -134,6 +235,10 @@ pub fn App() -> impl IntoView {
                 <button
                     class:selected=move || selected.get() == "suggestion"
                     class="object suggestion"
+                    style=move || panel_style(layout.get(), Panel::Suggestion)
+                    aria-label="Mind suggestion panel. Drag to reposition; use arrow keys for keyboard movement."
+                    on:pointerdown=move |event| start_drag(event, Panel::Suggestion, layout, dragging)
+                    on:keydown=move |event| keyboard_move(event, Panel::Suggestion, layout)
                     on:click=move |_| set_selected.set("suggestion")
                 >
                     <small>"Mind suggestion"</small>
@@ -147,5 +252,123 @@ pub fn App() -> impl IntoView {
                 </aside>
             </section>
         </main>
+    }
+}
+
+fn panel_style(layout: CanvasLayout, panel: Panel) -> String {
+    let point = layout.point(panel);
+    format!(
+        "left:{:.1}px;top:{:.1}px;z-index:{}",
+        point.x, point.y, point.z
+    )
+}
+
+fn start_drag(
+    event: PointerEvent,
+    panel: Panel,
+    layout: RwSignal<CanvasLayout>,
+    dragging: RwSignal<Option<DragState>>,
+) {
+    if event.button() != 0 {
+        return;
+    }
+    let Some(target) = event
+        .current_target()
+        .and_then(|target| target.dyn_into::<HtmlElement>().ok())
+    else {
+        return;
+    };
+    let _ = target.focus();
+    let _ = target.set_pointer_capture(event.pointer_id());
+    let rect = target.get_bounding_client_rect();
+    layout.update(|current| current.bring_forward(panel));
+    dragging.set(Some(DragState {
+        panel,
+        offset_x: f64::from(event.client_x()) - rect.left(),
+        offset_y: f64::from(event.client_y()) - rect.top(),
+        width: rect.width(),
+        height: rect.height(),
+    }));
+    event.prevent_default();
+}
+
+fn move_drag(
+    event: PointerEvent,
+    layout: RwSignal<CanvasLayout>,
+    dragging: RwSignal<Option<DragState>>,
+) {
+    let Some(drag) = dragging.get_untracked() else {
+        return;
+    };
+    let Some(surface) = event
+        .current_target()
+        .and_then(|target| target.dyn_into::<HtmlElement>().ok())
+    else {
+        return;
+    };
+    let bounds = surface.get_bounding_client_rect();
+    let x = (f64::from(event.client_x()) - bounds.left() - drag.offset_x)
+        .clamp(12.0, (bounds.width() - drag.width - 12.0).max(12.0));
+    let y = (f64::from(event.client_y()) - bounds.top() - drag.offset_y)
+        .clamp(12.0, (bounds.height() - drag.height - 12.0).max(12.0));
+    layout.update(|current| {
+        current.set_point(
+            drag.panel,
+            Point {
+                x,
+                y,
+                ..current.point(drag.panel)
+            },
+        );
+    });
+}
+
+fn finish_drag(layout: RwSignal<CanvasLayout>, dragging: RwSignal<Option<DragState>>) {
+    if dragging.get_untracked().is_some() {
+        dragging.set(None);
+        save_layout(layout.get_untracked());
+    }
+}
+
+fn keyboard_move(event: KeyboardEvent, panel: Panel, layout: RwSignal<CanvasLayout>) {
+    let step = if event.shift_key() { 40.0 } else { 10.0 };
+    let (dx, dy) = match event.key().as_str() {
+        "ArrowLeft" => (-step, 0.0),
+        "ArrowRight" => (step, 0.0),
+        "ArrowUp" => (0.0, -step),
+        "ArrowDown" => (0.0, step),
+        _ => return,
+    };
+    event.prevent_default();
+    layout.update(|current| {
+        current.bring_forward(panel);
+        let point = current.point(panel);
+        current.set_point(
+            panel,
+            Point {
+                x: (point.x + dx).max(12.0),
+                y: (point.y + dy).max(12.0),
+                ..point
+            },
+        );
+    });
+    save_layout(layout.get_untracked());
+}
+
+fn load_layout() -> CanvasLayout {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(LAYOUT_KEY).ok().flatten())
+        .and_then(|value| serde_json::from_str(&value).ok())
+        .unwrap_or_default()
+}
+
+fn save_layout(layout: CanvasLayout) {
+    let Some(storage) = web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    else {
+        return;
+    };
+    if let Ok(value) = serde_json::to_string(&layout) {
+        let _ = storage.set_item(LAYOUT_KEY, &value);
     }
 }
