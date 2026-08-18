@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "cybou-fabric"
-description = "Versioned Rust compatibility layer for the Cybou cognitive fabric"
+name = "cybou-perception"
+description = "Rust replacement candidate for the Cybou system-generation perception source"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,13 +11,12 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-ciborium.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+time.workspace = true
 
-[target.'cfg(target_os = "linux")'.dependencies]
-tokio.workspace = true
-zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
+[dev-dependencies]
+tempfile = "3.23.0"
 
 [lints]
 workspace = true

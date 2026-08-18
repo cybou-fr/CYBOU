@@ -25,6 +25,25 @@ trailing bytes, and is used by the live Presence adapter. Two golden CBOR stream
 actual Qt `FabricCodec`; every Debian gate recompiles the temporary C++ oracle and compares its
 output byte-for-byte before running Rust tests.
 
+R4 now also contains the bounded RPC policy and the `cybou-runtime` state foundation. Retry
+eligibility distinguishes read-only, idempotent, and non-idempotent operations; one outer deadline
+bounds all attempts, delay is capped with deterministic jitter, and the circuit breaker admits only
+one half-open probe. Runtime paths follow the predecessor XDG contract. Legacy-state migration
+preflights every collision before moving data, preserves unrelated target entries, and attempts the
+entire reverse-order rollback after a partial failure.
+
+The Linux-only `cybou-fabric::zbus_rpc` executor applies that policy to real asynchronous D-Bus
+method calls and returns the raw successful reply for owner-specific decoding. It preserves typed
+timeout, unavailable, rejected, unknown-outcome, and circuit-open results and counts only actual
+bus dispatches as attempts. Presence `Snapshot` is the first production caller and uses a single
+900 ms outer budget across proxy creation, dispatch, retries, and delays.
+
+R5 has begun with a deliberately non-authoritative `cybou-perception` library. It reproduces the
+first owner's pure system-generation acquisition boundary while excluding Event1 writes and D-Bus
+name ownership. Missing paths and regular files yield `source-unavailable` with no observation;
+valid symlinks yield the same `nixos.system` / `current-system` identity, target basename, provenance,
+and freshness semantics as the predecessor. This is replacement preparation, not a cutover.
+
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
 no-store and browser-security headers, enforces an outer projection timeout, and has no generic RPC

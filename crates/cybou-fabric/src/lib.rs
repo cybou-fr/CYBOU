@@ -8,6 +8,10 @@ use std::io::Cursor;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
+pub mod rpc;
+#[cfg(target_os = "linux")]
+pub mod zbus_rpc;
+
 /// Version emitted by the existing `FabricCodec` implementation.
 pub const FABRIC_VERSION: u16 = 1;
 

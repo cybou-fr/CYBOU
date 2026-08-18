@@ -7,7 +7,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use ciborium::Value;
-use cybou_fabric::{PRESENCE, decode};
+use cybou_fabric::{
+    PRESENCE, decode,
+    rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
+    zbus_rpc::ResilientZbusClient,
+};
 use cybou_protocol::{CapabilityState, KnowledgeState};
 use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
 use futures_util::StreamExt;
@@ -32,7 +36,7 @@ fn text(value: &Value) -> Option<&str> {
 
 /// Read-only adapter that maps the existing Qt CBOR projection into the web v1 contract.
 pub struct ZbusPresenceSource {
-    connection: Connection,
+    rpc: ResilientZbusClient,
     changed: Mutex<SignalStream<'static>>,
     projection_version: AtomicU64,
 }
@@ -54,25 +58,31 @@ impl ZbusPresenceSource {
         .await?;
         let changed = proxy.receive_signal("Changed").await?;
         Ok(Self {
-            connection,
+            rpc: ResilientZbusClient::new(connection, PRESENCE, RetryPolicy::default()),
             changed: Mutex::new(changed),
             projection_version: AtomicU64::new(0),
         })
     }
 
     async fn encoded_snapshot(&self) -> Result<Vec<u8>, GatewayError> {
-        let proxy = Proxy::new(
-            &self.connection,
-            PRESENCE.service,
-            PRESENCE.object_path,
-            PRESENCE.interface,
-        )
-        .await
-        .map_err(|_| GatewayError::Unavailable)?;
-        proxy
-            .call("Snapshot", &())
-            .await
-            .map_err(|_| GatewayError::Unavailable)
+        let result = self
+            .rpc
+            .call(
+                "Snapshot",
+                &(),
+                OperationSemantics::ReadOnly,
+                900,
+                0x50_52_45_53,
+            )
+            .await;
+        match (result.outcome, result.reply) {
+            (RpcOutcome::Succeeded, Some(reply)) => reply
+                .body()
+                .deserialize()
+                .map_err(|_| GatewayError::InvalidProjection),
+            (RpcOutcome::TimedOut, _) => Err(GatewayError::Timeout),
+            _ => Err(GatewayError::Unavailable),
+        }
     }
 
     fn decode_snapshot(
