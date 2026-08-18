@@ -9,7 +9,7 @@ use cybou_protocol::canonical::{
     CanonicalEnvelope, canonical_journal_row_v2, canonical_journal_row_v3,
     canonical_nonerasable_v3, sha256,
 };
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use thiserror::Error;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
@@ -63,6 +63,30 @@ pub struct JournalInspection {
     pub rotated_epoch: u64,
 }
 
+/// Trusted chain position from a previous successful verification.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JournalCheckpoint {
+    /// Last verified sequence, or zero before the first row.
+    pub sequence: u64,
+    /// Stored hash at `sequence`, empty only when `sequence` is zero.
+    pub hash: Vec<u8>,
+}
+
+/// Bounded verification facts for the suffix after a checkpoint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JournalVerification {
+    /// Trusted checkpoint sequence supplied by the caller.
+    pub verified_from: u64,
+    /// Last sequence cryptographically replayed by this call.
+    pub verified_through: u64,
+    /// V3 payloads whose bytes were still present and matched their commitment.
+    pub content_verified: u64,
+    /// Erased v3 payloads skipped while their metadata remained verified.
+    pub content_skipped: u64,
+    /// Checkpoint suitable for the next incremental verification.
+    pub checkpoint: JournalCheckpoint,
+}
+
 /// Read-only compatibility refusal.
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -91,6 +115,12 @@ pub enum StorageError {
         sequence: u64,
         /// Stable diagnostic that does not expose payload contents.
         reason: &'static str,
+    },
+    /// A supplied checkpoint no longer names the same stored row.
+    #[error("Journal checkpoint does not match sequence {sequence}")]
+    CheckpointMismatch {
+        /// Sequence whose stored hash differs or no longer exists.
+        sequence: u64,
     },
 }
 
@@ -146,7 +176,7 @@ pub fn inspect_journal(path: &Path) -> Result<JournalInspection, StorageError> {
     let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM contribution", [], |row| row.get(0))
         .map_err(StorageError::Query)?;
-    inspect_chain(&connection)?;
+    inspect_chain(&connection, None)?;
     let (erasure_epoch, rotated_epoch): (i64, i64) = connection
         .query_row(
             "SELECT erasure_epoch, rotated_epoch FROM journal_meta WHERE id=1",
@@ -162,7 +192,39 @@ pub fn inspect_journal(path: &Path) -> Result<JournalInspection, StorageError> {
     })
 }
 
-fn inspect_chain(connection: &Connection) -> Result<(), StorageError> {
+/// Verify only the Journal suffix after a previously trusted checkpoint.
+///
+/// # Errors
+///
+/// Fails closed if the database cannot be opened, the checkpoint does not match the stored row, or
+/// any subsequent link, canonical hash, metadata commitment, or live payload commitment differs.
+pub fn verify_journal_from(
+    path: &Path,
+    checkpoint: Option<&JournalCheckpoint>,
+) -> Result<JournalVerification, StorageError> {
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(StorageError::Open)?;
+    let schema_version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(StorageError::Query)?;
+    if schema_version != JOURNAL_SCHEMA_V2 {
+        return Err(StorageError::UnsupportedSchema {
+            received: schema_version,
+        });
+    }
+    inspect_chain(&connection, checkpoint)
+}
+
+fn inspect_chain(
+    connection: &Connection,
+    checkpoint: Option<&JournalCheckpoint>,
+) -> Result<JournalVerification, StorageError> {
+    let (start_after, mut previous_hash) = anchor_state(connection, checkpoint)?;
     let mut statement = connection
         .prepare(
             "SELECT seq, hash_version, schema_version, message_id, correlation_id, causation_id, \
@@ -170,12 +232,15 @@ fn inspect_chain(connection: &Connection) -> Result<(), StorageError> {
              payload, privacy, capability, sealed, key_domain, key_epoch, retention_class, \
              retention_policy, retain_until, sensitivity, prev_hash, hash, commitment, \
              payload_commitment, erased_at \
-             FROM contribution ORDER BY seq ASC",
+             FROM contribution WHERE seq > ?1 ORDER BY seq ASC",
         )
         .map_err(StorageError::Query)?;
-    let mut rows = statement.query([]).map_err(StorageError::Query)?;
-    let mut expected_sequence = 1_u64;
-    let mut previous_hash = Vec::new();
+    let mut rows = statement
+        .query([i64::try_from(start_after).map_err(|_| StorageError::InvalidCounter)?])
+        .map_err(StorageError::Query)?;
+    let mut expected_sequence = start_after.saturating_add(1);
+    let mut content_verified = 0_u64;
+    let mut content_skipped = 0_u64;
     while let Some(row) = rows.next().map_err(StorageError::Query)? {
         let raw_sequence: i64 = row.get(0).map_err(StorageError::Query)?;
         let sequence = u64::try_from(raw_sequence).map_err(|_| StorageError::InvalidCounter)?;
@@ -230,6 +295,11 @@ fn inspect_chain(connection: &Connection) -> Result<(), StorageError> {
                 {
                     return Err(invalid("v3 payload commitment does not match"));
                 }
+                if erased_at.is_some() {
+                    content_skipped = content_skipped.saturating_add(1);
+                } else {
+                    content_verified = content_verified.saturating_add(1);
+                }
                 sha256(&canonical_journal_row_v3(sequence, &previous, commitment))
             }
             _ => return Err(invalid("hash and envelope versions are incompatible")),
@@ -240,7 +310,47 @@ fn inspect_chain(connection: &Connection) -> Result<(), StorageError> {
         previous_hash = hash;
         expected_sequence = expected_sequence.saturating_add(1);
     }
-    Ok(())
+    let verified_through = expected_sequence.saturating_sub(1);
+    Ok(JournalVerification {
+        verified_from: start_after,
+        verified_through,
+        content_verified,
+        content_skipped,
+        checkpoint: JournalCheckpoint {
+            sequence: verified_through,
+            hash: previous_hash,
+        },
+    })
+}
+
+fn anchor_state(
+    connection: &Connection,
+    checkpoint: Option<&JournalCheckpoint>,
+) -> Result<(u64, Vec<u8>), StorageError> {
+    let Some(anchor) = checkpoint else {
+        return Ok((0, Vec::new()));
+    };
+    if anchor.sequence == 0 {
+        return if anchor.hash.is_empty() {
+            Ok((0, Vec::new()))
+        } else {
+            Err(StorageError::CheckpointMismatch { sequence: 0 })
+        };
+    }
+    let stored: Option<Vec<u8>> = connection
+        .query_row(
+            "SELECT hash FROM contribution WHERE seq=?1",
+            [i64::try_from(anchor.sequence).map_err(|_| StorageError::InvalidCounter)?],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(StorageError::Query)?;
+    if stored.as_deref() != Some(anchor.hash.as_slice()) {
+        return Err(StorageError::CheckpointMismatch {
+            sequence: anchor.sequence,
+        });
+    }
+    Ok((anchor.sequence, anchor.hash.clone()))
 }
 
 fn decode_envelope(
@@ -360,7 +470,9 @@ mod tests {
     use rusqlite::Connection;
     use tempfile::tempdir;
 
-    use super::{JOURNAL_SCHEMA_V2, StorageError, inspect_journal};
+    use super::{
+        JOURNAL_SCHEMA_V2, JournalCheckpoint, StorageError, inspect_journal, verify_journal_from,
+    };
 
     const SCHEMA: &str = "
         CREATE TABLE contribution (
@@ -568,5 +680,51 @@ mod tests {
                 .contribution_count,
             2
         );
+    }
+
+    #[test]
+    fn checkpoint_verifies_only_the_suffix_and_refuses_a_stale_anchor() {
+        let root = tempdir().expect("temporary root");
+        let path = root.path().join("checkpoint.db");
+        let connection = Connection::open(&path).expect("fixture database");
+        connection.execute_batch(SCHEMA).expect("fixture schema");
+        populate_valid_chain(&connection);
+        let first_hash: Vec<u8> = connection
+            .query_row("SELECT hash FROM contribution WHERE seq=1", [], |row| {
+                row.get(0)
+            })
+            .expect("first hash");
+        drop(connection);
+
+        let full = verify_journal_from(&path, None).expect("full verification");
+        assert_eq!(full.verified_from, 0);
+        assert_eq!(full.verified_through, 2);
+        assert_eq!(full.content_verified, 2);
+
+        let suffix = verify_journal_from(
+            &path,
+            Some(&JournalCheckpoint {
+                sequence: 1,
+                hash: first_hash,
+            }),
+        )
+        .expect("suffix verification");
+        assert_eq!(suffix.verified_from, 1);
+        assert_eq!(suffix.verified_through, 2);
+        assert_eq!(suffix.content_verified, 1);
+
+        let at_head = verify_journal_from(&path, Some(&full.checkpoint)).expect("head checkpoint");
+        assert_eq!(at_head.verified_from, 2);
+        assert_eq!(at_head.verified_through, 2);
+        assert_eq!(at_head.content_verified, 0);
+
+        let stale = JournalCheckpoint {
+            sequence: 2,
+            hash: vec![0; 32],
+        };
+        assert!(matches!(
+            verify_journal_from(&path, Some(&stale)),
+            Err(StorageError::CheckpointMismatch { sequence: 2 })
+        ));
     }
 }

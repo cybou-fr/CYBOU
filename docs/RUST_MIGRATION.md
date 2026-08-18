@@ -129,7 +129,10 @@ rebuilds the predecessor Qt encoder for every run. The inspector now consumes th
 it decodes stored envelopes and evidence, recomputes hash versions 1–3, verifies the v3 metadata
 and live-payload commitments independently, and skips erased content without skipping its surviving
 metadata. Canonical-hash and payload-tampering tests fail closed. Existing-database differential
-fixtures, interruption/recovery, scale, and all writer behavior remain subsequent gates.
+fixtures, interruption/recovery, scale, and all writer behavior remain subsequent gates. A typed
+checkpoint API now validates the anchor row and cryptographically replays only its suffix, reporting
+the verified range plus checked and erased-content counts. The library does not persist or assign
+trust to checkpoints; that remains Event-owner policy.
 
 ### R7 — desktop replacement and legacy removal
 

@@ -73,6 +73,12 @@ non-erased payload commitment. Erased payload bytes are skipped exactly as in th
 their surviving metadata remains verified. Tests sabotage chain links, canonical hashes, and live
 payload bytes independently. Writer behavior, recovery, migrations, and production ownership are
 still absent.
+The storage crate also exposes a typed read-only checkpoint and suffix-verification result. A
+checkpoint is accepted only when its sequence still exists with the identical stored hash; replay
+then queries and verifies rows strictly after that position. Results distinguish the verified
+range, intact live payloads, skipped erased payloads, and the next checkpoint. A head checkpoint
+therefore performs one anchor lookup and no history scan. Checkpoint persistence and trust policy
+belong to a future Rust Event owner and are not implied by this library API.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
