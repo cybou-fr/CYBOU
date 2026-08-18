@@ -135,6 +135,10 @@ the verified range plus checked and erased-content counts. The library does not 
 trust to checkpoints; that remains Event-owner policy. A row-bounded page variant rejects a zero
 budget, verifies at most the requested number of rows, reports whether more remain, and resumes from
 the returned checkpoint without weakening any per-row check.
+The `cybou-journal-inspect` binary makes a single page available for operator-driven differential
+checks on Debian. Its machine-readable key/value output contains ranges, counters, `has_more`, and
+the next checkpoint but no payload data. It is an inspection probe, not a recovery or migration
+tool.
 
 ### R7 — desktop replacement and legacy removal
 

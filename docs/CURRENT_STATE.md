@@ -83,6 +83,10 @@ For large histories the same verifier has a row-bounded page API. `max_rows` mus
 each result states whether more rows remain and returns the exact verified checkpoint from which the
 next page continues. The bound applies to canonical rows replayed per call, preventing an accidental
 unbounded suffix scan while preserving the identical hash and commitment checks.
+`cybou-journal-inspect` exposes one such page as a Debian-native command-line probe. It accepts an
+existing database path, positive row budget, and optional sequence/hash checkpoint; it prints only
+verification counters and the next checkpoint, never contribution payloads. The tool performs no
+copy, checkpoint persistence, repair, migration, or write.
 
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies

@@ -12,6 +12,29 @@ SPDX-License-Identifier: MIT
 
 ## Rust foundation build
 
+### Read-only Journal compatibility probe
+
+On the Debian builder, verify one bounded page of an existing Journal without creating or changing
+the database:
+
+```bash
+cargo run --locked -p cybou-storage --bin cybou-journal-inspect -- \
+  /path/to/journal.db 1000
+```
+
+The output includes `checkpoint_sequence`, `checkpoint_hash`, and `has_more`. Continue with exactly
+that trusted pair when another page is required:
+
+```bash
+cargo run --locked -p cybou-storage --bin cybou-journal-inspect -- \
+  /path/to/journal.db 1000 CHECKPOINT_SEQUENCE CHECKPOINT_HASH
+```
+
+The tool processes one page per invocation, opens SQLite read-only/no-follow, prints no payload, and
+returns a non-zero exit status for malformed arguments, stale checkpoints, schema incompatibility,
+or any cryptographic mismatch. Copying a live database safely remains the operator's responsibility;
+do not copy only the main SQLite file while a WAL writer is active.
+
 The R0/W0 workspace is additive: it does not replace the currently installed C++ owners.
 
 ```bash
