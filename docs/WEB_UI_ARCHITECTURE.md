@@ -408,8 +408,9 @@ Implementation status: the read-only Rust gateway binary, fixture adapter, Linux
 `Presence1.Snapshot` adapter, outer request budget, security headers, same-origin static delivery,
 live `GatewayMindClient`, immutable frontend derivation, and disabled-by-default NixOS user module
 exist. Cursor-aware SSE snapshot delivery now provides reconnect and duplicate suppression through
-`Last-Event-ID`, with a bounded two-second source poll until `Presence1.Changed` is integrated.
-Authenticated bootstrap and native changed-event delivery remain before the W1 exit gate
+`Last-Event-ID`. The Linux source retains a native `Presence1.Changed` zbus stream; deterministic
+fixtures use a bounded two-second polling fallback. Authenticated bootstrap remains before the W1
+exit gate
 can pass.
 
 Exit: browser read parity, ordered refresh, degraded-owner matrix, deadline budgets, and gateway

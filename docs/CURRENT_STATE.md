@@ -31,10 +31,10 @@ only as the deterministic test boundary.
 
 This is not yet a complete W1 delivery path. The gateway exposes `/api/v1/events` as bounded SSE:
 snapshot events carry their cursor as the SSE ID, browser reconnect uses `Last-Event-ID`, duplicate
-cursors are suppressed, and keepalives retain idle connections. Until the native
-`Presence1.Changed` subscription is implemented, the gateway checks its typed snapshot source every
-two seconds; this is a compatibility bridge rather than the final event transport. Desktop
-bootstrap authentication is still absent.
+cursors are suppressed, and keepalives retain idle connections. The Linux zbus source establishes
+and retains a native `Presence1.Changed` signal stream before serving snapshots, so changes queue
+across the snapshot/wait boundary. Deterministic non-D-Bus sources retain a bounded two-second
+polling fallback. Desktop bootstrap authentication is still absent.
 An operational preview is deployed at `https://vps-d0669a91.vps.ovh.net` and directly at
 `https://51.255.46.58`: Caddy terminates public TLS while the Rust gateway remains bound to
 loopback. The preview is deliberately public only while it is fixture-backed and contains no

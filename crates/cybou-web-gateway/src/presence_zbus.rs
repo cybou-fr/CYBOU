@@ -9,8 +9,10 @@ use async_trait::async_trait;
 use ciborium::Value;
 use cybou_protocol::{CapabilityState, KnowledgeState};
 use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
+use futures_util::StreamExt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use zbus::{Connection, Proxy};
+use tokio::sync::Mutex;
+use zbus::{Connection, Proxy, proxy::SignalStream};
 
 use crate::{GatewayError, PresenceSource};
 
@@ -35,6 +37,7 @@ fn text(value: &Value) -> Option<&str> {
 /// Read-only adapter that maps the existing Qt CBOR projection into the web v1 contract.
 pub struct ZbusPresenceSource {
     connection: Connection,
+    changed: Mutex<SignalStream<'static>>,
     projection_version: AtomicU64,
 }
 
@@ -45,8 +48,12 @@ impl ZbusPresenceSource {
     ///
     /// Returns a zbus error when no usable session bus can be established.
     pub async fn connect() -> zbus::Result<Self> {
+        let connection = Connection::session().await?;
+        let proxy = Proxy::new(&connection, DESTINATION, PATH, INTERFACE).await?;
+        let changed = proxy.receive_signal("Changed").await?;
         Ok(Self {
-            connection: Connection::session().await?,
+            connection,
+            changed: Mutex::new(changed),
             projection_version: AtomicU64::new(0),
         })
     }
@@ -136,6 +143,16 @@ impl PresenceSource for ZbusPresenceSource {
         let encoded = self.encoded_snapshot().await?;
         let projection_version = self.projection_version.fetch_add(1, Ordering::Relaxed) + 1;
         Self::decode_snapshot(&encoded, projection_version)
+    }
+
+    async fn wait_for_change(&self) -> Result<(), GatewayError> {
+        self.changed
+            .lock()
+            .await
+            .next()
+            .await
+            .map(|_| ())
+            .ok_or(GatewayError::Unavailable)
     }
 }
 

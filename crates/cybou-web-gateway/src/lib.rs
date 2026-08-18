@@ -48,6 +48,15 @@ pub trait PresenceSource: Send + Sync + 'static {
     /// Returns [`GatewayError`] when transport, decoding, or owner availability prevents a typed
     /// projection. It must never turn those failures into an empty successful snapshot.
     async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError>;
+
+    /// Wait until the source may have a newer projection.
+    ///
+    /// Sources with a native change signal override this method. Deterministic fixtures retain a
+    /// bounded polling fallback so the same gateway contract remains testable without D-Bus.
+    async fn wait_for_change(&self) -> Result<(), GatewayError> {
+        tokio::time::sleep(EVENT_POLL_INTERVAL).await;
+        Ok(())
+    }
 }
 
 /// Failure response safe to expose at the browser boundary.
@@ -281,7 +290,9 @@ async fn events(
                         return Some((Ok(event), (state, last_cursor)));
                     }
                 }
-                tokio::time::sleep(EVENT_POLL_INTERVAL).await;
+                if state.presence.wait_for_change().await.is_err() {
+                    tokio::time::sleep(EVENT_POLL_INTERVAL).await;
+                }
             }
         },
     );
@@ -294,7 +305,13 @@ async fn events(
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicU64, Ordering},
+        },
+        time::Duration,
+    };
 
     use async_trait::async_trait;
     use axum::{
@@ -400,6 +417,52 @@ mod tests {
             .await
             .expect("router response");
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    struct SignaledPresence {
+        version: AtomicU64,
+    }
+
+    #[async_trait]
+    impl PresenceSource for SignaledPresence {
+        async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError> {
+            let version = self.version.load(Ordering::Relaxed);
+            let mut snapshot = FixturePresenceSource::nominal().snapshot().await?;
+            snapshot.projection_version = version;
+            snapshot.cursor = format!("signal:{version}");
+            Ok(snapshot)
+        }
+
+        async fn wait_for_change(&self) -> Result<(), GatewayError> {
+            self.version.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn event_stream_waits_for_source_signal_before_new_snapshot() {
+        let response = router(Arc::new(SignaledPresence {
+            version: AtomicU64::new(42),
+        }))
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/events")
+                .header("last-event-id", "signal:42")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+        let mut body = response.into_body();
+        let frame = tokio::time::timeout(Duration::from_millis(100), body.frame())
+            .await
+            .expect("native change notification budget")
+            .expect("changed event frame")
+            .expect("valid changed event frame");
+        let data = frame.into_data().expect("event data");
+        let event = String::from_utf8_lossy(&data);
+        assert!(event.contains("id: signal:43"));
+        assert!(event.contains("\"projectionVersion\":43"));
     }
 
     #[tokio::test]

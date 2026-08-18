@@ -63,9 +63,9 @@ existing `Presence1` service through zbus; do not migrate Mind owners merely to 
 **Status: read-only seam implemented.** The loopback Axum service, typed session/snapshot routes,
 outer timeout, refusal responses, security headers, fixture adapter, Linux zbus snapshot decoder,
 and cursor-aware SSE snapshot stream exist. The browser resumes with `Last-Event-ID`; the temporary
-compatibility implementation polls the typed source until `Presence1.Changed` is wired directly.
-Desktop bootstrap authentication, authenticated remote sessions, and every mutation remain absent
-by design.
+fixture compatibility implementation polls its typed source, while the Linux adapter retains a
+native `Presence1.Changed` zbus subscription. Desktop bootstrap authentication, authenticated
+remote sessions, and every mutation remain absent by design.
 
 ### R4 — shared foundation
 
