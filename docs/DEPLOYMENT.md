@@ -29,7 +29,7 @@ A green local run is developer evidence; tag CI and the release process remain a
 
 ## Retired environment: OVH
 
-The former OVH VPS and `nixosConfigurations.cybou-vps` are not an active build, deployment, or
+The former OVH VPS and `nixosConfigurations.cybou-vps` are retired and are not an active build, deployment, or
 evaluation target. An attempted in-place conversion from Debian 13 to NixOS ended with SSH becoming
 unavailable. The configuration remains in the repository only as historical and recovery input.
 

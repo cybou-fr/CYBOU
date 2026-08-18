@@ -11,12 +11,14 @@ rustPlatform.buildRustPackage {
   version = "0.1.0";
   src = lib.cleanSourceWith {
     src = ../..;
-    filter = path: _type: !(builtins.elem (baseNameOf path) [
-      ".git"
-      "dist"
-      "node_modules"
-      "target"
-    ]);
+    filter =
+      path: _type:
+      !(builtins.elem (baseNameOf path) [
+        ".git"
+        "dist"
+        "node_modules"
+        "target"
+      ]);
   };
 
   cargoLock.lockFile = ../../Cargo.lock;

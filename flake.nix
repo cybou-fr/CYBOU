@@ -14,7 +14,19 @@
     let
       systems = [ "x86_64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-      src = nixpkgs.lib.cleanSource ./.;
+      src = nixpkgs.lib.cleanSourceWith {
+        src = ./.;
+        # Local preview output and Python bytecode are not repository inputs. Keep them out of
+        # every check even when they exist beside the working tree on the Windows mount.
+        filter =
+          path: _type:
+          let
+            relative = nixpkgs.lib.removePrefix "${toString ./.}/" (toString path);
+          in
+          relative != "living-canvas"
+          && !(nixpkgs.lib.hasPrefix "living-canvas/" relative)
+          && !(nixpkgs.lib.hasInfix "/__pycache__/" "/${relative}/");
+      };
     in
     {
       # `nix fmt` passes no path when invoked bare, and nixfmt then reads stdin and fails.
@@ -29,6 +41,7 @@
             pkgs.findutils
           ];
           text = ''
+
             if [ "$#" -eq 0 ]; then set -- .; fi
             find "$@" -type f -name '*.nix' -print0 | xargs -0 --no-run-if-empty nixfmt
           '';
@@ -49,51 +62,53 @@
           };
         in
         rec {
-        horizon-colors = pkgs.callPackage ./packages/horizon-colors { };
-        horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
-        horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
+          horizon-colors = pkgs.callPackage ./packages/horizon-colors { };
+          horizon-wallpaper = pkgs.callPackage ./packages/horizon-wallpaper { };
+          horizon-assets = pkgs.callPackage ./packages/horizon-assets { };
 
-        horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { inherit horizon-assets; };
-        horizon-plasma-style = pkgs.callPackage ./packages/horizon-plasma-style { };
-        horizon-sddm = pkgs.callPackage ./packages/horizon-sddm { inherit horizon-wallpaper; };
-        horizon-aurorae = pkgs.callPackage ./packages/horizon-aurorae { };
-        cybou-tools = pkgs.callPackage ./packages/cybou-tools { };
+          horizon-global-theme = pkgs.callPackage ./packages/horizon-global-theme { inherit horizon-assets; };
+          horizon-plasma-style = pkgs.callPackage ./packages/horizon-plasma-style { };
+          horizon-sddm = pkgs.callPackage ./packages/horizon-sddm { inherit horizon-wallpaper; };
+          horizon-aurorae = pkgs.callPackage ./packages/horizon-aurorae { };
+          cybou-tools = pkgs.callPackage ./packages/cybou-tools { };
 
-        # The Mind and the panel that shows it. Separate derivations: ADR-0008 keeps the
-        # cognitive code isolated, and the applet is data that must not force a C++ rebuild.
-        cybou-mind = pkgs.callPackage ./packages/cybou-mind { };
-        cybou-presence-applet = pkgs.callPackage ./packages/cybou-presence-applet { };
-        cybou-layout-templates = pkgs.callPackage ./packages/cybou-layout-templates { };
-        cybou-rust-foundation = pkgs.callPackage ./packages/cybou-rust-foundation { };
-        # Compatibility alias until the native workspace derivation is split by binary output.
-        cybou-web-gateway = cybou-rust-foundation;
-        cybou-web-ui = wasmPkgs.callPackage ./packages/cybou-web-ui {
-          inherit (pkgs) trunk wasm-bindgen-cli_0_2_126;
-        };
-        cybou-desktop-shell = pkgs.callPackage ./packages/cybou-desktop-shell { };
+          # The Mind and the panel that shows it. Separate derivations: ADR-0008 keeps the
+          # cognitive code isolated, and the applet is data that must not force a C++ rebuild.
+          cybou-mind = pkgs.callPackage ./packages/cybou-mind { };
+          cybou-presence-applet = pkgs.callPackage ./packages/cybou-presence-applet { };
+          cybou-layout-templates = pkgs.callPackage ./packages/cybou-layout-templates { };
+          cybou-rust-foundation = pkgs.callPackage ./packages/cybou-rust-foundation { };
+          # Compatibility alias until the native workspace derivation is split by binary output.
+          cybou-web-gateway = cybou-rust-foundation;
+          cybou-web-ui = wasmPkgs.callPackage ./packages/cybou-web-ui {
+            inherit (pkgs) trunk wasm-bindgen-cli_0_2_126 lld;
+          };
+          cybou-desktop-shell = pkgs.callPackage ./packages/cybou-desktop-shell { };
 
-        # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
-        # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
-        # that silently fails to load. checks.package-metadata caught exactly that.
-        cybou-theme = pkgs.runCommand "cybou-theme" { } ''
-          mkdir -p $out
-          for p in ${horizon-colors} ${horizon-wallpaper} ${horizon-global-theme} \
-                   ${horizon-plasma-style} ${horizon-aurorae}; do
-            cp -rL "$p"/. $out/
-            # Store files arrive read-only; without this the next package cannot be
-            # merged into the directories the previous one created.
+          # Copies rather than symlinkJoin, and not as a matter of taste: Plasma 6 KPackage
+          # rejects symlinks inside a theme package, so a symlink farm produces a Global Theme
+          # that silently fails to load. checks.package-metadata caught exactly that.
+          cybou-theme = pkgs.runCommand "cybou-theme" { } ''
+
+            mkdir -p $out
+            for p in ${horizon-colors} ${horizon-wallpaper} ${horizon-global-theme} \
+                     ${horizon-plasma-style} ${horizon-aurorae}; do
+              cp -rL "$p"/. $out/
+              # Store files arrive read-only; without this the next package cannot be
+              # merged into the directories the previous one created.
+              chmod -R u+w $out
+            done
+          '';
+
+          cybou-branding = pkgs.runCommand "cybou-branding" { } ''
+
+            mkdir -p $out
+            cp -rL ${horizon-assets}/. $out/
             chmod -R u+w $out
-          done
-        '';
-
-        cybou-branding = pkgs.runCommand "cybou-branding" { } ''
-          mkdir -p $out
-          cp -rL ${horizon-assets}/. $out/
-          chmod -R u+w $out
-        '';
-        # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
-        # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
-        default = cybou-theme;
+          '';
+          # `rec` rather than `self.packages.${pkgs.system}`: `pkgs.system` is deprecated
+          # in favour of `stdenv.hostPlatform.system` and warns during evaluation.
+          default = cybou-theme;
         }
       );
 
@@ -169,10 +184,11 @@
             pkgs.kdePackages.libplasma
 
             # Optional, heavy, and worth having: Qt Creator opens through WSLg for QML work.
-            pkgs.qtcreator
+            pkgs.qtcreato
           ];
 
           shellHook = ''
+
             echo "cybou dev shell ready: $(cmake --version | head -1)"
           '';
         };
@@ -192,6 +208,7 @@
               ];
             }
             ''
+
               find ${src} -type f -name '*.nix' -print0 \
                 | xargs -0 --no-run-if-empty nixfmt --check
               touch $out
@@ -200,6 +217,7 @@
         # Licence compliance (ADR-0007). Turns the Gate D "licence manifest" from a
         # hand-maintained checkbox into a machine-verified artifact.
         reuse = pkgs.runCommand "check-reuse" { nativeBuildInputs = [ pkgs.reuse ]; } ''
+
           cd ${src}
           reuse lint
           touch $out
@@ -241,17 +259,20 @@
         package-metadata =
           pkgs.runCommand "check-package-metadata" { nativeBuildInputs = [ pkgs.python3 ]; }
             ''
+
               python3 ${src}/scripts/validate-packages.py \
                 ${self.packages.${pkgs.stdenv.hostPlatform.system}.cybou-theme}/share
               touch $out
             '';
 
         cognitive-docs = pkgs.runCommand "check-cognitive-docs" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+
           python3 ${src}/scripts/validate-cognitive-docs.py ${src}
           touch $out
         '';
 
         mind-access = pkgs.runCommand "check-mind-access" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+
           python3 ${src}/scripts/validate-mind-access.py \
             ${src}/packages/cybou-presence-applet/org.cybou.presence \
             ${src}/packages/cybou-presence-applet/org.cybou.mindhandle \
@@ -260,12 +281,14 @@
         '';
 
         qml-api = pkgs.runCommand "check-qml-api" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+
           python3 ${src}/scripts/validate-qml-api.py \
             ${src}/packages/cybou-presence-applet/org.cybou.presence
           touch $out
         '';
 
         ui-polish = pkgs.runCommand "check-ui-polish" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+
           python3 ${src}/scripts/validate-ui-polish.py \
             ${src}/packages/cybou-presence-applet/org.cybou.presence \
             ${src}/packages/cybou-presence-applet/org.cybou.mindhandle
