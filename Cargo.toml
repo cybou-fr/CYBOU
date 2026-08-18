@@ -3,6 +3,7 @@
 
 [workspace]
 members = [
+    "crates/cybou-fabric",
     "crates/cybou-protocol",
     "crates/cybou-web-contracts",
     "crates/cybou-web-gateway",

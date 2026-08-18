@@ -377,6 +377,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-fabric"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "serde",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "cybou-protocol"
 version = "0.1.0"
 dependencies = [
@@ -402,6 +411,7 @@ dependencies = [
  "async-trait",
  "axum",
  "ciborium",
+ "cybou-fabric",
  "cybou-protocol",
  "cybou-web-contracts",
  "futures-core",

@@ -19,6 +19,12 @@ session and nominal snapshot fixtures, JSON round trips, and `MockMindClient`. C
 tests, strict clippy, `wasm32-unknown-unknown` compilation, and a release Trunk build. Trunk produces
 a content-hashed browser artifact from the same Rust frontend source.
 
+The first R4 shared-fabric slice is present in `cybou-fabric`. It freezes all twelve existing D-Bus
+endpoint addresses, strictly encodes/decodes fabric envelope v1, rejects future versions and
+trailing bytes, and is used by the live Presence adapter. Two golden CBOR streams come from the
+actual Qt `FabricCodec`; every Debian gate recompiles the temporary C++ oracle and compares its
+output byte-for-byte before running Rust tests.
+
 The additive W1 gateway seam is also present. `cybou-web-gateway` binds only to
 `127.0.0.1:8787`, exposes typed read-only `/api/v1/session` and `/api/v1/snapshot` routes, applies
 no-store and browser-security headers, enforces an outer projection timeout, and has no generic RPC

@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use ciborium::Value;
+use cybou_fabric::{PRESENCE, decode};
 use cybou_protocol::{CapabilityState, KnowledgeState};
 use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
 use futures_util::StreamExt;
@@ -15,11 +16,6 @@ use tokio::sync::Mutex;
 use zbus::{Connection, Proxy, proxy::SignalStream};
 
 use crate::{GatewayError, PresenceSource};
-
-const DESTINATION: &str = "org.cybou.Mind.Presence1";
-const PATH: &str = "/org/cybou/Mind/Presence1";
-const INTERFACE: &str = "org.cybou.Mind.Presence1";
-const FABRIC_VERSION: i64 = 1;
 
 fn field<'a>(map: &'a [(Value, Value)], name: &str) -> Option<&'a Value> {
     map.iter()
@@ -49,7 +45,13 @@ impl ZbusPresenceSource {
     /// Returns a zbus error when no usable session bus can be established.
     pub async fn connect() -> zbus::Result<Self> {
         let connection = Connection::session().await?;
-        let proxy = Proxy::new(&connection, DESTINATION, PATH, INTERFACE).await?;
+        let proxy = Proxy::new(
+            &connection,
+            PRESENCE.service,
+            PRESENCE.object_path,
+            PRESENCE.interface,
+        )
+        .await?;
         let changed = proxy.receive_signal("Changed").await?;
         Ok(Self {
             connection,
@@ -59,9 +61,14 @@ impl ZbusPresenceSource {
     }
 
     async fn encoded_snapshot(&self) -> Result<Vec<u8>, GatewayError> {
-        let proxy = Proxy::new(&self.connection, DESTINATION, PATH, INTERFACE)
-            .await
-            .map_err(|_| GatewayError::Unavailable)?;
+        let proxy = Proxy::new(
+            &self.connection,
+            PRESENCE.service,
+            PRESENCE.object_path,
+            PRESENCE.interface,
+        )
+        .await
+        .map_err(|_| GatewayError::Unavailable)?;
         proxy
             .call("Snapshot", &())
             .await
@@ -72,18 +79,8 @@ impl ZbusPresenceSource {
         encoded: &[u8],
         projection_version: u64,
     ) -> Result<SnapshotProjection, GatewayError> {
-        let root: Value =
-            ciborium::from_reader(encoded).map_err(|_| GatewayError::InvalidProjection)?;
-        let root = root.as_map().ok_or(GatewayError::InvalidProjection)?;
-        let version = field(root, "version")
-            .and_then(Value::as_integer)
-            .and_then(|value| i64::try_from(value).ok());
-        if version != Some(FABRIC_VERSION) {
-            return Err(GatewayError::InvalidProjection);
-        }
-        let value = field(root, "value")
-            .and_then(Value::as_map)
-            .ok_or(GatewayError::InvalidProjection)?;
+        let value: Value = decode(encoded).map_err(|_| GatewayError::InvalidProjection)?;
+        let value = value.as_map().ok_or(GatewayError::InvalidProjection)?;
         if field(value, "runtimeReachable").and_then(Value::as_bool) != Some(true) {
             return Err(GatewayError::Unavailable);
         }
