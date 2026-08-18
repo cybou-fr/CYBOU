@@ -142,6 +142,7 @@ enum RuntimeState {
 #[component]
 pub fn App() -> impl IntoView {
     let (selected, set_selected) = signal("release");
+    let (runtime_menu_open, set_runtime_menu_open) = signal(false);
     let layout = RwSignal::new(load_layout());
     let dragging = RwSignal::new(None::<DragState>);
     let runtime = RwSignal::new(RuntimeState::Loading);
@@ -223,10 +224,41 @@ pub fn App() -> impl IntoView {
                     <span>"Living Canvas"</span>
                 </a>
                 <p class="path">"Cybou Workspace / Programs / Cybou 0.8 release"</p>
-                <div class="runtime" aria-label="Runtime connection" aria-live="polite">
-                    <span class="status-dot" aria-hidden="true"></span>
-                    <strong>{runtime_label}</strong>
-                    <small>{projection_label}</small>
+                <div class="runtime-cluster">
+                    <div class="runtime" aria-label="Runtime connection" aria-live="polite">
+                        <span class="status-dot" aria-hidden="true"></span>
+                        <strong>{runtime_label}</strong>
+                        <small>{projection_label}</small>
+                    </div>
+                    <button
+                        class="runtime-switch"
+                        aria-expanded=move || runtime_menu_open.get().to_string()
+                        aria-controls="runtime-menu"
+                        on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                    >
+                        <span>"Local"</span>
+                        <span class="inactive">"Remote"</span>
+                    </button>
+                    <button
+                        class="profile-trigger"
+                        aria-label="Open Cybou workspace menu"
+                        aria-expanded=move || runtime_menu_open.get().to_string()
+                        on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                    >"C"</button>
+                    <Show when=move || runtime_menu_open.get()>
+                        <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
+                            <header><strong>"Cybou"</strong><small>"All data stays local"</small></header>
+                            <button>"New artifact"</button>
+                            <button>"New commitment"</button>
+                            <button>"Invite collaborator"</button>
+                            <button>"Open mind"</button>
+                            <hr />
+                            <button>"Canvas view"</button>
+                            <button>"Minimap"</button>
+                            <hr />
+                            <button>"System status"</button>
+                        </nav>
+                    </Show>
                 </div>
             </header>
 
@@ -252,6 +284,20 @@ pub fn App() -> impl IntoView {
                     <strong>"Release evidence"</strong>
                     <span>"12 verified sources"</span>
                 </button>
+
+                <Show when=move || selected.get() == "release">
+                    <nav
+                        class="object-actions"
+                        style=move || release_actions_style(layout.get())
+                        aria-label="Selected release actions"
+                    >
+                        <button>"Open"</button>
+                        <button>"Plan"</button>
+                        <button class="active">"Mind"</button>
+                        <button>"Link"</button>
+                        <button aria-label="More release actions">"More"</button>
+                    </nav>
+                </Show>
 
                 <button
                     class:selected=move || selected.get() == "collaborators"
@@ -304,19 +350,28 @@ pub fn App() -> impl IntoView {
                     <span class="row"><b>"Threat model"</b><i>"v2"</i></span>
                 </button>
 
-                <button
+                <article
                     class:selected=move || selected.get() == "suggestion"
                     class="object suggestion"
                     style=move || panel_style(layout.get(), Panel::Suggestion)
+                    tabindex="0"
                     aria-label="Mind suggestion panel. Drag to reposition; use arrow keys for keyboard movement."
                     on:pointerdown=move |event| start_drag(event, Panel::Suggestion, layout, dragging)
                     on:keydown=move |event| keyboard_move(event, Panel::Suggestion, layout)
                     on:click=move |_| set_selected.set("suggestion")
                 >
-                    <small>"Mind suggestion"</small>
-                    <strong>"Verify rollback path"</strong>
-                    <span>"Proposed · not authorized"</span>
-                </button>
+                    <header class="suggestion-heading">
+                        <small>"Mind suggests"</small>
+                        <b>"High impact"</b>
+                    </header>
+                    <strong>"Add rollback verification"</strong>
+                    <p>"No rollback test detected in plan. Adds safety and release confidence."</p>
+                    <div class="suggestion-actions">
+                        <button on:pointerdown=move |event: PointerEvent| event.stop_propagation()>"Review evidence"</button>
+                        <button class="primary" on:pointerdown=move |event: PointerEvent| event.stop_propagation()>"Add to plan"</button>
+                    </div>
+                    <span class="suggestion-source">"Source: test-results.json, design-doc.md"</span>
+                </article>
 
                 <button
                     class:selected=move || selected.get() == "commitments"
@@ -353,6 +408,16 @@ fn panel_style(layout: CanvasLayout, panel: Panel) -> String {
     format!(
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         point.x, point.y, point.z
+    )
+}
+
+fn release_actions_style(layout: CanvasLayout) -> String {
+    let point = layout.release;
+    format!(
+        "left:{:.1}px;top:{:.1}px;z-index:{}",
+        point.x + 18.0,
+        point.y + 251.0,
+        point.z + 1
     )
 }
 

@@ -42,9 +42,20 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; }
 .brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); }
 .path { margin: 0; color: var(--muted); font-size: 13px; }
-.runtime { justify-self: end; display: grid; grid-template-columns: auto auto; column-gap: 8px; align-items: center; font-size: 12px; }
+.runtime-cluster { position: relative; justify-self: end; display: flex; align-items: center; gap: 12px; }
+.runtime { display: grid; grid-template-columns: auto auto; column-gap: 8px; align-items: center; font-size: 12px; }
 .runtime small { grid-column: 2; color: var(--muted); }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px rgba(112, 225, 200, 0.8); }
+.runtime-switch { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 18px; background: rgba(9,14,20,.8); cursor: pointer; }
+.runtime-switch span { padding: 6px 13px; border-radius: 14px; background: rgba(255,255,255,.08); font-size: 11px; }
+.runtime-switch .inactive { color: var(--muted); background: transparent; }
+.profile-trigger { width: 34px; height: 34px; border: 1px solid rgba(112,225,200,.65); border-radius: 50%; background: rgba(18,31,39,.96); color: var(--accent); box-shadow: 0 0 18px rgba(112,225,200,.23); cursor: pointer; }
+.runtime-menu { position: absolute; z-index: 3000; top: 48px; right: 0; width: 220px; display: grid; gap: 4px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: rgba(17,25,34,.98); box-shadow: 0 24px 70px rgba(0,0,0,.55); }
+.runtime-menu header { display: grid; padding: 4px 8px 12px; }
+.runtime-menu header small { color: var(--accent); }
+.runtime-menu button { padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; color: #c9d3dc; cursor: pointer; }
+.runtime-menu button:hover { background: rgba(255,255,255,.06); }
+.runtime-menu hr { width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16); }
 
 .canvas { position: relative; min-height: calc(100vh - 64px); isolation: isolate; }
 .ambient { position: absolute; inset: 16% 26%; border: 1px solid rgba(112, 225, 200, 0.08); border-radius: 50%; filter: blur(1px); }
@@ -62,7 +73,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .progress { height: 5px; overflow: hidden; border-radius: 4px; background: #27313d; }
 .progress span { display: block; width: 68%; height: 100%; background: var(--accent); }
 .nominal { color: var(--accent) !important; }
-.suggestion { width: 245px; padding: 20px; }
+.object-actions { position: absolute; display: flex; gap: 4px; padding: 7px; border: 1px solid var(--border); border-radius: 15px; background: rgba(17,24,33,.96); box-shadow: 0 18px 45px rgba(0,0,0,.42); }
+.object-actions button { padding: 7px 12px; border: 0; border-radius: 10px; background: transparent; color: #cbd5dd; font-size: 12px; cursor: pointer; }
+.object-actions button:hover, .object-actions button.active { background: rgba(255,255,255,.07); color: white; }
+.suggestion { width: 335px; padding: 22px; border-color: rgba(225,174,55,.64); box-shadow: 0 22px 65px rgba(0,0,0,.42), 0 0 24px rgba(225,174,55,.08); }
+.suggestion.selected { border-color: #e0ad37; box-shadow: 0 0 0 1px rgba(224,173,55,.12), 0 0 32px rgba(224,173,55,.14), 0 24px 70px rgba(0,0,0,.44); }
+.suggestion-heading { display: flex; align-items: center; justify-content: space-between; }
+.suggestion-heading small { color: #f3bd3e; }
+.suggestion-heading b { padding: 5px 8px; border: 1px solid rgba(224,173,55,.5); border-radius: 12px; color: #f3bd3e; font-size: 10px; font-weight: 550; }
+.suggestion p { margin: 2px 0 4px; line-height: 1.5; }
+.suggestion-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 5px; }
+.suggestion-actions button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: #e3e9ed; cursor: pointer; }
+.suggestion-actions .primary { border-color: #efc45a; background: linear-gradient(#f8d36c,#e9af31); color: #17130a; font-weight: 650; }
+.suggestion-source { padding-top: 10px; border-top: 1px solid rgba(154,167,184,.14); font-size: 10px; }
 .sources { width: 245px; padding: 20px; }
 .commitments { width: 310px; padding: 22px; }
 .row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
@@ -78,9 +101,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 @media (max-width: 760px) {
   .topbar { grid-template-columns: 1fr auto; padding: 0 14px; }
-  .path { display: none; }
+  .path, .runtime-switch { display: none; }
   .canvas { min-height: 900px; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; }
-  .ambient, .system-state { display: none; }
+  .ambient, .system-state, .object-actions { display: none; }
   .object, .release, .release:hover { position: static; width: 100%; transform: none; }
   .release { order: -1; }
   .command-bar { position: fixed; }

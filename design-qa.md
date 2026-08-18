@@ -44,13 +44,16 @@ because all six panels use the same pointer-capture and keyboard-movement implem
 3. The six-panel deployment adds the reference background, collaborators, sources, commitments,
    and command bar. A fresh public-browser screenshot has no visible clipping or overlap at the
    tested viewport.
+4. The next deployed slice adds the selected release action rail, expanded amber Mind Suggestion,
+   Local/Remote control, and an interactive runtime/user menu. Semantic browser QA confirms the
+   menu toggles to `aria-expanded=true` and exposes all expected commands. The browser image capture
+   failed repeatedly for this slice, so it is not yet promoted to a new visual comparison baseline.
 
 ## Next implementation checklist
 
 1. Render relationship connectors from live panel centers during drag.
-2. Add the selected-object action rail and detailed card actions.
-3. Add the minimap and runtime/user menu.
-4. Integrate real icon assets and the amber suggestion treatment.
-5. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
+2. Add the minimap.
+3. Integrate real icon assets for the card headers, action rail, command bar, and runtime menu.
+4. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
 
 final result: blocked
