@@ -143,7 +143,6 @@
       bp_title: 'Cybou: A Governed Cognitive Runtime with a Replaceable Interface',
       bp_lead: 'The current whitepaper for Cybou’s twelve-service Mind runtime, its ownership and failure model, the verified M1–M6 substrate, the additive Rust/WebAssembly interface migration, and the M7–M13 roadmap.',
       btn_print_pdf: 'Export to PDF / Print',
-      btn_explore_landing: 'Explore Web Landing',
       bp_sec1_title: '1. Executive Summary & Core Vision',
       toc_vision: 'Vision',
       toc_architecture: 'Architecture',
@@ -170,7 +169,98 @@
       bp_sec4_title: '4. Implementation Status & Progress Matrix',
       bp_sec4_p1: 'Development progress is tracked rigorously across milestone phases and verified against automated acceptance gates.',
       bp_sec5_title: '5. Security, Privacy & Licensing',
-      bp_sec5_p1: 'Cybou is free software built for sovereignty and privacy:'
+      bp_sec5_p1: 'Cybou is free software built for sovereignty and privacy:',
+      nav_partners_footer: 'Partners & Donations',
+      kicker_interface: '01 · Interface',
+      kicker_foundation: '02 · Foundation',
+      kicker_progress: '03 · Live implementation progress',
+      kicker_design: '04 · Design language',
+      kicker_principles: '05 · Principles',
+      kicker_roadmap: '06 · Roadmap',
+      kicker_faq: '07 · Questions & architecture',
+      label_symbol: 'Symbol',
+      label_palette: 'Palette',
+      label_typography: 'Typography',
+      palette_name: 'Mineral dark · Aurora mint',
+      desktop_stable: 'Stable',
+      ws_active: 'Workspace {n} — active',
+      app_ready: '{app} ready',
+      bp_meta_foundation: 'Foundation:',
+      bp_meta_foundation_v: 'Reproducible NixOS 26.05, locked Flakes',
+      bp_meta_interface: 'Interface:',
+      bp_meta_interface_v: 'Rust / WebAssembly (Living Canvas)',
+      bp_meta_status: 'Status:',
+      bp_meta_status_v: 'M1–M6 verified · M7 and Rust migration advancing',
+      bp_meta_updated: 'Updated:',
+      bp_meta_updated_v: 'August 2026',
+      btn_view_state: 'View Current State',
+      bp_stack1: '<strong>Base System:</strong> NixOS 26.05 locked via Nix Flakes; Debian 13 is the active build and verification host for Linux gates.',
+      bp_stack2: '<strong>Interface Layer:</strong> A Rust workspace of five crates — protocol, fabric codec, web contracts, read-only gateway, and the Living Canvas WebAssembly frontend.',
+      bp_stack3: '<strong>Delivery:</strong> The gateway binds to loopback, serves the content-hashed frontend from its own origin, and exposes typed session, snapshot, and bounded event-stream routes with no mutation route.',
+      bp_stack4: '<strong>Session:</strong> An opt-in Wayland session gives the frontend a single surface through a minimal compositor and an ephemeral browser runtime profile. The KDE/Qt shell remains migration-era code and the current fallback.',
+      bp_stack5: '<strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, and one coherent visual grammar across login, windows, and wallpaper.',
+      bp_stack6: '<strong>Build Output:</strong> Bootable NixOS ISO, qemu/KVM virtual machine targets, and Hyper-V development images.',
+      bp_stack7: '<strong>Mind Runtime:</strong> Twelve C++20/Qt 6 user services activated by systemd and addressed through typed D-Bus interfaces.',
+      bp_stack8: '<strong>Canonical Memory:</strong> One event daemon is the only Journal writer; Journal v3 preserves causal metadata verification while supporting crash-safe payload erasure.',
+      bp_stack9: '<strong>Continuity:</strong> Identity, intentions, lifecycle runs, health snapshots, and event consumer progress persist under versioned schemas and atomic writes.',
+      bp_stack10: '<strong>Failure Model:</strong> Optional-owner loss degrades only dependent capabilities; required-owner loss fails mutations closed without inventing state.',
+      bp_topology_title: 'Process and ownership topology',
+      th_milestone: 'Milestone',
+      th_status: 'Status',
+      th_capability: 'Capability',
+      th_boundary: 'Implemented boundary',
+      th_evidence: 'Primary evidence',
+      tag_done: 'DONE',
+      tag_inprogress: 'IN PROGRESS',
+      tag_planned: 'PLANNED',
+      row_m0_cap: 'Green reproducible baseline',
+      row_m0_bound: 'Locked flake, formatting, licensing, metadata, documentation and UI gates',
+      row_m0_ev: 'Reproducible flake checks and focused gates',
+      row_m14_cap: 'Accepted memory and isolated organs',
+      row_m14_bound: 'Single Event1 writer, isolated services, remote Presence proxy',
+      row_m14_ev: 'Protocol, process, event, UI API and VM tests',
+      row_m5_cap: 'Continuity and consolidation lifecycle',
+      row_m5_bound: 'Persistent run state, Lifecycle1, deterministic owner effects, restart and reboot recovery',
+      row_m5_ev: 'Lifecycle continuity and split-commit fault gates',
+      row_m6_cap: 'Health, scheduling and recovery',
+      row_m6_bound: 'Capability graph, Health1, homeostasis v2, evidence-bound scheduling, degraded UI contract',
+      row_m6_ev: 'Recovery boundary and process fault matrix',
+      row_p67_cap: 'Bounded Presence orchestration',
+      row_p67_bound: 'One monotonic budget for every compound Presence read and mutation',
+      row_p67_ev: 'Bounded RPC, suspended-owner process tests and KVM continuity',
+      row_m7_cap: 'Grounded cognition and governed context',
+      row_m7_bound: 'Perception, epistemics, Journal v3 erasure, sensitivity, associative projection, and governed delivery',
+      row_m7_ev: 'Focused unit, process, scale, retention and disclosure gates',
+      row_w01_cap: 'Rust foundation and read-only web boundary',
+      row_w01_bound: 'Locked Cargo workspace, protocol and web-contract crates, loopback gateway with typed session, snapshot, and resumable event stream',
+      row_w01_ev: 'Native tests, strict lints, WebAssembly build and release frontend gates',
+      row_w2_cap: 'One interface for browser and desktop shell',
+      row_w2_bound: 'Shared WebAssembly frontend, independently buildable shell derivation, opt-in single-surface session',
+      row_w2_ev: 'Bootstrap authentication, lock screen, multi-display, input method, and accessibility gates remain open',
+      row_m8_cap: 'Optional language faculty',
+      row_m8_bound: 'Replaceable model behind typed context and proposal contracts',
+      row_m8_ev: 'No model is shipped today',
+      row_m913_cap: 'Learning, governed action, agents and security',
+      row_m913_bound: 'Learned artifacts, authorization, execution, agents, tools, and security remain separate governed boundaries',
+      row_m913_ev: 'None of these future runtimes is shipped today',
+      bp_lic1: '<strong>Code License:</strong> MIT License for all Nix code, build scripts, Rust crates, web assets, and core logic.',
+      bp_lic2: '<strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 for logos, wallpapers, and desktop themes.',
+      bp_lic3: '<strong>Trust Boundaries:</strong> Same-user local IPC is not treated as a complete capability-security boundary; future privileged action requires a separate authorization layer.',
+      bp_lic4: '<strong>Interface Boundary:</strong> The web gateway binds to loopback only, is read-only by construction, and applies no-store and browser-security headers. Bootstrap authentication is not yet implemented, so no live cognitive state may be exposed beyond the local device.',
+      bp_lic5: '<strong>Privacy:</strong> Event envelopes carry explicit privacy and sensitivity axes. Crash-safe transitive erasure and governed disclosure are implemented; sensitive payload storage, automatic expiry, backups, and replication remain open.',
+      bp_lic6: '<strong>Current Cloud Boundary:</strong> The runtime and interface require no hosted AI service or API key, and no language model is shipped today.',
+      bp_lic7: '<strong>Security Documents:</strong> The repository maintains explicit threat and privacy models under version control.',
+      bp_sources_title: 'Canonical sources and claim authority',
+      bp_sources_lead: 'This web whitepaper is a readable summary. Exact implementation claims are governed by the repository:',
+      bp_src1: '— authoritative implemented boundary.',
+      bp_src2: '— topology, ownership, and long-term model.',
+      bp_src3: '— process, reboot, fault, and KVM evidence.',
+      bp_src4: '— detailed implementation record and current work.',
+      bp_sec6_title: '6. Frequently Asked Questions',
+      skip_link: 'Skip to content',
+      metric_v_services: '12 Mind services',
+      metric_v_tests: '37 CTest suites',
+      metric_v_crates: '5 Rust crates'
     },
     fr: {
       nav_experience: 'Interface',
@@ -304,7 +394,6 @@
       bp_title: 'Cybou : un runtime cognitif gouverné avec une interface remplaçable',
       bp_lead: 'Le livre blanc actuel du runtime Mind à douze services, de son modèle de propriété et de panne, du substrat vérifié M1–M6, de la migration additive vers Rust/WebAssembly et de la feuille de route M7–M13.',
       btn_print_pdf: 'Exporter en PDF / Imprimer',
-      btn_explore_landing: 'Explorer le site',
       bp_sec1_title: '1. Résumé et vision',
       toc_vision: 'Vision',
       toc_architecture: 'Architecture',
@@ -331,7 +420,98 @@
       bp_sec4_title: '4. État d’implémentation et matrice de progression',
       bp_sec4_p1: 'La progression est suivie rigoureusement par jalons et vérifiée par des portes d’acceptation automatisées.',
       bp_sec5_title: '5. Sécurité, vie privée et licences',
-      bp_sec5_p1: 'Cybou est un logiciel libre conçu pour la souveraineté et la vie privée :'
+      bp_sec5_p1: 'Cybou est un logiciel libre conçu pour la souveraineté et la vie privée :',
+      nav_partners_footer: 'Partenaires & dons',
+      kicker_interface: '01 · Interface',
+      kicker_foundation: '02 · Fondation',
+      kicker_progress: '03 · Progression réelle',
+      kicker_design: '04 · Langage visuel',
+      kicker_principles: '05 · Principes',
+      kicker_roadmap: '06 · Feuille de route',
+      kicker_faq: '07 · Questions & architecture',
+      label_symbol: 'Symbole',
+      label_palette: 'Palette',
+      label_typography: 'Typographie',
+      palette_name: 'Minéral sombre · menthe aurore',
+      desktop_stable: 'Stable',
+      ws_active: 'Espace de travail {n} — actif',
+      app_ready: '{app} prêt',
+      bp_meta_foundation: 'Fondation :',
+      bp_meta_foundation_v: 'NixOS 26.05 reproductible, Flakes verrouillés',
+      bp_meta_interface: 'Interface :',
+      bp_meta_interface_v: 'Rust / WebAssembly (Living Canvas)',
+      bp_meta_status: 'Statut :',
+      bp_meta_status_v: 'M1–M6 vérifiés · M7 et migration Rust en cours',
+      bp_meta_updated: 'Mise à jour :',
+      bp_meta_updated_v: 'Août 2026',
+      btn_view_state: 'Voir l’état actuel',
+      bp_stack1: '<strong>Système de base :</strong> NixOS 26.05 verrouillé par Nix Flakes ; Debian 13 est l’hôte actif de build et de vérification pour les portes Linux.',
+      bp_stack2: '<strong>Couche d’interface :</strong> un espace de travail Rust de cinq crates — protocole, codec fabric, contrats web, passerelle en lecture seule et le frontend WebAssembly Living Canvas.',
+      bp_stack3: '<strong>Livraison :</strong> la passerelle écoute la boucle locale, sert le frontend au hachage de contenu depuis sa propre origine, et expose des routes typées de session, d’instantané et de flux d’événements borné, sans route de mutation.',
+      bp_stack4: '<strong>Session :</strong> une session Wayland optionnelle donne au frontend une surface unique via un compositeur minimal et un profil d’exécution éphémère. Le shell KDE/Qt reste du code de migration et le repli actuel.',
+      bp_stack5: '<strong>Thème & esthétique :</strong> thème global Cybou Horizon, jetons de couleur clair/sombre, et une grammaire visuelle cohérente pour la connexion, les fenêtres et le fond d’écran.',
+      bp_stack6: '<strong>Sorties de build :</strong> ISO NixOS amorçable, cibles de machines virtuelles qemu/KVM et images de développement Hyper-V.',
+      bp_stack7: '<strong>Runtime Mind :</strong> douze services utilisateur C++20/Qt 6 activés par systemd et adressés via des interfaces D-Bus typées.',
+      bp_stack8: '<strong>Mémoire canonique :</strong> un seul démon d’événements écrit dans le Journal ; le Journal v3 préserve la vérification des métadonnées causales tout en permettant un effacement sûr en cas de panne.',
+      bp_stack9: '<strong>Continuité :</strong> identité, intentions, exécutions de cycle de vie, instantanés de santé et progression des consommateurs d’événements persistent sous schémas versionnés et écritures atomiques.',
+      bp_stack10: '<strong>Modèle de panne :</strong> la perte d’un propriétaire optionnel ne dégrade que les capacités dépendantes ; la perte d’un propriétaire requis fait échouer les mutations sans inventer d’état.',
+      bp_topology_title: 'Topologie des processus et de la propriété',
+      th_milestone: 'Jalon',
+      th_status: 'Statut',
+      th_capability: 'Capacité',
+      th_boundary: 'Frontière implémentée',
+      th_evidence: 'Preuve principale',
+      tag_done: 'FAIT',
+      tag_inprogress: 'EN COURS',
+      tag_planned: 'PLANIFIÉ',
+      row_m0_cap: 'Base reproductible verte',
+      row_m0_bound: 'Flake verrouillé, formatage, licences, métadonnées, documentation et portes UI',
+      row_m0_ev: 'Vérifications de flake reproductibles et portes ciblées',
+      row_m14_cap: 'Mémoire acceptée et organes isolés',
+      row_m14_bound: 'Un seul écrivain Event1, services isolés, proxy Presence distant',
+      row_m14_ev: 'Tests de protocole, de processus, d’événements, d’API UI et de VM',
+      row_m5_cap: 'Continuité et cycle de vie de consolidation',
+      row_m5_bound: 'État d’exécution persistant, Lifecycle1, effets déterministes, reprise après redémarrage',
+      row_m5_ev: 'Portes de continuité de cycle de vie et de panne à commit partiel',
+      row_m6_cap: 'Santé, ordonnancement et reprise',
+      row_m6_bound: 'Graphe de capacités, Health1, homéostasie v2, ordonnancement lié aux preuves, contrat UI dégradé',
+      row_m6_ev: 'Frontière de reprise et matrice de pannes de processus',
+      row_p67_cap: 'Orchestration bornée de Presence',
+      row_p67_bound: 'Un budget monotone pour chaque lecture et mutation composée de Presence',
+      row_p67_ev: 'RPC borné, tests de propriétaire suspendu et continuité KVM',
+      row_m7_cap: 'Cognition ancrée et contexte gouverné',
+      row_m7_bound: 'Perception, épistémique, effacement Journal v3, sensibilité, projection associative et livraison gouvernée',
+      row_m7_ev: 'Portes ciblées d’unité, de processus, d’échelle, de rétention et de divulgation',
+      row_w01_cap: 'Fondation Rust et frontière web en lecture seule',
+      row_w01_bound: 'Espace de travail Cargo verrouillé, crates de protocole et de contrats web, passerelle locale avec session, instantané et flux d’événements reprenable',
+      row_w01_ev: 'Tests natifs, lints stricts, build WebAssembly et portes du frontend de version',
+      row_w2_cap: 'Une interface pour navigateur et shell de bureau',
+      row_w2_bound: 'Frontend WebAssembly partagé, dérivation de shell compilable séparément, session optionnelle à surface unique',
+      row_w2_ev: 'Authentification initiale, écran de verrouillage, multi-écrans, méthode de saisie et accessibilité restent ouverts',
+      row_m8_cap: 'Faculté de langage optionnelle',
+      row_m8_bound: 'Modèle remplaçable derrière des contrats typés de contexte et de proposition',
+      row_m8_ev: 'Aucun modèle livré aujourd’hui',
+      row_m913_cap: 'Apprentissage, action gouvernée, agents et sécurité',
+      row_m913_bound: 'Artefacts appris, autorisation, exécution, agents, outils et sécurité restent des frontières gouvernées distinctes',
+      row_m913_ev: 'Aucun de ces runtimes futurs n’est livré aujourd’hui',
+      bp_lic1: '<strong>Licence du code :</strong> licence MIT pour tout le code Nix, les scripts de build, les crates Rust, les ressources web et la logique centrale.',
+      bp_lic2: '<strong>Ressources visuelles :</strong> Creative Commons Attribution-ShareAlike 4.0 pour les logos, fonds d’écran et thèmes.',
+      bp_lic3: '<strong>Frontières de confiance :</strong> l’IPC local du même utilisateur n’est pas traité comme une frontière de sécurité complète ; toute action privilégiée future exigera une couche d’autorisation distincte.',
+      bp_lic4: '<strong>Frontière d’interface :</strong> la passerelle web n’écoute que la boucle locale, est en lecture seule par construction et applique des en-têtes no-store et de sécurité navigateur. L’authentification initiale n’est pas implémentée : aucun état cognitif réel ne peut être exposé hors de l’appareil local.',
+      bp_lic5: '<strong>Vie privée :</strong> les enveloppes d’événements portent des axes explicites de confidentialité et de sensibilité. L’effacement transitif sûr et la divulgation gouvernée sont implémentés ; le stockage de charges sensibles, l’expiration automatique, les sauvegardes et la réplication restent ouverts.',
+      bp_lic6: '<strong>Frontière cloud actuelle :</strong> le runtime et l’interface n’exigent aucun service d’IA hébergé ni clé d’API, et aucun modèle de langage n’est livré aujourd’hui.',
+      bp_lic7: '<strong>Documents de sécurité :</strong> le dépôt maintient des modèles explicites de menace et de vie privée sous contrôle de version.',
+      bp_sources_title: 'Sources canoniques et autorité des affirmations',
+      bp_sources_lead: 'Ce livre blanc web est un résumé lisible. Les affirmations exactes d’implémentation sont régies par le dépôt :',
+      bp_src1: '— frontière implémentée faisant autorité.',
+      bp_src2: '— topologie, propriété et modèle à long terme.',
+      bp_src3: '— preuves de processus, de redémarrage, de panne et KVM.',
+      bp_src4: '— journal d’implémentation détaillé et travaux en cours.',
+      bp_sec6_title: '6. Questions fréquentes',
+      skip_link: 'Aller au contenu',
+      metric_v_services: '12 services Mind',
+      metric_v_tests: '37 suites CTest',
+      metric_v_crates: '5 crates Rust'
     },
     ru: {
       nav_experience: 'Интерфейс',
@@ -465,7 +645,6 @@
       bp_title: 'Cybou: управляемый когнитивный рантайм с заменяемым интерфейсом',
       bp_lead: 'Актуальный технический документ о рантайме Mind из двенадцати сервисов, модели владения и отказов, проверенном фундаменте M1–M6, аддитивной миграции на Rust/WebAssembly и дорожной карте M7–M13.',
       btn_print_pdf: 'Экспорт в PDF / печать',
-      btn_explore_landing: 'Открыть сайт',
       bp_sec1_title: '1. Краткое резюме и видение',
       toc_vision: 'Видение',
       toc_architecture: 'Архитектура',
@@ -492,11 +671,130 @@
       bp_sec4_title: '4. Прогресс разработки и матрица задач',
       bp_sec4_p1: 'Ход разработки строго фиксируется по этапам и проверяется авто-тестами.',
       bp_sec5_title: '5. Безопасность, приватность и лицензии',
-      bp_sec5_p1: 'Cybou — свободное ПО, созданное для цифрового суверенитета:'
+      bp_sec5_p1: 'Cybou — свободное ПО, созданное для цифрового суверенитета:',
+      nav_partners_footer: 'Партнёры и донаты',
+      kicker_interface: '01 · Интерфейс',
+      kicker_foundation: '02 · Основа',
+      kicker_progress: '03 · Реальный прогресс',
+      kicker_design: '04 · Визуальный язык',
+      kicker_principles: '05 · Принципы',
+      kicker_roadmap: '06 · Дорожная карта',
+      kicker_faq: '07 · Вопросы и архитектура',
+      label_symbol: 'Символ',
+      label_palette: 'Палитра',
+      label_typography: 'Типографика',
+      palette_name: 'Минеральный тёмный · мятная аврора',
+      desktop_stable: 'Стабильно',
+      ws_active: 'Рабочий стол {n} — активен',
+      app_ready: '{app} готово',
+      bp_meta_foundation: 'Основа:',
+      bp_meta_foundation_v: 'Воспроизводимая NixOS 26.05, зафиксированные Flakes',
+      bp_meta_interface: 'Интерфейс:',
+      bp_meta_interface_v: 'Rust / WebAssembly (Living Canvas)',
+      bp_meta_status: 'Статус:',
+      bp_meta_status_v: 'M1–M6 проверены · M7 и миграция на Rust идут',
+      bp_meta_updated: 'Обновлено:',
+      bp_meta_updated_v: 'Август 2026',
+      btn_view_state: 'Открыть текущее состояние',
+      bp_stack1: '<strong>Базовая система:</strong> NixOS 26.05, зафиксированная через Nix Flakes; Debian 13 — активный хост сборки и проверки для Linux-гейтов.',
+      bp_stack2: '<strong>Слой интерфейса:</strong> Rust-воркспейс из пяти крейтов — протокол, кодек fabric, веб-контракты, шлюз только на чтение и WebAssembly-фронтенд Living Canvas.',
+      bp_stack3: '<strong>Доставка:</strong> шлюз слушает локальную петлю, отдаёт фронтенд с хешем содержимого со своего же origin и предоставляет типизированные маршруты сессии, снапшота и ограниченного потока событий — без единого маршрута мутации.',
+      bp_stack4: '<strong>Сессия:</strong> опциональная Wayland-сессия даёт фронтенду единственную поверхность через минимальный композитор и эфемерный профиль исполнения. Оболочка KDE/Qt остаётся кодом переходного периода и текущим запасным вариантом.',
+      bp_stack5: '<strong>Тема и эстетика:</strong> глобальная тема Cybou Horizon, цветовые токены светлой и тёмной схем и единая визуальная грамматика для входа, окон и обоев.',
+      bp_stack6: '<strong>Результаты сборки:</strong> загрузочный ISO NixOS, цели виртуальных машин qemu/KVM и образы разработки Hyper-V.',
+      bp_stack7: '<strong>Рантайм Mind:</strong> двенадцать пользовательских сервисов на C++20/Qt 6, активируемых systemd и адресуемых через типизированные интерфейсы D-Bus.',
+      bp_stack8: '<strong>Каноническая память:</strong> единственный демон событий — единственный писатель Журнала; Журнал v3 сохраняет проверяемость причинных метаданных и допускает устойчивое к сбоям стирание полезной нагрузки.',
+      bp_stack9: '<strong>Непрерывность:</strong> идентичность, намерения, запуски жизненного цикла, снимки здоровья и прогресс потребителей событий сохраняются по версионированным схемам и атомарным записям.',
+      bp_stack10: '<strong>Модель отказов:</strong> потеря необязательного владельца деградирует только зависимые возможности; потеря обязательного владельца закрывает мутации, не выдумывая состояние.',
+      bp_topology_title: 'Топология процессов и владения',
+      th_milestone: 'Этап',
+      th_status: 'Статус',
+      th_capability: 'Возможность',
+      th_boundary: 'Реализованная граница',
+      th_evidence: 'Основное доказательство',
+      tag_done: 'ГОТОВО',
+      tag_inprogress: 'В РАБОТЕ',
+      tag_planned: 'ПЛАН',
+      row_m0_cap: 'Зелёная воспроизводимая база',
+      row_m0_bound: 'Зафиксированный flake, форматирование, лицензии, метаданные, документация и UI-гейты',
+      row_m0_ev: 'Воспроизводимые проверки flake и точечные гейты',
+      row_m14_cap: 'Принятая память и изолированные органы',
+      row_m14_bound: 'Единственный писатель Event1, изолированные сервисы, удалённый прокси Presence',
+      row_m14_ev: 'Тесты протокола, процессов, событий, UI-API и VM',
+      row_m5_cap: 'Непрерывность и жизненный цикл консолидации',
+      row_m5_bound: 'Персистентное состояние запуска, Lifecycle1, детерминированные эффекты, восстановление после перезапуска и перезагрузки',
+      row_m5_ev: 'Гейты непрерывности жизненного цикла и сбоя при частичном коммите',
+      row_m6_cap: 'Здоровье, планирование и восстановление',
+      row_m6_bound: 'Граф возможностей, Health1, гомеостаз v2, планирование по свидетельствам, контракт деградированного UI',
+      row_m6_ev: 'Граница восстановления и матрица сбоев процессов',
+      row_p67_cap: 'Ограниченная оркестрация Presence',
+      row_p67_bound: 'Один монотонный бюджет на каждое составное чтение и мутацию Presence',
+      row_p67_ev: 'Ограниченный RPC, тесты приостановленного владельца и непрерывность в KVM',
+      row_m7_cap: 'Заземлённое познание и управляемый контекст',
+      row_m7_bound: 'Восприятие, эпистемика, стирание в Журнале v3, чувствительность, ассоциативная проекция и управляемая доставка',
+      row_m7_ev: 'Точечные гейты модулей, процессов, масштаба, хранения и раскрытия',
+      row_w01_cap: 'Основа на Rust и веб-граница только на чтение',
+      row_w01_bound: 'Зафиксированный воркспейс Cargo, крейты протокола и веб-контрактов, локальный шлюз с типизированными сессией, снапшотом и возобновляемым потоком событий',
+      row_w01_ev: 'Нативные тесты, строгие линты, сборка WebAssembly и гейты релизного фронтенда',
+      row_w2_cap: 'Один интерфейс для браузера и десктопной оболочки',
+      row_w2_bound: 'Общий WebAssembly-фронтенд, независимо собираемая деривация оболочки, опциональная сессия с единственной поверхностью',
+      row_w2_ev: 'Стартовая аутентификация, экран блокировки, много мониторов, метод ввода и доступность остаются открытыми',
+      row_m8_cap: 'Опциональная языковая способность',
+      row_m8_bound: 'Заменяемая модель за типизированными контрактами контекста и предложений',
+      row_m8_ev: 'Модель сегодня не поставляется',
+      row_m913_cap: 'Обучение, управляемое действие, агенты и безопасность',
+      row_m913_bound: 'Обученные артефакты, авторизация, исполнение, агенты, инструменты и безопасность остаются отдельными управляемыми границами',
+      row_m913_ev: 'Ни один из этих будущих рантаймов сегодня не поставляется',
+      bp_lic1: '<strong>Лицензия кода:</strong> MIT для всего кода Nix, скриптов сборки, Rust-крейтов, веб-ресурсов и основной логики.',
+      bp_lic2: '<strong>Визуальные ресурсы:</strong> Creative Commons Attribution-ShareAlike 4.0 для логотипов, обоев и тем.',
+      bp_lic3: '<strong>Границы доверия:</strong> локальный IPC того же пользователя не считается полной границей безопасности возможностей; будущее привилегированное действие потребует отдельного слоя авторизации.',
+      bp_lic4: '<strong>Граница интерфейса:</strong> веб-шлюз слушает только локальную петлю, по построению работает лишь на чтение и применяет no-store и браузерные заголовки безопасности. Стартовая аутентификация не реализована, поэтому живое когнитивное состояние не может покидать локальное устройство.',
+      bp_lic5: '<strong>Приватность:</strong> конверты событий несут явные оси приватности и чувствительности. Устойчивое к сбоям транзитивное стирание и управляемое раскрытие реализованы; хранение чувствительной нагрузки, автоматическое истечение, резервные копии и репликация остаются открытыми.',
+      bp_lic6: '<strong>Текущая граница облака:</strong> рантайму и интерфейсу не нужны хостинговый ИИ-сервис или API-ключ, и языковая модель сегодня не поставляется.',
+      bp_lic7: '<strong>Документы безопасности:</strong> репозиторий поддерживает явные модели угроз и приватности под контролем версий.',
+      bp_sources_title: 'Канонические источники и авторитет утверждений',
+      bp_sources_lead: 'Этот веб-документ — читаемое резюме. Точные утверждения о реализации определяются репозиторием:',
+      bp_src1: '— авторитетная реализованная граница.',
+      bp_src2: '— топология, владение и долгосрочная модель.',
+      bp_src3: '— доказательства процессов, перезагрузки, сбоев и KVM.',
+      bp_src4: '— подробный журнал реализации и текущая работа.',
+      bp_sec6_title: '6. Частые вопросы',
+      skip_link: 'Перейти к содержимому',
+      metric_v_services: '12 сервисов Mind',
+      metric_v_tests: '37 наборов CTest',
+      metric_v_crates: '5 Rust-крейтов'
     }
   };
 
   let currentLang = localStorage.getItem('cybou_lang') || 'en';
+
+  // Dictionary strings are authored in this file, never user input. Only the inline emphasis
+  // markup below is honoured; everything else is escaped, so a stray '<' can never become an element.
+  const INLINE_MARKUP = /&lt;(\/?)(strong|em|code)&gt;/g;
+
+  const applyText = (node, value) => {
+    if (value.indexOf('<') === -1) {
+      node.textContent = value;
+      return;
+    }
+    const escaped = value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    node.innerHTML = escaped.replace(INLINE_MARKUP, '<$1$2>');
+  };
+
+  const t = (key, replacements) => {
+    const table = translations[currentLang] || translations.en;
+    let value = table[key] || translations.en[key] || key;
+    if (replacements) {
+      Object.keys(replacements).forEach((name) => {
+        value = value.replace('{' + name + '}', replacements[name]);
+      });
+    }
+    return value;
+  };
+
 
   const setLanguage = (lang) => {
     if (!translations[lang]) return;
@@ -505,8 +803,16 @@
 
     document.querySelectorAll('[data-i18n]').forEach((node) => {
       const key = node.getAttribute('data-i18n');
-      if (translations[lang][key]) {
-        node.textContent = translations[lang][key];
+      const value = translations[lang][key];
+      if (value) {
+        applyText(node, value);
+      }
+    });
+
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((node) => {
+      const value = translations[lang][node.getAttribute('data-i18n-placeholder')];
+      if (value) {
+        node.setAttribute('placeholder', value);
       }
     });
 
@@ -682,7 +988,7 @@
       dot.classList.add('active');
       const wsNum = dot.getAttribute('data-ws');
       if (desktopStatusText) {
-        desktopStatusText.textContent = `Workspace ${wsNum} — active`;
+        desktopStatusText.textContent = t('ws_active', { n: wsNum });
       }
     });
   });
@@ -693,7 +999,7 @@
       e.stopPropagation();
       const appName = btn.getAttribute('data-app');
       if (desktopStatusText) {
-        desktopStatusText.textContent = `${appName} app ready`;
+        desktopStatusText.textContent = t('app_ready', { app: appName });
       }
     });
   });

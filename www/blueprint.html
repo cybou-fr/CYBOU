@@ -283,18 +283,18 @@ SPDX-License-Identifier: MIT
         The current whitepaper for Cybou’s twelve-service Mind runtime, its ownership and failure model, the verified M1–M6 substrate, the additive Rust/WebAssembly interface migration, and the M7–M13 roadmap.
       </p>
       <div class="bp-meta">
-        <span><strong>Foundation:</strong> Reproducible NixOS 26.05, locked Flakes</span>
-        <span><strong>Interface:</strong> Rust / WebAssembly (Living Canvas)</span>
-        <span><strong>Status:</strong> M1–M6 verified · M7 and Rust migration advancing</span>
-        <span><strong>Updated:</strong> August 2026</span>
+        <span><strong data-i18n="bp_meta_foundation">Foundation:</strong> <span data-i18n="bp_meta_foundation_v">Reproducible NixOS 26.05, locked Flakes</span></span>
+        <span><strong data-i18n="bp_meta_interface">Interface:</strong> <span data-i18n="bp_meta_interface_v">Rust / WebAssembly (Living Canvas)</span></span>
+        <span><strong data-i18n="bp_meta_status">Status:</strong> <span data-i18n="bp_meta_status_v">M1–M6 verified · M7 and Rust migration advancing</span></span>
+        <span><strong data-i18n="bp_meta_updated">Updated:</strong> <span data-i18n="bp_meta_updated_v">August 2026</span></span>
       </div>
 
       <div class="action-bar">
-        <button class="button button--primary" onclick="window.print()" data-i18n="btn_print_pdf">
+        <button class="button button--primary" onclick="window.print()">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1 -2-2v-5a2 2 0 0 1  2-2h16a2 2 0 0 1  2 2v5a2 2 0 0 1 -2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-          Export to PDF / Print
+          <span data-i18n="btn_print_pdf">Export to PDF / Print</span>
         </button>
-        <a class="button button--ghost" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener">View Current State</a>
+        <a class="button button--ghost" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener" data-i18n="btn_view_state">View Current State</a>
       </div>
     </header>
 
@@ -310,19 +310,19 @@ SPDX-License-Identifier: MIT
     <section class="bp-section reveal" id="summary">
       <h2 data-i18n="bp_sec1_title">1. Executive Summary & Core Vision</h2>
       <p data-i18n="bp_sec1_p1">
-        Cybou is an experimental agent-native operating environment with independently testable layers: a reproducible system foundation, Mind — a local typed runtime for durable biography, identity continuity, commitments, prediction, self projection, bounded attention, health, and lifecycle recovery — and a replaceable Rust/WebAssembly interface. It is not a chatbot and makes no claim of consciousness.
+        Cybou is an experimental agent-native operating environment with independently testable layers: a reproducible system foundation, Mind — a local typed runtime for durable biography, identity, commitments, prediction, bounded attention, health and recovery — and a replaceable Rust/WebAssembly interface. It is not a chatbot and makes no claim of consciousness.
       </p>
       <div class="bp-grid-2">
         <div class="bp-card">
           <h3 data-i18n="bp_layer1_title">Layer 1: Reproducible Body</h3>
           <p data-i18n="bp_layer1_desc">
-            Locked Flakes, atomic generations, Horizon visual packages, VM/ISO/Hyper-V outputs, and explicit build and recovery gates. Debian 13 is the active build and verification environment for every Linux gate.
+            Locked Flakes, atomic generations, VM/ISO/Hyper-V outputs, and explicit build and recovery gates. Debian 13 is the active build and verification environment for every Linux gate.
           </p>
         </div>
         <div class="bp-card">
           <h3 data-i18n="bp_layer2_title">Layer 2: Typed Mind Runtime</h3>
           <p data-i18n="bp_layer2_desc">
-        Twelve isolated systemd user services communicate through typed D-Bus contracts. Event1 is the single canonical Journal boundary; Presence is a projection, not a second owner. Language models and privileged execution remain absent.
+        Twelve isolated systemd user services communicate through typed D-Bus contracts. Event1 is the canonical Journal boundary; Presence is a projection, not a second owner. Language models and privileged execution remain absent.
       </p>
         </div>
         <div class="bp-card">
@@ -342,20 +342,20 @@ SPDX-License-Identifier: MIT
       <div class="bp-card">
         <h3 data-i18n="bp_stack_title">Core System Stack</h3>
         <ul>
-          <li><strong>Base System:</strong> NixOS 26.05 locked via Nix Flakes (<code style="color:var(--accent);">flake.lock</code>); Debian 13 is the active build and verification host for Linux gates.</li>
-          <li><strong>Interface Layer:</strong> A Rust workspace of five crates — protocol, fabric codec, web contracts, read-only gateway, and the Living Canvas WebAssembly frontend.</li>
-          <li><strong>Delivery:</strong> The gateway binds to <code style="color:var(--accent);">127.0.0.1</code>, serves the content-hashed frontend from its own origin, and exposes typed session, snapshot, and bounded event-stream routes with no mutation route.</li>
-          <li><strong>Session:</strong> An opt-in Wayland session gives the frontend a single surface through a minimal compositor and an ephemeral browser runtime profile. The KDE/Qt shell remains migration-era code and the current fallback.</li>
-          <li><strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, and one coherent visual grammar across login, windows, and wallpaper.</li>
-          <li><strong>Build Output:</strong> Bootable NixOS ISO, qemu/KVM virtual machine targets, and Hyper-V development images.</li>
-          <li><strong>Mind Runtime:</strong> Twelve C++20/Qt 6 user services activated by systemd and addressed through typed D-Bus interfaces.</li>
-          <li><strong>Canonical Memory:</strong> <code>cybou-eventd</code> is the only Journal writer; Journal v3 preserves causal metadata verification while supporting crash-safe payload erasure.</li>
-          <li><strong>Continuity:</strong> Identity, intentions, lifecycle runs, health snapshots, and Event1 consumer progress persist under versioned schemas and atomic writes.</li>
-          <li><strong>Failure Model:</strong> Optional-owner loss degrades only dependent capabilities; required-owner loss fails mutations closed without inventing state.</li>
+          <li data-i18n="bp_stack1"><strong>Base System:</strong> NixOS 26.05 locked via Nix Flakes; Debian 13 is the active build and verification host for Linux gates.</li>
+          <li data-i18n="bp_stack2"><strong>Interface Layer:</strong> A Rust workspace of five crates — protocol, fabric codec, web contracts, read-only gateway, and the Living Canvas WebAssembly frontend.</li>
+          <li data-i18n="bp_stack3"><strong>Delivery:</strong> The gateway binds to loopback, serves the content-hashed frontend from its own origin, and exposes typed session, snapshot, and bounded event-stream routes with no mutation route.</li>
+          <li data-i18n="bp_stack4"><strong>Session:</strong> An opt-in Wayland session gives the frontend a single surface through a minimal compositor and an ephemeral browser runtime profile. The KDE/Qt shell remains migration-era code and the current fallback.</li>
+          <li data-i18n="bp_stack5"><strong>Theme & Aesthetics:</strong> Cybou Horizon global theme, dark/light color tokens, and one coherent visual grammar across login, windows, and wallpaper.</li>
+          <li data-i18n="bp_stack6"><strong>Build Output:</strong> Bootable NixOS ISO, qemu/KVM virtual machine targets, and Hyper-V development images.</li>
+          <li data-i18n="bp_stack7"><strong>Mind Runtime:</strong> Twelve C++20/Qt 6 user services activated by systemd and addressed through typed D-Bus interfaces.</li>
+          <li data-i18n="bp_stack8"><strong>Canonical Memory:</strong> One event daemon is the only Journal writer; Journal v3 preserves causal metadata verification while supporting crash-safe payload erasure.</li>
+          <li data-i18n="bp_stack9"><strong>Continuity:</strong> Identity, intentions, lifecycle runs, health snapshots, and event consumer progress persist under versioned schemas and atomic writes.</li>
+          <li data-i18n="bp_stack10"><strong>Failure Model:</strong> Optional-owner loss degrades only dependent capabilities; required-owner loss fails mutations closed without inventing state.</li>
         </ul>
       </div>
       <div class="bp-card" style="margin-top:20px;">
-        <h3>Mind process and ownership topology</h3>
+        <h3 data-i18n="bp_topology_title">Process and ownership topology</h3>
         <pre style="overflow:auto; white-space:pre; color:var(--ink-1);"><code>Living Canvas (Rust / WebAssembly)
             │ typed JSON + event stream
             ▼
@@ -385,8 +385,8 @@ SPDX-License-Identifier: MIT
       <ul>
         <li data-i18n="bp_ai_point1"><strong>Ownership before intelligence:</strong> model ≠ identity, UI ≠ Mind, attention ≠ biography, and proposal ≠ authorization.</li>
         <li data-i18n="bp_ai_point2"><strong>Durability before visibility:</strong> state is projected only after its owner commits it; consolidation adds evidence-linked outcomes and never rewrites history.</li>
-        <li data-i18n="bp_ai_point3"><strong>Bounded degradation:</strong> Health1 publishes typed deficits and recovery progress; compound Presence reads and mutations share one monotonic deadline.</li>
-        <li data-i18n="bp_ai_point4"><strong>No hidden agency:</strong> M8 language is optional and replaceable; M9 learning, M10 action, and M11 agents remain separate governed boundaries.</li>
+        <li data-i18n="bp_ai_point3"><strong>Bounded degradation:</strong> Health1 publishes typed deficits and recovery progress; compound reads and mutations share one monotonic deadline.</li>
+        <li data-i18n="bp_ai_point4"><strong>No hidden agency:</strong> the interface may only read; M8 language is optional and replaceable, and M9 learning, M10 action, and M11 agents remain separate governed boundaries.</li>
       </ul>
     </section>
 
@@ -399,83 +399,83 @@ SPDX-License-Identifier: MIT
         <table class="bp-table">
           <thead>
             <tr>
-              <th>Milestone</th>
-              <th>Status</th>
-              <th>Capability</th>
-              <th>Implemented Boundary</th>
-              <th>Primary Evidence</th>
+              <th data-i18n="th_milestone">Milestone</th>
+              <th data-i18n="th_status">Status</th>
+              <th data-i18n="th_capability">Capability</th>
+              <th data-i18n="th_boundary">Implemented boundary</th>
+              <th data-i18n="th_evidence">Primary evidence</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>M0</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>Green reproducible baseline</td>
-              <td>Locked flake, formatting, licensing, metadata, documentation and UI gates</td>
-              <td><code>nix flake check</code> outputs and focused checks</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_m0_cap">Green reproducible baseline</td>
+              <td data-i18n="row_m0_bound">Locked flake, formatting, licensing, metadata, documentation and UI gates</td>
+              <td data-i18n="row_m0_ev">Reproducible flake checks and focused gates</td>
             </tr>
             <tr>
               <td>M1–M4</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>Accepted memory and isolated organs</td>
-              <td>Single Event1 writer, isolated services, remote Presence proxy</td>
-              <td>Protocol, process, Event1, QML API and VM tests</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_m14_cap">Accepted memory and isolated organs</td>
+              <td data-i18n="row_m14_bound">Single Event1 writer, isolated services, remote Presence proxy</td>
+              <td data-i18n="row_m14_ev">Protocol, process, event, UI API and VM tests</td>
             </tr>
             <tr>
               <td>M5</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>Continuity and consolidation lifecycle</td>
-              <td>Persistent run state, Lifecycle1, deterministic owner effects, restart/reboot recovery</td>
-              <td><code>lifecycle-continuity</code> and split-commit fault gates</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_m5_cap">Continuity and consolidation lifecycle</td>
+              <td data-i18n="row_m5_bound">Persistent run state, Lifecycle1, deterministic owner effects, restart and reboot recovery</td>
+              <td data-i18n="row_m5_ev">Lifecycle continuity and split-commit fault gates</td>
             </tr>
             <tr>
               <td>M6 / P6.1–P6.6</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>Health, scheduling and recovery</td>
-              <td>Capability graph, Health1, homeostasis v2, automatic evidence-bound scheduling, degraded UI contract</td>
-              <td><code>m6-recovery-boundary</code> and process fault matrix</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_m6_cap">Health, scheduling and recovery</td>
+              <td data-i18n="row_m6_bound">Capability graph, Health1, homeostasis v2, evidence-bound scheduling, degraded UI contract</td>
+              <td data-i18n="row_m6_ev">Recovery boundary and process fault matrix</td>
             </tr>
             <tr>
               <td>P6.7</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>Bounded Presence orchestration</td>
-              <td>One monotonic budget for every compound Presence read and mutation</td>
-              <td>Bounded RPC, suspended-owner process tests and KVM continuity</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_p67_cap">Bounded Presence orchestration</td>
+              <td data-i18n="row_p67_bound">One monotonic budget for every compound Presence read and mutation</td>
+              <td data-i18n="row_p67_ev">Bounded RPC, suspended-owner process tests and KVM continuity</td>
             </tr>
             <tr>
               <td>M7</td>
-              <td><span class="status-tag inprogress">IN PROGRESS</span></td>
-              <td>Grounded cognition and governed context</td>
-              <td>Perception, epistemics, Journal v3 erasure, sensitivity, associative projection, and governed delivery</td>
-              <td>Focused unit, process, scale, retention and disclosure gates</td>
+              <td><span class="status-tag inprogress" data-i18n="tag_inprogress">IN PROGRESS</span></td>
+              <td data-i18n="row_m7_cap">Grounded cognition and governed context</td>
+              <td data-i18n="row_m7_bound">Perception, epistemics, Journal v3 erasure, sensitivity, associative projection, and governed delivery</td>
+              <td data-i18n="row_m7_ev">Focused unit, process, scale, retention and disclosure gates</td>
             </tr>
             <tr>
               <td>W0–W1</td>
-              <td><span class="status-tag done">DONE</span></td>
-              <td>Rust foundation and read-only web boundary</td>
-              <td>Locked Cargo workspace, protocol and web-contract crates, loopback gateway with typed session, snapshot, and resumable event stream</td>
-              <td>Native tests, strict clippy, WebAssembly build and release frontend gates</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_w01_cap">Rust foundation and read-only web boundary</td>
+              <td data-i18n="row_w01_bound">Locked Cargo workspace, protocol and web-contract crates, loopback gateway with typed session, snapshot, and resumable event stream</td>
+              <td data-i18n="row_w01_ev">Native tests, strict lints, WebAssembly build and release frontend gates</td>
             </tr>
             <tr>
               <td>W2</td>
-              <td><span class="status-tag inprogress">IN PROGRESS</span></td>
-              <td>One interface for browser and desktop shell</td>
-              <td>Shared WebAssembly frontend, independently buildable shell derivation, opt-in single-surface session</td>
-              <td>Bootstrap authentication, lock screen, multi-display, input method, and accessibility gates remain open</td>
+              <td><span class="status-tag inprogress" data-i18n="tag_inprogress">IN PROGRESS</span></td>
+              <td data-i18n="row_w2_cap">One interface for browser and desktop shell</td>
+              <td data-i18n="row_w2_bound">Shared WebAssembly frontend, independently buildable shell derivation, opt-in single-surface session</td>
+              <td data-i18n="row_w2_ev">Bootstrap authentication, lock screen, multi-display, input method, and accessibility gates remain open</td>
             </tr>
             <tr>
               <td>M8</td>
-              <td><span class="status-tag todo">PLANNED</span></td>
-              <td>Optional language faculty</td>
-              <td>Replaceable model behind typed context and proposal contracts</td>
-              <td>No model is shipped today</td>
+              <td><span class="status-tag todo" data-i18n="tag_planned">PLANNED</span></td>
+              <td data-i18n="row_m8_cap">Optional language faculty</td>
+              <td data-i18n="row_m8_bound">Replaceable model behind typed context and proposal contracts</td>
+              <td data-i18n="row_m8_ev">No model is shipped today</td>
             </tr>
             <tr>
               <td>M9–M13</td>
-              <td><span class="status-tag todo">PLANNED</span></td>
-              <td>Learning, governed action, agents and security</td>
-              <td>Learned artifacts, authorization, execution, agents, tools, and security remain separate governed boundaries</td>
-              <td>None of these future runtimes is shipped today</td>
+              <td><span class="status-tag todo" data-i18n="tag_planned">PLANNED</span></td>
+              <td data-i18n="row_m913_cap">Learning, governed action, agents and security</td>
+              <td data-i18n="row_m913_bound">Learned artifacts, authorization, execution, agents, tools, and security remain separate governed boundaries</td>
+              <td data-i18n="row_m913_ev">None of these future runtimes is shipped today</td>
             </tr>
           </tbody>
         </table>
@@ -488,28 +488,28 @@ SPDX-License-Identifier: MIT
         Cybou is free software built for sovereignty and privacy:
       </p>
       <ul>
-        <li><strong>Code License:</strong> MIT License for all Nix code, build scripts, web assets, and core logic.</li>
-        <li><strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0) for logos, wallpapers, and desktop themes.</li>
-        <li><strong>Trust Boundaries:</strong> Same-user D-Bus is not treated as a complete capability-security boundary; future privileged action requires a separate authorization layer.</li>
-        <li><strong>Interface Boundary:</strong> The web gateway binds to loopback only, is read-only by construction, and applies no-store and browser-security headers. Bootstrap authentication is not yet implemented, so no live cognitive state may be exposed beyond the local device.</li>
-        <li><strong>Privacy:</strong> Event envelopes carry explicit privacy and sensitivity axes. Crash-safe transitive erasure and governed disclosure are implemented; sensitive payload storage, automatic expiry, backups, and replication remain open.</li>
-        <li><strong>Current Cloud Boundary:</strong> The desktop and Mind runtime require no hosted AI service or API key, and no language model is shipped today.</li>
-        <li><strong>Security Documents:</strong> The repository maintains explicit threat and privacy models under <code>docs/security/</code>.</li>
+        <li data-i18n="bp_lic1"><strong>Code License:</strong> MIT License for all Nix code, build scripts, Rust crates, web assets, and core logic.</li>
+        <li data-i18n="bp_lic2"><strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 for logos, wallpapers, and desktop themes.</li>
+        <li data-i18n="bp_lic3"><strong>Trust Boundaries:</strong> Same-user local IPC is not treated as a complete capability-security boundary; future privileged action requires a separate authorization layer.</li>
+        <li data-i18n="bp_lic4"><strong>Interface Boundary:</strong> The web gateway binds to loopback only, is read-only by construction, and applies no-store and browser-security headers. Bootstrap authentication is not yet implemented, so no live cognitive state may be exposed beyond the local device.</li>
+        <li data-i18n="bp_lic5"><strong>Privacy:</strong> Event envelopes carry explicit privacy and sensitivity axes. Crash-safe transitive erasure and governed disclosure are implemented; sensitive payload storage, automatic expiry, backups, and replication remain open.</li>
+        <li data-i18n="bp_lic6"><strong>Current Cloud Boundary:</strong> The runtime and interface require no hosted AI service or API key, and no language model is shipped today.</li>
+        <li data-i18n="bp_lic7"><strong>Security Documents:</strong> The repository maintains explicit threat and privacy models under version control.</li>
       </ul>
       <div class="bp-card" style="margin-top:20px;">
-        <h3>Canonical sources and claim authority</h3>
-        <p>This web whitepaper is a readable summary. Exact implementation claims are governed by the repository:</p>
+        <h3 data-i18n="bp_sources_title">Canonical sources and claim authority</h3>
+        <p data-i18n="bp_sources_lead">This web whitepaper is a readable summary. Exact implementation claims are governed by the repository:</p>
         <ul>
-          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener">Current State</a> — authoritative implemented boundary.</li>
-          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a> and <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/MIND_MODEL.md" target="_blank" rel="noopener">Mind Model</a> — topology, ownership, and long-term model.</li>
-          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener">Testing</a> — process, reboot, fault, and KVM evidence.</li>
-          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/NEXT_STEPS.md" target="_blank" rel="noopener">Next Engineering Steps</a> — detailed implementation record and current M7 work.</li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener">Current State</a> <span data-i18n="bp_src1">— authoritative implemented boundary.</span></li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a> and <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/MIND_MODEL.md" target="_blank" rel="noopener">Mind Model</a> <span data-i18n="bp_src2">— topology, ownership, and long-term model.</span></li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener">Testing</a> <span data-i18n="bp_src3">— process, reboot, fault, and KVM evidence.</span></li>
+          <li><a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/NEXT_STEPS.md" target="_blank" rel="noopener">Next Engineering Steps</a> <span data-i18n="bp_src4">— detailed implementation record and current work.</span></li>
         </ul>
       </div>
     </section>
 
     <section class="bp-section reveal" id="faq">
-      <h2>6. Frequently Asked Questions</h2>
+      <h2 data-i18n="bp_sec6_title">6. Frequently Asked Questions</h2>
       <div class="faq-list" data-faq-list>
         <article class="faq-item">
           <button type="button" class="faq-question">
@@ -564,8 +564,8 @@ SPDX-License-Identifier: MIT
 
   <footer>
     <a class="brand" href="index.html"><img src="assets/cybou-mark.svg" width="28" height="28" alt=""><span>Cybou</span></a>
-    <p>Agent-native environment · Typed local Mind · Rust and WebAssembly interface.</p>
-    <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
+    <p data-i18n="footer_sub">Agent-native environment · Typed local Mind · Rust and WebAssembly interface.</p>
+    <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners_footer">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
   <script src="script.js?v=20260819-1"></script>

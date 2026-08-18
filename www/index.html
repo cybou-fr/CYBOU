@@ -96,7 +96,7 @@ SPDX-License-Identifier: MIT
   </script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main" data-i18n="skip_link">Skip to content</a>
 
   <div class="page-atmosphere" aria-hidden="true">
     <div class="atmosphere-glow atmosphere-glow--one"></div>
@@ -177,8 +177,8 @@ SPDX-License-Identifier: MIT
         Cybou is an experimental agent-native operating environment. Twelve local services give it durable memory, identity, health, and recovery — and one Rust/WebAssembly interface renders it in a browser or a desktop shell. No shipped model, no required cloud.
       </p>
         <div class="hero-actions">
-          <a class="button button--primary" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/BUILDING.md" target="_blank" rel="noopener" data-i18n="hero_btn_explore">
-            Build Cybou
+          <a class="button button--primary" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/BUILDING.md" target="_blank" rel="noopener">
+            <span data-i18n="hero_btn_explore">Build Cybou</span>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg>
           </a>
           <a class="button button--ghost" href="blueprint.html" data-i18n="hero_btn_blueprint">Read Technical Blueprint</a>
@@ -218,7 +218,7 @@ SPDX-License-Identifier: MIT
               </div>
             </div>
             <div class="desktop-panel__right">
-              <span class="status-pill"><span></span> Stable</span>
+              <span class="status-pill"><span></span> <span data-i18n="desktop_stable">Stable</span></span>
               <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5a11 11 0 0 1 16 0M7 13.5a7 7 0 0 1 10 0M10 16.5a3 3 0 0 1 4 0M12 19h.01"/></svg>
               <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9v6h3l4 3V6L9 9zM16 9.5a4 4 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/></svg>
               <time data-clock>02:45</time>
@@ -234,7 +234,7 @@ SPDX-License-Identifier: MIT
           <div class="launcher glass" data-launcher aria-hidden="true">
             <div class="launcher-search">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-              <input type="text" placeholder="Search applications..." data-launcher-input aria-label="Search applications" style="background:transparent; border:none; color:var(--ink-0); outline:none; width:100%; font-size:0.9rem;">
+              <input type="text" placeholder="Search applications" data-i18n-placeholder="launcher_search" data-launcher-input aria-label="Search applications" style="background:transparent; border:none; color:var(--ink-0); outline:none; width:100%; font-size:0.9rem;">
             </div>
             <div class="launcher-grid" data-launcher-grid>
               <button type="button" data-app-name="files"><span class="launcher-icon launcher-icon--files"><svg viewBox="0 0 24 24"><path d="M4 7h6l2 2h8v10H4z"/></svg></span><span data-i18n="app_files">Files</span></button>
@@ -255,7 +255,7 @@ SPDX-License-Identifier: MIT
     </section>
 
     <section class="statement reveal" id="experience">
-      <p class="section-kicker">01 · Interface</p>
+      <p class="section-kicker" data-i18n="kicker_interface">01 · Interface</p>
       <h2><span data-i18n="exp_h2_1">One interface.</span><br><em data-i18n="exp_h2_2">Two surfaces.</em></h2>
       <p data-i18n="exp_lead">
         The same Rust/WebAssembly frontend runs in an ordinary browser and in a minimal desktop shell that owns a single Wayland surface. The interface is a projection of Mind, never a second owner of state — which is why it can be replaced without touching memory, identity, or policy.
@@ -294,7 +294,7 @@ SPDX-License-Identifier: MIT
 
     <section class="foundation" id="foundation">
       <div class="foundation-copy reveal">
-        <p class="section-kicker">02 · Foundation</p>
+        <p class="section-kicker" data-i18n="kicker_foundation">02 · Foundation</p>
         <h2><span data-i18n="found_h2_1">Declarative by nature.</span><br><em data-i18n="found_h2_2">Reversible by design.</em></h2>
         <p data-i18n="found_lead">
           Underneath, Cybou inherits reproducible configuration and generation rollback. Updates become explicit system states — understandable, testable and recoverable. Nothing becomes visible before its owner has durably committed it.
@@ -330,26 +330,26 @@ SPDX-License-Identifier: MIT
     <!-- NEW SECTION: Progress Dashboard -->
     <section class="progress-section reveal" id="progress">
       <div class="progress-heading">
-        <p class="section-kicker">03 · Live Implementation Progress</p>
+        <p class="section-kicker" data-i18n="kicker_progress">03 · Live implementation progress</p>
         <h2><span data-i18n="prog_h2_1">Measured execution.</span><br><em data-i18n="prog_h2_2">Verified milestones.</em></h2>
         <p data-i18n="prog_lead">The verified M1–M6 substrate now carries grounded perception, epistemic projection, crash-safe erasure, and governed context delivery — while the interface layer migrates to Rust and WebAssembly through additive, separately gated steps.</p>
       </div>
 
       <div class="progress-dashboard">
         <div class="progress-card">
-          <div class="card-metric">12 Mind Services</div>
+          <div class="card-metric" data-i18n="metric_v_services">12 Mind services</div>
           <p class="card-label" data-i18n="metric_gate_a">Twelve isolated Mind services with explicit typed ownership</p>
           <div class="status-indicator"><span></span><b data-i18n="status_development">Implemented runtime</b></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric">37 CTest Suites</div>
+          <div class="card-metric" data-i18n="metric_v_tests">37 CTest suites</div>
           <p class="card-label" data-i18n="metric_tasks">Thirty-seven CTest suites plus reproducible repository policy gates</p>
           <div class="status-indicator"><span></span><b data-i18n="status_runtime">Verified baseline</b></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric">5 Rust Crates</div>
+          <div class="card-metric" data-i18n="metric_v_crates">5 Rust crates</div>
           <p class="card-label" data-i18n="metric_contrast">Five Rust crates: protocol, fabric, web contracts, gateway, Living Canvas</p>
           <div class="status-indicator"><span></span><b data-i18n="status_verified">Migration in progress</b></div>
         </div>
@@ -363,7 +363,7 @@ SPDX-License-Identifier: MIT
 
     <section class="design" id="design">
       <div class="design-heading reveal">
-        <p class="section-kicker">04 · Design language</p>
+        <p class="section-kicker" data-i18n="kicker_design">04 · Design language</p>
         <h2>Cybou Horizon</h2>
         <p data-i18n="design_sub">A visual system shaped by depth, negative space and a single line of light.</p>
       </div>
@@ -371,15 +371,15 @@ SPDX-License-Identifier: MIT
       <div class="design-board reveal reveal-delay-1">
         <div class="design-board__logo">
           <div class="large-mark"><img src="assets/cybou-mark.svg" alt="Cybou mark"></div>
-          <div><span>Symbol</span><strong>Cybou Aperture</strong><p data-i18n="mark_desc">An open arc around a focused center: a system with room to evolve.</p></div>
+          <div><span data-i18n="label_symbol">Symbol</span><strong>Cybou Aperture</strong><p data-i18n="mark_desc">An open arc around a focused center: a system with room to evolve.</p></div>
         </div>
         <div class="design-board__colors">
-          <span>Palette</span>
+          <span data-i18n="label_palette">Palette</span>
           <div class="color-row"><i style="--swatch:#0A0D12"></i><i style="--swatch:#171D27"></i><i style="--swatch:#F2F5F8"></i><i style="--swatch:#70E1C8"></i><i style="--swatch:#7DA6FF"></i></div>
-          <strong>Mineral dark · Aurora mint</strong>
+          <strong data-i18n="palette_name">Mineral dark · Aurora mint</strong>
         </div>
         <div class="design-board__type">
-          <span>Typography</span>
+          <span data-i18n="label_typography">Typography</span>
           <b>Aa</b>
           <strong data-i18n="type_head">Calm, precise, human.</strong>
           <p data-i18n="type_desc">System sans-serif typography keeps the site independent from remote services.</p>
@@ -389,7 +389,7 @@ SPDX-License-Identifier: MIT
 
     <section class="principles">
       <div class="principles-intro reveal">
-        <p class="section-kicker">05 · Principles</p>
+        <p class="section-kicker" data-i18n="kicker_principles">05 · Principles</p>
         <h2><span data-i18n="princ_h2_1">Replaceable where it can be.</span><br><em data-i18n="princ_h2_2">Owned where it must be.</em></h2>
       </div>
       <div class="principle-list">
@@ -402,7 +402,7 @@ SPDX-License-Identifier: MIT
 
     <section class="roadmap" id="roadmap">
       <div class="roadmap-heading reveal">
-        <p class="section-kicker">06 · Roadmap</p>
+        <p class="section-kicker" data-i18n="kicker_roadmap">06 · Roadmap</p>
         <h2><span data-i18n="road_h2_1">Build the body.</span><br><em data-i18n="road_h2_2">Then grow the mind.</em></h2>
       </div>
       <div class="roadmap-track reveal reveal-delay-1">
@@ -428,7 +428,7 @@ SPDX-License-Identifier: MIT
     <!-- FAQ Section for Users, AI Agents & Search Engines -->
     <section class="faq-section reveal" id="faq">
       <div class="principles-intro">
-        <p class="section-kicker">07 · Questions & Architecture</p>
+        <p class="section-kicker" data-i18n="kicker_faq">07 · Questions & architecture</p>
         <h2><span data-i18n="faq_h2_1">Frequently asked</span><br><em data-i18n="faq_h2_2">questions.</em></h2>
       </div>
 
@@ -500,7 +500,7 @@ SPDX-License-Identifier: MIT
   <footer>
     <a class="brand" href="#top"><img src="assets/cybou-mark.svg" width="28" height="28" alt=""><span>Cybou</span></a>
     <p data-i18n="footer_sub">Agent-native environment · Typed local Mind · Rust and WebAssembly interface.</p>
-    <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
+    <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners_footer">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 
   <script src="script.js?v=20260819-1"></script>
