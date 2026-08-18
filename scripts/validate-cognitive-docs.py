@@ -129,6 +129,7 @@ def main(argv: list[str]) -> int:
         "checkpoint": repo / "docs/PROJECT_CHECKPOINT_2026-08-10.md",
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
+        "web_ui_architecture": repo / "docs/WEB_UI_ARCHITECTURE.md",
         "current": repo / "docs/CURRENT_STATE.md",
         "installation": repo / "docs/INSTALLATION.md",
         "roadmap": repo / "docs/ROADMAP.md",
@@ -139,6 +140,7 @@ def main(argv: list[str]) -> int:
         "adr24": repo / "docs/adr/ADR-0024-cognitive-lifecycle-and-consolidation.md",
         "adr25": repo / "docs/adr/ADR-0025-grounding-epistemics-and-cognitive-governance.md",
         "adr26": repo / "docs/adr/ADR-0026-lifecycle-owner-and-wire-contract.md",
+        "adr37": repo / "docs/adr/ADR-0037-web-first-presence-and-desktop.md",
         "lifecycle": repo / "docs/mind/LIFECYCLE.md",
         "health": repo / "docs/mind/HEALTH.md",
         "rpc_resilience": repo / "docs/mind/RPC_RESILIENCE.md",
@@ -258,6 +260,23 @@ def main(argv: list[str]) -> int:
         "cognitive topology section",
         "## Cognitive topology",
     )
+    for label, needle in (
+        ("web UI target topology", "## Target topology"),
+        ("web UI gateway boundary", "## Gateway architecture"),
+        ("web UI security model", "## Session and security model"),
+        ("web UI migration", "## Migration plan"),
+        ("web UI test matrix", "## Test matrix"),
+    ):
+        require(paths["web_ui_architecture"], label, needle)
+
+    for label, needle in (
+        ("one frontend artifact", "### One frontend artifact"),
+        ("browser non-owner", "### The browser is a renderer and untrusted client"),
+        ("gateway owner", "### A dedicated gateway owns the browser/network boundary"),
+        ("local/remote trust split", "### Local and remote are different trust contexts"),
+        ("web acceptance gates", "## Acceptance gates"),
+    ):
+        require(paths["adr37"], label, needle)
     require(
         paths["architecture"],
         "future faculty boundary",
@@ -267,6 +286,11 @@ def main(argv: list[str]) -> int:
         paths["architecture"],
         "future action boundary",
         "## Future action boundary",
+    )
+    require(
+        paths["architecture"],
+        "proposed web-first presentation boundary",
+        "### Proposed web-first presentation boundary",
     )
 
     require_regex(
@@ -518,6 +542,10 @@ def main(argv: list[str]) -> int:
         "authorized action boundary term",
         "**Authorized Action Boundary**",
     )
+    require(paths["glossary"], "Living Canvas term", "**Living Canvas**")
+    require(paths["glossary"], "web gateway term", "**Web gateway**")
+    require(paths["threat_model"], "web gateway trust boundary", "proposed browser session to `cybou-web-gateway`")
+    require(paths["threat_model"], "web target controls", "The proposed web-first Presence adds")
     for term in (
         "**Cognitive lifecycle**",
         "**Consolidation**",

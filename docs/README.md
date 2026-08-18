@@ -29,6 +29,7 @@ with [Current State](CURRENT_STATE.md).
 - [Architecture](ARCHITECTURE.md) — topology, ownership, failure domains, ordering
 - [Glossary](GLOSSARY.md) — normative vocabulary
 - [ADR index](adr/README.md) — decisions and their acceptance status
+- [Living Canvas Web UI Architecture](WEB_UI_ARCHITECTURE.md) — proposed single-frontend local/remote integration and migration plan
 
 ### Build, test, and release
 
@@ -47,6 +48,7 @@ MIND_MODEL.md     meaning, invariants, and long-term cognitive model
 CURRENT_STATE.md  what the repository actually implements today
 PROJECT_CHECKPOINT_2026-08-10.md  immutable assessment of one named source revision
 ARCHITECTURE.md   current topology plus explicit future boundaries
+WEB_UI_ARCHITECTURE.md  proposed web-first Presence, gateway, desktop, and migration blueprint
 ROADMAP.md        sequencing and acceptance meaning of milestones
 mind/*            protocol and component contracts
 security/*        threat, privacy, and trust boundaries

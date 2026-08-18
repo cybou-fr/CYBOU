@@ -206,6 +206,27 @@ unattended security follows governed actors/tools/models.
 
 The sequence above is the canonical capability progression.
 
+## Cross-cutting Presence modernization
+
+The proposed [web-first Presence architecture](WEB_UI_ARCHITECTURE.md) is a delivery track rather
+than a new cognitive milestone. It may advance beside M7/M8 provided it does not claim M10 action
+authority, M11 agent runtime, or M12 control-plane capability.
+
+Its order is:
+
+```text
+web contracts and fixtures
+→ read-only gateway beside Plasma
+→ opt-in Chromium/Wayland desktop
+→ parity for current bounded commands
+→ authenticated remote read-only access
+→ governed remote actions only after M10
+→ Plasma retirement after replacement gates
+```
+
+The same frontend may be delivered locally and remotely; session trust, context disclosure, and
+capability grants remain different. See [ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md).
+
 A shorter product reading:
 
 ```text

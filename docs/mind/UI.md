@@ -5,6 +5,11 @@ SPDX-License-Identifier: MIT
 
 # Mind Dock UI
 
+> This document describes the implemented Plasma/QML surface. The proposed replacement is the
+> single-frontend [Living Canvas Web UI Architecture](../WEB_UI_ARCHITECTURE.md) and
+> [ADR-0037](../adr/ADR-0037-web-first-presence-and-desktop.md). Until its acceptance gates pass,
+> this Plasma contract remains the current implementation authority.
+
 ## Purpose
 
 The Mind Dock is a persistent inspection surface for Cybou's cognitive runtime, not a traditional

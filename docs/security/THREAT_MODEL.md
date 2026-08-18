@@ -21,6 +21,8 @@ backups, and future inter-node messages.
 - cognition/planning to M10 authorization and executor;
 - actors, models and tools to the M11 grant and broker boundaries;
 - unattended response to M12 standing policy, which must hold with models unavailable.
+- proposed browser session to `cybou-web-gateway`, over local loopback or remote TLS;
+- proposed `cybou-web-gateway` to the typed Presence and Mind service interfaces.
 
 ## Threats
 
@@ -37,6 +39,14 @@ backups, and future inter-node messages.
 - sensitive content surviving through summaries, backups, or replicas after claimed erasure;
 - value/priority scoring being mistaken for execution permission;
 - resource exhaustion through event, contradiction, or consolidation backlog.
+- script injection, unsafe browser dependencies, or compromised rendered content escaping its
+  intended object boundary;
+- cross-site request forgery, clickjacking, hostile origins, session theft, or replay of a local
+  desktop bootstrap credential;
+- one browser consumer receiving another consumer's private context, cursor, or delivery state;
+- stale snapshots, resumptions, or caches presenting invalid state as current;
+- sensitive state surviving browser storage after retention or erasure obligations apply;
+- gateway connection, subscription, or mutation floods exhausting bounded Mind services.
 
 ## Controls
 
@@ -56,6 +66,24 @@ backups, and future inter-node messages.
 - typed action boundary;
 - security and concurrency tests.
 
+The proposed web-first Presence adds the following target controls. They are architectural gates,
+not claims about the currently shipped Plasma surface:
+
+- a dedicated `cybou-web-gateway` with an explicit, versioned HTTP/event contract rather than a
+  generic D-Bus, shell, or filesystem bridge;
+- loopback-only local binding, a short-lived single-use desktop bootstrap exchange, and a
+  host/origin allowlist;
+- authenticated remote sessions, secure and same-site cookies, CSRF protection, TLS, rate limits,
+  and per-session capability and consumer identity;
+- strict Content Security Policy, no inline script, dependency pinning, output encoding, frame
+  denial, and isolation of untrusted rich content;
+- server-authoritative privacy filtering, context allocation, authorization, and mutation
+  idempotency; hiding a control in the frontend is never an authorization decision;
+- cursor-based resumption with explicit reset on stale or unauthorized cursors, bounded queues,
+  and visible degraded/stale state;
+- browser storage minimization, privacy-class-aware cache policy, and erasure propagation tests;
+- separate budgets for sessions, subscriptions, payloads, mutations, and downstream calls.
+
 ## Current limitations
 
 - same-user D-Bus callers do not yet have capability tokens or method-level authorization. Event1
@@ -68,6 +96,9 @@ backups, and future inter-node messages.
   epistemic governance and the M10 authorized-action boundary remain proposed;
 - user-service hardening does not yet define a least-privilege filesystem/network sandbox for
   every daemon;
+- the web gateway, Chromium desktop session, remote authentication, cache/erasure enforcement, and
+  the web-specific controls above are proposed and are not present in the current Plasma/QML
+  implementation;
 - Mind binaries retain environment-triggered fault-injection hooks, which the reboot and
   split-commit gates set against the installed package. This is accepted rather than outstanding: a
   same-user process can already terminate any daemon with a signal, so the hooks grant no capability

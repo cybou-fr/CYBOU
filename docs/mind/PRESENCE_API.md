@@ -84,3 +84,23 @@ presenced routes cognitive operations to the organ that owns them; it does not c
 organ objects itself.
 
 Creating another QML Presence object creates another proxy only.
+
+## Proposed web mapping
+
+The Proposed [web-first Presence decision](../adr/ADR-0037-web-first-presence-and-desktop.md) keeps
+Presence1 behind `cybou-web-gateway`; it does not translate this interface into a generic browser
+RPC bridge.
+
+The gateway may map presentation-ready fields into a separately versioned web snapshot while
+preserving:
+
+- `awake` as presentation reachability rather than authority;
+- capability and command-availability explanations;
+- known versus empty versus unavailable state;
+- freshness and degraded causes;
+- one bounded request budget;
+- backend enforcement for every command;
+- QML/browser recreation as projection recreation, not identity or biography restart.
+
+The web schema is defined and tested independently so internal D-Bus evolution does not become a
+public network protocol by accident.

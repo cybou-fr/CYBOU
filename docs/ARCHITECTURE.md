@@ -192,6 +192,24 @@ Presence refresh       ≠ cognitive event
 
 Future presentation surfaces must preserve the same boundary.
 
+### Proposed web-first presentation boundary
+
+[ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md) proposes replacing the Plasma/QML
+surface with one Living Canvas frontend delivered through a dedicated browser/network gateway.
+This is target architecture, not the current process topology above.
+
+```text
+local Chromium/Ozone ─┐
+                      ├── cybou-web-gateway ── Presence1 / typed Mind APIs
+remote HTTPS browser ─┘
+```
+
+The gateway is a transport, session, schema, and browser-security boundary. It is not a cognitive
+owner and does not expose generic D-Bus, Journal, shell, or filesystem access to JavaScript. The
+same frontend artifact may be used locally and remotely, but the two sessions have different trust,
+delivery, and capability policies. See the full
+[Web UI Integration Architecture](WEB_UI_ARCHITECTURE.md).
+
 ## Future faculty boundary
 
 M8 adds an explicit meaning boundary without moving identity or memory authority into a model. No

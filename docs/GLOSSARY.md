@@ -5,6 +5,13 @@ SPDX-License-Identifier: MIT
 
 # Glossary
 
+**Living Canvas** — Proposed single web frontend for Cybou's complete local Chromium desktop and
+hosted browser surface. It is Presence, not Mind, and is not an authorization authority.
+
+**Web gateway** — Proposed separate browser/network boundary that authenticates sessions, serves
+the frontend, validates versioned web requests, enforces transport policy, and maps only explicit
+operations to local Presence/Mind APIs. It is not a cognitive state owner.
+
 **Body** — NixOS, Plasma, hardware, processes, and system/external state that Cybou can observe or
 eventually affect through explicit capabilities.
 
