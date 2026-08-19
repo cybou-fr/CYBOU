@@ -5,7 +5,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use living_canvas::{GatewayMindClient, MindClient};
 use lucide_leptos::{
-    Ellipsis, FileCheck, Files, FolderOpen, Link, ListChecks, Search, Sparkles, UsersRound,
+    Ellipsis, FileCheck, Files, FolderOpen, Link, ListChecks, Map, Search, Sparkles, UsersRound,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
@@ -146,6 +146,7 @@ enum RuntimeState {
 pub fn App() -> impl IntoView {
     let (selected, set_selected) = signal("release");
     let (runtime_menu_open, set_runtime_menu_open) = signal(false);
+    let (minimap_visible, set_minimap_visible) = signal(true);
     let layout = RwSignal::new(load_layout());
     let dragging = RwSignal::new(None::<DragState>);
     let runtime = RwSignal::new(RuntimeState::Loading);
@@ -257,7 +258,13 @@ pub fn App() -> impl IntoView {
                             <button>"Open mind"</button>
                             <hr />
                             <button>"Canvas view"</button>
-                            <button>"Minimap"</button>
+                            <button
+                                aria-pressed=move || minimap_visible.get().to_string()
+                                on:click=move |_| {
+                                    set_minimap_visible.set(!minimap_visible.get_untracked());
+                                    set_runtime_menu_open.set(false);
+                                }
+                            >"Minimap"</button>
                             <hr />
                             <button>"System status"</button>
                         </nav>
@@ -398,6 +405,56 @@ pub fn App() -> impl IntoView {
                     <kbd>"Ctrl K"</kbd>
                 </label>
 
+                <Show when=move || minimap_visible.get()>
+                    <nav class="minimap" aria-label="Canvas minimap">
+                        <header><Map size=15 /><strong>"Canvas map"</strong><span>"79%"</span></header>
+                        <div class="minimap-field">
+                            <button
+                                class:selected=move || selected.get() == "artifact"
+                                class="mini-node artifact-node"
+                                style=move || minimap_style(layout.get().artifact)
+                                aria-label="Select artifact panel"
+                                on:click=move |_| set_selected.set("artifact")
+                            ></button>
+                            <button
+                                class:selected=move || selected.get() == "collaborators"
+                                class="mini-node collaborators-node"
+                                style=move || minimap_style(layout.get().collaborators)
+                                aria-label="Select collaborators panel"
+                                on:click=move |_| set_selected.set("collaborators")
+                            ></button>
+                            <button
+                                class:selected=move || selected.get() == "release"
+                                class="mini-node release-node"
+                                style=move || minimap_style(layout.get().release)
+                                aria-label="Select release panel"
+                                on:click=move |_| set_selected.set("release")
+                            ></button>
+                            <button
+                                class:selected=move || selected.get() == "sources"
+                                class="mini-node sources-node"
+                                style=move || minimap_style(layout.get().sources)
+                                aria-label="Select sources panel"
+                                on:click=move |_| set_selected.set("sources")
+                            ></button>
+                            <button
+                                class:selected=move || selected.get() == "suggestion"
+                                class="mini-node suggestion-node"
+                                style=move || minimap_style(layout.get().suggestion)
+                                aria-label="Select mind suggestion panel"
+                                on:click=move |_| set_selected.set("suggestion")
+                            ></button>
+                            <button
+                                class:selected=move || selected.get() == "commitments"
+                                class="mini-node commitments-node"
+                                style=move || minimap_style(layout.get().commitments)
+                                aria-label="Select commitments panel"
+                                on:click=move |_| set_selected.set("commitments")
+                            ></button>
+                        </div>
+                    </nav>
+                </Show>
+
                 <aside class="system-state" aria-label="System state">
                     <span class="status-dot" aria-hidden="true"></span>
                     {system_label}
@@ -423,6 +480,12 @@ fn release_actions_style(layout: CanvasLayout) -> String {
         point.y + 251.0,
         point.z + 1
     )
+}
+
+fn minimap_style(point: Point) -> String {
+    let x = 10.0 + point.x / 1_280.0 * 180.0;
+    let y = 8.0 + point.y / 650.0 * 92.0;
+    format!("left:{x:.1}px;top:{y:.1}px")
 }
 
 fn start_drag(

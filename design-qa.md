@@ -53,12 +53,15 @@ because all six panels use the same pointer-capture and keyboard-movement implem
    artifact, collaborators, sources, selected-object actions, and command bar. Full-width semantic
    browser QA confirms the desktop-only runtime controls and action rail remain visible. Browser
    image capture remains unavailable, so the last accepted visual baseline is still comparison 05.
+6. The deployed minimap derives all six marker positions from the live `CanvasLayout`. Browser QA
+   confirms its runtime-menu control hides and restores the map, and selecting the Sources marker
+   applies the `selected` state to the full Sources panel. The topbar stacking context was raised so
+   menu commands receive pointer input above the isolated canvas.
 
 ## Next implementation checklist
 
 1. Render relationship connectors from live panel centers during drag.
-2. Add the minimap.
-3. Extend the Rust-native icon set to the remaining card and runtime-menu controls.
-4. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
+2. Extend the Rust-native icon set to the remaining card and runtime-menu controls.
+3. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
 
 final result: blocked
