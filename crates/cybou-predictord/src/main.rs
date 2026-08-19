@@ -33,7 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-predictord] Connecting to D-Bus session bus...");
         let service = Predictor1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(PREDICTOR.service)?
             .serve_at(PREDICTOR.object_path, service)?
             .build()

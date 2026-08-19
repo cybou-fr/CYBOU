@@ -3,11 +3,15 @@
 
 //! D-Bus `org.cybou.Mind.Event1` service implementation on zbus.
 
+// The `#[interface]` expansion emits part of its dispatch surface with the attribute's own span,
+// which an `allow` on the impl block cannot reach. Every handler written here is documented.
+#![allow(missing_docs)]
+
 use std::{fs, path::PathBuf, sync::Arc};
 
 use cybou_protocol::canonical::CanonicalEnvelope;
 use uuid::Uuid;
-use zbus::{SignalContext, interface};
+use zbus::{interface, object_server::SignalEmitter};
 
 use crate::{EventCore, SubmitResult, is_reserved_organ};
 
@@ -23,7 +27,7 @@ impl Event1Service {
     pub fn new(core: Arc<EventCore>) -> Self {
         let trusted_bin_dir = fs::read_link("/proc/self/exe")
             .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+            .and_then(|p| p.parent().map(std::path::Path::to_path_buf));
         Self {
             core,
             trusted_bin_dir,
@@ -33,10 +37,10 @@ impl Event1Service {
     fn resolve_caller_organ(&self, pid: u32) -> Option<String> {
         let exe_path = fs::read_link(format!("/proc/{pid}/exe")).ok()?;
         let parent = exe_path.parent()?;
-        if let Some(ref trusted) = self.trusted_bin_dir {
-            if parent != trusted {
-                return None;
-            }
+        if let Some(ref trusted) = self.trusted_bin_dir
+            && parent != trusted
+        {
+            return None;
         }
         let file_name = exe_path.file_name()?.to_str()?;
         let mut name = file_name;
@@ -46,15 +50,19 @@ impl Event1Service {
         if let Some(stripped) = name.strip_suffix("-wrapped") {
             name = stripped;
         }
-        if let Some(organ) = name.strip_prefix("cybou-") {
-            if is_reserved_organ(organ) {
-                return Some(organ.to_string());
-            }
+        if let Some(organ) = name.strip_prefix("cybou-")
+            && is_reserved_organ(organ)
+        {
+            return Some(organ.to_string());
         }
         None
     }
 }
 
+#[allow(
+    clippy::unused_async,
+    reason = "zbus dispatches every exported handler as a future"
+)]
 #[interface(name = "org.cybou.Mind.Event1")]
 impl Event1Service {
     /// Ready status.
@@ -74,7 +82,9 @@ impl Event1Service {
 
     /// Head envelope as CBOR bytes.
     async fn head(&self) -> Vec<u8> {
-        self.core.head().map_or_default(|e| encode_envelope(&e))
+        self.core
+            .head()
+            .map_or_else(Vec::new, |e| encode_envelope(&e))
     }
 
     /// Current erasure epoch.
@@ -86,7 +96,7 @@ impl Event1Service {
     async fn at_sequence(&self, sequence: u64) -> Vec<u8> {
         self.core
             .at_sequence(sequence)
-            .map_or_default(|e| encode_envelope(&e))
+            .map_or_else(Vec::new, |e| encode_envelope(&e))
     }
 
     /// Return whether message ID is present.
@@ -104,7 +114,7 @@ impl Event1Service {
         };
         self.core
             .find_by_message_id(&id)
-            .map_or_default(|e| encode_envelope(&e))
+            .map_or_else(Vec::new, |e| encode_envelope(&e))
     }
 
     /// Retrieve evidence UUIDs for message ID.
@@ -147,14 +157,14 @@ impl Event1Service {
 
     /// Recent contributions up to limit.
     async fn recent(&self, limit: i32) -> Vec<u8> {
-        let lim = if limit > 0 { limit as usize } else { 0 };
+        let lim = usize::try_from(limit).unwrap_or(0);
         let envelopes = self.core.recent(lim);
         encode_envelopes(&envelopes)
     }
 
     /// Replay contributions after sequence up to limit.
     async fn replay(&self, after_sequence: u64, limit: i32) -> Vec<u8> {
-        let lim = if limit > 0 { limit as usize } else { 0 };
+        let lim = usize::try_from(limit).unwrap_or(0);
         let envelopes = self.core.replay(after_sequence, lim);
         encode_envelopes(&envelopes)
     }
@@ -168,10 +178,10 @@ impl Event1Service {
         encode_envelopes(&envelopes)
     }
 
-    /// Submit a contribution to Event1 and emit Accepted signal upon durable SQLite commit.
+    /// Submit a contribution to `Event1` and emit an `Accepted` signal upon durable `SQLite` commit.
     async fn submit(
         &self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
+        #[zbus(signal_emitter)] ctxt: SignalEmitter<'_>,
         #[zbus(header)] header: zbus::message::Header<'_>,
         #[zbus(connection)] connection: &zbus::Connection,
         encoded_envelope: Vec<u8>,
@@ -185,15 +195,13 @@ impl Event1Service {
 
         // Check sender PID via D-Bus connection interface if available
         let mut caller_organ = None;
-        if let Some(sender) = header.sender() {
-            if let Ok(pid) = connection
-                .inner()
-                .bus_interface()
-                .get_connection_unix_process_id(sender.into())
+        if let Some(sender) = header.sender()
+            && let Ok(dbus) = zbus::fdo::DBusProxy::new(connection).await
+            && let Ok(pid) = dbus
+                .get_connection_unix_process_id(sender.to_owned().into())
                 .await
-            {
-                caller_organ = self.resolve_caller_organ(pid);
-            }
+        {
+            caller_organ = self.resolve_caller_organ(pid);
         }
 
         match self.core.submit(&decoded, caller_organ.as_deref()) {
@@ -208,7 +216,7 @@ impl Event1Service {
     /// Signal emitted when a contribution is durably committed to the Journal.
     #[zbus(signal)]
     async fn accepted(
-        ctxt: &SignalContext<'_>,
+        ctxt: &SignalEmitter<'_>,
         encoded_envelope: &[u8],
         sequence: u64,
     ) -> zbus::Result<()>;

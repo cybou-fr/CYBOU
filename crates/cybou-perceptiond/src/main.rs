@@ -40,13 +40,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 monotonic += 1;
                 let _ = &envelope;
                 #[cfg(target_os = "linux")]
-                if let Some(ref client) = event_client {
-                    if let Ok(res) = client.submit(&envelope).await {
-                        println!(
-                            "[cybou-perceptiond] Submitted observation sequence {} to Event1",
-                            res.sequence
-                        );
-                    }
+                if let Some(ref client) = event_client
+                    && let Ok(res) = client.submit(&envelope).await
+                {
+                    println!(
+                        "[cybou-perceptiond] Submitted observation sequence {} to Event1",
+                        res.sequence
+                    );
                 }
             }
         }
@@ -61,7 +61,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-perceptiond] Connecting to D-Bus session bus...");
         let service = Perception1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(PERCEPTION.service)?
             .serve_at(PERCEPTION.object_path, service)?
             .build()

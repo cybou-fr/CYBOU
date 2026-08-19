@@ -3,10 +3,15 @@
 
 //! D-Bus `org.cybou.Mind.Presence1` service implementation on zbus.
 
+// The `#[interface]` expansion emits part of its dispatch surface with the attribute's own span,
+// which an `allow` on the impl block cannot reach. Every handler written here is documented, and
+// the generated dispatch reads parameters that the fail-closed stubs below deliberately ignore.
+#![allow(clippy::used_underscore_binding, missing_docs)]
+
 use std::sync::Arc;
 
 use time::OffsetDateTime;
-use zbus::{SignalContext, interface};
+use zbus::{interface, object_server::SignalEmitter};
 
 use crate::PresenceCore;
 
@@ -23,6 +28,10 @@ impl Presence1Service {
     }
 }
 
+#[allow(
+    clippy::unused_async,
+    reason = "zbus dispatches every exported handler as a future"
+)]
 #[interface(name = "org.cybou.Mind.Presence1")]
 impl Presence1Service {
     /// Service readiness.
@@ -44,10 +53,9 @@ impl Presence1Service {
                     &(),
                 )
                 .await
+                && let Ok(h) = reply.body().deserialize::<String>()
             {
-                if let Ok(h) = reply.body::<String>() {
-                    return h;
-                }
+                return h;
             }
         }
         let _ = conn;
@@ -73,12 +81,10 @@ impl Presence1Service {
                     &(),
                 )
                 .await
+                && let Ok(snap_bytes) = reply.body().deserialize::<Vec<u8>>()
+                && !snap_bytes.is_empty()
             {
-                if let Ok(snap_bytes) = reply.body::<Vec<u8>>() {
-                    if !snap_bytes.is_empty() {
-                        return snap_bytes;
-                    }
-                }
+                return snap_bytes;
             }
         }
         let _ = conn;
@@ -136,5 +142,5 @@ impl Presence1Service {
 
     /// Signal emitted when compound projection changes.
     #[zbus(signal)]
-    async fn changed(ctxt: &SignalContext<'_>) -> zbus::Result<()>;
+    async fn changed(ctxt: &SignalEmitter<'_>) -> zbus::Result<()>;
 }

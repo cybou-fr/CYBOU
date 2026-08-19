@@ -23,15 +23,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn periodic active probing loop
     let probe_core = core.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
-        #[cfg(target_os = "linux")]
-        let session = zbus::Connection::session().await.ok();
-
         #[cfg(target_os = "linux")]
         use cybou_fabric::{
             CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, PREDICTOR,
             PRESENCE, SELF, WORKSPACE,
         };
+
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        #[cfg(target_os = "linux")]
+        let session = zbus::Connection::session().await.ok();
 
         #[cfg(target_os = "linux")]
         let endpoints = [
@@ -64,12 +64,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             &(),
                         )
                         .await
-                        .and_then(|r| r.body());
+                        .map_err(|e| e.to_string())
+                        .and_then(|r| r.body().deserialize().map_err(|e| e.to_string()));
 
                     let health = match res {
                         Ok(true) => ComponentHealth::Healthy,
                         Ok(false) => ComponentHealth::Degraded,
-                        Err(e) => ComponentHealth::Unavailable,
+                        Err(_) => ComponentHealth::Unavailable,
                     };
 
                     probe_core.update_component(
@@ -94,7 +95,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-healthd] Connecting to D-Bus session bus...");
         let service = Health1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(HEALTH.service)?
             .serve_at(HEALTH.object_path, service)?
             .build()

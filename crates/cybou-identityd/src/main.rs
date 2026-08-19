@@ -50,20 +50,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if let Some(envelope) = core.build_envelope(&action, now, 0) {
             tokio::spawn(async move {
-                if let Ok(client) = EventClient::session().await {
-                    if let Ok(res) = client.submit(&envelope).await {
-                        println!(
-                            "[cybou-identityd] Submitted session start sequence {} to Event1",
-                            res.sequence
-                        );
-                    }
+                if let Ok(client) = EventClient::session().await
+                    && let Ok(res) = client.submit(&envelope).await
+                {
+                    println!(
+                        "[cybou-identityd] Submitted session start sequence {} to Event1",
+                        res.sequence
+                    );
                 }
             });
         }
 
         println!("[cybou-identityd] Connecting to D-Bus session bus...");
         let service = Identity1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(IDENTITY.service)?
             .serve_at(IDENTITY.object_path, service)?
             .build()

@@ -32,7 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-lifecycled] Connecting to D-Bus session bus...");
         let service = Lifecycle1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(LIFECYCLE.service)?
             .serve_at(LIFECYCLE.object_path, service)?
             .build()

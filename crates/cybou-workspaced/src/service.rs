@@ -3,10 +3,14 @@
 
 //! D-Bus `org.cybou.Mind.Workspace1` service implementation on zbus.
 
+// The `#[interface]` expansion emits part of its dispatch surface with the attribute's own span,
+// which an `allow` on the impl block cannot reach. Every handler written here is documented.
+#![allow(missing_docs)]
+
 use std::sync::Arc;
 
 use time::OffsetDateTime;
-use zbus::{SignalContext, interface};
+use zbus::{interface, object_server::SignalEmitter};
 
 use crate::WorkspaceCore;
 
@@ -23,6 +27,10 @@ impl Workspace1Service {
     }
 }
 
+#[allow(
+    clippy::unused_async,
+    reason = "zbus dispatches every exported handler as a future"
+)]
 #[interface(name = "org.cybou.Mind.Workspace1")]
 impl Workspace1Service {
     /// Service readiness.
@@ -32,7 +40,7 @@ impl Workspace1Service {
 
     /// Return buffer capacity.
     async fn capacity(&self) -> u32 {
-        self.core.capacity() as u32
+        u32::try_from(self.core.capacity()).unwrap_or(u32::MAX)
     }
 
     /// Return all active coalitions ordered by salience encoded as CBOR.
@@ -64,5 +72,5 @@ impl Workspace1Service {
 
     /// Signal emitted when winning focus changes.
     #[zbus(signal)]
-    async fn focus_changed(ctxt: &SignalContext<'_>, correlation_id: String) -> zbus::Result<()>;
+    async fn focus_changed(ctxt: &SignalEmitter<'_>, correlation_id: String) -> zbus::Result<()>;
 }

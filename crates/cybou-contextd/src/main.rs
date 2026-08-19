@@ -33,7 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-contextd] Connecting to D-Bus session bus...");
         let service = Context1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(CONTEXT.service)?
             .serve_at(CONTEXT.object_path, service)?
             .build()

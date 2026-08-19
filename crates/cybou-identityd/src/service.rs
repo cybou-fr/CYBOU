@@ -3,6 +3,10 @@
 
 //! D-Bus `org.cybou.Mind.Identity1` service implementation on zbus.
 
+// The `#[interface]` expansion emits part of its dispatch surface with the attribute's own span,
+// which an `allow` on the impl block cannot reach. Every handler written here is documented.
+#![allow(missing_docs)]
+
 use std::sync::Arc;
 
 use time::format_description::well_known::Rfc3339;
@@ -23,6 +27,10 @@ impl Identity1Service {
     }
 }
 
+#[allow(
+    clippy::unused_async,
+    reason = "zbus dispatches every exported handler as a future"
+)]
 #[interface(name = "org.cybou.Mind.Identity1")]
 impl Identity1Service {
     /// Unique subject UUID string.
@@ -43,18 +51,12 @@ impl Identity1Service {
 
     /// Monotonic session count.
     async fn session_count(&self) -> u64 {
-        self.core
-            .current_state()
-            .map(|s| s.session_count)
-            .unwrap_or(0)
+        self.core.current_state().map_or(0, |s| s.session_count)
     }
 
     /// Age of the identity in whole days.
     async fn age_in_days(&self) -> i64 {
-        self.core
-            .current_state()
-            .map(|s| s.age_in_days())
-            .unwrap_or(0)
+        self.core.current_state().map_or(0, |s| s.age_in_days())
     }
 
     /// Active architecture version.

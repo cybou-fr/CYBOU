@@ -45,7 +45,11 @@ pub struct EventClient {
 }
 
 impl EventClient {
-    /// Create a new EventClient connected to the session bus.
+    /// Create a new `EventClient` connected to the session bus.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the session bus cannot be reached.
     #[cfg(target_os = "linux")]
     pub async fn session() -> Result<Self, EventClientError> {
         let connection = zbus::Connection::session()
@@ -55,6 +59,11 @@ impl EventClient {
     }
 
     /// Submit a canonical envelope to the Journal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the call fails and
+    /// [`EventClientError::Encoding`] if the envelope or the reply cannot be coded.
     #[cfg(target_os = "linux")]
     pub async fn submit(
         &self,
@@ -76,6 +85,7 @@ impl EventClient {
             .await
             .map_err(|e| EventClientError::Rpc(e.to_string()))?
             .body()
+            .deserialize()
             .map_err(|e| EventClientError::Rpc(e.to_string()))?;
 
         let outcome: SubmitOutcome = ciborium::from_reader(reply.as_slice())
@@ -85,6 +95,11 @@ impl EventClient {
     }
 
     /// Replay contributions strictly after `after_sequence`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the call fails and
+    /// [`EventClientError::Encoding`] if the reply cannot be decoded.
     #[cfg(target_os = "linux")]
     pub async fn replay(
         &self,
@@ -98,11 +113,12 @@ impl EventClient {
                 EVENT.object_path,
                 Some(EVENT.interface),
                 "Replay",
-                &(after_sequence, limit as i32),
+                &(after_sequence, i32::try_from(limit).unwrap_or(i32::MAX)),
             )
             .await
             .map_err(|e| EventClientError::Rpc(e.to_string()))?
             .body()
+            .deserialize()
             .map_err(|e| EventClientError::Rpc(e.to_string()))?;
 
         if reply.is_empty() {
@@ -116,6 +132,11 @@ impl EventClient {
     }
 
     /// Retrieve the head envelope, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the call fails and
+    /// [`EventClientError::Encoding`] if the reply cannot be decoded.
     #[cfg(target_os = "linux")]
     pub async fn head(&self) -> Result<Option<CanonicalEnvelope>, EventClientError> {
         let reply: Vec<u8> = self
@@ -130,6 +151,7 @@ impl EventClient {
             .await
             .map_err(|e| EventClientError::Rpc(e.to_string()))?
             .body()
+            .deserialize()
             .map_err(|e| EventClientError::Rpc(e.to_string()))?;
 
         if reply.is_empty() {
@@ -143,6 +165,10 @@ impl EventClient {
     }
 
     /// Retrieve the total number of contributions in the Journal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the call fails.
     #[cfg(target_os = "linux")]
     pub async fn count(&self) -> Result<u64, EventClientError> {
         let count: u64 = self
@@ -157,6 +183,7 @@ impl EventClient {
             .await
             .map_err(|e| EventClientError::Rpc(e.to_string()))?
             .body()
+            .deserialize()
             .map_err(|e| EventClientError::Rpc(e.to_string()))?;
 
         Ok(count)

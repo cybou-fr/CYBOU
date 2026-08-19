@@ -19,7 +19,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-presenced] Connecting to D-Bus session bus...");
         let service = Presence1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(PRESENCE.service)?
             .serve_at(PRESENCE.object_path, service)?
             .build()

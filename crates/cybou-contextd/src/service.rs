@@ -3,9 +3,13 @@
 
 //! D-Bus `org.cybou.Mind.Context1` service implementation on zbus.
 
+// The `#[interface]` expansion emits part of its dispatch surface with the attribute's own span,
+// which an `allow` on the impl block cannot reach. Every handler written here is documented.
+#![allow(missing_docs)]
+
 use std::sync::Arc;
 
-use zbus::{SignalContext, interface};
+use zbus::{interface, object_server::SignalEmitter};
 
 use crate::ContextCore;
 
@@ -22,6 +26,10 @@ impl Context1Service {
     }
 }
 
+#[allow(
+    clippy::unused_async,
+    reason = "zbus dispatches every exported handler as a future"
+)]
 #[interface(name = "org.cybou.Mind.Context1")]
 impl Context1Service {
     /// Service readiness.
@@ -54,5 +62,5 @@ impl Context1Service {
 
     /// Signal emitted when context vector changes.
     #[zbus(signal)]
-    async fn changed(ctxt: &SignalContext<'_>) -> zbus::Result<()>;
+    async fn changed(ctxt: &SignalEmitter<'_>) -> zbus::Result<()>;
 }

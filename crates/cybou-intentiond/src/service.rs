@@ -3,6 +3,10 @@
 
 //! D-Bus `org.cybou.Mind.Intention1` service implementation on zbus.
 
+// The `#[interface]` expansion emits part of its dispatch surface with the attribute's own span,
+// which an `allow` on the impl block cannot reach. Every handler written here is documented.
+#![allow(missing_docs)]
+
 use std::sync::Arc;
 
 use time::OffsetDateTime;
@@ -24,6 +28,10 @@ impl Intention1Service {
     }
 }
 
+#[allow(
+    clippy::unused_async,
+    reason = "zbus dispatches every exported handler as a future"
+)]
 #[interface(name = "org.cybou.Mind.Intention1")]
 impl Intention1Service {
     /// Service readiness.
@@ -77,6 +85,6 @@ impl Intention1Service {
 
     /// Return open intention count.
     async fn open_count(&self) -> u32 {
-        self.core.open_count() as u32
+        u32::try_from(self.core.open_count()).unwrap_or(u32::MAX)
     }
 }

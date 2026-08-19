@@ -45,7 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("[cybou-selfd] Connecting to D-Bus session bus...");
         let service = Self1Service::new(core);
-        let connection = zbus::connection::Builder::session()?
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let _connection = zbus::connection::Builder::session()?
             .name(SELF.service)?
             .serve_at(SELF.object_path, service)?
             .build()
