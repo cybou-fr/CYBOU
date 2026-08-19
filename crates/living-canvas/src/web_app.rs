@@ -252,21 +252,21 @@ pub fn App() -> impl IntoView {
                     <Show when=move || runtime_menu_open.get()>
                         <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
                             <header><strong>"Cybou"</strong><small>"All data stays local"</small></header>
-                        <button>"New artifact"</button>
-                            <button>"New commitment"</button>
-                            <button>"Invite collaborator"</button>
-                            <button>"Open mind"</button>
+                            <button><FileCheck size=15 /><span>"New artifact"</span></button>
+                            <button><ListChecks size=15 /><span>"New commitment"</span></button>
+                            <button><UsersRound size=15 /><span>"Invite collaborator"</span></button>
+                            <button><Sparkles size=15 /><span>"Open mind"</span></button>
                             <hr />
-                            <button>"Canvas view"</button>
+                            <button><Map size=15 /><span>"Canvas view"</span></button>
                             <button
                                 aria-pressed=move || minimap_visible.get().to_string()
                                 on:click=move |_| {
                                     set_minimap_visible.set(!minimap_visible.get_untracked());
                                     set_runtime_menu_open.set(false);
                                 }
-                            >"Minimap"</button>
+                            ><Map size=15 /><span>"Minimap"</span></button>
                             <hr />
-                            <button>"System status"</button>
+                            <button><Sparkles size=15 /><span>"System status"</span></button>
                         </nav>
                     </Show>
                 </div>
@@ -335,7 +335,7 @@ pub fn App() -> impl IntoView {
                     on:keydown=move |event| keyboard_move(event, Panel::Release, layout)
                     on:click=move |_| set_selected.set("release")
                 >
-                    <small>"Release plan"</small>
+                    <small class="panel-kicker"><Sparkles size=14 /><span>"Release plan"</span></small>
                     <h1>"Cybou 0.8 release"</h1>
                     <p>"Stable release with local-first guarantees, improved reliability, and rollback safety."</p>
                     <div class="progress-label"><span>"Progress"</span><strong>"68%"</strong></div>
@@ -371,7 +371,7 @@ pub fn App() -> impl IntoView {
                     on:click=move |_| set_selected.set("suggestion")
                 >
                     <header class="suggestion-heading">
-                        <small>"Mind suggests"</small>
+                        <small class="panel-kicker"><Sparkles size=14 /><span>"Mind suggests"</span></small>
                         <b>"High impact"</b>
                     </header>
                     <strong>"Add rollback verification"</strong>
@@ -392,7 +392,7 @@ pub fn App() -> impl IntoView {
                     on:keydown=move |event| keyboard_move(event, Panel::Commitments, layout)
                     on:click=move |_| set_selected.set("commitments")
                 >
-                    <small>"3 commitments"</small>
+                    <small class="panel-kicker"><ListChecks size=14 /><span>"3 commitments"</span></small>
                     <span class="check-row"><b>"Complete test matrix"</b><i>"May 20"</i></span>
                     <span class="check-row"><b>"Security review"</b><i>"May 22"</i></span>
                     <span class="check-row"><b>"Docs & migration guide"</b><i>"May 26"</i></span>

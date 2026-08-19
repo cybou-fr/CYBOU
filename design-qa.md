@@ -21,9 +21,8 @@
   shown in the source.
 - **P2 — Viewport density still differs.** At the 1280 × 720 browser viewport the implementation is
   more horizontally spread and vertically compressed than the 1536 × 1094 source composition.
-- **P2 — Iconography is partially integrated.** Rust-native Lucide icons now cover the primary card
-  headers, selected-object actions, and command bar. The remaining card and runtime-menu controls
-  still need the same treatment.
+- **Passed iconography slice.** Rust-native Lucide icons now cover the card headers,
+  selected-object actions, command bar, minimap, and runtime-menu controls.
 - **Passed interaction slice — draggable panels.** Pointer drag changed the release position from
   `(480, 140)` to `(630, 240)` and brought it forward. Reload restored `(630, 240)`. ArrowLeft moved
   it by 10 px and Shift+ArrowUp by 40 px after the focus fix. No warning/error console entries were
@@ -57,11 +56,14 @@ because all six panels use the same pointer-capture and keyboard-movement implem
    confirms its runtime-menu control hides and restores the map, and selecting the Sources marker
    applies the `selected` state to the full Sources panel. The topbar stacking context was raised so
    menu commands receive pointer input above the isolated canvas.
+7. Rust-native Lucide icons now cover the remaining Release, Mind Suggestion, Commitments, and all
+   runtime-menu commands. Debian Rust/WASM checks and production deployment pass. The follow-up
+   semantic browser inspection timed out and reset the browser session, so this slice still relies
+   on the previously validated control structure rather than a new visual baseline.
 
 ## Next implementation checklist
 
 1. Render relationship connectors from live panel centers during drag.
-2. Extend the Rust-native icon set to the remaining card and runtime-menu controls.
-3. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
+2. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
 
 final result: blocked

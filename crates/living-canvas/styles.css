@@ -55,7 +55,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .runtime-menu { position: absolute; z-index: 3000; top: 48px; right: 0; width: 220px; display: grid; gap: 4px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: rgba(17,25,34,.98); box-shadow: 0 24px 70px rgba(0,0,0,.55); }
 .runtime-menu header { display: grid; padding: 4px 8px 12px; }
 .runtime-menu header small { color: var(--accent); }
-.runtime-menu button { padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; color: #c9d3dc; cursor: pointer; }
+.runtime-menu button { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; color: #c9d3dc; cursor: pointer; }
+.runtime-menu button svg { flex: 0 0 auto; color: #91a5b4; stroke-width: 1.7; }
 .runtime-menu button:hover { background: rgba(255,255,255,.06); }
 .runtime-menu hr { width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16); }
 
