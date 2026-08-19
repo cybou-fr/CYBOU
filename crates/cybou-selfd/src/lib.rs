@@ -202,7 +202,7 @@ pub struct SelfCore {
 }
 
 impl SelfCore {
-    /// Create a new SelfCore manager.
+    /// Create a new `SelfCore` manager.
     #[must_use]
     pub fn new(age_in_days: i64, sessions: u64, architecture_version: impl Into<String>) -> Self {
         Self {
@@ -251,7 +251,13 @@ impl SelfCore {
     /// Default measurement when downstream owners are unobserved.
     #[must_use]
     pub fn measure(&self, now: OffsetDateTime, contributions: u64) -> SelfReport {
-        self.measure_with(now, contributions, None, None, VerificationKnowledge::Unknown)
+        self.measure_with(
+            now,
+            contributions,
+            None,
+            None,
+            VerificationKnowledge::Unknown,
+        )
     }
 
     /// Produce a narrated self-reflection string.

@@ -86,6 +86,13 @@ four facts about it, so no database is reachable from the rules. Unknown schema,
 sensitivity values are refused rather than defaulted, and every rule refuses rather than silently
 correcting a declaration.
 
+`cybou-protocol` additionally carries five **contract-only** modules — `meaning` (ADR-0031),
+`learning` (ADR-0032/0033), `governance` (ADR-0034/0035), `action` (ADR-0022/0036) and `security`
+(ADR-0036). They fix the shared spelling of the types the future agent/worker runtime, model broker,
+authorized action executor and security control plane will exchange. No daemon depends on them and
+no runtime enforces them: they are vocabulary, not behaviour, and the README statement that this
+repository does not yet implement those subsystems remains accurate.
+
 `cybou-storage::writer` provides the atomic SQLite write engine. It creates schema v2 with required
 tables, indexes, and the partial unique index enforcing one terminal Outcome per cause; reads WAL
 and `synchronous` back and refuses to open when either did not take; refuses a declared schema with no

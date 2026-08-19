@@ -59,7 +59,11 @@ impl Intention1Service {
             "obsolete" => Resolution::Obsolete,
             _ => return false, // reject unknown resolution
         };
-        let note_opt = if note.is_empty() { None } else { Some(note.as_str()) };
+        let note_opt = if note.is_empty() {
+            None
+        } else {
+            Some(note.as_str())
+        };
         self.core.close(id, res, note_opt).is_ok()
     }
 

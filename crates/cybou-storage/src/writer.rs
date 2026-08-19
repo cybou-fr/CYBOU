@@ -196,7 +196,7 @@ impl JournalWriter {
         Ok(writer)
     }
 
-    /// Attach an active KeyStore, key encryption key (KEK), and key domain for sealing sensitive contributions.
+    /// Attach an active `KeyStore`, key encryption key (KEK), and key domain for sealing sensitive contributions.
     pub fn set_key_store(
         &mut self,
         key_store: cybou_crypto::KeyStore,
@@ -316,13 +316,16 @@ impl JournalWriter {
     pub fn append(&mut self, envelope: &CanonicalEnvelope) -> Result<Appended, WriteError> {
         let envelope_to_write;
         let target_envelope = if envelope.sealed {
-            let (Some(store), Some(kek), Some(domain)) = (&self.key_store, &self.kek, &self.key_domain) else {
+            let (Some(store), Some(kek), Some(domain)) =
+                (&self.key_store, &self.kek, &self.key_domain)
+            else {
                 return Err(WriteError::SealedWithoutKeyStore);
             };
             let data_key = store.create_key_for(&envelope.message_id, kek)?;
             let sealed = cybou_crypto::Seal::seal(&envelope.payload, &data_key)?;
             let mut stored = envelope.clone();
-            let mut payload_bytes = Vec::with_capacity(sealed.nonce.len() + sealed.ciphertext.len());
+            let mut payload_bytes =
+                Vec::with_capacity(sealed.nonce.len() + sealed.ciphertext.len());
             payload_bytes.extend_from_slice(&sealed.nonce);
             payload_bytes.extend_from_slice(&sealed.ciphertext);
             stored.payload = payload_bytes;
@@ -378,12 +381,9 @@ impl JournalWriter {
         let mut rows = stmt.query([]).map_err(WriteError::Query)?;
         if let Some(row) = rows.next().map_err(WriteError::Query)? {
             let seq: i64 = row.get(0).map_err(WriteError::Query)?;
-            let envelope = crate::decode_envelope(
-                &self.connection,
-                row,
-                u64::try_from(seq).unwrap_or(0),
-            )
-            .map_err(WriteError::from)?;
+            let envelope =
+                crate::decode_envelope(&self.connection, row, u64::try_from(seq).unwrap_or(0))
+                    .map_err(WriteError::from)?;
             Ok(Some(envelope))
         } else {
             Ok(None)
@@ -441,12 +441,9 @@ impl JournalWriter {
         let mut result = Vec::new();
         while let Some(row) = rows.next().map_err(WriteError::Query)? {
             let seq: i64 = row.get(0).map_err(WriteError::Query)?;
-            let envelope = crate::decode_envelope(
-                &self.connection,
-                row,
-                u64::try_from(seq).unwrap_or(0),
-            )
-            .map_err(WriteError::from)?;
+            let envelope =
+                crate::decode_envelope(&self.connection, row, u64::try_from(seq).unwrap_or(0))
+                    .map_err(WriteError::from)?;
             result.push(envelope);
         }
         if limit > 0 {
@@ -465,8 +462,8 @@ impl JournalWriter {
         after_sequence: u64,
         limit: usize,
     ) -> Result<Vec<CanonicalEnvelope>, WriteError> {
-        let after_i64 =
-            i64::try_from(after_sequence).map_err(|_| WriteError::Malformed("sequence overflow"))?;
+        let after_i64 = i64::try_from(after_sequence)
+            .map_err(|_| WriteError::Malformed("sequence overflow"))?;
         let limit_clause = if limit > 0 {
             format!("LIMIT {limit}")
         } else {
@@ -484,12 +481,9 @@ impl JournalWriter {
         let mut result = Vec::new();
         while let Some(row) = rows.next().map_err(WriteError::Query)? {
             let seq: i64 = row.get(0).map_err(WriteError::Query)?;
-            let envelope = crate::decode_envelope(
-                &self.connection,
-                row,
-                u64::try_from(seq).unwrap_or(0),
-            )
-            .map_err(WriteError::from)?;
+            let envelope =
+                crate::decode_envelope(&self.connection, row, u64::try_from(seq).unwrap_or(0))
+                    .map_err(WriteError::from)?;
             result.push(envelope);
         }
         Ok(result)
@@ -519,12 +513,9 @@ impl JournalWriter {
             .map_err(WriteError::Query)?;
         if let Some(row) = rows.next().map_err(WriteError::Query)? {
             let seq: i64 = row.get(0).map_err(WriteError::Query)?;
-            let envelope = crate::decode_envelope(
-                &self.connection,
-                row,
-                u64::try_from(seq).unwrap_or(0),
-            )
-            .map_err(WriteError::from)?;
+            let envelope =
+                crate::decode_envelope(&self.connection, row, u64::try_from(seq).unwrap_or(0))
+                    .map_err(WriteError::from)?;
             Ok(Some(envelope))
         } else {
             Ok(None)
@@ -556,12 +547,9 @@ impl JournalWriter {
         let mut result = Vec::new();
         while let Some(row) = rows.next().map_err(WriteError::Query)? {
             let seq: i64 = row.get(0).map_err(WriteError::Query)?;
-            let envelope = crate::decode_envelope(
-                &self.connection,
-                row,
-                u64::try_from(seq).unwrap_or(0),
-            )
-            .map_err(WriteError::from)?;
+            let envelope =
+                crate::decode_envelope(&self.connection, row, u64::try_from(seq).unwrap_or(0))
+                    .map_err(WriteError::from)?;
             result.push(envelope);
         }
         Ok(result)
@@ -613,7 +601,7 @@ impl JournalWriter {
         Ok(list)
     }
 
-    /// Current erasure epoch from journal_meta.
+    /// Current erasure epoch from `journal_meta`.
     ///
     /// # Errors
     ///

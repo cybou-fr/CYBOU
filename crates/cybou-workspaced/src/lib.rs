@@ -12,7 +12,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope, unix_millis};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -105,7 +105,7 @@ impl Default for WorkspaceCore {
 }
 
 impl WorkspaceCore {
-    /// Create a new WorkspaceCore with bounded capacity.
+    /// Create a new `WorkspaceCore` with bounded capacity.
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -145,13 +145,21 @@ impl WorkspaceCore {
     }
 
     /// Calculate dynamic salience for a coalition at a given moment.
+    ///
+    /// Salience is a ranking heuristic, not a stored quantity: ages and member counts are
+    /// converted to `f64` for the decay curve, where losing sub-millisecond precision on
+    /// implausibly large values cannot change which coalition wins focus.
     #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "attention ranking tolerates f64 rounding of ages and counts"
+    )]
     pub fn salience_of(&self, coalition: &Coalition, now: OffsetDateTime) -> f64 {
-        let now_ms = now.unix_timestamp_nanos() as f64 / 1_000_000.0;
+        let now_ms = unix_millis(now);
         let mut total = 0.0;
 
         for env in &coalition.members {
-            let age_seconds = (now_ms - env.wall_time_ms as f64).max(0.0) / 1000.0;
+            let age_seconds = (now_ms - env.wall_time_ms).max(0) as f64 / 1000.0;
             let recency = 0.5_f64.powf(age_seconds / HALF_LIFE_SECONDS);
             let weight = attention_weight_u16(env.kind);
             total += weight * env.confidence * recency;
@@ -286,7 +294,7 @@ mod tests {
     fn attention_focus_competition() {
         let core = WorkspaceCore::new(10);
         let now = OffsetDateTime::now_utc();
-        let now_ms = now.unix_timestamp_nanos() as i64 / 1_000_000;
+        let now_ms = unix_millis(now);
 
         let ep1 = Uuid::new_v4();
         let ep2 = Uuid::new_v4();
@@ -296,10 +304,10 @@ mod tests {
         core.accept(env1);
 
         // Episode 2 has high priority NeedSignal from 2 organs
-        let env2a = make_envelope(Uuid::new_v4(), ep2, "healthd", 5, 1.0, now_ms);
-        let env2b = make_envelope(Uuid::new_v4(), ep2, "selfd", 5, 1.0, now_ms);
-        core.accept(env2a);
-        core.accept(env2b);
+        let env2_health = make_envelope(Uuid::new_v4(), ep2, "healthd", 5, 1.0, now_ms);
+        let env2_self = make_envelope(Uuid::new_v4(), ep2, "selfd", 5, 1.0, now_ms);
+        core.accept(env2_health);
+        core.accept(env2_self);
 
         let coalitions = core.coalitions(now);
         assert_eq!(coalitions.len(), 2);
@@ -307,6 +315,9 @@ mod tests {
 
         let focus = core.focus(now).expect("focus exists");
         assert_eq!(focus.correlation_id, ep2);
-        assert_eq!(focus.organs, vec!["healthd".to_string(), "selfd".to_string()]);
+        assert_eq!(
+            focus.organs,
+            vec!["healthd".to_string(), "selfd".to_string()]
+        );
     }
 }

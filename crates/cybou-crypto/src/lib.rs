@@ -4,7 +4,7 @@
 //! Cryptographic sealing, key derivation, and key store primitives for Cybou.
 //!
 //! Provides byte- and algorithm-level compatibility with the predecessor's
-//! XChaCha20-Poly1305 sealing, KeyStore storage, and sealed payload commitments.
+//! XChaCha20-Poly1305 sealing, `KeyStore` storage, and sealed payload commitments.
 
 use std::{
     fs::{self, File},
@@ -12,10 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use chacha20poly1305::{
-    KeyInit, XChaCha20Poly1305, XNonce,
-    aead::Aead,
-};
+use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce, aead::Aead};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -23,7 +20,7 @@ use uuid::Uuid;
 
 /// Length in bytes of an XChaCha20-Poly1305 symmetric key.
 pub const SEAL_KEY_BYTES: usize = 32;
-/// Length in bytes of an XChaCha20 extended nonce.
+/// Length in bytes of an `XChaCha20` extended nonce.
 pub const SEAL_NONCE_BYTES: usize = 24;
 /// Length in bytes of a Poly1305 authentication tag.
 pub const SEAL_TAG_BYTES: usize = 16;
@@ -126,7 +123,10 @@ impl Seal {
     /// # Errors
     ///
     /// Returns [`CryptoError`] on random generation failure or encryption error.
-    pub fn seal(plaintext: &[u8], key: &[u8; SEAL_KEY_BYTES]) -> Result<SealedPayload, CryptoError> {
+    pub fn seal(
+        plaintext: &[u8],
+        key: &[u8; SEAL_KEY_BYTES],
+    ) -> Result<SealedPayload, CryptoError> {
         let mut nonce_bytes = [0u8; SEAL_NONCE_BYTES];
         getrandom::getrandom(&mut nonce_bytes).map_err(|_| CryptoError::RandomGenerationFailed)?;
 
@@ -204,7 +204,7 @@ impl Seal {
     }
 }
 
-/// Errors occurring during KeyStore operations.
+/// Errors occurring during `KeyStore` operations.
 #[derive(Debug, Error)]
 pub enum KeyStoreError {
     /// Underlying cryptographic failure.
@@ -223,7 +223,7 @@ pub enum KeyStoreError {
     InvalidContributionId,
 }
 
-/// File-based KeyStore for per-contribution data keys.
+/// File-based `KeyStore` for per-contribution data keys.
 ///
 /// Implements idempotent key destruction and atomic file writes.
 #[derive(Clone, Debug)]
@@ -300,10 +300,11 @@ impl KeyStore {
                 let _ = file.set_permissions(fs::Permissions::from_mode(0o600));
             }
 
-            file.write_all(&encoded).map_err(|source| KeyStoreError::Io {
-                path: temp_path.clone(),
-                source,
-            })?;
+            file.write_all(&encoded)
+                .map_err(|source| KeyStoreError::Io {
+                    path: temp_path.clone(),
+                    source,
+                })?;
             file.flush().map_err(|source| KeyStoreError::Io {
                 path: temp_path.clone(),
                 source,
@@ -447,6 +448,8 @@ mod tests {
         assert_eq!(store.key_for(&id, &kek), None);
 
         // Idempotent destroy
-        store.destroy_key_for(&id).expect("destroy already absent key");
+        store
+            .destroy_key_for(&id)
+            .expect("destroy already absent key");
     }
 }

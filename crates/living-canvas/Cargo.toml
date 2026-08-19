@@ -24,6 +24,9 @@ uuid.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
+# `uuid` arrives transitively through cybou-protocol with `v4` enabled; on wasm32-unknown-unknown
+# it refuses to compile until a randomness source is named, so enable the browser one here.
+uuid = { workspace = true, features = ["js"] }
 gloo-net = "0.6.0"
 leptos = { version = "0.8.15", features = ["csr"] }
 lucide-leptos = { version = "3.23.0", features = ["account", "files", "layout", "multimedia", "navigation", "text"] }

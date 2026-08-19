@@ -178,13 +178,20 @@ impl Event1Service {
     ) -> Vec<u8> {
         let decoded: CanonicalEnvelope = match ciborium::from_reader(encoded_envelope.as_slice()) {
             Ok(env) => env,
-            Err(err) => return SubmitResult::failure(format!("CBOR decode error: {err}")).to_cbor(),
+            Err(err) => {
+                return SubmitResult::failure(format!("CBOR decode error: {err}")).to_cbor();
+            }
         };
 
         // Check sender PID via D-Bus connection interface if available
         let mut caller_organ = None;
         if let Some(sender) = header.sender() {
-            if let Ok(pid) = connection.inner().bus_interface().get_connection_unix_process_id(sender.into()).await {
+            if let Ok(pid) = connection
+                .inner()
+                .bus_interface()
+                .get_connection_unix_process_id(sender.into())
+                .await
+            {
                 caller_organ = self.resolve_caller_organ(pid);
             }
         }

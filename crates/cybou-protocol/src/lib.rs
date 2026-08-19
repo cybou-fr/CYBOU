@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub mod admission;
@@ -15,7 +16,28 @@ pub mod canonical;
 pub mod capability;
 pub mod observation;
 
+// Contract-only vocabulary: the modules below name the types of ADR-0031 through ADR-0036 so the
+// future agent/worker runtime, model broker, action executor and security control plane are
+// designed against one shared spelling. None of them has a runtime owner in this repository yet
+// and no daemon depends on them; see `docs/CURRENT_STATE.md`. Adding a type here is not evidence
+// that the corresponding behaviour exists.
+pub mod action;
+pub mod governance;
+pub mod learning;
+pub mod meaning;
+pub mod security;
+
 pub use admission::Kind;
+
+/// Canonical Qt-compatible UTC wall-clock spelling: whole milliseconds since the Unix epoch.
+///
+/// The `time` crate reports nanoseconds as `i128`; narrowing that with `as i64` would wrap
+/// silently rather than fail, so the division happens first and the result saturates.
+#[must_use]
+pub fn unix_millis(instant: OffsetDateTime) -> i64 {
+    let millis = instant.unix_timestamp_nanos() / 1_000_000;
+    i64::try_from(millis).unwrap_or(i64::MAX)
+}
 
 /// Version of a serialized contract schema.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

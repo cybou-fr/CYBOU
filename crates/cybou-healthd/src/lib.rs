@@ -6,10 +6,7 @@
 //! Evaluates the health of each registered Mind capability by combining component
 //! reachability against declarative dependency policy (`CapabilityRegistry`).
 
-use std::{
-    collections::HashMap,
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use cybou_protocol::{
     CapabilityState, KnowledgeState,
@@ -44,6 +41,10 @@ pub enum ComponentHealth {
 impl ComponentHealth {
     /// Convert component health to capability state.
     #[must_use]
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Healthy and Degraded map to the same state for different reasons; keep them distinct"
+    )]
     pub const fn to_capability_state(self) -> CapabilityState {
         match self {
             Self::Healthy => CapabilityState::Available,
@@ -86,7 +87,7 @@ impl Default for HealthCore {
 }
 
 impl HealthCore {
-    /// Create a new HealthCore engine.
+    /// Create a new `HealthCore` engine.
     #[must_use]
     pub fn new() -> Self {
         let core = Self {
@@ -183,9 +184,8 @@ impl HealthCore {
             capability_projections.push(projection);
         }
 
-        let mut version_guard = match self.projection_version.write() {
-            Ok(v) => v,
-            Err(_) => return,
+        let Ok(mut version_guard) = self.projection_version.write() else {
+            return;
         };
         *version_guard += 1;
         let new_version = *version_guard;
@@ -220,20 +220,29 @@ fn evaluate_capability(
             None => {
                 // If not recorded yet, assume Unavailable
                 state = CapabilityState::Unavailable;
-                reason = Some(format!("{comp} is unavailable: {impact}", impact = decl.unavailable_impact));
+                reason = Some(format!(
+                    "{comp} is unavailable: {impact}",
+                    impact = decl.unavailable_impact
+                ));
                 break;
             }
             Some(rec) => match rec.health {
                 ComponentHealth::Healthy => {}
                 ComponentHealth::Degraded => {
                     if state == CapabilityState::Available {
-                        reason = rec.detail.clone().or_else(|| Some(format!("{comp} is degraded")));
+                        reason = rec
+                            .detail
+                            .clone()
+                            .or_else(|| Some(format!("{comp} is degraded")));
                     }
                 }
                 ComponentHealth::Unavailable | ComponentHealth::Conflicted => {
                     state = CapabilityState::Unavailable;
                     reason = rec.detail.clone().or_else(|| {
-                        Some(format!("{comp} is unavailable: {impact}", impact = decl.unavailable_impact))
+                        Some(format!(
+                            "{comp} is unavailable: {impact}",
+                            impact = decl.unavailable_impact
+                        ))
                     });
                     break;
                 }
@@ -325,6 +334,12 @@ mod tests {
             .find(|c| c.id == "local-perception")
             .expect("local-perception exists");
         assert_eq!(perception_cap.state, CapabilityState::Unavailable);
-        assert!(perception_cap.reason.as_deref().unwrap().contains("perception sensor absent"));
+        assert!(
+            perception_cap
+                .reason
+                .as_deref()
+                .unwrap()
+                .contains("perception sensor absent")
+        );
     }
 }

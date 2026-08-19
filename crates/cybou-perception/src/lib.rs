@@ -148,9 +148,8 @@ impl LinuxSystemSource {
     /// Read the system identity once without mutating the observed system.
     #[must_use]
     pub fn acquire(&self, now: OffsetDateTime) -> AcquisitionResult {
-        let content = match fs::read_to_string(&self.os_release_path) {
-            Ok(content) => content,
-            Err(_) => return self.unavailable("cannot be read"),
+        let Ok(content) = fs::read_to_string(&self.os_release_path) else {
+            return self.unavailable("cannot be read");
         };
 
         let parsed = parse_os_release(&content);
@@ -219,12 +218,11 @@ fn parse_os_release(content: &str) -> std::collections::BTreeMap<String, String>
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim().to_string();
             let mut val = value.trim().to_string();
-            if (val.starts_with('"') && val.ends_with('"'))
-                || (val.starts_with('\'') && val.ends_with('\''))
+            if ((val.starts_with('"') && val.ends_with('"'))
+                || (val.starts_with('\'') && val.ends_with('\'')))
+                && val.len() >= 2
             {
-                if val.len() >= 2 {
-                    val = val[1..val.len() - 1].to_string();
-                }
+                val = val[1..val.len() - 1].to_string();
             }
             map.insert(key, val);
         }
@@ -335,7 +333,8 @@ VERSION="13 (trixie)"
 ID=debian
 "#;
         fs::write(&os_release_file, os_release_content).expect("write os-release");
-        fs::write(&machine_id_file, "a1b2c3d4e5f60718293a4b5c6d7e8f90\n").expect("write machine-id");
+        fs::write(&machine_id_file, "a1b2c3d4e5f60718293a4b5c6d7e8f90\n")
+            .expect("write machine-id");
 
         let now = OffsetDateTime::from_unix_timestamp(1_787_090_000).expect("fixed clock");
         let source = LinuxSystemSource::new(os_release_file, Some(machine_id_file), 300);
@@ -347,7 +346,11 @@ ID=debian
         assert_eq!(observation.subject, LINUX_SYSTEM_SUBJECT);
         assert_eq!(observation.value, "Debian GNU/Linux 13 (trixie)");
         assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
-        assert!(observation.provenance.contains("machine-id: a1b2c3d4e5f60718293a4b5c6d7e8f90"));
+        assert!(
+            observation
+                .provenance
+                .contains("machine-id: a1b2c3d4e5f60718293a4b5c6d7e8f90")
+        );
 
         let protocol = observation.into_protocol().expect("protocol observation");
         assert_eq!(protocol.source_id, LINUX_SYSTEM_SOURCE_ID);

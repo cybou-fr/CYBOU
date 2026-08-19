@@ -17,16 +17,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let now = OffsetDateTime::now_utc();
     let initial_env = core.acquire_once(now, 0);
-    println!("[cybou-perceptiond] Initial perception health: {}", core.health());
+    println!(
+        "[cybou-perceptiond] Initial perception health: {}",
+        core.health()
+    );
 
     // Spawn periodic background acquisition task submitting to Event1
     let sampling_core = core.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let mut interval = tokio::time::interval(Duration::from_mins(1));
         let mut monotonic = 1u64;
 
         #[cfg(target_os = "linux")]
-        let event_client = cybou_fabric::event_client::EventClient::session().await.ok();
+        let event_client = cybou_fabric::event_client::EventClient::session()
+            .await
+            .ok();
 
         loop {
             interval.tick().await;

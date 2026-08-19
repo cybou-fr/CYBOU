@@ -120,7 +120,7 @@ impl Default for ContextCore {
 }
 
 impl ContextCore {
-    /// Create a new transient ContextCore engine.
+    /// Create a new transient `ContextCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -130,7 +130,7 @@ impl ContextCore {
         }
     }
 
-    /// Open ContextCore with persistent JSON storage.
+    /// Open `ContextCore` with persistent JSON storage.
     ///
     /// # Errors
     ///
@@ -193,23 +193,29 @@ impl ContextCore {
         let reason_str = reason.into();
 
         let mut candidate_nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
-        let assocs = self.associations.read().map(|g| g.clone()).unwrap_or_default();
+        let assocs = self
+            .associations
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
 
-        let node = candidate_nodes.entry(label_str.clone()).or_insert_with(|| ConceptNode {
-            label: label_str,
-            salience,
-            activation_reason: reason_str.clone(),
-            last_activated_at: now,
-        });
+        let node = candidate_nodes
+            .entry(label_str.clone())
+            .or_insert_with(|| ConceptNode {
+                label: label_str,
+                salience,
+                activation_reason: reason_str.clone(),
+                last_activated_at: now,
+            });
 
         node.salience = (node.salience * 0.5 + salience * 0.5).clamp(0.0, 1.0);
         node.activation_reason = reason_str;
         node.last_activated_at = now;
 
-        if self.persist_candidate(&candidate_nodes, &assocs).is_ok() {
-            if let Ok(mut lock) = self.nodes.write() {
-                *lock = candidate_nodes;
-            }
+        if self.persist_candidate(&candidate_nodes, &assocs).is_ok()
+            && let Ok(mut lock) = self.nodes.write()
+        {
+            *lock = candidate_nodes;
         }
     }
 
@@ -226,7 +232,11 @@ impl ContextCore {
         let target_str = target.into();
 
         let nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
-        let mut candidate_assocs = self.associations.read().map(|g| g.clone()).unwrap_or_default();
+        let mut candidate_assocs = self
+            .associations
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
 
         // Update or insert
         if let Some(existing) = candidate_assocs
@@ -249,10 +259,10 @@ impl ContextCore {
             });
         }
 
-        if self.persist_candidate(&nodes, &candidate_assocs).is_ok() {
-            if let Ok(mut lock) = self.associations.write() {
-                *lock = candidate_assocs;
-            }
+        if self.persist_candidate(&nodes, &candidate_assocs).is_ok()
+            && let Ok(mut lock) = self.associations.write()
+        {
+            *lock = candidate_assocs;
         }
     }
 
@@ -260,13 +270,21 @@ impl ContextCore {
     #[must_use]
     pub fn bundle(&self, min_salience: f64) -> ContextBundle {
         let nodes_map = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
-        let assocs_list = self.associations.read().map(|g| g.clone()).unwrap_or_default();
+        let assocs_list = self
+            .associations
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
 
         let mut items: Vec<_> = nodes_map
             .into_values()
             .filter(|n| n.salience >= min_salience)
             .collect();
-        items.sort_by(|a, b| b.salience.partial_cmp(&a.salience).unwrap_or(std::cmp::Ordering::Equal));
+        items.sort_by(|a, b| {
+            b.salience
+                .partial_cmp(&a.salience)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let item_labels: Vec<_> = items.iter().map(|n| n.label.clone()).collect();
         let relevant_assocs: Vec<_> = assocs_list
@@ -290,7 +308,11 @@ impl ContextCore {
     /// Return related concept labels for a given tag.
     #[must_use]
     pub fn related_tags(&self, tag: &str) -> Vec<String> {
-        let assocs = self.associations.read().map(|g| g.clone()).unwrap_or_default();
+        let assocs = self
+            .associations
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
         let mut list = Vec::new();
         for a in assocs {
             if a.source == tag && !list.contains(&a.target) {

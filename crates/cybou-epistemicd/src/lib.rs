@@ -14,7 +14,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{canonical::CanonicalEnvelope, Kind};
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -96,7 +96,7 @@ impl Default for EpistemicCore {
 }
 
 impl EpistemicCore {
-    /// Create a new transient EpistemicCore engine.
+    /// Create a new transient `EpistemicCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -106,7 +106,7 @@ impl EpistemicCore {
         }
     }
 
-    /// Open EpistemicCore with persistent JSON storage.
+    /// Open `EpistemicCore` with persistent JSON storage.
     ///
     /// # Errors
     ///
@@ -170,14 +170,16 @@ impl EpistemicCore {
         let value_str = value.into();
 
         let mut candidate = self.beliefs.read().map(|g| g.clone()).unwrap_or_default();
-        let entry = candidate.entry(subject_str.clone()).or_insert_with(|| EpistemicBelief {
-            subject: subject_str,
-            value: value_str.clone(),
-            confidence,
-            evidence: Vec::new(),
-            last_corroborated_at: now,
-            status: EpistemicStatus::Observed,
-        });
+        let entry = candidate
+            .entry(subject_str.clone())
+            .or_insert_with(|| EpistemicBelief {
+                subject: subject_str,
+                value: value_str.clone(),
+                confidence,
+                evidence: Vec::new(),
+                last_corroborated_at: now,
+                status: EpistemicStatus::Observed,
+            });
 
         if entry.value == value_str {
             entry.confidence = (entry.confidence * 0.7 + confidence * 0.3).clamp(0.0, 1.0);
@@ -188,17 +190,17 @@ impl EpistemicCore {
             entry.confidence = (entry.confidence * 0.5).clamp(0.0, 1.0);
         }
 
-        if let Some(id) = evidence_id {
-            if !entry.evidence.contains(&id) {
-                entry.evidence.push(id);
-            }
+        if let Some(id) = evidence_id
+            && !entry.evidence.contains(&id)
+        {
+            entry.evidence.push(id);
         }
 
         let cur = self.cursor();
-        if self.persist_candidate(cur, &candidate).is_ok() {
-            if let Ok(mut lock) = self.beliefs.write() {
-                *lock = candidate;
-            }
+        if self.persist_candidate(cur, &candidate).is_ok()
+            && let Ok(mut lock) = self.beliefs.write()
+        {
+            *lock = candidate;
         }
     }
 
@@ -208,22 +210,31 @@ impl EpistemicCore {
             return;
         };
 
-        if matches!(kind, Kind::Observation | Kind::BeliefRevision | Kind::Hypothesis) {
+        if matches!(
+            kind,
+            Kind::Observation | Kind::BeliefRevision | Kind::Hypothesis
+        ) {
             let payload_str: String = ciborium::from_reader(envelope.payload.as_slice())
                 .unwrap_or_else(|_| String::from_utf8_lossy(&envelope.payload).to_string());
 
             let now = OffsetDateTime::from_unix_timestamp_nanos(
-                envelope.wall_time_ms as i128 * 1_000_000,
+                i128::from(envelope.wall_time_ms) * 1_000_000,
             )
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
             let subject = format!("organ.{}", envelope.origin_organ);
-            self.ingest(subject, payload_str, envelope.confidence, Some(envelope.message_id), now);
+            self.ingest(
+                subject,
+                payload_str,
+                envelope.confidence,
+                Some(envelope.message_id),
+                now,
+            );
 
-            if let Ok(mut cur) = self.cursor.write() {
-                if sequence > *cur {
-                    *cur = sequence;
-                }
+            if let Ok(mut cur) = self.cursor.write()
+                && sequence > *cur
+            {
+                *cur = sequence;
             }
         }
     }
@@ -238,7 +249,7 @@ impl EpistemicCore {
     /// Current journal sequence cursor mark.
     #[must_use]
     pub fn cursor(&self) -> u64 {
-        self.cursor.read().map(|g| *g).unwrap_or(0)
+        self.cursor.read().map_or(0, |g| *g)
     }
 
     /// Query a single belief by subject.
@@ -276,11 +287,17 @@ mod tests {
         let ev1 = Uuid::new_v4();
 
         core.ingest("system.os", "Debian 13", 1.0, Some(ev1), now);
-        assert_eq!(core.query("system.os").unwrap().status, EpistemicStatus::Observed);
+        assert_eq!(
+            core.query("system.os").unwrap().status,
+            EpistemicStatus::Observed
+        );
 
         // Competing value creates dispute
         core.ingest("system.os", "Fedora 40", 0.9, None, now);
-        assert_eq!(core.query("system.os").unwrap().status, EpistemicStatus::Disputed);
+        assert_eq!(
+            core.query("system.os").unwrap().status,
+            EpistemicStatus::Disputed
+        );
 
         // Reopen from disk: must survive restart
         let reopened = EpistemicCore::open(&state_path).expect("reopen");

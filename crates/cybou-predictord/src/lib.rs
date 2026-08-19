@@ -14,7 +14,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{canonical::CanonicalEnvelope, Kind};
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -121,7 +121,7 @@ impl Default for PredictorCore {
 }
 
 impl PredictorCore {
-    /// Create a transient in-memory PredictorCore engine.
+    /// Create a transient in-memory `PredictorCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -131,7 +131,7 @@ impl PredictorCore {
         }
     }
 
-    /// Open PredictorCore with persistent JSON storage.
+    /// Open `PredictorCore` with persistent JSON storage.
     ///
     /// # Errors
     ///
@@ -189,7 +189,11 @@ impl PredictorCore {
             return;
         }
 
-        let mut candidate = self.by_subject.read().map(|g| g.clone()).unwrap_or_default();
+        let mut candidate = self
+            .by_subject
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
         let state = candidate.entry(subject).or_default();
         state.samples.push(Sample {
             contribution_id,
@@ -197,10 +201,10 @@ impl PredictorCore {
         });
 
         let cur = self.cursor();
-        if self.persist_candidate(cur, &candidate).is_ok() {
-            if let Ok(mut lock) = self.by_subject.write() {
-                *lock = candidate;
-            }
+        if self.persist_candidate(cur, &candidate).is_ok()
+            && let Ok(mut lock) = self.by_subject.write()
+        {
+            *lock = candidate;
         }
     }
 
@@ -209,6 +213,10 @@ impl PredictorCore {
     /// # Errors
     ///
     /// Returns [`PredictorError`] if subject is empty or has no history.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "sample counts are empirical statistics; f64 rounding cannot change a forecast"
+    )]
     pub fn predict(&self, subject: &str) -> Result<Forecast, PredictorError> {
         let subject = subject.trim();
         if subject.is_empty() {
@@ -245,7 +253,7 @@ impl PredictorCore {
             estimate,
             margin,
             confidence,
-            samples: count as u32,
+            samples: u32::try_from(count).unwrap_or(u32::MAX),
         })
     }
 
@@ -256,7 +264,11 @@ impl PredictorCore {
             return;
         }
 
-        let mut candidate = self.by_subject.read().map(|g| g.clone()).unwrap_or_default();
+        let mut candidate = self
+            .by_subject
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
         let state = candidate.entry(subject).or_default();
         let error = actual - forecast_estimate;
         state.absolute_error += error.abs();
@@ -264,10 +276,10 @@ impl PredictorCore {
         state.settled += 1;
 
         let cur = self.cursor();
-        if self.persist_candidate(cur, &candidate).is_ok() {
-            if let Ok(mut lock) = self.by_subject.write() {
-                *lock = candidate;
-            }
+        if self.persist_candidate(cur, &candidate).is_ok()
+            && let Ok(mut lock) = self.by_subject.write()
+        {
+            *lock = candidate;
         }
     }
 
@@ -284,17 +296,17 @@ impl PredictorCore {
             }
         }
 
-        if let Ok(mut cur) = self.cursor.write() {
-            if sequence > *cur {
-                *cur = sequence;
-            }
+        if let Ok(mut cur) = self.cursor.write()
+            && sequence > *cur
+        {
+            *cur = sequence;
         }
     }
 
     /// Current journal replay cursor.
     #[must_use]
     pub fn cursor(&self) -> u64 {
-        self.cursor.read().map(|g| *g).unwrap_or(0)
+        self.cursor.read().map_or(0, |g| *g)
     }
 
     /// Return calibration for a subject.
@@ -308,17 +320,16 @@ impl PredictorCore {
         Some(Calibration {
             subject: subject.to_string(),
             settled: state.settled,
-            mean_error: state.absolute_error / state.settled as f64,
-            bias: state.signed_error / state.settled as f64,
+            mean_error: state.absolute_error / f64::from(state.settled),
+            bias: state.signed_error / f64::from(state.settled),
         })
     }
 
     /// Return all calibrated subjects.
     #[must_use]
     pub fn all_calibrations(&self) -> Vec<Calibration> {
-        let map = match self.by_subject.read() {
-            Ok(g) => g,
-            Err(_) => return vec![],
+        let Ok(map) = self.by_subject.read() else {
+            return vec![];
         };
         let mut list = Vec::new();
         for (subject, state) in map.iter() {
@@ -326,8 +337,8 @@ impl PredictorCore {
                 list.push(Calibration {
                     subject: subject.clone(),
                     settled: state.settled,
-                    mean_error: state.absolute_error / state.settled as f64,
-                    bias: state.signed_error / state.settled as f64,
+                    mean_error: state.absolute_error / f64::from(state.settled),
+                    bias: state.signed_error / f64::from(state.settled),
                 });
             }
         }

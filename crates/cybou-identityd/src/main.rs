@@ -10,24 +10,29 @@ use time::OffsetDateTime;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let state_path = env::var("CYBOU_IDENTITY_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            let state_dir = env::var("XDG_STATE_HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| {
+    let state_path = env::var("CYBOU_IDENTITY_PATH").map_or_else(
+        |_| {
+            let state_dir = env::var("XDG_STATE_HOME").map_or_else(
+                |_| {
                     let home = env::var("HOME").unwrap_or_else(|_| ".".into());
                     PathBuf::from(home).join(".local/state")
-                });
+                },
+                PathBuf::from,
+            );
             state_dir.join("cybou/identity.json")
-        });
+        },
+        PathBuf::from,
+    );
 
-    println!("[cybou-identityd] Managing identity at {}", state_path.display());
+    println!(
+        "[cybou-identityd] Managing identity at {}",
+        state_path.display()
+    );
     let core = Arc::new(IdentityCore::open(&state_path));
 
     let now = OffsetDateTime::now_utc();
     let action = core.begin_session(now, ARCHITECTURE_VERSION)?;
-    println!("[cybou-identityd] Session initialized with action: {:?}", action);
+    println!("[cybou-identityd] Session initialized with action: {action:?}");
 
     if let Some(state) = core.current_state() {
         println!(
@@ -40,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     {
-        use cybou_fabric::{event_client::EventClient, IDENTITY};
+        use cybou_fabric::{IDENTITY, event_client::EventClient};
         use cybou_identityd::service::Identity1Service;
 
         if let Some(envelope) = core.build_envelope(&action, now, 0) {

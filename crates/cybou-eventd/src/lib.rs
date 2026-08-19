@@ -46,7 +46,7 @@ pub fn is_reserved_organ(origin: &str) -> bool {
     RESERVED_ORGAN_IDENTITIES.contains(&origin)
 }
 
-/// Errors occurring within EventCore.
+/// Errors occurring within `EventCore`.
 #[derive(Debug, Error)]
 pub enum EventError {
     /// Storage / Journal writer failure.
@@ -118,7 +118,7 @@ impl SubmitResult {
     }
 }
 
-/// Pure core domain logic for Event1 service, wrapping JournalWriter, KeyStore, and offsets.
+/// Pure core domain logic for Event1 service, wrapping `JournalWriter`, `KeyStore`, and offsets.
 pub struct EventCore {
     writer: Mutex<JournalWriter>,
     offsets_path: PathBuf,
@@ -132,7 +132,7 @@ impl EventCore {
     pub fn checkpoint_path(&self) -> &Path {
         &self.checkpoint_path
     }
-    /// Open EventCore around a journal database file.
+    /// Open `EventCore` around a journal database file.
     ///
     /// # Errors
     ///
@@ -156,7 +156,7 @@ impl EventCore {
         Ok(core)
     }
 
-    /// Attach a KeyStore to the underlying JournalWriter for sensitive payload sealing.
+    /// Attach a `KeyStore` to the underlying `JournalWriter` for sensitive payload sealing.
     pub fn set_key_store(&self, key_store: KeyStore, kek: [u8; 32], key_domain: KeyDomain) {
         if let Ok(mut writer) = self.writer.lock() {
             writer.set_key_store(key_store, kek, key_domain);
@@ -183,8 +183,9 @@ impl EventCore {
         }
 
         // ADR-0028: submitting a contribution never authorizes an erasure.
-        let kind = Kind::from_u16(envelope.kind)
-            .ok_or_else(|| EventError::Storage(WriteError::Malformed("unknown contribution kind")))?;
+        let kind = Kind::from_u16(envelope.kind).ok_or_else(|| {
+            EventError::Storage(WriteError::Malformed("unknown contribution kind"))
+        })?;
         if kind.is_erasure() {
             return Err(EventError::ErasureRefused);
         }
@@ -207,7 +208,11 @@ impl EventCore {
 
     /// Return head envelope, if any.
     pub fn head(&self) -> Option<CanonicalEnvelope> {
-        self.writer.lock().ok().and_then(|w| w.head().ok()).flatten()
+        self.writer
+            .lock()
+            .ok()
+            .and_then(|w| w.head().ok())
+            .flatten()
     }
 
     /// Retrieve an envelope at a specific sequence.
@@ -287,11 +292,12 @@ impl EventCore {
         if !is_valid_consumer_id(consumer_id) {
             return false;
         }
-        let mut offsets = match self.offsets.lock() {
-            Ok(guard) => guard,
-            Err(_) => return false,
+        let Ok(mut offsets) = self.offsets.lock() else {
+            return false;
         };
-        offsets.entry(consumer_id.to_string()).or_insert(initial_offset);
+        offsets
+            .entry(consumer_id.to_string())
+            .or_insert(initial_offset);
         self.save_offsets(&offsets)
     }
 
@@ -300,9 +306,8 @@ impl EventCore {
         if !is_valid_consumer_id(consumer_id) {
             return false;
         }
-        let mut offsets = match self.offsets.lock() {
-            Ok(guard) => guard,
-            Err(_) => return false,
+        let Ok(mut offsets) = self.offsets.lock() else {
+            return false;
         };
         let head = self.count();
         if offset > head {
@@ -331,17 +336,17 @@ impl EventCore {
         if file.read_to_string(&mut content).is_err() {
             return;
         }
-        if let Ok(persisted) = serde_json::from_str::<PersistedOffsets>(&content) {
-            if persisted.version == 1 {
-                let mut map = HashMap::new();
-                for (k, v) in persisted.offsets {
-                    if let Ok(offset) = v.parse::<u64>() {
-                        map.insert(k, offset);
-                    }
+        if let Ok(persisted) = serde_json::from_str::<PersistedOffsets>(&content)
+            && persisted.version == 1
+        {
+            let mut map = HashMap::new();
+            for (k, v) in persisted.offsets {
+                if let Ok(offset) = v.parse::<u64>() {
+                    map.insert(k, offset);
                 }
-                if let Ok(mut offsets) = self.offsets.lock() {
-                    *offsets = map;
-                }
+            }
+            if let Ok(mut offsets) = self.offsets.lock() {
+                *offsets = map;
             }
         }
     }
@@ -359,10 +364,11 @@ impl EventCore {
             return false;
         };
         let temp_path = self.offsets_path.with_extension("tmp");
-        if let Ok(mut file) = File::create(&temp_path) {
-            if file.write_all(json.as_bytes()).is_ok() && file.flush().is_ok() {
-                return fs::rename(&temp_path, &self.offsets_path).is_ok();
-            }
+        if let Ok(mut file) = File::create(&temp_path)
+            && file.write_all(json.as_bytes()).is_ok()
+            && file.flush().is_ok()
+        {
+            return fs::rename(&temp_path, &self.offsets_path).is_ok();
         }
         false
     }
@@ -383,6 +389,7 @@ fn is_valid_consumer_id(consumer_id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use cybou_protocol::unix_millis;
     use tempfile::tempdir;
     use time::OffsetDateTime;
     use uuid::Uuid;
@@ -398,7 +405,7 @@ mod tests {
             origin_organ: origin_organ.to_string(),
             origin_node: String::new(),
             kind: 1, // Observation
-            wall_time_ms: OffsetDateTime::now_utc().unix_timestamp_nanos() as i64 / 1_000_000,
+            wall_time_ms: unix_millis(OffsetDateTime::now_utc()),
             monotonic_time: 100,
             logical_clock: 1,
             confidence: 1.0,
@@ -436,7 +443,9 @@ mod tests {
         let retrieved = core.at_sequence(1).expect("at sequence 1");
         assert_eq!(retrieved.message_id, env1.message_id);
 
-        let found = core.find_by_message_id(&env1.message_id).expect("found by id");
+        let found = core
+            .find_by_message_id(&env1.message_id)
+            .expect("found by id");
         assert_eq!(found.message_id, env1.message_id);
     }
 
@@ -467,7 +476,9 @@ mod tests {
         let mut env13 = dummy_envelope(Uuid::new_v4(), "selfd");
         env13.kind = Kind::SelfAssessment as u16;
         env13.evidence = vec![root_obs.message_id];
-        let res13 = core.submit(&env13, Some("selfd")).expect("SelfAssessment permitted");
+        let res13 = core
+            .submit(&env13, Some("selfd"))
+            .expect("SelfAssessment permitted");
         assert_eq!(res13.sequence, 2);
 
         // Kind 14 (Learning) is permitted (derived from SelfAssessment)
@@ -480,13 +491,17 @@ mod tests {
         // Kind 15 (ErasureRequested) is refused on normal Submit
         let mut env15 = dummy_envelope(Uuid::new_v4(), "admin");
         env15.kind = Kind::ErasureRequested as u16;
-        let err15 = core.submit(&env15, None).expect_err("ErasureRequested must be refused");
+        let err15 = core
+            .submit(&env15, None)
+            .expect_err("ErasureRequested must be refused");
         assert!(matches!(err15, EventError::ErasureRefused));
 
         // Kind 16 (ErasureApplied) is refused on normal Submit
         let mut env16 = dummy_envelope(Uuid::new_v4(), "admin");
         env16.kind = Kind::ErasureApplied as u16;
-        let err16 = core.submit(&env16, None).expect_err("ErasureApplied must be refused");
+        let err16 = core
+            .submit(&env16, None)
+            .expect_err("ErasureApplied must be refused");
         assert!(matches!(err16, EventError::ErasureRefused));
     }
 }

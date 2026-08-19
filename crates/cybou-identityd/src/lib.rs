@@ -13,7 +13,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{canonical::CanonicalEnvelope, Kind};
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope, unix_millis};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -217,7 +217,9 @@ impl IdentityCore {
             }
             Some(mut state) => {
                 state.session_count += 1;
-                if state.architecture_version != arch_version {
+                if state.architecture_version == arch_version {
+                    (SessionAction::Continued, state)
+                } else {
                     let from = state.architecture_version.clone();
                     state.architecture_version = arch_version.to_string();
                     (
@@ -227,8 +229,6 @@ impl IdentityCore {
                         },
                         state,
                     )
-                } else {
-                    (SessionAction::Continued, state)
                 }
             }
         };
@@ -255,7 +255,7 @@ impl IdentityCore {
     /// Whether this run was a first-run birth.
     #[must_use]
     pub fn is_first_run(&self) -> bool {
-        self.is_first_run.read().ok().map(|g| *g).unwrap_or(false)
+        self.is_first_run.read().ok().is_some_and(|g| *g)
     }
 
     /// Construct a canonical cognitive envelope to record this session action in Event1.
@@ -290,7 +290,7 @@ impl IdentityCore {
             origin_organ: "identityd".to_string(),
             origin_node: String::new(),
             kind,
-            wall_time_ms: now.unix_timestamp_nanos() as i64 / 1_000_000,
+            wall_time_ms: unix_millis(now),
             monotonic_time,
             logical_clock: 1,
             confidence: 1.0,
@@ -346,9 +346,7 @@ mod tests {
         assert_eq!(state2.session_count, 2);
 
         // Third run on new architecture -> Migrated
-        let action3 = core
-            .begin_session(now, "arch-v2")
-            .expect("migrate session");
+        let action3 = core.begin_session(now, "arch-v2").expect("migrate session");
         assert_eq!(
             action3,
             SessionAction::Migrated {

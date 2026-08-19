@@ -9,7 +9,7 @@
 use std::sync::RwLock;
 
 use cybou_perception::{AcquisitionStatus, LinuxSystemSource};
-use cybou_protocol::{canonical::CanonicalEnvelope, observation::ObservationV1};
+use cybou_protocol::{canonical::CanonicalEnvelope, observation::ObservationV1, unix_millis};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -56,7 +56,7 @@ impl Default for PerceptionCore {
 }
 
 impl PerceptionCore {
-    /// Create a new PerceptionCore manager around a source.
+    /// Create a new `PerceptionCore` manager around a source.
     #[must_use]
     pub fn new(source: LinuxSystemSource) -> Self {
         let initial_state = PerceptionState {
@@ -74,7 +74,7 @@ impl PerceptionCore {
         }
     }
 
-    /// Read source once and return a CanonicalEnvelope if a contribution is warranted.
+    /// Read source once and return a `CanonicalEnvelope` if a contribution is warranted.
     pub fn acquire_once(
         &self,
         now: OffsetDateTime,
@@ -121,7 +121,7 @@ impl PerceptionCore {
             origin_organ: "perceptiond".to_string(),
             origin_node: String::new(),
             kind: 1, // Observation
-            wall_time_ms: now.unix_timestamp_nanos() as i64 / 1_000_000,
+            wall_time_ms: unix_millis(now),
             monotonic_time,
             logical_clock: 1,
             confidence: 1.0,
@@ -157,15 +157,15 @@ impl PerceptionCore {
     /// Current perception state.
     #[must_use]
     pub fn current_state(&self) -> PerceptionState {
-        self.state
-            .read()
-            .map(|g| g.clone())
-            .unwrap_or_else(|_| PerceptionState {
+        self.state.read().map_or_else(
+            |_| PerceptionState {
                 status: AcquisitionStatus::SourceUnavailable,
                 acquired_at: OffsetDateTime::UNIX_EPOCH,
                 observation: None,
                 source_id: "linux.system".to_string(),
-            })
+            },
+            |g| g.clone(),
+        )
     }
 
     fn should_contribute(&self, obs: &ObservationV1, now: OffsetDateTime) -> bool {
@@ -209,7 +209,11 @@ mod tests {
         let os_release = dir.path().join("os-release");
         let machine_id = dir.path().join("machine-id");
 
-        std::fs::write(&os_release, b"NAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\n").expect("write");
+        std::fs::write(
+            &os_release,
+            b"NAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\n",
+        )
+        .expect("write");
         std::fs::write(&machine_id, b"0123456789abcdef0123456789abcdef\n").expect("write");
 
         let source = LinuxSystemSource::new(os_release, Some(machine_id), 300);

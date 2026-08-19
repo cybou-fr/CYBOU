@@ -119,7 +119,7 @@ impl Default for LifecycleCore {
 }
 
 impl LifecycleCore {
-    /// Create a transient LifecycleCore scheduler.
+    /// Create a transient `LifecycleCore` scheduler.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -130,7 +130,7 @@ impl LifecycleCore {
         }
     }
 
-    /// Open or initialize LifecycleCore with a persistent JSON state file.
+    /// Open or initialize `LifecycleCore` with a persistent JSON state file.
     ///
     /// # Errors
     ///
@@ -176,9 +176,18 @@ impl LifecycleCore {
     }
 
     /// Notify that user activity occurred, immediately returning mode to `Awake` (durable before visible).
-    pub fn notify_user_activity(&self, _cause: &str, now: OffsetDateTime) -> Result<(), LifecycleError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LifecycleError`] if the new state could not be persisted; the previous mode
+    /// and activity instant are restored before returning.
+    pub fn notify_user_activity(
+        &self,
+        _cause: &str,
+        now: OffsetDateTime,
+    ) -> Result<(), LifecycleError> {
         let prev_mode = self.mode();
-        let prev_act = self.last_user_activity.read().map(|g| *g).unwrap_or(now);
+        let prev_act = self.last_user_activity.read().map_or(now, |g| *g);
 
         if let Ok(mut lock) = self.last_user_activity.write() {
             *lock = now;
@@ -201,6 +210,11 @@ impl LifecycleCore {
     }
 
     /// Manually transition lifecycle mode (durable before visible).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LifecycleError`] if the new mode could not be persisted; the previous mode
+    /// is restored before returning.
     pub fn transition(&self, mode: LifecycleMode) -> Result<(), LifecycleError> {
         let prev_mode = self.mode();
         if let Ok(mut lock) = self.mode.write() {
@@ -220,12 +234,11 @@ impl LifecycleCore {
     /// Retrieve full current lifecycle state.
     #[must_use]
     pub fn state(&self) -> LifecycleState {
-        let mode = self.mode.read().map(|g| *g).unwrap_or(LifecycleMode::Awake);
+        let mode = self.mode.read().map_or(LifecycleMode::Awake, |g| *g);
         let last_user_activity_at = self
             .last_user_activity
             .read()
-            .map(|g| *g)
-            .unwrap_or_else(|_| OffsetDateTime::now_utc());
+            .map_or_else(|_| OffsetDateTime::now_utc(), |g| *g);
         let run = self.active_run.read().ok().and_then(|g| g.clone());
 
         LifecycleState {
@@ -238,7 +251,7 @@ impl LifecycleCore {
     /// Current mode.
     #[must_use]
     pub fn mode(&self) -> LifecycleMode {
-        self.mode.read().map(|g| *g).unwrap_or(LifecycleMode::Awake)
+        self.mode.read().map_or(LifecycleMode::Awake, |g| *g)
     }
 }
 
@@ -256,7 +269,8 @@ mod tests {
         let core = LifecycleCore::open(&state_path).expect("open");
         assert_eq!(core.mode(), LifecycleMode::Awake);
 
-        core.transition(LifecycleMode::Dozing).expect("transition success");
+        core.transition(LifecycleMode::Dozing)
+            .expect("transition success");
         assert_eq!(core.mode(), LifecycleMode::Dozing);
 
         // Reopen from disk: must survive restart
@@ -264,7 +278,9 @@ mod tests {
         assert_eq!(reopened.mode(), LifecycleMode::Dozing);
 
         let now = OffsetDateTime::now_utc();
-        reopened.notify_user_activity("mouse-move", now).expect("notify success");
+        reopened
+            .notify_user_activity("mouse-move", now)
+            .expect("notify success");
         assert_eq!(reopened.mode(), LifecycleMode::Awake);
 
         let reclosed = LifecycleCore::open(&state_path).expect("reclosed");

@@ -10,17 +10,19 @@ use cybou_selfd::SelfCore;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let state_path = env::var("CYBOU_IDENTITY_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            let state_dir = env::var("XDG_STATE_HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| {
+    let state_path = env::var("CYBOU_IDENTITY_PATH").map_or_else(
+        |_| {
+            let state_dir = env::var("XDG_STATE_HOME").map_or_else(
+                |_| {
                     let home = env::var("HOME").unwrap_or_else(|_| ".".into());
                     PathBuf::from(home).join(".local/state")
-                });
+                },
+                PathBuf::from,
+            );
             state_dir.join("cybou/identity.json")
-        });
+        },
+        PathBuf::from,
+    );
 
     println!("[cybou-selfd] Initializing self organ...");
     let identity_core = IdentityCore::open(&state_path);
@@ -61,8 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "linux"))]
     {
         println!(
-            "[cybou-selfd] Running on non-Linux host in headless mode (sessions: {}).",
-            sessions
+            "[cybou-selfd] Running on non-Linux host in headless mode (sessions: {sessions})."
         );
         let _ = core;
         tokio::signal::ctrl_c().await?;

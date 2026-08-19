@@ -8,10 +8,7 @@
 
 use std::sync::RwLock;
 
-use cybou_protocol::{
-    CapabilityState, KnowledgeState,
-    capability::CapabilityRegistry,
-};
+use cybou_protocol::{CapabilityState, KnowledgeState, capability::CapabilityRegistry};
 use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -53,7 +50,7 @@ impl Default for PresenceCore {
 }
 
 impl PresenceCore {
-    /// Create a new PresenceCore engine.
+    /// Create a new `PresenceCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -65,7 +62,7 @@ impl PresenceCore {
     /// Whether Mind is currently awake.
     #[must_use]
     pub fn is_awake(&self) -> bool {
-        self.is_awake.read().map(|g| *g).unwrap_or(true)
+        self.is_awake.read().map_or(true, |g| *g)
     }
 
     /// Set awake state.
@@ -80,8 +77,7 @@ impl PresenceCore {
     pub fn narration(&self) -> String {
         self.narration
             .read()
-            .map(|g| g.clone())
-            .unwrap_or_else(|_| "This is my first day.".to_string())
+            .map_or_else(|_| "This is my first day.".to_string(), |g| g.clone())
     }
 
     /// Update narration string.

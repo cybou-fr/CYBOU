@@ -87,7 +87,7 @@ impl Default for IntentionCore {
 }
 
 impl IntentionCore {
-    /// Create a transient in-memory IntentionCore manager.
+    /// Create a transient in-memory `IntentionCore` manager.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -96,7 +96,7 @@ impl IntentionCore {
         }
     }
 
-    /// Open or initialize IntentionCore with a persistent JSON state file.
+    /// Open or initialize `IntentionCore` with a persistent JSON state file.
     ///
     /// # Errors
     ///
@@ -143,6 +143,11 @@ impl IntentionCore {
     }
 
     /// Form a new intention, add it to open obligations, and persist (durable before visible).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IntentionError`] if the commitment could not be persisted, leaving the
+    /// in-memory obligation set unchanged.
     pub fn form(
         &self,
         description: impl Into<String>,
@@ -216,10 +221,7 @@ impl IntentionCore {
     /// Total count of open intentions.
     #[must_use]
     pub fn open_count(&self) -> usize {
-        self.open_intentions
-            .read()
-            .map(|g| g.len())
-            .unwrap_or(0)
+        self.open_intentions.read().map_or(0, |g| g.len())
     }
 }
 

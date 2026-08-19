@@ -27,6 +27,7 @@ cybou_ssh "
   cargo test --workspace --locked
   cargo clippy --workspace --all-targets --locked -- -D warnings
   cargo check -p living-canvas --target wasm32-unknown-unknown --locked
+  bash scripts/test-multi-daemon-integration.sh
   if [ '$profile' = release ]; then
     cargo build --workspace --release --locked
     cd crates/living-canvas

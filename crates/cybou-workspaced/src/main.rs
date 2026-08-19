@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     {
-        use cybou_fabric::{event_client::EventClient, WORKSPACE};
+        use cybou_fabric::{WORKSPACE, event_client::EventClient};
         use cybou_workspaced::service::Workspace1Service;
 
         // Perform initial catch-up replay to seed the global workspace
