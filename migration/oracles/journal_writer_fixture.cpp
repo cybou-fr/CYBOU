@@ -18,6 +18,8 @@
 
 #include <QCoreApplication>
 #include <QDir>
+// QSqlDatabase only forward-declares QSqlError, so lastError().text() needs the definition.
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QTemporaryDir>
@@ -146,7 +148,10 @@ int main(int argc, char **argv)
     }
     const QString path = directory.filePath(QStringLiteral("journal.db"));
 
-    cybou::Journal journal(path);
+    // Journal opens its own named connection; reading back through the default connection
+    // asks Qt for a connection nothing ever added, which reports itself as a missing driver.
+    const QString connection = QStringLiteral("journal-writer-oracle");
+    cybou::Journal journal(path, connection);
     if (!journal.isOpen()) {
         err << "cannot open the journal: " << journal.lastError() << '\n';
         return 1;
@@ -165,7 +170,7 @@ int main(int argc, char **argv)
         quoted.append(QStringLiteral("quote(%1)").arg(column));
     }
 
-    QSqlQuery rows(QSqlDatabase::database(QSqlDatabase::defaultConnection));
+    QSqlQuery rows(QSqlDatabase::database(connection));
     if (!rows.exec(QStringLiteral("SELECT %1 FROM contribution ORDER BY seq")
                        .arg(quoted.join(QStringLiteral(", "))))) {
         err << "cannot read the written rows: " << rows.lastError().text() << '\n';
@@ -180,7 +185,7 @@ int main(int argc, char **argv)
         }
     }
 
-    QSqlQuery links(QSqlDatabase::database(QSqlDatabase::defaultConnection));
+    QSqlQuery links(QSqlDatabase::database(connection));
     if (!links.exec(QStringLiteral(
             "SELECT quote(contribution_id), quote(evidence_id), quote(ordinal) "
             "FROM contribution_evidence ORDER BY contribution_id, ordinal"))) {
