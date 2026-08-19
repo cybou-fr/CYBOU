@@ -34,6 +34,10 @@
 - **Passed command-navigation slice.** `Ctrl/Cmd+K` opens and focuses the Rust/WASM command
   palette, text input filters the six canvas objects, Enter selects the first match, and Escape
   closes and clears the palette. Selection continues to drive the active relationship subgraph.
+- **Passed cross-panel workflow slice.** Release actions now navigate to Commitments, Mind, and
+  linked Sources; More opens and focuses the command palette. Mind actions route Review evidence
+  to Artifact and Add to plan to Commitments. Workspace-menu commands select their corresponding
+  canvas objects and close the menu.
 
 ## Focused evidence
 
@@ -91,6 +95,9 @@ because all six panels use the same pointer-capture and keyboard-movement implem
     both Release-actions/Commitments and Commitments/command-bar, with no warning-level logs. The
     follow-up image capture was unavailable, so the numerical check supplements rather than
     replaces the accepted visual baseline.
+13. Browser workflow QA confirmed Plan selects Commitments, More opens the palette with its search
+    field focused, Review evidence selects Artifact, Add to plan selects Commitments, and Open mind
+    selects Mind Suggestion while closing the workspace menu. No warning-level logs were emitted.
 
 ## Next implementation checklist
 

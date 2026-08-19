@@ -331,12 +331,12 @@ pub fn App() -> impl IntoView {
                     <Show when=move || runtime_menu_open.get()>
                         <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
                             <header><strong>"Cybou"</strong><small>"All data stays local"</small></header>
-                            <button><FileCheck size=15 /><span>"New artifact"</span></button>
-                            <button><ListChecks size=15 /><span>"New commitment"</span></button>
-                            <button><UsersRound size=15 /><span>"Invite collaborator"</span></button>
-                            <button><Sparkles size=15 /><span>"Open mind"</span></button>
+                            <button on:click=move |_| navigate_from_menu("artifact", set_selected, set_runtime_menu_open)><FileCheck size=15 /><span>"New artifact"</span></button>
+                            <button on:click=move |_| navigate_from_menu("commitments", set_selected, set_runtime_menu_open)><ListChecks size=15 /><span>"New commitment"</span></button>
+                            <button on:click=move |_| navigate_from_menu("collaborators", set_selected, set_runtime_menu_open)><UsersRound size=15 /><span>"Invite collaborator"</span></button>
+                            <button on:click=move |_| navigate_from_menu("suggestion", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Open mind"</span></button>
                             <hr />
-                            <button><Map size=15 /><span>"Canvas view"</span></button>
+                            <button on:click=move |_| navigate_from_menu("release", set_selected, set_runtime_menu_open)><Map size=15 /><span>"Canvas view"</span></button>
                             <button
                                 aria-pressed=move || minimap_visible.get().to_string()
                                 on:click=move |_| {
@@ -345,7 +345,7 @@ pub fn App() -> impl IntoView {
                                 }
                             ><Map size=15 /><span>"Minimap"</span></button>
                             <hr />
-                            <button><Sparkles size=15 /><span>"System status"</span></button>
+                            <button on:click=move |_| navigate_from_menu("sources", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"System status"</span></button>
                         </nav>
                     </Show>
                 </div>
@@ -389,11 +389,19 @@ pub fn App() -> impl IntoView {
                         style=move || release_actions_style(layout.get())
                         aria-label="Selected release actions"
                     >
-                        <button><FolderOpen size=15 /><span>"Open"</span></button>
-                        <button><ListChecks size=15 /><span>"Plan"</span></button>
-                        <button class="active"><Sparkles size=15 /><span>"Mind"</span></button>
-                        <button><Link size=15 /><span>"Link"</span></button>
-                        <button aria-label="More release actions"><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
+                        <button aria-label="Open release" on:click=move |_| set_selected.set("release")><FolderOpen size=15 /><span>"Open"</span></button>
+                        <button aria-label="Open release plan commitments" on:click=move |_| set_selected.set("commitments")><ListChecks size=15 /><span>"Plan"</span></button>
+                        <button aria-label="Open Mind suggestion" on:click=move |_| set_selected.set("suggestion")><Sparkles size=15 /><span>"Mind"</span></button>
+                        <button aria-label="Open linked sources" on:click=move |_| set_selected.set("sources")><Link size=15 /><span>"Link"</span></button>
+                        <button
+                            aria-label="More release actions"
+                            on:click=move |_| {
+                                set_command_open.set(true);
+                                if let Some(input) = command_input.get() {
+                                    let _ = input.focus();
+                                }
+                            }
+                        ><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
                     </nav>
                 </Show>
 
@@ -474,8 +482,21 @@ pub fn App() -> impl IntoView {
                     <strong>"Add rollback verification"</strong>
                     <p>"No rollback test detected in plan. Adds safety and release confidence."</p>
                     <div class="suggestion-actions">
-                        <button on:pointerdown=move |event: PointerEvent| event.stop_propagation()>"Review evidence"</button>
-                        <button class="primary" on:pointerdown=move |event: PointerEvent| event.stop_propagation()>"Add to plan"</button>
+                        <button
+                            on:pointerdown=move |event: PointerEvent| event.stop_propagation()
+                            on:click=move |event| {
+                                event.stop_propagation();
+                                set_selected.set("artifact");
+                            }
+                        >"Review evidence"</button>
+                        <button
+                            class="primary"
+                            on:pointerdown=move |event: PointerEvent| event.stop_propagation()
+                            on:click=move |event| {
+                                event.stop_propagation();
+                                set_selected.set("commitments");
+                            }
+                        >"Add to plan"</button>
                     </div>
                     <span class="suggestion-source">"Source: test-results.json, design-doc.md"</span>
                 </article>
@@ -646,6 +667,15 @@ fn select_from_command(
     set_selected.set(panel);
     set_command_open.set(false);
     set_command_query.set(String::new());
+}
+
+fn navigate_from_menu(
+    panel: &'static str,
+    set_selected: WriteSignal<&'static str>,
+    set_runtime_menu_open: WriteSignal<bool>,
+) {
+    set_selected.set(panel);
+    set_runtime_menu_open.set(false);
 }
 
 fn release_actions_style(layout: CanvasLayout) -> String {
