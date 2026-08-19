@@ -12,8 +12,10 @@ repository.workspace = true
 
 [dependencies]
 ciborium.workspace = true
+cybou-protocol = { path = "../cybou-protocol" }
 serde.workspace = true
 thiserror.workspace = true
+uuid.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tokio.workspace = true

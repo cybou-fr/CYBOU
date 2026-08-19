@@ -17,21 +17,18 @@ Debian 13 · Rust/WebAssembly · Wayland/Chromium · one frontend for web and de
 
 ## What Cybou is
 
-Cybou is an experimental agent-native environment targeting Debian 13. The active replacement
-builds one Rust/WebAssembly frontend shared by ordinary browsers and a lightweight Chromium/Wayland
-desktop. The C++/Qt/NixOS tree is retained as migration evidence, not as the target platform. Its long-term
-target is not "Linux with a chatbot". It is an **agent-native computing environment** in which a
-persistent **Mind** remembers and governs the system while models, agents, workers, tools, and user
-interfaces remain replaceable.
+Cybou is an experimental agent-native environment targeting Debian 13. The architecture builds one
+Rust/WebAssembly frontend (Living Canvas) shared by ordinary browsers and a lightweight Chromium/Wayland
+desktop shell. Its long-term target is an **agent-native computing environment** in which a persistent
+**Mind** remembers and governs the system while models, agents, workers, tools, and user interfaces
+remain replaceable.
 
-All Linux builds, tests, and deployments run on the Debian 13 OVH target through
-`scripts/vps-checks.sh` and `scripts/deploy-vps.sh`. WSL and NixOS are not active build targets;
-see [Debian Build and Deployment](docs/DEPLOYMENT.md).
+All Linux builds, tests, and deployments run on Debian 13; see [Debian Build and Deployment](docs/DEPLOYMENT.md).
 
 Mind owns durable cognitive continuity: biography, identity, commitments, prediction/calibration,
-epistemic state, context, learning, policy inputs, and the future authorization boundary. The target
-extends that substrate into a cognitive **control plane** that can continuously observe, protect,
-and maintain the machine even when no person is present.
+epistemic state, associative context, learning, policy inputs, and the future authorization boundary.
+The target extends that substrate into a cognitive **control plane** that can continuously observe,
+protect, and maintain the machine even when no person is present.
 
 The intended hierarchy is:
 
@@ -73,6 +70,8 @@ MCP availability ≠ authorization
 UI ≠ Mind
 attention ≠ biography
 perception ≠ truth
+observation ≠ knowledge
+association ≠ truth
 confidence ≠ authorization
 proposal ≠ permission to execute
 command sent ≠ observed outcome
@@ -85,30 +84,32 @@ future autonomous actions independently testable.
 ## Current architecture
 
 ```text
-Plasma/QML Presence proxy
-          │ Presence1
-          ▼
-   cybou-presenced
-     │    │    │
-     │    │    ├── cybou-identityd
-     │    │    ├── cybou-intentiond
-     │    │    ├── cybou-predictord
-     │    │    ├── cybou-selfd
-     │    │    └── cybou-workspaced
-     │    ├─────── cybou-lifecycled ── Lifecycle1
-     │    ├─────── cybou-healthd ───── Health1
-     │    │              │
-     └────┴──────────────┤ Event1
-                         ▼
-                   cybou-eventd
-                         │
-                         ▼
-                 SQLite Journal v2
+             Living Canvas (WASM / Wayland)
+                           │ Presence1
+                           ▼
+                    cybou-presenced
+                           │
+                           ├── cybou-healthd (Health1)
+                           ├── cybou-workspaced (Workspace1)
+                           ├── cybou-contextd (Context1)
+                           ├── cybou-epistemicd (Epistemic1)
+                           ├── cybou-perceptiond (Perception1)
+                           ├── cybou-intentiond (Intention1)
+                           ├── cybou-predictord (Predictor1)
+                           ├── cybou-selfd (Self1)
+                           ├── cybou-identityd (Identity1)
+                           └── cybou-lifecycled (Lifecycle1)
+                                   │
+                                   ▼
+                             cybou-eventd (Event1)
+                                   │
+                                   ▼
+                           SQLite Journal v2
 ```
 
-All twelve Mind services are separate `systemd --user` D-Bus processes. `cybou-eventd` is the only
-canonical Journal writer. The Plasma component is a remote projection/cache and cannot silently
-become a second cognitive owner.
+All twelve Mind services are separate `systemd --user` D-Bus daemons written in Rust. `cybou-eventd`
+is the only canonical Journal writer. Living Canvas is a pure read-model projection and user command
+gateway that cannot become a second cognitive owner.
 
 ## Capability status
 
@@ -118,14 +119,14 @@ become a second cognitive owner.
 | Journal v2 causal, privacy, hashing, and migration semantics | Implemented — M2 |
 | Single canonical Journal writer (`cybou-eventd`) | Implemented — M3 |
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
-| Restart/reboot continuity and lifecycle/consolidation core | Evaluation complete — M5 |
+| Restart/reboot continuity and lifecycle/consolidation core | Implemented — M5 |
 | Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 |
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
-| Grounded local perception and epistemic projection | Implemented — M7 slices |
+| Grounded local perception and epistemic projection (`cybou-epistemicd`) | Implemented — ADR-0027 |
+| Associative context engine (`cybou-contextd`) | Implemented — ADR-0029 |
 | Journal v3 commitments and crash-safe transitive erasure | Implemented — M7 slices |
 | Sensitivity as a durable schema axis | Implemented — M7 slices |
-| Associative context and transparent governed delivery | Implemented/advancing — ADR-0029/0030 |
 | Distributed Mind prototype | Planned — M7 |
 | Structured language and meaning boundary | Planned — M8 |
 | Lifelong learning and learned-artifact governance | Planned — M9 |
@@ -250,11 +251,11 @@ The security substrate must not depend on persuading an AI model to behave.
 
 ## Build and test
 
-Push the working tree to the sole Debian 13 builder and run the Rust/WASM gates there:
+Run standard workspace gates:
 
 ```bash
-bash scripts/vps-checks.sh fast
-bash scripts/vps-checks.sh release
+cargo check --workspace
+cargo test --workspace
 ```
 
 Run the repository gates described in [Building](docs/BUILDING.md) and
@@ -263,15 +264,12 @@ Run the repository gates described in [Building](docs/BUILDING.md) and
 ## Repository map
 
 ```text
-mind/       C++/Qt protocols, storage, IPC, organs, services, and tests
-modules/    reusable NixOS modules
-systems/    VM, ISO, and Hyper-V compositions
-packages/   Mind, Plasma, Horizon, layout, and tool derivations
-tests/      NixOS VM integration test
-spec/       machine-readable visual design tokens
-docs/       architecture, operations, security, and ADRs
-scripts/    repository and package validators
-www/        project website
+crates/     Rust workspace: protocol, storage, crypto, runtime, fabric, daemons, living-canvas
+systemd/    User service definitions for the 12 Mind daemons
+spec/       Machine-readable visual design tokens
+docs/       Architecture, operations, security, and ADRs
+scripts/    Repository and package validators
+www/        Project website
 ```
 
 ## Documentation
@@ -293,9 +291,9 @@ Choose a route:
 
 - Local-first operation and no required cloud service.
 - Remote inference or external tools, when used, cross explicit policy and disclosure boundaries.
-- Reproducible Nix builds and explicit state transitions.
+- Native Debian 13 deployment and deterministic Rust workspace.
 - Durable state is accepted before it becomes visible.
-- One canonical writer for cognitive history.
+- One canonical writer for cognitive history (`cybou-eventd`).
 - UI, language, planning, authorization, execution, and security governance remain separate.
 - Unknown, stale, inferred, and disputed state remain distinguishable.
 - Privacy, sensitivity, retention, erasure, and egress are separate governed concerns.

@@ -6,7 +6,6 @@
 use std::sync::Arc;
 
 use time::OffsetDateTime;
-use uuid::Uuid;
 use zbus::{SignalContext, interface};
 
 use crate::PresenceCore;
@@ -31,9 +30,28 @@ impl Presence1Service {
         true
     }
 
-    /// Overall health summary.
-    async fn health(&self) -> String {
-        "healthy".to_string()
+    /// Overall health summary querying Health1 owner when available.
+    async fn health(&self, #[zbus(connection)] conn: &zbus::Connection) -> String {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::HEALTH;
+            if let Ok(reply) = conn
+                .call_method(
+                    Some(HEALTH.service),
+                    HEALTH.object_path,
+                    Some(HEALTH.interface),
+                    "Health",
+                    &(),
+                )
+                .await
+            {
+                if let Ok(h) = reply.body::<String>() {
+                    return h;
+                }
+            }
+        }
+        let _ = conn;
+        "unknown".to_string()
     }
 
     /// Last error diagnostic.
@@ -41,8 +59,29 @@ impl Presence1Service {
         String::new()
     }
 
-    /// Compound snapshot projection encoded as CBOR.
-    async fn snapshot(&self) -> Vec<u8> {
+    /// Compound snapshot projection encoded as CBOR from Health1, or honest unknown default.
+    async fn snapshot(&self, #[zbus(connection)] conn: &zbus::Connection) -> Vec<u8> {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::HEALTH;
+            if let Ok(reply) = conn
+                .call_method(
+                    Some(HEALTH.service),
+                    HEALTH.object_path,
+                    Some(HEALTH.interface),
+                    "Snapshot",
+                    &(),
+                )
+                .await
+            {
+                if let Ok(snap_bytes) = reply.body::<Vec<u8>>() {
+                    if !snap_bytes.is_empty() {
+                        return snap_bytes;
+                    }
+                }
+            }
+        }
+        let _ = conn;
         let now = OffsetDateTime::now_utc();
         let snap = self.core.build_snapshot(now);
         let mut buf = Vec::new();

@@ -13,6 +13,21 @@ use time::OffsetDateTime;
 #[cfg(target_os = "linux")]
 pub mod service;
 
+/// Knowledge state of Journal cryptographic integrity.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum VerificationKnowledge {
+    /// Journal integrity has not been actively verified.
+    Unknown,
+    /// Cryptographic chain has been verified completely intact.
+    Verified,
+    /// Cryptographic chain is damaged starting at sequence.
+    Invalid {
+        /// Sequence number where verification first failed.
+        first_broken_at: u64,
+    },
+}
+
 /// Calibration record for one prediction subject.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,10 +71,8 @@ pub struct SelfReport {
 
     /// Total accepted contributions in the Journal.
     pub contributions: u64,
-    /// Whether cryptographic verification succeeded.
-    pub journal_intact: bool,
-    /// First broken sequence if integrity verification failed, or 0.
-    pub first_broken_at: u64,
+    /// Knowledge state of memory integrity.
+    pub verification: VerificationKnowledge,
 }
 
 impl Default for SelfReport {
@@ -76,8 +89,7 @@ impl Default for SelfReport {
             calibrations: vec![],
             settled_predictions: 0,
             contributions: 0,
-            journal_intact: true,
-            first_broken_at: 0,
+            verification: VerificationKnowledge::Unknown,
         }
     }
 }
@@ -156,11 +168,16 @@ pub fn narrate_self_report(report: &SelfReport) -> String {
     }
 
     // 4. Memory & Journal integrity
-    if !report.journal_intact {
-        lines.push(format!(
-            "My memory is damaged from record {} onward.",
-            report.first_broken_at
-        ));
+    match report.verification {
+        VerificationKnowledge::Unknown => {
+            lines.push("My memory integrity has not been verified yet.".to_string());
+        }
+        VerificationKnowledge::Verified => {}
+        VerificationKnowledge::Invalid { first_broken_at } => {
+            lines.push(format!(
+                "My memory is damaged from record {first_broken_at} onward."
+            ));
+        }
     }
 
     lines.join("\n")
@@ -203,7 +220,7 @@ impl SelfCore {
         contributions: u64,
         obligations: Option<(u32, i64)>,
         calibrations_opt: Option<(Vec<CalibrationEntry>, u32)>,
-        journal_intact_opt: Option<(bool, u64)>,
+        verification: VerificationKnowledge,
     ) -> SelfReport {
         let (open_intentions, oldest_obligation_days, obligations_known) = match obligations {
             Some((count, days)) => (count, days, true),
@@ -213,11 +230,6 @@ impl SelfCore {
         let (calibrations, settled_predictions, calibrations_known) = match calibrations_opt {
             Some((cals, settled)) => (cals, settled, true),
             None => (vec![], 0, false),
-        };
-
-        let (journal_intact, first_broken_at) = match journal_intact_opt {
-            Some((intact, broken)) => (intact, broken),
-            None => (true, 0),
         };
 
         SelfReport {
@@ -232,15 +244,14 @@ impl SelfCore {
             calibrations,
             settled_predictions,
             contributions,
-            journal_intact,
-            first_broken_at,
+            verification,
         }
     }
 
     /// Default measurement when downstream owners are unobserved.
     #[must_use]
     pub fn measure(&self, now: OffsetDateTime, contributions: u64) -> SelfReport {
-        self.measure_with(now, contributions, None, None, None)
+        self.measure_with(now, contributions, None, None, VerificationKnowledge::Unknown)
     }
 
     /// Produce a narrated self-reflection string.
@@ -270,8 +281,7 @@ mod tests {
             calibrations: vec![],
             settled_predictions: 0,
             contributions: 5,
-            journal_intact: true,
-            first_broken_at: 0,
+            verification: VerificationKnowledge::Verified,
         };
 
         let text = narrate_self_report(&report);
@@ -298,8 +308,7 @@ mod tests {
             }],
             settled_predictions: 8,
             contributions: 120,
-            journal_intact: true,
-            first_broken_at: 0,
+            verification: VerificationKnowledge::Verified,
         };
 
         let text = narrate_self_report(&report);
@@ -317,9 +326,11 @@ mod tests {
 
         assert!(!report.obligations_known);
         assert!(!report.calibrations_known);
+        assert_eq!(report.verification, VerificationKnowledge::Unknown);
 
         let text = narrate_self_report(&report);
         assert!(text.contains("I cannot determine my obligations right now."));
         assert!(text.contains("My calibration state is currently unknown."));
+        assert!(text.contains("My memory integrity has not been verified yet."));
     }
 }

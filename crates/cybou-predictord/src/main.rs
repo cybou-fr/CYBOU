@@ -3,14 +3,26 @@
 
 //! `cybou-predictord` daemon entrypoint.
 
-use std::sync::Arc;
+use std::{env, path::PathBuf, sync::Arc};
 
 use cybou_predictord::PredictorCore;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("[cybou-predictord] Initializing predictor engine...");
-    let core = Arc::new(PredictorCore::new());
+    println!("[cybou-predictord] Initializing empirical forecasting and calibration engine...");
+    let state_path = env::var("CYBOU_PREDICTOR_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let state_dir = env::var("XDG_STATE_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| {
+                    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
+                    PathBuf::from(home).join(".local/state")
+                });
+            state_dir.join("cybou/predictor.json")
+        });
+
+    let core = Arc::new(PredictorCore::open(&state_path)?);
 
     #[cfg(target_os = "linux")]
     {

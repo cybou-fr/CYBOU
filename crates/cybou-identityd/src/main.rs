@@ -40,8 +40,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     {
-        use cybou_fabric::IDENTITY;
+        use cybou_fabric::{event_client::EventClient, IDENTITY};
         use cybou_identityd::service::Identity1Service;
+
+        if let Some(envelope) = core.build_envelope(&action, now, 0) {
+            tokio::spawn(async move {
+                if let Ok(client) = EventClient::session().await {
+                    if let Ok(res) = client.submit(&envelope).await {
+                        println!(
+                            "[cybou-identityd] Submitted session start sequence {} to Event1",
+                            res.sequence
+                        );
+                    }
+                }
+            });
+        }
 
         println!("[cybou-identityd] Connecting to D-Bus session bus...");
         let service = Identity1Service::new(core);
@@ -63,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "linux"))]
     {
         println!("[cybou-identityd] Running on non-Linux host in headless mode.");
+        let _ = core;
         tokio::signal::ctrl_c().await?;
     }
 

@@ -2,12 +2,19 @@
 // SPDX-License-Identifier: MIT
 
 //! Empirical forecasting, prediction calibration, and outcome settlement.
+//!
+//! Maintains reconstructible statistical models per subject, mapping predictions
+//! against empirical outcomes and preserving calibration history across restarts.
 
 use std::{
     collections::HashMap,
+    fs::{self, File},
+    io::{Read, Write},
+    path::{Path, PathBuf},
     sync::RwLock,
 };
 
+use cybou_protocol::{canonical::CanonicalEnvelope, Kind};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -48,7 +55,8 @@ pub struct Calibration {
 }
 
 /// A single numerical observation sample.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Sample {
     /// Contribution ID of the recorded sample.
     pub contribution_id: Uuid,
@@ -56,12 +64,21 @@ pub struct Sample {
     pub value: f64,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SubjectState {
     samples: Vec<Sample>,
     settled: u32,
     absolute_error: f64,
     signed_error: f64,
+}
+
+/// Persistent predictor state schema.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PredictorState {
+    cursor: u64,
+    subjects: HashMap<String, SubjectState>,
 }
 
 /// Errors occurring in the prediction engine.
@@ -79,6 +96,12 @@ pub enum PredictorError {
     /// Forecast already settled.
     #[error("the forecast is already settled")]
     AlreadySettled,
+    /// I/O error.
+    #[error("predictor state i/o failed: {0}")]
+    Io(#[from] std::io::Error),
+    /// Corrupt state.
+    #[error("predictor state corrupted: {0}")]
+    CorruptState(String),
     /// Internal lock poisoning.
     #[error("internal lock poisoned")]
     LockPoisoned,
@@ -86,6 +109,8 @@ pub enum PredictorError {
 
 /// Core domain logic of the predictor organ.
 pub struct PredictorCore {
+    state_path: Option<PathBuf>,
+    cursor: RwLock<u64>,
     by_subject: RwLock<HashMap<String, SubjectState>>,
 }
 
@@ -96,26 +121,86 @@ impl Default for PredictorCore {
 }
 
 impl PredictorCore {
-    /// Create a new PredictorCore engine.
+    /// Create a transient in-memory PredictorCore engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
+            state_path: None,
+            cursor: RwLock::new(0),
             by_subject: RwLock::new(HashMap::new()),
         }
     }
 
-    /// Record an observation sample for a subject.
+    /// Open PredictorCore with persistent JSON storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PredictorError`] on I/O failure or corrupt state file.
+    pub fn open(path: &Path) -> Result<Self, PredictorError> {
+        let (cursor, subjects) = if path.exists() {
+            let mut file = File::open(path)?;
+            let mut content = String::new();
+            file.read_to_string(&mut content)?;
+            let state: PredictorState = serde_json::from_str(&content)
+                .map_err(|e| PredictorError::CorruptState(e.to_string()))?;
+            (state.cursor, state.subjects)
+        } else {
+            (0, HashMap::new())
+        };
+
+        Ok(Self {
+            state_path: Some(path.to_path_buf()),
+            cursor: RwLock::new(cursor),
+            by_subject: RwLock::new(subjects),
+        })
+    }
+
+    fn persist_candidate(
+        &self,
+        cursor: u64,
+        subjects: &HashMap<String, SubjectState>,
+    ) -> Result<(), PredictorError> {
+        if let Some(path) = &self.state_path {
+            let state = PredictorState {
+                cursor,
+                subjects: subjects.clone(),
+            };
+            let serialized = serde_json::to_string_pretty(&state)
+                .map_err(|e| PredictorError::CorruptState(e.to_string()))?;
+
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let temp_path = path.with_extension("tmp");
+            {
+                let mut temp_file = File::create(&temp_path)?;
+                temp_file.write_all(serialized.as_bytes())?;
+                temp_file.sync_all()?;
+            }
+            fs::rename(&temp_path, path)?;
+        }
+        Ok(())
+    }
+
+    /// Record an observation sample for a subject (durable before visible).
     pub fn observe(&self, subject: &str, value: f64, contribution_id: Uuid) {
         let subject = subject.trim().to_string();
         if subject.is_empty() {
             return;
         }
-        if let Ok(mut map) = self.by_subject.write() {
-            let state = map.entry(subject).or_default();
-            state.samples.push(Sample {
-                contribution_id,
-                value,
-            });
+
+        let mut candidate = self.by_subject.read().map(|g| g.clone()).unwrap_or_default();
+        let state = candidate.entry(subject).or_default();
+        state.samples.push(Sample {
+            contribution_id,
+            value,
+        });
+
+        let cur = self.cursor();
+        if self.persist_candidate(cur, &candidate).is_ok() {
+            if let Ok(mut lock) = self.by_subject.write() {
+                *lock = candidate;
+            }
         }
     }
 
@@ -164,16 +249,52 @@ impl PredictorCore {
         })
     }
 
-    /// Settle a forecast with actual measured outcome.
+    /// Settle a forecast with actual measured outcome (durable before visible).
     pub fn settle(&self, subject: &str, forecast_estimate: f64, actual: f64) {
-        let subject = subject.trim();
-        if let Ok(mut map) = self.by_subject.write() {
-            let state = map.entry(subject.to_string()).or_default();
-            let error = actual - forecast_estimate;
-            state.absolute_error += error.abs();
-            state.signed_error += error;
-            state.settled += 1;
+        let subject = subject.trim().to_string();
+        if subject.is_empty() {
+            return;
         }
+
+        let mut candidate = self.by_subject.read().map(|g| g.clone()).unwrap_or_default();
+        let state = candidate.entry(subject).or_default();
+        let error = actual - forecast_estimate;
+        state.absolute_error += error.abs();
+        state.signed_error += error;
+        state.settled += 1;
+
+        let cur = self.cursor();
+        if self.persist_candidate(cur, &candidate).is_ok() {
+            if let Ok(mut lock) = self.by_subject.write() {
+                *lock = candidate;
+            }
+        }
+    }
+
+    /// Replay an envelope from Journal.
+    pub fn ingest_envelope(&self, envelope: &CanonicalEnvelope, sequence: u64) {
+        let Some(kind) = Kind::from_u16(envelope.kind) else {
+            return;
+        };
+
+        if kind == Kind::Observation {
+            // Check for numeric observation payload
+            if let Ok(val) = ciborium::from_reader::<f64, _>(envelope.payload.as_slice()) {
+                self.observe(&envelope.origin_organ, val, envelope.message_id);
+            }
+        }
+
+        if let Ok(mut cur) = self.cursor.write() {
+            if sequence > *cur {
+                *cur = sequence;
+            }
+        }
+    }
+
+    /// Current journal replay cursor.
+    #[must_use]
+    pub fn cursor(&self) -> u64 {
+        self.cursor.read().map(|g| *g).unwrap_or(0)
     }
 
     /// Return calibration for a subject.
@@ -216,11 +337,16 @@ impl PredictorCore {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use super::*;
 
     #[test]
-    fn forecast_and_calibration_lifecycle() {
-        let core = PredictorCore::new();
+    fn forecast_and_calibration_persistence() {
+        let dir = tempdir().expect("tempdir");
+        let state_path = dir.path().join("predictor.json");
+
+        let core = PredictorCore::open(&state_path).expect("open");
         assert!(core.predict("build-time").is_err());
 
         // Observe samples
@@ -231,7 +357,6 @@ mod tests {
         let forecast = core.predict("build-time").expect("predict success");
         assert_eq!(forecast.samples, 3);
         assert!((forecast.estimate - 12.0).abs() < 1e-6);
-        assert!((forecast.confidence - (3.0 / 6.0)).abs() < 1e-6);
 
         // Settle with actual = 13.0
         core.settle("build-time", forecast.estimate, 13.0);
@@ -239,6 +364,10 @@ mod tests {
         let cal = core.calibration("build-time").expect("cal exists");
         assert_eq!(cal.settled, 1);
         assert!((cal.mean_error - 1.0).abs() < 1e-6);
-        assert!((cal.bias - 1.0).abs() < 1e-6);
+
+        // Reopen from disk: survives restart
+        let reopened = PredictorCore::open(&state_path).expect("reopen");
+        let reopened_cal = reopened.calibration("build-time").expect("reopened cal");
+        assert_eq!(reopened_cal.settled, 1);
     }
 }

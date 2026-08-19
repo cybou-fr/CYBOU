@@ -175,25 +175,46 @@ impl LifecycleCore {
         Ok(())
     }
 
-    /// Notify that user activity occurred, immediately returning mode to `Awake`.
-    pub fn notify_user_activity(&self, _cause: &str, now: OffsetDateTime) {
+    /// Notify that user activity occurred, immediately returning mode to `Awake` (durable before visible).
+    pub fn notify_user_activity(&self, _cause: &str, now: OffsetDateTime) -> Result<(), LifecycleError> {
+        let prev_mode = self.mode();
+        let prev_act = self.last_user_activity.read().map(|g| *g).unwrap_or(now);
+
         if let Ok(mut lock) = self.last_user_activity.write() {
             *lock = now;
         }
         if let Ok(mut mode_lock) = self.mode.write() {
-            if *mode_lock != LifecycleMode::Awake {
-                *mode_lock = LifecycleMode::Awake;
-            }
+            *mode_lock = LifecycleMode::Awake;
         }
-        let _ = self.persist();
+
+        if let Err(e) = self.persist() {
+            // Rollback in-memory state on persistence failure
+            if let Ok(mut lock) = self.last_user_activity.write() {
+                *lock = prev_act;
+            }
+            if let Ok(mut mode_lock) = self.mode.write() {
+                *mode_lock = prev_mode;
+            }
+            return Err(e);
+        }
+        Ok(())
     }
 
-    /// Manually transition lifecycle mode.
-    pub fn transition(&self, mode: LifecycleMode) {
+    /// Manually transition lifecycle mode (durable before visible).
+    pub fn transition(&self, mode: LifecycleMode) -> Result<(), LifecycleError> {
+        let prev_mode = self.mode();
         if let Ok(mut lock) = self.mode.write() {
             *lock = mode;
         }
-        let _ = self.persist();
+
+        if let Err(e) = self.persist() {
+            // Rollback in-memory state on persistence failure
+            if let Ok(mut lock) = self.mode.write() {
+                *lock = prev_mode;
+            }
+            return Err(e);
+        }
+        Ok(())
     }
 
     /// Retrieve full current lifecycle state.
@@ -235,7 +256,7 @@ mod tests {
         let core = LifecycleCore::open(&state_path).expect("open");
         assert_eq!(core.mode(), LifecycleMode::Awake);
 
-        core.transition(LifecycleMode::Dozing);
+        core.transition(LifecycleMode::Dozing).expect("transition success");
         assert_eq!(core.mode(), LifecycleMode::Dozing);
 
         // Reopen from disk: must survive restart
@@ -243,7 +264,7 @@ mod tests {
         assert_eq!(reopened.mode(), LifecycleMode::Dozing);
 
         let now = OffsetDateTime::now_utc();
-        reopened.notify_user_activity("mouse-move", now);
+        reopened.notify_user_activity("mouse-move", now).expect("notify success");
         assert_eq!(reopened.mode(), LifecycleMode::Awake);
 
         let reclosed = LifecycleCore::open(&state_path).expect("reclosed");

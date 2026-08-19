@@ -13,7 +13,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::canonical::CanonicalEnvelope;
+use cybou_protocol::{canonical::CanonicalEnvelope, Kind};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -268,10 +268,13 @@ impl IdentityCore {
     ) -> Option<CanonicalEnvelope> {
         let state = self.current_state()?;
         let (kind, payload_str) = match action {
-            SessionAction::Born => (1, "identity created".to_string()),
-            SessionAction::Continued => (1, format!("session {} began", state.session_count)),
+            SessionAction::Born => (Kind::Observation as u16, "identity created".to_string()),
+            SessionAction::Continued => (
+                Kind::Observation as u16,
+                format!("session {} began", state.session_count),
+            ),
             SessionAction::Migrated { from, to } => (
-                12, // SelfAssessment
+                Kind::Observation as u16,
                 format!("architecture changed from {from} to {to}, identity preserved"),
             ),
         };

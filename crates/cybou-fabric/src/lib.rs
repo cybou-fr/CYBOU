@@ -8,6 +8,7 @@ use std::io::Cursor;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
+pub mod event_client;
 pub mod rpc;
 #[cfg(target_os = "linux")]
 pub mod zbus_rpc;

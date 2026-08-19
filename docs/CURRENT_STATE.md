@@ -8,10 +8,10 @@ SPDX-License-Identifier: MIT
 > Debian 13 and Rust are the active production target. The entire Mind suite has been ported to pure Rust
 > within the unified Cargo workspace: `cybou-crypto`, `cybou-storage`, `cybou-eventd`, `cybou-identityd`,
 > `cybou-healthd`, `cybou-selfd`, `cybou-predictord`, `cybou-intentiond`, `cybou-perceptiond`,
-> `cybou-workspaced`, `cybou-lifecycled`, and `cybou-presenced`, complete with systemd user units
-> and zbus D-Bus service implementations. The C++/Qt/NixOS implementation is retained as a frozen
-> behavioral and compatibility reference oracle. See [ADR-0038](adr/ADR-0038-rust-first-codebase.md) and
-> [ADR-0039](adr/ADR-0039-debian-13-base-system.md).
+> `cybou-epistemicd`, `cybou-contextd`, `cybou-workspaced`, `cybou-lifecycled`, and `cybou-presenced`,
+> complete with systemd user units and zbus D-Bus service implementations. The C++/Qt/NixOS
+> implementation is retained as a frozen behavioral and compatibility reference oracle. See
+> [ADR-0038](adr/ADR-0038-rust-first-codebase.md) and [ADR-0039](adr/ADR-0039-debian-13-base-system.md).
 
 ## Rust Mind foundation status
 
@@ -25,6 +25,8 @@ The repository builds all Mind services from one locked workspace:
 - `cybou-predictord`: Empirical forecasting, calibration, and outcome settlement (`org.cybou.Mind.Predictor1`).
 - `cybou-intentiond`: Commitments and obligations tracking (`org.cybou.Mind.Intention1`).
 - `cybou-perceptiond`: Linux system perception adapter (`org.cybou.Mind.Perception1`).
+- `cybou-epistemicd`: Epistemic proposition projection and belief validity (`org.cybou.Mind.Epistemic1`).
+- `cybou-contextd`: Associative and situational context management (`org.cybou.Mind.Context1`).
 - `cybou-workspaced`: Global Workspace Theory attention coalitions and focus selection (`org.cybou.Mind.Workspace1`).
 - `cybou-lifecycled`: Sleep/wake lifecycle and consolidation scheduler (`org.cybou.Mind.Lifecycle1`).
 - `cybou-presenced`: Unified Mind presentation and command gateway (`org.cybou.Mind.Presence1`).

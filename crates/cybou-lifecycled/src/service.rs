@@ -51,11 +51,10 @@ impl Lifecycle1Service {
     /// Notify that user interaction occurred.
     async fn notify_user_activity(&self, cause: String) -> bool {
         let now = OffsetDateTime::now_utc();
-        self.core.notify_user_activity(&cause, now);
-        true
+        self.core.notify_user_activity(&cause, now).is_ok()
     }
 
-    /// Manually transition mode.
+    /// Manually transition mode (rejects unknown mode strings).
     async fn transition(&self, mode: String) -> bool {
         let parsed = match mode.to_lowercase().as_str() {
             "awake" => LifecycleMode::Awake,
@@ -64,10 +63,10 @@ impl Lifecycle1Service {
             "deep-rest" => LifecycleMode::DeepRest,
             "consolidating" => LifecycleMode::Consolidating,
             "maintenance" => LifecycleMode::Maintenance,
-            _ => LifecycleMode::Interrupted,
+            "interrupted" => LifecycleMode::Interrupted,
+            _ => return false, // reject unknown mode string without changing state
         };
-        self.core.transition(parsed);
-        true
+        self.core.transition(parsed).is_ok()
     }
 
     /// Signal emitted when lifecycle state changes.

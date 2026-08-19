@@ -19,17 +19,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let initial_env = core.acquire_once(now, 0);
     println!("[cybou-perceptiond] Initial perception health: {}", core.health());
 
-    // Spawn periodic background acquisition task
+    // Spawn periodic background acquisition task submitting to Event1
     let sampling_core = core.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(60));
         let mut monotonic = 1u64;
+
+        #[cfg(target_os = "linux")]
+        let event_client = cybou_fabric::event_client::EventClient::session().await.ok();
+
         loop {
             interval.tick().await;
             let now = OffsetDateTime::now_utc();
-            if let Some(_envelope) = sampling_core.acquire_once(now, monotonic) {
+            if let Some(envelope) = sampling_core.acquire_once(now, monotonic) {
                 monotonic += 1;
-                // On real bus, newly acquired envelopes are submitted to Event1
+                let _ = &envelope;
+                #[cfg(target_os = "linux")]
+                if let Some(ref client) = event_client {
+                    if let Ok(res) = client.submit(&envelope).await {
+                        println!(
+                            "[cybou-perceptiond] Submitted observation sequence {} to Event1",
+                            res.sequence
+                        );
+                    }
+                }
             }
         }
     });

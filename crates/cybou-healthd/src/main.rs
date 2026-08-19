@@ -5,7 +5,8 @@
 
 use std::{sync::Arc, time::Duration};
 
-use cybou_healthd::HealthCore;
+#[allow(unused_imports)]
+use cybou_healthd::{ComponentHealth, ComponentHealthRecord, HealthCore};
 use time::OffsetDateTime;
 
 #[tokio::main]
@@ -19,14 +20,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         core.overall_health()
     );
 
-    // Spawn periodic health refresh task
-    let refresh_core = core.clone();
+    // Spawn periodic active probing loop
+    let probe_core = core.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(10));
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        #[cfg(target_os = "linux")]
+        let session = zbus::Connection::session().await.ok();
+
+        #[cfg(target_os = "linux")]
+        use cybou_fabric::{
+            CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, PREDICTOR,
+            PRESENCE, SELF, WORKSPACE,
+        };
+
+        #[cfg(target_os = "linux")]
+        let endpoints = [
+            ("eventd", EVENT),
+            ("identityd", IDENTITY),
+            ("intentiond", INTENTION),
+            ("predictord", PREDICTOR),
+            ("selfd", SELF),
+            ("workspaced", WORKSPACE),
+            ("perceptiond", PERCEPTION),
+            ("epistemicd", EPISTEMIC),
+            ("contextd", CONTEXT),
+            ("lifecycled", LIFECYCLE),
+            ("presenced", PRESENCE),
+        ];
+
         loop {
             interval.tick().await;
             let now = OffsetDateTime::now_utc();
-            refresh_core.recalculate(now);
+
+            #[cfg(target_os = "linux")]
+            if let Some(ref conn) = session {
+                for (id, ep) in &endpoints {
+                    let res: Result<bool, _> = conn
+                        .call_method(
+                            Some(ep.service),
+                            ep.object_path,
+                            Some(ep.interface),
+                            "Ready",
+                            &(),
+                        )
+                        .await
+                        .and_then(|r| r.body());
+
+                    let health = match res {
+                        Ok(true) => ComponentHealth::Healthy,
+                        Ok(false) => ComponentHealth::Degraded,
+                        Err(e) => ComponentHealth::Unavailable,
+                    };
+
+                    probe_core.update_component(
+                        *id,
+                        ComponentHealthRecord {
+                            health,
+                            detail: None,
+                        },
+                        now,
+                    );
+                }
+            }
+
+            probe_core.recalculate(now);
         }
     });
 

@@ -119,14 +119,12 @@ impl IntentionCore {
         })
     }
 
-    fn persist(&self) -> Result<(), IntentionError> {
+    fn persist_candidate(&self, open: &[Intention]) -> Result<(), IntentionError> {
         if let Some(path) = &self.state_path {
-            let open = self
-                .open_intentions
-                .read()
-                .map_err(|_| IntentionError::LockPoisoned)?
-                .clone();
-            let state = IntentionsState { version: 1, open };
+            let state = IntentionsState {
+                version: 1,
+                open: open.to_vec(),
+            };
             let serialized = serde_json::to_string_pretty(&state)
                 .map_err(|e| IntentionError::CorruptState(e.to_string()))?;
 
@@ -144,7 +142,7 @@ impl IntentionCore {
         Ok(())
     }
 
-    /// Form a new intention, add it to open obligations, and persist.
+    /// Form a new intention, add it to open obligations, and persist (durable before visible).
     pub fn form(
         &self,
         description: impl Into<String>,
@@ -161,14 +159,22 @@ impl IntentionCore {
             formed: now,
         };
 
+        let mut candidate = self
+            .open_intentions
+            .read()
+            .map_err(|_| IntentionError::LockPoisoned)?
+            .clone();
+        candidate.push(intention);
+
+        self.persist_candidate(&candidate)?;
+
         if let Ok(mut list) = self.open_intentions.write() {
-            list.push(intention);
+            *list = candidate;
         }
-        self.persist()?;
         Ok(id)
     }
 
-    /// Close an open intention by resolution and persist.
+    /// Close an open intention by resolution and persist (durable before visible).
     ///
     /// # Errors
     ///
@@ -179,18 +185,22 @@ impl IntentionCore {
         _resolution: Resolution,
         _note: Option<&str>,
     ) -> Result<(), IntentionError> {
-        let mut list = self
+        let mut candidate = self
             .open_intentions
-            .write()
-            .map_err(|_| IntentionError::LockPoisoned)?;
-        let pos = list
+            .read()
+            .map_err(|_| IntentionError::LockPoisoned)?
+            .clone();
+        let pos = candidate
             .iter()
             .position(|i| i.id == id)
             .ok_or(IntentionError::NotFound(id))?;
-        list.remove(pos);
-        drop(list);
+        candidate.remove(pos);
 
-        self.persist()?;
+        self.persist_candidate(&candidate)?;
+
+        if let Ok(mut list) = self.open_intentions.write() {
+            *list = candidate;
+        }
         Ok(())
     }
 

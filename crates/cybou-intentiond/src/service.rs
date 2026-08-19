@@ -31,17 +31,24 @@ impl Intention1Service {
         true
     }
 
-    /// Form a new intention obligation and return its UUID string.
+    /// Form a new intention obligation and return its UUID string (rejects invalid cause UUIDs).
     async fn form(&self, description: String, trigger: String, cause_id: String) -> String {
         let now = OffsetDateTime::now_utc();
-        let cause = Uuid::parse_str(&cause_id).ok();
+        let cause = if cause_id.is_empty() {
+            None
+        } else {
+            match Uuid::parse_str(&cause_id) {
+                Ok(id) => Some(id),
+                Err(_) => return String::new(), // reject invalid cause
+            }
+        };
         match self.core.form(description, trigger, cause, now) {
             Ok(id) => id.to_string(),
             Err(_) => String::new(),
         }
     }
 
-    /// Close an intention by resolution ("fulfilled", "abandoned", "obsolete").
+    /// Close an intention by resolution ("fulfilled", "abandoned", "obsolete") or reject.
     async fn close(&self, intention_id: String, resolution: String, note: String) -> bool {
         let Ok(id) = Uuid::parse_str(&intention_id) else {
             return false;
@@ -49,7 +56,8 @@ impl Intention1Service {
         let res = match resolution.to_lowercase().as_str() {
             "fulfilled" => Resolution::Fulfilled,
             "abandoned" => Resolution::Abandoned,
-            _ => Resolution::Obsolete,
+            "obsolete" => Resolution::Obsolete,
+            _ => return false, // reject unknown resolution
         };
         let note_opt = if note.is_empty() { None } else { Some(note.as_str()) };
         self.core.close(id, res, note_opt).is_ok()

@@ -13,11 +13,10 @@ milestone definition; [Current State](CURRENT_STATE.md) remains the implementati
 
 The immediate objective is:
 
-> **Complete Rust Event1 ownership and cutover on Debian 13.**
+> **Complete Rust multi-daemon integration and semantic cutover on Debian 13.**
 
-`cybou-storage` already implements read/verify and the SQLite `writer::append()` engine with SQLite-level
-differential oracle verification against the C++ writer. The remaining blocker to having our first
-fully functioning Rust Mind owner is completing crypto sealing and packaging the D-Bus service into `cybou-eventd`.
+All 12 Rust Mind daemons are implemented in the Cargo workspace with corresponding systemd user units
+and D-Bus contracts. The current priority is end-to-end integration testing and transitioning CI to pure Debian 13.
 
 ### Execution sequence
 
@@ -27,16 +26,18 @@ fully functioning Rust Mind owner is completing crypto sealing and packaging the
 3. cybou-crypto (Complete: KeyStore, KeyDomain, XChaCha20-Poly1305 sealing, erasure)
 4. cybou-eventd (Complete: Event1 D-Bus daemon, JournalWriter integration, Accepted signal)
 5. cybou-identityd (Complete: Identity1 D-Bus daemon, session continuity, fail-closed)
-6. cybou-healthd (Complete: Health1 D-Bus daemon, CapabilityRegistry dependency policy)
-7. cybou-selfd (Complete: Self1 D-Bus daemon, self-assessment and narration)
+6. cybou-healthd (Complete: Health1 D-Bus daemon, active D-Bus probing, CapabilityRegistry)
+7. cybou-selfd (Complete: Self1 D-Bus daemon, VerificationKnowledge, self-assessment and narration)
 8. cybou-predictord (Complete: Predictor1 D-Bus daemon, empirical forecasting/calibration)
-9. cybou-intentiond (Complete: Intention1 D-Bus daemon, commitments and obligations)
-10. cybou-perceptiond (Complete: Perception1 D-Bus daemon, Debian/Linux system sensor)
-11. cybou-workspaced (Complete: Workspace1 D-Bus daemon, GWT attention coalitions)
-12. cybou-lifecycled (Complete: Lifecycle1 D-Bus daemon, sleep/wake/consolidation scheduler)
-13. cybou-presenced (Complete: Presence1 D-Bus daemon, compound snapshot presentation)
-14. Systemd unit integration (Complete: all 10 user service units created in systemd/user/)
-15. Final legacy removal and Debian 13 packaging
+9. cybou-intentiond (Complete: Intention1 D-Bus daemon, durable-before-visible commitments)
+10. cybou-perceptiond (Complete: Perception1 D-Bus daemon, Debian sensor submitting to Event1)
+11. cybou-epistemicd (Complete: Epistemic1 D-Bus daemon, reconstructible belief validity per ADR-0027)
+12. cybou-contextd (Complete: Context1 D-Bus daemon, associative context graph per ADR-0029)
+13. cybou-workspaced (Complete: Workspace1 D-Bus daemon, GWT attention coalitions)
+14. cybou-lifecycled (Complete: Lifecycle1 D-Bus daemon, durable sleep/wake scheduler)
+15. cybou-presenced (Complete: Presence1 D-Bus daemon, honest Health1-derived presentation)
+16. Systemd unit integration (Complete: all 12 user service units created in systemd/user/)
+17. Final legacy removal and Debian 13 packaging
 ```
 
 ## Current architecture assessment
