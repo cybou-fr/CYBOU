@@ -14,7 +14,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope, observation::ObservationV1};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -214,18 +214,26 @@ impl EpistemicCore {
             kind,
             Kind::Observation | Kind::BeliefRevision | Kind::Hypothesis
         ) {
-            let payload_str: String = ciborium::from_reader(envelope.payload.as_slice())
-                .unwrap_or_else(|_| String::from_utf8_lossy(&envelope.payload).to_string());
+            // The organ that spoke is not the subject of what it said. An observation carries its
+            // own subject and value, and using them is what makes two organs able to corroborate
+            // or contradict each other about the same thing. Keying beliefs by origin organ
+            // instead collapsed everything one organ ever observed into a single belief that
+            // disputed itself on every new observation.
+            let Some((subject, value)) = observed_claim(&envelope.payload) else {
+                // A payload that does not decode is not a belief about anything. Storing its
+                // bytes as the asserted value would put an unreadable string where a claim
+                // belongs — and publish whatever the payload happened to contain.
+                return;
+            };
 
             let now = OffsetDateTime::from_unix_timestamp_nanos(
                 i128::from(envelope.wall_time_ms) * 1_000_000,
             )
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
-            let subject = format!("organ.{}", envelope.origin_organ);
             self.ingest(
                 subject,
-                payload_str,
+                value,
                 envelope.confidence,
                 Some(envelope.message_id),
                 now,
@@ -271,8 +279,54 @@ impl EpistemicCore {
     }
 }
 
+/// The subject and asserted value carried by an observation payload.
+///
+/// Returns `None` when the payload is not an observation this version can read. Refusing is the
+/// point: a belief whose value is undecodable bytes asserts nothing, and rendering it anywhere
+/// would show a reader the payload rather than the claim.
+fn observed_claim(payload: &[u8]) -> Option<(String, String)> {
+    let observation: ObservationV1 = ciborium::from_reader(payload).ok()?;
+    let value = match &observation.value {
+        ciborium::Value::Text(text) => text.clone(),
+        ciborium::Value::Integer(number) => i128::from(*number).to_string(),
+        ciborium::Value::Float(number) => number.to_string(),
+        ciborium::Value::Bool(flag) => flag.to_string(),
+        _ => return None,
+    };
+    if observation.subject.is_empty() || value.is_empty() {
+        return None;
+    }
+    Some((observation.subject, value))
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_belief_is_about_what_was_observed_not_about_who_observed_it() {
+        let observation = cybou_protocol::observation::ObservationV1 {
+            source_id: "linux.system".into(),
+            subject: "operating-system".into(),
+            value: ciborium::Value::Text("Debian GNU/Linux 13 (trixie)".into()),
+            acquired_at: "2026-08-19T17:54:15.103Z".into(),
+            freshness_until: "2026-08-19T17:59:15.103Z".into(),
+            provenance: "os-release from /etc/os-release".into(),
+        };
+        let mut payload = Vec::new();
+        ciborium::into_writer(&observation, &mut payload).expect("encode observation");
+
+        assert_eq!(
+            super::observed_claim(&payload),
+            Some((
+                "operating-system".to_owned(),
+                "Debian GNU/Linux 13 (trixie)".to_owned()
+            ))
+        );
+
+        // Anything that is not a readable observation asserts nothing and must not become one.
+        assert_eq!(super::observed_claim(b"not cbor at all"), None);
+        assert_eq!(super::observed_claim(&[]), None);
+    }
+
     use tempfile::tempdir;
 
     use super::*;
