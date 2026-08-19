@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cybou.org/schemas/web/v1/mind.schema.json",
+  "title": "Cybou Mind panel projection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "observedAt",
+    "identity",
+    "journal",
+    "commitments",
+    "lifecycle"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge",
+        "identityId",
+        "origin",
+        "sessionCount",
+        "ageInDays",
+        "architectureVersion"
+      ],
+      "properties": {
+        "knowledge": { "enum": ["known", "unknown"] },
+        "identityId": { "type": ["string", "null"], "minLength": 1 },
+        "origin": { "type": ["string", "null"] },
+        "sessionCount": { "type": ["integer", "null"], "minimum": 0 },
+        "ageInDays": { "type": ["integer", "null"] },
+        "architectureVersion": { "type": ["string", "null"] }
+      }
+    },
+    "journal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledge", "contributionCount", "erasureEpoch"],
+      "properties": {
+        "knowledge": { "enum": ["known", "unknown"] },
+        "contributionCount": { "type": ["integer", "null"], "minimum": 0 },
+        "erasureEpoch": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "commitments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledge", "openCount", "open"],
+      "properties": {
+        "knowledge": { "enum": ["known", "unknown"] },
+        "openCount": { "type": ["integer", "null"], "minimum": 0 },
+        "open": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "description", "trigger", "formed"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" },
+              "trigger": { "type": "string" },
+              "formed": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledge", "mode", "lastUserActivityAt"],
+      "properties": {
+        "knowledge": { "enum": ["known", "unknown"] },
+        "mode": { "type": ["string", "null"] },
+        "lastUserActivityAt": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

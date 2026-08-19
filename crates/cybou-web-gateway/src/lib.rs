@@ -16,7 +16,9 @@ use axum::{
     },
     routing::{any, get},
 };
-use cybou_web_contracts::{SessionMode, SessionProjection, SnapshotProjection, WEB_SCHEMA_V1};
+use cybou_web_contracts::{
+    MindProjection, SessionMode, SessionProjection, SnapshotProjection, WEB_SCHEMA_V1,
+};
 use serde::Serialize;
 use thiserror::Error;
 use time::{Duration as TimeDuration, OffsetDateTime, format_description::well_known::Rfc3339};
@@ -56,6 +58,19 @@ pub trait PresenceSource: Send + Sync + 'static {
     async fn wait_for_change(&self) -> Result<(), GatewayError> {
         tokio::time::sleep(EVENT_POLL_INTERVAL).await;
         Ok(())
+    }
+
+    /// Return what the owners behind Mind actually hold right now.
+    ///
+    /// Defaulting to unavailable is deliberate: a source that cannot reach the owners must say so
+    /// rather than answer with a projection full of absent sections, which a reader could mistake
+    /// for a Mind that holds nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GatewayError`] when the source cannot produce the projection at all.
+    async fn mind(&self) -> Result<MindProjection, GatewayError> {
+        Err(GatewayError::Unavailable)
     }
 }
 
@@ -179,6 +194,7 @@ pub fn router_with_assets_and_session(
     let app = Router::new()
         .route("/api/v1/session", get(session))
         .route("/api/v1/snapshot", get(snapshot))
+        .route("/api/v1/mind", get(mind))
         .route("/api/v1/events", get(events))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
@@ -221,6 +237,13 @@ async fn snapshot(
     State(state): State<GatewayState>,
 ) -> Result<Json<SnapshotProjection>, GatewayError> {
     tokio::time::timeout(SNAPSHOT_BUDGET, state.presence.snapshot())
+        .await
+        .map_err(|_| GatewayError::Timeout)?
+        .map(Json)
+}
+
+async fn mind(State(state): State<GatewayState>) -> Result<Json<MindProjection>, GatewayError> {
+    tokio::time::timeout(SNAPSHOT_BUDGET, state.presence.mind())
         .await
         .map_err(|_| GatewayError::Timeout)?
         .map(Json)
@@ -322,7 +345,8 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
-    use cybou_web_contracts::{SessionMode, SessionProjection, SnapshotProjection};
+    use cybou_protocol::KnowledgeState;
+    use cybou_web_contracts::{MindProjection, SessionMode, SessionProjection, SnapshotProjection};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
@@ -489,6 +513,53 @@ mod tests {
             .to_bytes();
         let snapshot: SnapshotProjection = serde_json::from_slice(&bytes).expect("typed snapshot");
         assert_eq!(snapshot.projection_version, 42);
+    }
+
+    #[tokio::test]
+    async fn mind_route_returns_what_the_owners_hold() {
+        let response = router(Arc::new(FixturePresenceSource::nominal()))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/mind")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("router response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response
+            .into_body()
+            .collect()
+            .await
+            .expect("mind body")
+            .to_bytes();
+        let mind: MindProjection = serde_json::from_slice(&bytes).expect("typed mind projection");
+        assert_eq!(mind.identity.knowledge, KnowledgeState::Known);
+        assert_eq!(mind.journal.contribution_count, Some(134));
+        assert_eq!(mind.commitments.open.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_source_that_cannot_reach_the_owners_says_so_rather_than_answering_empty() {
+        struct SnapshotOnlySource;
+
+        #[async_trait]
+        impl PresenceSource for SnapshotOnlySource {
+            async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError> {
+                FixturePresenceSource::nominal().snapshot().await
+            }
+        }
+
+        let response = router(Arc::new(SnapshotOnlySource))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/mind")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("router response");
+        assert_ne!(response.status(), StatusCode::OK);
     }
 
     struct SlowPresence;

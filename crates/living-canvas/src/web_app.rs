@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v4";
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v5";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Point {
@@ -22,38 +22,38 @@ struct Point {
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct CanvasLayout {
-    artifact: Point,
-    collaborators: Point,
-    release: Point,
-    sources: Point,
-    suggestion: Point,
+    identity: Point,
+    session: Point,
+    capabilities: Point,
+    journal: Point,
+    lifecycle: Point,
     commitments: Point,
 }
 
 impl Default for CanvasLayout {
     fn default() -> Self {
         Self {
-            artifact: Point {
+            identity: Point {
                 x: 70.0,
                 y: 50.0,
                 z: 1,
             },
-            collaborators: Point {
+            session: Point {
                 x: 55.0,
                 y: 300.0,
                 z: 2,
             },
-            release: Point {
+            capabilities: Point {
                 x: 445.0,
                 y: 70.0,
                 z: 6,
             },
-            sources: Point {
+            journal: Point {
                 x: 880.0,
                 y: 50.0,
                 z: 3,
             },
-            suggestion: Point {
+            lifecycle: Point {
                 x: 900.0,
                 y: 300.0,
                 z: 5,
@@ -69,33 +69,33 @@ impl Default for CanvasLayout {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Panel {
-    Artifact,
-    Collaborators,
-    Release,
-    Sources,
-    Suggestion,
+    Identity,
+    Session,
+    Capabilities,
+    Journal,
+    Lifecycle,
     Commitments,
 }
 
 impl Panel {
     const fn key(self) -> &'static str {
         match self {
-            Self::Artifact => "artifact",
-            Self::Collaborators => "collaborators",
-            Self::Release => "release",
-            Self::Sources => "sources",
-            Self::Suggestion => "suggestion",
+            Self::Identity => "identity",
+            Self::Session => "session",
+            Self::Capabilities => "capabilities",
+            Self::Journal => "journal",
+            Self::Lifecycle => "lifecycle",
             Self::Commitments => "commitments",
         }
     }
 
     const fn size(self) -> (f64, f64) {
         match self {
-            Self::Artifact => (220.0, 188.0),
-            Self::Collaborators => (240.0, 236.0),
-            Self::Release => (390.0, 294.0),
-            Self::Sources => (245.0, 230.0),
-            Self::Suggestion => (335.0, 252.0),
+            Self::Identity => (220.0, 188.0),
+            Self::Session => (240.0, 236.0),
+            Self::Capabilities => (390.0, 294.0),
+            Self::Journal => (245.0, 230.0),
+            Self::Lifecycle => (335.0, 252.0),
             Self::Commitments => (310.0, 184.0),
         }
     }
@@ -113,33 +113,33 @@ struct DragState {
 impl CanvasLayout {
     const fn point(self, panel: Panel) -> Point {
         match panel {
-            Panel::Artifact => self.artifact,
-            Panel::Collaborators => self.collaborators,
-            Panel::Release => self.release,
-            Panel::Sources => self.sources,
-            Panel::Suggestion => self.suggestion,
+            Panel::Identity => self.identity,
+            Panel::Session => self.session,
+            Panel::Capabilities => self.capabilities,
+            Panel::Journal => self.journal,
+            Panel::Lifecycle => self.lifecycle,
             Panel::Commitments => self.commitments,
         }
     }
 
     fn set_point(&mut self, panel: Panel, point: Point) {
         match panel {
-            Panel::Artifact => self.artifact = point,
-            Panel::Collaborators => self.collaborators = point,
-            Panel::Release => self.release = point,
-            Panel::Sources => self.sources = point,
-            Panel::Suggestion => self.suggestion = point,
+            Panel::Identity => self.identity = point,
+            Panel::Session => self.session = point,
+            Panel::Capabilities => self.capabilities = point,
+            Panel::Journal => self.journal = point,
+            Panel::Lifecycle => self.lifecycle = point,
             Panel::Commitments => self.commitments = point,
         }
     }
 
     fn bring_forward(&mut self, panel: Panel) {
         let next = [
-            self.artifact.z,
-            self.collaborators.z,
-            self.release.z,
-            self.sources.z,
-            self.suggestion.z,
+            self.identity.z,
+            self.session.z,
+            self.capabilities.z,
+            self.journal.z,
+            self.lifecycle.z,
             self.commitments.z,
         ]
         .into_iter()
@@ -162,6 +162,9 @@ enum RuntimeState {
     Ready {
         mode: cybou_web_contracts::SessionMode,
         snapshot: cybou_web_contracts::SnapshotProjection,
+        /// `None` when the gateway could not assemble the owner projection at all. It is kept
+        /// distinct from a projection whose sections are individually unknown.
+        mind: Option<cybou_web_contracts::MindProjection>,
     },
     Error(String),
 }
@@ -199,7 +202,7 @@ fn RelationshipEdge(
 
 #[component]
 pub fn App() -> impl IntoView {
-    let (selected, set_selected) = signal("release");
+    let (selected, set_selected) = signal("capabilities");
     let (runtime_menu_open, set_runtime_menu_open) = signal(false);
     let (minimap_visible, set_minimap_visible) = signal(true);
     let (command_open, set_command_open) = signal(false);
@@ -217,8 +220,15 @@ pub fn App() -> impl IntoView {
             Ok::<_, living_canvas::ClientError>((session.mode, snapshot))
         }
         .await;
+        // The owner projection is fetched separately and allowed to fail on its own: capabilities
+        // are still worth showing when Identity1 or the Journal cannot be read.
+        let mind = client.mind().await.ok();
         runtime.set(match result {
-            Ok((mode, snapshot)) => RuntimeState::Ready { mode, snapshot },
+            Ok((mode, snapshot)) => RuntimeState::Ready {
+                mode,
+                snapshot,
+                mind,
+            },
             Err(error) => RuntimeState::Error(error.to_string()),
         });
     });
@@ -315,376 +325,455 @@ pub fn App() -> impl IntoView {
         RuntimeState::Ready { snapshot, .. } => snapshot.capabilities,
         RuntimeState::Loading | RuntimeState::Error(_) => Vec::new(),
     };
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+    // Every reader below answers "not read" rather than inventing a placeholder value, because a
+    // dash is honest and a zero is a claim.
+    let identity_id = move || {
+        mind()
+            .and_then(|m| m.identity.identity_id)
+            .unwrap_or_else(unread)
+    };
+    let identity_origin = move || {
+        mind()
+            .and_then(|m| m.identity.origin)
+            .unwrap_or_else(unread)
+    };
+    let identity_sessions = move || {
+        mind()
+            .and_then(|m| m.identity.session_count)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let identity_age = move || {
+        mind()
+            .and_then(|m| m.identity.age_in_days)
+            .map_or_else(unread, |value| format!("{value} d"))
+    };
+    let identity_architecture = move || {
+        mind()
+            .and_then(|m| m.identity.architecture_version)
+            .unwrap_or_else(unread)
+    };
+    let journal_count = move || {
+        mind()
+            .and_then(|m| m.journal.contribution_count)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let journal_epoch = move || {
+        mind()
+            .and_then(|m| m.journal.erasure_epoch)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let journal_state = move || {
+        mind().map_or_else(
+            || "Event1 not read".to_owned(),
+            |m| knowledge_label(m.journal.knowledge).to_owned(),
+        )
+    };
+    let lifecycle_mode = move || mind().and_then(|m| m.lifecycle.mode).unwrap_or_else(unread);
+    let lifecycle_activity = move || {
+        mind()
+            .and_then(|m| m.lifecycle.last_user_activity_at)
+            .unwrap_or_else(unread)
+    };
+    let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
+    let commitments_label = move || match mind() {
+        None => "Intention1 not read".to_owned(),
+        Some(m) if m.commitments.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Intention1 not read".to_owned()
+        }
+        Some(m) => match m.commitments.open_count.unwrap_or_default() {
+            0 => "No open commitments".to_owned(),
+            1 => "1 open commitment".to_owned(),
+            count => format!("{count} open commitments"),
+        },
+    };
+    let session_consumer = move || match runtime.get() {
+        RuntimeState::Ready { .. } => "living-canvas".to_owned(),
+        RuntimeState::Loading | RuntimeState::Error(_) => unread(),
+    };
+    let mind_observed = move || {
+        mind().map_or_else(
+            || "owners not read".to_owned(),
+            |m| format!("Owners read {}", m.observed_at),
+        )
+    };
 
     view! {
-        <main class="app-shell">
-            <header class="topbar">
-                <a class="brand" href="#canvas" aria-label="Living Canvas home">
-                    <img class="brand-mark" src="/cybou-mark.svg" alt="" />
-                    <span>"Living Canvas"</span>
-                </a>
-                <p class="path">"Cybou Workspace / Programs / Cybou 0.8 release"</p>
-                <div class="runtime-cluster">
-                    <div class="runtime" aria-label="Runtime connection" aria-live="polite">
-                        <span class="status-dot" aria-hidden="true"></span>
-                        <strong>{runtime_label}</strong>
-                        <small>{projection_label}</small>
+            <main class="app-shell">
+                <header class="topbar">
+                    <a class="brand" href="#canvas" aria-label="Living Canvas home">
+                        <img class="brand-mark" src="/cybou-mark.svg" alt="" />
+                        <span>"Living Canvas"</span>
+                    </a>
+                    <p class="path">"Cybou / Mind / live projection"</p>
+                    <div class="runtime-cluster">
+                        <div class="runtime" aria-label="Runtime connection" aria-live="polite">
+                            <span class="status-dot" aria-hidden="true"></span>
+                            <strong>{runtime_label}</strong>
+                            <small>{projection_label}</small>
+                        </div>
+                        <button
+                            class="runtime-switch"
+                            aria-expanded=move || runtime_menu_open.get().to_string()
+                            aria-controls="runtime-menu"
+                            on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                        >
+                            <span>"Local"</span>
+                            <span class="inactive">"Remote"</span>
+                        </button>
+                        <button
+                            class="profile-trigger"
+                            aria-label="Open Cybou workspace menu"
+                            aria-expanded=move || runtime_menu_open.get().to_string()
+                            on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                        >"C"</button>
+                        <Show when=move || runtime_menu_open.get()>
+                            <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
+                                <header><strong>"Cybou"</strong><small>{mind_observed}</small></header>
+                                <button on:click=move |_| navigate_from_menu("identity", set_selected, set_runtime_menu_open)><FileCheck size=15 /><span>"Identity"</span></button>
+                                <button on:click=move |_| navigate_from_menu("commitments", set_selected, set_runtime_menu_open)><ListChecks size=15 /><span>"Commitments"</span></button>
+                                <button on:click=move |_| navigate_from_menu("session", set_selected, set_runtime_menu_open)><UsersRound size=15 /><span>"Session"</span></button>
+                                <button on:click=move |_| navigate_from_menu("lifecycle", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Lifecycle"</span></button>
+                                <hr />
+                                <button on:click=move |_| navigate_from_menu("capabilities", set_selected, set_runtime_menu_open)><Map size=15 /><span>"Capabilities"</span></button>
+                                <button
+                                    aria-pressed=move || minimap_visible.get().to_string()
+                                    on:click=move |_| {
+                                        set_minimap_visible.set(!minimap_visible.get_untracked());
+                                        set_runtime_menu_open.set(false);
+                                    }
+                                ><Map size=15 /><span>"Minimap"</span></button>
+                                <hr />
+                                <button on:click=move |_| navigate_from_menu("journal", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Journal"</span></button>
+                            </nav>
+                        </Show>
                     </div>
+                </header>
+
+                <section
+                    id="canvas"
+                    class="canvas"
+                    aria-label="Cybou living canvas"
+                    on:pointermove=move |event: PointerEvent| move_drag(event, layout, dragging)
+                    on:pointerup=move |_| finish_drag(layout, dragging)
+                    on:pointercancel=move |_| finish_drag(layout, dragging)
+                >
+                    <div class="ambient" aria-hidden="true"></div>
+                    <svg class="relationship-layer" aria-label="Canvas relationships">
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Identity to=Panel::Capabilities label="delivers" amber=false />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Session to=Panel::Capabilities label="involves" amber=false />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Journal label="validated by" amber=false />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Lifecycle label="depends on" amber=true />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Commitments label="tracked by" amber=false />
+                    </svg>
                     <button
-                        class="runtime-switch"
-                        aria-expanded=move || runtime_menu_open.get().to_string()
-                        aria-controls="runtime-menu"
-                        on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                        class:selected=move || selected.get() == "identity"
+                        class="object identity"
+                        style=move || panel_style(layout.get(), Panel::Identity)
+                        aria-label="Artifact panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Identity, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Identity, layout)
+                        on:click=move |_| set_selected.set("identity")
                     >
-                        <span>"Local"</span>
-                        <span class="inactive">"Remote"</span>
+                        <small class="panel-kicker"><FileCheck size=14 /><span>"Identity1"</span></small>
+                        <strong>"Subject continuity"</strong>
+                        <span class="identity-digest">{identity_id}</span>
+                        <span class="identity-badges"><i>{identity_sessions}" sessions"</i><i>{identity_age}</i></span>
+                        <span class="identity-meta">"Origin "{identity_origin}" · "{identity_architecture}</span>
                     </button>
-                    <button
-                        class="profile-trigger"
-                        aria-label="Open Cybou workspace menu"
-                        aria-expanded=move || runtime_menu_open.get().to_string()
-                        on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
-                    >"C"</button>
-                    <Show when=move || runtime_menu_open.get()>
-                        <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
-                            <header><strong>"Cybou"</strong><small>"All data stays local"</small></header>
-                            <button on:click=move |_| navigate_from_menu("artifact", set_selected, set_runtime_menu_open)><FileCheck size=15 /><span>"New artifact"</span></button>
-                            <button on:click=move |_| navigate_from_menu("commitments", set_selected, set_runtime_menu_open)><ListChecks size=15 /><span>"New commitment"</span></button>
-                            <button on:click=move |_| navigate_from_menu("collaborators", set_selected, set_runtime_menu_open)><UsersRound size=15 /><span>"Invite collaborator"</span></button>
-                            <button on:click=move |_| navigate_from_menu("suggestion", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Open mind"</span></button>
-                            <hr />
-                            <button on:click=move |_| navigate_from_menu("release", set_selected, set_runtime_menu_open)><Map size=15 /><span>"Canvas view"</span></button>
+
+                    <Show when=move || selected.get() == "capabilities">
+                        <nav
+                            class="object-actions"
+                            style=move || selection_actions_style(layout.get())
+                            aria-label="Selected release actions"
+                        >
+                            <button aria-label="Open capability health" on:click=move |_| set_selected.set("capabilities")><FolderOpen size=15 /><span>"Health"</span></button>
+                            <button aria-label="Open commitments" on:click=move |_| set_selected.set("commitments")><ListChecks size=15 /><span>"Promises"</span></button>
+                            <button aria-label="Open lifecycle" on:click=move |_| set_selected.set("lifecycle")><Sparkles size=15 /><span>"Lifecycle"</span></button>
+                            <button aria-label="Open the Journal" on:click=move |_| set_selected.set("journal")><Link size=15 /><span>"Journal"</span></button>
                             <button
-                                aria-pressed=move || minimap_visible.get().to_string()
+                                aria-label="More release actions"
                                 on:click=move |_| {
-                                    set_minimap_visible.set(!minimap_visible.get_untracked());
-                                    set_runtime_menu_open.set(false);
+                                    set_command_open.set(true);
+                                    if let Some(input) = command_input.get() {
+                                        let _ = input.focus();
+                                    }
                                 }
-                            ><Map size=15 /><span>"Minimap"</span></button>
-                            <hr />
-                            <button on:click=move |_| navigate_from_menu("sources", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"System status"</span></button>
+                            ><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
                         </nav>
                     </Show>
-                </div>
-            </header>
 
-            <section
-                id="canvas"
-                class="canvas"
-                aria-label="Cybou living canvas"
-                on:pointermove=move |event: PointerEvent| move_drag(event, layout, dragging)
-                on:pointerup=move |_| finish_drag(layout, dragging)
-                on:pointercancel=move |_| finish_drag(layout, dragging)
-            >
-                <div class="ambient" aria-hidden="true"></div>
-                <svg class="relationship-layer" aria-label="Canvas relationships">
-                    <RelationshipEdge layout=layout selected=selected from=Panel::Artifact to=Panel::Release label="delivers" amber=false />
-                    <RelationshipEdge layout=layout selected=selected from=Panel::Collaborators to=Panel::Release label="involves" amber=false />
-                    <RelationshipEdge layout=layout selected=selected from=Panel::Release to=Panel::Sources label="validated by" amber=false />
-                    <RelationshipEdge layout=layout selected=selected from=Panel::Release to=Panel::Suggestion label="depends on" amber=true />
-                    <RelationshipEdge layout=layout selected=selected from=Panel::Release to=Panel::Commitments label="tracked by" amber=false />
-                </svg>
-                <button
-                    class:selected=move || selected.get() == "artifact"
-                    class="object artifact"
-                    style=move || panel_style(layout.get(), Panel::Artifact)
-                    aria-label="Artifact panel. Drag to reposition; use arrow keys for keyboard movement."
-                    on:pointerdown=move |event| start_drag(event, Panel::Artifact, layout, dragging)
-                    on:keydown=move |event| keyboard_move(event, Panel::Artifact, layout)
-                    on:click=move |_| set_selected.set("artifact")
-                >
-                    <small class="panel-kicker"><FileCheck size=14 /><span>"Verified artifact"</span></small>
-                    <strong>"cybou-0.8.0.tar.zst"</strong>
-                    <span class="artifact-digest">"SHA256: a3f2…9c7b"</span>
-                    <span class="artifact-badges"><i>"Reproducible"</i><i>"Signed"</i></span>
-                    <span class="artifact-meta">"Build · 10m ago · Local"</span>
-                </button>
-
-                <Show when=move || selected.get() == "release">
-                    <nav
-                        class="object-actions"
-                        style=move || release_actions_style(layout.get())
-                        aria-label="Selected release actions"
+                    <button
+                        class:selected=move || selected.get() == "session"
+                        class="object session"
+                        style=move || panel_style(layout.get(), Panel::Session)
+                        aria-label="Collaborators panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Session, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Session, layout)
+                        on:click=move |_| set_selected.set("session")
                     >
-                        <button aria-label="Open release" on:click=move |_| set_selected.set("release")><FolderOpen size=15 /><span>"Open"</span></button>
-                        <button aria-label="Open release plan commitments" on:click=move |_| set_selected.set("commitments")><ListChecks size=15 /><span>"Plan"</span></button>
-                        <button aria-label="Open Mind suggestion" on:click=move |_| set_selected.set("suggestion")><Sparkles size=15 /><span>"Mind"</span></button>
-                        <button aria-label="Open linked sources" on:click=move |_| set_selected.set("sources")><Link size=15 /><span>"Link"</span></button>
-                        <button
-                            aria-label="More release actions"
-                            on:click=move |_| {
-                                set_command_open.set(true);
-                                if let Some(input) = command_input.get() {
-                                    let _ = input.focus();
+                        <small class="panel-kicker"><UsersRound size=14 /><span>"Session"</span></small>
+                        <strong>"Established trust"</strong>
+                        <span class="row"><b>"Mode"</b><i>{runtime_label}</i></span>
+                        <span class="row"><b>"Consumer"</b><i>{session_consumer}</i></span>
+                        <span class="row"><b>"Authenticated"</b><i>"No"</i></span>
+                        <span class="row"><b>"Device bound"</b><i>"No"</i></span>
+                        <span class="panel-link">"Established by the gateway, never by this page"</span>
+                    </button>
+
+                    <button
+                        class:selected=move || selected.get() == "capabilities"
+                        class="object capabilities"
+                        style=move || panel_style(layout.get(), Panel::Capabilities)
+                        aria-label="Release plan panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Capabilities, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Capabilities, layout)
+                        on:click=move |_| set_selected.set("capabilities")
+                    >
+                        <small class="panel-kicker"><Sparkles size=14 /><span>"Health1"</span></small>
+                        <h1>{system_label}</h1>
+                        <span class="capabilities-kind">"Capability health"</span>
+                        <p>"A capability is available only while every organ it depends on answers Health1. Nothing here is composed by this page."</p>
+                        <div class="capability-list">
+                            <For
+                                each=capabilities
+                                key=|capability| capability.id.clone()
+                                children=move |capability| {
+                                    let available = capability.state == cybou_protocol::CapabilityState::Available;
+                                    let status = capability_state_label(capability.state);
+                                    let reason = capability.reason.unwrap_or_default();
+                                    view! {
+                                        <span class:available=available class="capability-line">
+                                            <span class="status-dot" aria-hidden="true"></span>
+                                            <b>{capability.id}</b>
+                                            <i>{status}</i>
+                                            <small>{reason}</small>
+                                        </span>
+                                    }
                                 }
-                            }
-                        ><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
-                    </nav>
-                </Show>
-
-                <button
-                    class:selected=move || selected.get() == "collaborators"
-                    class="object collaborators"
-                    style=move || panel_style(layout.get(), Panel::Collaborators)
-                    aria-label="Collaborators panel. Drag to reposition; use arrow keys for keyboard movement."
-                    on:pointerdown=move |event| start_drag(event, Panel::Collaborators, layout, dragging)
-                    on:keydown=move |event| keyboard_move(event, Panel::Collaborators, layout)
-                    on:click=move |_| set_selected.set("collaborators")
-                >
-                    <small class="panel-kicker"><UsersRound size=14 /><span>"Collaborators"</span></small>
-                    <strong>"Release team"</strong>
-                    <span class="row"><b>"Ari N."</b><i>"Owner"</i></span>
-                    <span class="row"><b>"Mina K."</b><i>"Release lead"</i></span>
-                    <span class="row"><b>"Jonas L."</b><i>"QA lead"</i></span>
-                    <span class="row"><b>"Priya S."</b><i>"Security"</i></span>
-                    <span class="row"><b>"Devon R."</b><i>"Docs"</i></span>
-                    <span class="panel-link">"Invite collaborator"</span>
-                </button>
-
-                <button
-                    class:selected=move || selected.get() == "release"
-                    class="object release"
-                    style=move || panel_style(layout.get(), Panel::Release)
-                    aria-label="Release plan panel. Drag to reposition; use arrow keys for keyboard movement."
-                    on:pointerdown=move |event| start_drag(event, Panel::Release, layout, dragging)
-                    on:keydown=move |event| keyboard_move(event, Panel::Release, layout)
-                    on:click=move |_| set_selected.set("release")
-                >
-                    <small class="panel-kicker"><Sparkles size=14 /><span>"Release plan"</span></small>
-                    <h1>"Cybou 0.8 release"</h1>
-                    <span class="release-kind">"Release plan"</span>
-                    <p>"Stable release with local-first guarantees, improved reliability, and rollback safety."</p>
-                    <div class="progress-label"><span>"Progress"</span><strong>"68%"</strong></div>
-                    <div class="progress" aria-label="Release progress 68 percent"><span></span></div>
-                    <footer class="release-meta">
-                        <span><small>"Target"</small><b>"May 30, 2025"</b></span>
-                        <span><small>"Owner"</small><b>"Ari N."</b></span>
-                        <span><small>"State"</small><b class="nominal">"On track"</b></span>
-                    </footer>
-                </button>
-
-                <button
-                    class:selected=move || selected.get() == "sources"
-                    class="object sources"
-                    style=move || panel_style(layout.get(), Panel::Sources)
-                    aria-label="Sources panel. Drag to reposition; use arrow keys for keyboard movement."
-                    on:pointerdown=move |event| start_drag(event, Panel::Sources, layout, dragging)
-                    on:keydown=move |event| keyboard_move(event, Panel::Sources, layout)
-                    on:click=move |_| set_selected.set("sources")
-                >
-                    <small class="panel-kicker"><Files size=14 /><span>"Sources"</span></small>
-                    <strong>"Validated inputs"</strong>
-                    <span class="row"><b>"Design doc"</b><i>"v4"</i></span>
-                    <span class="row"><b>"Changelog"</b><i>"v3"</i></span>
-                    <span class="row"><b>"Test results"</b><i>"128"</i></span>
-                    <span class="row"><b>"Threat model"</b><i>"v2"</i></span>
-                    <span class="row"><b>"Dependencies"</b><i>"52"</i></span>
-                    <span class="sources-footer"><i>"5 items"</i><b>"View all"</b></span>
-                </button>
-
-                <article
-                    class:selected=move || selected.get() == "suggestion"
-                    class="object suggestion"
-                    style=move || panel_style(layout.get(), Panel::Suggestion)
-                    tabindex="0"
-                    aria-label="Mind suggestion panel. Drag to reposition; use arrow keys for keyboard movement."
-                    on:pointerdown=move |event| start_drag(event, Panel::Suggestion, layout, dragging)
-                    on:keydown=move |event| keyboard_move(event, Panel::Suggestion, layout)
-                    on:click=move |_| set_selected.set("suggestion")
-                >
-                    <header class="suggestion-heading">
-                        <small class="panel-kicker"><Sparkles size=14 /><span>"Mind suggests"</span></small>
-                        <b>"High impact"</b>
-                    </header>
-                    <strong>"Add rollback verification"</strong>
-                    <p>"No rollback test detected in plan. Adds safety and release confidence."</p>
-                    <div class="suggestion-actions">
-                        <button
-                            on:pointerdown=move |event: PointerEvent| event.stop_propagation()
-                            on:click=move |event| {
-                                event.stop_propagation();
-                                set_selected.set("artifact");
-                            }
-                        >"Review evidence"</button>
-                        <button
-                            class="primary"
-                            on:pointerdown=move |event: PointerEvent| event.stop_propagation()
-                            on:click=move |event| {
-                                event.stop_propagation();
-                                set_selected.set("commitments");
-                            }
-                        >"Add to plan"</button>
-                    </div>
-                    <span class="suggestion-source">"Source: test-results.json, design-doc.md"</span>
-                </article>
-
-                <button
-                    class:selected=move || selected.get() == "commitments"
-                    class="object commitments"
-                    style=move || panel_style(layout.get(), Panel::Commitments)
-                    aria-label="Commitments panel. Drag to reposition; use arrow keys for keyboard movement."
-                    on:pointerdown=move |event| start_drag(event, Panel::Commitments, layout, dragging)
-                    on:keydown=move |event| keyboard_move(event, Panel::Commitments, layout)
-                    on:click=move |_| set_selected.set("commitments")
-                >
-                    <small class="panel-kicker"><ListChecks size=14 /><span>"3 commitments"</span></small>
-                    <span class="check-row"><b>"Complete test matrix"</b><i>"May 20"</i></span>
-                    <span class="check-row"><b>"Security review"</b><i>"May 22"</i></span>
-                    <span class="check-row"><b>"Docs & migration guide"</b><i>"May 26"</i></span>
-                    <span class="panel-link">"View commitments"</span>
-                </button>
-
-                <Show when=move || command_open.get()>
-                    <nav class="command-palette" aria-label="Canvas commands">
-                        <small>"Jump to"</small>
-                        <button
-                            class:hidden=move || !command_matches(&command_query.get(), "release plan")
-                            on:click=move |_| select_from_command("release", set_selected, set_command_open, set_command_query)
-                        ><Sparkles size=15 /><span><b>"Release plan"</b><i>"Central object"</i></span></button>
-                        <button
-                            class:hidden=move || !command_matches(&command_query.get(), "verified artifact evidence")
-                            on:click=move |_| select_from_command("artifact", set_selected, set_command_open, set_command_query)
-                        ><FileCheck size=15 /><span><b>"Verified artifact"</b><i>"Evidence and provenance"</i></span></button>
-                        <button
-                            class:hidden=move || !command_matches(&command_query.get(), "collaborators release team")
-                            on:click=move |_| select_from_command("collaborators", set_selected, set_command_open, set_command_query)
-                        ><UsersRound size=15 /><span><b>"Collaborators"</b><i>"Release team"</i></span></button>
-                        <button
-                            class:hidden=move || !command_matches(&command_query.get(), "sources validated inputs")
-                            on:click=move |_| select_from_command("sources", set_selected, set_command_open, set_command_query)
-                        ><Files size=15 /><span><b>"Sources"</b><i>"Validated inputs"</i></span></button>
-                        <button
-                            class:hidden=move || !command_matches(&command_query.get(), "mind suggestion rollback")
-                            on:click=move |_| select_from_command("suggestion", set_selected, set_command_open, set_command_query)
-                        ><Sparkles size=15 /><span><b>"Mind suggestion"</b><i>"Rollback verification"</i></span></button>
-                        <button
-                            class:hidden=move || !command_matches(&command_query.get(), "commitments tasks")
-                            on:click=move |_| select_from_command("commitments", set_selected, set_command_open, set_command_query)
-                        ><ListChecks size=15 /><span><b>"Commitments"</b><i>"Three tracked tasks"</i></span></button>
-                    </nav>
-                </Show>
-
-                <label class:open=move || command_open.get() class="command-bar" aria-label="Search or act">
-                    <Search size=19 />
-                    <input
-                        node_ref=command_input
-                        type="search"
-                        placeholder="Search or act…"
-                        prop:value=move || command_query.get()
-                        on:focus=move |_| set_command_open.set(true)
-                        on:input=move |event| set_command_query.set(event_target_value(&event))
-                        on:keydown=move |event: KeyboardEvent| {
-                            if event.key() == "Enter"
-                                && let Some(panel) = first_command_match(&command_query.get())
-                            {
-                                event.prevent_default();
-                                select_from_command(
-                                    panel,
-                                    set_selected,
-                                    set_command_open,
-                                    set_command_query,
-                                );
-                            }
-                        }
-                    />
-                    <kbd>"Ctrl K"</kbd>
-                </label>
-
-                <Show when=move || minimap_visible.get()>
-                    <nav class="minimap" aria-label="Canvas minimap">
-                        <header><Map size=15 /><strong>"Canvas map"</strong><span>"79%"</span></header>
-                        <div class="minimap-field">
-                            <button
-                                class:selected=move || selected.get() == "artifact"
-                                class="mini-node artifact-node"
-                                style=move || minimap_style(layout.get().artifact)
-                                aria-label="Select artifact panel"
-                                on:click=move |_| set_selected.set("artifact")
-                            ></button>
-                            <button
-                                class:selected=move || selected.get() == "collaborators"
-                                class="mini-node collaborators-node"
-                                style=move || minimap_style(layout.get().collaborators)
-                                aria-label="Select collaborators panel"
-                                on:click=move |_| set_selected.set("collaborators")
-                            ></button>
-                            <button
-                                class:selected=move || selected.get() == "release"
-                                class="mini-node release-node"
-                                style=move || minimap_style(layout.get().release)
-                                aria-label="Select release panel"
-                                on:click=move |_| set_selected.set("release")
-                            ></button>
-                            <button
-                                class:selected=move || selected.get() == "sources"
-                                class="mini-node sources-node"
-                                style=move || minimap_style(layout.get().sources)
-                                aria-label="Select sources panel"
-                                on:click=move |_| set_selected.set("sources")
-                            ></button>
-                            <button
-                                class:selected=move || selected.get() == "suggestion"
-                                class="mini-node suggestion-node"
-                                style=move || minimap_style(layout.get().suggestion)
-                                aria-label="Select mind suggestion panel"
-                                on:click=move |_| set_selected.set("suggestion")
-                            ></button>
-                            <button
-                                class:selected=move || selected.get() == "commitments"
-                                class="mini-node commitments-node"
-                                style=move || minimap_style(layout.get().commitments)
-                                aria-label="Select commitments panel"
-                                on:click=move |_| set_selected.set("commitments")
-                            ></button>
+                            />
                         </div>
-                    </nav>
-                </Show>
+                        <footer class="capabilities-meta">
+                            <span><small>"Observed"</small><b>{observed_label}</b></span>
+                        </footer>
+                    </button>
 
-                <Show when=move || capabilities_open.get()>
-                    <aside id="capability-inspector" class="capability-inspector" aria-label="Gateway capabilities">
-                        <header>
-                            <span><strong>"Gateway capabilities"</strong><small>{observed_label}</small></span>
-                            <button aria-label="Close capability inspector" on:click=move |_| set_capabilities_open.set(false)>"×"</button>
+                    <button
+                        class:selected=move || selected.get() == "journal"
+                        class="object journal"
+                        style=move || panel_style(layout.get(), Panel::Journal)
+                        aria-label="Sources panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Journal, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Journal, layout)
+                        on:click=move |_| set_selected.set("journal")
+                    >
+                        <small class="panel-kicker"><Files size=14 /><span>"Event1"</span></small>
+                        <strong>"Canonical Journal"</strong>
+                        <span class="row"><b>"Contributions"</b><i>{journal_count}</i></span>
+                        <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch}</i></span>
+                        <span class="journal-footer"><i>{journal_state}</i><b>"Append only"</b></span>
+                    </button>
+
+                    <article
+                        class:selected=move || selected.get() == "lifecycle"
+                        class="object lifecycle"
+                        style=move || panel_style(layout.get(), Panel::Lifecycle)
+                        tabindex="0"
+                        aria-label="Lifecycle panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Lifecycle, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Lifecycle, layout)
+                        on:click=move |_| set_selected.set("lifecycle")
+                    >
+                        <header class="lifecycle-heading">
+                            <small class="panel-kicker"><Sparkles size=14 /><span>"Lifecycle1"</span></small>
+                            <b>{lifecycle_mode}</b>
                         </header>
+                        <strong>"Sleep and wake"</strong>
+                        <p>"Consolidation runs while nobody is present. The mode is the owner's own spelling, not a summary of it."</p>
+                        <span class="row"><b>"Last user activity"</b><i>{lifecycle_activity}</i></span>
+                        <span class="lifecycle-source">{mind_observed}</span>
+                    </article>
+
+                    <button
+                        class:selected=move || selected.get() == "commitments"
+                        class="object commitments"
+                        style=move || panel_style(layout.get(), Panel::Commitments)
+                        aria-label="Commitments panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Commitments, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Commitments, layout)
+                        on:click=move |_| set_selected.set("commitments")
+                    >
+                        <small class="panel-kicker"><ListChecks size=14 /><span>{commitments_label}</span></small>
                         <For
-                            each=capabilities
-                            key=|capability| capability.id.clone()
-                            children=move |capability| {
-                                let available = capability.state == cybou_protocol::CapabilityState::Available;
-                                let status = capability_state_label(capability.state);
-                                let context = capability.reason.unwrap_or_else(|| {
-                                    format!(
-                                        "{} · {}",
-                                        knowledge_label(capability.knowledge),
-                                        freshness_label(capability.freshness),
-                                    )
-                                });
+                            each=commitments
+                            key=|commitment| commitment.id.clone()
+                            children=move |commitment| {
                                 view! {
-                                    <div class:available=available class="capability-row">
-                                        <span class="status-dot" aria-hidden="true"></span>
-                                        <span><b>{capability.id}</b><small>{context}</small></span>
-                                        <i>{status}</i>
-                                    </div>
+                                    <span class="check-row">
+                                        <b>{commitment.description}</b>
+                                        <i>{commitment.trigger}</i>
+                                    </span>
                                 }
                             }
                         />
-                    </aside>
-                </Show>
+                        <span class="panel-link">"Intention1 holds these until they are closed"</span>
+                    </button>
 
-                <button
-                    class:open=move || capabilities_open.get()
-                    class="system-state"
-                    aria-label="Open gateway capability inspector"
-                    aria-expanded=move || capabilities_open.get().to_string()
-                    aria-controls="capability-inspector"
-                    on:click=move |_| set_capabilities_open.update(|open| *open = !*open)
-                >
-                    <span class="status-dot" aria-hidden="true"></span>
-                    {system_label}
-                </button>
-            </section>
-        </main>
-    }
+                    <Show when=move || command_open.get()>
+                        <nav class="command-palette" aria-label="Canvas commands">
+                            <small>"Jump to"</small>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "capabilities health")
+                                on:click=move |_| select_from_command("capabilities", set_selected, set_command_open, set_command_query)
+    ><Sparkles size=15 /><span><b>"Capabilities"</b><i>"Health1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "identity subject continuity")
+                                on:click=move |_| select_from_command("identity", set_selected, set_command_open, set_command_query)
+    ><FileCheck size=15 /><span><b>"Identity"</b><i>"Identity1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "session trust mode")
+                                on:click=move |_| select_from_command("session", set_selected, set_command_open, set_command_query)
+    ><UsersRound size=15 /><span><b>"Session"</b><i>"Established trust"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "journal contributions event1")
+                                on:click=move |_| select_from_command("journal", set_selected, set_command_open, set_command_query)
+    ><Files size=15 /><span><b>"Journal"</b><i>"Event1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "lifecycle sleep wake")
+                                on:click=move |_| select_from_command("lifecycle", set_selected, set_command_open, set_command_query)
+    ><Sparkles size=15 /><span><b>"Lifecycle"</b><i>"Sleep and wake"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "commitments obligations intention1")
+                                on:click=move |_| select_from_command("commitments", set_selected, set_command_open, set_command_query)
+    ><ListChecks size=15 /><span><b>"Commitments"</b><i>"Intention1"</i></span></button>
+                        </nav>
+                    </Show>
+
+                    <label class:open=move || command_open.get() class="command-bar" aria-label="Search or act">
+                        <Search size=19 />
+                        <input
+                            node_ref=command_input
+                            type="search"
+                            placeholder="Search or act…"
+                            prop:value=move || command_query.get()
+                            on:focus=move |_| set_command_open.set(true)
+                            on:input=move |event| set_command_query.set(event_target_value(&event))
+                            on:keydown=move |event: KeyboardEvent| {
+                                if event.key() == "Enter"
+                                    && let Some(panel) = first_command_match(&command_query.get())
+                                {
+                                    event.prevent_default();
+                                    select_from_command(
+                                        panel,
+                                        set_selected,
+                                        set_command_open,
+                                        set_command_query,
+                                    );
+                                }
+                            }
+                        />
+                        <kbd>"Ctrl K"</kbd>
+                    </label>
+
+                    <Show when=move || minimap_visible.get()>
+                        <nav class="minimap" aria-label="Canvas minimap">
+                            <header><Map size=15 /><strong>"Canvas map"</strong></header>
+                            <div class="minimap-field">
+                                <button
+                                    class:selected=move || selected.get() == "identity"
+                                    class="mini-node identity-node"
+                                    style=move || minimap_style(layout.get().identity)
+                                    aria-label="Select artifact panel"
+                                    on:click=move |_| set_selected.set("identity")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "session"
+                                    class="mini-node session-node"
+                                    style=move || minimap_style(layout.get().session)
+                                    aria-label="Select collaborators panel"
+                                    on:click=move |_| set_selected.set("session")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "capabilities"
+                                    class="mini-node capabilities-node"
+                                    style=move || minimap_style(layout.get().capabilities)
+                                    aria-label="Select release panel"
+                                    on:click=move |_| set_selected.set("capabilities")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "journal"
+                                    class="mini-node journal-node"
+                                    style=move || minimap_style(layout.get().journal)
+                                    aria-label="Select sources panel"
+                                    on:click=move |_| set_selected.set("journal")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "lifecycle"
+                                    class="mini-node lifecycle-node"
+                                    style=move || minimap_style(layout.get().lifecycle)
+                                    aria-label="Select mind suggestion panel"
+                                    on:click=move |_| set_selected.set("lifecycle")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "commitments"
+                                    class="mini-node commitments-node"
+                                    style=move || minimap_style(layout.get().commitments)
+                                    aria-label="Select commitments panel"
+                                    on:click=move |_| set_selected.set("commitments")
+                                ></button>
+                            </div>
+                        </nav>
+                    </Show>
+
+                    <Show when=move || capabilities_open.get()>
+                        <aside id="capability-inspector" class="capability-inspector" aria-label="Gateway capabilities">
+                            <header>
+                                <span><strong>"Gateway capabilities"</strong><small>{observed_label}</small></span>
+                                <button aria-label="Close capability inspector" on:click=move |_| set_capabilities_open.set(false)>"×"</button>
+                            </header>
+                            <For
+                                each=capabilities
+                                key=|capability| capability.id.clone()
+                                children=move |capability| {
+                                    let available = capability.state == cybou_protocol::CapabilityState::Available;
+                                    let status = capability_state_label(capability.state);
+                                    let context = capability.reason.unwrap_or_else(|| {
+                                        format!(
+                                            "{} · {}",
+                                            knowledge_label(capability.knowledge),
+                                            freshness_label(capability.freshness),
+                                        )
+                                    });
+                                    view! {
+                                        <div class:available=available class="capability-row">
+                                            <span class="status-dot" aria-hidden="true"></span>
+                                            <span><b>{capability.id}</b><small>{context}</small></span>
+                                            <i>{status}</i>
+                                        </div>
+                                    }
+                                }
+                            />
+                        </aside>
+                    </Show>
+
+                    <button
+                        class:open=move || capabilities_open.get()
+                        class="system-state"
+                        aria-label="Open gateway capability inspector"
+                        aria-expanded=move || capabilities_open.get().to_string()
+                        aria-controls="capability-inspector"
+                        on:click=move |_| set_capabilities_open.update(|open| *open = !*open)
+                    >
+                        <span class="status-dot" aria-hidden="true"></span>
+                        {system_label}
+                    </button>
+                </section>
+            </main>
+        }
 }
 
 fn panel_style(layout: CanvasLayout, panel: Panel) -> String {
@@ -693,6 +782,14 @@ fn panel_style(layout: CanvasLayout, panel: Panel) -> String {
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         point.x, point.y, point.z
     )
+}
+
+/// What a field reads when the owner behind it was not read.
+///
+/// A dash says nothing was read. A zero would say the owner answered and held nothing, which is a
+/// different claim and not one the gateway made.
+fn unread() -> String {
+    "—".to_owned()
 }
 
 const fn capability_state_label(state: cybou_protocol::CapabilityState) -> &'static str {
@@ -725,12 +822,12 @@ fn command_matches(query: &str, haystack: &str) -> bool {
 
 fn first_command_match(query: &str) -> Option<&'static str> {
     [
-        ("release", "release plan"),
-        ("artifact", "verified artifact evidence"),
-        ("collaborators", "collaborators release team"),
-        ("sources", "sources validated inputs"),
-        ("suggestion", "mind suggestion rollback"),
-        ("commitments", "commitments tasks"),
+        ("capabilities", "capabilities health"),
+        ("identity", "identity subject continuity"),
+        ("session", "session trust mode"),
+        ("journal", "journal contributions event1"),
+        ("lifecycle", "lifecycle sleep wake"),
+        ("commitments", "commitments obligations intention1"),
     ]
     .into_iter()
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))
@@ -756,8 +853,8 @@ fn navigate_from_menu(
     set_runtime_menu_open.set(false);
 }
 
-fn release_actions_style(layout: CanvasLayout) -> String {
-    let point = layout.release;
+fn selection_actions_style(layout: CanvasLayout) -> String {
+    let point = layout.capabilities;
     format!(
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         point.x + 18.0,

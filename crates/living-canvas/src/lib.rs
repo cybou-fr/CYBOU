@@ -4,7 +4,7 @@
 //! Runtime-independent client boundary for Living Canvas.
 
 use async_trait::async_trait;
-use cybou_web_contracts::{SessionProjection, SnapshotProjection};
+use cybou_web_contracts::{MindProjection, SessionProjection, SnapshotProjection};
 use thiserror::Error;
 
 #[cfg(target_arch = "wasm32")]
@@ -45,6 +45,13 @@ pub trait MindClient {
     ///
     /// Returns [`ClientError`] when the projection cannot be obtained as a typed atomic value.
     async fn snapshot(&self) -> Result<SnapshotProjection, ClientError>;
+
+    /// Return what the owners behind Mind currently hold.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the gateway cannot produce the projection.
+    async fn mind(&self) -> Result<MindProjection, ClientError>;
 }
 
 /// Deterministic client for component, visual, and state-vocabulary tests.
@@ -52,13 +59,25 @@ pub trait MindClient {
 pub struct MockMindClient {
     session: SessionProjection,
     snapshot: SnapshotProjection,
+    mind: Option<MindProjection>,
 }
 
 impl MockMindClient {
     /// Construct a mock from explicit typed projections.
     #[must_use]
     pub const fn new(session: SessionProjection, snapshot: SnapshotProjection) -> Self {
-        Self { session, snapshot }
+        Self {
+            session,
+            snapshot,
+            mind: None,
+        }
+    }
+
+    /// Attach an owner projection to a mock that would otherwise report none.
+    #[must_use]
+    pub fn with_mind(mut self, mind: MindProjection) -> Self {
+        self.mind = Some(mind);
+        self
     }
 
     /// Load the repository's nominal W0 fixture pair.
@@ -75,7 +94,9 @@ impl MockMindClient {
             "../../../fixtures/web/v1/snapshot-nominal.json"
         ))
         .map_err(|error| ClientError::InvalidFixture(error.to_string()))?;
-        Ok(Self::new(session, snapshot))
+        let mind = serde_json::from_str(include_str!("../../../fixtures/web/v1/mind-nominal.json"))
+            .map_err(|error| ClientError::InvalidFixture(error.to_string()))?;
+        Ok(Self::new(session, snapshot).with_mind(mind))
     }
 }
 
@@ -87,6 +108,12 @@ impl MindClient for MockMindClient {
 
     async fn snapshot(&self) -> Result<SnapshotProjection, ClientError> {
         Ok(self.snapshot.clone())
+    }
+
+    async fn mind(&self) -> Result<MindProjection, ClientError> {
+        self.mind.clone().ok_or_else(|| {
+            ClientError::GatewayRequest("mock client holds no owner projection".into())
+        })
     }
 }
 

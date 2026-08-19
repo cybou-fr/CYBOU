@@ -90,14 +90,113 @@ pub struct SnapshotProjection {
     pub capabilities: Vec<CapabilityProjection>,
 }
 
+/// One owner's contribution to the Mind panel.
+///
+/// Every section carries its own [`KnowledgeState`] because the owners are separate processes and
+/// fail separately: a Journal the gateway could not reach must not render as a Journal with no
+/// contributions. `Unknown` means the owner was not reached, and the payload fields are then
+/// absent rather than zero.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentityProjection {
+    /// Whether Identity1 answered.
+    pub knowledge: KnowledgeState,
+    /// Stable subject identifier.
+    pub identity_id: Option<String>,
+    /// RFC 3339 instant the subject was first created.
+    pub origin: Option<String>,
+    /// Number of sessions since origin.
+    pub session_count: Option<u64>,
+    /// Whole days since origin.
+    pub age_in_days: Option<i64>,
+    /// Architecture version the subject was created under.
+    pub architecture_version: Option<String>,
+}
+
+/// What the canonical Journal holds, as reported by Event1.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JournalProjection {
+    /// Whether Event1 answered.
+    pub knowledge: KnowledgeState,
+    /// Total accepted contributions.
+    pub contribution_count: Option<u64>,
+    /// Current erasure epoch.
+    pub erasure_epoch: Option<u64>,
+}
+
+/// One open commitment as Intention1 holds it.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitmentProjection {
+    /// Intention identity.
+    pub id: String,
+    /// What was promised.
+    pub description: String,
+    /// Condition under which it became active.
+    pub trigger: String,
+    /// RFC 3339 formation instant.
+    pub formed: String,
+}
+
+/// Open obligations, as reported by Intention1.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitmentsProjection {
+    /// Whether Intention1 answered. An empty list is meaningful only when this is `Known`.
+    pub knowledge: KnowledgeState,
+    /// Number of open obligations.
+    pub open_count: Option<u32>,
+    /// The open obligations themselves.
+    pub open: Vec<CommitmentProjection>,
+}
+
+/// Sleep/wake state, as reported by Lifecycle1.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleProjection {
+    /// Whether Lifecycle1 answered.
+    pub knowledge: KnowledgeState,
+    /// Current mode, in the owner's own spelling.
+    pub mode: Option<String>,
+    /// RFC 3339 instant of the last observed user activity.
+    pub last_user_activity_at: Option<String>,
+}
+
+/// What Mind actually holds right now, returned by `/api/v1/mind`.
+///
+/// Only owners that hold real state appear here. Nothing in this projection is composed by the
+/// gateway: each section is what one owner answered, or an explicit unknown.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MindProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// RFC 3339 instant the gateway assembled this read.
+    pub observed_at: String,
+    /// Subject continuity.
+    pub identity: IdentityProjection,
+    /// Canonical Journal.
+    pub journal: JournalProjection,
+    /// Open obligations.
+    pub commitments: CommitmentsProjection,
+    /// Sleep/wake state.
+    pub lifecycle: LifecycleProjection,
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SessionMode, SessionProjection, SnapshotProjection, WEB_SCHEMA_V1};
+    use super::{
+        CommitmentsProjection, MindProjection, SessionMode, SessionProjection, SnapshotProjection,
+        WEB_SCHEMA_V1,
+    };
 
     const SESSION_FIXTURE: &str = include_str!("../../../fixtures/web/v1/session-local.json");
     const SNAPSHOT_FIXTURE: &str = include_str!("../../../fixtures/web/v1/snapshot-nominal.json");
     const SESSION_SCHEMA: &str = include_str!("../../../schemas/web/v1/session.schema.json");
     const SNAPSHOT_SCHEMA: &str = include_str!("../../../schemas/web/v1/snapshot.schema.json");
+    const MIND_FIXTURE: &str = include_str!("../../../fixtures/web/v1/mind-nominal.json");
+    const MIND_SCHEMA: &str = include_str!("../../../schemas/web/v1/mind.schema.json");
 
     #[test]
     fn local_session_fixture_is_explicitly_local() {
@@ -122,8 +221,32 @@ mod tests {
     }
 
     #[test]
+    fn mind_fixture_round_trips_and_keeps_unknown_distinct_from_empty() {
+        let projection: MindProjection =
+            serde_json::from_str(MIND_FIXTURE).expect("valid nominal mind fixture");
+        let encoded = serde_json::to_string(&projection).expect("serialize mind projection");
+        let decoded: MindProjection =
+            serde_json::from_str(&encoded).expect("round-trip mind projection");
+        assert_eq!(decoded, projection);
+        assert_eq!(projection.schema_version, WEB_SCHEMA_V1);
+
+        // A section the gateway could not read must not be readable as a section holding nothing.
+        let unreached = CommitmentsProjection {
+            knowledge: cybou_protocol::KnowledgeState::Unknown,
+            open_count: None,
+            open: Vec::new(),
+        };
+        let known_empty = CommitmentsProjection {
+            knowledge: cybou_protocol::KnowledgeState::Known,
+            open_count: Some(0),
+            open: Vec::new(),
+        };
+        assert_ne!(unreached, known_empty);
+    }
+
+    #[test]
     fn checked_in_json_schemas_are_v1_and_closed() {
-        for raw in [SESSION_SCHEMA, SNAPSHOT_SCHEMA] {
+        for raw in [SESSION_SCHEMA, SNAPSHOT_SCHEMA, MIND_SCHEMA] {
             let schema: serde_json::Value = serde_json::from_str(raw).expect("valid JSON schema");
             assert_eq!(
                 schema["$schema"],

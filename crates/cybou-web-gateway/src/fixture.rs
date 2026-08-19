@@ -4,7 +4,7 @@
 //! Deterministic non-production adapter for contract and HTTP tests.
 
 use async_trait::async_trait;
-use cybou_web_contracts::SnapshotProjection;
+use cybou_web_contracts::{MindProjection, SnapshotProjection};
 
 use crate::{GatewayError, PresenceSource};
 
@@ -12,6 +12,7 @@ use crate::{GatewayError, PresenceSource};
 #[derive(Clone, Debug)]
 pub struct FixturePresenceSource {
     snapshot: SnapshotProjection,
+    mind: MindProjection,
 }
 
 impl FixturePresenceSource {
@@ -26,7 +27,9 @@ impl FixturePresenceSource {
             "../../../fixtures/web/v1/snapshot-nominal.json"
         ))
         .expect("checked nominal snapshot fixture");
-        Self { snapshot }
+        let mind = serde_json::from_str(include_str!("../../../fixtures/web/v1/mind-nominal.json"))
+            .expect("checked nominal mind fixture");
+        Self { snapshot, mind }
     }
 }
 
@@ -34,5 +37,9 @@ impl FixturePresenceSource {
 impl PresenceSource for FixturePresenceSource {
     async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError> {
         Ok(self.snapshot.clone())
+    }
+
+    async fn mind(&self) -> Result<MindProjection, GatewayError> {
+        Ok(self.mind.clone())
     }
 }

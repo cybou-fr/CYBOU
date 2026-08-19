@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-19T12:00:00Z",
+  "identity": {
+    "knowledge": "known",
+    "identityId": "8f14e45f-ceea-467a-9c9e-4d3f2a1b7c60",
+    "origin": "2026-08-01T09:15:00Z",
+    "sessionCount": 12,
+    "ageInDays": 18,
+    "architectureVersion": "rust-1"
+  },
+  "journal": {
+    "knowledge": "known",
+    "contributionCount": 134,
+    "erasureEpoch": 0
+  },
+  "commitments": {
+    "knowledge": "known",
+    "openCount": 1,
+    "open": [
+      {
+        "id": "3f2a1b7c-8f14-4e45-9c9e-467aceea4d3f",
+        "description": "Run integration tests",
+        "trigger": "Session startup",
+        "formed": "2026-08-19T11:40:00Z"
+      }
+    ]
+  },
+  "lifecycle": {
+    "knowledge": "known",
+    "mode": "awake",
+    "lastUserActivityAt": "2026-08-19T11:59:30Z"
+  }
+}

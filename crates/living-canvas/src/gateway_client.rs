@@ -4,7 +4,7 @@
 //! Browser implementation of the typed Mind boundary.
 
 use async_trait::async_trait;
-use cybou_web_contracts::{SessionProjection, SnapshotProjection};
+use cybou_web_contracts::{MindProjection, SessionProjection, SnapshotProjection};
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
 
@@ -41,5 +41,9 @@ impl MindClient for GatewayMindClient {
 
     async fn snapshot(&self) -> Result<SnapshotProjection, ClientError> {
         Self::get("/api/v1/snapshot").await
+    }
+
+    async fn mind(&self) -> Result<MindProjection, ClientError> {
+        Self::get("/api/v1/mind").await
     }
 }
