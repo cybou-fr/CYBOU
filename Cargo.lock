@@ -473,6 +473,7 @@ dependencies = [
  "cybou-fabric",
  "cybou-protocol",
  "cybou-runtime",
+ "futures-util",
  "serde",
  "serde_json",
  "tempfile",
