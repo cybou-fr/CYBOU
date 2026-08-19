@@ -19,13 +19,12 @@ binding, not advisory.
 
 ## Context
 
-M7 adds a grounded observation to Mind for the first time. The
-[2026-08-10 checkpoint](../PROJECT_CHECKPOINT_2026-08-10.md) requires that the owner, state
+M7 adds a grounded observation to Mind for the first time. M7 entry requires that the owner, state
 locations, freshness vocabulary, contradiction handling and budgets be frozen before implementation,
-and its stated exit gate is that no dual ownership remains and no perception source is treated as
+and its exit gate is that no dual ownership remains and no perception source is treated as
 truth merely because it is available.
 
-Three things have changed since that checkpoint that this decision can now rest on rather than
+Three things have changed since that gate was set that this decision can now rest on rather than
 guess at:
 
 - **Provenance is enforceable.** Event1 binds a contribution's `originOrgan` to the calling

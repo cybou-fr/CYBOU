@@ -126,7 +126,6 @@ def main(argv: list[str]) -> int:
     paths = {
         "root_readme": repo / "README.md",
         "docs_index": repo / "docs/README.md",
-        "checkpoint": repo / "docs/PROJECT_CHECKPOINT_2026-08-10.md",
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
         "web_ui_architecture": repo / "docs/WEB_UI_ARCHITECTURE.md",
@@ -216,30 +215,6 @@ def main(argv: list[str]) -> int:
         "Debian check entry point",
         "scripts/vps-checks.sh",
     )
-    require(
-        paths["docs_index"],
-        "project checkpoint entry",
-        "[Project Checkpoint — 2026-08-10](PROJECT_CHECKPOINT_2026-08-10.md)",
-    )
-
-    for label in (
-        "## Checkpoint identity",
-        "## Executive assessment",
-        "## Quantitative repository snapshot",
-        "## Evidence and quality assessment",
-        "## Architecture maturity matrix",
-        "## Risk register",
-        "## Recommended M7 sequence",
-        "## Checkpoint acceptance criteria",
-        "## Decision at this checkpoint",
-    ):
-        require(paths["checkpoint"], label, label)
-    require(
-        paths["checkpoint"],
-        "analysed source revision",
-        "8857d32038f10892e718f7095da6b3f4207d6687",
-    )
-
     for label in (
         "## Terminology and scope",
         "## Cognitive topology",
@@ -324,7 +299,7 @@ def main(argv: list[str]) -> int:
     require(
         paths["current"],
         "Rust target versus current implementation",
-        "Rust-first owner migration remains proposed.",
+        "no Rust Mind owner or complete desktop has cut over yet",
     )
     require(
         paths["building"],

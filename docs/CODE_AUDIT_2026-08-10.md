@@ -11,7 +11,7 @@ SPDX-License-Identifier: MIT
 |---|---|
 | Audited commit | `108f0304` |
 | Method | source reading of the Mind C++ tree, Nix modules, and CI workflow |
-| Relationship to the checkpoint | complements [Project Checkpoint — 2026-08-10](PROJECT_CHECKPOINT_2026-08-10.md) |
+| Relationship to the checkpoint | complements the 2026-08-10 project checkpoint (retired; see [Current State](CURRENT_STATE.md)) |
 | Scope | implementation evidence only; no new capability was assessed |
 
 The checkpoint records what the architecture claims and how mature each area is. This document

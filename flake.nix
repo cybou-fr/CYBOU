@@ -16,16 +16,14 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
       src = nixpkgs.lib.cleanSourceWith {
         src = ./.;
-        # Local preview output and Python bytecode are not repository inputs. Keep them out of
-        # every check even when they exist beside the working tree on the Windows mount.
+        # Python bytecode is not a repository input. Keep it out of every check even when it
+        # exists beside the working tree on the Windows mount.
         filter =
           path: _type:
           let
             relative = nixpkgs.lib.removePrefix "${toString ./.}/" (toString path);
           in
-          relative != "living-canvas"
-          && !(nixpkgs.lib.hasPrefix "living-canvas/" relative)
-          && !(nixpkgs.lib.hasInfix "/__pycache__/" "/${relative}/");
+          !(nixpkgs.lib.hasInfix "/__pycache__/" "/${relative}/");
       };
     in
     {
@@ -112,33 +110,16 @@
         }
       );
 
+      # One configuration remains, and it is a test harness rather than a product. The ISO,
+      # Hyper-V, and NixOS-VPS images were removed with ADR-0037/ADR-0038: Debian 13 is the
+      # deployment target, so a NixOS installer and a NixOS server image describe a system nothing
+      # is aimed at any more. `cybou-vm` stays because the KVM fault and recovery gates run on it,
+      # and that evidence has no replacement yet.
       nixosConfigurations = {
         cybou-vm = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           specialArgs.cybouPackages = self.packages.x86_64-linux;
           modules = [ ./systems/vm.nix ];
-        };
-
-        # Live ISO; build system.build.isoImage (ADR-0005).
-        cybou-iso = nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-          specialArgs.cybouPackages = self.packages.x86_64-linux;
-          modules = [ ./systems/iso.nix ];
-        };
-
-        # Archived OVH configuration retained as historical recovery input. It is no longer an
-        # active deploy/evaluation target; local Linux/Nix validation runs in NixOS on WSL2.
-        cybou-vps = nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-          specialArgs.cybouPackages = self.packages.x86_64-linux;
-          modules = [ ./systems/vps.nix ];
-        };
-
-        # Development image for Hyper-V; build system.build.hypervImage.
-        cybou-hyperv = nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-          specialArgs.cybouPackages = self.packages.x86_64-linux;
-          modules = [ ./systems/hyperv.nix ];
         };
       };
 

@@ -30,27 +30,16 @@ login details are defined in `systems/vm.nix` and intentionally not duplicated h
 
 | Target | Build output | Intended use |
 |---|---|---|
-| QEMU/KVM VM | `cybou-vm.config.system.build.vm` | primary development/evaluation |
-| Live ISO | `cybou-iso.config.system.build.isoImage` | installer/live-session testing |
-| Hyper-V | `cybou-hyperv.config.system.build.hypervImage` | Windows/Hyper-V development |
+| QEMU/KVM VM | `cybou-vm.config.system.build.vm` | development/evaluation and the KVM gates |
 
-Example ISO build:
+One target, and it is a test harness rather than a product. The live ISO, its Calamares installer,
+and the Hyper-V image were removed: they installed NixOS, and [ADR-0038](adr/ADR-0038-rust-first-codebase.md)
+makes Debian 13 the deployment target. Keeping an installer for a system nothing is aimed at would
+have meant maintaining an install path no gate exercised and no release intended anyone to use.
 
-```bash
-nix build .#nixosConfigurations.cybou-iso.config.system.build.isoImage --print-build-logs
-sha256sum result/iso/*.iso
-```
-
-## Before physical installation
-
-- verify the checksum against the release record;
-- confirm the exact target disk and maintain an independent backup;
-- test UEFI, storage, network, graphics, suspend, and rollback in a live/VM environment;
-- read release notes and persistent-state compatibility;
-- confirm that the release includes the expected installer test evidence.
-
-The Calamares profile inherits the upstream NixOS graphical installer with Cybou branding. Branding
-does not imply that every hardware/install path has been validated by this project.
+There is currently no installable Cybou image. The Debian packaging that replaces it is tracked in
+[Deployment](DEPLOYMENT.md); until it exists, evaluation means the VM above or the deployed web
+preview, not an installation.
 
 ## After boot
 

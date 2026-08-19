@@ -22,6 +22,7 @@ cybou_ssh "
   cd '$CYBOU_VPS_SRC'
   export CARGO_TARGET_DIR='$CYBOU_VPS_TARGET'
   bash scripts/check-fabric-oracle.sh
+  bash scripts/check-journal-writer-oracle.sh
   cargo fmt --all -- --check
   cargo test --workspace --locked
   cargo clippy --workspace --all-targets --locked -- -D warnings

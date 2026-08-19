@@ -18,7 +18,7 @@ v0.1.0-alpha.2
 
 - fast and full CI are green;
 - all packages build from the tagged commit;
-- VM and ISO smoke tests pass;
+- VM smoke tests pass;
 - checksums are generated;
 - known limitations are documented;
 - CHANGELOG is updated;
@@ -34,15 +34,18 @@ v0.1.0-alpha.2
 A release may include:
 
 ```text
-Cybou ISO
 NixOS VM image
-Hyper-V development image
 SHA256SUMS
 release notes
 source archive
 ```
 
-Never label a development image stable when Mind-state migrations or installation paths are unverified.
+The ISO and Hyper-V images were removed with the Debian cutover: both installed NixOS, which is no
+longer the deployment target. Until Debian packaging replaces them there is no installable artifact,
+and a release must say so rather than let its absence read as an oversight.
+
+Never label a development image stable when Mind-state migrations or installation paths are
+unverified.
 
 ## Reproducible release outline
 
@@ -56,8 +59,6 @@ nix build --print-build-logs \
   .#packages.x86_64-linux.cybou-presence-applet
 nix flake check --print-build-logs
 nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
-nix build .#nixosConfigurations.cybou-iso.config.system.build.isoImage
-sha256sum result/iso/*.iso > SHA256SUMS
 ```
 
 Run release commands from the clean tagged tree. Record the flake revision, artifact hashes, test

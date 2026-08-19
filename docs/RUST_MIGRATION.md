@@ -144,6 +144,105 @@ monotonic, and the paged final checkpoint equals full replay. No real Journal ex
 fixture-backed Debian host, so captured predecessor-database differential evidence remains an open
 R6 gate rather than a simulated claim.
 
+#### R6-writer — the canonical writer, in slices
+
+The read side is done to the point where the next honest step is writing, and writing is where the
+blast radius is. It is sliced so that each slice can be refused on its own evidence rather than as
+part of one large cutover.
+
+- **W1 — admission rules, no storage.** *Implemented.* `cybou-protocol::admission` ports the
+  predecessor's structural envelope validation and its reference-dependent admission rules: frozen
+  kind/privacy/sensitivity numbering, root-versus-derived reference shape, sealed-payload schema and
+  key-domain requirements, duplicate identity, missing cause or evidence, privacy that may not be
+  weakened, retention that may not be outlived with the erasure kinds exempt, sensitivity checked
+  only for schema 4, and one terminal `Outcome` per cause. It reads nothing: the writer resolves
+  each reference and supplies four facts per reference, so the rules stay protocol semantics rather
+  than behavior a storage engine happens to have. Unknown schema, kind, privacy, and sensitivity
+  values are refused rather than defaulted. Every refusal is a refusal and never a correction, which
+  is the predecessor's choice and the reason a declaration stays a contract.
+- **W2 — schema creation and durability, no rows.** *Implemented.* `cybou-storage::writer` creates
+  Journal schema v2 with the predecessor's exact tables, indexes and the partial unique index that
+  makes one terminal `Outcome` per cause a storage constraint rather than only a rule. Durability is
+  verified rather than requested: WAL and `synchronous` are read back and the writer refuses to open
+  when either did not take, because SQLite silently keeps the previous mode when it cannot apply one
+  and a silent fallback would leave "durable before visible" stated more strongly than the storage
+  supports. A database declaring a schema with no tables is refused rather than repaired, and a v1
+  database is refused rather than migrated as a side effect of opening a connection.
+- **W3 — one appended row.** *Implemented against the Rust reader; the differential gate remains
+  open.* `append` runs the reference reads, the tail read and the insert inside one
+  `BEGIN IMMEDIATE` transaction, so a concurrent writer cannot expire a reference between the check
+  and the row that rests on it. It chains hash v3 over the split commitment and stores the
+  predecessor's exact spellings — UUIDs without braces, `ISODateWithMs` instants with exactly three
+  subsecond digits, empty string for an absent node, and the inherited `evidence` column left null
+  because evidence order is a column in `contribution_evidence` rather than a convention about how a
+  string was joined. Rows it writes are cryptographically replayed by the existing read-only
+  verifier in the same test.
+- **W4 — transaction, refusal, and concurrent-writer behavior.** *Implemented.* The write lock is
+  taken before the reference reads, so a contended append is refused at the start rather than at the
+  commit, after the admission rules have already been decided against state that moved. A busy
+  database surfaces as its own `Concurrent` error rather than a generic query failure: "someone else
+  is writing" is a retry and "this statement is wrong" is a bug, and collapsing them would make
+  every concurrency stall look like corruption. A refused append is proven to leave the database
+  byte-identical.
+- **W5 — migration and interruption.** *Implemented, explicit rather than automatic.* `VACUUM INTO`
+  takes the backup before the transaction opens — it cannot run inside one, and a backup taken after
+  the first irreversible step is not a backup. Everything after it is one transaction, so an
+  interruption leaves either a v1 database with a spare copy beside it or a complete v2, never a
+  half-migrated one. Legacy comma-joined evidence becomes ordered join-table rows with every
+  identity parsed, deduplicated, and required to exist; a dangling reference is refused rather than
+  dropped. The legacy chain is verified at hash v1 *before* the commit, because a migration that
+  committed a broken chain and then reported it would have already made the corruption the new
+  baseline. A partially versioned schema is refused rather than repaired.
+
+  The one predecessor behavior deliberately not reproduced: migration does not happen while opening
+  a connection. It carries a backup, a full-chain verification, and a rollback, and running it as a
+  side effect of opening a database means running it wherever a connection happens to be made —
+  including in processes that are only reading, and at moments when nothing is watching it fail.
+
+- **W6 — the writer differential gate.** *Harness written; not yet run against Qt.*
+  `scripts/check-journal-writer-oracle.sh` gives the predecessor Journal and the Rust writer the
+  same three contributions — a bare root observation, one carrying every value the first leaves at
+  its default, and a derived contribution citing both — and compares every stored row. Both dumps go
+  through SQLite's own `quote()`, so neither side formats anything of its own and a REAL rendered
+  differently by two languages cannot be mistaken for a difference in what was stored. The gate
+  compares Qt against Rust first and only then against `fixtures/storage/journal-writer-v3.txt`: a
+  checked-in fixture both sides drifted away from together would still pass, and the point is that
+  they cannot drift apart. The recorded dump is also asserted by an ordinary `cargo test`, so the
+  Rust half is guarded where every developer runs it rather than only on the one host with Qt, SQL
+  drivers, and libsodium.
+
+  Writing the harness already paid for itself. Building the Rust dump surfaced two columns where the
+  writer disagreed with the predecessor and no verification would ever have said so: the head row's
+  `prev_hash` and an absent `capability` were stored as an empty blob and an empty string, where the
+  predecessor's SQLite driver binds a null `QByteArray` and a null `QString` as NULL. Verification
+  treats NULL and empty alike, so both journals verify — but every Journal written by Rust would
+  have been distinguishable from every Journal written by Qt. That the predecessor converts
+  `originNode` to an empty string with an explicit ternary, and does not do so for these two, is
+  what settles it as a decision rather than an accident. Both are now bound the predecessor's way.
+
+- **W7 — batch append and the scale probe.** *Implemented.* `append_batch` shares one commit
+  across many contributions, validating, hashing and chaining each exactly as a single append does.
+  It exists so a large Journal can be built for measurement without one fsync per row, and it must
+  never be reachable from Event1: acceptance there is per contribution, and batching it would
+  publish acceptance for contributions whose commit had not returned. The batch is atomic, and a
+  contribution may cite one earlier in the same batch because that one is already inserted in the
+  open transaction.
+
+  `cybou-journal-scale` measures the paths that grow with history against the budgets in
+  [Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md), which until now described only the
+  C++ Journal. Build, verification, paged verification and row size are all flat per contribution
+  across an order of magnitude, reproducing the predecessor's linearity finding through an
+  independent implementation. The absolute numbers are from a different host and are recorded as
+  such; a real comparison needs both binaries on the same Debian machine and has not run.
+
+Sealing is deliberately outside this sequence. A Rust writer without a key store must refuse a
+sealed contribution outright rather than store a sensitive payload in the clear, which is what the
+predecessor already does; the key store itself is its own slice with its own crypto evidence.
+
+Ownership is not implied by any of it. The C++ `eventd` remains the single canonical writer until
+the differential, interruption, recovery, scale, and rollback gates all pass, and dual-running two
+canonical owners against the same writable state stays forbidden.
+
 ### R7 — desktop replacement and legacy removal
 
 Boot the Rust/WASM UI through the minimal Chromium desktop session. After web parity, Mind parity,

@@ -6,12 +6,10 @@
 #
 #   every push  -> cheap checks only, minutes, always green or genuinely broken
 #   tag         -> VM build if it fits the runner
-#   ISO         -> built locally in WSL, never on a hosted runner
 #
-# Why the ISO is not here: hosted runners give roughly 14 GB of free disk. A NixOS
-# Plasma ISO sits at or past that line, so it fails for reasons unrelated to the change
-# and trains everyone to ignore red CI. docs/BUILDING.md documents WSL/Linux development;
-# docs/RELEASE.md defines the manual release ISO + SHA256 step.
+# The ISO used to be the third line here, built by hand because a NixOS Plasma image sits at or
+# past the roughly 14 GB a hosted runner gives. It is gone entirely now: Debian 13 is the
+# deployment target, so a NixOS installer described a system nothing is aimed at.
 #
 # Note there is almost nothing here. That is the point: `nix flake check` already runs
 # formatting, REUSE compliance and package-metadata validation, each pinned by flake.lock,
@@ -96,8 +94,3 @@ jobs:
             experimental-features = nix-command flakes
       - run: nix flake check --print-build-logs
       - run: nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
-
-# Not in CI, by decision:
-#   nix build .#nixosConfigurations.cybou-iso.config.system.build.isoImage
-#   sha256sum result/iso/*.iso
-# Run both in WSL/Linux for a release and publish the hash per docs/RELEASE.md.

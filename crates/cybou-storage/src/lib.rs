@@ -5,6 +5,8 @@
 
 use std::path::Path;
 
+pub mod writer;
+
 use cybou_protocol::canonical::{
     CanonicalEnvelope, canonical_journal_row_v2, canonical_journal_row_v3,
     canonical_nonerasable_v3, sha256,

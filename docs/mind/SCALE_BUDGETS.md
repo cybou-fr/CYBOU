@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 ## Purpose
 
-The [2026-08-10 checkpoint](../PROJECT_CHECKPOINT_2026-08-10.md) records "no performance envelope for
+The 2026-08-10 project checkpoint recorded "no performance envelope for
 Journal and compound projections" as a P0 risk: correctness tests can pass while a cost grows without
 bound. This document is the first measurement against that risk.
 
@@ -52,6 +52,37 @@ machine-specific; the per-contribution costs and their linearity are the transfe
 Every growth-sensitive path is linear across two orders of magnitude. Nothing is quadratic, and
 indexed lookup is flat — reaching the newest contribution costs the same as the oldest at every
 size, so the indexes are doing their job.
+
+## The Rust writer, measured against the same paths
+
+`cybou-journal-scale` is the Rust counterpart of `journal-scale`: the same deterministic fixture
+shape, the same batched build, the same separate one-commit-each append sample. Until it existed,
+the Rust stack had budgets it had never been held to.
+
+Recorded 2026-08-19 on the development host (x86_64, Windows/NTFS, NVMe), release profile. Payload
+is ~108 bytes per contribution.
+
+| Measure | 10k | 100k | Per contribution |
+|---|---:|---:|---:|
+| Fixture build (batched, 1000/commit) | 160 ms | 1,621 ms | ~16 µs |
+| Append, one commit each (50 sample) | — | — | ~330 µs |
+| Full verification | 39 ms | 367 ms | ~3 µs |
+| Paged verification, 1000/page | 46 ms | 466 ms | ~4.6 µs |
+| Journal size | 5.1 MiB | 51 MiB | ~534 bytes |
+
+**Linear, and that is the transferable result.** Build, verification and size per contribution are
+flat across an order of magnitude, and paged verification tracks full verification within noise —
+the same finding the C++ measurement produced, reproduced through an independent implementation.
+
+**The absolute numbers are not comparable to the table above, and must not be read as a
+comparison.** Different machine, different filesystem, different fsync semantics, and a different
+payload size, any one of which would account for the gap on its own. That the Rust append sample
+came in at ~330 µs where the predecessor measured ~1.2 ms says something about the two hosts, not
+about the two writers. A real comparison needs both binaries on the same Debian host against the
+same fixture, and that run has not happened.
+
+**Not yet measured on this side:** a million contributions, concurrent read/write pressure, RSS, and
+cold organ reconstruction end to end — the last of which has no Rust owner to reconstruct yet.
 
 ## What the numbers say
 

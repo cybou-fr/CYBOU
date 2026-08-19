@@ -11,7 +11,7 @@ This document is the executable plan. The packages that produced the completed M
 boundaries have moved to [Historical Execution](history/M5-M6.md), because a plan whose first thirty
 pages are finished work stops being readable as a plan; the current work now comes first. [Roadmap](ROADMAP.md) remains the milestone definition; [Current State](CURRENT_STATE.md)
 remains the implementation authority. The current M7 entry sequence and risk priorities are
-recorded in the [2026-08-10 Project Checkpoint](PROJECT_CHECKPOINT_2026-08-10.md).
+stated below.
 
 The immediate objective is still not language or autonomous action. It is:
 
@@ -40,10 +40,10 @@ untyped RPC outcomes, unbounded compound reads — and all of it has since been 
 lists solved problems is worse than none: it makes the document unreadable as a statement of where
 the work actually is. What follows is the current set.
 
-- retention and erasure are decided but not built: [ADR-0028](adr/ADR-0028-retention-and-erasure.md)
-  is Proposed, and until it is Accepted and implemented
-  [ADR-0027](adr/ADR-0027-local-epistemic-projection-owner.md) forbids ingesting any sensitive
-  observation;
+- the canonical Journal writer is still C++. Rust can inspect and cryptographically replay an
+  existing Journal but cannot append a single row, so every Rust owner that needs to record a fact
+  still depends on the predecessor. This is the widest remaining gap between the stated Rust-first
+  target and what the workspace can do;
 - cold reconstruction still costs a full replay per organ, which the measured budgets put at roughly
   nine seconds each at a million contributions. Only epistemicd persists a checkpoint across
   restarts; predictord and intentiond rebuild theirs on start;

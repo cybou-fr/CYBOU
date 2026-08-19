@@ -83,6 +83,57 @@ For large histories the same verifier has a row-bounded page API. `max_rows` mus
 each result states whether more rows remain and returns the exact verified checkpoint from which the
 next page continues. The bound applies to canonical rows replayed per call, preventing an accidental
 unbounded suffix scan while preserving the identical hash and commitment checks.
+The first writer slice is present as rules rather than as a writer. `cybou-protocol::admission`
+decides what may enter the Journal without touching storage: structural envelope validity, the
+frozen kind/privacy/sensitivity numbering, root-versus-derived reference shape, sealed-payload
+schema and key-domain requirements, and the reference-dependent rules — duplicate identity, missing
+cause or evidence, privacy that may not be weakened, retention that may not be outlived with the
+erasure kinds exempt, sensitivity checked only for schema 4, and one terminal Outcome per cause.
+The caller resolves each reference and supplies four facts about it, so no database is reachable
+from the rules. Unknown schema, kind, privacy and sensitivity values are refused rather than
+defaulted, and every rule refuses rather than silently correcting a declaration. No row is written,
+hashed, or sequenced by this module, and the C++ eventd remains the only canonical writer.
+
+`cybou-storage::writer` is the first Rust code that can create a Journal and append to it. It
+creates schema v2 with the predecessor's tables, indexes, and the partial unique index enforcing one
+terminal Outcome per cause; reads WAL and `synchronous` back and refuses to open when either did not
+take; refuses a declared schema with no tables rather than repairing it; and refuses a v1 database
+rather than migrating it while opening a connection. `append` performs the reference reads, the tail
+read, and the insert inside one `BEGIN IMMEDIATE` transaction, chains hash v3 over the split
+commitment, and stores the predecessor's column spellings. Rows it writes are cryptographically
+replayed by the existing read-only verifier. A sealed contribution is refused outright, because a
+payload written unsealed for want of a key store would be a payload nobody could later erase. The
+writer differential harness exists as `scripts/check-journal-writer-oracle.sh`: it gives the
+predecessor Journal and the Rust writer the same three contributions and compares every stored
+column through SQLite's own `quote()`, first Qt against Rust and only then against the recorded
+fixture. The recorded dump is asserted by an ordinary `cargo test`, so the Rust half is guarded
+everywhere; the Qt half needs a host with Qt, SQL drivers, and libsodium and has not run yet.
+Building it already found two columns where the writer disagreed with the predecessor without any
+verification being able to say so — a head-row `prev_hash` and an absent `capability` stored as
+empty rather than NULL — and both are now bound the predecessor's way. Until the Qt half runs, this
+is a writer proven against the Rust reader and the recorded fixture, not one proven against the
+predecessor, and the C++ eventd remains the only canonical writer.
+
+Concurrency and migration are present with the same discipline. The write lock is taken before the
+reference reads, so a contended append is refused at the start rather than after the admission rules
+have been decided against state that moved, and a busy database surfaces as its own typed result
+rather than a generic query failure. A refused append leaves the database byte-identical.
+`migrate_v1_to_v2` is an explicit call rather than something that happens while opening a
+connection: it takes a `VACUUM INTO` backup before its transaction opens, converts legacy
+comma-joined evidence into ordered join-table rows while refusing malformed, duplicate, or dangling
+identities, refuses a cause carrying more than one terminal Outcome, and verifies the whole legacy
+chain at hash v1 before committing. A partially versioned schema is refused rather than repaired.
+Interruption leaves either a v1 database with a backup beside it or a complete v2.
+
+The writer also has a batch path and a scale probe. `append_batch` shares one commit across many
+contributions while validating, hashing and chaining each exactly as a single append does; it exists
+for fixture construction and is deliberately unreachable from Event1, where acceptance must stay per
+contribution. `cybou-journal-scale` measures build, append, full verification, paged verification
+and row size against the recorded budgets. Every per-contribution cost is flat across an order of
+magnitude, reproducing the predecessor's linearity finding through an independent implementation;
+the absolute values come from a different host than the C++ baseline and are not a comparison
+between the two writers.
+
 `cybou-journal-inspect` exposes one such page as a Debian-native command-line probe. It accepts an
 existing database path, positive row budget, and optional sequence/hash checkpoint; it prints only
 verification counters and the next checkpoint, never contribution payloads. The tool performs no

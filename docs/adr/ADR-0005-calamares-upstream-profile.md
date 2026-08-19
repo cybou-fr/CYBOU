@@ -6,7 +6,15 @@ SPDX-License-Identifier: MIT
 # ADR-0005: Calamares Installer - Upstream Profile
 
 ## Status
-Accepted
+
+Superseded by [ADR-0037](ADR-0037-web-first-presence-and-desktop.md) and
+[ADR-0038](ADR-0038-rust-first-codebase.md).
+
+The decision itself was never wrong: given a NixOS live ISO, inheriting the upstream Calamares
+profile rather than forking it was the right call, and it is recorded here for that reason. What
+changed is the premise. Debian 13 is the deployment target, so there is no NixOS ISO for an
+installer to install, and `systems/iso.nix` and `systems/iso-calamares-branding.nix` have been
+removed. Nothing replaces them yet: Debian packaging is the intended path and does not exist.
 
 ## Context
 Cybou needs an installer for the live ISO. Options include:
@@ -90,6 +98,5 @@ Deep installer theming is **optional and must not block the release**.
 - **Rejected**: Not integrated with NixOS, more work
 
 ## Related
-- systems/iso.nix - ISO configuration using Calamares
-- systems/iso-calamares-branding.nix - Branding customizations
+- systems/iso.nix and systems/iso-calamares-branding.nix - removed with this decision
 - ADR-0008 - Similar isolation principle for Mind Dock

@@ -49,7 +49,8 @@ They may be overridden with `CYBOU_VPS_SRC` and `CYBOU_VPS_TARGET`.
 
 ## Safety boundary
 
-- `scripts/prepare-vps-nixos.sh` remains permanently retired and refuses to run.
+- There is no NixOS conversion path. The retired `prepare-vps-nixos.sh` has been removed rather
+  than left in the tree as a script whose only behaviour was to refuse to run.
 - Deployment does not modify the bootloader or replace Debian.
 - Package/service activation will be added as part of the Debian hard cutover.
 - Public preview access is limited to deterministic non-personal fixtures behind TLS. Any personal

@@ -101,8 +101,9 @@ packages/
   cybou-desktop-shell/
 ```
 
-The current React `living-canvas/` prototype remains visual evidence and interaction exploration.
-The production Rust/WASM shell lives in `crates/living-canvas`. Its production browser adapter is
+The production Rust/WASM shell lives in `crates/living-canvas`. The earlier React `living-canvas/`
+prototype has been removed; its visual and interaction evidence is preserved in the design
+references under `docs/`. Its production browser adapter is
 `GatewayMindClient`, which reads the typed session and atomic snapshot from the same-origin gateway;
 `MockMindClient` is retained for deterministic contract tests. The first read-only Presence
 connection and same-origin static delivery are implemented; subscriptions and mutations remain
