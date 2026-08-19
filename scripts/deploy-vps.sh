@@ -40,7 +40,7 @@ cybou_ssh "
     cybou-presenced
   )
   for daemon in \"\${DAEMONS[@]}\"; do
-    sudo install -m 0755 \"\$CYBOU_VPS_TARGET/release/\$daemon\" \"/usr/libexec/cybou/\$daemon\"
+    sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
   done
 
   # Install Living Canvas web assets
