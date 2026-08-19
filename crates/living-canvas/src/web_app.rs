@@ -408,7 +408,6 @@ pub fn App() -> impl IntoView {
                         <img class="brand-mark" src="/cybou-mark.svg" alt="" />
                         <span>"Cybou"</span>
                     </a>
-                    <p class="path">"Cybou / Mind / live projection"</p>
                     <div class="runtime-cluster">
                         <div class="runtime" aria-label="Runtime connection" aria-live="polite">
                             <span class="status-dot" aria-hidden="true"></span>
