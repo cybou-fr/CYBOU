@@ -136,7 +136,21 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .command-bar input { min-width: 0; flex: 1; border: 0; outline: 0; padding: 8px 0; background: transparent; color: #edf4f6; font: inherit; }
 .command-bar input::placeholder { color: #81909f; }
 .command-bar kbd { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.06); color: #8f9daa; font: 11px/1 Inter, sans-serif; }
-.system-state { position: absolute; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 16px; background: rgba(8, 12, 17, 0.76); color: var(--muted); font-size: 11px; }
+.system-state { position: absolute; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 16px; background: rgba(8, 12, 17, 0.76); color: var(--muted); font-size: 11px; cursor: pointer; }
+.system-state.open, .system-state:hover { border-color: rgba(112,225,200,.42); color: #dbe7eb; }
+.capability-inspector { position: absolute; z-index: 1200; right: 24px; bottom: 70px; width: min(370px, calc(100% - 48px)); display: grid; gap: 5px; padding: 14px; border: 1px solid rgba(154,167,184,.28); border-radius: 16px; background: rgba(12,18,25,.98); box-shadow: 0 24px 70px rgba(0,0,0,.55); backdrop-filter: blur(24px); }
+.capability-inspector header { display: flex; align-items: flex-start; justify-content: space-between; padding: 3px 4px 10px; }
+.capability-inspector header > span { display: grid; gap: 3px; }
+.capability-inspector header small { color: var(--muted); font-size: 10px; }
+.capability-inspector header button { width: 26px; height: 26px; border: 0; border-radius: 8px; background: rgba(255,255,255,.05); color: var(--muted); cursor: pointer; }
+.capability-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.025); }
+.capability-row > .status-dot { background: #d9a62f; box-shadow: 0 0 10px rgba(217,166,47,.55); }
+.capability-row.available > .status-dot { background: var(--accent); box-shadow: 0 0 10px rgba(112,225,200,.55); }
+.capability-row > span { min-width: 0; display: grid; gap: 3px; }
+.capability-row b { overflow: hidden; color: #dfe8ed; font-size: 11px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.capability-row small { color: var(--muted); font-size: 10px; }
+.capability-row i { color: #d9a62f; font-size: 10px; font-style: normal; }
+.capability-row.available i { color: var(--accent); }
 .minimap { position: absolute; z-index: 900; left: 24px; bottom: 24px; width: 220px; padding: 12px; border: 1px solid rgba(154,167,184,.32); border-radius: 14px; background: rgba(8,13,20,.88); box-shadow: 0 18px 55px rgba(0,0,0,.36); backdrop-filter: blur(22px); }
 .minimap header { display: flex; align-items: center; gap: 7px; color: #dce6eb; font-size: 11px; }
 .minimap header svg { color: var(--accent); }

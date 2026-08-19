@@ -41,6 +41,9 @@
 - **Passed live-projection slice.** The frontend retains the complete typed `SnapshotProjection`
   and atomically replaces it from SSE. Runtime and system surfaces derive their projection number
   and capability availability from that snapshot rather than from static presentation copy.
+- **Passed capability-inspection slice.** The live system indicator opens an accessible inspector
+  listing each typed capability, its availability, freshness/knowledge context, and owner-supplied
+  reason. The inspector closes from its control or Escape without changing canvas selection.
 
 ## Focused evidence
 
@@ -105,6 +108,11 @@ because all six panels use the same pointer-capture and keyboard-movement implem
     The deployed UI independently rendered `Gateway · projection 42` and
     `1/2 capabilities available · projection 42`, confirming the presentation matches the typed
     live snapshot. Browser warning logs remained empty.
+15. Browser QA opened the system indicator through a real pointer action and rendered two live
+    rows: `mind.identity.read` as Available with Known/Current context, and
+    `mind.lifecycle.command` as Unavailable with the gateway reason `authorization boundary not
+    implemented`. `aria-expanded` tracked the open state, Escape removed the inspector, and no
+    warnings were logged. A follow-up screenshot capture was unavailable.
 
 ## Next implementation checklist
 

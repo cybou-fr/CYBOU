@@ -204,6 +204,7 @@ pub fn App() -> impl IntoView {
     let (minimap_visible, set_minimap_visible) = signal(true);
     let (command_open, set_command_open) = signal(false);
     let (command_query, set_command_query) = signal(String::new());
+    let (capabilities_open, set_capabilities_open) = signal(false);
     let command_input = NodeRef::<leptos::html::Input>::new();
     let layout = RwSignal::new(load_layout());
     let dragging = RwSignal::new(None::<DragState>);
@@ -262,6 +263,7 @@ pub fn App() -> impl IntoView {
             } else if event.key() == "Escape" {
                 set_command_open.set(false);
                 set_command_query.set(String::new());
+                set_capabilities_open.set(false);
             }
         });
         if window
@@ -303,6 +305,15 @@ pub fn App() -> impl IntoView {
             )
         }
         RuntimeState::Error(_) => "Gateway unavailable · canvas remains read-only".into(),
+    };
+    let observed_label = move || match runtime.get() {
+        RuntimeState::Ready { snapshot, .. } => format!("Observed {}", snapshot.observed_at),
+        RuntimeState::Loading => "Waiting for first snapshot".into(),
+        RuntimeState::Error(_) => "No current snapshot".into(),
+    };
+    let capabilities = move || match runtime.get() {
+        RuntimeState::Ready { snapshot, .. } => snapshot.capabilities,
+        RuntimeState::Loading | RuntimeState::Error(_) => Vec::new(),
     };
 
     view! {
@@ -629,10 +640,48 @@ pub fn App() -> impl IntoView {
                     </nav>
                 </Show>
 
-                <aside class="system-state" aria-label="System state">
+                <Show when=move || capabilities_open.get()>
+                    <aside id="capability-inspector" class="capability-inspector" aria-label="Gateway capabilities">
+                        <header>
+                            <span><strong>"Gateway capabilities"</strong><small>{observed_label}</small></span>
+                            <button aria-label="Close capability inspector" on:click=move |_| set_capabilities_open.set(false)>"×"</button>
+                        </header>
+                        <For
+                            each=capabilities
+                            key=|capability| capability.id.clone()
+                            children=move |capability| {
+                                let available = capability.state == cybou_protocol::CapabilityState::Available;
+                                let status = capability_state_label(capability.state);
+                                let context = capability.reason.unwrap_or_else(|| {
+                                    format!(
+                                        "{} · {}",
+                                        knowledge_label(capability.knowledge),
+                                        freshness_label(capability.freshness),
+                                    )
+                                });
+                                view! {
+                                    <div class:available=available class="capability-row">
+                                        <span class="status-dot" aria-hidden="true"></span>
+                                        <span><b>{capability.id}</b><small>{context}</small></span>
+                                        <i>{status}</i>
+                                    </div>
+                                }
+                            }
+                        />
+                    </aside>
+                </Show>
+
+                <button
+                    class:open=move || capabilities_open.get()
+                    class="system-state"
+                    aria-label="Open gateway capability inspector"
+                    aria-expanded=move || capabilities_open.get().to_string()
+                    aria-controls="capability-inspector"
+                    on:click=move |_| set_capabilities_open.update(|open| *open = !*open)
+                >
                     <span class="status-dot" aria-hidden="true"></span>
                     {system_label}
-                </aside>
+                </button>
             </section>
         </main>
     }
@@ -644,6 +693,29 @@ fn panel_style(layout: CanvasLayout, panel: Panel) -> String {
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         point.x, point.y, point.z
     )
+}
+
+const fn capability_state_label(state: cybou_protocol::CapabilityState) -> &'static str {
+    match state {
+        cybou_protocol::CapabilityState::Available => "Available",
+        cybou_protocol::CapabilityState::Unavailable => "Unavailable",
+        cybou_protocol::CapabilityState::Unknown => "Unknown",
+    }
+}
+
+const fn knowledge_label(state: cybou_protocol::KnowledgeState) -> &'static str {
+    match state {
+        cybou_protocol::KnowledgeState::Known => "Known",
+        cybou_protocol::KnowledgeState::Unknown => "Unknown",
+    }
+}
+
+const fn freshness_label(state: cybou_web_contracts::Freshness) -> &'static str {
+    match state {
+        cybou_web_contracts::Freshness::Current => "Current",
+        cybou_web_contracts::Freshness::Stale => "Stale",
+        cybou_web_contracts::Freshness::Unknown => "Unknown freshness",
+    }
 }
 
 fn command_matches(query: &str, haystack: &str) -> bool {
