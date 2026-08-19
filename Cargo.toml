@@ -6,10 +6,12 @@ members = [
     "crates/cybou-crypto",
     "crates/cybou-eventd",
     "crates/cybou-fabric",
+    "crates/cybou-healthd",
     "crates/cybou-identityd",
     "crates/cybou-perception",
     "crates/cybou-protocol",
     "crates/cybou-runtime",
+    "crates/cybou-selfd",
     "crates/cybou-storage",
     "crates/cybou-web-contracts",
     "crates/cybou-web-gateway",
@@ -38,7 +40,7 @@ http-body-util = "0.1.5"
 futures-core = "0.3.31"
 futures-util = "0.3.34"
 thiserror = "2.0.20"
-time = { version = "0.3.55", features = ["formatting", "parsing"] }
+time = { version = "0.3.55", features = ["formatting", "parsing", "serde"] }
 tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "test-util", "time"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.0", features = ["fs", "set-header", "trace"] }

@@ -16,7 +16,7 @@ use std::{
 use cybou_protocol::canonical::CanonicalEnvelope;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 #[cfg(target_os = "linux")]
@@ -135,7 +135,7 @@ impl IdentityCore {
             return Ok(None);
         }
         let mut file = File::open(&self.state_path).map_err(|source| IdentityError::Io {
-            path: self.state_path.clone>,
+            path: self.state_path.clone(),
             source,
         })?;
         let mut contents = String::new();
@@ -255,7 +255,7 @@ impl IdentityCore {
     /// Whether this run was a first-run birth.
     #[must_use]
     pub fn is_first_run(&self) -> bool {
-        self.is_first_run.read().ok().copied().unwrap_or(false)
+        self.is_first_run.read().ok().map(|g| *g).unwrap_or(false)
     }
 
     /// Construct a canonical cognitive envelope to record this session action in Event1.

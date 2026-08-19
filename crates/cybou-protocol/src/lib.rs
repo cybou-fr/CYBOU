@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 pub mod admission;
 pub mod canonical;
+pub mod capability;
 pub mod observation;
 
 /// Version of a serialized contract schema.
