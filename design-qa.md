@@ -30,6 +30,9 @@
   `(480, 140)` to `(630, 240)` and brought it forward. Reload restored `(630, 240)`. ArrowLeft moved
   it by 10 px and Shift+ArrowUp by 40 px after the focus fix. No warning/error console entries were
   observed.
+- **Passed command-navigation slice.** `Ctrl/Cmd+K` opens and focuses the Rust/WASM command
+  palette, text input filters the six canvas objects, Enter selects the first match, and Escape
+  closes and clears the palette. Selection continues to drive the active relationship subgraph.
 
 ## Focused evidence
 
@@ -78,6 +81,10 @@ because all six panels use the same pointer-capture and keyboard-movement implem
     footer are present. The fresh capture preserves the intended hierarchy at 1237 × 720; the
     short viewport still compresses the release action rail toward Commitments, consistent with
     the known viewport-density gap.
+11. The command bar is now a working object navigator rather than a decorative input. Browser QA
+    opened it with Ctrl+K, filtered `sources` to one result, selected Sources with Enter, and then
+    confirmed Escape closes and clears a reopened palette. Sources became the selected panel with
+    exactly one active relationship, and no browser warnings were emitted.
 
 ## Next implementation checklist
 

@@ -202,6 +202,9 @@ pub fn App() -> impl IntoView {
     let (selected, set_selected) = signal("release");
     let (runtime_menu_open, set_runtime_menu_open) = signal(false);
     let (minimap_visible, set_minimap_visible) = signal(true);
+    let (command_open, set_command_open) = signal(false);
+    let (command_query, set_command_query) = signal(String::new());
+    let command_input = NodeRef::<leptos::html::Input>::new();
     let layout = RwSignal::new(load_layout());
     let dragging = RwSignal::new(None::<DragState>);
     let runtime = RwSignal::new(RuntimeState::Loading);
@@ -248,6 +251,27 @@ pub fn App() -> impl IntoView {
             // App is the page root and is mounted once; keep the browser stream for that lifetime.
             on_snapshot.forget();
             std::mem::forget(events);
+        }
+    }
+
+    if let Some(window) = web_sys::window() {
+        let on_shortcut = Closure::<dyn FnMut(KeyboardEvent)>::new(move |event: KeyboardEvent| {
+            if (event.ctrl_key() || event.meta_key()) && event.key().eq_ignore_ascii_case("k") {
+                event.prevent_default();
+                set_command_open.set(true);
+                if let Some(input) = command_input.get() {
+                    let _ = input.focus();
+                }
+            } else if event.key() == "Escape" {
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+        });
+        if window
+            .add_event_listener_with_callback("keydown", on_shortcut.as_ref().unchecked_ref())
+            .is_ok()
+        {
+            on_shortcut.forget();
         }
     }
 
@@ -472,9 +496,59 @@ pub fn App() -> impl IntoView {
                     <span class="panel-link">"View commitments"</span>
                 </button>
 
-                <label class="command-bar" aria-label="Search or act">
+                <Show when=move || command_open.get()>
+                    <nav class="command-palette" aria-label="Canvas commands">
+                        <small>"Jump to"</small>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "release plan")
+                            on:click=move |_| select_from_command("release", set_selected, set_command_open, set_command_query)
+                        ><Sparkles size=15 /><span><b>"Release plan"</b><i>"Central object"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "verified artifact evidence")
+                            on:click=move |_| select_from_command("artifact", set_selected, set_command_open, set_command_query)
+                        ><FileCheck size=15 /><span><b>"Verified artifact"</b><i>"Evidence and provenance"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "collaborators release team")
+                            on:click=move |_| select_from_command("collaborators", set_selected, set_command_open, set_command_query)
+                        ><UsersRound size=15 /><span><b>"Collaborators"</b><i>"Release team"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "sources validated inputs")
+                            on:click=move |_| select_from_command("sources", set_selected, set_command_open, set_command_query)
+                        ><Files size=15 /><span><b>"Sources"</b><i>"Validated inputs"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "mind suggestion rollback")
+                            on:click=move |_| select_from_command("suggestion", set_selected, set_command_open, set_command_query)
+                        ><Sparkles size=15 /><span><b>"Mind suggestion"</b><i>"Rollback verification"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "commitments tasks")
+                            on:click=move |_| select_from_command("commitments", set_selected, set_command_open, set_command_query)
+                        ><ListChecks size=15 /><span><b>"Commitments"</b><i>"Three tracked tasks"</i></span></button>
+                    </nav>
+                </Show>
+
+                <label class:open=move || command_open.get() class="command-bar" aria-label="Search or act">
                     <Search size=19 />
-                    <input type="search" placeholder="Search or act…" />
+                    <input
+                        node_ref=command_input
+                        type="search"
+                        placeholder="Search or act…"
+                        prop:value=move || command_query.get()
+                        on:focus=move |_| set_command_open.set(true)
+                        on:input=move |event| set_command_query.set(event_target_value(&event))
+                        on:keydown=move |event: KeyboardEvent| {
+                            if event.key() == "Enter"
+                                && let Some(panel) = first_command_match(&command_query.get())
+                            {
+                                event.prevent_default();
+                                select_from_command(
+                                    panel,
+                                    set_selected,
+                                    set_command_open,
+                                    set_command_query,
+                                );
+                            }
+                        }
+                    />
                     <kbd>"Ctrl K"</kbd>
                 </label>
 
@@ -543,6 +617,35 @@ fn panel_style(layout: CanvasLayout, panel: Panel) -> String {
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         point.x, point.y, point.z
     )
+}
+
+fn command_matches(query: &str, haystack: &str) -> bool {
+    let query = query.trim().to_ascii_lowercase();
+    query.is_empty() || haystack.contains(&query)
+}
+
+fn first_command_match(query: &str) -> Option<&'static str> {
+    [
+        ("release", "release plan"),
+        ("artifact", "verified artifact evidence"),
+        ("collaborators", "collaborators release team"),
+        ("sources", "sources validated inputs"),
+        ("suggestion", "mind suggestion rollback"),
+        ("commitments", "commitments tasks"),
+    ]
+    .into_iter()
+    .find_map(|(panel, label)| command_matches(query, label).then_some(panel))
+}
+
+fn select_from_command(
+    panel: &'static str,
+    set_selected: WriteSignal<&'static str>,
+    set_command_open: WriteSignal<bool>,
+    set_command_query: WriteSignal<String>,
+) {
+    set_selected.set(panel);
+    set_command_open.set(false);
+    set_command_query.set(String::new());
 }
 
 fn release_actions_style(layout: CanvasLayout) -> String {
