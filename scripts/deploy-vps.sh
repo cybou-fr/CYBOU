@@ -75,6 +75,12 @@ cybou_ssh "
     sleep 1
   done
   sudo systemctl --user --machine=cybou@.host enable --now cybou-mind.target
+
+  # enable --now starts what is stopped and leaves what is running alone, so on every deploy after
+  # the first the organs would keep executing the binaries they were started with. Each unit is
+  # PartOf=cybou-mind.target, which is the directive that propagates a restart of the target down
+  # to them.
+  sudo systemctl --user --machine=cybou@.host restart cybou-mind.target
   sudo systemctl --user --machine=cybou@.host --no-pager --full status cybou-mind.target || true
 
   sudo systemctl --no-pager --full status cybou-web-gateway.service caddy.service
