@@ -3,14 +3,25 @@
 
 //! `cybou-intentiond` daemon entrypoint.
 
-use std::sync::Arc;
+use std::{env, path::PathBuf, sync::Arc};
 
 use cybou_intentiond::IntentionCore;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("[cybou-intentiond] Initializing intention manager...");
-    let core = Arc::new(IntentionCore::new());
+    println!("[cybou-intentiond] Initializing Commitments and Obligations engine...");
+    let state_path = env::var("CYBOU_INTENTIONS_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let state_dir = env::var("XDG_STATE_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| {
+                    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
+                    PathBuf::from(home).join(".local/state")
+                });
+            state_dir.join("cybou/intentions.json")
+        });
+    let core = Arc::new(IntentionCore::open(&state_path)?);
 
     #[cfg(target_os = "linux")]
     {

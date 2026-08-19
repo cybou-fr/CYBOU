@@ -466,6 +466,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-contextd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-crypto"
 version = "0.1.0"
 dependencies = [
@@ -477,6 +495,24 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "uuid",
+]
+
+[[package]]
+name = "cybou-epistemicd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
 ]
 
 [[package]]

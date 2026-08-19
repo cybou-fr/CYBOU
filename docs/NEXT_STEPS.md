@@ -51,12 +51,11 @@ fully functioning Rust Mind owner is completing crypto sealing and packaging the
 - Living Canvas Rust/WASM frontend;
 - differential oracle test harness (`scripts/check-journal-writer-oracle.sh`, `scripts/check-fabric-oracle.sh`).
 
-### Immediate gaps
+### Current focus
 
-- `cybou-crypto` does not exist yet: sealed payload support, key epoch management, and erasure in Rust;
-- `cybou-eventd` daemon is not yet present in the Cargo workspace;
-- `cybou-perception` still references legacy `nixos.system` / `/run/current-system` instead of Debian standard paths;
-- CI needs full alignment with Debian 13 container testing.
+- Debian 13 systemd process integration testing (multi-process D-Bus lifecycle test);
+- CI pipeline alignment for pure Debian 13 container builds;
+- Removing frozen legacy NixOS / C++ CMake artifacts from active path.
 
 ### Architectural direction
 

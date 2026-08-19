@@ -32,14 +32,17 @@ impl Intention1Service {
     }
 
     /// Form a new intention obligation and return its UUID string.
-    async fn form(&self, description: String, trigger: String, _cause_id: String) -> String {
+    async fn form(&self, description: String, trigger: String, cause_id: String) -> String {
         let now = OffsetDateTime::now_utc();
-        let id = self.core.form(description, trigger, now);
-        id.to_string()
+        let cause = Uuid::parse_str(&cause_id).ok();
+        match self.core.form(description, trigger, cause, now) {
+            Ok(id) => id.to_string(),
+            Err(_) => String::new(),
+        }
     }
 
     /// Close an intention by resolution ("fulfilled", "abandoned", "obsolete").
-    async fn close(&self, intention_id: String, resolution: String, _note: String) -> bool {
+    async fn close(&self, intention_id: String, resolution: String, note: String) -> bool {
         let Ok(id) = Uuid::parse_str(&intention_id) else {
             return false;
         };
@@ -48,12 +51,13 @@ impl Intention1Service {
             "abandoned" => Resolution::Abandoned,
             _ => Resolution::Obsolete,
         };
-        self.core.close(id, res).is_ok()
+        let note_opt = if note.is_empty() { None } else { Some(note.as_str()) };
+        self.core.close(id, res, note_opt).is_ok()
     }
 
     /// Return open intentions encoded as CBOR.
     async fn open(&self) -> Vec<u8> {
-        let list = self.core.open();
+        let list = self.core.open_intentions();
         let mut buf = Vec::new();
         let _ = ciborium::into_writer(&list, &mut buf);
         buf

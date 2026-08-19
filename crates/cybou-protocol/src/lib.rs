@@ -15,6 +15,8 @@ pub mod canonical;
 pub mod capability;
 pub mod observation;
 
+pub use admission::Kind;
+
 /// Version of a serialized contract schema.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(transparent)]

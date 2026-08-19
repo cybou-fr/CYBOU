@@ -92,28 +92,41 @@ impl PresenceCore {
     }
 
     /// Build a default nominal snapshot projection.
+    /// Build snapshot projection from actual observed capabilities, or unmeasured defaults.
+    #[must_use]
+    pub fn build_snapshot_with(
+        &self,
+        now: OffsetDateTime,
+        capabilities: Vec<CapabilityProjection>,
+        freshness: Freshness,
+        knowledge: KnowledgeState,
+    ) -> SnapshotProjection {
+        SnapshotProjection {
+            schema_version: WEB_SCHEMA_V1,
+            projection_version: 1,
+            cursor: "0".into(),
+            observed_at: now.format(&Rfc3339).unwrap_or_default(),
+            freshness,
+            knowledge,
+            capabilities,
+        }
+    }
+
+    /// Build default honest unmeasured snapshot when downstreams are unreached.
     #[must_use]
     pub fn build_snapshot(&self, now: OffsetDateTime) -> SnapshotProjection {
         let mut caps = Vec::new();
         for decl in CapabilityRegistry::capabilities() {
             caps.push(CapabilityProjection {
                 id: decl.capability_id.to_string(),
-                state: CapabilityState::Available,
-                knowledge: KnowledgeState::Known,
-                freshness: Freshness::Current,
-                reason: None,
+                state: CapabilityState::Unknown,
+                knowledge: KnowledgeState::Unknown,
+                freshness: Freshness::Stale,
+                reason: Some("downstream component unreached".to_string()),
             });
         }
 
-        SnapshotProjection {
-            schema_version: WEB_SCHEMA_V1,
-            projection_version: 1,
-            cursor: "0".into(),
-            observed_at: now.format(&Rfc3339).unwrap_or_default(),
-            freshness: Freshness::Current,
-            knowledge: KnowledgeState::Known,
-            capabilities: caps,
-        }
+        self.build_snapshot_with(now, caps, Freshness::Stale, KnowledgeState::Unknown)
     }
 }
 
@@ -122,11 +135,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nominal_presence_snapshot() {
+    fn unobserved_presence_snapshot_is_honest_unknown() {
         let core = PresenceCore::new();
         let now = OffsetDateTime::now_utc();
         let snap = core.build_snapshot(now);
         assert_eq!(snap.capabilities.len(), 11);
-        assert_eq!(core.is_awake(), true);
+        assert_eq!(snap.knowledge, KnowledgeState::Unknown);
+        assert_eq!(snap.freshness, Freshness::Stale);
+        for cap in &snap.capabilities {
+            assert_eq!(cap.state, CapabilityState::Unknown);
+            assert_eq!(cap.knowledge, KnowledgeState::Unknown);
+        }
     }
 }

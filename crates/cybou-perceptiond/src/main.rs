@@ -3,7 +3,7 @@
 
 //! `cybou-perceptiond` daemon entrypoint.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use cybou_perception::LinuxSystemSource;
 use cybou_perceptiond::PerceptionCore;
@@ -16,8 +16,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let core = Arc::new(PerceptionCore::new(source));
 
     let now = OffsetDateTime::now_utc();
-    let _ = core.acquire_once(now, 0);
+    let initial_env = core.acquire_once(now, 0);
     println!("[cybou-perceptiond] Initial perception health: {}", core.health());
+
+    // Spawn periodic background acquisition task
+    let sampling_core = core.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let mut monotonic = 1u64;
+        loop {
+            interval.tick().await;
+            let now = OffsetDateTime::now_utc();
+            if let Some(_envelope) = sampling_core.acquire_once(now, monotonic) {
+                monotonic += 1;
+                // On real bus, newly acquired envelopes are submitted to Event1
+            }
+        }
+    });
+
+    let _ = initial_env;
 
     #[cfg(target_os = "linux")]
     {

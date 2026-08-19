@@ -60,39 +60,39 @@ impl Presence1Service {
         vec![]
     }
 
-    /// User mutation: promise an obligation and return intention ID.
+    /// User mutation: promise an obligation (fails closed with empty string when unexecuted).
     async fn promise(&self, _description: String) -> String {
-        Uuid::new_v4().to_string()
+        String::new()
     }
 
-    /// User mutation: trigger self reflection.
+    /// User mutation: trigger self reflection (fails closed with false when unexecuted).
     async fn reflect(&self) -> bool {
-        true
+        false
     }
 
-    /// User mutation: fulfill intention at index.
+    /// User mutation: fulfill intention at index (fails closed with false when unexecuted).
     async fn fulfill_index(&self, _index: i32) -> bool {
-        true
+        false
     }
 
-    /// User mutation: abandon intention at index.
+    /// User mutation: abandon intention at index (fails closed with false when unexecuted).
     async fn abandon_index(&self, _index: i32) -> bool {
-        true
+        false
     }
 
-    /// User mutation: record observation.
+    /// User mutation: record observation (fails closed with false when unexecuted).
     async fn observe(&self, _subject: String, _value: f64) -> bool {
-        true
+        false
     }
 
-    /// User mutation: produce forecast and return CBOR.
+    /// User mutation: produce forecast (returns empty vec when unexecuted).
     async fn predict(&self, _subject: String) -> Vec<u8> {
         vec![]
     }
 
-    /// User mutation: interrupt background lifecycle.
+    /// User mutation: interrupt background lifecycle (fails closed with false when unexecuted).
     async fn interrupt_lifecycle(&self, _cause: String) -> bool {
-        true
+        false
     }
 
     /// Signal emitted when compound projection changes.

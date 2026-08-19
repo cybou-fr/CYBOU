@@ -3,7 +3,7 @@
 
 //! `cybou-healthd` daemon entrypoint.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use cybou_healthd::HealthCore;
 use time::OffsetDateTime;
@@ -18,6 +18,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "[cybou-healthd] Initial overall health: {}",
         core.overall_health()
     );
+
+    // Spawn periodic health refresh task
+    let refresh_core = core.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(10));
+        loop {
+            interval.tick().await;
+            let now = OffsetDateTime::now_utc();
+            refresh_core.recalculate(now);
+        }
+    });
 
     #[cfg(target_os = "linux")]
     {

@@ -1,0 +1,58 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+//! D-Bus `org.cybou.Mind.Context1` service implementation on zbus.
+
+use std::sync::Arc;
+
+use zbus::{SignalContext, interface};
+
+use crate::ContextCore;
+
+/// D-Bus Service exporting `org.cybou.Mind.Context1`.
+pub struct Context1Service {
+    core: Arc<ContextCore>,
+}
+
+impl Context1Service {
+    /// Create a new Context1 D-Bus service handler around `ContextCore`.
+    #[must_use]
+    pub fn new(core: Arc<ContextCore>) -> Self {
+        Self { core }
+    }
+}
+
+#[interface(name = "org.cybou.Mind.Context1")]
+impl Context1Service {
+    /// Service readiness.
+    async fn ready(&self) -> bool {
+        true
+    }
+
+    /// Overall health.
+    async fn health(&self) -> String {
+        "healthy".to_string()
+    }
+
+    /// Last error diagnostic.
+    async fn last_error(&self) -> String {
+        String::new()
+    }
+
+    /// Active context entries encoded as CBOR.
+    async fn active_context(&self) -> Vec<u8> {
+        let list = self.core.active_context();
+        let mut buf = Vec::new();
+        let _ = ciborium::into_writer(&list, &mut buf);
+        buf
+    }
+
+    /// Related associative tags for a concept.
+    async fn related_tags(&self, tag: String) -> Vec<String> {
+        self.core.related_tags(&tag)
+    }
+
+    /// Signal emitted when context vector changes.
+    #[zbus(signal)]
+    async fn changed(ctxt: &SignalContext<'_>) -> zbus::Result<()>;
+}

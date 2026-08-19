@@ -15,7 +15,7 @@ use std::{
 };
 
 use cybou_crypto::{KeyDomain, KeyStore};
-use cybou_protocol::canonical::CanonicalEnvelope;
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
 use cybou_storage::writer::{Appended, JournalWriter, WriteError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -183,8 +183,9 @@ impl EventCore {
         }
 
         // ADR-0028: submitting a contribution never authorizes an erasure.
-        if envelope.kind == 13 || envelope.kind == 14 {
-            // ErasurePlanned (13) or ErasureExecuted (14)
+        let kind = Kind::from_u16(envelope.kind)
+            .ok_or_else(|| EventError::Storage(WriteError::Malformed("unknown contribution kind")))?;
+        if kind.is_erasure() {
             return Err(EventError::ErasureRefused);
         }
 
@@ -449,5 +450,43 @@ mod tests {
         let env = dummy_envelope(Uuid::new_v4(), "identityd");
         let err = core.submit(&env, None).expect_err("should refuse");
         assert!(matches!(err, EventError::OriginUnauthentic(_)));
+    }
+
+    #[test]
+    fn self_assessment_and_learning_are_permitted_but_erasure_is_refused() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("journal.sqlite3");
+        let core = EventCore::open(&db_path).expect("open event core");
+
+        // Submit root observation first
+        let root_obs = dummy_envelope(Uuid::new_v4(), "unreserved");
+        let root_res = core.submit(&root_obs, None).expect("root observation");
+        assert_eq!(root_res.sequence, 1);
+
+        // Kind 13 (SelfAssessment) is permitted when citing evidence
+        let mut env13 = dummy_envelope(Uuid::new_v4(), "selfd");
+        env13.kind = Kind::SelfAssessment as u16;
+        env13.evidence = vec![root_obs.message_id];
+        let res13 = core.submit(&env13, Some("selfd")).expect("SelfAssessment permitted");
+        assert_eq!(res13.sequence, 2);
+
+        // Kind 14 (Learning) is permitted (derived from SelfAssessment)
+        let mut env14 = dummy_envelope(Uuid::new_v4(), "learning_organ");
+        env14.kind = Kind::Learning as u16;
+        env14.causation_id = env13.message_id;
+        let res14 = core.submit(&env14, None).expect("Learning permitted");
+        assert_eq!(res14.sequence, 3);
+
+        // Kind 15 (ErasureRequested) is refused on normal Submit
+        let mut env15 = dummy_envelope(Uuid::new_v4(), "admin");
+        env15.kind = Kind::ErasureRequested as u16;
+        let err15 = core.submit(&env15, None).expect_err("ErasureRequested must be refused");
+        assert!(matches!(err15, EventError::ErasureRefused));
+
+        // Kind 16 (ErasureApplied) is refused on normal Submit
+        let mut env16 = dummy_envelope(Uuid::new_v4(), "admin");
+        env16.kind = Kind::ErasureApplied as u16;
+        let err16 = core.submit(&env16, None).expect_err("ErasureApplied must be refused");
+        assert!(matches!(err16, EventError::ErasureRefused));
     }
 }

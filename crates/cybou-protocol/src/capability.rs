@@ -167,15 +167,15 @@ impl CapabilityRegistry {
         ]
     }
 
-    /// Required capabilities for a command, or empty slice if unrestricted/unknown.
+    /// Required capabilities for a command, or `None` if unknown (fail-closed gating).
     #[must_use]
-    pub fn required_capabilities_for(command_id: &str) -> &'static [&'static str] {
+    pub fn required_capabilities_for(command_id: &str) -> Option<&'static [&'static str]> {
         for cmd in Self::commands() {
             if cmd.command_id == command_id {
-                return cmd.required_capabilities;
+                return Some(cmd.required_capabilities);
             }
         }
-        &[]
+        None
     }
 }
 
@@ -194,9 +194,10 @@ mod tests {
         assert_eq!(cmds.len(), 9);
 
         let required = CapabilityRegistry::required_capabilities_for("identity");
-        assert_eq!(required, &["identity-continuity"]);
+        assert_eq!(required, Some(&["identity-continuity"][..]));
 
+        // Unknown command must fail closed by returning None
         let unknown = CapabilityRegistry::required_capabilities_for("unknown-cmd");
-        assert!(unknown.is_empty());
+        assert_eq!(unknown, None);
     }
 }

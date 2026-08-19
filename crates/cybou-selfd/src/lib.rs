@@ -113,7 +113,9 @@ pub fn narrate_self_report(report: &SelfReport) -> String {
     }
 
     // 2. Intentions & Obligations
-    if report.open_intentions == 0 {
+    if !report.obligations_known {
+        lines.push("I cannot determine my obligations right now.".to_string());
+    } else if report.open_intentions == 0 {
         lines.push("I owe you nothing right now.".to_string());
     } else if report.oldest_obligation_days >= 1 {
         lines.push(format!(
@@ -125,7 +127,9 @@ pub fn narrate_self_report(report: &SelfReport) -> String {
     }
 
     // 3. Calibrations & Predictions
-    if report.settled_predictions == 0 {
+    if !report.calibrations_known {
+        lines.push("My calibration state is currently unknown.".to_string());
+    } else if report.settled_predictions == 0 {
         lines.push("I have not yet been tested against anything I predicted.".to_string());
     } else {
         lines.push(format!(
@@ -191,24 +195,52 @@ impl SelfCore {
         }
     }
 
-    /// Measure the current self-state snapshot.
+    /// Measure the current self-state snapshot with optional downstream inputs.
     #[must_use]
-    pub fn measure(&self, now: OffsetDateTime, contributions: u64) -> SelfReport {
+    pub fn measure_with(
+        &self,
+        now: OffsetDateTime,
+        contributions: u64,
+        obligations: Option<(u32, i64)>,
+        calibrations_opt: Option<(Vec<CalibrationEntry>, u32)>,
+        journal_intact_opt: Option<(bool, u64)>,
+    ) -> SelfReport {
+        let (open_intentions, oldest_obligation_days, obligations_known) = match obligations {
+            Some((count, days)) => (count, days, true),
+            None => (0, 0, false),
+        };
+
+        let (calibrations, settled_predictions, calibrations_known) = match calibrations_opt {
+            Some((cals, settled)) => (cals, settled, true),
+            None => (vec![], 0, false),
+        };
+
+        let (journal_intact, first_broken_at) = match journal_intact_opt {
+            Some((intact, broken)) => (intact, broken),
+            None => (true, 0),
+        };
+
         SelfReport {
             taken: now,
             age_in_days: self.age_in_days,
             sessions: self.sessions,
             architecture_version: self.architecture_version.clone(),
-            open_intentions: 0,
-            oldest_obligation_days: 0,
-            obligations_known: true,
-            calibrations_known: true,
-            calibrations: vec![],
-            settled_predictions: 0,
+            open_intentions,
+            oldest_obligation_days,
+            obligations_known,
+            calibrations_known,
+            calibrations,
+            settled_predictions,
             contributions,
-            journal_intact: true,
-            first_broken_at: 0,
+            journal_intact,
+            first_broken_at,
         }
+    }
+
+    /// Default measurement when downstream owners are unobserved.
+    #[must_use]
+    pub fn measure(&self, now: OffsetDateTime, contributions: u64) -> SelfReport {
+        self.measure_with(now, contributions, None, None, None)
     }
 
     /// Produce a narrated self-reflection string.
@@ -275,5 +307,19 @@ mod tests {
         assert!(text.contains("I owe you 3 thing(s); the oldest has been waiting 5 day(s)."));
         assert!(text.contains("I have checked myself against reality 8 time(s)."));
         assert!(text.contains("On build-duration I tend to be optimistic."));
+    }
+
+    #[test]
+    fn narration_unobserved_state_reports_honest_unknown() {
+        let core = SelfCore::new(10, 3, "debian-rust-1.0");
+        let now = OffsetDateTime::now_utc();
+        let report = core.measure(now, 50);
+
+        assert!(!report.obligations_known);
+        assert!(!report.calibrations_known);
+
+        let text = narrate_self_report(&report);
+        assert!(text.contains("I cannot determine my obligations right now."));
+        assert!(text.contains("My calibration state is currently unknown."));
     }
 }

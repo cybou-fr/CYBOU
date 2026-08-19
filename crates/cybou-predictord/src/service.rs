@@ -30,9 +30,12 @@ impl Predictor1Service {
         true
     }
 
-    /// Record an empirical observation on a subject.
-    async fn observe(&self, subject: String, value: f64) -> bool {
-        self.core.observe(&subject, value, Uuid::new_v4());
+    /// Record an empirical observation on a subject with its authentic contribution identity.
+    async fn observe(&self, subject: String, value: f64, contribution_id: String) -> bool {
+        let Ok(id) = Uuid::parse_str(&contribution_id) else {
+            return false;
+        };
+        self.core.observe(&subject, value, id);
         true
     }
 

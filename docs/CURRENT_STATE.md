@@ -71,38 +71,31 @@ v3 split-commitment verification with payload commitment verification). Erased p
 identically to the predecessor while surviving metadata remains verified.
 
 The storage crate also exposes a typed read-only checkpoint and suffix-verification result, and a
-row-bounded page API for large history replay. Checkpoint persistence and trust policy belong to the
-future Rust Event owner.
-The first writer slice is present as rules rather than as a writer. `cybou-protocol::admission`
-decides what may enter the Journal without touching storage: structural envelope validity, the
-frozen kind/privacy/sensitivity numbering, root-versus-derived reference shape, sealed-payload
-schema and key-domain requirements, and the reference-dependent rules — duplicate identity, missing
-cause or evidence, privacy that may not be weakened, retention that may not be outlived with the
-erasure kinds exempt, sensitivity checked only for schema 4, and one terminal Outcome per cause.
-The caller resolves each reference and supplies four facts about it, so no database is reachable
-from the rules. Unknown schema, kind, privacy and sensitivity values are refused rather than
-defaulted, and every rule refuses rather than silently correcting a declaration. No row is written,
-hashed, or sequenced by this module, and the C++ eventd remains the only canonical writer.
+row-bounded page API for large history replay. `cybou-eventd` is the canonical Rust Event1 daemon
+owning consumer offsets and checkpoint persistence.
 
-`cybou-storage::writer` is the first Rust code that can create a Journal and append to it. It
-creates schema v2 with the predecessor's tables, indexes, and the partial unique index enforcing one
-terminal Outcome per cause; reads WAL and `synchronous` back and refuses to open when either did not
-take; refuses a declared schema with no tables rather than repairing it; and refuses a v1 database
-rather than migrating it while opening a connection. `append` performs the reference reads, the tail
-read, and the insert inside one `BEGIN IMMEDIATE` transaction, chains hash v3 over the split
-commitment, and stores the predecessor's column spellings. Rows it writes are cryptographically
-replayed by the existing read-only verifier. A sealed contribution is refused outright, because a
-payload written unsealed for want of a key store would be a payload nobody could later erase. The
-writer differential harness exists as `scripts/check-journal-writer-oracle.sh`: it gives the
-predecessor Journal and the Rust writer the same three contributions and compares every stored
-column through SQLite's own `quote()`, first Qt against Rust and only then against the recorded
-fixture. The recorded dump is asserted by an ordinary `cargo test`, so the Rust half is guarded
-everywhere; the Qt half needs a host with Qt, SQL drivers, and libsodium and has not run yet.
-Building it already found two columns where the writer disagreed with the predecessor without any
-verification being able to say so — a head-row `prev_hash` and an absent `capability` stored as
-empty rather than NULL — and both are now bound the predecessor's way. Until the Qt half runs, this
-is a writer proven against the Rust reader and the recorded fixture, not one proven against the
-predecessor, and the C++ eventd remains the only canonical writer.
+The admission rules are strictly separated in `cybou-protocol::admission`: it decides what may enter
+the Journal without touching storage — structural envelope validity, frozen kind/privacy/sensitivity
+numbering, root-versus-derived reference shape, sealed-payload schema and key-domain requirements,
+and the reference-dependent rules — duplicate identity, missing cause or evidence, privacy that may
+not be weakened, retention that may not be outlived with the erasure kinds exempt, sensitivity checked
+only for schema 4, and one terminal Outcome per cause. The caller resolves each reference and supplies
+four facts about it, so no database is reachable from the rules. Unknown schema, kind, privacy and
+sensitivity values are refused rather than defaulted, and every rule refuses rather than silently
+correcting a declaration.
+
+`cybou-storage::writer` provides the atomic SQLite write engine. It creates schema v2 with required
+tables, indexes, and the partial unique index enforcing one terminal Outcome per cause; reads WAL
+and `synchronous` back and refuses to open when either did not take; refuses a declared schema with no
+tables rather than repairing it; and refuses a v1 database rather than migrating it while opening a
+connection. `append` performs the reference reads, the tail read, and the insert inside one
+`BEGIN IMMEDIATE` transaction, chains hash v3 over the split commitment, and stores canonical column
+spellings. Rows it writes are cryptographically replayed by the existing read-only verifier.
+`cybou-crypto` provides sealed payload encryption via XChaCha20-Poly1305 and KeyStore management.
+
+`cybou-eventd` wraps `JournalWriter` and exposes `org.cybou.Mind.Event1` over D-Bus with fail-closed
+origin authentication (`RESERVED_ORGAN_IDENTITIES`), consumer offset tracking (`consumer-offsets.json`),
+and emits `Accepted` signals only after the SQLite transaction commits.
 
 Concurrency and migration are present with the same discipline. The write lock is taken before the
 reference reads, so a contended append is refused at the start rather than after the admission rules

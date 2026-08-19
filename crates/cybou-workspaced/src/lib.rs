@@ -12,7 +12,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::canonical::CanonicalEnvelope;
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -25,14 +25,20 @@ const HALF_LIFE_SECONDS: f64 = 120.0;
 
 /// Return attention weight for a given contribution kind.
 #[must_use]
-pub const fn attention_weight(kind: u16) -> f64 {
+pub fn attention_weight(kind: Kind) -> f64 {
     match kind {
-        5 | 6 => 3.0,       // NeedSignal, Objection
-        7 | 4 => 2.0,       // Decision, Intention
-        3 | 12 | 8 => 1.5,  // Outcome, SelfAssessment, AttentionCandidate
-        2 | 9 | 10 | 11 => 1.0, // Prediction, PlanProposal, Hypothesis, BeliefRevision
+        Kind::NeedSignal | Kind::Objection => 3.0,
+        Kind::Decision | Kind::Intention => 2.0,
+        Kind::Outcome | Kind::SelfAssessment | Kind::AttentionCandidate => 1.5,
+        Kind::Prediction | Kind::PlanProposal | Kind::Hypothesis | Kind::BeliefRevision => 1.0,
         _ => 0.5,
     }
+}
+
+/// Return attention weight for a raw u16 kind.
+#[must_use]
+pub fn attention_weight_u16(kind_u16: u16) -> f64 {
+    Kind::from_u16(kind_u16).map_or(0.5, attention_weight)
 }
 
 /// A cluster of related cognitive contributions competing for conscious workspace focus.
@@ -147,7 +153,7 @@ impl WorkspaceCore {
         for env in &coalition.members {
             let age_seconds = (now_ms - env.wall_time_ms as f64).max(0.0) / 1000.0;
             let recency = 0.5_f64.powf(age_seconds / HALF_LIFE_SECONDS);
-            let weight = attention_weight(env.kind);
+            let weight = attention_weight_u16(env.kind);
             total += weight * env.confidence * recency;
         }
 
