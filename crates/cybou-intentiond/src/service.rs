@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use cybou_fabric::event_client::EventClient;
+use cybou_protocol::{canonical::CanonicalEnvelope, unix_millis};
 use time::OffsetDateTime;
 use uuid::Uuid;
 use zbus::interface;
@@ -26,6 +28,125 @@ impl Intention1Service {
     pub fn new(core: Arc<IntentionCore>) -> Self {
         Self { core }
     }
+}
+
+/// Record a formed intention in the Journal as a contribution caused by what prompted it.
+///
+/// Returns whether the Journal accepted it. The intention itself is already durable in this
+/// organ's own state by the time this runs, so a Journal that refuses the contribution costs the
+/// biography an entry and does not cost the person their commitment.
+async fn submit_intention(
+    id: &Uuid,
+    description: &str,
+    trigger: &str,
+    cause: Uuid,
+    now: OffsetDateTime,
+) -> Option<Uuid> {
+    let payload = IntentionPayload {
+        intention_id: *id,
+        description: description.to_owned(),
+        trigger: trigger.to_owned(),
+    };
+    let mut encoded = Vec::new();
+    ciborium::into_writer(&payload, &mut encoded).ok()?;
+
+    let message_id = Uuid::new_v4();
+    let envelope = CanonicalEnvelope {
+        schema_version: 3,
+        message_id,
+        correlation_id: cause,
+        causation_id: cause,
+        origin_organ: "intentiond".to_string(),
+        origin_node: String::new(),
+        kind: 11, // Intention
+        wall_time_ms: unix_millis(now),
+        monotonic_time: 0,
+        logical_clock: 1,
+        confidence: 1.0,
+        evidence: vec![],
+        payload: encoded,
+        privacy: 1, // Node
+        capability_scope: String::new(),
+        sealed: false,
+        key_domain_id: Uuid::nil(),
+        key_epoch: 0,
+        retention_class: 2,
+        retention_policy_version: 0,
+        retain_until_ms: 0,
+        sensitivity: 1,
+    };
+
+    let client = EventClient::session().await.ok()?;
+    client.submit(&envelope).await.ok()?;
+    Some(message_id)
+}
+
+/// Record the conclusion of an intention as the one terminal Outcome of its contribution.
+///
+/// The Journal enforces one terminal Outcome per cause, which is what makes a concluded
+/// obligation impossible to conclude twice. An intention the Journal never took has nothing to
+/// conclude against, so nothing is written for it rather than an Outcome citing thin air.
+async fn submit_outcome(
+    contribution_id: Uuid,
+    resolution: Resolution,
+    note: Option<&str>,
+    now: OffsetDateTime,
+) -> bool {
+    let payload = OutcomePayload {
+        resolution: format!("{resolution:?}").to_lowercase(),
+        note: note.map(ToOwned::to_owned),
+    };
+    let mut encoded = Vec::new();
+    if ciborium::into_writer(&payload, &mut encoded).is_err() {
+        return false;
+    }
+
+    let envelope = CanonicalEnvelope {
+        schema_version: 3,
+        message_id: Uuid::new_v4(),
+        correlation_id: contribution_id,
+        causation_id: contribution_id,
+        origin_organ: "intentiond".to_string(),
+        origin_node: String::new(),
+        kind: 12, // Outcome
+        wall_time_ms: unix_millis(now),
+        monotonic_time: 0,
+        logical_clock: 1,
+        confidence: 1.0,
+        evidence: vec![],
+        payload: encoded,
+        privacy: 1, // Node
+        capability_scope: String::new(),
+        sealed: false,
+        key_domain_id: Uuid::nil(),
+        key_epoch: 0,
+        retention_class: 2,
+        retention_policy_version: 0,
+        retain_until_ms: 0,
+        sensitivity: 1,
+    };
+
+    let Ok(client) = EventClient::session().await else {
+        return false;
+    };
+    client.submit(&envelope).await.is_ok()
+}
+
+/// How an obligation ended.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OutcomePayload {
+    resolution: String,
+    note: Option<String>,
+}
+
+/// What a recorded intention says. The obligation itself, not a description of the organ.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IntentionPayload {
+    intention_id: Uuid,
+    description: String,
+    trigger: String,
 }
 
 #[allow(
@@ -50,10 +171,30 @@ impl Intention1Service {
                 Err(_) => return String::new(), // reject invalid cause
             }
         };
-        match self.core.form(description, trigger, cause, now) {
-            Ok(id) => id.to_string(),
-            Err(_) => String::new(),
+        let Ok(id) = self
+            .core
+            .form(description.clone(), trigger.clone(), cause, now)
+        else {
+            return String::new();
+        };
+
+        // An intention is a thought, and the admission rules require a thought to cite what it
+        // came from: Kind::Intention is not a root kind, so a contribution with no cause and no
+        // evidence is refused. An intention formed from nothing therefore stays in this organ's
+        // own state and does not enter the biography — which is the rule working, not a failure
+        // to record it.
+        if let Some(cause) = cause {
+            match submit_intention(&id, &description, &trigger, cause, now).await {
+                Some(contribution_id) => {
+                    let _ = self.core.record_contribution(id, contribution_id);
+                }
+                None => {
+                    println!("[cybou-intentiond] Intention {id} was not accepted into the Journal");
+                }
+            }
         }
+
+        id.to_string()
     }
 
     /// Close an intention by resolution ("fulfilled", "abandoned", "obsolete") or reject.
@@ -72,7 +213,24 @@ impl Intention1Service {
         } else {
             Some(note.as_str())
         };
-        self.core.close(id, res, note_opt).is_ok()
+        // Read the contribution before closing: closing removes the intention, and with it the
+        // only record of which contribution an Outcome would have to conclude.
+        let contribution_id = self.core.contribution_of(id);
+
+        if self.core.close(id, res, note_opt).is_err() {
+            return false;
+        }
+
+        if let Some(contribution_id) = contribution_id {
+            let now = OffsetDateTime::now_utc();
+            if !submit_outcome(contribution_id, res, note_opt, now).await {
+                println!(
+                    "[cybou-intentiond] Outcome for contribution {contribution_id} was not accepted"
+                );
+            }
+        }
+
+        true
     }
 
     /// Return open intentions encoded as CBOR.

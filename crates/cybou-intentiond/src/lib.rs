@@ -36,6 +36,13 @@ pub struct Intention {
     /// Formation timestamp.
     #[serde(with = "time::serde::rfc3339")]
     pub formed: OffsetDateTime,
+    /// The contribution that recorded this intention in the Journal, when one was accepted.
+    ///
+    /// Absent for an intention the Journal never took — one formed without a cause to cite, or
+    /// formed while Event1 was unreachable. Its conclusion cannot be recorded either, because an
+    /// Outcome has to name the contribution it concludes.
+    #[serde(default)]
+    pub contribution_id: Option<Uuid>,
 }
 
 /// How an intention was closed.
@@ -162,6 +169,7 @@ impl IntentionCore {
             trigger: trigger.into(),
             cause_id,
             formed: now,
+            contribution_id: None,
         };
 
         let mut candidate = self
@@ -207,6 +215,46 @@ impl IntentionCore {
             *list = candidate;
         }
         Ok(())
+    }
+
+    /// Record which contribution carried this intention into the Journal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IntentionError`] when the intention is unknown or the state cannot be persisted.
+    pub fn record_contribution(
+        &self,
+        id: Uuid,
+        contribution_id: Uuid,
+    ) -> Result<(), IntentionError> {
+        let mut candidate = self
+            .open_intentions
+            .read()
+            .map_err(|_| IntentionError::LockPoisoned)?
+            .clone();
+        let entry = candidate
+            .iter_mut()
+            .find(|item| item.id == id)
+            .ok_or(IntentionError::NotFound(id))?;
+        entry.contribution_id = Some(contribution_id);
+
+        self.persist_candidate(&candidate)?;
+
+        if let Ok(mut list) = self.open_intentions.write() {
+            *list = candidate;
+        }
+        Ok(())
+    }
+
+    /// The contribution that recorded an open intention, if the Journal took one.
+    #[must_use]
+    pub fn contribution_of(&self, id: Uuid) -> Option<Uuid> {
+        self.open_intentions
+            .read()
+            .ok()?
+            .iter()
+            .find(|item| item.id == id)?
+            .contribution_id
     }
 
     /// Return all currently open intentions.

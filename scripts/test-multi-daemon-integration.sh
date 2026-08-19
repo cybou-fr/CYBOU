@@ -123,6 +123,9 @@ for name in "${NAMES[@]}"; do
     echo "    $name Ready -> $answer"
 done
 
+# Formed with no cause on purpose: Kind::Intention is not a root kind, so an intention with
+# nothing to cite cannot enter the Journal, and this exercises the path where the obligation is
+# durable in its own organ while the biography records nothing.
 echo "==> Testing Intention formation and restart survival..."
 INTENTION_ID=$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 Form sss "Run integration tests" "Session startup" "" | awk '{print $2}' | tr -d '"')
 echo "Formed Intention ID: $INTENTION_ID"
