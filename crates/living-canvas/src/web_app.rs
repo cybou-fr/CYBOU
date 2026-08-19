@@ -463,11 +463,14 @@ pub fn App() -> impl IntoView {
                 >
                     <div class="ambient" aria-hidden="true"></div>
                     <svg class="relationship-layer" aria-label="Canvas relationships">
-                        <RelationshipEdge layout=layout selected=selected from=Panel::Identity to=Panel::Capabilities label="delivers" amber=false />
-                        <RelationshipEdge layout=layout selected=selected from=Panel::Session to=Panel::Capabilities label="involves" amber=false />
-                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Journal label="validated by" amber=false />
-                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Lifecycle label="depends on" amber=true />
-                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Commitments label="tracked by" amber=false />
+                        // Each edge is a relationship the system actually has: every organ writes
+                        // its contributions into the one Journal, Health1 derives capabilities from
+                        // whether those organs answer, and the session only presents the result.
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Identity to=Panel::Journal label="writes to" amber=false />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Commitments to=Panel::Journal label="writes to" amber=false />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Lifecycle to=Panel::Journal label="consolidates into" amber=true />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Identity label="evaluates" amber=false />
+                        <RelationshipEdge layout=layout selected=selected from=Panel::Capabilities to=Panel::Session label="presented under" amber=false />
                     </svg>
                     <button
                         class:selected=move || selected.get() == "identity"
