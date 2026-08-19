@@ -81,7 +81,8 @@
         "knowledge",
         "contributionCount",
         "erasureEpoch",
-        "recent"
+        "recent",
+        "integrity"
       ],
       "properties": {
         "knowledge": {
@@ -133,6 +134,12 @@
               }
             }
           }
+        },
+        "integrity": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },

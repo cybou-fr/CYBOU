@@ -7,6 +7,17 @@ use std::{env, path::PathBuf, sync::Arc};
 
 use cybou_crypto::{KeyDomain, KeyStore, Seal};
 use cybou_eventd::EventCore;
+#[cfg(target_os = "linux")]
+use time::OffsetDateTime;
+
+/// How many rows one verification pass replays. Bounded so a long Journal is caught up over
+/// several passes instead of blocking one.
+#[cfg(target_os = "linux")]
+const VERIFICATION_PAGE: u64 = 512;
+
+/// How often a pass runs.
+#[cfg(target_os = "linux")]
+const VERIFICATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,6 +71,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         use cybou_eventd::service::Event1Service;
         use cybou_fabric::EVENT;
+
+        // Verify the chain in bounded passes rather than on demand. Verification is linear in
+        // the length of the Journal, so answering it inside a request would make every reader pay
+        // for the whole biography; a background pass catches up once and then tracks the tail.
+        let verifier_core = core.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(VERIFICATION_INTERVAL);
+            loop {
+                interval.tick().await;
+                let state = verifier_core.verify_page(VERIFICATION_PAGE, OffsetDateTime::now_utc());
+                if let Some(state) = state
+                    && let Some(broken_at) = state.broken_at
+                {
+                    println!(
+                        "[cybou-eventd] Journal chain broken at sequence {broken_at}; verified through {}",
+                        state.verified_through
+                    );
+                }
+            }
+        });
 
         println!("[cybou-eventd] Connecting to D-Bus session bus...");
         let service = Event1Service::new(core);

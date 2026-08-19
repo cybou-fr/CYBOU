@@ -229,6 +229,7 @@ impl ZbusPresenceSource {
                 contribution_count: None,
                 erasure_epoch: None,
                 recent: Vec::new(),
+                integrity: None,
             };
         };
         JournalProjection {
@@ -236,7 +237,30 @@ impl ZbusPresenceSource {
             contribution_count: Some(count),
             erasure_epoch: self.read(EVENT, "ErasureEpoch").await,
             recent: self.recent_contributions().await,
+            integrity: self.integrity().await,
         }
+    }
+
+    /// How far the chain has been verified, stated as a position rather than a verdict.
+    ///
+    /// "Verified" without a position would claim something about rows nobody replayed, so a pass
+    /// still catching up says how far it got.
+    async fn integrity(&self) -> Option<String> {
+        let encoded = self.read::<Vec<u8>>(EVENT, "Verification").await?;
+        if encoded.is_empty() {
+            return None;
+        }
+        let state = ciborium::from_reader::<OwnerVerification, _>(encoded.as_slice()).ok()?;
+        Some(match state.broken_at {
+            Some(broken_at) => format!("chain broken at {broken_at}"),
+            None if state.verified_through >= state.head => {
+                format!("verified through {}", state.verified_through)
+            }
+            None => format!(
+                "verified through {} of {}",
+                state.verified_through, state.head
+            ),
+        })
     }
 
     /// The tail of the Journal, newest first.
@@ -444,6 +468,15 @@ struct OwnerMomentState {
     focus: Option<uuid::Uuid>,
     salience: f64,
     organs: Vec<String>,
+}
+
+/// Event1's verification state.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerVerification {
+    verified_through: u64,
+    head: u64,
+    broken_at: Option<u64>,
 }
 
 /// Lifecycle1's own state shape, of which the panel uses two fields.

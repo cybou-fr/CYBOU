@@ -38,13 +38,9 @@ impl Self1Service {
         let obligations = self.read_obligations(conn, now).await;
         let calibrations = self.read_calibrations(conn).await;
         let contributions = read::<u64>(conn, EVENT, "Count").await.unwrap_or_default();
-        self.core.measure_with(
-            now,
-            contributions,
-            obligations,
-            calibrations,
-            VerificationKnowledge::Unknown,
-        )
+        let verification = read_verification(conn).await;
+        self.core
+            .measure_with(now, contributions, obligations, calibrations, verification)
     }
 
     async fn read_obligations(
@@ -90,6 +86,36 @@ impl Self1Service {
             settled,
         ))
     }
+}
+
+/// What Event1 established about the chain, translated into what Self1 is willing to claim.
+///
+/// A chain replayed only part of the way is not verified memory. Reporting it as verified would
+/// state something about rows nobody has looked at, so a pass still catching up stays unknown.
+async fn read_verification(conn: &zbus::Connection) -> VerificationKnowledge {
+    let Some(encoded) = read::<Vec<u8>>(conn, EVENT, "Verification").await else {
+        return VerificationKnowledge::Unknown;
+    };
+    if encoded.is_empty() {
+        return VerificationKnowledge::Unknown;
+    }
+    let Ok(state) = ciborium::from_reader::<OwnerVerification, _>(encoded.as_slice()) else {
+        return VerificationKnowledge::Unknown;
+    };
+    match state.broken_at {
+        Some(first_broken_at) => VerificationKnowledge::Invalid { first_broken_at },
+        None if state.verified_through >= state.head => VerificationKnowledge::Verified,
+        None => VerificationKnowledge::Unknown,
+    }
+}
+
+/// Event1's verification state.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerVerification {
+    verified_through: u64,
+    head: u64,
+    broken_at: Option<u64>,
 }
 
 /// One open obligation, of which only its age is needed here.

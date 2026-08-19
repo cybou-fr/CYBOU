@@ -87,6 +87,14 @@ impl Event1Service {
             .map_or_else(Vec::new, |e| encode_envelope(&e))
     }
 
+    /// The verification the last incremental pass established, as CBOR, or empty when none has
+    /// run yet.
+    async fn verification(&self) -> Vec<u8> {
+        self.core
+            .verification()
+            .map_or_else(Vec::new, |state| encode(&state))
+    }
+
     /// Current erasure epoch.
     async fn erasure_epoch(&self) -> u64 {
         self.core.erasure_epoch()
@@ -220,6 +228,12 @@ impl Event1Service {
         encoded_envelope: &[u8],
         sequence: u64,
     ) -> zbus::Result<()>;
+}
+
+fn encode<T: serde::Serialize>(value: &T) -> Vec<u8> {
+    let mut buf = Vec::new();
+    let _ = ciborium::into_writer(value, &mut buf);
+    buf
 }
 
 fn encode_envelope(env: &CanonicalEnvelope) -> Vec<u8> {

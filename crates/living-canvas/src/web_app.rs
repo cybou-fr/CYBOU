@@ -110,7 +110,7 @@ impl Panel {
             Self::Identity => (220.0, 188.0),
             Self::Session => (240.0, 236.0),
             Self::Capabilities => (390.0, 294.0),
-            Self::Journal => (300.0, 260.0),
+            Self::Journal => (300.0, 285.0),
             Self::Lifecycle => (335.0, 252.0),
             Self::Commitments => (310.0, 184.0),
             Self::SelfModel => (330.0, 210.0),
@@ -391,6 +391,11 @@ pub fn App() -> impl IntoView {
             .map_or_else(unread, |value| value.to_string())
     };
     let journal_recent = move || mind().map_or_else(Vec::new, |m| m.journal.recent);
+    let journal_integrity = move || {
+        mind()
+            .and_then(|m| m.journal.integrity)
+            .unwrap_or_else(|| "not verified yet".to_owned())
+    };
     let journal_state = move || {
         mind().map_or_else(
             || "Event1 not read".to_owned(),
@@ -641,6 +646,7 @@ pub fn App() -> impl IntoView {
                         <strong>"Canonical Journal"</strong>
                         <span class="row"><b>"Contributions"</b><i>{journal_count}</i></span>
                         <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch}</i></span>
+                        <span class="row"><b>"Integrity"</b><i>{journal_integrity}</i></span>
                         <div class="journal-feed">
                             <For
                                 each=journal_recent

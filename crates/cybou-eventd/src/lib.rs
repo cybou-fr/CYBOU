@@ -16,9 +16,13 @@ use std::{
 
 use cybou_crypto::{KeyDomain, KeyStore};
 use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
-use cybou_storage::writer::{Appended, JournalWriter, WriteError};
+use cybou_storage::{
+    JournalCheckpoint,
+    writer::{Appended, JournalWriter, WriteError},
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 #[cfg(target_os = "linux")]
@@ -124,6 +128,48 @@ pub struct EventCore {
     offsets_path: PathBuf,
     offsets: Mutex<HashMap<String, u64>>,
     checkpoint_path: PathBuf,
+    journal_path: PathBuf,
+    verification: Mutex<Option<VerificationState>>,
+}
+
+/// What the last incremental verification established about the Journal.
+///
+/// It carries how far verification reached and where the head is, because "verified" is only
+/// meaningful against a position: a chain proven intact through row 200 of 400 says nothing about
+/// the other 200, and reporting that as verified would be the kind of claim this system exists to
+/// avoid.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerificationState {
+    /// Last sequence whose hash chain has been replayed.
+    pub verified_through: u64,
+    /// Journal head at the moment of the check.
+    pub head: u64,
+    /// Sequence where the chain first failed, if it did.
+    pub broken_at: Option<u64>,
+    /// V3 payloads whose bytes were present and matched their commitment.
+    pub content_verified: u64,
+    /// Erased v3 payloads skipped while their metadata stayed verified.
+    pub content_skipped: u64,
+    /// RFC 3339 instant of the check.
+    pub taken_at: String,
+}
+
+impl VerificationState {
+    /// Whether the whole chain up to the head has been replayed without a break.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.broken_at.is_none() && self.verified_through >= self.head
+    }
+}
+
+/// The checkpoint as persisted between runs.
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistedCheckpoint {
+    version: u8,
+    sequence: u64,
+    hash: String,
 }
 
 impl EventCore {
@@ -150,10 +196,96 @@ impl EventCore {
             offsets_path,
             offsets: Mutex::new(HashMap::new()),
             checkpoint_path,
+            journal_path: journal_path.to_path_buf(),
+            verification: Mutex::new(None),
         };
 
         core.load_offsets();
         Ok(core)
+    }
+
+    /// The verification established by the last incremental pass, if one has run.
+    #[must_use]
+    pub fn verification(&self) -> Option<VerificationState> {
+        self.verification
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+    }
+
+    /// Replay a bounded page of the hash chain, continuing from the persisted checkpoint.
+    ///
+    /// Bounded on purpose: verifying a Journal is linear in its length, and an unbounded pass
+    /// would grow without limit against a Journal that only ever grows. Each pass advances the
+    /// checkpoint, so repeated calls catch up and then track the tail.
+    ///
+    /// A break is not recorded as a checkpoint: the trusted position must stay where the chain was
+    /// last actually intact.
+    pub fn verify_page(&self, max_rows: u64, now: OffsetDateTime) -> Option<VerificationState> {
+        let checkpoint = self.load_checkpoint();
+        let head = self.count();
+        let outcome =
+            cybou_storage::verify_journal_page(&self.journal_path, checkpoint.as_ref(), max_rows);
+
+        let state = match outcome {
+            Ok(verification) => {
+                self.save_checkpoint(&verification.checkpoint);
+                VerificationState {
+                    verified_through: verification.verified_through,
+                    head,
+                    broken_at: None,
+                    content_verified: verification.content_verified,
+                    content_skipped: verification.content_skipped,
+                    taken_at: format_instant(now),
+                }
+            }
+            Err(_) => VerificationState {
+                verified_through: checkpoint.as_ref().map_or(0, |c| c.sequence),
+                head,
+                broken_at: Some(checkpoint.as_ref().map_or(0, |c| c.sequence) + 1),
+                content_verified: 0,
+                content_skipped: 0,
+                taken_at: format_instant(now),
+            },
+        };
+
+        if let Ok(mut guard) = self.verification.lock() {
+            *guard = Some(state.clone());
+        }
+        Some(state)
+    }
+
+    fn load_checkpoint(&self) -> Option<JournalCheckpoint> {
+        let mut file = File::open(&self.checkpoint_path).ok()?;
+        let mut raw = String::new();
+        file.read_to_string(&mut raw).ok()?;
+        let persisted: PersistedCheckpoint = serde_json::from_str(&raw).ok()?;
+        if persisted.version != 1 {
+            return None;
+        }
+        Some(JournalCheckpoint {
+            sequence: persisted.sequence,
+            hash: decode_hex(&persisted.hash)?,
+        })
+    }
+
+    fn save_checkpoint(&self, checkpoint: &JournalCheckpoint) -> bool {
+        let persisted = PersistedCheckpoint {
+            version: 1,
+            sequence: checkpoint.sequence,
+            hash: encode_hex(&checkpoint.hash),
+        };
+        let Ok(json) = serde_json::to_string(&persisted) else {
+            return false;
+        };
+        let temp_path = self.checkpoint_path.with_extension("tmp");
+        if let Ok(mut file) = File::create(&temp_path)
+            && file.write_all(json.as_bytes()).is_ok()
+            && file.sync_all().is_ok()
+        {
+            return fs::rename(&temp_path, &self.checkpoint_path).is_ok();
+        }
+        false
     }
 
     /// Attach a `KeyStore` to the underlying `JournalWriter` for sensitive payload sealing.
@@ -387,8 +519,42 @@ fn is_valid_consumer_id(consumer_id: &str) -> bool {
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '-')
 }
 
+fn format_instant(now: OffsetDateTime) -> String {
+    now.format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into())
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+
+    bytes.iter().fold(String::new(), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
+}
+
+fn decode_hex(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(text.get(index..index + 2)?, 16).ok())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn hex_round_trips_the_checkpoint_hash() {
+        let hash = vec![0x00, 0x0f, 0xa5, 0xff];
+        let text = super::encode_hex(&hash);
+        assert_eq!(text, "000fa5ff");
+        assert_eq!(super::decode_hex(&text), Some(hash));
+        assert_eq!(super::decode_hex("abc"), None);
+        assert_eq!(super::decode_hex("zz"), None);
+    }
+
     use cybou_protocol::unix_millis;
     use tempfile::tempdir;
     use time::OffsetDateTime;

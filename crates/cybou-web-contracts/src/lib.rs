@@ -145,6 +145,9 @@ pub struct JournalProjection {
     /// The most recent contributions, newest first. Empty is meaningful only when `knowledge`
     /// is known.
     pub recent: Vec<ContributionProjection>,
+    /// What verification has established about the chain, in the owner's own terms: `verified`,
+    /// `broken at N`, `verified through N of M`, or unknown when no pass has run.
+    pub integrity: Option<String>,
 }
 
 /// One open commitment as Intention1 holds it.
