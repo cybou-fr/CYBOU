@@ -12,7 +12,21 @@
   "journal": {
     "knowledge": "known",
     "contributionCount": 134,
-    "erasureEpoch": 0
+    "erasureEpoch": 0,
+    "recent": [
+      {
+        "messageId": "9c9e4d3f-2a1b-47c6-8f14-e45fceea0001",
+        "kind": "observation",
+        "originOrgan": "perceptiond",
+        "recordedAt": "2026-08-19T11:59:58Z"
+      },
+      {
+        "messageId": "9c9e4d3f-2a1b-47c6-8f14-e45fceea0002",
+        "kind": "intention",
+        "originOrgan": "intentiond",
+        "recordedAt": "2026-08-19T11:40:00Z"
+      }
+    ]
   },
   "commitments": {
     "knowledge": "known",

@@ -12,11 +12,11 @@ use cybou_fabric::{
     rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
     zbus_rpc::ResilientZbusClient,
 };
-use cybou_protocol::{CapabilityState, KnowledgeState};
+use cybou_protocol::{CapabilityState, KnowledgeState, canonical::CanonicalEnvelope};
 use cybou_web_contracts::{
-    CapabilityProjection, CommitmentProjection, CommitmentsProjection, Freshness,
-    IdentityProjection, JournalProjection, LifecycleProjection, MindProjection, SnapshotProjection,
-    WEB_SCHEMA_V1,
+    CapabilityProjection, CommitmentProjection, CommitmentsProjection, ContributionProjection,
+    Freshness, IdentityProjection, JournalProjection, LifecycleProjection, MindProjection,
+    SnapshotProjection, WEB_SCHEMA_V1,
 };
 use futures_util::StreamExt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -172,13 +172,26 @@ impl ZbusPresenceSource {
     where
         T: serde::de::DeserializeOwned + zbus::zvariant::Type,
     {
+        self.read_with(endpoint, method, &()).await
+    }
+
+    async fn read_with<T, A>(
+        &self,
+        endpoint: cybou_fabric::BusEndpoint,
+        method: &str,
+        args: &A,
+    ) -> Option<T>
+    where
+        T: serde::de::DeserializeOwned + zbus::zvariant::Type,
+        A: serde::Serialize + zbus::zvariant::DynamicType,
+    {
         self.connection
             .call_method(
                 Some(endpoint.service),
                 endpoint.object_path,
                 Some(endpoint.interface),
                 method,
-                &(),
+                args,
             )
             .await
             .ok()?
@@ -215,13 +228,46 @@ impl ZbusPresenceSource {
                 knowledge: KnowledgeState::Unknown,
                 contribution_count: None,
                 erasure_epoch: None,
+                recent: Vec::new(),
             };
         };
         JournalProjection {
             knowledge: KnowledgeState::Known,
             contribution_count: Some(count),
             erasure_epoch: self.read(EVENT, "ErasureEpoch").await,
+            recent: self.recent_contributions().await,
         }
+    }
+
+    /// The tail of the Journal, newest first.
+    ///
+    /// Event1 returns the rows in stored order; a reader watching a system live wants the newest
+    /// line at the top, so the order is reversed here rather than left for the page to guess.
+    async fn recent_contributions(&self) -> Vec<ContributionProjection> {
+        let Some(encoded) = self
+            .read_with::<Vec<u8>, _>(EVENT, "Recent", &(RECENT_CONTRIBUTIONS,))
+            .await
+        else {
+            return Vec::new();
+        };
+        if encoded.is_empty() {
+            return Vec::new();
+        }
+        let Ok(envelopes) = ciborium::from_reader::<Vec<CanonicalEnvelope>, _>(encoded.as_slice())
+        else {
+            return Vec::new();
+        };
+        let mut rows: Vec<ContributionProjection> = envelopes
+            .into_iter()
+            .map(|envelope| ContributionProjection {
+                message_id: envelope.message_id.to_string(),
+                kind: kind_name(envelope.kind),
+                origin_organ: envelope.origin_organ,
+                recorded_at: millis_to_rfc3339(envelope.wall_time_ms),
+            })
+            .collect();
+        rows.reverse();
+        rows
     }
 
     async fn commitments(&self) -> CommitmentsProjection {
@@ -286,6 +332,28 @@ impl ZbusPresenceSource {
     }
 }
 
+/// How many Journal rows the panel asks for. Enough to show that a system is living, few enough
+/// that one read stays inside the gateway's budget.
+const RECENT_CONTRIBUTIONS: i32 = 12;
+
+/// The frozen kind in its own spelling, or an explicit unknown.
+///
+/// A kind this contract version cannot name is reported as unknown rather than guessed at, for the
+/// same reason `Kind::from_u16` refuses to default it.
+fn kind_name(kind: u16) -> String {
+    cybou_protocol::Kind::from_u16(kind).map_or_else(
+        || format!("unknown kind {kind}"),
+        |kind| format!("{kind:?}").to_lowercase(),
+    )
+}
+
+fn millis_to_rfc3339(millis: i64) -> String {
+    OffsetDateTime::from_unix_timestamp_nanos(i128::from(millis) * 1_000_000)
+        .ok()
+        .and_then(|instant| instant.format(&Rfc3339).ok())
+        .unwrap_or_else(|| "1970-01-01T00:00:00Z".into())
+}
+
 /// Intention1's own row shape, decoded only to be re-projected into the web contract.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -344,7 +412,7 @@ mod tests {
     use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
     use serde_json::{Value, json};
 
-    use super::ZbusPresenceSource;
+    use super::{ZbusPresenceSource, kind_name, millis_to_rfc3339};
 
     fn encoded(value: &Value) -> Vec<u8> {
         let root = json!({ "version": 1, "value": value });
@@ -381,6 +449,20 @@ mod tests {
         assert_eq!(decoded.capabilities.len(), 1);
         assert_eq!(decoded.capabilities[0].id, "identity-continuity");
         assert_eq!(decoded.capabilities[0].state, CapabilityState::Available);
+    }
+
+    #[test]
+    fn an_unnameable_kind_is_reported_as_unknown_rather_than_guessed() {
+        assert_eq!(kind_name(1), "observation");
+        assert_eq!(kind_name(11), "intention");
+        assert_eq!(kind_name(17), "contextdisclosed");
+        assert_eq!(kind_name(999), "unknown kind 999");
+    }
+
+    #[test]
+    fn journal_instants_are_rendered_from_the_stored_milliseconds() {
+        assert_eq!(millis_to_rfc3339(0), "1970-01-01T00:00:00Z");
+        assert_eq!(millis_to_rfc3339(1_787_175_856_000), "2026-08-19T21:44:16Z");
     }
 
     #[test]

@@ -113,6 +113,25 @@ pub struct IdentityProjection {
     pub architecture_version: Option<String>,
 }
 
+/// One contribution as the Journal recorded it.
+///
+/// Metadata only. Payloads are sealed in the Journal and stay sealed here: what a reader learns is
+/// that an organ recorded something of a given kind at a given moment, which is what a biography
+/// looks like from outside.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContributionProjection {
+    /// Stable contribution identity.
+    pub message_id: String,
+    /// Frozen contribution kind in its own spelling, or an explicit unknown for a kind this
+    /// contract version cannot name.
+    pub kind: String,
+    /// Organ that recorded it.
+    pub origin_organ: String,
+    /// RFC 3339 instant the organ recorded.
+    pub recorded_at: String,
+}
+
 /// What the canonical Journal holds, as reported by Event1.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +142,9 @@ pub struct JournalProjection {
     pub contribution_count: Option<u64>,
     /// Current erasure epoch.
     pub erasure_epoch: Option<u64>,
+    /// The most recent contributions, newest first. Empty is meaningful only when `knowledge`
+    /// is known.
+    pub recent: Vec<ContributionProjection>,
 }
 
 /// One open commitment as Intention1 holds it.

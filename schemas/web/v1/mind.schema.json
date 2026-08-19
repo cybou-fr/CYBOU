@@ -13,8 +13,13 @@
     "lifecycle"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "observedAt": { "type": "string", "format": "date-time" },
+    "schemaVersion": {
+      "const": 1
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
     "identity": {
       "type": "object",
       "additionalProperties": false,
@@ -27,42 +32,156 @@
         "architectureVersion"
       ],
       "properties": {
-        "knowledge": { "enum": ["known", "unknown"] },
-        "identityId": { "type": ["string", "null"], "minLength": 1 },
-        "origin": { "type": ["string", "null"] },
-        "sessionCount": { "type": ["integer", "null"], "minimum": 0 },
-        "ageInDays": { "type": ["integer", "null"] },
-        "architectureVersion": { "type": ["string", "null"] }
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "identityId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sessionCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "ageInDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "architectureVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "journal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["knowledge", "contributionCount", "erasureEpoch"],
+      "required": [
+        "knowledge",
+        "contributionCount",
+        "erasureEpoch",
+        "recent"
+      ],
       "properties": {
-        "knowledge": { "enum": ["known", "unknown"] },
-        "contributionCount": { "type": ["integer", "null"], "minimum": 0 },
-        "erasureEpoch": { "type": ["integer", "null"], "minimum": 0 }
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "contributionCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "erasureEpoch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "recent": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "messageId",
+              "kind",
+              "originOrgan",
+              "recordedAt"
+            ],
+            "properties": {
+              "messageId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "originOrgan": {
+                "type": "string"
+              },
+              "recordedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
       }
     },
     "commitments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["knowledge", "openCount", "open"],
+      "required": [
+        "knowledge",
+        "openCount",
+        "open"
+      ],
       "properties": {
-        "knowledge": { "enum": ["known", "unknown"] },
-        "openCount": { "type": ["integer", "null"], "minimum": 0 },
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "openCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
         "open": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "description", "trigger", "formed"],
+            "required": [
+              "id",
+              "description",
+              "trigger",
+              "formed"
+            ],
             "properties": {
-              "id": { "type": "string", "minLength": 1 },
-              "description": { "type": "string" },
-              "trigger": { "type": "string" },
-              "formed": { "type": "string", "format": "date-time" }
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string"
+              },
+              "trigger": {
+                "type": "string"
+              },
+              "formed": {
+                "type": "string",
+                "format": "date-time"
+              }
             }
           }
         }
@@ -71,11 +190,30 @@
     "lifecycle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["knowledge", "mode", "lastUserActivityAt"],
+      "required": [
+        "knowledge",
+        "mode",
+        "lastUserActivityAt"
+      ],
       "properties": {
-        "knowledge": { "enum": ["known", "unknown"] },
-        "mode": { "type": ["string", "null"] },
-        "lastUserActivityAt": { "type": ["string", "null"] }
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastUserActivityAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     }
   }

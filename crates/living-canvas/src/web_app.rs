@@ -94,7 +94,7 @@ impl Panel {
             Self::Identity => (220.0, 188.0),
             Self::Session => (240.0, 236.0),
             Self::Capabilities => (390.0, 294.0),
-            Self::Journal => (245.0, 230.0),
+            Self::Journal => (300.0, 300.0),
             Self::Lifecycle => (335.0, 252.0),
             Self::Commitments => (310.0, 184.0),
         }
@@ -366,6 +366,7 @@ pub fn App() -> impl IntoView {
             .and_then(|m| m.journal.erasure_epoch)
             .map_or_else(unread, |value| value.to_string())
     };
+    let journal_recent = move || mind().map_or_else(Vec::new, |m| m.journal.recent);
     let journal_state = move || {
         mind().map_or_else(
             || "Event1 not read".to_owned(),
@@ -577,6 +578,21 @@ pub fn App() -> impl IntoView {
                         <strong>"Canonical Journal"</strong>
                         <span class="row"><b>"Contributions"</b><i>{journal_count}</i></span>
                         <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch}</i></span>
+                        <div class="journal-feed">
+                            <For
+                                each=journal_recent
+                                key=|contribution| contribution.message_id.clone()
+                                children=move |contribution| {
+                                    view! {
+                                        <span class="journal-line">
+                                            <b>{contribution.kind}</b>
+                                            <i>{contribution.origin_organ}</i>
+                                            <small>{contribution.recorded_at}</small>
+                                        </span>
+                                    }
+                                }
+                            />
+                        </div>
                         <span class="journal-footer"><i>{journal_state}</i><b>"Append only"</b></span>
                     </button>
 

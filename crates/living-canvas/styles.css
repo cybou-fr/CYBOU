@@ -114,7 +114,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .lifecycle-actions button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: #e3e9ed; cursor: pointer; }
 .lifecycle-actions .primary { border-color: #efc45a; background: linear-gradient(#f8d36c,#e9af31); color: #17130a; font-weight: 650; }
 .lifecycle-source { padding-top: 10px; border-top: 1px solid rgba(154,167,184,.14); font-size: 10px; }
-.journal { width: 245px; padding: 20px; }
+.journal { width: 300px; padding: 20px; }
+.journal-feed { display: grid; gap: 5px; max-height: 150px; overflow-y: auto; margin-top: 4px; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
+.journal-line { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; font-size: 11px; }
+.journal-line b { color: #dfe8ed; font-weight: 500; }
+.journal-line i { color: var(--accent); font-style: normal; font-size: 10px; }
+.journal-line small { color: var(--muted); font-size: 10px; white-space: nowrap; }
 .journal-footer { display: flex; justify-content: space-between; margin-top: 3px; padding-top: 11px; border-top: 1px solid rgba(154,167,184,.14); font-size: 11px; }
 .journal-footer i { color: var(--muted); font-style: normal; }
 .journal-footer b { color: #70a8f7; font-weight: 500; }
