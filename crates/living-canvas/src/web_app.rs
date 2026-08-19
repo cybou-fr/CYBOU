@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v1";
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v2";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Point {
@@ -91,10 +91,10 @@ impl Panel {
 
     const fn size(self) -> (f64, f64) {
         match self {
-            Self::Artifact => (220.0, 112.0),
-            Self::Collaborators => (240.0, 184.0),
-            Self::Release => (390.0, 251.0),
-            Self::Sources => (245.0, 184.0),
+            Self::Artifact => (220.0, 188.0),
+            Self::Collaborators => (240.0, 236.0),
+            Self::Release => (390.0, 294.0),
+            Self::Sources => (245.0, 230.0),
             Self::Suggestion => (335.0, 252.0),
             Self::Commitments => (310.0, 184.0),
         }
@@ -352,9 +352,11 @@ pub fn App() -> impl IntoView {
                     on:keydown=move |event| keyboard_move(event, Panel::Artifact, layout)
                     on:click=move |_| set_selected.set("artifact")
                 >
-                    <small class="panel-kicker"><FileCheck size=14 /><span>"Artifact"</span></small>
-                    <strong>"Release evidence"</strong>
-                    <span>"12 verified sources"</span>
+                    <small class="panel-kicker"><FileCheck size=14 /><span>"Verified artifact"</span></small>
+                    <strong>"cybou-0.8.0.tar.zst"</strong>
+                    <span class="artifact-digest">"SHA256: a3f2…9c7b"</span>
+                    <span class="artifact-badges"><i>"Reproducible"</i><i>"Signed"</i></span>
+                    <span class="artifact-meta">"Build · 10m ago · Local"</span>
                 </button>
 
                 <Show when=move || selected.get() == "release">
@@ -386,6 +388,8 @@ pub fn App() -> impl IntoView {
                     <span class="row"><b>"Mina K."</b><i>"Release lead"</i></span>
                     <span class="row"><b>"Jonas L."</b><i>"QA lead"</i></span>
                     <span class="row"><b>"Priya S."</b><i>"Security"</i></span>
+                    <span class="row"><b>"Devon R."</b><i>"Docs"</i></span>
+                    <span class="panel-link">"Invite collaborator"</span>
                 </button>
 
                 <button
@@ -399,10 +403,15 @@ pub fn App() -> impl IntoView {
                 >
                     <small class="panel-kicker"><Sparkles size=14 /><span>"Release plan"</span></small>
                     <h1>"Cybou 0.8 release"</h1>
+                    <span class="release-kind">"Release plan"</span>
                     <p>"Stable release with local-first guarantees, improved reliability, and rollback safety."</p>
                     <div class="progress-label"><span>"Progress"</span><strong>"68%"</strong></div>
                     <div class="progress" aria-label="Release progress 68 percent"><span></span></div>
-                    <footer><span>"Target · May 30"</span><span class="nominal">"On track"</span></footer>
+                    <footer class="release-meta">
+                        <span><small>"Target"</small><b>"May 30, 2025"</b></span>
+                        <span><small>"Owner"</small><b>"Ari N."</b></span>
+                        <span><small>"State"</small><b class="nominal">"On track"</b></span>
+                    </footer>
                 </button>
 
                 <button
@@ -420,6 +429,8 @@ pub fn App() -> impl IntoView {
                     <span class="row"><b>"Changelog"</b><i>"v3"</i></span>
                     <span class="row"><b>"Test results"</b><i>"128"</i></span>
                     <span class="row"><b>"Threat model"</b><i>"v2"</i></span>
+                    <span class="row"><b>"Dependencies"</b><i>"52"</i></span>
+                    <span class="sources-footer"><i>"5 items"</i><b>"View all"</b></span>
                 </button>
 
                 <article
@@ -539,7 +550,7 @@ fn release_actions_style(layout: CanvasLayout) -> String {
     format!(
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         point.x + 18.0,
-        point.y + 251.0,
+        point.y + 294.0,
         point.z + 1
     )
 }

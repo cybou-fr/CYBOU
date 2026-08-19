@@ -80,14 +80,24 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .panel-kicker svg { flex: 0 0 auto; stroke-width: 1.7; }
 .object span, .object p { color: var(--muted); }
 .artifact { width: 220px; padding: 19px; }
+.artifact-digest { font-size: 11px; }
+.artifact-badges { display: flex; gap: 7px; margin-top: 2px; }
+.artifact-badges i { padding: 5px 8px; border: 1px solid rgba(112,225,200,.34); border-radius: 12px; color: var(--accent); font-size: 10px; font-style: normal; }
+.artifact-meta { margin-top: 4px; padding-top: 11px; border-top: 1px solid rgba(154,167,184,.14); font-size: 10px; }
 .collaborators { width: 240px; padding: 20px; }
 .release { width: 390px; padding: 30px; }
 .release h1 { margin: 5px 0 0; font-size: 30px; font-weight: 560; }
+.release-kind { padding-left: 10px; border-left: 2px solid #5d9df5; font-size: 11px; }
 .release p { margin: 0; line-height: 1.55; }
-.progress-label, .release footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.progress-label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
 .progress { height: 5px; overflow: hidden; border-radius: 4px; background: #27313d; }
 .progress span { display: block; width: 68%; height: 100%; background: var(--accent); }
 .nominal { color: var(--accent) !important; }
+.release-meta { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 10px; padding-top: 3px; }
+.release-meta > span { display: grid; gap: 3px; padding-right: 8px; border-right: 1px solid rgba(154,167,184,.14); }
+.release-meta > span:last-child { border-right: 0; }
+.release-meta small { color: var(--muted); font-size: 10px; text-transform: none; letter-spacing: 0; }
+.release-meta b { color: #dfe8ed; font-size: 11px; font-weight: 500; }
 .object-actions { position: absolute; display: flex; gap: 4px; padding: 7px; border: 1px solid var(--border); border-radius: 15px; background: rgba(17,24,33,.96); box-shadow: 0 18px 45px rgba(0,0,0,.42); }
 .object-actions button { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; color: #cbd5dd; font-size: 12px; cursor: pointer; }
 .object-actions button:hover, .object-actions button.active { background: rgba(255,255,255,.07); color: white; }
@@ -102,6 +112,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .suggestion-actions .primary { border-color: #efc45a; background: linear-gradient(#f8d36c,#e9af31); color: #17130a; font-weight: 650; }
 .suggestion-source { padding-top: 10px; border-top: 1px solid rgba(154,167,184,.14); font-size: 10px; }
 .sources { width: 245px; padding: 20px; }
+.sources-footer { display: flex; justify-content: space-between; margin-top: 3px; padding-top: 11px; border-top: 1px solid rgba(154,167,184,.14); font-size: 11px; }
+.sources-footer i { color: var(--muted); font-style: normal; }
+.sources-footer b { color: #70a8f7; font-weight: 500; }
 .commitments { width: 310px; padding: 22px; }
 .row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
 .row b, .check-row b { color: #dfe8ed; font-weight: 500; }

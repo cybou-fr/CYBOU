@@ -18,9 +18,10 @@
   boundaries, including the amber dependency edge. Selecting a panel promotes only its immediate
   relationships while dimming the rest of the graph. Selected-object actions, minimap, and the
   expanded runtime/user menu are also implemented.
-- **P2 — Panel content fidelity is incomplete.** The artifact card, focal release metadata, and
-  suggestion card need the detailed controls, badges, ownership data, and amber action treatment
-  shown in the source.
+- **Passed content-density slice.** The artifact now exposes its filename, digest, provenance, and
+  trust badges; Release exposes object type plus Target/Owner/State; Sources and Collaborators now
+  carry the complete rows and footer actions visible in the source. The supplied source does not
+  include reusable avatar assets, so people remain text-first instead of using fabricated faces.
 - **P2 — Viewport density still differs.** At the 1280 × 720 browser viewport the implementation is
   more horizontally spread and vertically compressed than the 1536 × 1094 source composition.
 - **Passed iconography slice.** Rust-native Lucide icons now cover the card headers,
@@ -71,6 +72,12 @@ because all six panels use the same pointer-capture and keyboard-movement implem
    the focal Release activates all five. The deployed browser reports no warning-level logs. A
    fresh 1237 × 720 browser capture also confirms the graph remains behind the cards with no new
    clipping or overlap, but the target-aspect normalized comparison is still pending.
+10. The detailed-card deployment resets persisted layout data to the new `v2` geometry so edge
+    anchors match the expanded card heights. Browser inspection confirms the artifact digest and
+    badges, five collaborator rows, structured Release metadata, five Sources rows, and Sources
+    footer are present. The fresh capture preserves the intended hierarchy at 1237 × 720; the
+    short viewport still compresses the release action rail toward Commitments, consistent with
+    the known viewport-density gap.
 
 ## Next implementation checklist
 
