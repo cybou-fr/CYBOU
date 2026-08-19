@@ -1,9 +1,0 @@
-{
-  "name": "Cybou Living Canvas",
-  "short_name": "Cybou",
-  "description": "One web-first operating environment for local and remote use.",
-  "start_url": "/",
-  "display": "fullscreen",
-  "background_color": "#0A0D12",
-  "theme_color": "#0A0D12"
-}
