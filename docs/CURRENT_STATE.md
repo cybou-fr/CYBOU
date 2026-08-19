@@ -15,6 +15,15 @@ SPDX-License-Identifier: MIT
 
 ## Rust Mind foundation status
 
+> Verification note (2026-08-19). Until this date the statement below was true only of the code
+> that compiles on any platform. Everything behind `cfg(target_os = "linux")` — the twelve daemons,
+> their D-Bus surfaces and the Event1 origin-authentication path — had drifted out of sync with
+> zbus 5 and did not build at all, because `cybou-fabric` failed first and thirteen crates depend
+> on it. The journal-writer oracle did not compile either, and the multi-daemon integration script
+> had never run. All of these now pass on the Debian 13 builder, which is what "builds" below is
+> claiming. A daemon listed as complete means its gate runs and passes, not that its behaviour has
+> been exercised beyond what that gate covers.
+
 The repository builds all Mind services from one locked workspace:
 - `cybou-crypto`: XChaCha20-Poly1305 payload sealing, `KeyStore`, `KeyDomain`, and key epoch erasure.
 - `cybou-storage`: Canonical SQLite Journal reader/verifier and atomic `JournalWriter`.
