@@ -404,9 +404,9 @@ pub fn App() -> impl IntoView {
     view! {
             <main class="app-shell">
                 <header class="topbar">
-                    <a class="brand" href="#canvas" aria-label="Living Canvas home">
+                    <a class="brand" href="#canvas" aria-label="Cybou home">
                         <img class="brand-mark" src="/cybou-mark.svg" alt="" />
-                        <span>"Living Canvas"</span>
+                        <span>"Cybou"</span>
                     </a>
                     <p class="path">"Cybou / Mind / live projection"</p>
                     <div class="runtime-cluster">
