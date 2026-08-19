@@ -131,7 +131,11 @@ impl SessionContext {
         }
     }
 
-    /// Unauthenticated context permitted only for deterministic, non-personal fixtures.
+    /// Unauthenticated context: no login was performed and no device binding was established.
+    ///
+    /// It is deliberately honest rather than restrictive. The gateway states the trust it
+    /// actually has; what a deployment chooses to expose under it is the owner's decision, and
+    /// the public deployment currently exposes the live Mind while authentication is being built.
     #[must_use]
     pub fn public_preview() -> Self {
         Self {

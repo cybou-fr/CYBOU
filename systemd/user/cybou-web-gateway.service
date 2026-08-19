@@ -1,28 +1,24 @@
 # SPDX-FileCopyrightText: 2026 Cybou contributors
 # SPDX-License-Identifier: MIT
+#
+# The gateway is a consumer of Mind, so it runs where Mind runs: in the cybou user manager, on the
+# same session bus. As a system service it had no session bus at all and could only ever serve
+# fixtures.
 
 [Unit]
 Description=Cybou read-only web gateway
-After=network-online.target
-Wants=network-online.target
+Documentation=https://github.com/cybou-fr/CYBOU
+After=cybou-presenced.service
+PartOf=cybou-mind.target
 
 [Service]
 Type=simple
-User=cybou
-Group=cybou
 Environment=CYBOU_WEB_ROOT=/usr/share/cybou/web
-Environment=CYBOU_GATEWAY_FIXTURE=1
 Environment=CYBOU_SESSION_MODE=public-preview
 ExecStart=/usr/libexec/cybou/cybou-web-gateway
 Restart=on-failure
 RestartSec=1
 NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=strict
-ProtectHome=yes
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectControlGroups=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
@@ -30,4 +26,4 @@ LockPersonality=yes
 MemoryDenyWriteExecute=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

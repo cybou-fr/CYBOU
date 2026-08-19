@@ -163,13 +163,18 @@ cursors are suppressed, and keepalives retain idle connections. The Linux zbus s
 and retains a native `Presence1.Changed` signal stream before serving snapshots, so changes queue
 across the snapshot/wait boundary. Deterministic non-D-Bus sources retain a bounded two-second
 polling fallback. Desktop bootstrap authentication is still absent.
-An operational preview is deployed at `https://vps-d0669a91.vps.ovh.net` and directly at
+An operational deployment runs at `https://vps-d0669a91.vps.ovh.net` and directly at
 `https://51.255.46.58`: Caddy terminates public TLS while the Rust gateway remains bound to
-loopback. The preview is deliberately public only while it is fixture-backed and contains no
-Journal or live Mind state; authentication is a hard gate before either is connected. It proves
-the shared Rust/WASM frontend delivery path, not production identity or desktop parity.
+loopback. It is a working desktop over the live Mind, and it is unauthenticated. That is the
+owner's deliberate and temporary choice, made while no authentication boundary exists and the host
+holds nothing worth protecting; the intended replacement is authentication plus a demo user granted
+per request. Until then everything the deployed Mind observes is public.
+The gateway runs as a user unit in the `cybou` user manager so it shares the session bus with the
+organs — as a system service it had no session bus and could reach nothing, which is why this
+deployment served fixtures until 2026-08-19.
 Its server-issued session mode is `publicPreview`, so the browser cannot mistake this deployment
-for a device-bound local desktop or an authenticated remote session.
+for a device-bound local desktop or an authenticated remote session. The mode names the trust that
+was established, which is none, and that remains true with live state behind it.
 The repository now also contains independently buildable `cybou-web-ui` and
 `cybou-desktop-shell` derivations. The development VM offers an opt-in `Cybou Living Canvas`
 Wayland session: Cage owns the single surface, Chromium/Ozone opens the loopback application origin,
@@ -177,7 +182,7 @@ and an ephemeral runtime profile is used. This is W2 preview plumbing, not deskt
 default session; Plasma remains the fallback, and lock screen, multi-display, input-method,
 accessibility, renderer recovery, and navigation-policy gates are still open.
 
-Status date: 2026-08-18.
+Status date: 2026-08-19.
 
 This document is intentionally limited to implemented behavior and current limitations.
 

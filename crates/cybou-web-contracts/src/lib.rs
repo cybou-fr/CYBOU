@@ -16,7 +16,11 @@ pub const WEB_SCHEMA_V1: SchemaVersion = SchemaVersion(1);
 pub enum SessionMode {
     /// Device-bound loopback session created by the desktop shell.
     LocalDesktop,
-    /// Explicitly unauthenticated, non-personal demonstration surface.
+    /// Explicitly unauthenticated surface reachable by anyone who has the address.
+    ///
+    /// The name records the trust level, not the content: it promises no authentication was
+    /// performed, and makes no claim that what it shows is non-personal. Whether a deployment
+    /// points this mode at fixtures or at a live Mind is the owner's decision.
     PublicPreview,
     /// Authenticated browser session crossing the external network boundary.
     RemoteBrowser,

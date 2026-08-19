@@ -54,16 +54,17 @@ cybou_ssh "
   sudo id cybou >/dev/null 2>&1 || sudo useradd --system --gid cybou \
     --home-dir /var/lib/cybou --create-home --shell /usr/sbin/nologin cybou
 
-  # Install systemd system unit for web gateway and Caddy
-  sudo install -m 0644 systemd/system/cybou-web-gateway.service \
-    /etc/systemd/system/cybou-web-gateway.service
+  # The gateway used to be a system service, which is why it could only serve fixtures: a system
+  # service has no session bus and therefore no way to reach Presence1. It is a user unit now,
+  # started by the same user manager as the organs it presents.
+  sudo systemctl disable --now cybou-web-gateway.service 2>/dev/null || true
+  sudo rm -f /etc/systemd/system/cybou-web-gateway.service
+
   sudo install -m 0644 debian/Caddyfile /etc/caddy/Caddyfile
   sudo rm -f /etc/systemd/system/caddy.service.d/cybou.conf
   sudo rm -f /etc/cybou/web.env /etc/cybou/web-password
 
   sudo systemctl daemon-reload
-  sudo systemctl enable cybou-web-gateway.service
-  sudo systemctl restart cybou-web-gateway.service
   sudo systemctl restart caddy.service
 
   # The Mind daemons are systemd *user* units owned by the cybou user. A system user with
@@ -83,7 +84,7 @@ cybou_ssh "
   sudo systemctl --user --machine=cybou@.host restart cybou-mind.target
   sudo systemctl --user --machine=cybou@.host --no-pager --full status cybou-mind.target || true
 
-  sudo systemctl --no-pager --full status cybou-web-gateway.service caddy.service
+  sudo systemctl --no-pager --full status caddy.service
 "
 
 echo "==> Living Canvas and Mind daemons deployed at https://vps-d0669a91.vps.ovh.net"
