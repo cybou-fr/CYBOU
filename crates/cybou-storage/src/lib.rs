@@ -422,7 +422,7 @@ fn anchor_state(
     Ok((anchor.sequence, anchor.hash.clone()))
 }
 
-fn decode_envelope(
+pub(crate) fn decode_envelope(
     connection: &Connection,
     row: &rusqlite::Row<'_>,
     sequence: u64,

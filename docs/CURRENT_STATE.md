@@ -54,35 +54,21 @@ The Rust system-generation adapter converts successful acquisition directly into
 type, including Qt-compatible UTC millisecond timestamp spelling. It still has no Event1 write
 capability and remains safe to run as a non-authoritative comparison.
 
-The first Rust storage boundary is `cybou-storage`, currently inspection-only. It opens an existing
-Journal with explicit SQLite read-only and no-follow flags, requires `user_version=2`, verifies the
-required tables and contribution columns, and reports row count plus erasure/rotation epochs. It
-cannot create or migrate a database and contains no write API. Tests prove a missing path stays
-missing, future and partial schemas fail closed, and a compatible database is byte-identical after
-inspection.
-Inspection now walks the complete chain shape: sequence numbers must be contiguous, each
-`prev_hash` must equal the preceding stored hash, hash versions must be 1–3, hashes must be 32
-bytes, and v3 rows must carry both 32-byte commitments. The protocol crate now also reproduces the
-predecessor's canonical envelope v2, non-erasable v3, Journal-row v2, split-commitment v3, and
-Journal-row v3 byte streams plus their SHA-256 digests. Every Debian gate compiles the actual Qt
-canonical encoder and compares these artifacts byte-for-byte. These proven primitives are not yet
-connected to any writer, but the read-only inspector now decodes persisted envelopes and evidence
-and uses them for full hash replay. Hash v1 uses the frozen legacy concatenation, hash v2 uses the
-canonical by-value row, and hash v3 verifies the row hash, surviving metadata commitment, and every
-non-erased payload commitment. Erased payload bytes are skipped exactly as in the predecessor while
-their surviving metadata remains verified. Tests sabotage chain links, canonical hashes, and live
-payload bytes independently. Writer behavior, recovery, migrations, and production ownership are
-still absent.
-The storage crate also exposes a typed read-only checkpoint and suffix-verification result. A
-checkpoint is accepted only when its sequence still exists with the identical stored hash; replay
-then queries and verifies rows strictly after that position. Results distinguish the verified
-range, intact live payloads, skipped erased payloads, and the next checkpoint. A head checkpoint
-therefore performs one anchor lookup and no history scan. Checkpoint persistence and trust policy
-belong to a future Rust Event owner and are not implied by this library API.
-For large histories the same verifier has a row-bounded page API. `max_rows` must be positive;
-each result states whether more rows remain and returns the exact verified checkpoint from which the
-next page continues. The bound applies to canonical rows replayed per call, preventing an accidental
-unbounded suffix scan while preserving the identical hash and commitment checks.
+The Rust storage foundation is `cybou-storage`. It opens existing Journals with explicit SQLite
+read-only and no-follow flags, requires `user_version=2`, verifies required tables and contribution
+columns, and reports row count plus erasure/rotation epochs. Tests prove missing paths stay missing,
+future and partial schemas fail closed, and compatible databases remain unchanged after inspection.
+Inspection walks the complete chain shape: sequence numbers must be contiguous, each `prev_hash`
+equals the preceding stored hash, hash versions are 1–3, hashes are 32 bytes, and v3 rows carry both
+32-byte commitments. The protocol crate reproduces canonical envelope v2, non-erasable v3, Journal-row
+v2, split-commitment v3, and Journal-row v3 byte streams plus SHA-256 digests. The storage verifier
+decodes persisted envelopes and evidence for full hash replay (v1 concatenation, v2 by-value row,
+v3 split-commitment verification with payload commitment verification). Erased payload bytes are skipped
+identically to the predecessor while surviving metadata remains verified.
+
+The storage crate also exposes a typed read-only checkpoint and suffix-verification result, and a
+row-bounded page API for large history replay. Checkpoint persistence and trust policy belong to the
+future Rust Event owner.
 The first writer slice is present as rules rather than as a writer. `cybou-protocol::admission`
 decides what may enter the Journal without touching storage: structural envelope validity, the
 frozen kind/privacy/sensitivity numbering, root-versus-derived reference shape, sealed-payload

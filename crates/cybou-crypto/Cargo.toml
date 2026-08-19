@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "cybou-storage"
-description = "Read-only compatibility inspection for the Cybou Journal"
+name = "cybou-crypto"
+description = "Cryptographic sealing, key derivation, and key store primitives for Cybou"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,12 +11,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-cybou-crypto = { path = "../cybou-crypto" }
+chacha20poly1305 = { workspace = true, features = ["alloc"] }
 cybou-protocol = { path = "../cybou-protocol" }
-rusqlite.workspace = true
-thiserror.workspace = true
-time.workspace = true
-uuid.workspace = true
+getrandom = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.23.0"

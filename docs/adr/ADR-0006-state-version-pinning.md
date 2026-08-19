@@ -6,7 +6,12 @@ SPDX-License-Identifier: MIT
 # ADR-0006: State Version Pinning
 
 ## Status
-Accepted
+
+Superseded by [ADR-0039](ADR-0039-debian-13-base-system.md).
+
+The decision to pin NixOS state version applied when NixOS was the target platform.
+Cybou has transitioned to Debian 13 (Trixie) as the active deployment target, so NixOS
+`system.stateVersion` is no longer applicable.
 
 ## Context
 NixOS allows system configurations to specify a `system.stateVersion` which pins the system to a specific NixOS version. This prevents automatic upgrades that might break compatibility.

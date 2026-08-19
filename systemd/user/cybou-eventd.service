@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=Cybou Event1 Canonical Journal Writer and D-Bus Service
+Documentation=https://github.com/cybou-fr/CYBOU
+After=dbus.socket
+PartOf=cybou-mind.target
+
+[Service]
+Type=dbus
+BusName=org.cybou.Mind.Event1
+ExecStart=/usr/libexec/cybou/cybou-eventd
+Restart=on-failure
+RestartSec=1
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=default.target

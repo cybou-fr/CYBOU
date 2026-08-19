@@ -80,13 +80,16 @@ gateway, zbus for compatibility with existing versioned D-Bus interfaces, Serde 
 serialization, and SQLx/rusqlite evaluated against canonical SQLite and migration gates. Library
 selection does not change owners or contracts and must be pinned and audited.
 
-### Migration is contract-preserving replacement
+### Migration is contract-preserving replacement with executable oracles
 
-The rewrite proceeds vertically, one owner or boundary at a time. A Rust replacement must run
-against the existing process through the same versioned wire contract before it may replace it.
-For persistent owners, acceptance requires reading existing state without reinterpreting history,
-writing byte/semantic-compatible canonical records, fail-closed migration, crash recovery, and
-rollback evidence.
+The rewrite proceeds vertically, one owner or boundary at a time. C++/Qt/NixOS is frozen as
+compatibility evidence and an executable oracle; the new production runtime is Rust/Debian
+immediately. Legacy binaries are not maintained as a parallel production product.
+
+A Rust replacement must validate against the predecessor's wire and storage contracts via differential
+oracles before cutting over. For persistent owners, acceptance requires reading existing state without
+reinterpreting history, writing byte/semantic-compatible canonical records, fail-closed migration,
+crash recovery, and rollback evidence.
 
 No production state is bulk-converted merely to make it Rust-shaped. Stored schemas and canonical
 hash inputs change only through their own versioned ADR and migration.
@@ -104,15 +107,15 @@ hash inputs change only through their own versioned ADR and migration.
 
 | | Gate |
 |---|---|
-| **R1** | Locked Cargo workspace builds reproducibly in Nix and CI |
-| **R2** | Shared protocol fixtures pass in C++ and Rust, including canonical hashes and failure values |
+| **R1** | Locked Cargo workspace builds reproducibly in CI on Debian 13 |
+| **R2** | Shared protocol fixtures pass in C++ oracle and Rust, including canonical hashes and failure values |
 | **R3** | Rust fabric preserves timeouts, caller identity, bounded retries, and unknown-outcome semantics |
-| **R4** | Each Rust owner passes black-box differential tests against its C++ predecessor |
+| **R4** | Each Rust owner passes black-box differential tests against its C++ predecessor oracle |
 | **R5** | Existing Journal and owner state open without destructive conversion; interruption and rollback tests pass |
 | **R6** | Rust/WASM Living Canvas is the identical content-hashed artifact in local and hosted modes |
 | **R7** | Gateway and frontend contain no hand-authored JavaScript/TypeScript and expose no native bridge |
 | **R8** | Renderer, gateway, and every migrated owner can crash independently without violating continuity |
-| **R9** | Audit, license, SBOM, clippy, format, unit, integration, fuzz/property, and VM gates pass |
+| **R9** | Audit, license, SBOM, clippy, format, unit, integration, fuzz/property, and Debian gates pass |
 | **R10** | C++/Qt/CMake, QML/Plasma, Python/shell tooling, and authored JavaScript are removed only after owning replacements pass their gates |
 
 ## Consequences
@@ -120,17 +123,18 @@ hash inputs change only through their own versioned ADR and migration.
 Positive consequences are one primary type system and toolchain, shared end-to-end DTOs, memory-safe
 defaults at hostile boundaries, reusable native/WASM domain code, and less Qt-specific coupling.
 
-Costs are a long dual-runtime interval, duplicated differential fixtures, WASM bundle/startup work,
-browser accessibility testing, Rust async complexity, and semantic-drift risk. Rust removes classes
+Costs are managing differential test fixtures and oracle harnesses during migration, WASM bundle/startup
+work, browser accessibility testing, Rust async complexity, and semantic-drift risk. Rust removes classes
 of memory bugs; it does not provide authorization, privacy, correctness, boundedness, or continuity
 automatically.
 
 ## Rejected alternatives
 
-### Rewrite everything at once
+### Unvalidated rewrite without oracles
 
-Rejected because it destroys the executable behavioral oracle and combines storage, IPC, UI, and
-deployment risk into one unreviewable transition.
+Rejected because dropping differential and oracle verification against predecessor behavior destroys
+grounded invariants and combines storage, IPC, UI, and deployment risk into an unreviewable transition.
+The legacy implementation is preserved as an executable oracle until replacement gates pass.
 
 ### Rust backend with TypeScript frontend
 

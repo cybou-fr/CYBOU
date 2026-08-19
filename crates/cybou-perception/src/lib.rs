@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 //! Read-only perception sources for the staged Rust replacement of `perceptiond`.
+//!
+//! Provides the production Linux/Debian system perception source (`linux.system`)
+//! and the legacy NixOS system-generation source (`nixos.system`) as a migration oracle.
 
 use std::{fs, path::PathBuf};
 
@@ -10,26 +13,37 @@ use time::{Duration, OffsetDateTime, UtcOffset, format_description};
 
 use cybou_protocol::observation::ObservationV1;
 
-/// Stable identity of the first non-sensitive local source.
-pub const SYSTEM_SOURCE_ID: &str = "nixos.system";
-/// Stable subject described by the system-generation source.
-pub const SYSTEM_SUBJECT: &str = "current-system";
+/// Production Linux system source identifier.
+pub const LINUX_SYSTEM_SOURCE_ID: &str = "linux.system";
+/// Production Linux system subject.
+pub const LINUX_SYSTEM_SUBJECT: &str = "operating-system";
+
+/// Legacy NixOS system generation source identifier (retained as migration oracle).
+pub const NIXOS_SYSTEM_SOURCE_ID: &str = "nixos.system";
+/// Legacy NixOS system generation subject.
+pub const NIXOS_SYSTEM_SUBJECT: &str = "current-system";
+
+/// Legacy alias for compatibility.
+pub const SYSTEM_SOURCE_ID: &str = NIXOS_SYSTEM_SOURCE_ID;
+/// Legacy alias for compatibility.
+pub const SYSTEM_SUBJECT: &str = NIXOS_SYSTEM_SUBJECT;
+
 const DEFAULT_FRESHNESS_SECONDS: i64 = 300;
 
 /// Why one acquisition did or did not produce an observation.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AcquisitionStatus {
-    /// The symlink was read and produced a structurally valid observation.
+    /// The source was read and produced a structurally valid observation.
     Acquired,
-    /// The path is absent or is not a symbolic link.
+    /// The path is absent or is not accessible.
     SourceUnavailable,
-    /// A symbolic link exists but cannot produce the required build identity.
+    /// The source exists but cannot produce the required identity/structure.
     SourceMalformed,
 }
 
 impl AcquisitionStatus {
-    /// Frozen predecessor wire spelling.
+    /// Wire spelling.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -40,14 +54,14 @@ impl AcquisitionStatus {
     }
 }
 
-/// One valid non-sensitive system-generation observation.
+/// One valid non-sensitive system observation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SystemObservation {
     /// Stable source identifier, distinct from the producing organ.
     pub source_id: &'static str,
     /// Subject whose value was observed.
     pub subject: &'static str,
-    /// Final component of the current-system symlink target.
+    /// String value representing the observed state.
     pub value: String,
     /// Acquisition instant supplied by the caller's clock.
     pub acquired_at: OffsetDateTime,
@@ -94,12 +108,139 @@ pub struct AcquisitionResult {
     pub detail: Option<String>,
 }
 
-/// Read-only adapter for the `/run/current-system` symlink contract.
+/// Production read-only adapter for standard Linux/Debian system identity (`/etc/os-release`, `/etc/machine-id`).
+#[derive(Clone, Debug)]
+pub struct LinuxSystemSource {
+    os_release_path: PathBuf,
+    machine_id_path: Option<PathBuf>,
+    freshness_seconds: i64,
+}
+
+impl LinuxSystemSource {
+    /// Construct a new Linux system perception source with standard default paths.
+    #[must_use]
+    pub fn new_standard(freshness_seconds: i64) -> Self {
+        Self::new(
+            PathBuf::from("/etc/os-release"),
+            Some(PathBuf::from("/etc/machine-id")),
+            freshness_seconds,
+        )
+    }
+
+    /// Construct an injectable source with custom paths (useful for testing).
+    #[must_use]
+    pub fn new(
+        os_release_path: PathBuf,
+        machine_id_path: Option<PathBuf>,
+        freshness_seconds: i64,
+    ) -> Self {
+        Self {
+            os_release_path,
+            machine_id_path,
+            freshness_seconds: if freshness_seconds > 0 {
+                freshness_seconds
+            } else {
+                DEFAULT_FRESHNESS_SECONDS
+            },
+        }
+    }
+
+    /// Read the system identity once without mutating the observed system.
+    #[must_use]
+    pub fn acquire(&self, now: OffsetDateTime) -> AcquisitionResult {
+        let content = match fs::read_to_string(&self.os_release_path) {
+            Ok(content) => content,
+            Err(_) => return self.unavailable("cannot be read"),
+        };
+
+        let parsed = parse_os_release(&content);
+        let Some(pretty_or_name) = parsed.get("PRETTY_NAME").or_else(|| parsed.get("NAME")) else {
+            return self.malformed("contains no PRETTY_NAME or NAME field");
+        };
+
+        if pretty_or_name.trim().is_empty() {
+            return self.malformed("has empty PRETTY_NAME / NAME");
+        }
+
+        let machine_id = self.machine_id_path.as_ref().and_then(|p| {
+            fs::read_to_string(p)
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        });
+
+        let provenance = match machine_id {
+            Some(mid) => format!(
+                "os-release from {} (machine-id: {mid})",
+                self.os_release_path.display()
+            ),
+            None => format!("os-release from {}", self.os_release_path.display()),
+        };
+
+        AcquisitionResult {
+            status: AcquisitionStatus::Acquired,
+            observation: Some(SystemObservation {
+                source_id: LINUX_SYSTEM_SOURCE_ID,
+                subject: LINUX_SYSTEM_SUBJECT,
+                value: pretty_or_name.trim().to_string(),
+                acquired_at: now,
+                freshness_until: now + Duration::seconds(self.freshness_seconds),
+                provenance,
+            }),
+            detail: None,
+        }
+    }
+
+    fn unavailable(&self, reason: &str) -> AcquisitionResult {
+        AcquisitionResult {
+            status: AcquisitionStatus::SourceUnavailable,
+            observation: None,
+            detail: Some(format!("{} {reason}", self.os_release_path.display())),
+        }
+    }
+
+    fn malformed(&self, reason: &str) -> AcquisitionResult {
+        AcquisitionResult {
+            status: AcquisitionStatus::SourceMalformed,
+            observation: None,
+            detail: Some(format!("{} {reason}", self.os_release_path.display())),
+        }
+    }
+}
+
+/// Simple parser for standard `os-release` key-value format.
+fn parse_os_release(content: &str) -> std::collections::BTreeMap<String, String> {
+    let mut map = std::collections::BTreeMap::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some((key, value)) = line.split_once('=') {
+            let key = key.trim().to_string();
+            let mut val = value.trim().to_string();
+            if (val.starts_with('"') && val.ends_with('"'))
+                || (val.starts_with('\'') && val.ends_with('\''))
+            {
+                if val.len() >= 2 {
+                    val = val[1..val.len() - 1].to_string();
+                }
+            }
+            map.insert(key, val);
+        }
+    }
+    map
+}
+
+/// Legacy read-only adapter for the `/run/current-system` NixOS symlink contract (migration oracle).
 #[derive(Clone, Debug)]
 pub struct SystemGenerationSource {
     system_link_path: PathBuf,
     freshness_seconds: i64,
 }
+
+/// Alias for [`SystemGenerationSource`] clarifying its legacy oracle status.
+pub type NixosSystemSource = SystemGenerationSource;
 
 impl SystemGenerationSource {
     /// Construct an injectable source. Non-positive freshness uses the predecessor's 300 seconds.
@@ -136,8 +277,8 @@ impl SystemGenerationSource {
         AcquisitionResult {
             status: AcquisitionStatus::Acquired,
             observation: Some(SystemObservation {
-                source_id: SYSTEM_SOURCE_ID,
-                subject: SYSTEM_SUBJECT,
+                source_id: NIXOS_SYSTEM_SOURCE_ID,
+                subject: NIXOS_SYSTEM_SUBJECT,
                 value: build_identity.to_owned(),
                 acquired_at: now,
                 freshness_until: now + Duration::seconds(self.freshness_seconds),
@@ -170,15 +311,81 @@ impl SystemGenerationSource {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, os::unix::fs::symlink};
-
+    use std::fs;
     use tempfile::tempdir;
     use time::OffsetDateTime;
 
-    use super::{AcquisitionStatus, SYSTEM_SOURCE_ID, SYSTEM_SUBJECT, SystemGenerationSource};
+    use super::{
+        AcquisitionStatus, LINUX_SYSTEM_SOURCE_ID, LINUX_SYSTEM_SUBJECT, LinuxSystemSource,
+    };
+    #[cfg(unix)]
+    use super::{NIXOS_SYSTEM_SOURCE_ID, NIXOS_SYSTEM_SUBJECT, SystemGenerationSource};
 
     #[test]
-    fn valid_symlink_produces_the_predecessor_observation_contract() {
+    fn linux_system_source_parses_debian_os_release() {
+        let root = tempdir().expect("temporary directory");
+        let os_release_file = root.path().join("os-release");
+        let machine_id_file = root.path().join("machine-id");
+
+        let os_release_content = r#"
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+ID=debian
+"#;
+        fs::write(&os_release_file, os_release_content).expect("write os-release");
+        fs::write(&machine_id_file, "a1b2c3d4e5f60718293a4b5c6d7e8f90\n").expect("write machine-id");
+
+        let now = OffsetDateTime::from_unix_timestamp(1_787_090_000).expect("fixed clock");
+        let source = LinuxSystemSource::new(os_release_file, Some(machine_id_file), 300);
+        let result = source.acquire(now);
+
+        assert_eq!(result.status, AcquisitionStatus::Acquired);
+        let observation = result.observation.expect("typed observation");
+        assert_eq!(observation.source_id, LINUX_SYSTEM_SOURCE_ID);
+        assert_eq!(observation.subject, LINUX_SYSTEM_SUBJECT);
+        assert_eq!(observation.value, "Debian GNU/Linux 13 (trixie)");
+        assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
+        assert!(observation.provenance.contains("machine-id: a1b2c3d4e5f60718293a4b5c6d7e8f90"));
+
+        let protocol = observation.into_protocol().expect("protocol observation");
+        assert_eq!(protocol.source_id, LINUX_SYSTEM_SOURCE_ID);
+        assert_eq!(protocol.subject, LINUX_SYSTEM_SUBJECT);
+        assert!(protocol.encode().is_ok());
+        assert!(protocol.message_id().is_ok());
+    }
+
+    #[test]
+    fn linux_system_source_absent_path_is_unavailable() {
+        let root = tempdir().expect("temporary directory");
+        let absent_file = root.path().join("absent-os-release");
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let source = LinuxSystemSource::new(absent_file, None, 300);
+        let result = source.acquire(now);
+
+        assert_eq!(result.status, AcquisitionStatus::SourceUnavailable);
+        assert!(result.observation.is_none());
+    }
+
+    #[test]
+    fn linux_system_source_malformed_when_no_name() {
+        let root = tempdir().expect("temporary directory");
+        let malformed_file = root.path().join("os-release");
+        fs::write(&malformed_file, "FOO=BAR\nBAZ=QUX\n").expect("write malformed");
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let source = LinuxSystemSource::new(malformed_file, None, 300);
+        let result = source.acquire(now);
+
+        assert_eq!(result.status, AcquisitionStatus::SourceMalformed);
+        assert!(result.observation.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nixos_legacy_oracle_symlink_produces_predecessor_contract() {
+        use std::os::unix::fs::symlink;
+
         let root = tempdir().expect("temporary source tree");
         let target = root.path().join("abc-nixos-system-host-26.05");
         fs::create_dir(&target).expect("system generation");
@@ -190,47 +397,16 @@ mod tests {
 
         assert_eq!(result.status, AcquisitionStatus::Acquired);
         let observation = result.observation.expect("typed observation");
-        assert_eq!(observation.source_id, SYSTEM_SOURCE_ID);
-        assert_eq!(observation.subject, SYSTEM_SUBJECT);
+        assert_eq!(observation.source_id, NIXOS_SYSTEM_SOURCE_ID);
+        assert_eq!(observation.subject, NIXOS_SYSTEM_SUBJECT);
         assert_eq!(observation.value, "abc-nixos-system-host-26.05");
         assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
 
         let protocol = observation.into_protocol().expect("protocol observation");
-        assert_eq!(protocol.source_id, SYSTEM_SOURCE_ID);
-        assert_eq!(protocol.subject, SYSTEM_SUBJECT);
+        assert_eq!(protocol.source_id, NIXOS_SYSTEM_SOURCE_ID);
+        assert_eq!(protocol.subject, NIXOS_SYSTEM_SUBJECT);
         assert_eq!(protocol.acquired_at, "2026-08-18T21:53:20.000Z");
         assert!(protocol.encode().is_ok());
         assert!(protocol.message_id().is_ok());
-    }
-
-    #[test]
-    fn absent_or_regular_path_is_unavailable_without_an_observation() {
-        let root = tempdir().expect("temporary source tree");
-        let absent = root.path().join("absent");
-        let now = OffsetDateTime::UNIX_EPOCH;
-        let result = SystemGenerationSource::new(absent, 300).acquire(now);
-        assert_eq!(result.status, AcquisitionStatus::SourceUnavailable);
-        assert!(result.observation.is_none());
-
-        let regular = root.path().join("current-system");
-        fs::write(&regular, b"not a link").expect("regular file");
-        let result = SystemGenerationSource::new(regular, 300).acquire(now);
-        assert_eq!(result.status, AcquisitionStatus::SourceUnavailable);
-        assert!(result.observation.is_none());
-    }
-
-    #[test]
-    fn non_positive_freshness_uses_the_frozen_default() {
-        let root = tempdir().expect("temporary source tree");
-        let target = root.path().join("generation");
-        fs::create_dir(&target).expect("system generation");
-        let link = root.path().join("current-system");
-        symlink(target, &link).expect("current system link");
-        let now = OffsetDateTime::UNIX_EPOCH;
-        let observation = SystemGenerationSource::new(link, 0)
-            .acquire(now)
-            .observation
-            .expect("typed observation");
-        assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
     }
 }

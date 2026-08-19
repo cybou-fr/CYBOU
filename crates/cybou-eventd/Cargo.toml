@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "cybou-storage"
-description = "Read-only compatibility inspection for the Cybou Journal"
+name = "cybou-eventd"
+description = "Canonical Journal writer and Event1 D-Bus service daemon for Cybou"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,12 +11,21 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ciborium.workspace = true
 cybou-crypto = { path = "../cybou-crypto" }
+cybou-fabric = { path = "../cybou-fabric" }
 cybou-protocol = { path = "../cybou-protocol" }
-rusqlite.workspace = true
+cybou-runtime = { path = "../cybou-runtime" }
+cybou-storage = { path = "../cybou-storage" }
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 time.workspace = true
+tokio.workspace = true
 uuid.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
 
 [dev-dependencies]
 tempfile = "3.23.0"

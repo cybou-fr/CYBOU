@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=Cybou Identity1 Subject Continuity Service
+Documentation=https://github.com/cybou-fr/CYBOU
+After=cybou-eventd.service
+PartOf=cybou-mind.target
+
+[Service]
+Type=dbus
+BusName=org.cybou.Mind.Identity1
+ExecStart=/usr/libexec/cybou/cybou-identityd
+Restart=on-failure
+RestartSec=1
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=default.target

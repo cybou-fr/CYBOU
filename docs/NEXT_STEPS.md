@@ -8,19 +8,30 @@ SPDX-License-Identifier: MIT
 ## Purpose
 
 This document is the executable plan. The packages that produced the completed M5, M6 and P6.7
-boundaries have moved to [Historical Execution](history/M5-M6.md), because a plan whose first thirty
-pages are finished work stops being readable as a plan; the current work now comes first. [Roadmap](ROADMAP.md) remains the milestone definition; [Current State](CURRENT_STATE.md)
-remains the implementation authority. The current M7 entry sequence and risk priorities are
-stated below.
+boundaries have moved to [Historical Execution](history/M5-M6.md). [Roadmap](ROADMAP.md) remains the
+milestone definition; [Current State](CURRENT_STATE.md) remains the implementation authority.
 
-The immediate objective is still not language or autonomous action. It is:
+The immediate objective is:
 
-> add one provenance-bearing local perception path with explicit freshness, epistemic status,
-> retention behavior, bounded projection, and fault evidence.
+> **Complete Rust Event1 ownership and cutover on Debian 13.**
 
-M5 continuity, M6 capability honesty, and P6.7 bounded compound IPC are demonstrated. The current
-architectural bottleneck is grounded knowledge governance: source provenance, freshness,
-contradiction, retention, and erasure must become testable before replication or language.
+`cybou-storage` already implements read/verify and the SQLite `writer::append()` engine with SQLite-level
+differential oracle verification against the C++ writer. The remaining blocker to having our first
+fully functioning Rust Mind owner is completing crypto sealing and packaging the D-Bus service into `cybou-eventd`.
+
+### Execution sequence
+
+```text
+1. Repository truth & ADR cleanup (Complete)
+2. UI Feature Freeze (Living Canvas features frozen; only bugfixes/contracts allowed)
+3. cybou-crypto (KeyStore, key domain/epoch, sealing, erasure, differential fixtures)
+4. cybou-eventd (Event1 D-Bus service, Submit, Replay, Verify, Accepted after COMMIT)
+5. Debian systemd Event1 service & crash/recovery gates
+6. Cut over Event1 (First production Rust Mind owner)
+7. Replace perception (nixos.system -> linux.system for Debian 13)
+8. Port remaining owners (identityd, selfd, predictord, intentiond, workspaced, etc.)
+9. Final legacy removal (flake.nix, NixOS VM, CMake C++ Mind, Qt/QML)
+```
 
 ## Current architecture assessment
 
@@ -28,27 +39,18 @@ contradiction, retention, and erasure must become testable before replication or
 
 - one canonical Event1/Journal acceptance boundary;
 - explicit process and state owners;
-- durable-before-visible ordering;
-- lifecycle run persistence, high-water marks, deterministic operation keys, and split-commit recovery;
-- Presence and Plasma as replaceable projections rather than cognitive owners;
-- layered unit, process-integration, focused KVM, and full Plasma gates.
+- durable-before-visible ordering (Acceptance emitted only after `BEGIN IMMEDIATE ... COMMIT`);
+- strict admission rules separated as protocol semantics (`cybou-protocol::admission`);
+- resilient bounded RPC executor in `cybou-fabric`;
+- Living Canvas Rust/WASM frontend;
+- differential oracle test harness (`scripts/check-journal-writer-oracle.sh`, `scripts/check-fabric-oracle.sh`).
 
 ### Immediate gaps
 
-Every entry that stood here described the substrate before M6 — no capability dependency owner,
-untyped RPC outcomes, unbounded compound reads — and all of it has since been built. A gap list that
-lists solved problems is worse than none: it makes the document unreadable as a statement of where
-the work actually is. What follows is the current set.
-
-- the canonical Journal writer is still C++. Rust can inspect and cryptographically replay an
-  existing Journal but cannot append a single row, so every Rust owner that needs to record a fact
-  still depends on the predecessor. This is the widest remaining gap between the stated Rust-first
-  target and what the workspace can do;
-- cold reconstruction still costs a full replay per organ, which the measured budgets put at roughly
-  nine seconds each at a million contributions. Only epistemicd persists a checkpoint across
-  restarts; predictord and intentiond rebuild theirs on start;
-- the KVM gates run only locally, so the fault and recovery evidence — the substrate's most
-  distinctive asset — is not exercised by any hosted check.
+- `cybou-crypto` does not exist yet: sealed payload support, key epoch management, and erasure in Rust;
+- `cybou-eventd` daemon is not yet present in the Cargo workspace;
+- `cybou-perception` still references legacy `nixos.system` / `/run/current-system` instead of Debian standard paths;
+- CI needs full alignment with Debian 13 container testing.
 
 ### Architectural direction
 

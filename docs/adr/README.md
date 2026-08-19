@@ -11,8 +11,8 @@ SPDX-License-Identifier: MIT
 | [0002](ADR-0002-cognitive-causality-and-journal-invariants.md) | Causality and Journal Invariants | Accepted |
 | [0003](ADR-0003-ai-in-v0.1-none.md) | AI in v0.1 — None | Accepted |
 | [0004](ADR-0004-ci-workflow.md) | CI Workflow | Accepted |
-| [0005](ADR-0005-calamares-upstream-profile.md) | Calamares Upstream Profile | Accepted |
-| [0006](ADR-0006-state-version-pinning.md) | State Version Pinning | Accepted |
+| [0005](ADR-0005-calamares-upstream-profile.md) | Calamares Upstream Profile | Superseded |
+| [0006](ADR-0006-state-version-pinning.md) | State Version Pinning | Superseded |
 | [0007](ADR-0007-reuse-3.x-compliance.md) | REUSE 3.x Compliance | Accepted |
 | [0008](ADR-0008-mind-dock-with-tabs.md) | Mind Dock with Organ Tabs | Accepted |
 | [0009](ADR-0009-one-presence-per-user-session.md) | One Presence per Session | Accepted |
@@ -45,6 +45,7 @@ SPDX-License-Identifier: MIT
 | [0036](ADR-0036-autonomous-security-control-plane.md) | Autonomous Security and Operations Control Plane | Proposed |
 | [0037](ADR-0037-web-first-presence-and-desktop.md) | Web-First Presence and Chromium Desktop | Accepted |
 | [0038](ADR-0038-rust-first-codebase.md) | Rust-First Product Codebase | Accepted |
+| [0039](ADR-0039-debian-13-base-system.md) | Debian 13 Base System | Accepted |
 
 ## Why some ADRs remain Proposed
 
@@ -60,12 +61,6 @@ code already enforces leaves the record contradicting itself. These do not:
   Autonomous Security** describe boundaries that deliberately precede their implementation. Writing them
   first is the point: they exist so the code can be reviewed against explicit invariants rather than
   the invariants being reconstructed afterwards from whatever the code turned out to do.
-- **0037 Web-First Presence** accepts the replacement presentation and desktop delivery boundary.
-  The current tree still ships Plasma/QML, so accepting it would overstate implementation and would
-  prematurely supersede the proven v0.1 surface decisions.
-- **0038 Rust-First Codebase** accepts the implementation destination and contract-preserving
-  rewrite policy. The shipped owners remain C++/Qt today, so the decision stays Proposed until the
-  migration gates demonstrate the target rather than merely naming it.
 - **0018 Privacy and Replication** is half enforced and half absent. The Journal rejects a
   contribution whose privacy is weaker than its references, so classification and inheritance are
   real; replication does not exist at all. It should be split before either half is accepted, rather

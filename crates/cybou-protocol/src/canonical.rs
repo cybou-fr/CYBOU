@@ -3,11 +3,12 @@
 
 //! Frozen canonical envelope and Journal-row representations.
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 /// Protocol fields needed by canonical hashing, expressed without storage concerns.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CanonicalEnvelope {
     /// Envelope schema selecting the canonical field set.
     pub schema_version: u16,

@@ -121,6 +121,12 @@ pub enum WriteError {
     /// A sealed contribution reached a writer with no key store.
     #[error("refusing a sealed contribution: this journal has no key store")]
     SealedWithoutKeyStore,
+    /// Cryptographic failure.
+    #[error("cryptographic failure: {0}")]
+    Crypto(#[from] cybou_crypto::CryptoError),
+    /// Key store failure.
+    #[error("key store failure: {0}")]
+    KeyStore(#[from] cybou_crypto::KeyStoreError),
     /// A stored value could not be read back as the type its column promises.
     #[error("Journal contains a malformed stored value: {0}")]
     Malformed(&'static str),
@@ -155,6 +161,9 @@ pub struct Appended {
 #[derive(Debug)]
 pub struct JournalWriter {
     connection: Connection,
+    key_store: Option<cybou_crypto::KeyStore>,
+    kek: Option<[u8; 32]>,
+    key_domain: Option<cybou_crypto::KeyDomain>,
 }
 
 impl JournalWriter {
@@ -177,9 +186,26 @@ impl JournalWriter {
     pub fn open(path: &Path) -> Result<Self, WriteError> {
         let connection = open_for_write(path)?;
         ensure_durability(&connection)?;
-        let writer = Self { connection };
+        let writer = Self {
+            connection,
+            key_store: None,
+            kek: None,
+            key_domain: None,
+        };
         writer.ensure_schema()?;
         Ok(writer)
+    }
+
+    /// Attach an active KeyStore, key encryption key (KEK), and key domain for sealing sensitive contributions.
+    pub fn set_key_store(
+        &mut self,
+        key_store: cybou_crypto::KeyStore,
+        kek: [u8; 32],
+        key_domain: cybou_crypto::KeyDomain,
+    ) {
+        self.key_store = Some(key_store);
+        self.kek = Some(kek);
+        self.key_domain = Some(key_domain);
     }
 
     fn user_version(&self) -> Result<i64, WriteError> {
@@ -288,9 +314,25 @@ impl JournalWriter {
     /// Returns [`WriteError::Refused`] when a rule declines the contribution, leaving the Journal
     /// exactly as it was, or another [`WriteError`] when the database itself failed.
     pub fn append(&mut self, envelope: &CanonicalEnvelope) -> Result<Appended, WriteError> {
-        if envelope.sealed {
-            return Err(WriteError::SealedWithoutKeyStore);
-        }
+        let envelope_to_write;
+        let target_envelope = if envelope.sealed {
+            let (Some(store), Some(kek), Some(domain)) = (&self.key_store, &self.kek, &self.key_domain) else {
+                return Err(WriteError::SealedWithoutKeyStore);
+            };
+            let data_key = store.create_key_for(&envelope.message_id, kek)?;
+            let sealed = cybou_crypto::Seal::seal(&envelope.payload, &data_key)?;
+            let mut stored = envelope.clone();
+            let mut payload_bytes = Vec::with_capacity(sealed.nonce.len() + sealed.ciphertext.len());
+            payload_bytes.extend_from_slice(&sealed.nonce);
+            payload_bytes.extend_from_slice(&sealed.ciphertext);
+            stored.payload = payload_bytes;
+            stored.key_domain_id = domain.key_domain_id;
+            stored.key_epoch = domain.key_epoch;
+            envelope_to_write = stored;
+            &envelope_to_write
+        } else {
+            envelope
+        };
 
         // Immediate rather than deferred: the write lock is taken before the reference reads, so
         // a concurrent writer is refused here, at the start, rather than at the commit after the
@@ -299,9 +341,293 @@ impl JournalWriter {
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(write_error)?;
-        let appended = append_within_transaction(&transaction, envelope)?;
+        let appended = append_within_transaction(&transaction, target_envelope)?;
         transaction.commit().map_err(write_error)?;
         Ok(appended)
+    }
+
+    /// Return the count of contributions stored in the Journal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure.
+    pub fn count(&self) -> Result<u64, WriteError> {
+        let count: i64 = self
+            .connection
+            .query_row("SELECT COUNT(*) FROM contribution", [], |row| row.get(0))
+            .map_err(WriteError::Query)?;
+        u64::try_from(count).map_err(|_| WriteError::Malformed("negative count"))
+    }
+
+    /// Return the latest (head) envelope, or `None` if the Journal is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure or decoding error.
+    pub fn head(&self) -> Result<Option<CanonicalEnvelope>, WriteError> {
+        let mut stmt = self
+            .connection
+            .prepare(
+                "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
+                 origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
+                 confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
+                 retention_class, retention_policy, retain_until \
+                 FROM contribution ORDER BY seq DESC LIMIT 1",
+            )
+            .map_err(WriteError::Query)?;
+        let mut rows = stmt.query([]).map_err(WriteError::Query)?;
+        if let Some(row) = rows.next().map_err(WriteError::Query)? {
+            let seq: i64 = row.get(0).map_err(WriteError::Query)?;
+            let envelope = crate::decode_envelope(
+                &self.connection,
+                row,
+                u64::try_from(seq).unwrap_or(0),
+            )
+            .map_err(WriteError::from)?;
+            Ok(Some(envelope))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Retrieve the envelope at a specific sequence number.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure or decoding error.
+    pub fn at_sequence(&self, sequence: u64) -> Result<Option<CanonicalEnvelope>, WriteError> {
+        let mut stmt = self
+            .connection
+            .prepare(
+                "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
+                 origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
+                 confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
+                 retention_class, retention_policy, retain_until \
+                 FROM contribution WHERE seq=?1 LIMIT 1",
+            )
+            .map_err(WriteError::Query)?;
+        let seq_i64 =
+            i64::try_from(sequence).map_err(|_| WriteError::Malformed("sequence overflow"))?;
+        let mut rows = stmt.query([seq_i64]).map_err(WriteError::Query)?;
+        if let Some(row) = rows.next().map_err(WriteError::Query)? {
+            let envelope = crate::decode_envelope(&self.connection, row, sequence)
+                .map_err(WriteError::from)?;
+            Ok(Some(envelope))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Retrieve a list of recent contributions, ordered oldest to newest.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure or decoding error.
+    pub fn recent(&self, limit: usize) -> Result<Vec<CanonicalEnvelope>, WriteError> {
+        let limit_clause = if limit > 0 {
+            format!("ORDER BY seq DESC LIMIT {limit}")
+        } else {
+            "ORDER BY seq ASC".to_string()
+        };
+        let query = format!(
+            "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
+             origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
+             confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
+             retention_class, retention_policy, retain_until \
+             FROM contribution {limit_clause}"
+        );
+        let mut stmt = self.connection.prepare(&query).map_err(WriteError::Query)?;
+        let mut rows = stmt.query([]).map_err(WriteError::Query)?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().map_err(WriteError::Query)? {
+            let seq: i64 = row.get(0).map_err(WriteError::Query)?;
+            let envelope = crate::decode_envelope(
+                &self.connection,
+                row,
+                u64::try_from(seq).unwrap_or(0),
+            )
+            .map_err(WriteError::from)?;
+            result.push(envelope);
+        }
+        if limit > 0 {
+            result.reverse();
+        }
+        Ok(result)
+    }
+
+    /// Paged replay of contributions strictly after `after_sequence`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure or decoding error.
+    pub fn replay(
+        &self,
+        after_sequence: u64,
+        limit: usize,
+    ) -> Result<Vec<CanonicalEnvelope>, WriteError> {
+        let after_i64 =
+            i64::try_from(after_sequence).map_err(|_| WriteError::Malformed("sequence overflow"))?;
+        let limit_clause = if limit > 0 {
+            format!("LIMIT {limit}")
+        } else {
+            String::new()
+        };
+        let query = format!(
+            "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
+             origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
+             confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
+             retention_class, retention_policy, retain_until \
+             FROM contribution WHERE seq > ?1 ORDER BY seq ASC {limit_clause}"
+        );
+        let mut stmt = self.connection.prepare(&query).map_err(WriteError::Query)?;
+        let mut rows = stmt.query([after_i64]).map_err(WriteError::Query)?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().map_err(WriteError::Query)? {
+            let seq: i64 = row.get(0).map_err(WriteError::Query)?;
+            let envelope = crate::decode_envelope(
+                &self.connection,
+                row,
+                u64::try_from(seq).unwrap_or(0),
+            )
+            .map_err(WriteError::from)?;
+            result.push(envelope);
+        }
+        Ok(result)
+    }
+
+    /// Find an envelope by message ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure or decoding error.
+    pub fn find_by_message_id(
+        &self,
+        message_id: &Uuid,
+    ) -> Result<Option<CanonicalEnvelope>, WriteError> {
+        let mut stmt = self
+            .connection
+            .prepare(
+                "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
+                 origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
+                 confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
+                 retention_class, retention_policy, retain_until \
+                 FROM contribution WHERE message_id=?1 LIMIT 1",
+            )
+            .map_err(WriteError::Query)?;
+        let mut rows = stmt
+            .query([message_id.hyphenated().to_string()])
+            .map_err(WriteError::Query)?;
+        if let Some(row) = rows.next().map_err(WriteError::Query)? {
+            let seq: i64 = row.get(0).map_err(WriteError::Query)?;
+            let envelope = crate::decode_envelope(
+                &self.connection,
+                row,
+                u64::try_from(seq).unwrap_or(0),
+            )
+            .map_err(WriteError::from)?;
+            Ok(Some(envelope))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Find envelopes by correlation ID (episode).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure or decoding error.
+    pub fn find_by_correlation_id(
+        &self,
+        correlation_id: &Uuid,
+    ) -> Result<Vec<CanonicalEnvelope>, WriteError> {
+        let mut stmt = self
+            .connection
+            .prepare(
+                "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
+                 origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
+                 confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
+                 retention_class, retention_policy, retain_until \
+                 FROM contribution WHERE correlation_id=?1 ORDER BY seq ASC",
+            )
+            .map_err(WriteError::Query)?;
+        let mut rows = stmt
+            .query([correlation_id.hyphenated().to_string()])
+            .map_err(WriteError::Query)?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().map_err(WriteError::Query)? {
+            let seq: i64 = row.get(0).map_err(WriteError::Query)?;
+            let envelope = crate::decode_envelope(
+                &self.connection,
+                row,
+                u64::try_from(seq).unwrap_or(0),
+            )
+            .map_err(WriteError::from)?;
+            result.push(envelope);
+        }
+        Ok(result)
+    }
+
+    /// Check if a terminal outcome exists for a cause and organ.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure.
+    pub fn has_outcome_for(&self, cause_id: &Uuid, origin_organ: &str) -> Result<bool, WriteError> {
+        let exists: bool = self
+            .connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM contribution WHERE causation_id=?1 AND \
+                 origin_organ=?2 AND kind=15)",
+                (cause_id.hyphenated().to_string(), origin_organ),
+                |row| row.get(0),
+            )
+            .map_err(WriteError::Query)?;
+        Ok(exists)
+    }
+
+    /// Retrieve evidence UUIDs for a message ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure.
+    pub fn evidence_for(&self, message_id: &Uuid) -> Result<Vec<Uuid>, WriteError> {
+        let mut stmt = self
+            .connection
+            .prepare(
+                "SELECT evidence_id FROM contribution_evidence WHERE contribution_id=?1 ORDER BY \
+                 ordinal",
+            )
+            .map_err(WriteError::Query)?;
+        let rows = stmt
+            .query_map([message_id.hyphenated().to_string()], |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(WriteError::Query)?;
+        let mut list = Vec::new();
+        for id_str in rows {
+            let s = id_str.map_err(WriteError::Query)?;
+            if let Ok(u) = Uuid::parse_str(&s) {
+                list.push(u);
+            }
+        }
+        Ok(list)
+    }
+
+    /// Current erasure epoch from journal_meta.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure.
+    pub fn erasure_epoch(&self) -> Result<u64, WriteError> {
+        let epoch: i64 = self
+            .connection
+            .query_row(
+                "SELECT erasure_epoch FROM journal_meta WHERE id=1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(WriteError::Query)?;
+        u64::try_from(epoch).map_err(|_| WriteError::Malformed("negative erasure epoch"))
     }
 
     /// Append many contributions under one transaction, returning the last accepted position.
