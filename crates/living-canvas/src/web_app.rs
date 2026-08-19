@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v2";
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v4";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Point {
@@ -35,32 +35,32 @@ impl Default for CanvasLayout {
         Self {
             artifact: Point {
                 x: 70.0,
-                y: 65.0,
+                y: 50.0,
                 z: 1,
             },
             collaborators: Point {
                 x: 55.0,
-                y: 335.0,
+                y: 300.0,
                 z: 2,
             },
             release: Point {
                 x: 445.0,
-                y: 105.0,
+                y: 70.0,
                 z: 6,
             },
             sources: Point {
                 x: 880.0,
-                y: 70.0,
+                y: 50.0,
                 z: 3,
             },
             suggestion: Point {
                 x: 900.0,
-                y: 335.0,
+                y: 300.0,
                 z: 5,
             },
             commitments: Point {
                 x: 470.0,
-                y: 400.0,
+                y: 410.0,
                 z: 4,
             },
         }

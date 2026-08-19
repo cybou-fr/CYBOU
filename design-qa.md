@@ -22,8 +22,9 @@
   trust badges; Release exposes object type plus Target/Owner/State; Sources and Collaborators now
   carry the complete rows and footer actions visible in the source. The supplied source does not
   include reusable avatar assets, so people remain text-first instead of using fabricated faces.
-- **P2 — Viewport density still differs.** At the 1280 × 720 browser viewport the implementation is
-  more horizontally spread and vertically compressed than the 1536 × 1094 source composition.
+- **Passed compact-desktop density slice.** At 1280 × 720 the Release action rail, Commitments,
+  and command bar now have zero measured intersection area. A target-aspect comparison at
+  1536 × 1094 is still required before declaring full composition parity.
 - **Passed iconography slice.** Rust-native Lucide icons now cover the card headers,
   selected-object actions, command bar, minimap, and runtime-menu controls.
 - **Passed interaction slice — draggable panels.** Pointer drag changed the release position from
@@ -85,6 +86,11 @@ because all six panels use the same pointer-capture and keyboard-movement implem
     opened it with Ctrl+K, filtered `sources` to one result, selected Sources with Enter, and then
     confirmed Escape closes and clears a reopened palette. Sources became the selected panel with
     exactly one active relationship, and no browser warnings were emitted.
+12. Persisted layout schema `v4` introduces a compact desktop arrangement for the six panels and
+    lowers the command surface. At 1280 × 720, browser geometry reports `0 px²` intersection for
+    both Release-actions/Commitments and Commitments/command-bar, with no warning-level logs. The
+    follow-up image capture was unavailable, so the numerical check supplements rather than
+    replaces the accepted visual baseline.
 
 ## Next implementation checklist
 
