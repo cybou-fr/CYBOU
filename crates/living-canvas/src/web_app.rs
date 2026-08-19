@@ -4,6 +4,9 @@
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use living_canvas::{GatewayMindClient, MindClient};
+use lucide_leptos::{
+    Ellipsis, FileCheck, Files, FolderOpen, Link, ListChecks, Search, Sparkles, UsersRound,
+};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
@@ -220,7 +223,7 @@ pub fn App() -> impl IntoView {
         <main class="app-shell">
             <header class="topbar">
                 <a class="brand" href="#canvas" aria-label="Living Canvas home">
-                    <span class="brand-mark" aria-hidden="true">"◌"</span>
+                    <img class="brand-mark" src="/cybou-mark.svg" alt="" />
                     <span>"Living Canvas"</span>
                 </a>
                 <p class="path">"Cybou Workspace / Programs / Cybou 0.8 release"</p>
@@ -248,7 +251,7 @@ pub fn App() -> impl IntoView {
                     <Show when=move || runtime_menu_open.get()>
                         <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
                             <header><strong>"Cybou"</strong><small>"All data stays local"</small></header>
-                            <button>"New artifact"</button>
+                        <button>"New artifact"</button>
                             <button>"New commitment"</button>
                             <button>"Invite collaborator"</button>
                             <button>"Open mind"</button>
@@ -280,7 +283,7 @@ pub fn App() -> impl IntoView {
                     on:keydown=move |event| keyboard_move(event, Panel::Artifact, layout)
                     on:click=move |_| set_selected.set("artifact")
                 >
-                    <small>"Artifact"</small>
+                    <small class="panel-kicker"><FileCheck size=14 /><span>"Artifact"</span></small>
                     <strong>"Release evidence"</strong>
                     <span>"12 verified sources"</span>
                 </button>
@@ -291,11 +294,11 @@ pub fn App() -> impl IntoView {
                         style=move || release_actions_style(layout.get())
                         aria-label="Selected release actions"
                     >
-                        <button>"Open"</button>
-                        <button>"Plan"</button>
-                        <button class="active">"Mind"</button>
-                        <button>"Link"</button>
-                        <button aria-label="More release actions">"More"</button>
+                        <button><FolderOpen size=15 /><span>"Open"</span></button>
+                        <button><ListChecks size=15 /><span>"Plan"</span></button>
+                        <button class="active"><Sparkles size=15 /><span>"Mind"</span></button>
+                        <button><Link size=15 /><span>"Link"</span></button>
+                        <button aria-label="More release actions"><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
                     </nav>
                 </Show>
 
@@ -308,7 +311,7 @@ pub fn App() -> impl IntoView {
                     on:keydown=move |event| keyboard_move(event, Panel::Collaborators, layout)
                     on:click=move |_| set_selected.set("collaborators")
                 >
-                    <small>"Collaborators"</small>
+                    <small class="panel-kicker"><UsersRound size=14 /><span>"Collaborators"</span></small>
                     <strong>"Release team"</strong>
                     <span class="row"><b>"Ari N."</b><i>"Owner"</i></span>
                     <span class="row"><b>"Mina K."</b><i>"Release lead"</i></span>
@@ -342,7 +345,7 @@ pub fn App() -> impl IntoView {
                     on:keydown=move |event| keyboard_move(event, Panel::Sources, layout)
                     on:click=move |_| set_selected.set("sources")
                 >
-                    <small>"Sources"</small>
+                    <small class="panel-kicker"><Files size=14 /><span>"Sources"</span></small>
                     <strong>"Validated inputs"</strong>
                     <span class="row"><b>"Design doc"</b><i>"v4"</i></span>
                     <span class="row"><b>"Changelog"</b><i>"v3"</i></span>
@@ -390,6 +393,7 @@ pub fn App() -> impl IntoView {
                 </button>
 
                 <label class="command-bar" aria-label="Search or act">
+                    <Search size=19 />
                     <input type="search" placeholder="Search or act…" />
                     <kbd>"Ctrl K"</kbd>
                 </label>

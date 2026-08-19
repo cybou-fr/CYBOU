@@ -21,8 +21,9 @@
   shown in the source.
 - **P2 — Viewport density still differs.** At the 1280 × 720 browser viewport the implementation is
   more horizontally spread and vertically compressed than the 1536 × 1094 source composition.
-- **P2 — Iconography is not integrated yet.** Real library or source icons are still required for
-  the card headers, action rail, command bar, and status/menu controls.
+- **P2 — Iconography is partially integrated.** Rust-native Lucide icons now cover the primary card
+  headers, selected-object actions, and command bar. The remaining card and runtime-menu controls
+  still need the same treatment.
 - **Passed interaction slice — draggable panels.** Pointer drag changed the release position from
   `(480, 140)` to `(630, 240)` and brought it forward. Reload restored `(630, 240)`. ArrowLeft moved
   it by 10 px and Shift+ArrowUp by 40 px after the focus fix. No warning/error console entries were
@@ -48,12 +49,16 @@ because all six panels use the same pointer-capture and keyboard-movement implem
    Local/Remote control, and an interactive runtime/user menu. Semantic browser QA confirms the
    menu toggles to `aria-expanded=true` and exposes all expected commands. The browser image capture
    failed repeatedly for this slice, so it is not yet promoted to a new visual comparison baseline.
+5. Rust-native Lucide icons now replace the symbolic brand mark and add source-backed icons to the
+   artifact, collaborators, sources, selected-object actions, and command bar. Full-width semantic
+   browser QA confirms the desktop-only runtime controls and action rail remain visible. Browser
+   image capture remains unavailable, so the last accepted visual baseline is still comparison 05.
 
 ## Next implementation checklist
 
 1. Render relationship connectors from live panel centers during drag.
 2. Add the minimap.
-3. Integrate real icon assets for the card headers, action rail, command bar, and runtime menu.
+3. Extend the Rust-native icon set to the remaining card and runtime-menu controls.
 4. Repeat browser comparison at the target aspect ratio and fix remaining P1/P2 gaps.
 
 final result: blocked

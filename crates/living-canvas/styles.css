@@ -40,7 +40,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 }
 
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; }
-.brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); }
+.brand-mark { display: block; width: 28px; height: 28px; object-fit: contain; }
 .path { margin: 0; color: var(--muted); font-size: 13px; }
 .runtime-cluster { position: relative; justify-self: end; display: flex; align-items: center; gap: 12px; }
 .runtime { display: grid; grid-template-columns: auto auto; column-gap: 8px; align-items: center; font-size: 12px; }
@@ -63,6 +63,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .object:active { cursor: grabbing; }
 .object.selected { border-color: rgba(112, 225, 200, 0.82); box-shadow: 0 0 0 1px rgba(112, 225, 200, 0.15), 0 0 36px rgba(62, 206, 178, 0.17), 0 24px 70px rgba(0, 0, 0, 0.42); }
 .object small { color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; }
+.panel-kicker { display: flex; align-items: center; gap: 7px; }
+.panel-kicker svg { flex: 0 0 auto; stroke-width: 1.7; }
 .object span, .object p { color: var(--muted); }
 .artifact { width: 220px; padding: 19px; }
 .collaborators { width: 240px; padding: 20px; }
@@ -74,7 +76,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .progress span { display: block; width: 68%; height: 100%; background: var(--accent); }
 .nominal { color: var(--accent) !important; }
 .object-actions { position: absolute; display: flex; gap: 4px; padding: 7px; border: 1px solid var(--border); border-radius: 15px; background: rgba(17,24,33,.96); box-shadow: 0 18px 45px rgba(0,0,0,.42); }
-.object-actions button { padding: 7px 12px; border: 0; border-radius: 10px; background: transparent; color: #cbd5dd; font-size: 12px; cursor: pointer; }
+.object-actions button { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; color: #cbd5dd; font-size: 12px; cursor: pointer; }
 .object-actions button:hover, .object-actions button.active { background: rgba(255,255,255,.07); color: white; }
 .suggestion { width: 335px; padding: 22px; border-color: rgba(225,174,55,.64); box-shadow: 0 22px 65px rgba(0,0,0,.42), 0 0 24px rgba(225,174,55,.08); }
 .suggestion.selected { border-color: #e0ad37; box-shadow: 0 0 0 1px rgba(224,173,55,.12), 0 0 32px rgba(224,173,55,.14), 0 24px 70px rgba(0,0,0,.44); }
@@ -93,11 +95,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .row i, .check-row i { color: var(--muted); font-style: normal; white-space: nowrap; }
 .check-row b { margin-right: auto; }
 .panel-link { margin-top: 7px; padding-top: 12px; border-top: 1px solid rgba(154,167,184,.16); color: var(--accent) !important; }
-.command-bar { position: absolute; z-index: 1000; left: 50%; bottom: 24px; width: min(360px, calc(100% - 48px)); transform: translateX(-50%); display: flex; align-items: center; padding: 5px 8px 5px 18px; border: 1px solid rgba(154,167,184,.27); border-radius: 22px; background: rgba(8,13,20,.91); box-shadow: 0 18px 55px rgba(0,0,0,.38); backdrop-filter: blur(22px); }
+.command-bar { position: absolute; z-index: 1000; left: 50%; bottom: 24px; width: min(360px, calc(100% - 48px)); transform: translateX(-50%); display: flex; align-items: center; gap: 11px; padding: 5px 8px 5px 16px; border: 1px solid rgba(154,167,184,.27); border-radius: 22px; background: rgba(8,13,20,.91); box-shadow: 0 18px 55px rgba(0,0,0,.38); backdrop-filter: blur(22px); }
+.command-bar > svg { color: #a9b8c5; flex: 0 0 auto; }
 .command-bar input { min-width: 0; flex: 1; border: 0; outline: 0; padding: 8px 0; background: transparent; color: #edf4f6; font: inherit; }
 .command-bar input::placeholder { color: #81909f; }
 .command-bar kbd { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.06); color: #8f9daa; font: 11px/1 Inter, sans-serif; }
 .system-state { position: absolute; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 16px; background: rgba(8, 12, 17, 0.76); color: var(--muted); font-size: 11px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 @media (max-width: 760px) {
   .topbar { grid-template-columns: 1fr auto; padding: 0 14px; }

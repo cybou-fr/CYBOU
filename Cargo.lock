@@ -1340,6 +1340,7 @@ dependencies = [
  "gloo-net",
  "js-sys",
  "leptos",
+ "lucide-leptos",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -1355,6 +1356,15 @@ name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
+
+[[package]]
+name = "lucide-leptos"
+version = "3.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "debc06b189cd36d5447b8495a0cfc3121cf84cfa6ffd6f92ad82181f145a2e21"
+dependencies = [
+ "leptos",
+]
 
 [[package]]
 name = "manyhow"
