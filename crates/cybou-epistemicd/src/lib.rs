@@ -62,11 +62,25 @@ pub struct EpistemicBelief {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EpistemicState {
+    /// Which derivation rule produced these beliefs.
+    ///
+    /// A projection is derived, not observed: it is only as good as the rule that produced it.
+    /// When that rule changes, beliefs carried over from the old one assert things the current
+    /// rule would never have concluded, so they are discarded and rebuilt from the Journal rather
+    /// than trusted because they happen to be on disk. Absent in state written before this field
+    /// existed, which is exactly the state that must not be trusted.
+    #[serde(default)]
+    pub rule_version: u32,
     /// Journal sequence cursor mark.
     pub cursor: u64,
     /// Map of active beliefs.
     pub beliefs: HashMap<String, EpistemicBelief>,
 }
+
+/// The rule this build derives beliefs with.
+///
+/// Raise it whenever `ingest_envelope` changes what it concludes from the same contribution.
+pub const BELIEF_RULE_VERSION: u32 = 1;
 
 /// Errors occurring in the epistemic engine.
 #[derive(Debug, Error)]
@@ -118,7 +132,14 @@ impl EpistemicCore {
             file.read_to_string(&mut content)?;
             let state: EpistemicState = serde_json::from_str(&content)
                 .map_err(|e| EpistemicError::CorruptState(e.to_string()))?;
-            (state.cursor, state.beliefs)
+            if state.rule_version == BELIEF_RULE_VERSION {
+                (state.cursor, state.beliefs)
+            } else {
+                // Rebuild from sequence zero rather than keep conclusions a rule that no longer
+                // exists once drew. Nothing is lost: the Journal is the record, and the
+                // projection is reconstructible from it by design.
+                (0, HashMap::new())
+            }
         } else {
             (0, HashMap::new())
         };
@@ -137,6 +158,7 @@ impl EpistemicCore {
     ) -> Result<(), EpistemicError> {
         if let Some(path) = &self.state_path {
             let state = EpistemicState {
+                rule_version: BELIEF_RULE_VERSION,
                 cursor,
                 beliefs: beliefs.clone(),
             };
@@ -301,6 +323,26 @@ fn observed_claim(payload: &[u8]) -> Option<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn beliefs_derived_by_an_older_rule_are_rebuilt_rather_than_trusted() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("epistemic-state.json");
+
+        // State as an earlier build wrote it: no rule version, and a belief that build concluded.
+        std::fs::write(
+            &path,
+            r#"{"cursor":42,"beliefs":{"organ.perceptiond":{"subject":"organ.perceptiond","value":"garbage","confidence":1.0,"evidence":[],"lastCorroboratedAt":"2026-08-19T12:00:00Z","status":"disputed"}}}"#,
+        )
+        .expect("write legacy state");
+
+        let core = super::EpistemicCore::open(&path).expect("open over legacy state");
+        assert_eq!(core.cursor(), 0, "replay must restart from the Journal");
+        assert!(
+            core.projection().is_empty(),
+            "conclusions of a rule that no longer exists must not survive"
+        );
+    }
+
     #[test]
     fn a_belief_is_about_what_was_observed_not_about_who_observed_it() {
         let observation = cybou_protocol::observation::ObservationV1 {
