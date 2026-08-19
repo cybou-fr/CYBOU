@@ -14,8 +14,11 @@ pub const OBSERVATION_SCHEMA_V1: u16 = 1;
 pub const OBSERVATION_PAYLOAD_TYPE: &str = "cybou.observation.v1";
 const OBSERVATION_NAMESPACE: Uuid = Uuid::from_u128(0x9f2c1d84_6b3a_5e07_bc41_0d2a7f9e5c13);
 
+use serde::{Deserialize, Serialize};
+
 /// Structurally valid Observation v1 payload.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ObservationV1 {
     /// Stable source identity, independent of the adapter process.
     pub source_id: String,

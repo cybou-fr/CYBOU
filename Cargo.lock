@@ -578,6 +578,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-perceptiond"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-perception",
+ "cybou-protocol",
+ "cybou-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-predictord"
 version = "0.1.0"
 dependencies = [
@@ -679,6 +698,24 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
+name = "cybou-workspaced"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
  "uuid",
  "zbus",
 ]

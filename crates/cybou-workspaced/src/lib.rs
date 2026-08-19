@@ -1,0 +1,306 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+//! Global Workspace Theory attention coalitions and focus selection.
+//!
+//! Groups recent cognitive contributions into episodic coalitions by correlation ID,
+//! calculates dynamic salience with exponential half-life recency decay,
+//! and determines current attentional focus.
+
+use std::{
+    collections::{HashMap, HashSet},
+    sync::RwLock,
+};
+
+use cybou_protocol::canonical::CanonicalEnvelope;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use time::OffsetDateTime;
+use uuid::Uuid;
+
+#[cfg(target_os = "linux")]
+pub mod service;
+
+const HALF_LIFE_SECONDS: f64 = 120.0;
+
+/// Return attention weight for a given contribution kind.
+#[must_use]
+pub const fn attention_weight(kind: u16) -> f64 {
+    match kind {
+        5 | 6 => 3.0,       // NeedSignal, Objection
+        7 | 4 => 2.0,       // Decision, Intention
+        3 | 12 | 8 => 1.5,  // Outcome, SelfAssessment, AttentionCandidate
+        2 | 9 | 10 | 11 => 1.0, // Prediction, PlanProposal, Hypothesis, BeliefRevision
+        _ => 0.5,
+    }
+}
+
+/// A cluster of related cognitive contributions competing for conscious workspace focus.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Coalition {
+    /// Episode correlation identity.
+    pub correlation_id: Uuid,
+    /// Contributing envelopes in chronological order.
+    pub members: Vec<CanonicalEnvelope>,
+    /// Calculated dynamic salience.
+    pub salience: f64,
+    /// Wall time ms of latest member.
+    pub latest_ms: i64,
+    /// Distinct organs participating in this coalition.
+    pub organs: Vec<String>,
+}
+
+impl Coalition {
+    /// Number of contributions in this thread.
+    #[must_use]
+    pub fn thread_count(&self) -> usize {
+        self.members.len()
+    }
+
+    /// Whether this coalition is structurally valid.
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        !self.correlation_id.is_nil() && !self.members.is_empty()
+    }
+}
+
+/// Snapshot of the conscious moment in the workspace.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentState {
+    /// Current winning focus correlation ID if any.
+    pub focus: Option<Uuid>,
+    /// Salience score of the current focus.
+    pub salience: f64,
+    /// Organs active in the current focus.
+    pub organs: Vec<String>,
+}
+
+/// Errors occurring in the workspace engine.
+#[derive(Debug, Error)]
+pub enum WorkspaceError {
+    /// Internal lock poisoned.
+    #[error("workspace lock poisoned")]
+    LockPoisoned,
+}
+
+/// Core domain logic of the global workspace organ.
+pub struct WorkspaceCore {
+    capacity: usize,
+    moment: RwLock<Vec<CanonicalEnvelope>>,
+    last_focus: RwLock<Option<Uuid>>,
+}
+
+impl Default for WorkspaceCore {
+    fn default() -> Self {
+        Self::new(32)
+    }
+}
+
+impl WorkspaceCore {
+    /// Create a new WorkspaceCore with bounded capacity.
+    #[must_use]
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            moment: RwLock::new(Vec::new()),
+            last_focus: RwLock::new(None),
+        }
+    }
+
+    /// Capacity limit of the workspace buffer.
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Last observed winning focus UUID.
+    #[must_use]
+    pub fn last_focus(&self) -> Option<Uuid> {
+        self.last_focus.read().ok().and_then(|g| *g)
+    }
+
+    /// Accept a newly committed contribution into the short-term conscious moment.
+    pub fn accept(&self, envelope: CanonicalEnvelope) {
+        if envelope.message_id.is_nil() {
+            return;
+        }
+
+        if let Ok(mut moment) = self.moment.write() {
+            if moment.iter().any(|e| e.message_id == envelope.message_id) {
+                return;
+            }
+            moment.insert(0, envelope);
+            if moment.len() > self.capacity {
+                moment.truncate(self.capacity);
+            }
+        }
+    }
+
+    /// Calculate dynamic salience for a coalition at a given moment.
+    #[must_use]
+    pub fn salience_of(&self, coalition: &Coalition, now: OffsetDateTime) -> f64 {
+        let now_ms = now.unix_timestamp_nanos() as f64 / 1_000_000.0;
+        let mut total = 0.0;
+
+        for env in &coalition.members {
+            let age_seconds = (now_ms - env.wall_time_ms as f64).max(0.0) / 1000.0;
+            let recency = 0.5_f64.powf(age_seconds / HALF_LIFE_SECONDS);
+            let weight = attention_weight(env.kind);
+            total += weight * env.confidence * recency;
+        }
+
+        let distinct_organs = coalition.organs.len().max(1);
+        total * (distinct_organs as f64).sqrt()
+    }
+
+    /// Group all recent envelopes into coalitions and sort by salience descending.
+    #[must_use]
+    pub fn coalitions(&self, now: OffsetDateTime) -> Vec<Coalition> {
+        let moment = match self.moment.read() {
+            Ok(g) => g.clone(),
+            Err(_) => return vec![],
+        };
+
+        let mut map: HashMap<Uuid, Vec<CanonicalEnvelope>> = HashMap::new();
+
+        // Iterate in reverse (oldest to newest) to preserve member order
+        for env in moment.iter().rev() {
+            let key = if env.correlation_id.is_nil() {
+                env.message_id
+            } else {
+                env.correlation_id
+            };
+            map.entry(key).or_default().push(env.clone());
+        }
+
+        let mut result = Vec::new();
+        for (key, members) in map {
+            let mut organs_set = HashSet::new();
+            let mut latest_ms = 0;
+            for m in &members {
+                if !m.origin_organ.is_empty() {
+                    organs_set.insert(m.origin_organ.clone());
+                }
+                if m.wall_time_ms > latest_ms {
+                    latest_ms = m.wall_time_ms;
+                }
+            }
+            let mut organs: Vec<String> = organs_set.into_iter().collect();
+            organs.sort();
+
+            let mut coalition = Coalition {
+                correlation_id: key,
+                members,
+                salience: 0.0,
+                latest_ms,
+                organs,
+            };
+            coalition.salience = self.salience_of(&coalition, now);
+            result.push(coalition);
+        }
+
+        result.sort_by(|a, b| {
+            b.salience
+                .partial_cmp(&a.salience)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.latest_ms.cmp(&a.latest_ms))
+        });
+
+        result
+    }
+
+    /// Return the winning attentional focus coalition, if any.
+    #[must_use]
+    pub fn focus(&self, now: OffsetDateTime) -> Option<Coalition> {
+        self.coalitions(now).into_iter().next()
+    }
+
+    /// Snapshot of current conscious moment.
+    #[must_use]
+    pub fn moment_state(&self, now: OffsetDateTime) -> MomentState {
+        let f = self.focus(now);
+        match f {
+            Some(c) => MomentState {
+                focus: Some(c.correlation_id),
+                salience: c.salience,
+                organs: c.organs,
+            },
+            None => MomentState {
+                focus: None,
+                salience: 0.0,
+                organs: vec![],
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use time::OffsetDateTime;
+
+    use super::*;
+
+    fn make_envelope(
+        message_id: Uuid,
+        correlation_id: Uuid,
+        origin_organ: &str,
+        kind: u16,
+        confidence: f64,
+        wall_time_ms: i64,
+    ) -> CanonicalEnvelope {
+        CanonicalEnvelope {
+            schema_version: 3,
+            message_id,
+            correlation_id,
+            causation_id: Uuid::nil(),
+            origin_organ: origin_organ.to_string(),
+            origin_node: String::new(),
+            kind,
+            wall_time_ms,
+            monotonic_time: 100,
+            logical_clock: 1,
+            confidence,
+            evidence: vec![],
+            payload: vec![],
+            privacy: 1,
+            capability_scope: String::new(),
+            sealed: false,
+            key_domain_id: Uuid::nil(),
+            key_epoch: 0,
+            retention_class: 2,
+            retention_policy_version: 0,
+            retain_until_ms: 0,
+            sensitivity: 1,
+        }
+    }
+
+    #[test]
+    fn attention_focus_competition() {
+        let core = WorkspaceCore::new(10);
+        let now = OffsetDateTime::now_utc();
+        let now_ms = now.unix_timestamp_nanos() as i64 / 1_000_000;
+
+        let ep1 = Uuid::new_v4();
+        let ep2 = Uuid::new_v4();
+
+        // Episode 1 has low priority Observation
+        let env1 = make_envelope(Uuid::new_v4(), ep1, "perceptiond", 1, 1.0, now_ms);
+        core.accept(env1);
+
+        // Episode 2 has high priority NeedSignal from 2 organs
+        let env2a = make_envelope(Uuid::new_v4(), ep2, "healthd", 5, 1.0, now_ms);
+        let env2b = make_envelope(Uuid::new_v4(), ep2, "selfd", 5, 1.0, now_ms);
+        core.accept(env2a);
+        core.accept(env2b);
+
+        let coalitions = core.coalitions(now);
+        assert_eq!(coalitions.len(), 2);
+        assert_eq!(coalitions[0].correlation_id, ep2); // ep2 wins focus!
+
+        let focus = core.focus(now).expect("focus exists");
+        assert_eq!(focus.correlation_id, ep2);
+        assert_eq!(focus.organs, vec!["healthd".to_string(), "selfd".to_string()]);
+    }
+}

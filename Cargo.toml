@@ -10,6 +10,7 @@ members = [
     "crates/cybou-identityd",
     "crates/cybou-intentiond",
     "crates/cybou-perception",
+    "crates/cybou-perceptiond",
     "crates/cybou-predictord",
     "crates/cybou-protocol",
     "crates/cybou-runtime",
@@ -17,6 +18,7 @@ members = [
     "crates/cybou-storage",
     "crates/cybou-web-contracts",
     "crates/cybou-web-gateway",
+    "crates/cybou-workspaced",
     "crates/living-canvas",
 ]
 resolver = "3"
