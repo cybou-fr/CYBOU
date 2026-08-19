@@ -139,6 +139,45 @@ impl PerceptionCore {
         })
     }
 
+    /// Wrap an already-acquired observation as a contribution belonging to one episode.
+    ///
+    /// Facts read in the same sweep share a correlation identity because they were observed
+    /// together. Giving each its own, as a single-subject acquisition does, would leave nothing
+    /// able to notice that two things were true at the same moment.
+    #[must_use]
+    pub fn envelope_for(
+        observation: &ObservationV1,
+        correlation_id: Uuid,
+        now: OffsetDateTime,
+        monotonic_time: u64,
+    ) -> Option<CanonicalEnvelope> {
+        let payload = observation.encode().ok()?;
+        Some(CanonicalEnvelope {
+            schema_version: 3,
+            message_id: Uuid::new_v4(),
+            correlation_id,
+            causation_id: Uuid::nil(),
+            origin_organ: "perceptiond".to_string(),
+            origin_node: String::new(),
+            kind: 1, // Observation
+            wall_time_ms: unix_millis(now),
+            monotonic_time,
+            logical_clock: 1,
+            confidence: 1.0,
+            evidence: vec![],
+            payload,
+            privacy: 1, // Node
+            capability_scope: String::new(),
+            sealed: false,
+            key_domain_id: Uuid::nil(),
+            key_epoch: 0,
+            retention_class: 2,
+            retention_policy_version: 0,
+            retain_until_ms: 0,
+            sensitivity: 1,
+        })
+    }
+
     /// Current health state summary ("healthy", "degraded", "unavailable").
     #[must_use]
     pub fn health(&self) -> &'static str {

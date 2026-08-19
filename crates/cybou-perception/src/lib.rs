@@ -6,7 +6,10 @@
 //! Provides the production Linux/Debian system perception source (`linux.system`)
 //! and the legacy NixOS system-generation source (`nixos.system`) as a migration oracle.
 
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime, UtcOffset, format_description};
@@ -309,6 +312,49 @@ impl SystemGenerationSource {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn host_facts_that_cannot_be_read_produce_no_observation() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let kernel = dir.path().join("osrelease");
+        let hostname = dir.path().join("hostname");
+        let cpuinfo = dir.path().join("cpuinfo");
+        let meminfo = dir.path().join("meminfo");
+
+        std::fs::write(
+            &kernel,
+            "6.12.0-amd64
+",
+        )
+        .expect("write kernel version");
+        std::fs::write(
+            &cpuinfo,
+            "processor	: 0
+processor	: 1
+",
+        )
+        .expect("write cpuinfo");
+        std::fs::write(
+            &meminfo,
+            "MemTotal:        8039284 kB
+MemFree:  1 kB
+",
+        )
+        .expect("write meminfo");
+        // hostname is deliberately absent.
+
+        let source = super::LinuxHostSource::new(kernel, hostname, cpuinfo, meminfo, 300);
+        let observed = source.acquire(time::OffsetDateTime::UNIX_EPOCH);
+
+        let subjects: Vec<_> = observed.iter().map(|o| o.subject).collect();
+        assert_eq!(
+            subjects,
+            vec!["kernel-version", "cpu-count", "memory-total-kib"]
+        );
+        assert_eq!(observed[0].value, "6.12.0-amd64");
+        assert_eq!(observed[1].value, "2");
+        assert_eq!(observed[2].value, "8039284");
+    }
+
     use std::fs;
     use tempfile::tempdir;
     use time::OffsetDateTime;
@@ -412,4 +458,145 @@ ID=debian
         assert!(protocol.encode().is_ok());
         assert!(protocol.message_id().is_ok());
     }
+}
+
+/// Read-only adapter for the host facts that describe the machine rather than measure it.
+///
+/// Deliberately not telemetry. Load, free memory and temperature change every time they are read,
+/// and a Journal that is a biography should not fill with the fact that a number moved. These are
+/// the facts that stay put and mean something when they do change: a kernel upgrade, a rename, a
+/// resized machine. Each is a separate subject, so two of them changing in one sweep is a real
+/// co-occurrence rather than an artefact of reading them together.
+#[derive(Clone, Debug)]
+pub struct LinuxHostSource {
+    kernel_version_path: PathBuf,
+    hostname_path: PathBuf,
+    cpuinfo_path: PathBuf,
+    meminfo_path: PathBuf,
+    freshness_seconds: i64,
+}
+
+impl LinuxHostSource {
+    /// Construct a source over the standard Linux paths.
+    #[must_use]
+    pub fn new_standard(freshness_seconds: i64) -> Self {
+        Self::new(
+            PathBuf::from("/proc/sys/kernel/osrelease"),
+            PathBuf::from("/proc/sys/kernel/hostname"),
+            PathBuf::from("/proc/cpuinfo"),
+            PathBuf::from("/proc/meminfo"),
+            freshness_seconds,
+        )
+    }
+
+    /// Construct an injectable source with custom paths.
+    #[must_use]
+    pub const fn new(
+        kernel_version_path: PathBuf,
+        hostname_path: PathBuf,
+        cpuinfo_path: PathBuf,
+        meminfo_path: PathBuf,
+        freshness_seconds: i64,
+    ) -> Self {
+        Self {
+            kernel_version_path,
+            hostname_path,
+            cpuinfo_path,
+            meminfo_path,
+            freshness_seconds,
+        }
+    }
+
+    /// Read every host fact that can be read, and none that cannot.
+    ///
+    /// A source that cannot be read yields no observation for that subject rather than an
+    /// observation of nothing, so an absent file never becomes an asserted value.
+    #[must_use]
+    pub fn acquire(&self, now: OffsetDateTime) -> Vec<SystemObservation> {
+        let freshness_until = now + time::Duration::seconds(self.freshness_seconds);
+        let mut observations = Vec::new();
+
+        if let Some(value) = read_trimmed(&self.kernel_version_path) {
+            observations.push(self.observe(
+                "kernel-version",
+                value,
+                &self.kernel_version_path,
+                now,
+                freshness_until,
+            ));
+        }
+        if let Some(value) = read_trimmed(&self.hostname_path) {
+            observations.push(self.observe(
+                "hostname",
+                value,
+                &self.hostname_path,
+                now,
+                freshness_until,
+            ));
+        }
+        if let Some(count) = read_cpu_count(&self.cpuinfo_path) {
+            observations.push(self.observe(
+                "cpu-count",
+                count.to_string(),
+                &self.cpuinfo_path,
+                now,
+                freshness_until,
+            ));
+        }
+        if let Some(kib) = read_total_memory_kib(&self.meminfo_path) {
+            observations.push(self.observe(
+                "memory-total-kib",
+                kib.to_string(),
+                &self.meminfo_path,
+                now,
+                freshness_until,
+            ));
+        }
+
+        observations
+    }
+
+    fn observe(
+        &self,
+        subject: &'static str,
+        value: String,
+        path: &Path,
+        acquired_at: OffsetDateTime,
+        freshness_until: OffsetDateTime,
+    ) -> SystemObservation {
+        let _ = self;
+        SystemObservation {
+            source_id: "linux.host",
+            subject,
+            value,
+            acquired_at,
+            freshness_until,
+            provenance: format!("read from {}", path.display()),
+        }
+    }
+}
+
+fn read_trimmed(path: &Path) -> Option<String> {
+    let value = fs::read_to_string(path).ok()?.trim().to_owned();
+    (!value.is_empty()).then_some(value)
+}
+
+fn read_cpu_count(path: &Path) -> Option<usize> {
+    let content = fs::read_to_string(path).ok()?;
+    let count = content
+        .lines()
+        .filter(|line| line.starts_with("processor"))
+        .count();
+    (count > 0).then_some(count)
+}
+
+fn read_total_memory_kib(path: &Path) -> Option<u64> {
+    let content = fs::read_to_string(path).ok()?;
+    content
+        .lines()
+        .find_map(|line| line.strip_prefix("MemTotal:"))?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()
 }

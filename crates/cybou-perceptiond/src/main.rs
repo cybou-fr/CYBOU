@@ -3,11 +3,12 @@
 
 //! `cybou-perceptiond` daemon entrypoint.
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use cybou_perception::LinuxSystemSource;
+use cybou_perception::{LinuxHostSource, LinuxSystemSource};
 use cybou_perceptiond::PerceptionCore;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,6 +26,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn periodic background acquisition task submitting to Event1
     let sampling_core = core.clone();
     tokio::spawn(async move {
+        let host_source = LinuxHostSource::new_standard(300);
+        // The last value contributed for each subject. A host fact that has not changed is not
+        // news, and re-recording it every minute would bury the moments when one actually did.
+        let mut contributed: HashMap<&'static str, String> = HashMap::new();
         let mut interval = tokio::time::interval(Duration::from_mins(1));
         let mut monotonic = 1u64;
 
@@ -48,6 +53,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         res.sequence
                     );
                 }
+            }
+
+            // One sweep of host facts is one episode: they were observed together, and sharing a
+            // correlation identity is what lets anything downstream see that.
+            let episode = Uuid::new_v4();
+            for observation in host_source.acquire(now) {
+                let subject = observation.subject;
+                let Ok(observation) = observation.into_protocol() else {
+                    continue;
+                };
+                let value = match &observation.value {
+                    ciborium::Value::Text(text) => text.clone(),
+                    _ => continue,
+                };
+                if contributed.get(subject) == Some(&value) {
+                    continue;
+                }
+                let Some(envelope) =
+                    PerceptionCore::envelope_for(&observation, episode, now, monotonic)
+                else {
+                    continue;
+                };
+                monotonic += 1;
+                let _ = &envelope;
+                #[cfg(target_os = "linux")]
+                if let Some(ref client) = event_client
+                    && client.submit(&envelope).await.is_ok()
+                {
+                    println!("[cybou-perceptiond] Observed {subject} = {value}");
+                    contributed.insert(subject, value);
+                }
+                #[cfg(not(target_os = "linux"))]
+                contributed.insert(subject, value);
             }
         }
     });
