@@ -77,6 +77,19 @@ enum Panel {
     Commitments,
 }
 
+impl Panel {
+    const fn size(self) -> (f64, f64) {
+        match self {
+            Self::Artifact => (220.0, 112.0),
+            Self::Collaborators => (240.0, 184.0),
+            Self::Release => (390.0, 251.0),
+            Self::Sources => (245.0, 184.0),
+            Self::Suggestion => (335.0, 252.0),
+            Self::Commitments => (310.0, 184.0),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct DragState {
     panel: Panel,
@@ -140,6 +153,32 @@ enum RuntimeState {
         projection_version: u64,
     },
     Error(String),
+}
+
+#[component]
+fn RelationshipEdge(
+    layout: RwSignal<CanvasLayout>,
+    from: Panel,
+    to: Panel,
+    label: &'static str,
+    amber: bool,
+) -> impl IntoView {
+    let points = move || relationship_points(layout.get(), from, to);
+    view! {
+        <g class:amber=amber class="relationship-edge">
+            <line
+                x1=move || points().0.to_string()
+                y1=move || points().1.to_string()
+                x2=move || points().2.to_string()
+                y2=move || points().3.to_string()
+            />
+            <text
+                x=move || points().4.to_string()
+                y=move || points().5.to_string()
+                text-anchor="middle"
+            >{label}</text>
+        </g>
+    }
 }
 
 #[component]
@@ -281,6 +320,13 @@ pub fn App() -> impl IntoView {
                 on:pointercancel=move |_| finish_drag(layout, dragging)
             >
                 <div class="ambient" aria-hidden="true"></div>
+                <svg class="relationship-layer" aria-label="Canvas relationships">
+                    <RelationshipEdge layout=layout from=Panel::Artifact to=Panel::Release label="delivers" amber=false />
+                    <RelationshipEdge layout=layout from=Panel::Collaborators to=Panel::Release label="involves" amber=false />
+                    <RelationshipEdge layout=layout from=Panel::Release to=Panel::Sources label="validated by" amber=false />
+                    <RelationshipEdge layout=layout from=Panel::Release to=Panel::Suggestion label="depends on" amber=true />
+                    <RelationshipEdge layout=layout from=Panel::Release to=Panel::Commitments label="tracked by" amber=false />
+                </svg>
                 <button
                     class:selected=move || selected.get() == "artifact"
                     class="object artifact"
@@ -486,6 +532,22 @@ fn minimap_style(point: Point) -> String {
     let x = 10.0 + point.x / 1_280.0 * 180.0;
     let y = 8.0 + point.y / 650.0 * 92.0;
     format!("left:{x:.1}px;top:{y:.1}px")
+}
+
+fn relationship_points(
+    layout: CanvasLayout,
+    from: Panel,
+    to: Panel,
+) -> (f64, f64, f64, f64, f64, f64) {
+    let from_point = layout.point(from);
+    let to_point = layout.point(to);
+    let from_size = from.size();
+    let to_size = to.size();
+    let x1 = from_point.x + from_size.0 / 2.0;
+    let y1 = from_point.y + from_size.1 / 2.0;
+    let x2 = to_point.x + to_size.0 / 2.0;
+    let y2 = to_point.y + to_size.1 / 2.0;
+    (x1, y1, x2, y2, (x1 + x2) / 2.0, (y1 + y2) / 2.0 - 7.0)
 }
 
 fn start_drag(
