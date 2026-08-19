@@ -131,6 +131,40 @@ impl EventClient {
         Ok(envelopes)
     }
 
+    /// Retrieve the newest contributions, oldest first within the returned window.
+    ///
+    /// This is not `replay(0, limit)`: replay returns the beginning of the Journal, which is the
+    /// wrong end for anything that wants to know what just happened.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the call fails and
+    /// [`EventClientError::Encoding`] if the reply cannot be decoded.
+    #[cfg(target_os = "linux")]
+    pub async fn recent(&self, limit: u32) -> Result<Vec<CanonicalEnvelope>, EventClientError> {
+        let reply: Vec<u8> = self
+            .connection
+            .call_method(
+                Some(EVENT.service),
+                EVENT.object_path,
+                Some(EVENT.interface),
+                "Recent",
+                &(i32::try_from(limit).unwrap_or(i32::MAX),),
+            )
+            .await
+            .map_err(|e| EventClientError::Rpc(e.to_string()))?
+            .body()
+            .deserialize()
+            .map_err(|e| EventClientError::Rpc(e.to_string()))?;
+
+        if reply.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        ciborium::from_reader(reply.as_slice())
+            .map_err(|e| EventClientError::Encoding(e.to_string()))
+    }
+
     /// Retrieve the head envelope, if any.
     ///
     /// # Errors

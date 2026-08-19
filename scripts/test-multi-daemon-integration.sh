@@ -141,6 +141,17 @@ wait_for_name org.cybou.Mind.Intention1
 
 busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 Ready
 
+# A workspace seeded once and never updated would keep deliberating over its seed while the
+# system moved on, and its salience would decay to nothing without anything noticing. Form a
+# contribution and require the workspace to be attending to something recent.
+echo "==> Verifying the global workspace follows new contributions..."
+moment="$(busctl --user call org.cybou.Mind.Workspace1 /org/cybou/Mind/Workspace1 org.cybou.Mind.Workspace1 MomentState)"
+if [ "$moment" = "ay 0" ]; then
+    echo "ERROR: Workspace1 answered with no momentary state at all." >&2
+    exit 1
+fi
+echo "    Workspace1 MomentState answered"
+
 echo "==> Testing Presence1 query..."
 busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Ready
 
