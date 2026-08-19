@@ -161,7 +161,7 @@ enum RuntimeState {
     Loading,
     Ready {
         mode: cybou_web_contracts::SessionMode,
-        projection_version: u64,
+        snapshot: cybou_web_contracts::SnapshotProjection,
     },
     Error(String),
 }
@@ -213,14 +213,11 @@ pub fn App() -> impl IntoView {
         let result = async {
             let session = client.session().await?;
             let snapshot = client.snapshot().await?;
-            Ok::<_, living_canvas::ClientError>((session.mode, snapshot.projection_version))
+            Ok::<_, living_canvas::ClientError>((session.mode, snapshot))
         }
         .await;
         runtime.set(match result {
-            Ok((mode, projection_version)) => RuntimeState::Ready {
-                mode,
-                projection_version,
-            },
+            Ok((mode, snapshot)) => RuntimeState::Ready { mode, snapshot },
             Err(error) => RuntimeState::Error(error.to_string()),
         });
     });
@@ -237,10 +234,10 @@ pub fn App() -> impl IntoView {
             };
             runtime.update(|state| {
                 if let RuntimeState::Ready {
-                    projection_version, ..
+                    snapshot: current, ..
                 } = state
                 {
-                    *projection_version = snapshot.projection_version;
+                    *current = snapshot;
                 }
             });
         });
@@ -286,16 +283,25 @@ pub fn App() -> impl IntoView {
     };
     let projection_label = move || match runtime.get() {
         RuntimeState::Loading => "Loading projection…".into(),
-        RuntimeState::Ready {
-            projection_version, ..
-        } => format!("Gateway · projection {projection_version}"),
+        RuntimeState::Ready { snapshot, .. } => {
+            format!("Gateway · projection {}", snapshot.projection_version)
+        }
         RuntimeState::Error(error) => error,
     };
     let system_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting to local gateway…".into(),
-        RuntimeState::Ready {
-            projection_version, ..
-        } => format!("System nominal · projection {projection_version}"),
+        RuntimeState::Ready { snapshot, .. } => {
+            let available = snapshot
+                .capabilities
+                .iter()
+                .filter(|capability| capability.state == cybou_protocol::CapabilityState::Available)
+                .count();
+            format!(
+                "{available}/{} capabilities available · projection {}",
+                snapshot.capabilities.len(),
+                snapshot.projection_version
+            )
+        }
         RuntimeState::Error(_) => "Gateway unavailable · canvas remains read-only".into(),
     };
 

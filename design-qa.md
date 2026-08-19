@@ -38,6 +38,9 @@
   linked Sources; More opens and focuses the command palette. Mind actions route Review evidence
   to Artifact and Add to plan to Commitments. Workspace-menu commands select their corresponding
   canvas objects and close the menu.
+- **Passed live-projection slice.** The frontend retains the complete typed `SnapshotProjection`
+  and atomically replaces it from SSE. Runtime and system surfaces derive their projection number
+  and capability availability from that snapshot rather than from static presentation copy.
 
 ## Focused evidence
 
@@ -98,6 +101,10 @@ because all six panels use the same pointer-capture and keyboard-movement implem
 13. Browser workflow QA confirmed Plan selects Commitments, More opens the palette with its search
     field focused, Review evidence selects Artifact, Add to plan selects Commitments, and Open mind
     selects Mind Suggestion while closing the workspace menu. No warning-level logs were emitted.
+14. The public gateway returned projection 42 with one available and one unavailable capability.
+    The deployed UI independently rendered `Gateway · projection 42` and
+    `1/2 capabilities available · projection 42`, confirming the presentation matches the typed
+    live snapshot. Browser warning logs remained empty.
 
 ## Next implementation checklist
 
