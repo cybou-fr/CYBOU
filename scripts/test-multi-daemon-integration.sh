@@ -88,29 +88,37 @@ spawn cybou-lifecycled
 spawn cybou-selfd
 spawn cybou-presenced
 
-for name in \
-    org.cybou.Mind.Identity1 \
-    org.cybou.Mind.Health1 \
-    org.cybou.Mind.Intention1 \
-    org.cybou.Mind.Predictor1 \
-    org.cybou.Mind.Perception1 \
-    org.cybou.Mind.Epistemic1 \
-    org.cybou.Mind.Context1 \
-    org.cybou.Mind.Workspace1 \
-    org.cybou.Mind.Lifecycle1 \
-    org.cybou.Mind.Self1 \
-    org.cybou.Mind.Presence1; do
+NAMES=(
+    org.cybou.Mind.Event1
+    org.cybou.Mind.Identity1
+    org.cybou.Mind.Health1
+    org.cybou.Mind.Intention1
+    org.cybou.Mind.Predictor1
+    org.cybou.Mind.Perception1
+    org.cybou.Mind.Epistemic1
+    org.cybou.Mind.Context1
+    org.cybou.Mind.Workspace1
+    org.cybou.Mind.Lifecycle1
+    org.cybou.Mind.Self1
+    org.cybou.Mind.Presence1
+)
+
+for name in "${NAMES[@]}"; do
     wait_for_name "$name"
 done
 
-echo "==> Testing D-Bus readiness on Event1..."
-busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Ready
-
-echo "==> Testing D-Bus readiness on Epistemic1..."
-busctl --user call org.cybou.Mind.Epistemic1 /org/cybou/Mind/Epistemic1 org.cybou.Mind.Epistemic1 Ready
-
-echo "==> Testing D-Bus readiness on Context1..."
-busctl --user call org.cybou.Mind.Context1 /org/cybou/Mind/Context1 org.cybou.Mind.Context1 Ready
+# Health1 probes Ready on every organ, so an organ that does not export it is indistinguishable
+# from one that is down and pins the whole control plane at "unavailable". Check all of them.
+echo "==> Testing that every organ answers the Health1 readiness probe..."
+for name in "${NAMES[@]}"; do
+    path="/$(printf '%s' "$name" | tr . /)"
+    answer="$(busctl --user call "$name" "$path" "$name" Ready)"
+    if [ "$answer" != "b true" ]; then
+        echo "ERROR: $name Ready answered '$answer', expected 'b true'." >&2
+        exit 1
+    fi
+    echo "    $name Ready -> $answer"
+done
 
 echo "==> Testing Intention formation and restart survival..."
 INTENTION_ID=$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 Form sss "Run integration tests" "Session startup" "" | awk '{print $2}' | tr -d '"')
@@ -132,6 +140,24 @@ busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybo
 
 echo "==> Testing Presence1 query..."
 busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Ready
-busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Health
+
+# With every organ up and answering, the control plane must describe itself as healthy. The first
+# probe round fires before the later organs have taken their names, so the reading starts degraded
+# and settles; poll until it does rather than accepting the transient.
+echo "==> Waiting for the control plane to report its own health..."
+health="unset"
+deadline=$((SECONDS + 40))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    health="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Health)"
+    if [ "$health" = 's "healthy"' ]; then
+        break
+    fi
+    sleep 1
+done
+echo "    Presence1 Health -> $health"
+if [ "$health" != 's "healthy"' ]; then
+    echo "ERROR: every organ is running and answering Ready, yet the control plane settled on $health." >&2
+    exit 1
+fi
 
 echo "==> Multi-daemon integration test PASSED successfully!"

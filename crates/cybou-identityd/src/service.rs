@@ -33,6 +33,14 @@ impl Identity1Service {
 )]
 #[interface(name = "org.cybou.Mind.Identity1")]
 impl Identity1Service {
+    /// Service readiness.
+    ///
+    /// Health1 probes this method on every organ; Identity1 answers with whether identity state
+    /// actually loaded, because that is the fact the `identity-continuity` capability claims.
+    async fn ready(&self) -> bool {
+        self.core.current_state().is_some()
+    }
+
     /// Unique subject UUID string.
     async fn identity_id(&self) -> String {
         self.core
