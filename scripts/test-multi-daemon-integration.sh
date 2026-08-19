@@ -144,6 +144,25 @@ busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybo
 # A workspace seeded once and never updated would keep deliberating over its seed while the
 # system moved on, and its salience would decay to nothing without anything noticing. Form a
 # contribution and require the workspace to be attending to something recent.
+# contextd derives its graph from accepted contributions. An organ that subscribed but never
+# ingested, or ingested but never activated a concept, is indistinguishable from one that started
+# correctly — until something asks it what it holds.
+echo "==> Verifying the associative context is built from what was accepted..."
+context="ay 1 128"
+deadline=$((SECONDS + 30))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    context="$(busctl --user call org.cybou.Mind.Context1 /org/cybou/Mind/Context1 org.cybou.Mind.Context1 ActiveContext)"
+    if [ "$context" != "ay 1 128" ]; then
+        break
+    fi
+    sleep 1
+done
+if [ "$context" = "ay 1 128" ]; then
+    echo "ERROR: contributions were accepted, yet Context1 activated no concept." >&2
+    exit 1
+fi
+echo "    Context1 activated at least one concept"
+
 echo "==> Verifying the global workspace follows new contributions..."
 moment="$(busctl --user call org.cybou.Mind.Workspace1 /org/cybou/Mind/Workspace1 org.cybou.Mind.Workspace1 MomentState)"
 if [ "$moment" = "ay 0" ]; then

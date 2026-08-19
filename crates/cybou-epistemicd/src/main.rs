@@ -57,6 +57,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
 
+        // The replay above catches up once and then stops. Every contribution accepted afterwards
+        // would go unseen, which is why a system observing four new subjects still held exactly
+        // one belief: the beliefs were formed at startup and nothing revised them since.
+        tokio::spawn(follow_acceptances(core.clone()));
+
         println!("[cybou-epistemicd] Connecting to D-Bus session bus...");
         let service = Epistemic1Service::new(core);
         // Bound, not discarded: dropping the connection would release the well-known name.
@@ -83,4 +88,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+/// Form beliefs from contributions as they are accepted.
+///
+/// A projection that is only rebuilt at startup describes the system as it was when the process
+/// began, which is a different claim from what the system currently believes.
+#[cfg(target_os = "linux")]
+async fn follow_acceptances(core: Arc<EpistemicCore>) {
+    use cybou_fabric::EVENT;
+    use cybou_protocol::canonical::CanonicalEnvelope;
+    use futures_util::StreamExt;
+
+    let Ok(connection) = zbus::Connection::session().await else {
+        println!("[cybou-epistemicd] Cannot observe Event1: no session bus");
+        return;
+    };
+    let proxy = match zbus::Proxy::new(
+        &connection,
+        EVENT.service,
+        EVENT.object_path,
+        EVENT.interface,
+    )
+    .await
+    {
+        Ok(proxy) => proxy,
+        Err(error) => {
+            println!("[cybou-epistemicd] Cannot observe Event1: {error}");
+            return;
+        }
+    };
+    let mut accepted = match proxy.receive_signal("Accepted").await {
+        Ok(stream) => stream,
+        Err(error) => {
+            println!("[cybou-epistemicd] Cannot subscribe to Event1 Accepted: {error}");
+            return;
+        }
+    };
+    println!("[cybou-epistemicd] Following Event1 acceptances");
+
+    while let Some(message) = accepted.next().await {
+        let Ok((encoded, sequence)) = message.body().deserialize::<(Vec<u8>, u64)>() else {
+            continue;
+        };
+        if let Ok(envelope) = ciborium::from_reader::<CanonicalEnvelope, _>(encoded.as_slice()) {
+            core.ingest_envelope(&envelope, sequence);
+        }
+    }
 }
