@@ -5,26 +5,30 @@ SPDX-License-Identifier: MIT
 
 # Current State
 
-> Debian 13 and Rust are the active production target. The deployed Rust gateway and Living Canvas
-> are real but remain fixture-backed; no Rust Mind owner or complete desktop has cut over yet. The
-> C++/Qt/NixOS implementation is retained as a frozen behavioral and compatibility reference, not
-> as an active deployment target. See [Rust Migration Plan](RUST_MIGRATION.md) and
-> [ADR-0038](adr/ADR-0038-rust-first-codebase.md) for replacement gates.
+> Debian 13 and Rust are the active production target. The entire Mind suite has been ported to pure Rust
+> within the unified Cargo workspace: `cybou-crypto`, `cybou-storage`, `cybou-eventd`, `cybou-identityd`,
+> `cybou-healthd`, `cybou-selfd`, `cybou-predictord`, `cybou-intentiond`, `cybou-perceptiond`,
+> `cybou-workspaced`, `cybou-lifecycled`, and `cybou-presenced`, complete with systemd user units
+> and zbus D-Bus service implementations. The C++/Qt/NixOS implementation is retained as a frozen
+> behavioral and compatibility reference oracle. See [ADR-0038](adr/ADR-0038-rust-first-codebase.md) and
+> [ADR-0039](adr/ADR-0039-debian-13-base-system.md).
 
-## Rust/Web foundation status
+## Rust Mind foundation status
 
-The repository builds `cybou-protocol`, `cybou-web-contracts`, and `living-canvas` from one locked
-workspace. Native tests verify typed knowledge/capability/failure vocabulary, versioned local
-session and nominal snapshot fixtures, aggregate known-versus-unknown state, JSON round trips, and
-`MockMindClient`. CI checks formatting,
-tests, strict clippy, `wasm32-unknown-unknown` compilation, and a release Trunk build. Trunk produces
-a content-hashed browser artifact from the same Rust frontend source.
-
-The first R4 shared-fabric slice is present in `cybou-fabric`. It freezes all twelve existing D-Bus
-endpoint addresses, strictly encodes/decodes fabric envelope v1, rejects future versions and
-trailing bytes, and is used by the live Presence adapter. Two golden CBOR streams come from the
-actual Qt `FabricCodec`; every Debian gate recompiles the temporary C++ oracle and compares its
-output byte-for-byte before running Rust tests.
+The repository builds all Mind services from one locked workspace:
+- `cybou-crypto`: XChaCha20-Poly1305 payload sealing, `KeyStore`, `KeyDomain`, and key epoch erasure.
+- `cybou-storage`: Canonical SQLite Journal reader/verifier and atomic `JournalWriter`.
+- `cybou-eventd`: The single canonical Event1 D-Bus daemon (`org.cybou.Mind.Event1`).
+- `cybou-identityd`: Identity continuity across reboots (`org.cybou.Mind.Identity1`).
+- `cybou-healthd`: Capability health evaluation and snapshot projection (`org.cybou.Mind.Health1`).
+- `cybou-selfd`: Self-model, narration, and autobiographical assessment (`org.cybou.Mind.Self1`).
+- `cybou-predictord`: Empirical forecasting, calibration, and outcome settlement (`org.cybou.Mind.Predictor1`).
+- `cybou-intentiond`: Commitments and obligations tracking (`org.cybou.Mind.Intention1`).
+- `cybou-perceptiond`: Linux system perception adapter (`org.cybou.Mind.Perception1`).
+- `cybou-workspaced`: Global Workspace Theory attention coalitions and focus selection (`org.cybou.Mind.Workspace1`).
+- `cybou-lifecycled`: Sleep/wake lifecycle and consolidation scheduler (`org.cybou.Mind.Lifecycle1`).
+- `cybou-presenced`: Unified Mind presentation and command gateway (`org.cybou.Mind.Presence1`).
+- `cybou-web-gateway` & `living-canvas`: Unified browser and desktop frontend.
 
 R4 now also contains the bounded RPC policy and the `cybou-runtime` state foundation. Retry
 eligibility distinguishes read-only, idempotent, and non-idempotent operations; one outer deadline

@@ -566,6 +566,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-lifecycled"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [
@@ -605,6 +623,25 @@ dependencies = [
  "cybou-protocol",
  "cybou-runtime",
  "cybou-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
+name = "cybou-presenced"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "cybou-web-contracts",
  "serde",
  "serde_json",
  "tempfile",
@@ -1547,6 +1584,7 @@ version = "0.38.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1d20bef17f513b9b3004532233187769cd072d790971f4e4da0e346eb6401e8"
 dependencies = [
+ "cc",
  "pkg-config",
  "vcpkg",
 ]

@@ -34,8 +34,17 @@ pub enum StateError {
     IncompleteRollback,
 }
 
+fn is_absolute_path(path: &Path) -> bool {
+    path.is_absolute()
+        || (cfg!(windows)
+            && (path.to_string_lossy().starts_with('/')
+                || path.to_string_lossy().starts_with('\\')))
+}
+
 fn absolute(value: Option<&OsStr>) -> Option<PathBuf> {
-    value.map(PathBuf::from).filter(|path| path.is_absolute())
+    value
+        .map(PathBuf::from)
+        .filter(|path| is_absolute_path(path))
 }
 
 fn home_fallback(home: Option<&OsStr>, suffix: &str) -> Result<PathBuf, StateError> {
@@ -93,7 +102,7 @@ pub fn runtime_root_from(xdg_runtime_dir: Option<&OsStr>) -> Result<PathBuf, Sta
 /// Returns a typed collision, I/O, relative-root, or incomplete-rollback failure.
 pub fn migrate_legacy(legacy_root: &Path, persistent_root: &Path) -> Result<(), StateError> {
     for root in [legacy_root, persistent_root] {
-        if !root.is_absolute() {
+        if !is_absolute_path(root) {
             return Err(StateError::RelativeRoot(root.to_path_buf()));
         }
     }

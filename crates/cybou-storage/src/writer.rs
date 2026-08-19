@@ -371,7 +371,7 @@ impl JournalWriter {
                 "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
                  origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
                  confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
-                 retention_class, retention_policy, retain_until \
+                 retention_class, retention_policy, retain_until, sensitivity \
                  FROM contribution ORDER BY seq DESC LIMIT 1",
             )
             .map_err(WriteError::Query)?;
@@ -402,7 +402,7 @@ impl JournalWriter {
                 "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
                  origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
                  confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
-                 retention_class, retention_policy, retain_until \
+                 retention_class, retention_policy, retain_until, sensitivity \
                  FROM contribution WHERE seq=?1 LIMIT 1",
             )
             .map_err(WriteError::Query)?;
@@ -433,7 +433,7 @@ impl JournalWriter {
             "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
              origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
              confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
-             retention_class, retention_policy, retain_until \
+             retention_class, retention_policy, retain_until, sensitivity \
              FROM contribution {limit_clause}"
         );
         let mut stmt = self.connection.prepare(&query).map_err(WriteError::Query)?;
@@ -476,7 +476,7 @@ impl JournalWriter {
             "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
              origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
              confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
-             retention_class, retention_policy, retain_until \
+             retention_class, retention_policy, retain_until, sensitivity \
              FROM contribution WHERE seq > ?1 ORDER BY seq ASC {limit_clause}"
         );
         let mut stmt = self.connection.prepare(&query).map_err(WriteError::Query)?;
@@ -510,7 +510,7 @@ impl JournalWriter {
                 "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
                  origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
                  confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
-                 retention_class, retention_policy, retain_until \
+                 retention_class, retention_policy, retain_until, sensitivity \
                  FROM contribution WHERE message_id=?1 LIMIT 1",
             )
             .map_err(WriteError::Query)?;
@@ -546,7 +546,7 @@ impl JournalWriter {
                 "SELECT seq, prev_hash, schema_version, message_id, correlation_id, causation_id, \
                  origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
                  confidence, payload, privacy, capability, sealed, key_domain, key_epoch, \
-                 retention_class, retention_policy, retain_until \
+                 retention_class, retention_policy, retain_until, sensitivity \
                  FROM contribution WHERE correlation_id=?1 ORDER BY seq ASC",
             )
             .map_err(WriteError::Query)?;

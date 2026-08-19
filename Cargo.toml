@@ -9,9 +9,11 @@ members = [
     "crates/cybou-healthd",
     "crates/cybou-identityd",
     "crates/cybou-intentiond",
+    "crates/cybou-lifecycled",
     "crates/cybou-perception",
     "crates/cybou-perceptiond",
     "crates/cybou-predictord",
+    "crates/cybou-presenced",
     "crates/cybou-protocol",
     "crates/cybou-runtime",
     "crates/cybou-selfd",
@@ -33,7 +35,7 @@ repository = "https://github.com/cybou-fr/CYBOU"
 [workspace.dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-rusqlite = "0.40.1"
+rusqlite = { version = "0.40.1", features = ["bundled"] }
 sha2 = "0.11.0"
 chacha20poly1305 = "0.10.1"
 getrandom = "0.2.15"

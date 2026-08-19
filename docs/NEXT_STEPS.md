@@ -22,15 +22,21 @@ fully functioning Rust Mind owner is completing crypto sealing and packaging the
 ### Execution sequence
 
 ```text
-1. Repository truth & ADR cleanup (Complete)
-2. UI Feature Freeze (Living Canvas features frozen; only bugfixes/contracts allowed)
-3. cybou-crypto (KeyStore, key domain/epoch, sealing, erasure, differential fixtures)
-4. cybou-eventd (Event1 D-Bus service, Submit, Replay, Verify, Accepted after COMMIT)
-5. Debian systemd Event1 service & crash/recovery gates
-6. Cut over Event1 (First production Rust Mind owner)
-7. Replace perception (nixos.system -> linux.system for Debian 13)
-8. Port remaining owners (identityd, selfd, predictord, intentiond, workspaced, etc.)
-9. Final legacy removal (flake.nix, NixOS VM, CMake C++ Mind, Qt/QML)
+1. Repository truth & ADR cleanup (Complete: ADR-0005/0006 Superseded, ADR-0038/0039 Accepted)
+2. UI Feature Freeze (Complete: Living Canvas frozen for Rust Mind transition)
+3. cybou-crypto (Complete: KeyStore, KeyDomain, XChaCha20-Poly1305 sealing, erasure)
+4. cybou-eventd (Complete: Event1 D-Bus daemon, JournalWriter integration, Accepted signal)
+5. cybou-identityd (Complete: Identity1 D-Bus daemon, session continuity, fail-closed)
+6. cybou-healthd (Complete: Health1 D-Bus daemon, CapabilityRegistry dependency policy)
+7. cybou-selfd (Complete: Self1 D-Bus daemon, self-assessment and narration)
+8. cybou-predictord (Complete: Predictor1 D-Bus daemon, empirical forecasting/calibration)
+9. cybou-intentiond (Complete: Intention1 D-Bus daemon, commitments and obligations)
+10. cybou-perceptiond (Complete: Perception1 D-Bus daemon, Debian/Linux system sensor)
+11. cybou-workspaced (Complete: Workspace1 D-Bus daemon, GWT attention coalitions)
+12. cybou-lifecycled (Complete: Lifecycle1 D-Bus daemon, sleep/wake/consolidation scheduler)
+13. cybou-presenced (Complete: Presence1 D-Bus daemon, compound snapshot presentation)
+14. Systemd unit integration (Complete: all 10 user service units created in systemd/user/)
+15. Final legacy removal and Debian 13 packaging
 ```
 
 ## Current architecture assessment
