@@ -8,15 +8,15 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use async_trait::async_trait;
 use ciborium::Value;
 use cybou_fabric::{
-    EVENT, IDENTITY, INTENTION, LIFECYCLE, PRESENCE, decode,
+    EVENT, IDENTITY, INTENTION, LIFECYCLE, PRESENCE, SELF, WORKSPACE, decode,
     rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
     zbus_rpc::ResilientZbusClient,
 };
 use cybou_protocol::{CapabilityState, KnowledgeState, canonical::CanonicalEnvelope};
 use cybou_web_contracts::{
-    CapabilityProjection, CommitmentProjection, CommitmentsProjection, ContributionProjection,
-    Freshness, IdentityProjection, JournalProjection, LifecycleProjection, MindProjection,
-    SnapshotProjection, WEB_SCHEMA_V1,
+    AttentionProjection, CapabilityProjection, CommitmentProjection, CommitmentsProjection,
+    ContributionProjection, Freshness, IdentityProjection, JournalProjection, LifecycleProjection,
+    MindProjection, SelfProjection, SnapshotProjection, WEB_SCHEMA_V1,
 };
 use futures_util::StreamExt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -309,6 +309,65 @@ impl ZbusPresenceSource {
         }
     }
 
+    /// Self1's own assessment, including the sentence it composes about itself.
+    ///
+    /// Measure and Narrate are two calls on purpose: the narration must come from the owner, so
+    /// the gateway hands the report straight back rather than describing it in its own words.
+    async fn self_model(&self) -> SelfProjection {
+        let unread = || SelfProjection {
+            knowledge: KnowledgeState::Unknown,
+            narration: None,
+            age_in_days: None,
+            sessions: None,
+            open_intentions: None,
+            settled_predictions: None,
+        };
+        let Some(encoded) = self.read::<Vec<u8>>(SELF, "Measure").await else {
+            return unread();
+        };
+        let Ok(report) = ciborium::from_reader::<OwnerSelfReport, _>(encoded.as_slice()) else {
+            return unread();
+        };
+        SelfProjection {
+            knowledge: KnowledgeState::Known,
+            narration: self
+                .read_with::<String, _>(SELF, "Narrate", &(encoded,))
+                .await
+                .filter(|narration| !narration.is_empty()),
+            age_in_days: Some(report.age_in_days),
+            sessions: Some(report.sessions),
+            open_intentions: Some(report.open_intentions),
+            settled_predictions: Some(report.settled_predictions),
+        }
+    }
+
+    async fn attention(&self) -> AttentionProjection {
+        let Some(encoded) = self.read::<Vec<u8>>(WORKSPACE, "MomentState").await else {
+            return AttentionProjection {
+                knowledge: KnowledgeState::Unknown,
+                focus: None,
+                salience: None,
+                organs: Vec::new(),
+            };
+        };
+        match ciborium::from_reader::<OwnerMomentState, _>(encoded.as_slice()) {
+            // Workspace1 answering with no focus is knowledge, not absence: nothing currently
+            // holds attention, and that is a fact about the system.
+            Ok(state) => AttentionProjection {
+                knowledge: KnowledgeState::Known,
+                focus: state.focus,
+                salience: Some(state.salience),
+                organs: state.organs,
+            },
+            Err(_) => AttentionProjection {
+                knowledge: KnowledgeState::Unknown,
+                focus: None,
+                salience: None,
+                organs: Vec::new(),
+            },
+        }
+    }
+
     async fn lifecycle(&self) -> LifecycleProjection {
         let Some(encoded) = self.read::<Vec<u8>>(LIFECYCLE, "State").await else {
             return LifecycleProjection {
@@ -364,6 +423,25 @@ struct OwnerIntention {
     formed: String,
 }
 
+/// The fields of Self1's report the panel uses; the rest of the report stays with its owner.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerSelfReport {
+    age_in_days: i64,
+    sessions: u64,
+    open_intentions: u32,
+    settled_predictions: u32,
+}
+
+/// Workspace1's momentary state.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerMomentState {
+    focus: Option<String>,
+    salience: f64,
+    organs: Vec<String>,
+}
+
 /// Lifecycle1's own state shape, of which the panel uses two fields.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -390,6 +468,8 @@ impl PresenceSource for ZbusPresenceSource {
             journal: self.journal().await,
             commitments: self.commitments().await,
             lifecycle: self.lifecycle().await,
+            self_model: self.self_model().await,
+            attention: self.attention().await,
         })
     }
 

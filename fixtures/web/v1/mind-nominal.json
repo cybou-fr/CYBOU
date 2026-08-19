@@ -44,5 +44,22 @@
     "knowledge": "known",
     "mode": "awake",
     "lastUserActivityAt": "2026-08-19T11:59:30Z"
+  },
+  "selfModel": {
+    "knowledge": "known",
+    "narration": "This is my first day. This is session 12. I hold no unfulfilled obligations.",
+    "ageInDays": 18,
+    "sessions": 12,
+    "openIntentions": 1,
+    "settledPredictions": 0
+  },
+  "attention": {
+    "knowledge": "known",
+    "focus": "4d3f2a1b-7c60-48f1-9c9e-467aceea8f14",
+    "salience": 0.82,
+    "organs": [
+      "perceptiond",
+      "identityd"
+    ]
   }
 }

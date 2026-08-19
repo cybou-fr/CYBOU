@@ -185,11 +185,47 @@ pub struct LifecycleProjection {
     pub last_user_activity_at: Option<String>,
 }
 
+/// How the system assesses itself, as reported by Self1.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfProjection {
+    /// Whether Self1 answered.
+    pub knowledge: KnowledgeState,
+    /// The narration Self1 produced from its own report.
+    ///
+    /// Composed by the owner, not by the gateway and not by the page: these are the system's
+    /// words about itself, and rewording them here would make them someone else's.
+    pub narration: Option<String>,
+    /// Whole days since origin, as the report measured them.
+    pub age_in_days: Option<i64>,
+    /// Sessions recorded.
+    pub sessions: Option<u64>,
+    /// Obligations still open at the moment of assessment.
+    pub open_intentions: Option<u32>,
+    /// Predictions that have been settled against an outcome.
+    pub settled_predictions: Option<u32>,
+}
+
+/// What currently holds attention, as reported by Workspace1.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttentionProjection {
+    /// Whether Workspace1 answered.
+    pub knowledge: KnowledgeState,
+    /// Correlation identity of the winning coalition, absent when nothing holds focus.
+    pub focus: Option<String>,
+    /// Salience of the winning coalition.
+    pub salience: Option<f64>,
+    /// Organs participating in it.
+    pub organs: Vec<String>,
+}
+
 /// What Mind actually holds right now, returned by `/api/v1/mind`.
 ///
 /// Only owners that hold real state appear here. Nothing in this projection is composed by the
 /// gateway: each section is what one owner answered, or an explicit unknown.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+// Salience is a float, so this projection compares by value rather than by identity.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MindProjection {
     /// Web contract version.
@@ -204,6 +240,10 @@ pub struct MindProjection {
     pub commitments: CommitmentsProjection,
     /// Sleep/wake state.
     pub lifecycle: LifecycleProjection,
+    /// Self-assessment.
+    pub self_model: SelfProjection,
+    /// Global workspace attention.
+    pub attention: AttentionProjection,
 }
 
 #[cfg(test)]

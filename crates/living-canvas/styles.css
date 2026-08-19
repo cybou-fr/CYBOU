@@ -124,6 +124,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .journal-footer i { color: var(--muted); font-style: normal; }
 .journal-footer b { color: #70a8f7; font-weight: 500; }
 .commitments { width: 310px; padding: 22px; }
+.self-model { width: 330px; padding: 22px; }
+.self-narration { margin: 0; line-height: 1.5; color: #cfd8de; font-size: 12px; }
+.attention { width: 320px; padding: 20px; }
+.attention-focus { padding: 8px 10px; border: 1px solid rgba(112,225,200,.28); border-radius: 8px; color: var(--accent); font-size: 11px; word-break: break-all; }
 .row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
 .row b, .check-row b { color: #dfe8ed; font-weight: 500; }
 .row i, .check-row i { color: var(--muted); font-style: normal; white-space: nowrap; }

@@ -10,7 +10,9 @@
     "identity",
     "journal",
     "commitments",
-    "lifecycle"
+    "lifecycle",
+    "selfModel",
+    "attention"
   ],
   "properties": {
     "schemaVersion": {
@@ -213,6 +215,95 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "selfModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge",
+        "narration",
+        "ageInDays",
+        "sessions",
+        "openIntentions",
+        "settledPredictions"
+      ],
+      "properties": {
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "narration": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ageInDays": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sessions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "openIntentions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "settledPredictions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "attention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge",
+        "focus",
+        "salience",
+        "organs"
+      ],
+      "properties": {
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "focus": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "salience": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "organs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

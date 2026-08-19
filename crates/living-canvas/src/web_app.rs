@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v5";
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v6";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Point {
@@ -28,6 +28,8 @@ struct CanvasLayout {
     journal: Point,
     lifecycle: Point,
     commitments: Point,
+    self_model: Point,
+    attention: Point,
 }
 
 impl Default for CanvasLayout {
@@ -55,13 +57,23 @@ impl Default for CanvasLayout {
             },
             lifecycle: Point {
                 x: 900.0,
-                y: 300.0,
+                y: 340.0,
                 z: 5,
             },
             commitments: Point {
                 x: 470.0,
                 y: 410.0,
                 z: 4,
+            },
+            self_model: Point {
+                x: 55.0,
+                y: 600.0,
+                z: 7,
+            },
+            attention: Point {
+                x: 470.0,
+                y: 620.0,
+                z: 8,
             },
         }
     }
@@ -75,6 +87,8 @@ enum Panel {
     Journal,
     Lifecycle,
     Commitments,
+    SelfModel,
+    Attention,
 }
 
 impl Panel {
@@ -86,6 +100,8 @@ impl Panel {
             Self::Journal => "journal",
             Self::Lifecycle => "lifecycle",
             Self::Commitments => "commitments",
+            Self::SelfModel => "self",
+            Self::Attention => "attention",
         }
     }
 
@@ -94,9 +110,11 @@ impl Panel {
             Self::Identity => (220.0, 188.0),
             Self::Session => (240.0, 236.0),
             Self::Capabilities => (390.0, 294.0),
-            Self::Journal => (300.0, 300.0),
+            Self::Journal => (300.0, 260.0),
             Self::Lifecycle => (335.0, 252.0),
             Self::Commitments => (310.0, 184.0),
+            Self::SelfModel => (330.0, 210.0),
+            Self::Attention => (320.0, 170.0),
         }
     }
 }
@@ -119,6 +137,8 @@ impl CanvasLayout {
             Panel::Journal => self.journal,
             Panel::Lifecycle => self.lifecycle,
             Panel::Commitments => self.commitments,
+            Panel::SelfModel => self.self_model,
+            Panel::Attention => self.attention,
         }
     }
 
@@ -130,6 +150,8 @@ impl CanvasLayout {
             Panel::Journal => self.journal = point,
             Panel::Lifecycle => self.lifecycle = point,
             Panel::Commitments => self.commitments = point,
+            Panel::SelfModel => self.self_model = point,
+            Panel::Attention => self.attention = point,
         }
     }
 
@@ -141,6 +163,8 @@ impl CanvasLayout {
             self.journal.z,
             self.lifecycle.z,
             self.commitments.z,
+            self.self_model.z,
+            self.attention.z,
         ]
         .into_iter()
         .max()
@@ -378,6 +402,45 @@ pub fn App() -> impl IntoView {
         mind()
             .and_then(|m| m.lifecycle.last_user_activity_at)
             .unwrap_or_else(unread)
+    };
+    let self_narration = move || {
+        mind()
+            .and_then(|m| m.self_model.narration)
+            .unwrap_or_else(|| "Self1 has not been read.".to_owned())
+    };
+    let self_open_intentions = move || {
+        mind()
+            .and_then(|m| m.self_model.open_intentions)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let self_settled = move || {
+        mind()
+            .and_then(|m| m.self_model.settled_predictions)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let attention_focus = move || match mind() {
+        None => "Workspace1 not read".to_owned(),
+        Some(m) if m.attention.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Workspace1 not read".to_owned()
+        }
+        // Workspace1 answering with no winner is knowledge: nothing currently holds attention.
+        Some(m) => m
+            .attention
+            .focus
+            .unwrap_or_else(|| "Nothing holds focus".to_owned()),
+    };
+    let attention_salience = move || {
+        mind()
+            .and_then(|m| m.attention.salience)
+            .map_or_else(unread, |value| format!("{value:.2}"))
+    };
+    let attention_organs = move || {
+        let organs = mind().map_or_else(Vec::new, |m| m.attention.organs);
+        if organs.is_empty() {
+            unread()
+        } else {
+            organs.join(", ")
+        }
     };
     let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
     let commitments_label = move || match mind() {
@@ -641,6 +704,40 @@ pub fn App() -> impl IntoView {
                         <span class="panel-link">"Intention1 holds these until they are closed"</span>
                     </button>
 
+                    <article
+                        class:selected=move || selected.get() == "self"
+                        class="object self-model"
+                        style=move || panel_style(layout.get(), Panel::SelfModel)
+                        tabindex="0"
+                        aria-label="Self-assessment panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::SelfModel, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::SelfModel, layout)
+                        on:click=move |_| set_selected.set("self")
+                    >
+                        <small class="panel-kicker"><Sparkles size=14 /><span>"Self1"</span></small>
+                        <strong>"Self-assessment"</strong>
+                        <p class="self-narration">{self_narration}</p>
+                        <span class="row"><b>"Open obligations"</b><i>{self_open_intentions}</i></span>
+                        <span class="row"><b>"Settled predictions"</b><i>{self_settled}</i></span>
+                        <span class="panel-link">"Composed by Self1, not by this page"</span>
+                    </article>
+
+                    <button
+                        class:selected=move || selected.get() == "attention"
+                        class="object attention"
+                        style=move || panel_style(layout.get(), Panel::Attention)
+                        aria-label="Attention panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Attention, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Attention, layout)
+                        on:click=move |_| set_selected.set("attention")
+                    >
+                        <small class="panel-kicker"><Map size=14 /><span>"Workspace1"</span></small>
+                        <strong>"Attention"</strong>
+                        <span class="attention-focus">{attention_focus}</span>
+                        <span class="row"><b>"Salience"</b><i>{attention_salience}</i></span>
+                        <span class="row"><b>"Organs"</b><i>{attention_organs}</i></span>
+                    </button>
+
                     <Show when=move || command_open.get()>
                         <nav class="command-palette" aria-label="Canvas commands">
                             <small>"Jump to"</small>
@@ -668,6 +765,14 @@ pub fn App() -> impl IntoView {
                                 class:hidden=move || !command_matches(&command_query.get(), "commitments obligations intention1")
                                 on:click=move |_| select_from_command("commitments", set_selected, set_command_open, set_command_query)
     ><ListChecks size=15 /><span><b>"Commitments"</b><i>"Intention1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "self assessment narration self1")
+                                on:click=move |_| select_from_command("self", set_selected, set_command_open, set_command_query)
+                            ><Sparkles size=15 /><span><b>"Self-assessment"</b><i>"Self1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "attention focus workspace1")
+                                on:click=move |_| select_from_command("attention", set_selected, set_command_open, set_command_query)
+                            ><Map size=15 /><span><b>"Attention"</b><i>"Workspace1"</i></span></button>
                         </nav>
                     </Show>
 
@@ -742,6 +847,20 @@ pub fn App() -> impl IntoView {
                                     style=move || minimap_style(layout.get().commitments)
                                     aria-label="Select commitments panel"
                                     on:click=move |_| set_selected.set("commitments")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "self"
+                                    class="mini-node self-node"
+                                    style=move || minimap_style(layout.get().self_model)
+                                    aria-label="Select self-assessment panel"
+                                    on:click=move |_| set_selected.set("self")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "attention"
+                                    class="mini-node attention-node"
+                                    style=move || minimap_style(layout.get().attention)
+                                    aria-label="Select attention panel"
+                                    on:click=move |_| set_selected.set("attention")
                                 ></button>
                             </div>
                         </nav>
@@ -846,6 +965,8 @@ fn first_command_match(query: &str) -> Option<&'static str> {
         ("journal", "journal contributions event1"),
         ("lifecycle", "lifecycle sleep wake"),
         ("commitments", "commitments obligations intention1"),
+        ("self", "self assessment narration self1"),
+        ("attention", "attention focus workspace1"),
     ]
     .into_iter()
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))
