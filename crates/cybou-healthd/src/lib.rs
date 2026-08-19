@@ -95,7 +95,7 @@ impl HealthCore {
             snapshot: RwLock::new(None),
             projection_version: RwLock::new(0),
         };
-        core.recalculate(OffsetDateTime::now_utc());
+        let _ = core.recalculate(OffsetDateTime::now_utc());
         core
     }
 
@@ -109,19 +109,24 @@ impl HealthCore {
         if let Ok(mut map) = self.component_records.write() {
             map.insert(component_id.into(), record);
         }
-        self.recalculate(now);
+        let _ = self.recalculate(now);
     }
 
     /// Set all component records in bulk and recalculate.
+    ///
+    /// Returns whether the capability states changed, exactly as [`Self::recalculate`] does. A
+    /// probe round must land as one update: applying eleven components one at a time recalculates
+    /// eleven times, and the transition an observer cares about is absorbed by whichever component
+    /// happened to be written first.
     pub fn set_components(
         &self,
         records: HashMap<String, ComponentHealthRecord>,
         now: OffsetDateTime,
-    ) {
+    ) -> bool {
         if let Ok(mut map) = self.component_records.write() {
             *map = records;
         }
-        self.recalculate(now);
+        self.recalculate(now)
     }
 
     /// Evaluate overall health state string ("healthy", "degraded", "unavailable").
@@ -170,7 +175,12 @@ impl HealthCore {
     }
 
     /// Recalculate capability states based on registered declarations and component records.
-    pub fn recalculate(&self, now: OffsetDateTime) {
+    ///
+    /// Returns whether the capability states themselves differ from the previous projection.
+    /// The projection is rebuilt on every probe round and its version and observation instant
+    /// change every time, so "the projection is new" is not the same question as "an observer
+    /// would see something different", and only the second one is worth a signal.
+    pub fn recalculate(&self, now: OffsetDateTime) -> bool {
         let records = self
             .component_records
             .read()
@@ -184,8 +194,16 @@ impl HealthCore {
             capability_projections.push(projection);
         }
 
+        let previous_states = self
+            .snapshot
+            .read()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(Self::state_fingerprint));
+        let new_states = Self::state_fingerprint_of(&capability_projections);
+        let changed = previous_states.as_ref() != Some(&new_states);
+
         let Ok(mut version_guard) = self.projection_version.write() else {
-            return;
+            return false;
         };
         *version_guard += 1;
         let new_version = *version_guard;
@@ -205,6 +223,21 @@ impl HealthCore {
         if let Ok(mut snap_guard) = self.snapshot.write() {
             *snap_guard = Some(snapshot);
         }
+
+        changed
+    }
+
+    fn state_fingerprint(snapshot: &SnapshotProjection) -> Vec<(String, CapabilityState)> {
+        Self::state_fingerprint_of(&snapshot.capabilities)
+    }
+
+    fn state_fingerprint_of(
+        capabilities: &[CapabilityProjection],
+    ) -> Vec<(String, CapabilityState)> {
+        capabilities
+            .iter()
+            .map(|cap| (cap.id.clone(), cap.state))
+            .collect()
     }
 }
 

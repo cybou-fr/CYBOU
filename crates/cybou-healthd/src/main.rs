@@ -3,10 +3,17 @@
 
 //! `cybou-healthd` daemon entrypoint.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+
+#[cfg(target_os = "linux")]
+use std::collections::HashMap;
+
+#[cfg(target_os = "linux")]
+use std::time::Duration;
 
 #[allow(unused_imports)]
 use cybou_healthd::{ComponentHealth, ComponentHealthRecord, HealthCore};
+#[cfg(target_os = "linux")]
 use time::OffsetDateTime;
 
 #[tokio::main]
@@ -14,48 +21,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[cybou-healthd] Initializing capability health engine...");
     let core = Arc::new(HealthCore::new());
 
-    core.recalculate(OffsetDateTime::now_utc());
-    println!(
-        "[cybou-healthd] Initial overall health: {}",
-        core.overall_health()
-    );
-
-    // Spawn periodic active probing loop
-    let probe_core = core.clone();
-    tokio::spawn(async move {
-        #[cfg(target_os = "linux")]
+    #[cfg(target_os = "linux")]
+    {
         use cybou_fabric::{
-            CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, PREDICTOR,
-            PRESENCE, SELF, WORKSPACE,
+            CONTEXT, EPISTEMIC, EVENT, HEALTH, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION,
+            PREDICTOR, PRESENCE, SELF, WORKSPACE,
         };
+        use cybou_healthd::service::{Health1Service, emit_changed};
 
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
-        #[cfg(target_os = "linux")]
-        let session = zbus::Connection::session().await.ok();
+        let _ = core.recalculate(OffsetDateTime::now_utc());
+        println!(
+            "[cybou-healthd] Initial overall health: {}",
+            core.overall_health()
+        );
 
-        #[cfg(target_os = "linux")]
-        let endpoints = [
-            ("eventd", EVENT),
-            ("identityd", IDENTITY),
-            ("intentiond", INTENTION),
-            ("predictord", PREDICTOR),
-            ("selfd", SELF),
-            ("workspaced", WORKSPACE),
-            ("perceptiond", PERCEPTION),
-            ("epistemicd", EPISTEMIC),
-            ("contextd", CONTEXT),
-            ("lifecycled", LIFECYCLE),
-            ("presenced", PRESENCE),
-        ];
+        println!("[cybou-healthd] Connecting to D-Bus session bus...");
+        let probe_core = core.clone();
+        let service = Health1Service::new(core);
+        // Bound, not discarded: dropping the connection would release the well-known name.
+        let connection = zbus::connection::Builder::session()?
+            .name(HEALTH.service)?
+            .serve_at(HEALTH.object_path, service)?
+            .build()
+            .await?;
 
-        loop {
-            interval.tick().await;
-            let now = OffsetDateTime::now_utc();
+        println!(
+            "[cybou-healthd] Registered '{}' at '{}'",
+            HEALTH.service, HEALTH.object_path
+        );
 
-            #[cfg(target_os = "linux")]
-            if let Some(ref conn) = session {
+        // The probe loop shares the owning connection: it both dispatches the Ready probes and
+        // emits Changed, and a signal sent over a second connection would carry a sender no
+        // subscriber matches.
+        let probe_connection = connection.clone();
+        tokio::spawn(async move {
+            let endpoints = [
+                ("eventd", EVENT),
+                ("identityd", IDENTITY),
+                ("intentiond", INTENTION),
+                ("predictord", PREDICTOR),
+                ("selfd", SELF),
+                ("workspaced", WORKSPACE),
+                ("perceptiond", PERCEPTION),
+                ("epistemicd", EPISTEMIC),
+                ("contextd", CONTEXT),
+                ("lifecycled", LIFECYCLE),
+                ("presenced", PRESENCE),
+            ];
+
+            let mut interval = tokio::time::interval(Duration::from_secs(5));
+            loop {
+                interval.tick().await;
+                let now = OffsetDateTime::now_utc();
+
+                let mut records = HashMap::new();
                 for (id, ep) in &endpoints {
-                    let res: Result<bool, _> = conn
+                    let res: Result<bool, _> = probe_connection
                         .call_method(
                             Some(ep.service),
                             ep.object_path,
@@ -73,39 +94,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(_) => ComponentHealth::Unavailable,
                     };
 
-                    probe_core.update_component(
-                        *id,
+                    records.insert(
+                        (*id).to_string(),
                         ComponentHealthRecord {
                             health,
                             detail: None,
                         },
-                        now,
                     );
                 }
+
+                // One probe round is one observation: applied together so the transition is
+                // reported once, and only when an observer could actually see the difference.
+                if probe_core.set_components(records, now) {
+                    let _ = emit_changed(&probe_connection).await;
+                }
             }
-
-            probe_core.recalculate(now);
-        }
-    });
-
-    #[cfg(target_os = "linux")]
-    {
-        use cybou_fabric::HEALTH;
-        use cybou_healthd::service::Health1Service;
-
-        println!("[cybou-healthd] Connecting to D-Bus session bus...");
-        let service = Health1Service::new(core);
-        // Bound, not discarded: dropping the connection would release the well-known name.
-        let _connection = zbus::connection::Builder::session()?
-            .name(HEALTH.service)?
-            .serve_at(HEALTH.object_path, service)?
-            .build()
-            .await?;
-
-        println!(
-            "[cybou-healthd] Registered '{}' at '{}'",
-            HEALTH.service, HEALTH.object_path
-        );
+        });
 
         tokio::signal::ctrl_c().await?;
         println!("[cybou-healthd] Shutting down.");
@@ -114,6 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "linux"))]
     {
         println!("[cybou-healthd] Running on non-Linux host in headless mode.");
+        let _ = core;
         tokio::signal::ctrl_c().await?;
     }
 

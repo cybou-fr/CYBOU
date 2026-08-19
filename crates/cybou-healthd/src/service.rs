@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use cybou_fabric::HEALTH;
 use time::OffsetDateTime;
 use zbus::{interface, object_server::SignalEmitter};
 
@@ -74,7 +75,7 @@ impl Health1Service {
 
     /// Refresh capability evaluations and emit Changed signal.
     async fn refresh(&self, #[zbus(signal_emitter)] ctxt: SignalEmitter<'_>) -> bool {
-        self.core.recalculate(OffsetDateTime::now_utc());
+        let _ = self.core.recalculate(OffsetDateTime::now_utc());
         let _ = Self::changed(&ctxt).await;
         true
     }
@@ -82,4 +83,18 @@ impl Health1Service {
     /// Signal emitted when capability health snapshot changes.
     #[zbus(signal)]
     async fn changed(ctxt: &SignalEmitter<'_>) -> zbus::Result<()>;
+}
+
+/// Emit `Changed` from outside a method call, over the connection that owns Health1.
+///
+/// The periodic probe loop is not a D-Bus method, so it never receives a `SignalEmitter` of its
+/// own. It must still emit from the owning connection: a signal sent over any other connection
+/// would carry a sender no subscriber matches.
+///
+/// # Errors
+///
+/// Returns the zbus error when the path is invalid or the signal cannot be sent.
+pub async fn emit_changed(connection: &zbus::Connection) -> zbus::Result<()> {
+    let emitter = SignalEmitter::new(connection, HEALTH.object_path)?;
+    Health1Service::changed(&emitter).await
 }

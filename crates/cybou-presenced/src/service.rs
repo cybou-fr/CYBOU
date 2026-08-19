@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use cybou_fabric::PRESENCE;
 use time::OffsetDateTime;
 use zbus::{interface, object_server::SignalEmitter};
 
@@ -143,4 +144,18 @@ impl Presence1Service {
     /// Signal emitted when compound projection changes.
     #[zbus(signal)]
     async fn changed(ctxt: &SignalEmitter<'_>) -> zbus::Result<()>;
+}
+
+/// Emit `Changed` from outside a method call, over the connection that owns Presence1.
+///
+/// Presence1 has no clock of its own: it changes when the owners it presents change. The
+/// re-emission task is therefore not a D-Bus method and needs an emitter bound to the owning
+/// connection.
+///
+/// # Errors
+///
+/// Returns the zbus error when the path is invalid or the signal cannot be sent.
+pub async fn emit_changed(connection: &zbus::Connection) -> zbus::Result<()> {
+    let emitter = SignalEmitter::new(connection, PRESENCE.object_path)?;
+    Presence1Service::changed(&emitter).await
 }

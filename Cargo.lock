@@ -680,6 +680,7 @@ dependencies = [
  "cybou-protocol",
  "cybou-runtime",
  "cybou-web-contracts",
+ "futures-util",
  "serde",
  "serde_json",
  "tempfile",

@@ -85,7 +85,10 @@ spawn cybou-epistemicd
 spawn cybou-contextd
 spawn cybou-workspaced
 spawn cybou-lifecycled
+
 spawn cybou-selfd
+SELF_PID="${PIDS[-1]}"
+
 spawn cybou-presenced
 
 NAMES=(
@@ -157,6 +160,69 @@ done
 echo "    Presence1 Health -> $health"
 if [ "$health" != 's "healthy"' ]; then
     echo "ERROR: every organ is running and answering Ready, yet the control plane settled on $health." >&2
+    exit 1
+fi
+
+# A control plane that cannot report a change is a control plane nobody can watch. Presence1
+# declares a Changed signal; prove it actually fires, and fires for a real reason, by taking one
+# organ away and requiring both the signal and the degraded verdict that explains it.
+echo "==> Verifying the control plane observes and announces an organ dying..."
+# Watch both links of the chain. Health1 is where the observation happens and Presence1 is where
+# a subscriber waits; logging them separately says which half broke rather than only that one did.
+HEALTH_LOG="$TMP_DIR/health-changed.log"
+CHANGED_LOG="$TMP_DIR/presence-changed.log"
+dbus-monitor --session     "type='signal',interface='org.cybou.Mind.Health1',member='Changed'"     >"$HEALTH_LOG" 2>/dev/null &
+PIDS+=("$!")
+dbus-monitor --session     "type='signal',interface='org.cybou.Mind.Presence1',member='Changed'"     >"$CHANGED_LOG" 2>/dev/null &
+PIDS+=("$!")
+sleep 1
+
+kill "$SELF_PID" 2>/dev/null || true
+wait "$SELF_PID" 2>/dev/null || true
+
+health="unset"
+deadline=$((SECONDS + 30))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    health="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Health)"
+    if [ "$health" != 's "healthy"' ]; then
+        break
+    fi
+    sleep 1
+done
+echo "    Presence1 Health after losing selfd -> $health"
+if [ "$health" = 's "healthy"' ]; then
+    echo "ERROR: selfd was killed and the control plane still reports itself healthy." >&2
+    exit 1
+fi
+
+if ! grep -q "member=Changed" "$HEALTH_LOG"; then
+    echo "ERROR: the capability states changed but Health1 never emitted Changed." >&2
+    exit 1
+fi
+echo "    Health1 emitted Changed"
+
+if ! grep -q "member=Changed" "$CHANGED_LOG"; then
+    echo "ERROR: Health1 announced the change but Presence1 never relayed it." >&2
+    exit 1
+fi
+echo "    Presence1 relayed Changed"
+
+echo "==> Restoring cybou-selfd..."
+spawn cybou-selfd
+wait_for_name org.cybou.Mind.Self1
+
+health="unset"
+deadline=$((SECONDS + 40))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    health="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Health)"
+    if [ "$health" = 's "healthy"' ]; then
+        break
+    fi
+    sleep 1
+done
+echo "    Presence1 Health after restoring selfd -> $health"
+if [ "$health" != 's "healthy"' ]; then
+    echo "ERROR: selfd is back and answering, yet the control plane settled on $health." >&2
     exit 1
 fi
 
