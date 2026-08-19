@@ -300,7 +300,7 @@ impl ZbusPresenceSource {
             open: open
                 .into_iter()
                 .map(|item| CommitmentProjection {
-                    id: item.id,
+                    id: item.id.to_string(),
                     description: item.description,
                     trigger: item.trigger,
                     formed: item.formed,
@@ -355,7 +355,7 @@ impl ZbusPresenceSource {
             // holds attention, and that is a fact about the system.
             Ok(state) => AttentionProjection {
                 knowledge: KnowledgeState::Known,
-                focus: state.focus,
+                focus: state.focus.map(|id| id.to_string()),
                 salience: Some(state.salience),
                 organs: state.organs,
             },
@@ -414,10 +414,14 @@ fn millis_to_rfc3339(millis: i64) -> String {
 }
 
 /// Intention1's own row shape, decoded only to be re-projected into the web contract.
+///
+/// The identity is a `Uuid`, not a string: serde encodes a UUID as raw bytes in CBOR and as text
+/// only in human-readable formats, so decoding it as `String` fails against the owner's real
+/// bytes while looking correct in a JSON fixture.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OwnerIntention {
-    id: String,
+    id: uuid::Uuid,
     description: String,
     trigger: String,
     formed: String,
@@ -437,7 +441,7 @@ struct OwnerSelfReport {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OwnerMomentState {
-    focus: Option<String>,
+    focus: Option<uuid::Uuid>,
     salience: f64,
     organs: Vec<String>,
 }
@@ -492,6 +496,8 @@ mod tests {
     use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
     use serde_json::{Value, json};
 
+    use uuid::Uuid;
+
     use super::{ZbusPresenceSource, kind_name, millis_to_rfc3339};
 
     fn encoded(value: &Value) -> Vec<u8> {
@@ -529,6 +535,55 @@ mod tests {
         assert_eq!(decoded.capabilities.len(), 1);
         assert_eq!(decoded.capabilities[0].id, "identity-continuity");
         assert_eq!(decoded.capabilities[0].state, CapabilityState::Available);
+    }
+
+    #[test]
+    fn owner_rows_decode_from_the_bytes_the_owners_actually_write() {
+        // Encoded exactly as the owners encode them: ciborium over their own types, where a Uuid
+        // is raw bytes rather than the text a JSON fixture would have shown.
+        #[derive(serde::Serialize)]
+        struct OwnerIntentionWire {
+            id: Uuid,
+            description: String,
+            trigger: String,
+            formed: String,
+        }
+        #[derive(serde::Serialize)]
+        struct OwnerMomentStateWire {
+            focus: Option<Uuid>,
+            salience: f64,
+            organs: Vec<String>,
+        }
+
+        let id = Uuid::from_u128(0x8f14_e45f_ceea_467a_9c9e_4d3f_2a1b_7c60);
+        let mut bytes = Vec::new();
+        ciborium::into_writer(
+            &vec![OwnerIntentionWire {
+                id,
+                description: "Run integration tests".into(),
+                trigger: "Session startup".into(),
+                formed: "2026-08-19T11:40:00Z".into(),
+            }],
+            &mut bytes,
+        )
+        .expect("encode owner intentions");
+        let decoded: Vec<super::OwnerIntention> =
+            ciborium::from_reader(bytes.as_slice()).expect("decode owner intentions");
+        assert_eq!(decoded[0].id, id);
+
+        let mut bytes = Vec::new();
+        ciborium::into_writer(
+            &OwnerMomentStateWire {
+                focus: Some(id),
+                salience: 0.75,
+                organs: vec!["perceptiond".into()],
+            },
+            &mut bytes,
+        )
+        .expect("encode owner moment state");
+        let decoded: super::OwnerMomentState =
+            ciborium::from_reader(bytes.as_slice()).expect("decode owner moment state");
+        assert_eq!(decoded.focus, Some(id));
     }
 
     #[test]

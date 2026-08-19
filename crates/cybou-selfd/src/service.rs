@@ -10,10 +10,11 @@
 
 use std::sync::Arc;
 
+use cybou_fabric::{EVENT, INTENTION, PREDICTOR};
 use time::OffsetDateTime;
 use zbus::interface;
 
-use crate::{SelfCore, SelfReport, narrate_self_report};
+use crate::{CalibrationEntry, SelfCore, SelfReport, VerificationKnowledge, narrate_self_report};
 
 /// D-Bus Service exporting `org.cybou.Mind.Self1`.
 pub struct Self1Service {
@@ -26,6 +27,109 @@ impl Self1Service {
     pub fn new(core: Arc<SelfCore>) -> Self {
         Self { core }
     }
+
+    /// Assemble a report from the owners that hold the facts it is about.
+    ///
+    /// Self1 owns the assessment, not the facts: obligations belong to Intention1, calibration to
+    /// Predictor1 and the contribution count to Event1. An owner that does not answer leaves its
+    /// part unknown rather than zero, which is why the narration can say it cannot determine
+    /// something instead of claiming there is nothing to determine.
+    async fn measure_now(&self, conn: &zbus::Connection, now: OffsetDateTime) -> SelfReport {
+        let obligations = self.read_obligations(conn, now).await;
+        let calibrations = self.read_calibrations(conn).await;
+        let contributions = read::<u64>(conn, EVENT, "Count").await.unwrap_or_default();
+        self.core.measure_with(
+            now,
+            contributions,
+            obligations,
+            calibrations,
+            VerificationKnowledge::Unknown,
+        )
+    }
+
+    async fn read_obligations(
+        &self,
+        conn: &zbus::Connection,
+        now: OffsetDateTime,
+    ) -> Option<(u32, i64)> {
+        let count = read::<u32>(conn, INTENTION, "OpenCount").await?;
+        let encoded = read::<Vec<u8>>(conn, INTENTION, "Open").await?;
+        // An owner holding nothing answers with an empty body; that is a known zero, and the
+        // oldest obligation of none is none rather than an error.
+        if encoded.is_empty() {
+            return Some((count, 0));
+        }
+        let open: Vec<OpenIntention> = ciborium::from_reader(encoded.as_slice()).ok()?;
+        let oldest = open
+            .iter()
+            .map(|item| (now - item.formed).whole_days())
+            .max()
+            .unwrap_or_default();
+        Some((count, oldest))
+    }
+
+    async fn read_calibrations(
+        &self,
+        conn: &zbus::Connection,
+    ) -> Option<(Vec<CalibrationEntry>, u32)> {
+        let encoded = read::<Vec<u8>>(conn, PREDICTOR, "AllCalibrations").await?;
+        if encoded.is_empty() {
+            return Some((Vec::new(), 0));
+        }
+        let calibrations: Vec<OwnerCalibration> = ciborium::from_reader(encoded.as_slice()).ok()?;
+        let settled = calibrations.iter().map(|item| item.settled).sum();
+        Some((
+            calibrations
+                .into_iter()
+                .map(|item| CalibrationEntry {
+                    subject: item.subject,
+                    settled: item.settled,
+                    bias: item.bias,
+                })
+                .collect(),
+            settled,
+        ))
+    }
+}
+
+/// One open obligation, of which only its age is needed here.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenIntention {
+    #[serde(with = "time::serde::rfc3339")]
+    formed: OffsetDateTime,
+}
+
+/// Predictor1's calibration row.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerCalibration {
+    subject: String,
+    settled: u32,
+    bias: f64,
+}
+
+/// Call one owner method and decode its reply, treating any failure as "not answered".
+async fn read<T>(
+    conn: &zbus::Connection,
+    endpoint: cybou_fabric::BusEndpoint,
+    method: &str,
+) -> Option<T>
+where
+    T: serde::de::DeserializeOwned + zbus::zvariant::Type,
+{
+    conn.call_method(
+        Some(endpoint.service),
+        endpoint.object_path,
+        Some(endpoint.interface),
+        method,
+        &(),
+    )
+    .await
+    .ok()?
+    .body()
+    .deserialize()
+    .ok()
 }
 
 #[allow(
@@ -40,18 +144,22 @@ impl Self1Service {
     }
 
     /// Measure the self model and return the `SelfReport` encoded as CBOR.
-    async fn measure(&self) -> Vec<u8> {
+    async fn measure(&self, #[zbus(connection)] conn: &zbus::Connection) -> Vec<u8> {
         let now = OffsetDateTime::now_utc();
-        let report = self.core.measure(now, 0);
+        let report = self.measure_now(conn, now).await;
         let mut buf = Vec::new();
         let _ = ciborium::into_writer(&report, &mut buf);
         buf
     }
 
     /// Assess self against a specific cause contribution and return `SelfReport` CBOR.
-    async fn assess(&self, _cause_id: String) -> Vec<u8> {
+    async fn assess(
+        &self,
+        #[zbus(connection)] conn: &zbus::Connection,
+        _cause_id: String,
+    ) -> Vec<u8> {
         let now = OffsetDateTime::now_utc();
-        let report = self.core.measure(now, 0);
+        let report = self.measure_now(conn, now).await;
         let mut buf = Vec::new();
         let _ = ciborium::into_writer(&report, &mut buf);
         buf
