@@ -15,8 +15,9 @@
   The command bar and supplied nebula background are integrated, and the focal release panel uses
   the stronger glass and teal selected treatment.
 - **Passed relationship/navigation slice.** Five labeled relationships now follow live panel
-  centers, including the amber dependency edge. Selected-object actions, minimap, and the expanded
-  runtime/user menu are also implemented.
+  boundaries, including the amber dependency edge. Selecting a panel promotes only its immediate
+  relationships while dimming the rest of the graph. Selected-object actions, minimap, and the
+  expanded runtime/user menu are also implemented.
 - **P2 — Panel content fidelity is incomplete.** The artifact card, focal release metadata, and
   suggestion card need the detailed controls, badges, ownership data, and amber action treatment
   shown in the source.
@@ -65,6 +66,11 @@ because all six panels use the same pointer-capture and keyboard-movement implem
    pointer drag moved Release from `(445, 105)` to `(525, 165)` and every connected endpoint moved
    from `(640, 230.5)` to `(720, 290.5)` in the same frame. No browser warnings or errors were
    observed. Screenshot capture still fails, so comparison 05 remains the visual baseline.
+9. Relationship endpoints now intersect the panel rectangles instead of terminating at their
+   centers. Selecting Sources leaves exactly one of five edges active (`validated by`); selecting
+   the focal Release activates all five. The deployed browser reports no warning-level logs. A
+   fresh 1237 × 720 browser capture also confirms the graph remains behind the cards with no new
+   clipping or overlap, but the target-aspect normalized comparison is still pending.
 
 ## Next implementation checklist
 

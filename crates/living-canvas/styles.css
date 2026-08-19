@@ -63,10 +63,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .canvas { position: relative; min-height: calc(100vh - 64px); isolation: isolate; }
 .ambient { position: absolute; inset: 16% 26%; border: 1px solid rgba(112, 225, 200, 0.08); border-radius: 50%; filter: blur(1px); }
 .relationship-layer { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.relationship-edge line { stroke: rgba(111,197,190,.58); stroke-width: 1.2; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
+.relationship-edge { opacity: .28; transition: opacity 160ms ease; }
+.relationship-edge line { stroke: rgba(111,197,190,.68); stroke-width: 1.2; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
 .relationship-edge text { fill: #8296a5; font-size: 10px; letter-spacing: .035em; paint-order: stroke; stroke: rgba(5,10,15,.96); stroke-width: 5px; stroke-linejoin: round; }
+.relationship-edge.active { opacity: 1; }
+.relationship-edge.active line { stroke-width: 1.55; filter: drop-shadow(0 0 4px rgba(112,225,200,.32)); }
+.relationship-edge.active text { fill: #a9c9c7; }
 .relationship-edge.amber line { stroke: rgba(225,174,55,.72); stroke-dasharray: 3 7; }
 .relationship-edge.amber text { fill: #d5a942; }
+.relationship-edge.amber.active line { filter: drop-shadow(0 0 5px rgba(225,174,55,.34)); }
 .object { position: absolute; display: flex; flex-direction: column; text-align: left; gap: 9px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, rgba(19, 28, 38, 0.94), rgba(10, 16, 23, 0.9)); box-shadow: 0 22px 65px rgba(0, 0, 0, 0.4), inset 0 1px rgba(255,255,255,0.035); backdrop-filter: blur(24px); cursor: grab; touch-action: none; user-select: none; transition: border-color 160ms ease, box-shadow 160ms ease; }
 .object:active { cursor: grabbing; }
 .object.selected { border-color: rgba(112, 225, 200, 0.82); box-shadow: 0 0 0 1px rgba(112, 225, 200, 0.15), 0 0 36px rgba(62, 206, 178, 0.17), 0 24px 70px rgba(0, 0, 0, 0.42); }

@@ -78,6 +78,17 @@ enum Panel {
 }
 
 impl Panel {
+    const fn key(self) -> &'static str {
+        match self {
+            Self::Artifact => "artifact",
+            Self::Collaborators => "collaborators",
+            Self::Release => "release",
+            Self::Sources => "sources",
+            Self::Suggestion => "suggestion",
+            Self::Commitments => "commitments",
+        }
+    }
+
     const fn size(self) -> (f64, f64) {
         match self {
             Self::Artifact => (220.0, 112.0),
@@ -158,6 +169,7 @@ enum RuntimeState {
 #[component]
 fn RelationshipEdge(
     layout: RwSignal<CanvasLayout>,
+    selected: ReadSignal<&'static str>,
     from: Panel,
     to: Panel,
     label: &'static str,
@@ -165,7 +177,11 @@ fn RelationshipEdge(
 ) -> impl IntoView {
     let points = move || relationship_points(layout.get(), from, to);
     view! {
-        <g class:amber=amber class="relationship-edge">
+        <g
+            class:amber=amber
+            class:active=move || selected.get() == from.key() || selected.get() == to.key()
+            class="relationship-edge"
+        >
             <line
                 x1=move || points().0.to_string()
                 y1=move || points().1.to_string()
@@ -321,11 +337,11 @@ pub fn App() -> impl IntoView {
             >
                 <div class="ambient" aria-hidden="true"></div>
                 <svg class="relationship-layer" aria-label="Canvas relationships">
-                    <RelationshipEdge layout=layout from=Panel::Artifact to=Panel::Release label="delivers" amber=false />
-                    <RelationshipEdge layout=layout from=Panel::Collaborators to=Panel::Release label="involves" amber=false />
-                    <RelationshipEdge layout=layout from=Panel::Release to=Panel::Sources label="validated by" amber=false />
-                    <RelationshipEdge layout=layout from=Panel::Release to=Panel::Suggestion label="depends on" amber=true />
-                    <RelationshipEdge layout=layout from=Panel::Release to=Panel::Commitments label="tracked by" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=Panel::Artifact to=Panel::Release label="delivers" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=Panel::Collaborators to=Panel::Release label="involves" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=Panel::Release to=Panel::Sources label="validated by" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=Panel::Release to=Panel::Suggestion label="depends on" amber=true />
+                    <RelationshipEdge layout=layout selected=selected from=Panel::Release to=Panel::Commitments label="tracked by" amber=false />
                 </svg>
                 <button
                     class:selected=move || selected.get() == "artifact"
@@ -543,11 +559,34 @@ fn relationship_points(
     let to_point = layout.point(to);
     let from_size = from.size();
     let to_size = to.size();
-    let x1 = from_point.x + from_size.0 / 2.0;
-    let y1 = from_point.y + from_size.1 / 2.0;
-    let x2 = to_point.x + to_size.0 / 2.0;
-    let y2 = to_point.y + to_size.1 / 2.0;
+    let from_center = (
+        from_point.x + from_size.0 / 2.0,
+        from_point.y + from_size.1 / 2.0,
+    );
+    let to_center = (to_point.x + to_size.0 / 2.0, to_point.y + to_size.1 / 2.0);
+    let (x1, y1) = edge_anchor(from_center, from_size, to_center);
+    let (x2, y2) = edge_anchor(to_center, to_size, from_center);
     (x1, y1, x2, y2, (x1 + x2) / 2.0, (y1 + y2) / 2.0 - 7.0)
+}
+
+fn edge_anchor(center: (f64, f64), size: (f64, f64), target: (f64, f64)) -> (f64, f64) {
+    let dx = target.0 - center.0;
+    let dy = target.1 - center.1;
+    if dx.abs() < f64::EPSILON && dy.abs() < f64::EPSILON {
+        return center;
+    }
+    let x_scale = if dx.abs() < f64::EPSILON {
+        f64::INFINITY
+    } else {
+        size.0 / 2.0 / dx.abs()
+    };
+    let y_scale = if dy.abs() < f64::EPSILON {
+        f64::INFINITY
+    } else {
+        size.1 / 2.0 / dy.abs()
+    };
+    let scale = x_scale.min(y_scale);
+    (center.0 + dx * scale, center.1 + dy * scale)
 }
 
 fn start_drag(
