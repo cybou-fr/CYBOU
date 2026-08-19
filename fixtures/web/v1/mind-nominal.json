@@ -62,5 +62,23 @@
       "perceptiond",
       "identityd"
     ]
+  },
+  "beliefs": {
+    "knowledge": "known",
+    "beliefs": [
+      {
+        "subject": "organ.identityd",
+        "value": "identity created",
+        "confidence": 1.0,
+        "status": "observed",
+        "lastCorroboratedAt": "2026-08-19T11:59:00Z"
+      }
+    ]
+  },
+  "perception": {
+    "knowledge": "known",
+    "status": "acquired",
+    "acquiredAt": "2026-08-19T11:59:58Z",
+    "sourceId": "linux.os-release"
   }
 }

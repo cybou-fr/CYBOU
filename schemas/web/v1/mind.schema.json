@@ -12,7 +12,9 @@
     "commitments",
     "lifecycle",
     "selfModel",
-    "attention"
+    "attention",
+    "beliefs",
+    "perception"
   ],
   "properties": {
     "schemaVersion": {
@@ -311,6 +313,92 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "beliefs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge",
+        "beliefs"
+      ],
+      "properties": {
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "beliefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subject",
+              "value",
+              "confidence",
+              "status",
+              "lastCorroboratedAt"
+            ],
+            "properties": {
+              "subject": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lastCorroboratedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    "perception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge",
+        "status",
+        "acquiredAt",
+        "sourceId"
+      ],
+      "properties": {
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "acquiredAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceId": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }

@@ -223,6 +223,48 @@ pub struct AttentionProjection {
     pub organs: Vec<String>,
 }
 
+/// One belief as Epistemic1 holds it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BeliefProjection {
+    /// What the belief is about.
+    pub subject: String,
+    /// What is asserted about it.
+    pub value: String,
+    /// Confidence in the assertion.
+    pub confidence: f64,
+    /// Epistemic validity in the owner's own spelling: observed, stale, disputed, superseded or
+    /// unknown. A belief and its validity are separate facts, and the second is the one that says
+    /// whether the first may still be relied on.
+    pub status: String,
+    /// RFC 3339 instant the belief was last corroborated.
+    pub last_corroborated_at: String,
+}
+
+/// What the system currently believes, as reported by Epistemic1.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BeliefsProjection {
+    /// Whether Epistemic1 answered. An empty list is meaningful only when this is known.
+    pub knowledge: KnowledgeState,
+    /// The beliefs themselves.
+    pub beliefs: Vec<BeliefProjection>,
+}
+
+/// What the system perceives of the machine it runs on, as reported by Perception1.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PerceptionProjection {
+    /// Whether Perception1 answered.
+    pub knowledge: KnowledgeState,
+    /// Outcome of the last acquisition in the owner's own spelling.
+    pub status: Option<String>,
+    /// RFC 3339 instant of that acquisition.
+    pub acquired_at: Option<String>,
+    /// Which source was read.
+    pub source_id: Option<String>,
+}
+
 /// What Mind actually holds right now, returned by `/api/v1/mind`.
 ///
 /// Only owners that hold real state appear here. Nothing in this projection is composed by the
@@ -247,6 +289,10 @@ pub struct MindProjection {
     pub self_model: SelfProjection,
     /// Global workspace attention.
     pub attention: AttentionProjection,
+    /// Beliefs and their validity.
+    pub beliefs: BeliefsProjection,
+    /// Perception of the host.
+    pub perception: PerceptionProjection,
 }
 
 #[cfg(test)]

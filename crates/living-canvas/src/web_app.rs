@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v6";
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v7";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Point {
@@ -30,6 +30,8 @@ struct CanvasLayout {
     commitments: Point,
     self_model: Point,
     attention: Point,
+    beliefs: Point,
+    perception: Point,
 }
 
 impl Default for CanvasLayout {
@@ -75,6 +77,16 @@ impl Default for CanvasLayout {
                 y: 620.0,
                 z: 8,
             },
+            beliefs: Point {
+                x: 880.0,
+                y: 620.0,
+                z: 9,
+            },
+            perception: Point {
+                x: 55.0,
+                y: 840.0,
+                z: 10,
+            },
         }
     }
 }
@@ -89,6 +101,8 @@ enum Panel {
     Commitments,
     SelfModel,
     Attention,
+    Beliefs,
+    Perception,
 }
 
 impl Panel {
@@ -102,6 +116,8 @@ impl Panel {
             Self::Commitments => "commitments",
             Self::SelfModel => "self",
             Self::Attention => "attention",
+            Self::Beliefs => "beliefs",
+            Self::Perception => "perception",
         }
     }
 
@@ -115,6 +131,8 @@ impl Panel {
             Self::Commitments => (310.0, 184.0),
             Self::SelfModel => (330.0, 210.0),
             Self::Attention => (320.0, 170.0),
+            Self::Beliefs => (330.0, 260.0),
+            Self::Perception => (330.0, 170.0),
         }
     }
 }
@@ -139,6 +157,8 @@ impl CanvasLayout {
             Panel::Commitments => self.commitments,
             Panel::SelfModel => self.self_model,
             Panel::Attention => self.attention,
+            Panel::Beliefs => self.beliefs,
+            Panel::Perception => self.perception,
         }
     }
 
@@ -152,6 +172,8 @@ impl CanvasLayout {
             Panel::Commitments => self.commitments = point,
             Panel::SelfModel => self.self_model = point,
             Panel::Attention => self.attention = point,
+            Panel::Beliefs => self.beliefs = point,
+            Panel::Perception => self.perception = point,
         }
     }
 
@@ -165,6 +187,8 @@ impl CanvasLayout {
             self.commitments.z,
             self.self_model.z,
             self.attention.z,
+            self.beliefs.z,
+            self.perception.z,
         ]
         .into_iter()
         .max()
@@ -446,6 +470,33 @@ pub fn App() -> impl IntoView {
         } else {
             organs.join(", ")
         }
+    };
+    let beliefs = move || mind().map_or_else(Vec::new, |m| m.beliefs.beliefs);
+    let beliefs_label = move || match mind() {
+        None => "Epistemic1 not read".to_owned(),
+        Some(m) if m.beliefs.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Epistemic1 not read".to_owned()
+        }
+        Some(m) => match m.beliefs.beliefs.len() {
+            0 => "Believes nothing yet".to_owned(),
+            1 => "1 belief".to_owned(),
+            count => format!("{count} beliefs"),
+        },
+    };
+    let perception_status = move || {
+        mind()
+            .and_then(|m| m.perception.status)
+            .unwrap_or_else(unread)
+    };
+    let perception_source = move || {
+        mind()
+            .and_then(|m| m.perception.source_id)
+            .unwrap_or_else(unread)
+    };
+    let perception_at = move || {
+        mind()
+            .and_then(|m| m.perception.acquired_at)
+            .unwrap_or_else(unread)
     };
     let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
     let commitments_label = move || match mind() {
@@ -729,6 +780,52 @@ pub fn App() -> impl IntoView {
                     </article>
 
                     <button
+                        class:selected=move || selected.get() == "beliefs"
+                        class="object beliefs"
+                        style=move || panel_style(layout.get(), Panel::Beliefs)
+                        aria-label="Beliefs panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Beliefs, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Beliefs, layout)
+                        on:click=move |_| set_selected.set("beliefs")
+                    >
+                        <small class="panel-kicker"><Sparkles size=14 /><span>"Epistemic1"</span></small>
+                        <strong>{beliefs_label}</strong>
+                        <div class="belief-list">
+                            <For
+                                each=beliefs
+                                key=|belief| belief.subject.clone()
+                                children=move |belief| {
+                                    let observed = belief.status == "observed";
+                                    view! {
+                                        <span class:observed=observed class="belief-line">
+                                            <b>{belief.subject}</b>
+                                            <span class="belief-value">{belief.value}</span>
+                                            <i>{belief.status}</i>
+                                        </span>
+                                    }
+                                }
+                            />
+                        </div>
+                        <span class="panel-link">"A belief and its validity are separate facts"</span>
+                    </button>
+
+                    <button
+                        class:selected=move || selected.get() == "perception"
+                        class="object perception"
+                        style=move || panel_style(layout.get(), Panel::Perception)
+                        aria-label="Perception panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Perception, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Perception, layout)
+                        on:click=move |_| set_selected.set("perception")
+                    >
+                        <small class="panel-kicker"><Files size=14 /><span>"Perception1"</span></small>
+                        <strong>"Host observation"</strong>
+                        <span class="row"><b>"Status"</b><i>{perception_status}</i></span>
+                        <span class="row"><b>"Source"</b><i>{perception_source}</i></span>
+                        <span class="row"><b>"Acquired"</b><i>{perception_at}</i></span>
+                    </button>
+
+                    <button
                         class:selected=move || selected.get() == "attention"
                         class="object attention"
                         style=move || panel_style(layout.get(), Panel::Attention)
@@ -779,6 +876,14 @@ pub fn App() -> impl IntoView {
                                 class:hidden=move || !command_matches(&command_query.get(), "attention focus workspace1")
                                 on:click=move |_| select_from_command("attention", set_selected, set_command_open, set_command_query)
                             ><Map size=15 /><span><b>"Attention"</b><i>"Workspace1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "beliefs epistemic1 validity")
+                                on:click=move |_| select_from_command("beliefs", set_selected, set_command_open, set_command_query)
+                            ><Sparkles size=15 /><span><b>"Beliefs"</b><i>"Epistemic1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "perception host observation")
+                                on:click=move |_| select_from_command("perception", set_selected, set_command_open, set_command_query)
+                            ><Files size=15 /><span><b>"Perception"</b><i>"Perception1"</i></span></button>
                         </nav>
                     </Show>
 
@@ -867,6 +972,20 @@ pub fn App() -> impl IntoView {
                                     style=move || minimap_style(layout.get().attention)
                                     aria-label="Select attention panel"
                                     on:click=move |_| set_selected.set("attention")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "beliefs"
+                                    class="mini-node beliefs-node"
+                                    style=move || minimap_style(layout.get().beliefs)
+                                    aria-label="Select beliefs panel"
+                                    on:click=move |_| set_selected.set("beliefs")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "perception"
+                                    class="mini-node perception-node"
+                                    style=move || minimap_style(layout.get().perception)
+                                    aria-label="Select perception panel"
+                                    on:click=move |_| set_selected.set("perception")
                                 ></button>
                             </div>
                         </nav>
@@ -973,6 +1092,8 @@ fn first_command_match(query: &str) -> Option<&'static str> {
         ("commitments", "commitments obligations intention1"),
         ("self", "self assessment narration self1"),
         ("attention", "attention focus workspace1"),
+        ("beliefs", "beliefs epistemic1 validity"),
+        ("perception", "perception host observation"),
     ]
     .into_iter()
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))

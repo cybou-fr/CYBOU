@@ -8,15 +8,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use async_trait::async_trait;
 use ciborium::Value;
 use cybou_fabric::{
-    EVENT, IDENTITY, INTENTION, LIFECYCLE, PRESENCE, SELF, WORKSPACE, decode,
+    EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, PRESENCE, SELF, WORKSPACE,
+    decode,
     rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
     zbus_rpc::ResilientZbusClient,
 };
 use cybou_protocol::{CapabilityState, KnowledgeState, canonical::CanonicalEnvelope};
 use cybou_web_contracts::{
-    AttentionProjection, CapabilityProjection, CommitmentProjection, CommitmentsProjection,
-    ContributionProjection, Freshness, IdentityProjection, JournalProjection, LifecycleProjection,
-    MindProjection, SelfProjection, SnapshotProjection, WEB_SCHEMA_V1,
+    AttentionProjection, BeliefProjection, BeliefsProjection, CapabilityProjection,
+    CommitmentProjection, CommitmentsProjection, ContributionProjection, Freshness,
+    IdentityProjection, JournalProjection, LifecycleProjection, MindProjection,
+    PerceptionProjection, SelfProjection, SnapshotProjection, WEB_SCHEMA_V1,
 };
 use futures_util::StreamExt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -392,6 +394,61 @@ impl ZbusPresenceSource {
         }
     }
 
+    async fn beliefs(&self) -> BeliefsProjection {
+        let Some(encoded) = self.read::<Vec<u8>>(EPISTEMIC, "Beliefs").await else {
+            return BeliefsProjection {
+                knowledge: KnowledgeState::Unknown,
+                beliefs: Vec::new(),
+            };
+        };
+        if encoded.is_empty() {
+            return BeliefsProjection {
+                knowledge: KnowledgeState::Known,
+                beliefs: Vec::new(),
+            };
+        }
+        match ciborium::from_reader::<Vec<OwnerBelief>, _>(encoded.as_slice()) {
+            Ok(beliefs) => BeliefsProjection {
+                knowledge: KnowledgeState::Known,
+                beliefs: beliefs
+                    .into_iter()
+                    .map(|belief| BeliefProjection {
+                        subject: belief.subject,
+                        value: belief.value,
+                        confidence: belief.confidence,
+                        status: belief.status,
+                        last_corroborated_at: belief.last_corroborated_at,
+                    })
+                    .collect(),
+            },
+            Err(_) => BeliefsProjection {
+                knowledge: KnowledgeState::Unknown,
+                beliefs: Vec::new(),
+            },
+        }
+    }
+
+    async fn perception(&self) -> PerceptionProjection {
+        let unread = || PerceptionProjection {
+            knowledge: KnowledgeState::Unknown,
+            status: None,
+            acquired_at: None,
+            source_id: None,
+        };
+        let Some(encoded) = self.read::<Vec<u8>>(PERCEPTION, "State").await else {
+            return unread();
+        };
+        match ciborium::from_reader::<OwnerPerceptionState, _>(encoded.as_slice()) {
+            Ok(state) => PerceptionProjection {
+                knowledge: KnowledgeState::Known,
+                status: Some(state.status),
+                acquired_at: Some(state.acquired_at),
+                source_id: Some(state.source_id),
+            },
+            Err(_) => unread(),
+        }
+    }
+
     async fn lifecycle(&self) -> LifecycleProjection {
         let Some(encoded) = self.read::<Vec<u8>>(LIFECYCLE, "State").await else {
             return LifecycleProjection {
@@ -470,6 +527,26 @@ struct OwnerMomentState {
     organs: Vec<String>,
 }
 
+/// Epistemic1's belief row.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerBelief {
+    subject: String,
+    value: String,
+    confidence: f64,
+    status: String,
+    last_corroborated_at: String,
+}
+
+/// Perception1's last acquisition.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerPerceptionState {
+    status: String,
+    acquired_at: String,
+    source_id: String,
+}
+
 /// Event1's verification state.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -507,6 +584,8 @@ impl PresenceSource for ZbusPresenceSource {
             lifecycle: self.lifecycle().await,
             self_model: self.self_model().await,
             attention: self.attention().await,
+            beliefs: self.beliefs().await,
+            perception: self.perception().await,
         })
     }
 
