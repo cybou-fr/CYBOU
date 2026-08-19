@@ -80,5 +80,16 @@
     "status": "acquired",
     "acquiredAt": "2026-08-19T11:59:58Z",
     "sourceId": "linux.os-release"
+  },
+  "context": {
+    "knowledge": "known",
+    "concepts": [
+      {
+        "label": "operating-system",
+        "salience": 1.0,
+        "activationReason": "observed by perceptiond",
+        "lastActivatedAt": "2026-08-19T11:59:58Z"
+      }
+    ]
   }
 }

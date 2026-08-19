@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v7";
+const LAYOUT_KEY: &str = "cybou.living-canvas.layout.v8";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Point {
@@ -32,6 +32,7 @@ struct CanvasLayout {
     attention: Point,
     beliefs: Point,
     perception: Point,
+    context: Point,
 }
 
 impl Default for CanvasLayout {
@@ -87,6 +88,11 @@ impl Default for CanvasLayout {
                 y: 840.0,
                 z: 10,
             },
+            context: Point {
+                x: 470.0,
+                y: 840.0,
+                z: 11,
+            },
         }
     }
 }
@@ -103,6 +109,7 @@ enum Panel {
     Attention,
     Beliefs,
     Perception,
+    Context,
 }
 
 impl Panel {
@@ -118,6 +125,7 @@ impl Panel {
             Self::Attention => "attention",
             Self::Beliefs => "beliefs",
             Self::Perception => "perception",
+            Self::Context => "context",
         }
     }
 
@@ -133,6 +141,7 @@ impl Panel {
             Self::Attention => (320.0, 170.0),
             Self::Beliefs => (330.0, 260.0),
             Self::Perception => (330.0, 170.0),
+            Self::Context => (330.0, 200.0),
         }
     }
 }
@@ -159,6 +168,7 @@ impl CanvasLayout {
             Panel::Attention => self.attention,
             Panel::Beliefs => self.beliefs,
             Panel::Perception => self.perception,
+            Panel::Context => self.context,
         }
     }
 
@@ -174,6 +184,7 @@ impl CanvasLayout {
             Panel::Attention => self.attention = point,
             Panel::Beliefs => self.beliefs = point,
             Panel::Perception => self.perception = point,
+            Panel::Context => self.context = point,
         }
     }
 
@@ -189,6 +200,7 @@ impl CanvasLayout {
             self.attention.z,
             self.beliefs.z,
             self.perception.z,
+            self.context.z,
         ]
         .into_iter()
         .max()
@@ -497,6 +509,18 @@ pub fn App() -> impl IntoView {
         mind()
             .and_then(|m| m.perception.acquired_at)
             .unwrap_or_else(unread)
+    };
+    let concepts = move || mind().map_or_else(Vec::new, |m| m.context.concepts);
+    let context_label = move || match mind() {
+        None => "Context1 not read".to_owned(),
+        Some(m) if m.context.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Context1 not read".to_owned()
+        }
+        Some(m) => match m.context.concepts.len() {
+            0 => "Nothing activated yet".to_owned(),
+            1 => "1 active concept".to_owned(),
+            count => format!("{count} active concepts"),
+        },
     };
     let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
     let commitments_label = move || match mind() {
@@ -810,6 +834,35 @@ pub fn App() -> impl IntoView {
                     </button>
 
                     <button
+                        class:selected=move || selected.get() == "context"
+                        class="object context"
+                        style=move || panel_style(layout.get(), Panel::Context)
+                        aria-label="Associative context panel. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, Panel::Context, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, Panel::Context, layout)
+                        on:click=move |_| set_selected.set("context")
+                    >
+                        <small class="panel-kicker"><Link size=14 /><span>"Context1"</span></small>
+                        <strong>{context_label}</strong>
+                        <div class="concept-list">
+                            <For
+                                each=concepts
+                                key=|concept| concept.label.clone()
+                                children=move |concept| {
+                                    view! {
+                                        <span class="concept-line">
+                                            <b>{concept.label}</b>
+                                            <i>{format!("{:.2}", concept.salience)}</i>
+                                            <small>{concept.activation_reason}</small>
+                                        </span>
+                                    }
+                                }
+                            />
+                        </div>
+                        <span class="panel-link">"Association is not truth"</span>
+                    </button>
+
+                    <button
                         class:selected=move || selected.get() == "perception"
                         class="object perception"
                         style=move || panel_style(layout.get(), Panel::Perception)
@@ -884,6 +937,10 @@ pub fn App() -> impl IntoView {
                                 class:hidden=move || !command_matches(&command_query.get(), "perception host observation")
                                 on:click=move |_| select_from_command("perception", set_selected, set_command_open, set_command_query)
                             ><Files size=15 /><span><b>"Perception"</b><i>"Perception1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "context association concepts context1")
+                                on:click=move |_| select_from_command("context", set_selected, set_command_open, set_command_query)
+                            ><Link size=15 /><span><b>"Context"</b><i>"Context1"</i></span></button>
                         </nav>
                     </Show>
 
@@ -986,6 +1043,13 @@ pub fn App() -> impl IntoView {
                                     style=move || minimap_style(layout.get().perception)
                                     aria-label="Select perception panel"
                                     on:click=move |_| set_selected.set("perception")
+                                ></button>
+                                <button
+                                    class:selected=move || selected.get() == "context"
+                                    class="mini-node context-node"
+                                    style=move || minimap_style(layout.get().context)
+                                    aria-label="Select associative context panel"
+                                    on:click=move |_| set_selected.set("context")
                                 ></button>
                             </div>
                         </nav>
@@ -1094,6 +1158,7 @@ fn first_command_match(query: &str) -> Option<&'static str> {
         ("attention", "attention focus workspace1"),
         ("beliefs", "beliefs epistemic1 validity"),
         ("perception", "perception host observation"),
+        ("context", "context association concepts context1"),
     ]
     .into_iter()
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))

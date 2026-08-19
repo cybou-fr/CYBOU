@@ -8,17 +8,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use async_trait::async_trait;
 use ciborium::Value;
 use cybou_fabric::{
-    EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, PRESENCE, SELF, WORKSPACE,
-    decode,
+    CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, PRESENCE, SELF,
+    WORKSPACE, decode,
     rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
     zbus_rpc::ResilientZbusClient,
 };
 use cybou_protocol::{CapabilityState, KnowledgeState, canonical::CanonicalEnvelope};
 use cybou_web_contracts::{
     AttentionProjection, BeliefProjection, BeliefsProjection, CapabilityProjection,
-    CommitmentProjection, CommitmentsProjection, ContributionProjection, Freshness,
-    IdentityProjection, JournalProjection, LifecycleProjection, MindProjection,
-    PerceptionProjection, SelfProjection, SnapshotProjection, WEB_SCHEMA_V1,
+    CommitmentProjection, CommitmentsProjection, ConceptProjection, ContextProjection,
+    ContributionProjection, Freshness, IdentityProjection, JournalProjection, LifecycleProjection,
+    MindProjection, PerceptionProjection, SelfProjection, SnapshotProjection, WEB_SCHEMA_V1,
 };
 use futures_util::StreamExt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -449,6 +449,33 @@ impl ZbusPresenceSource {
         }
     }
 
+    async fn context(&self) -> ContextProjection {
+        let Some(encoded) = self.read::<Vec<u8>>(CONTEXT, "ActiveContext").await else {
+            return ContextProjection {
+                knowledge: KnowledgeState::Unknown,
+                concepts: Vec::new(),
+            };
+        };
+        match ciborium::from_reader::<Vec<OwnerConcept>, _>(encoded.as_slice()) {
+            Ok(concepts) => ContextProjection {
+                knowledge: KnowledgeState::Known,
+                concepts: concepts
+                    .into_iter()
+                    .map(|concept| ConceptProjection {
+                        label: concept.label,
+                        salience: concept.salience,
+                        activation_reason: concept.activation_reason,
+                        last_activated_at: concept.last_activated_at,
+                    })
+                    .collect(),
+            },
+            Err(_) => ContextProjection {
+                knowledge: KnowledgeState::Unknown,
+                concepts: Vec::new(),
+            },
+        }
+    }
+
     async fn lifecycle(&self) -> LifecycleProjection {
         let Some(encoded) = self.read::<Vec<u8>>(LIFECYCLE, "State").await else {
             return LifecycleProjection {
@@ -547,6 +574,16 @@ struct OwnerPerceptionState {
     source_id: String,
 }
 
+/// Context1's concept node.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerConcept {
+    label: String,
+    salience: f64,
+    activation_reason: String,
+    last_activated_at: String,
+}
+
 /// Event1's verification state.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -586,6 +623,7 @@ impl PresenceSource for ZbusPresenceSource {
             attention: self.attention().await,
             beliefs: self.beliefs().await,
             perception: self.perception().await,
+            context: self.context().await,
         })
     }
 

@@ -14,7 +14,8 @@
     "selfModel",
     "attention",
     "beliefs",
-    "perception"
+    "perception",
+    "context"
   ],
   "properties": {
     "schemaVersion": {
@@ -399,6 +400,51 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge",
+        "concepts"
+      ],
+      "properties": {
+        "knowledge": {
+          "enum": [
+            "known",
+            "unknown"
+          ]
+        },
+        "concepts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "salience",
+              "activationReason",
+              "lastActivatedAt"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "salience": {
+                "type": "number"
+              },
+              "activationReason": {
+                "type": "string"
+              },
+              "lastActivatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
         }
       }
     }

@@ -265,6 +265,30 @@ pub struct PerceptionProjection {
     pub source_id: Option<String>,
 }
 
+/// One activated concept as Context1 holds it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConceptProjection {
+    /// The concept.
+    pub label: String,
+    /// Activation weight.
+    pub salience: f64,
+    /// Why it was activated — the answer to "why was this retrieved?".
+    pub activation_reason: String,
+    /// RFC 3339 instant it was last activated.
+    pub last_activated_at: String,
+}
+
+/// The associative context, as reported by Context1.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextProjection {
+    /// Whether Context1 answered. An empty list is meaningful only when this is known.
+    pub knowledge: KnowledgeState,
+    /// Currently activated concepts.
+    pub concepts: Vec<ConceptProjection>,
+}
+
 /// What Mind actually holds right now, returned by `/api/v1/mind`.
 ///
 /// Only owners that hold real state appear here. Nothing in this projection is composed by the
@@ -293,6 +317,8 @@ pub struct MindProjection {
     pub beliefs: BeliefsProjection,
     /// Perception of the host.
     pub perception: PerceptionProjection,
+    /// Associative context.
+    pub context: ContextProjection,
 }
 
 #[cfg(test)]
