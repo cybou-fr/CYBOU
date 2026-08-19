@@ -89,6 +89,16 @@ impl ZbusPresenceSource {
         encoded: &[u8],
         projection_version: u64,
     ) -> Result<SnapshotProjection, GatewayError> {
+        // The Rust `presenced` owns Presence1 in production and already speaks the web v1
+        // contract, unwrapped: it writes a `SnapshotProjection` straight onto the wire. Its
+        // projection carries the owner's own version and cursor, so it is passed through rather
+        // than renumbered by a counter that only the gateway can see.
+        if let Ok(projection) = ciborium::from_reader::<SnapshotProjection, _>(encoded) {
+            return Ok(projection);
+        }
+
+        // The frozen Qt Presence1 wraps a differently shaped payload in a fabric envelope. It is
+        // no longer deployed, but it remains the compatibility reference, so it still decodes.
         let value: Value = decode(encoded).map_err(|_| GatewayError::InvalidProjection)?;
         let value = value.as_map().ok_or(GatewayError::InvalidProjection)?;
         if field(value, "runtimeReachable").and_then(Value::as_bool) != Some(true) {
@@ -168,7 +178,8 @@ impl PresenceSource for ZbusPresenceSource {
 mod tests {
     use std::collections::BTreeMap;
 
-    use cybou_protocol::CapabilityState;
+    use cybou_protocol::{CapabilityState, KnowledgeState};
+    use cybou_web_contracts::{CapabilityProjection, Freshness, SnapshotProjection, WEB_SCHEMA_V1};
     use serde_json::{Value, json};
 
     use super::ZbusPresenceSource;
@@ -178,6 +189,36 @@ mod tests {
         let mut bytes = Vec::new();
         ciborium::into_writer(&root, &mut bytes).expect("encode fixture envelope");
         bytes
+    }
+
+    #[test]
+    fn rust_presenced_projection_is_passed_through_unchanged() {
+        // Byte-for-byte what the deployed Rust presenced answers Snapshot with: the web v1
+        // projection itself, with no fabric envelope and no Qt-era capabilityStates map.
+        let projection = SnapshotProjection {
+            schema_version: WEB_SCHEMA_V1,
+            projection_version: 98,
+            cursor: "0".into(),
+            observed_at: "2026-08-19T17:56:40.069132466Z".into(),
+            freshness: Freshness::Current,
+            knowledge: KnowledgeState::Known,
+            capabilities: vec![CapabilityProjection {
+                id: "identity-continuity".into(),
+                state: CapabilityState::Available,
+                knowledge: KnowledgeState::Known,
+                freshness: Freshness::Current,
+                reason: None,
+            }],
+        };
+        let mut bytes = Vec::new();
+        ciborium::into_writer(&projection, &mut bytes).expect("encode owner projection");
+
+        let decoded = ZbusPresenceSource::decode_snapshot(&bytes, 1).expect("typed projection");
+        assert_eq!(decoded.projection_version, 98);
+        assert_eq!(decoded.cursor, "0");
+        assert_eq!(decoded.capabilities.len(), 1);
+        assert_eq!(decoded.capabilities[0].id, "identity-continuity");
+        assert_eq!(decoded.capabilities[0].state, CapabilityState::Available);
     }
 
     #[test]
