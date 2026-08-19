@@ -548,6 +548,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-intentiond"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [
@@ -557,6 +575,25 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "time",
+]
+
+[[package]]
+name = "cybou-predictord"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-runtime",
+ "cybou-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
 ]
 
 [[package]]
