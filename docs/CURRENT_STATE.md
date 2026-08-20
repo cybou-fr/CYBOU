@@ -41,6 +41,40 @@ The repository builds all Mind services from one locked workspace:
 - `cybou-presenced`: Unified Mind presentation and command gateway (`org.cybou.Mind.Presence1`).
 - `cybou-web-gateway` & `living-canvas`: Unified browser and desktop frontend.
 
+## What is wired to what (2026-08-20)
+
+Every daemon above existed before this date and most of them were connected to nothing. Listing an
+organ says it runs; this section says what actually reaches it, because the two were not the same
+thing and the difference was invisible from the code.
+
+Contributions flow one way. `perceptiond` observes the host — the operating system plus kernel
+version, hostname, CPU count and total memory, each contributed once and then only when its value
+changes — and submits to Event1. `identityd` records session starts. `intentiond` records a formed
+intention as a `Kind::Intention` contribution caused by whatever prompted it, and its conclusion as
+the one terminal `Outcome` of that contribution; an intention formed with nothing to cite stays in
+its own organ, because a derived kind must name a cause.
+
+Three organs derive their state from that flow and follow Event1's `Accepted` signal to do it:
+`epistemicd` forms beliefs keyed by the subject of each observation, `contextd` activates a concept
+per subject and links subjects that co-occurred in one episode as `TemporalCooccurrence`, and
+`workspaced` keeps attention over the recent tail. All three previously read only the beginning of
+the Journal, once, at startup.
+
+`healthd` probes `Ready` on every organ each five seconds and emits `Changed` only when the
+capability states actually differ; `presenced` re-emits that as `Presence1.Changed`, which is what
+wakes the gateway's event stream. `eventd` replays a bounded page of the hash chain every thirty
+seconds from a persisted checkpoint, and reports verification as a position rather than a verdict,
+so `Verified` means the chain was replayed to the head and nothing weaker.
+
+`presenced` accepts commands by asking owners: Promise reaches Intention1, Reflect asks Self1 for an
+assessment, Observe and Predict reach Predictor1, InterruptLifecycle tells Lifecycle1 a person is
+present. It holds none of that state itself. No gateway route exposes any command; the web surface
+is read-only.
+
+`Predictor1` has no source of its own and this is deliberate. Nothing the system observes varies —
+the host facts were chosen to be stable so the Journal stays a biography rather than a metrics
+stream — so a forecast has to be about something a person asked to track, through `Presence1.Observe`.
+
 R4 now also contains the bounded RPC policy and the `cybou-runtime` state foundation. Retry
 eligibility distinguishes read-only, idempotent, and non-idempotent operations; one outer deadline
 bounds all attempts, delay is capped with deterministic jitter, and the circuit breaker admits only
@@ -182,7 +216,7 @@ and an ephemeral runtime profile is used. This is W2 preview plumbing, not deskt
 default session; Plasma remains the fallback, and lock screen, multi-display, input-method,
 accessibility, renderer recovery, and navigation-policy gates are still open.
 
-Status date: 2026-08-19.
+Status date: 2026-08-20.
 
 This document is intentionally limited to implemented behavior and current limitations.
 
@@ -794,7 +828,10 @@ the corresponding milestone is implemented and gated.
 - P6.8: complete. Substrate audit repair — durable commit mode enforced at open, presenced health
   derived from real projection outcomes, consolidation backlog counted by aggregate query, user-unit
   hardening limited to directives a user manager can enforce, and the whole Presence surface moved
-  to non-blocking asynchronous transport. Scalable biography replay and incremental verification
-  remain open and are carried into M7 with the scale budgets that give them a target.
+  to non-blocking asynchronous transport. Scalable biography replay remains open and is carried
+  into M7 with the scale budgets that give it a target.
+- Incremental verification is no longer open. `eventd` replays a bounded page of the chain from a
+  persisted checkpoint on a timer, and a break is never checkpointed, so the trusted position stays
+  where the chain was last intact.
 
 See `ROADMAP.md` for the capability meaning of M5–M9.
