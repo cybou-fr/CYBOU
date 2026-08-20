@@ -16,16 +16,6 @@ Type=simple
 Environment=CYBOU_WEB_ROOT=/usr/share/cybou/web
 Environment=CYBOU_SESSION_MODE=public-preview
 
-# This deployment's Journal predates the classification rule: every contribution written before
-# 2026-08-20 carries sensitivity 1 because the writers stamped a constant instead of classifying
-# what they were recording. Those rows are machine facts — kernel version, host name, session
-# starts — and the labels cannot be corrected, because sensitivity is inside the canonical envelope
-# the hash chain covers. Refusing to publish them would refuse to publish what has been public all
-# along, so this deployment permits sensitivity 1 as a stated decision.
-#
-# It still refuses anything above that. Remove this line once the mislabelled rows are gone, and
-# the surface goes back to publishing only what is ordinary.
-Environment=CYBOU_PUBLISHABLE_SENSITIVITY=1
 ExecStart=/usr/libexec/cybou/cybou-web-gateway
 Restart=on-failure
 RestartSec=1

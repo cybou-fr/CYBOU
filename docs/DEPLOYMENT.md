@@ -45,12 +45,13 @@ first time a person records something of their own — a promise, an observation
 the public surface stops instead of publishing it, and the choice becomes explicit rather than
 forgotten.
 
-This deployment currently permits sensitivity 1, and the reason is written in the unit: its Journal
-predates the classification rule, so 1252 machine facts carry a Personal label a constant put there.
-Those labels cannot be corrected in place — sensitivity is inside the canonical envelope the hash
-chain covers, which is the Journal refusing to let its past be quietly rewritten, working exactly as
-intended and against us here. The alternatives are to keep the deployment as it is, or to begin a
-new biography; both are the owner's call, and neither is a code change.
+This deployment permits ordinary only, the strict default. Its first Journal was discarded on
+2026-08-20 rather than carried: 1252 rows written before the classification rule carried a Personal
+label a constant had put there, and the labels could not be corrected in place, because sensitivity
+sits inside the canonical envelope the hash chain covers. That is the Journal refusing to let its
+past be quietly rewritten. Discarding a development biography of machine facts was the proportionate
+answer; on a Journal that held anything a person cared about it would not have been, and the choice
+would have been a migration that rebuilds rather than edits.
 
 **The public deployment serves the live Mind, without authentication.** This is a deliberate,
 temporary decision by the owner: the point of the deployment is a working desktop anyone can look
