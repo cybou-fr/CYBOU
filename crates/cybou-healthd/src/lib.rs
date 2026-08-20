@@ -300,6 +300,52 @@ fn evaluate_capability(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_conflicted_journal_takes_the_biography_capability_down() {
+        let core = super::HealthCore::new();
+        let now = time::OffsetDateTime::now_utc();
+
+        let healthy = |component: &str| {
+            (
+                component.to_string(),
+                super::ComponentHealthRecord {
+                    health: super::ComponentHealth::Healthy,
+                    detail: None,
+                },
+            )
+        };
+        let mut records: std::collections::HashMap<_, _> = [
+            "eventd",
+            "identityd",
+            "intentiond",
+            "predictord",
+            "selfd",
+            "workspaced",
+            "perceptiond",
+            "epistemicd",
+            "contextd",
+            "lifecycled",
+            "presenced",
+        ]
+        .into_iter()
+        .map(healthy)
+        .collect();
+        assert!(core.set_components(records.clone(), now));
+        assert_eq!(core.overall_health(), "healthy");
+
+        // A Journal whose chain contradicts itself is not a healthy control plane, even though
+        // every process is answering.
+        records.insert(
+            "eventd".to_string(),
+            super::ComponentHealthRecord {
+                health: super::ComponentHealth::Conflicted,
+                detail: Some("chain broken".into()),
+            },
+        );
+        core.set_components(records, now);
+        assert_eq!(core.overall_health(), "unavailable");
+    }
+
     use super::*;
 
     #[test]

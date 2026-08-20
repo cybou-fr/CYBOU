@@ -68,6 +68,61 @@ impl Presence1Service {
     }
 }
 
+/// Record what a person observed as a contribution, and return the identity it was given.
+///
+/// An observation is a root kind: it records something that happened outside the Journal and has
+/// no prior contribution to cite, which is exactly what a person reporting a measurement is.
+#[cfg(target_os = "linux")]
+async fn record_observation(subject: &str, value: f64) -> Option<uuid::Uuid> {
+    use cybou_fabric::event_client::EventClient;
+    use cybou_protocol::{canonical::CanonicalEnvelope, observation::ObservationV1, unix_millis};
+    use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+
+    let now = OffsetDateTime::now_utc();
+    let instant = now.format(&Rfc3339).ok()?;
+    let observation = ObservationV1 {
+        source_id: "presence.user".into(),
+        subject: subject.to_owned(),
+        value: ciborium::Value::Float(value),
+        acquired_at: instant.clone(),
+        // A person's report is about now; it says nothing about how long it stays true.
+        freshness_until: instant,
+        provenance: "reported through Presence1 by the person using the system".into(),
+    };
+    let mut payload = Vec::new();
+    ciborium::into_writer(&observation, &mut payload).ok()?;
+
+    let message_id = uuid::Uuid::new_v4();
+    let envelope = CanonicalEnvelope {
+        schema_version: 3,
+        message_id,
+        correlation_id: uuid::Uuid::new_v4(),
+        causation_id: uuid::Uuid::nil(),
+        origin_organ: "presenced".to_string(),
+        origin_node: String::new(),
+        kind: 1, // Observation
+        wall_time_ms: unix_millis(now),
+        monotonic_time: 0,
+        logical_clock: 1,
+        confidence: 1.0,
+        evidence: vec![],
+        payload,
+        privacy: 1, // Node
+        capability_scope: String::new(),
+        sealed: false,
+        key_domain_id: uuid::Uuid::nil(),
+        key_epoch: 0,
+        retention_class: 2,
+        retention_policy_version: 0,
+        retain_until_ms: 0,
+        sensitivity: 1,
+    };
+
+    let client = EventClient::session().await.ok()?;
+    client.submit(&envelope).await.ok()?;
+    Some(message_id)
+}
+
 /// Only the identity is needed to close an obligation someone pointed at.
 #[cfg(target_os = "linux")]
 #[derive(serde::Deserialize)]
@@ -266,15 +321,23 @@ impl Presence1Service {
         #[cfg(target_os = "linux")]
         {
             use cybou_fabric::PREDICTOR;
-            // Predictor1 requires a contributing identity for every sample, so an observation
-            // arriving through Presence1 says it came from here rather than borrowing a
-            // contribution that did not produce it.
-            let origin = uuid::Uuid::new_v4().to_string();
+
+            // Predictor1 asks for the contribution that produced the sample. A fresh UUID answers
+            // the type and lies about the fact: it names no contribution, so nothing could ever be
+            // traced back to what was actually observed. Record the observation first and pass the
+            // identity the Journal gave it.
+            let Some(contribution_id) = record_observation(&subject, value).await else {
+                return false;
+            };
             return call(
                 conn,
                 PREDICTOR,
                 "Observe",
-                &(subject.as_str(), value, origin.as_str()),
+                &(
+                    subject.as_str(),
+                    value,
+                    contribution_id.to_string().as_str(),
+                ),
             )
             .await
             .unwrap_or(false);

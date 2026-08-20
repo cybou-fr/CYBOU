@@ -88,11 +88,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|e| e.to_string())
                         .and_then(|r| r.body().deserialize().map_err(|e| e.to_string()));
 
-                    let health = match res {
+                    let mut health = match res {
                         Ok(true) => ComponentHealth::Healthy,
                         Ok(false) => ComponentHealth::Degraded,
                         Err(_) => ComponentHealth::Unavailable,
                     };
+
+                    // Answering is not the same as being sound. Event1 replies Ready while its
+                    // chain is broken, so a corrupted biography would leave every capability
+                    // reading available — the system would report itself healthy about the one
+                    // thing it exists to keep. Readiness stays a question about the process; this
+                    // asks the separate question about what it holds.
+                    if *id == "eventd" && health == ComponentHealth::Healthy {
+                        health = journal_integrity(&probe_connection).await;
+                    }
 
                     records.insert(
                         (*id).to_string(),
@@ -123,4 +132,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+/// Judge Event1 by what its verification established, not only by its willingness to answer.
+///
+/// A chain that has been replayed to the head and found intact is healthy. A chain with a known
+/// break is conflicted: the process is alive and its contents contradict themselves, which is a
+/// different failure from a process that is gone. A verification that has not reached the head yet
+/// says nothing either way, so it says nothing.
+#[cfg(target_os = "linux")]
+async fn journal_integrity(connection: &zbus::Connection) -> ComponentHealth {
+    use cybou_fabric::EVENT;
+
+    let Ok(reply) = connection
+        .call_method(
+            Some(EVENT.service),
+            EVENT.object_path,
+            Some(EVENT.interface),
+            "Verification",
+            &(),
+        )
+        .await
+    else {
+        return ComponentHealth::Healthy;
+    };
+    let Ok(encoded) = reply.body().deserialize::<Vec<u8>>() else {
+        return ComponentHealth::Healthy;
+    };
+    if encoded.is_empty() {
+        return ComponentHealth::Healthy;
+    }
+    let Ok(state) = ciborium::from_reader::<JournalVerification, _>(encoded.as_slice()) else {
+        return ComponentHealth::Healthy;
+    };
+
+    if state.broken_at.is_some() {
+        ComponentHealth::Conflicted
+    } else {
+        ComponentHealth::Healthy
+    }
+}
+
+/// What Event1 established about its own chain.
+#[cfg(target_os = "linux")]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JournalVerification {
+    broken_at: Option<u64>,
 }
