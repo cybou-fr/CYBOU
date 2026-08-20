@@ -106,15 +106,35 @@ pub struct IdentityCore {
     state_path: PathBuf,
     state: RwLock<Option<IdentityState>>,
     is_first_run: RwLock<bool>,
+    /// The contribution that recorded this session's start, once the Journal has accepted it.
+    ///
+    /// The session count is this organ's own arithmetic. Without something to point at, a count
+    /// of nine sessions and a biography holding eight starts look identical from outside, and the
+    /// count is exactly the claim a restart is supposed to be able to prove.
+    session_start_contribution: RwLock<Option<Uuid>>,
 }
 
 impl IdentityCore {
+    /// Record which contribution the Journal accepted for this session's start.
+    pub fn record_session_start(&self, contribution: Uuid) {
+        if let Ok(mut held) = self.session_start_contribution.write() {
+            *held = Some(contribution);
+        }
+    }
+
+    /// The contribution that recorded this session's start, if the Journal has accepted one.
+    #[must_use]
+    pub fn session_start_contribution(&self) -> Option<Uuid> {
+        self.session_start_contribution.read().ok().and_then(|g| *g)
+    }
+
     /// Open the identity manager around the state file path (`identity.json`).
     #[must_use]
     pub fn open(state_path: impl AsRef<Path>) -> Self {
         Self {
             state_path: state_path.as_ref().to_path_buf(),
             state: RwLock::new(None),
+            session_start_contribution: RwLock::new(None),
             is_first_run: RwLock::new(false),
         }
     }

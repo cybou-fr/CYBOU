@@ -41,6 +41,17 @@ impl Identity1Service {
         self.core.current_state().is_some()
     }
 
+    /// The contribution that recorded this session's start, or empty until the Journal holds one.
+    ///
+    /// What makes `SessionCount` checkable: a caller can ask Event1 whether the biography actually
+    /// contains the start this organ counted, rather than taking the count on the organ's word.
+    async fn session_start_contribution(&self) -> String {
+        self.core
+            .session_start_contribution()
+            .map(|id| id.to_string())
+            .unwrap_or_default()
+    }
+
     /// Unique subject UUID string.
     async fn identity_id(&self) -> String {
         self.core

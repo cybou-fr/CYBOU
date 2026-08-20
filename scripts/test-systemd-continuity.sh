@@ -122,6 +122,30 @@ echo "    Journal did not shrink: $journal_before -> $journal_after"
 wait_for_health 'healthy'
 echo "    Control plane healthy after the restart"
 
+# The session count is the identity's own arithmetic. It is only worth something if the biography
+# holds the start it counted, and the start is offered to Event1 while every organ is still coming
+# up — so what is being proven here is that it survives that race, not that it was tried once.
+echo "==> Verifying the session the identity counted is one the Journal holds..."
+start_id=""
+deadline=$((SECONDS + 90))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    start_id="$(scalar Identity1 SessionStartContribution 2>/dev/null || true)"
+    if [ -n "$start_id" ]; then
+        break
+    fi
+    sleep 2
+done
+if [ -z "$start_id" ]; then
+    echo "ERROR: the identity counted session $sessions_after and recorded no start for it." >&2
+    exit 1
+fi
+held="$(mind Event1 Contains s "$start_id" | awk '{print $2}')"
+if [ "$held" != "true" ]; then
+    echo "ERROR: the identity names start $start_id, and the Journal does not hold it." >&2
+    exit 1
+fi
+echo "    Session $sessions_after is in the biography as $start_id"
+
 # Losing a required owner is the failure the removed VM gates used to cover. Under systemd the
 # question is not only whether the control plane notices, but whether it recovers on its own once
 # the unit is back.
