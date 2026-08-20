@@ -66,6 +66,13 @@ wakes the gateway's event stream. `eventd` replays a bounded page of the hash ch
 seconds from a persisted checkpoint, and reports verification as a position rather than a verdict,
 so `Verified` means the chain was replayed to the head and nothing weaker.
 
+`Lifecycle1` records a mode and nothing schedules a change of it. The organ is described as a
+sleep/wake lifecycle and consolidation scheduler; it has no loop, no idle evaluation and no run
+execution, and `LifecycleRun` is a shape nothing constructs. The mode moves when `Transition` or
+`NotifyUserActivity` is called and at no other time, so consolidation does not run unattended
+because there is no consolidation to run. What such a run should do is a design decision, not a
+missing wire.
+
 `presenced` accepts commands by asking owners: Promise reaches Intention1, Reflect asks Self1 for an
 assessment, Observe and Predict reach Predictor1, InterruptLifecycle tells Lifecycle1 a person is
 present. It holds none of that state itself. No gateway route exposes any command; the web surface
