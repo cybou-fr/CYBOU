@@ -73,6 +73,7 @@ async fn submit_intention(
         retention_class: 2,
         retention_policy_version: 0,
         retain_until_ms: 0,
+        // Personal: a commitment is about the person who made it, and theirs to release.
         sensitivity: 1,
     };
 
@@ -123,6 +124,7 @@ async fn submit_outcome(
         retention_class: 2,
         retention_policy_version: 0,
         retain_until_ms: 0,
+        // Personal: a commitment is about the person who made it, and theirs to release.
         sensitivity: 1,
     };
 

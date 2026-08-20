@@ -25,11 +25,11 @@ true while the chain underneath it was broken.
 
 ## In order
 
-1. **Authentication before any real personal biography.** `/api/v1/mind` is read-only and
-   unauthenticated by an explicit, dated decision recorded in [Deployment](DEPLOYMENT.md). It
-   already exposes identity, Journal metadata, commitment descriptions, Self narration, beliefs and
-   attention. Read-only is not privacy-safe. This is the gate before the deployment holds anything
-   that matters to a person.
+1. **Authentication, when the tripwire says so.** Not now: the deployment holds facts about a
+   machine, and a login would cost the demo and protect nothing. The gateway refuses to serve an
+   unauthenticated public surface once the Journal holds anything above ordinary sensitivity, so
+   the moment this stops being true is enforced rather than remembered. When it trips, this becomes
+   the work — and it will trip on the first promise a person makes through the interface.
 
 2. **Reboot integration.** `scripts/test-systemd-continuity.sh` now proves identity continuity, a
    noticed restart, an unshrinking Journal and recovery from the loss of a required owner — under

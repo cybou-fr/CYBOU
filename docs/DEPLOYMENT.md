@@ -37,6 +37,13 @@ bash scripts/deploy-vps.sh
 The public URLs are `https://vps-d0669a91.vps.ovh.net` and `https://51.255.46.58`; neither requires
 a login. The IP endpoint uses a renewable Let's Encrypt `shortlived` certificate.
 
+The gateway refuses to start in `public-preview` mode if the Journal holds anything above ordinary
+sensitivity. That is not authentication; it is the tripwire that decides when authentication stops
+being optional. Today every contribution is a fact about the machine and the surface serves it. The
+first time a person records something of their own — a promise, an observation they asked to track —
+the public surface stops instead of publishing it, and the choice becomes explicit rather than
+forgotten.
+
 **The public deployment serves the live Mind, without authentication.** This is a deliberate,
 temporary decision by the owner: the point of the deployment is a working desktop anyone can look
 at, and there is nothing on that host worth protecting yet. It is not an oversight and not a

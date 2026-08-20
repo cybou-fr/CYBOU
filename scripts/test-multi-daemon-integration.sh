@@ -240,6 +240,17 @@ echo "    Context1 activated at least one concept"
 # Keying them by organ collapsed everything one organ ever said into a single self-disputing
 # belief, and printed a payload where a claim belonged. Both derived organs are checked, because
 # both take the subject from the same place and both were wrong in the same way.
+# The public surface refuses to publish personal state, and that refusal is only worth anything if
+# the classification underneath it is real. Machine facts must not be labelled as belonging to the
+# person: every writer used to stamp Personal regardless of what it was recording.
+echo "==> Verifying machine facts are not labelled as belonging to the person..."
+highest="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 HighestSensitivity | awk '{print $2}')"
+if [ "$highest" != "0" ]; then
+    echo "ERROR: the Journal holds only machine facts, yet reports sensitivity $highest." >&2
+    exit 1
+fi
+echo "    Journal sensitivity is ordinary; a public surface may serve it"
+
 echo "==> Verifying the derived organs name what was observed, not who observed it..."
 observed_subject="operating-system"
 for owner in Epistemic1:Beliefs Context1:ActiveContext; do

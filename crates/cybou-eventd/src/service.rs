@@ -106,6 +106,11 @@ impl Event1Service {
         encode(&step)
     }
 
+    /// The most exposing sensitivity anything in the Journal carries, on the frozen scale.
+    async fn highest_sensitivity(&self) -> u8 {
+        self.core.highest_sensitivity()
+    }
+
     /// Current erasure epoch.
     async fn erasure_epoch(&self) -> u64 {
         self.core.erasure_epoch()

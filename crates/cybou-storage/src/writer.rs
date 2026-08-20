@@ -369,6 +369,24 @@ impl JournalWriter {
         Ok(appended)
     }
 
+    /// Return the most exposing sensitivity anything in the Journal carries.
+    ///
+    /// One question, asked of the owner of the data rather than of a second reader: what is the
+    /// most a surface would be publishing if it published everything here?
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure.
+    pub fn highest_sensitivity(&self) -> Result<u8, WriteError> {
+        let highest: Option<i64> = self
+            .connection
+            .query_row("SELECT MAX(sensitivity) FROM contribution", [], |row| {
+                row.get(0)
+            })
+            .map_err(WriteError::Query)?;
+        Ok(u8::try_from(highest.unwrap_or(0)).unwrap_or(u8::MAX))
+    }
+
     /// Return the count of contributions stored in the Journal.
     ///
     /// # Errors

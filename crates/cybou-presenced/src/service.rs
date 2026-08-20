@@ -122,6 +122,7 @@ async fn record_observation(subject: &str, value: ciborium::Value) -> Option<uui
         retention_class: 2,
         retention_policy_version: 0,
         retain_until_ms: 0,
+        // Personal: a person reported this, so it is about them and theirs to release.
         sensitivity: 1,
     };
 

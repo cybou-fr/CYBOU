@@ -135,7 +135,10 @@ impl PerceptionCore {
             retention_class: 2,
             retention_policy_version: 0,
             retain_until_ms: 0,
-            sensitivity: 1,
+            // Ordinary: this is a fact about the machine, not about the person using it.
+            // Every writer used to stamp Personal regardless of content, which made the system
+            // label its own kernel version as something the person had a claim over.
+            sensitivity: 0,
         })
     }
 
@@ -174,7 +177,10 @@ impl PerceptionCore {
             retention_class: 2,
             retention_policy_version: 0,
             retain_until_ms: 0,
-            sensitivity: 1,
+            // Ordinary: this is a fact about the machine, not about the person using it.
+            // Every writer used to stamp Personal regardless of content, which made the system
+            // label its own kernel version as something the person had a claim over.
+            sensitivity: 0,
         })
     }
 

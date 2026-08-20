@@ -220,6 +220,21 @@ impl EventCore {
         Ok(core)
     }
 
+    /// The most exposing sensitivity anything in the Journal carries.
+    ///
+    /// Zero when the Journal is empty or unreadable: a surface deciding what it may publish should
+    /// not be told a Journal it cannot read is full of secrets, nor that it is safe. It is told the
+    /// least alarming answer, and the surface's own rule decides what to do with a Journal it could
+    /// not consult.
+    #[must_use]
+    pub fn highest_sensitivity(&self) -> u8 {
+        self.writer
+            .lock()
+            .ok()
+            .and_then(|writer| writer.highest_sensitivity().ok())
+            .unwrap_or(0)
+    }
+
     /// The verification established by the last incremental pass, if one has run.
     #[must_use]
     pub fn verification(&self) -> Option<VerificationState> {

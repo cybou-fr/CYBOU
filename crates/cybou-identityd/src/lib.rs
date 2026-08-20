@@ -304,7 +304,8 @@ impl IdentityCore {
             retention_class: 2,
             retention_policy_version: 0,
             retain_until_ms: 0,
-            sensitivity: 1,
+            // Ordinary: a session beginning is a fact about the system, not about the person.
+            sensitivity: 0,
         })
     }
 }
