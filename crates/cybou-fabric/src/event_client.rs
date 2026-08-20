@@ -7,7 +7,6 @@
 use cybou_protocol::canonical::CanonicalEnvelope;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use uuid::Uuid;
 
 #[allow(unused_imports)]
 use crate::EVENT;
@@ -18,10 +17,41 @@ use crate::EVENT;
 pub struct SubmitOutcome {
     /// Journal sequence number assigned to the contribution.
     pub sequence: u64,
-    /// Message ID of the accepted contribution.
-    pub message_id: Uuid,
-    /// SHA-256 hash chaining this row to the previous row.
-    pub hash: Vec<u8>,
+}
+
+/// Read Event1's answer to a submission.
+///
+/// # Errors
+///
+/// Returns [`EventClientError::Rejected`] when the Journal refused the contribution, and
+/// [`EventClientError::Encoding`] when the reply cannot be read at all. A refusal is an answer,
+/// not a transport failure: the caller has to be able to tell "the Journal would not take this"
+/// from "the Journal could not be reached".
+fn decode_submit_reply(reply: &[u8]) -> Result<SubmitOutcome, EventClientError> {
+    let decoded: SubmitReply =
+        ciborium::from_reader(reply).map_err(|e| EventClientError::Encoding(e.to_string()))?;
+
+    if !decoded.error.is_empty() {
+        return Err(EventClientError::Rejected(decoded.error));
+    }
+
+    let sequence = decoded.sequence.parse().map_err(|_| {
+        EventClientError::Encoding(format!("sequence {} is not a number", decoded.sequence))
+    })?;
+
+    Ok(SubmitOutcome { sequence })
+}
+
+/// The reply Event1 actually sends, in the owner's own spelling.
+///
+/// The sequence is a string because that is the Qt wire spelling Event1 kept, and `error` is empty
+/// on acceptance. Decoding some other shape here would report every accepted contribution as a
+/// failure while the row sat in the Journal.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubmitReply {
+    sequence: String,
+    error: String,
 }
 
 /// Errors occurring during Event1 operations.
@@ -88,10 +118,7 @@ impl EventClient {
             .deserialize()
             .map_err(|e| EventClientError::Rpc(e.to_string()))?;
 
-        let outcome: SubmitOutcome = ciborium::from_reader(reply.as_slice())
-            .map_err(|e| EventClientError::Encoding(e.to_string()))?;
-
-        Ok(outcome)
+        decode_submit_reply(&reply)
     }
 
     /// Replay contributions strictly after `after_sequence`.
@@ -221,5 +248,41 @@ impl EventClient {
             .map_err(|e| EventClientError::Rpc(e.to_string()))?;
 
         Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EventClientError, decode_submit_reply};
+
+    #[derive(serde::Serialize)]
+    struct OwnerReply<'a> {
+        sequence: &'a str,
+        error: &'a str,
+    }
+
+    /// Encode exactly what Event1 sends back.
+    fn owner_reply(sequence: &str, error: &str) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        ciborium::into_writer(&OwnerReply { sequence, error }, &mut bytes)
+            .expect("encode owner reply");
+        bytes
+    }
+
+    #[test]
+    fn an_accepted_contribution_is_not_reported_as_a_failure() {
+        // Decoding some other shape here turned every accepted contribution into an error while
+        // its row sat in the Journal, which is how intentions came to be recorded and forgotten.
+        let outcome = decode_submit_reply(&owner_reply("42", "")).expect("accepted");
+        assert_eq!(outcome.sequence, 42);
+    }
+
+    #[test]
+    fn a_refusal_is_distinguishable_from_a_transport_failure() {
+        let error =
+            decode_submit_reply(&owner_reply("0", "duplicate identity")).expect_err("refused");
+        assert!(
+            matches!(error, EventClientError::Rejected(reason) if reason == "duplicate identity")
+        );
     }
 }
