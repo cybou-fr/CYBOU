@@ -180,6 +180,17 @@ if [ "$domain_before" != "$domain_after" ]; then
 fi
 echo "    Key domain and master secret survived the restart"
 
+# The public surface refuses to publish personal state, and that refusal is only worth anything if
+# the classification underneath it is real. Before a person has done anything, the Journal holds
+# machine facts and nothing else — every writer used to stamp Personal regardless of content.
+echo "==> Verifying machine facts are not labelled as belonging to the person..."
+sensitivity_before="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 HighestSensitivity | awk '{print $2}')"
+if [ "$sensitivity_before" != "0" ]; then
+    echo "ERROR: only machine facts have been recorded, yet the Journal reports sensitivity $sensitivity_before." >&2
+    exit 1
+fi
+echo "    Journal sensitivity is ordinary; a public surface may serve it"
+
 echo "==> Verifying a Presence1 command reaches the owner that holds the state..."
 before="$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 OpenCount | awk '{print $2}')"
 promised="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Promise s "Verify the command path" | awk '{print $2}' | tr -d '"')"
@@ -193,6 +204,16 @@ if [ "$after" -le "$before" ]; then
     exit 1
 fi
 echo "    Promise reached Intention1: open obligations $before -> $after"
+
+# And a promise is the person's, so recording one has to raise what the Journal carries. This is
+# the transition the public surface refuses to publish across; if it never happened, the tripwire
+# would be watching for something that cannot occur.
+sensitivity_after="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 HighestSensitivity | awk '{print $2}')"
+if [ "$sensitivity_after" -le "$sensitivity_before" ]; then
+    echo "ERROR: a person made a promise and the Journal still reports sensitivity $sensitivity_after." >&2
+    exit 1
+fi
+echo "    A promise raised Journal sensitivity $sensitivity_before -> $sensitivity_after"
 
 # A promise the biography never heard of is the failure this path had: Kind::Intention is derived,
 # so an intention with no cause cannot enter the Journal, and a promise made through Presence1 had
@@ -240,17 +261,6 @@ echo "    Context1 activated at least one concept"
 # Keying them by organ collapsed everything one organ ever said into a single self-disputing
 # belief, and printed a payload where a claim belonged. Both derived organs are checked, because
 # both take the subject from the same place and both were wrong in the same way.
-# The public surface refuses to publish personal state, and that refusal is only worth anything if
-# the classification underneath it is real. Machine facts must not be labelled as belonging to the
-# person: every writer used to stamp Personal regardless of what it was recording.
-echo "==> Verifying machine facts are not labelled as belonging to the person..."
-highest="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 HighestSensitivity | awk '{print $2}')"
-if [ "$highest" != "0" ]; then
-    echo "ERROR: the Journal holds only machine facts, yet reports sensitivity $highest." >&2
-    exit 1
-fi
-echo "    Journal sensitivity is ordinary; a public surface may serve it"
-
 echo "==> Verifying the derived organs name what was observed, not who observed it..."
 observed_subject="operating-system"
 for owner in Epistemic1:Beliefs Context1:ActiveContext; do
