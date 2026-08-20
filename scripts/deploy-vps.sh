@@ -35,6 +35,7 @@ cybou_ssh "
     cybou-epistemicd
     cybou-contextd
     cybou-meaningd
+    cybou-authd
     cybou-workspaced
     cybou-lifecycled
     cybou-selfd
@@ -65,17 +66,25 @@ cybou_ssh "
   sudo rm -f /etc/systemd/system/caddy.service.d/cybou.conf
   sudo rm -f /etc/cybou/web.env /etc/cybou/web-password
 
-  # The credential that entitles a reader to the unfiltered projection. Generated once and never
-  # regenerated: rotating it on every deploy would invalidate it behind whoever is holding it, and
-  # a credential nobody can rely on is one people work around. It is readable only by the user the
-  # gateway runs as, which is why it is a file rather than a line in a world-readable unit.
-  if [ ! -s /var/lib/cybou/access-credential ]; then
-    sudo install -d -m 0700 -o cybou -g cybou /var/lib/cybou
-    head -c 32 /dev/urandom | base64 | tr -d '=+/' | sudo tee /var/lib/cybou/access-credential >/dev/null
-    sudo chown cybou:cybou /var/lib/cybou/access-credential
-    sudo chmod 0400 /var/lib/cybou/access-credential
-    echo '==> generated an access credential at /var/lib/cybou/access-credential'
-  fi
+  # Who may sign in. Membership in this group is the grant: being a valid Linux account is not the
+  # same as being someone this system answers to, and without the group every service account on
+  # the host would be a way in.
+  sudo getent group cybou-access >/dev/null || sudo groupadd --system cybou-access
+
+  # The PAM stack the helper opens. Ordinary Unix password checking and nothing else; `account`
+  # is what makes `usermod -L` actually revoke access rather than only look like it.
+  sudo install -m 0644 debian/pam-cybou /etc/pam.d/cybou
+
+  # The helper is a system service because it is the one thing here that needs root. Its socket is
+  # group-owned by cybou, so only the gateway can attempt a password.
+  sudo install -m 0644 systemd/system/cybou-authd.service /etc/systemd/system/
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now cybou-authd.service
+  sudo systemctl restart cybou-authd.service
+
+  # The shared secret this replaced is removed rather than left lying about. A second way in that
+  # nobody maintains is how a temporary arrangement outlives the reason for it.
+  sudo rm -f /var/lib/cybou/access-credential
 
   sudo systemctl daemon-reload
   sudo systemctl restart caddy.service

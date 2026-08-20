@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# The one Cybou process that runs as root, and the only one that needs to: checking a password
+# means reading the shadow database. Everything below is about making that privilege buy as little
+# as possible if the process is ever subverted — it has no network, no new privileges, a private
+# view of most of the filesystem, and a socket only the gateway's user can open.
+
+[Unit]
+Description=Cybou credential helper (PAM)
+Documentation=https://github.com/cybou-fr/CYBOU
+Before=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/cybou/cybou-authd
+Restart=on-failure
+RestartSec=1
+
+RuntimeDirectory=cybou
+RuntimeDirectoryMode=0750
+Environment=CYBOU_AUTH_SOCKET=/run/cybou/auth.sock
+
+# The socket is group-owned by the account the gateway runs as, so only that user may attempt a
+# password. Anyone else on the host cannot reach the helper at all.
+Group=cybou
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

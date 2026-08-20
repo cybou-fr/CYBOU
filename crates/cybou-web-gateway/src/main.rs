@@ -8,17 +8,18 @@ use std::{net::SocketAddr, sync::Arc};
 #[cfg(target_os = "linux")]
 use cybou_web_contracts::SessionMode;
 use cybou_web_gateway::{
-    PresenceSource, SessionContext, fixture::FixturePresenceSource, router_with_privileged_access,
+    PresenceSource, SessionContext, access::CredentialVerifier, fixture::FixturePresenceSource,
+    router_with_verifier_and_access,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Two sources, not one source and a flag. The filtered one is what a stranger reads; the full
-    // one is reachable only through the credential below, and only if this deployment has one.
+    // one is reachable only by signing in, and only if this deployment can authenticate anybody.
     let permitted = publishable_sensitivity_or_default();
     let presence: Arc<dyn PresenceSource> = source(Some(permitted)).await?;
-    let credential = access_credential()?;
-    let privileged: Option<Arc<dyn PresenceSource>> = if credential.is_some() {
+    let verifier = credential_verifier();
+    let privileged: Option<Arc<dyn PresenceSource>> = if verifier.is_some() {
         Some(source(None).await?)
     } else {
         None
@@ -59,20 +60,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // check that fires when nothing is wrong gets removed by whoever it wakes at night.
         //
         // The guarantee is structural instead: there is one filtered source, every route reads it,
-        // and the unfiltered one is reachable only through the credential. A route added later
-        // cannot forget to filter, because filtering is not something a route does.
+        // and the unfiltered one is reachable only by signing in. A route added later cannot
+        // forget to filter, because filtering is not something a route does.
         println!("public projection withholds anything above sensitivity {permitted}");
     }
 
     println!("cybou-web-gateway listening on http://{address}");
-    if credential.is_some() {
-        println!("a credential is configured; readers presenting it are served unfiltered");
+    if verifier.is_some() {
+        println!("sign-in is available; a reader who signs in is served unfiltered");
     } else {
-        println!("no credential is configured; every reader is served the public projection");
+        println!("sign-in is unavailable; every reader is served the public projection");
     }
     axum::serve(
         listener,
-        router_with_privileged_access(presence, privileged, credential, web_root, session_context),
+        router_with_verifier_and_access(presence, privileged, verifier, web_root, session_context),
     )
     .await?;
     Ok(())
@@ -104,30 +105,24 @@ async fn source(
     }
 }
 
-/// The credential that entitles a reader to the unfiltered projection, if one is configured.
+/// What can say whether a Linux account accepts a secret, if anything on this host can.
 ///
-/// Read from a file rather than the environment: a unit file is world-readable and a process
-/// environment is readable by anyone who can see the process, and a secret in either is a secret
-/// in the clear. An unset path means this deployment has nobody to entitle, which is a valid
-/// configuration and the one a public demo runs with.
-///
-/// A configured path that cannot be read is an error rather than a shrug. Falling back to "no
-/// credential" would silently turn a deployment that meant to have privileged access into one that
-/// serves everyone the same thing, and it would look exactly like it was working.
-fn access_credential() -> Result<Option<Arc<str>>, Box<dyn std::error::Error>> {
-    let Some(path) = std::env::var_os("CYBOU_ACCESS_CREDENTIAL_FILE") else {
-        return Ok(None);
-    };
-    let raw = std::fs::read_to_string(&path)
-        .map_err(|error| format!("cannot read the access credential file: {error}"))?;
-    let credential = raw.trim();
-    if credential.is_empty() {
-        return Err(
-            "the access credential file is empty; remove the setting or put a credential in it"
-                .into(),
-        );
-    }
-    Ok(Some(Arc::from(credential)))
+/// The gateway asks; it never checks. Checking needs the shadow database, which needs privilege
+/// this process must not have, so the question goes to `cybou-authd` over a socket only this user
+/// can open. An unset socket path means this deployment cannot authenticate anybody, which is a
+/// valid way to run a public demo and is said at startup rather than left to be discovered.
+#[cfg(target_os = "linux")]
+fn credential_verifier() -> Option<Arc<dyn CredentialVerifier>> {
+    let path = std::env::var_os("CYBOU_AUTH_SOCKET")?;
+    Some(Arc::new(
+        cybou_web_gateway::auth_socket::HelperVerifier::at(std::path::PathBuf::from(path)),
+    ))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn credential_verifier() -> Option<Arc<dyn CredentialVerifier>> {
+    // The helper is a unix socket and a PAM stack; there is neither here.
+    None
 }
 
 /// What a public surface may publish, on every platform.

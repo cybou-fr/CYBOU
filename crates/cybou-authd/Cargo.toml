@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-authd"
+description = "Privileged helper that answers one question: does this Linux account accept this password"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ciborium.workspace = true
+serde.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+pam = "0.8.0"
+
+[lints]
+workspace = true

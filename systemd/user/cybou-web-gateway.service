@@ -16,11 +16,12 @@ Type=simple
 Environment=CYBOU_WEB_ROOT=/usr/share/cybou/web
 Environment=CYBOU_SESSION_MODE=public-preview
 
-# Everyone is served a projection with nothing above ordinary in it. A reader presenting the
-# credential in this file is served the unfiltered one instead. The path is here and the secret is
-# not, because a unit file is world-readable; an unset path means this deployment entitles nobody,
-# which is a valid way to run a public demo.
-Environment=CYBOU_ACCESS_CREDENTIAL_FILE=/var/lib/cybou/access-credential
+# Everyone is served a projection with nothing above ordinary in it. A reader who signs in with a
+# Linux account is served the unfiltered one instead. The gateway never checks the password itself:
+# it asks cybou-authd over this socket, which is the only process with the privilege to look. An
+# unset path means this deployment cannot authenticate anybody, which is a valid way to run a
+# public demo.
+Environment=CYBOU_AUTH_SOCKET=/run/cybou/auth.sock
 
 ExecStart=/usr/libexec/cybou/cybou-web-gateway
 Restart=on-failure

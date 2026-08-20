@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# The PAM stack `cybou-authd` opens, installed as /etc/pam.d/cybou.
+#
+# It is deliberately the ordinary Unix password check and nothing else. A stack that included
+# session or password management would let this service change accounts; it only ever asks whether
+# one accepts a secret. `account` is included because an expired or locked account must not
+# authenticate, which is what makes `usermod -L` a way to revoke access.
+
+auth     required   pam_unix.so
+account  required   pam_unix.so

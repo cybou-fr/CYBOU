@@ -14,10 +14,11 @@ use axum::{
         IntoResponse, Response,
         sse::{Event, KeepAlive, Sse},
     },
-    routing::{any, get},
+    routing::{any, get, post},
 };
 use cybou_web_contracts::{
-    MindProjection, SessionMode, SessionProjection, SnapshotProjection, WEB_SCHEMA_V1,
+    MindProjection, SessionMode, SessionProjection, ShellExecRequest, ShellExecResponse,
+    SnapshotProjection, WEB_SCHEMA_V1,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -28,9 +29,14 @@ use tower_http::{
 };
 use uuid::Uuid;
 
+pub mod access;
+#[cfg(target_os = "linux")]
+pub mod auth_socket;
 pub mod fixture;
 #[cfg(target_os = "linux")]
 pub mod presence_zbus;
+
+pub use access::{CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions};
 
 /// Maximum time the gateway permits one Presence projection request to occupy.
 pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(1_500);
@@ -124,53 +130,45 @@ impl IntoResponse for GatewayError {
 #[derive(Clone)]
 struct GatewayState {
     presence: Arc<dyn PresenceSource>,
-    /// The unfiltered source, for a reader who proved they are entitled to it.
+    /// The unfiltered source, for a reader who has signed in.
     ///
-    /// `None` when this deployment has no credential configured, which is the case where there is
-    /// nobody to be entitled: every reader is then served the filtered source.
+    /// `None` when this deployment cannot authenticate anybody, which is a valid way to run a
+    /// public demo: every reader is then served the filtered source and there is no way in.
     privileged: Option<Arc<dyn PresenceSource>>,
-    /// The credential that distinguishes the two, if this deployment has one.
-    credential: Option<Arc<str>>,
+    /// Who can say whether an account accepts a secret, if anything can.
+    verifier: Option<Arc<dyn CredentialVerifier>>,
+    /// The sessions this process is honouring.
+    sessions: Arc<Sessions>,
     session: SessionProjection,
+    shell: Arc<tokio::sync::Mutex<cybou_shelld::ShellEngine>>,
 }
 
 impl GatewayState {
+    /// The session this request carries, if it carries a live one.
+    fn session_for(&self, headers: &HeaderMap) -> Option<Session> {
+        let token = headers
+            .get(axum::http::header::COOKIE)
+            .and_then(|value| value.to_str().ok())
+            .and_then(access::token_in)?;
+        self.sessions.resolve(token, OffsetDateTime::now_utc())
+    }
+
     /// The source this request is entitled to.
     ///
-    /// Defaulting to the filtered source is what makes a missing, malformed or wrong credential
+    /// Defaulting to the filtered source is what makes a missing, expired or invented session
     /// harmless: none of them is an entitlement, and they do not need to be told apart to be
     /// refused. Nothing is rejected outright, because a public surface that answered 401 to
     /// strangers would stop being a public surface.
     fn source_for(&self, headers: &HeaderMap) -> &Arc<dyn PresenceSource> {
-        let (Some(expected), Some(privileged)) = (&self.credential, &self.privileged) else {
+        let Some(privileged) = &self.privileged else {
             return &self.presence;
         };
-        let offered = headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.strip_prefix("Bearer "))
-            .unwrap_or_default();
-        if constant_time_eq(offered.as_bytes(), expected.as_bytes()) {
+        if self.session_for(headers).is_some() {
             privileged
         } else {
             &self.presence
         }
     }
-}
-
-/// Compare two secrets without letting the time taken say how much of one is right.
-///
-/// A short-circuiting comparison leaks the length of the matching prefix, which turns guessing a
-/// credential from an impossible problem into a long but ordinary one.
-fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    let mut difference = 0u8;
-    for (left, right) in left.iter().zip(right.iter()) {
-        difference |= left ^ right;
-    }
-    difference == 0
 }
 
 /// Server-established browser trust context.
@@ -188,32 +186,34 @@ impl SessionContext {
     pub fn local_desktop() -> Self {
         Self {
             mode: SessionMode::LocalDesktop,
-            consumer_id: "living-canvas:local-desktop".into(),
+            consumer_id: "cybou-desktop".into(),
         }
     }
 
-    /// Unauthenticated context: no login was performed and no device binding was established.
-    ///
-    /// It is deliberately honest rather than restrictive. The gateway states the trust it
-    /// actually has; what a deployment chooses to expose under it is the owner's decision, and
-    /// the public deployment currently exposes the live Mind while authentication is being built.
+    /// Read-only public preview context.
     #[must_use]
     pub fn public_preview() -> Self {
         Self {
             mode: SessionMode::PublicPreview,
-            consumer_id: "living-canvas:public-preview".into(),
+            consumer_id: "public-preview".into(),
         }
     }
 }
 
-/// Build the read-only v1 router around a typed Presence source.
+/// Build the v1 router around a single source.
 pub fn router(presence: Arc<dyn PresenceSource>) -> Router {
-    router_with_assets(presence, None)
+    router_with_verifier_and_access(presence, None, None, None, SessionContext::local_desktop())
 }
 
-/// Build the read-only v1 router and optionally serve a Living Canvas build from the same origin.
+/// Build the v1 router serving static assets when configured.
 pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<PathBuf>) -> Router {
-    router_with_assets_and_session(presence, web_root, SessionContext::local_desktop())
+    router_with_verifier_and_access(
+        presence,
+        None,
+        None,
+        web_root,
+        SessionContext::local_desktop(),
+    )
 }
 
 /// Build the v1 router with an explicit server-established trust context.
@@ -222,18 +222,27 @@ pub fn router_with_assets_and_session(
     web_root: Option<PathBuf>,
     session_context: SessionContext,
 ) -> Router {
-    router_with_privileged_access(presence, None, None, web_root, session_context)
+    router_with_verifier_and_access(presence, None, None, web_root, session_context)
 }
 
-/// Build the v1 router with a filtered source for everyone and a full source for a credential.
+/// Build the v1 router with a filtered source for everyone and a full source for a signed-in
+/// reader.
 ///
-/// The two sources are separate objects rather than one source and a flag, so a route cannot ask
-/// the wrong question and get the privileged answer: what a request is entitled to is decided once,
-/// where the credential is read.
-pub fn router_with_privileged_access(
+/// The two sources are separate objects rather than one source and a flag, so a route cannot
+/// ask the wrong question and get the privileged answer: what a request is entitled to is
+/// decided once, where the session is read.
+///
+/// # Panics
+///
+/// If the sandbox the shell surface runs in cannot be created.
+///
+/// # Panics
+///
+/// If the sandbox jail the shell surface runs in cannot be created.
+pub fn router_with_verifier_and_access(
     presence: Arc<dyn PresenceSource>,
     privileged: Option<Arc<dyn PresenceSource>>,
-    credential: Option<Arc<str>>,
+    verifier: Option<Arc<dyn CredentialVerifier>>,
     web_root: Option<PathBuf>,
     session_context: SessionContext,
 ) -> Router {
@@ -241,10 +250,18 @@ pub fn router_with_privileged_access(
     let expires_at = (now + TimeDuration::hours(8))
         .format(&Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into());
+
+    let sandbox_path = std::env::temp_dir().join(format!("cybou_sandbox_{}", std::process::id()));
+    let jail = cybou_jailfs::JailFs::new(&sandbox_path).expect("initialize gateway sandbox jail");
+    let shell = Arc::new(tokio::sync::Mutex::new(cybou_shelld::ShellEngine::new(
+        jail,
+    )));
+
     let state = GatewayState {
         presence,
         privileged,
-        credential,
+        verifier,
+        sessions: Arc::new(Sessions::default()),
         session: SessionProjection {
             schema_version: WEB_SCHEMA_V1,
             session_id: Uuid::new_v4(),
@@ -252,13 +269,17 @@ pub fn router_with_privileged_access(
             consumer_id: session_context.consumer_id,
             expires_at,
         },
+        shell,
     };
 
     let app = Router::new()
         .route("/api/v1/session", get(session))
+        .route("/api/v1/login", post(login))
+        .route("/api/v1/logout", post(logout))
         .route("/api/v1/snapshot", get(snapshot))
         .route("/api/v1/mind", get(mind))
         .route("/api/v1/events", get(events))
+        .route("/api/v1/shell/exec", post(shell_exec))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -292,8 +313,80 @@ async fn api_not_found() -> StatusCode {
     StatusCode::NOT_FOUND
 }
 
-async fn session(State(state): State<GatewayState>) -> Json<SessionProjection> {
-    Json(state.session)
+async fn session(State(state): State<GatewayState>, headers: HeaderMap) -> Json<SessionProjection> {
+    let mut projection = state.session.clone();
+    // A signed-in reader is a different trust context, and the contract already has a name for it.
+    // Leaving it at `publicPreview` would make the page unable to tell that anyone had signed in,
+    // and would state a trust level that is no longer the one that was established.
+    if let Some(session) = state.session_for(&headers) {
+        projection.mode = SessionMode::RemoteBrowser;
+        projection.consumer_id = format!("living-canvas:{}", session.username);
+        projection.expires_at = session
+            .expires_at
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| projection.expires_at.clone());
+    }
+    Json(projection)
+}
+
+/// Establish a session for a Linux account.
+///
+/// The gateway never learns whether the account exists: it asks the privileged helper and receives
+/// one bit. A deployment with no helper answers the same as a wrong password, because in both
+/// cases nothing was established.
+async fn login(
+    State(state): State<GatewayState>,
+    Json(request): Json<LoginRequest>,
+) -> impl IntoResponse {
+    let authenticated = match &state.verifier {
+        Some(verifier) => verifier.verify(&request.username, &request.password).await,
+        None => false,
+    };
+    let username = request.username.clone();
+    // Dropped here rather than at the end of the function: the secret is gone from this process
+    // before the response is built.
+    drop(request);
+
+    if !authenticated {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(LoginOutcome {
+                authenticated: false,
+            }),
+        )
+            .into_response();
+    }
+
+    let token = state.sessions.begin(&username, OffsetDateTime::now_utc());
+    (
+        StatusCode::OK,
+        [(
+            axum::http::header::SET_COOKIE,
+            access::session_cookie(&token),
+        )],
+        Json(LoginOutcome {
+            authenticated: true,
+        }),
+    )
+        .into_response()
+}
+
+/// End the session this request carries, if it carries one.
+///
+/// Answers the same either way. Whether a token named a live session is not something a caller
+/// needs told, and saying so would make this a way to test tokens.
+async fn logout(State(state): State<GatewayState>, headers: HeaderMap) -> impl IntoResponse {
+    if let Some(token) = headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(access::token_in)
+    {
+        state.sessions.end(token);
+    }
+    (
+        StatusCode::OK,
+        [(axum::http::header::SET_COOKIE, access::cleared_cookie())],
+    )
 }
 
 async fn snapshot(
@@ -314,6 +407,33 @@ async fn mind(
         .await
         .map_err(|_| GatewayError::Timeout)?
         .map(Json)
+}
+
+async fn shell_exec(
+    State(state): State<GatewayState>,
+    Json(payload): Json<ShellExecRequest>,
+) -> Result<Json<ShellExecResponse>, (StatusCode, Json<ErrorBody>)> {
+    if state.session.mode == SessionMode::PublicPreview {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorBody {
+                schema_version: WEB_SCHEMA_V1,
+                error: "shellExecutionForbiddenInPublicPreview",
+                retryable: false,
+            }),
+        ));
+    }
+
+    let mut engine = state.shell.lock().await;
+    let output = engine.execute(&payload.command);
+
+    Ok(Json(ShellExecResponse {
+        schema_version: WEB_SCHEMA_V1,
+        exit_code: output.exit_code,
+        stdout: output.stdout,
+        stderr: output.stderr,
+        cwd: output.cwd,
+    }))
 }
 
 fn resume_cursor(headers: &HeaderMap) -> Result<Option<String>, GatewayError> {
@@ -414,13 +534,16 @@ mod tests {
         http::{Request, StatusCode},
     };
     use cybou_protocol::KnowledgeState;
-    use cybou_web_contracts::{MindProjection, SessionMode, SessionProjection, SnapshotProjection};
+    use cybou_web_contracts::{
+        MindProjection, SessionMode, SessionProjection, ShellExecRequest, ShellExecResponse,
+        SnapshotProjection,
+    };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
     use super::{
-        GatewayError, PresenceSource, SessionContext, constant_time_eq, router, router_with_assets,
-        router_with_assets_and_session, router_with_privileged_access,
+        CredentialVerifier, GatewayError, PresenceSource, SessionContext, router,
+        router_with_assets, router_with_assets_and_session, router_with_verifier_and_access,
     };
     use crate::fixture::FixturePresenceSource;
 
@@ -441,10 +564,20 @@ mod tests {
         }
     }
 
-    async fn cursor_for(app: &Router, credential: Option<&str>) -> String {
+    /// A verifier that accepts exactly one account with exactly one secret.
+    struct OneAccount;
+
+    #[async_trait]
+    impl CredentialVerifier for OneAccount {
+        async fn verify(&self, username: &str, password: &str) -> bool {
+            username == "alice" && password == "hunter2"
+        }
+    }
+
+    async fn cursor_for(app: &Router, cookie: Option<&str>) -> String {
         let mut request = Request::builder().uri("/api/v1/snapshot");
-        if let Some(credential) = credential {
-            request = request.header("authorization", format!("Bearer {credential}"));
+        if let Some(cookie) = cookie {
+            request = request.header("cookie", cookie);
         }
         let response = app
             .clone()
@@ -458,44 +591,108 @@ mod tests {
         projection.cursor
     }
 
+    /// Sign in and return the cookie the browser would send back, if it worked.
+    async fn sign_in(app: &Router, username: &str, password: &str) -> Option<String> {
+        let body = format!(r#"{{"username":"{username}","password":"{password}"}}"#);
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/login")
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        if response.status() != StatusCode::OK {
+            return None;
+        }
+        let cookie = response
+            .headers()
+            .get("set-cookie")?
+            .to_str()
+            .ok()?
+            .split(';')
+            .next()?
+            .to_owned();
+        Some(cookie)
+    }
+
     fn guarded_router() -> Router {
-        router_with_privileged_access(
+        router_with_verifier_and_access(
             Arc::new(NamedSource { name: "public" }),
             Some(Arc::new(NamedSource { name: "privileged" })),
-            Some(Arc::from("the-credential")),
+            Some(Arc::new(OneAccount)),
             None,
             SessionContext::public_preview(),
         )
     }
 
     #[tokio::test]
-    async fn a_reader_without_the_credential_is_served_the_public_source() {
+    async fn a_reader_who_has_not_signed_in_is_served_the_public_source() {
         let app = guarded_router();
         assert_eq!(cursor_for(&app, None).await, "public");
     }
 
     #[tokio::test]
-    async fn a_wrong_credential_is_served_the_public_source_rather_than_refused() {
+    async fn a_session_nobody_issued_is_served_the_public_source_rather_than_refused() {
         // Refusing would stop this being a public surface. A stranger gets what a stranger gets,
-        // and a wrong guess is a stranger.
+        // and an invented cookie is a stranger.
         let app = guarded_router();
-        assert_eq!(cursor_for(&app, Some("not-the-credential")).await, "public");
-        assert_eq!(cursor_for(&app, Some("")).await, "public");
-        // A prefix of the credential is still not the credential.
-        assert_eq!(cursor_for(&app, Some("the-credenti")).await, "public");
+        assert_eq!(
+            cursor_for(&app, Some("cybou_session=invented")).await,
+            "public"
+        );
+        assert_eq!(cursor_for(&app, Some("cybou_session=")).await, "public");
+        assert_eq!(cursor_for(&app, Some("theme=dark")).await, "public");
     }
 
     #[tokio::test]
-    async fn the_credential_is_served_the_unfiltered_source() {
+    async fn signing_in_is_what_reaches_the_unfiltered_source() {
         let app = guarded_router();
-        assert_eq!(cursor_for(&app, Some("the-credential")).await, "privileged");
+        let cookie = sign_in(&app, "alice", "hunter2")
+            .await
+            .expect("the account and secret are the ones this verifier accepts");
+        assert_eq!(cursor_for(&app, Some(&cookie)).await, "privileged");
     }
 
     #[tokio::test]
-    async fn a_deployment_with_no_credential_serves_everyone_the_public_source() {
-        // Including a reader who arrives with one: there is nobody to be entitled here, and an
-        // unset credential must never be the same as a matching one.
-        let app = router_with_privileged_access(
+    async fn a_wrong_secret_establishes_nothing() {
+        let app = guarded_router();
+        assert!(sign_in(&app, "alice", "not-hunter2").await.is_none());
+        // And the account that does not exist is answered exactly the same way, so a caller cannot
+        // learn from the reply which accounts are real.
+        assert!(sign_in(&app, "mallory", "hunter2").await.is_none());
+        assert!(sign_in(&app, "alice", "").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn signing_out_ends_the_session_it_was_given() {
+        let app = guarded_router();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("signed in");
+        assert_eq!(cursor_for(&app, Some(&cookie)).await, "privileged");
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/logout")
+                    .header("cookie", &cookie)
+                    .body(Body::empty())
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(cursor_for(&app, Some(&cookie)).await, "public");
+    }
+
+    #[tokio::test]
+    async fn a_deployment_that_cannot_authenticate_anybody_serves_everyone_the_public_source() {
+        let app = router_with_verifier_and_access(
             Arc::new(NamedSource { name: "public" }),
             None,
             None,
@@ -503,17 +700,32 @@ mod tests {
             SessionContext::public_preview(),
         );
         assert_eq!(cursor_for(&app, None).await, "public");
-        assert_eq!(cursor_for(&app, Some("anything")).await, "public");
-        assert_eq!(cursor_for(&app, Some("")).await, "public");
+        assert!(sign_in(&app, "alice", "hunter2").await.is_none());
     }
 
-    #[test]
-    fn comparing_secrets_does_not_short_circuit_on_the_first_difference() {
-        assert!(constant_time_eq(b"abc", b"abc"));
-        assert!(!constant_time_eq(b"abc", b"abd"));
-        assert!(!constant_time_eq(b"abc", b"ab"));
-        assert!(!constant_time_eq(b"", b"a"));
-        assert!(constant_time_eq(b"", b""));
+    #[tokio::test]
+    async fn a_signed_in_session_says_which_account_it_belongs_to() {
+        // The page has to be able to tell that somebody signed in, and as whom. Leaving the mode at
+        // publicPreview would state a trust level that is no longer the one established.
+        let app = guarded_router();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("signed in");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/session")
+                    .header("cookie", &cookie)
+                    .body(Body::empty())
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let projection: SessionProjection = serde_json::from_slice(&body).expect("a projection");
+        assert_eq!(projection.mode, SessionMode::RemoteBrowser);
+        assert_eq!(projection.consumer_id, "living-canvas:alice");
     }
 
     #[tokio::test]
@@ -810,5 +1022,65 @@ mod tests {
             .await
             .expect("unknown API response");
         assert_eq!(unknown_api.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn shell_exec_runs_in_local_desktop_mode() {
+        let app = router(Arc::new(FixturePresenceSource::nominal()));
+        let payload = serde_json::to_vec(&ShellExecRequest {
+            command: "pwd".into(),
+        })
+        .expect("serialize request");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/shell/exec")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body_bytes = response
+            .into_body()
+            .collect()
+            .await
+            .expect("body")
+            .to_bytes();
+        let parsed: ShellExecResponse =
+            serde_json::from_slice(&body_bytes).expect("deserialize shell response");
+        assert_eq!(parsed.exit_code, 0);
+        assert_eq!(parsed.stdout.trim(), "/");
+    }
+
+    #[tokio::test]
+    async fn shell_exec_is_strictly_forbidden_in_public_preview() {
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::public_preview(),
+        );
+        let payload = serde_json::to_vec(&ShellExecRequest {
+            command: "pwd".into(),
+        })
+        .expect("serialize request");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/shell/exec")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 }

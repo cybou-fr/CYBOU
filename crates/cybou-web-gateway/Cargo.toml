@@ -15,7 +15,9 @@ async-trait.workspace = true
 axum.workspace = true
 ciborium.workspace = true
 cybou-fabric = { path = "../cybou-fabric" }
+cybou-jailfs = { path = "../cybou-jailfs" }
 cybou-protocol = { path = "../cybou-protocol" }
+cybou-shelld = { path = "../cybou-shelld" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
 futures-core.workspace = true
 futures-util.workspace = true
