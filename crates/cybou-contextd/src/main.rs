@@ -142,12 +142,17 @@ fn activate_from(
         // TemporalCooccurrence, deliberately: these two were seen in one episode and nothing more
         // was established. ADR-0029 keeps the origin a closed set exactly so co-occurrence cannot
         // quietly become knowledge.
-        core.associate(
+        // ADR-0029 A9: the link inherits what its evidence carries. Only this contribution's
+        // classes are known here; the earlier one tightened them when it was seen, and the
+        // strictest of the two survives the merge.
+        core.associate_with_class(
             previous.clone(),
             observation.subject.clone(),
             envelope.confidence,
             AssociationOrigin::TemporalCooccurrence,
             vec![*previous_message, envelope.message_id],
+            envelope.privacy,
+            envelope.retention_class,
         );
     }
     previous_in_episode.insert(

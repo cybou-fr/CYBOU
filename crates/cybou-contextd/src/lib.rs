@@ -53,6 +53,19 @@ pub struct Association {
     pub origin: AssociationOrigin,
     /// Contributing evidence / causal message IDs.
     pub evidence: Vec<Uuid>,
+    /// Privacy class inherited from the evidence, most restrictive of them.
+    ///
+    /// ADR-0029 A9. An association is a claim derived from contributions, and a derived claim that
+    /// is less private than what it was derived from is a way to launder a private fact into a
+    /// public one by observing it twice.
+    #[serde(default)]
+    pub privacy: u8,
+    /// Retention class inherited from the evidence, shortest-lived of them.
+    ///
+    /// An association that outlives its evidence would keep asserting a link whose contributions
+    /// are gone.
+    #[serde(default)]
+    pub retention_class: u8,
 }
 
 /// An active situational context element.
@@ -336,6 +349,28 @@ impl ContextCore {
         origin: AssociationOrigin,
         evidence: Vec<Uuid>,
     ) {
+        self.associate_with_class(source, target, strength, origin, evidence, 0, 0);
+    }
+
+    /// Link two concepts, inheriting privacy and retention from the contributions behind them.
+    ///
+    /// The caller supplies the classes of the evidence because it is the caller that saw the
+    /// envelopes; this decides what to keep. Most restrictive privacy and shortest retention win,
+    /// which is the only direction that cannot make a derived claim looser than its sources.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "each argument is a distinct fact about one link"
+    )]
+    pub fn associate_with_class(
+        &self,
+        source: impl Into<String>,
+        target: impl Into<String>,
+        strength: f64,
+        origin: AssociationOrigin,
+        evidence: Vec<Uuid>,
+        privacy: u8,
+        retention_class: u8,
+    ) {
         let source_str = source.into();
         let target_str = target.into();
 
@@ -357,6 +392,16 @@ impl ContextCore {
                     existing.evidence.push(ev);
                 }
             }
+            // Corroborating a link with more evidence can only tighten what it inherits: new
+            // evidence adds an obligation, it never relaxes one already carried.
+            existing.privacy = existing.privacy.max(privacy);
+            existing.retention_class = if existing.retention_class == 0 {
+                retention_class
+            } else if retention_class == 0 {
+                existing.retention_class
+            } else {
+                existing.retention_class.min(retention_class)
+            };
         } else {
             candidate_assocs.push(Association {
                 source: source_str,
@@ -364,6 +409,8 @@ impl ContextCore {
                 strength: strength.clamp(0.0, 1.0),
                 origin,
                 evidence,
+                privacy,
+                retention_class,
             });
         }
 
@@ -486,6 +533,57 @@ fn enforce_edge_budget(associations: &mut Vec<Association>, budget: usize) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn an_association_inherits_the_strictest_class_of_its_evidence() {
+        let core = super::ContextCore::new();
+        let now = time::OffsetDateTime::now_utc();
+        let evidence = |n: u128| vec![uuid::Uuid::from_u128(n)];
+
+        // A bundle carries links between concepts that are active, so both ends are activated
+        // first — which is also the order the organ itself works in.
+        core.activate("operating-system", 1.0, "observed", now);
+        core.activate("kernel-version", 1.0, "observed", now);
+
+        // Formed from a node-private contribution with a long retention.
+        core.associate_with_class(
+            "operating-system",
+            "kernel-version",
+            0.5,
+            super::AssociationOrigin::TemporalCooccurrence,
+            evidence(1),
+            1,
+            3,
+        );
+
+        // Corroborated by a stricter one. A derived claim that came out looser than something it
+        // was derived from would be a way to launder a private fact by observing it twice.
+        core.associate_with_class(
+            "operating-system",
+            "kernel-version",
+            0.9,
+            super::AssociationOrigin::TemporalCooccurrence,
+            evidence(2),
+            4,
+            1,
+        );
+
+        let bundle = core.bundle(0.0);
+        let link = bundle
+            .associations
+            .iter()
+            .find(|a| a.target == "kernel-version")
+            .expect("the association exists");
+        assert_eq!(
+            link.privacy, 4,
+            "privacy is the most restrictive of the evidence"
+        );
+        assert_eq!(
+            link.retention_class, 1,
+            "retention is the shortest-lived of the evidence"
+        );
+        assert_eq!(link.evidence.len(), 2);
+    }
+
     #[test]
     fn the_graph_is_held_within_its_budget_and_keeps_what_is_salient() {
         let core = super::ContextCore::new();

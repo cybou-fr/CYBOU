@@ -75,9 +75,12 @@ wiring did. `Context1` is live and reconstructible — it rebuilds from sequence
 two of ADR-0029's invariants: the graph is bounded by node and edge budgets, dropping the least
 salient concept and the weakest link rather than whatever arrived first (A2, A11), and an erasure
 epoch discards the projection so a derived index cannot outlive the evidence a person destroyed
-(A7). Still missing: depth, time and token budgets, which belong to an activation session this
-version does not have; privacy and retention inheritance from evidence (A9); and epistemic status.
-Its status is `live integration implemented, ADR-0029 partial`. `Predictor1` has calibration and settlement and
+(A7). An association also inherits the most restrictive privacy and the shortest retention of its
+evidence, and corroboration can only tighten them (A9): a derived claim that came out looser than
+what it was derived from would be a way to launder a private fact by observing it twice. Still
+missing: depth, time and token budgets, which belong to an activation session this version does not
+have, and epistemic status, which defers to `Epistemic1` by design. Its status is
+`live integration implemented, ADR-0029 partial`. `Predictor1` has calibration and settlement and
 no source of its own beyond what a person reports through Presence1.
 
 `Lifecycle1` schedules one piece of maintenance and only one. After fifteen minutes without a
