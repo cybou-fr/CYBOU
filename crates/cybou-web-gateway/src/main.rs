@@ -8,12 +8,21 @@ use std::{net::SocketAddr, sync::Arc};
 #[cfg(target_os = "linux")]
 use cybou_web_contracts::SessionMode;
 use cybou_web_gateway::{
-    PresenceSource, SessionContext, fixture::FixturePresenceSource, router_with_assets_and_session,
+    PresenceSource, SessionContext, fixture::FixturePresenceSource, router_with_privileged_access,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let presence: Arc<dyn PresenceSource> = source().await?;
+    // Two sources, not one source and a flag. The filtered one is what a stranger reads; the full
+    // one is reachable only through the credential below, and only if this deployment has one.
+    let permitted = publishable_sensitivity_or_default();
+    let presence: Arc<dyn PresenceSource> = source(Some(permitted)).await?;
+    let credential = access_credential()?;
+    let privileged: Option<Arc<dyn PresenceSource>> = if credential.is_some() {
+        Some(source(None).await?)
+    } else {
+        None
+    };
     // Loopback always; the port is settable so a gate can start one of these beside a deployment
     // instead of having to stop the deployment to test the thing that protects it.
     let address: SocketAddr = match std::env::var("CYBOU_GATEWAY_ADDR") {
@@ -38,24 +47,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if session_context.mode == SessionMode::PublicPreview
         && std::env::var_os("CYBOU_GATEWAY_FIXTURE").is_none()
     {
-        refuse_publishing_personal_state().await?;
-        // Checking once at startup guards the door of a room somebody is already in: a promise
-        // recorded a minute after this process came up would be published by it for as long as it
-        // kept running. The same question is asked again while it serves.
-        tokio::spawn(stop_when_the_journal_turns_personal());
+        // What used to happen here was a refusal to start at all whenever the Journal held
+        // anything above ordinary. That was the right instinct and the wrong instrument: it took
+        // the whole surface down over rows it would not have shown anyway, and the pressure to get
+        // the surface back is what produced a raised threshold that outlived its reason and
+        // published a person's words.
+        //
+        // What replaces it is not another watcher. A watcher comparing what is served against what
+        // exists cannot tell "nothing needed withholding" from "withholding is broken", because a
+        // contribution above the line need not produce anything a projection would carry — and a
+        // check that fires when nothing is wrong gets removed by whoever it wakes at night.
+        //
+        // The guarantee is structural instead: there is one filtered source, every route reads it,
+        // and the unfiltered one is reachable only through the credential. A route added later
+        // cannot forget to filter, because filtering is not something a route does.
+        println!("public projection withholds anything above sensitivity {permitted}");
     }
 
     println!("cybou-web-gateway listening on http://{address}");
+    if credential.is_some() {
+        println!("a credential is configured; readers presenting it are served unfiltered");
+    } else {
+        println!("no credential is configured; every reader is served the public projection");
+    }
     axum::serve(
         listener,
-        router_with_assets_and_session(presence, web_root, session_context),
+        router_with_privileged_access(presence, privileged, credential, web_root, session_context),
     )
     .await?;
     Ok(())
 }
 
+/// A source that passes on nothing above `permitted`, or everything when `permitted` is `None`.
 #[cfg_attr(not(target_os = "linux"), allow(clippy::unused_async))]
-async fn source() -> Result<Arc<dyn PresenceSource>, Box<dyn std::error::Error>> {
+async fn source(
+    permitted: Option<u8>,
+) -> Result<Arc<dyn PresenceSource>, Box<dyn std::error::Error>> {
     if std::env::var_os("CYBOU_GATEWAY_FIXTURE").is_some() {
         return Ok(Arc::new(FixturePresenceSource::nominal()));
     }
@@ -63,13 +90,58 @@ async fn source() -> Result<Arc<dyn PresenceSource>, Box<dyn std::error::Error>>
     #[cfg(target_os = "linux")]
     {
         Ok(Arc::new(
-            cybou_web_gateway::presence_zbus::ZbusPresenceSource::connect().await?,
+            cybou_web_gateway::presence_zbus::ZbusPresenceSource::connect_permitting(
+                permitted.unwrap_or(u8::MAX),
+            )
+            .await?,
         ))
     }
 
     #[cfg(not(target_os = "linux"))]
     {
+        let _ = permitted;
         Err("live Presence1 adapter is available only on Linux; set CYBOU_GATEWAY_FIXTURE=1".into())
+    }
+}
+
+/// The credential that entitles a reader to the unfiltered projection, if one is configured.
+///
+/// Read from a file rather than the environment: a unit file is world-readable and a process
+/// environment is readable by anyone who can see the process, and a secret in either is a secret
+/// in the clear. An unset path means this deployment has nobody to entitle, which is a valid
+/// configuration and the one a public demo runs with.
+///
+/// A configured path that cannot be read is an error rather than a shrug. Falling back to "no
+/// credential" would silently turn a deployment that meant to have privileged access into one that
+/// serves everyone the same thing, and it would look exactly like it was working.
+fn access_credential() -> Result<Option<Arc<str>>, Box<dyn std::error::Error>> {
+    let Some(path) = std::env::var_os("CYBOU_ACCESS_CREDENTIAL_FILE") else {
+        return Ok(None);
+    };
+    let raw = std::fs::read_to_string(&path)
+        .map_err(|error| format!("cannot read the access credential file: {error}"))?;
+    let credential = raw.trim();
+    if credential.is_empty() {
+        return Err(
+            "the access credential file is empty; remove the setting or put a credential in it"
+                .into(),
+        );
+    }
+    Ok(Some(Arc::from(credential)))
+}
+
+/// What a public surface may publish, on every platform.
+///
+/// The Linux build reads the owner's decision; elsewhere there is no Journal to classify, so the
+/// filter has nothing to do and the strict default stands.
+fn publishable_sensitivity_or_default() -> u8 {
+    #[cfg(target_os = "linux")]
+    {
+        publishable_sensitivity()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        0
     }
 }
 
@@ -92,127 +164,4 @@ fn publishable_sensitivity() -> u8 {
         .ok()
         .and_then(|value| value.trim().parse().ok())
         .unwrap_or(DEFAULT_PUBLISHABLE_SENSITIVITY)
-}
-
-/// Refuse to serve an unauthenticated public surface over a Journal that holds personal state.
-///
-/// This exists because the alternative was remembering. The deployment is public and
-/// unauthenticated by an explicit decision, taken while the Journal held facts about a machine and
-/// nothing about a person. That decision stays right exactly as long as that stays true, and
-/// nothing was watching for the moment it stopped being true.
-///
-/// So the moment is watched here instead. It costs nothing while the Journal holds machine facts,
-/// and the first time a person puts something of their own in, the public surface stops rather
-/// than quietly publishing it.
-///
-/// A Journal that cannot be reached is not a Journal known to be safe, so it refuses too, after
-/// giving Event1 time to come up.
-#[cfg(target_os = "linux")]
-async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Error>> {
-    let permitted = publishable_sensitivity();
-    let connection = zbus::Connection::session().await?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-
-    loop {
-        let answer = highest_sensitivity(&connection).await;
-
-        match answer {
-            Some(highest) if highest > permitted => {
-                return Err(format!(
-                    "refusing to serve an unauthenticated public surface: the Journal holds contributions at sensitivity {highest}, above the {permitted} this deployment permits. Serve it behind authentication, run it in local-desktop mode, or raise CYBOU_PUBLISHABLE_SENSITIVITY if publishing that is a decision you are making."
-                )
-                .into());
-            }
-            Some(_) => return Ok(()),
-            None if std::time::Instant::now() < deadline => {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            }
-            None => {
-                return Err("refusing to serve an unauthenticated public surface: what this deployment would publish could not be established"
-                    .into());
-            }
-        }
-    }
-}
-
-/// How often a running surface re-asks what it would be publishing.
-#[cfg(target_os = "linux")]
-const RECHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
-
-/// How many consecutive unestablished answers a running surface tolerates before stopping.
-#[cfg(target_os = "linux")]
-const UNKNOWN_TOLERANCE: u32 = 4;
-
-/// Ask Event1 what the most exposing thing in the Journal is.
-///
-/// `None` covers both a call that failed and an answer of -1, which is how Event1 says it could
-/// not establish one. To a caller they are the same fact: what would be published is unknown, and
-/// not knowing is not permission.
-#[cfg(target_os = "linux")]
-async fn highest_sensitivity(connection: &zbus::Connection) -> Option<u8> {
-    use cybou_fabric::EVENT;
-
-    let answer: i16 = connection
-        .call_method(
-            Some(EVENT.service),
-            EVENT.object_path,
-            Some(EVENT.interface),
-            "HighestSensitivity",
-            &(),
-        )
-        .await
-        .ok()?
-        .body()
-        .deserialize()
-        .ok()?;
-    u8::try_from(answer).ok()
-}
-
-/// Stop serving once the Journal holds more than this deployment permits.
-///
-/// Exiting rather than refusing individual requests: a public surface that has started publishing
-/// personal state should stop being a public surface, not answer some routes and not others. The
-/// unit restarts it, the startup check refuses, and it lands in failed with the reason in the
-/// journal — the same place an operator would look, saying the same thing.
-///
-/// A Journal that stops answering does not stop the surface. That would turn every transient
-/// hiccup in one owner into an outage of another, and the startup check already refuses to begin
-/// on an unknown Journal; this one only reacts to an answer it actually received.
-#[cfg(target_os = "linux")]
-async fn stop_when_the_journal_turns_personal() {
-    let permitted = publishable_sensitivity();
-    let Ok(connection) = zbus::Connection::session().await else {
-        return;
-    };
-    let mut interval = tokio::time::interval(RECHECK_INTERVAL);
-    let mut unknown_for: u32 = 0;
-
-    loop {
-        interval.tick().await;
-
-        // A Journal that does not answer for a moment is a hiccup, not a disclosure: an outage in
-        // one owner should not take another down. A Journal that keeps not answering is different,
-        // because a surface that cannot learn what it is publishing is publishing blind.
-        let answer = highest_sensitivity(&connection).await;
-        if answer.is_none() {
-            unknown_for = unknown_for.saturating_add(1);
-            if unknown_for >= UNKNOWN_TOLERANCE {
-                eprintln!(
-                    "what this deployment is publishing has been unestablished for {unknown_for} checks; a public surface stops rather than publishing blind"
-                );
-                std::process::exit(1);
-            }
-            continue;
-        }
-        unknown_for = 0;
-
-        if let Some(highest) = answer
-            && highest > permitted
-        {
-            eprintln!(
-                "the Journal now holds contributions at sensitivity {highest}, above the {permitted} this deployment permits; a public surface stops rather than publishing them"
-            );
-            std::process::exit(1);
-        }
-    }
 }

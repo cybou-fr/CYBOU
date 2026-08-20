@@ -252,25 +252,65 @@ if [ "$sensitivity_after" -le "$sensitivity_before" ]; then
 fi
 echo "    A promise raised Journal sensitivity $sensitivity_before -> $sensitivity_after"
 
-# And that is the transition the surface must not keep serving across. Checking only at startup
-# would guard the door of a room somebody is already in.
-deadline=$((SECONDS + 45))
+# And that is the transition the surface must survive without publishing across it. Stopping was
+# what it used to do, and it was the wrong instrument: it took the whole surface down over rows it
+# would never have shown, and the pressure to bring it back is what produced a raised threshold
+# that outlived its reason and published a person's words. It withholds them instead now, and both
+# halves are checked, because withholding everything would pass the first half on its own.
+sleep 3
+if ! kill -0 "$GATEWAY_PID" 2>/dev/null; then
+    echo "ERROR: the public surface stopped instead of withholding what it may not publish:" >&2
+    sed -n '1,10p' "$TMP_DIR/gateway.log" >&2
+    exit 1
+fi
+if ! grep -q "withholds anything above sensitivity 0" "$TMP_DIR/gateway.log"; then
+    echo "ERROR: the surface is serving without the public filter in place:" >&2
+    sed -n '1,10p' "$TMP_DIR/gateway.log" >&2
+    exit 1
+fi
+
+public_projection="$(curl -fsS --max-time 10 "http://$GATEWAY_ADDR/api/v1/mind" 2>/dev/null || true)"
+if [ -z "$public_projection" ]; then
+    echo "ERROR: the public surface did not answer, so nothing was proven about what it withholds." >&2
+    exit 1
+fi
+case "$public_projection" in
+    *"Verify the command path"*)
+        echo "ERROR: the public surface published what the person promised." >&2
+        exit 1
+        ;;
+esac
+case "$public_projection" in
+    *kernel-version*) ;;
+    *)
+        echo "ERROR: the public surface withheld the machine facts too, so it proves nothing." >&2
+        exit 1
+        ;;
+esac
+echo "    Public surface kept serving machine facts and withheld the person's promise"
+
+# The same for a sentence spoken to Meaning1, which is what actually leaked: the beliefs and
+# concepts derived from an utterance carried its text verbatim into the public projection.
+spoken="a sentence only the owner should see"
+busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Interpret ss "Remember that $spoken" person >/dev/null
+
+deadline=$((SECONDS + 30))
 while [ "$SECONDS" -lt "$deadline" ]; do
-    if ! kill -0 "$GATEWAY_PID" 2>/dev/null; then
+    if busctl --user call org.cybou.Mind.Context1 /org/cybou/Mind/Context1 org.cybou.Mind.Context1 ActiveContext | grep -q "117 116 116 101 114 97 110 99 101"; then
         break
     fi
     sleep 1
 done
-if kill -0 "$GATEWAY_PID" 2>/dev/null; then
-    echo "ERROR: a promise was recorded and the public surface kept serving it." >&2
-    exit 1
-fi
-if ! grep -q "a public surface stops rather than publishing" "$TMP_DIR/gateway.log"; then
-    echo "ERROR: the public surface stopped, but not for the reason it was supposed to:" >&2
-    sed -n '1,10p' "$TMP_DIR/gateway.log" >&2
-    exit 1
-fi
-echo "    Public surface stopped once the Journal turned personal"
+
+public_projection="$(curl -fsS --max-time 10 "http://$GATEWAY_ADDR/api/v1/mind" 2>/dev/null || true)"
+case "$public_projection" in
+    *"$spoken"*)
+        echo "ERROR: the public surface published what a person said to Meaning1." >&2
+        exit 1
+        ;;
+esac
+echo "    Public surface withheld what a person said to Meaning1"
+
 
 # A promise the biography never heard of is the failure this path had: Kind::Intention is derived,
 # so an intention with no cause cannot enter the Journal, and a promise made through Presence1 had

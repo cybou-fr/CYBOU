@@ -124,7 +124,53 @@ impl IntoResponse for GatewayError {
 #[derive(Clone)]
 struct GatewayState {
     presence: Arc<dyn PresenceSource>,
+    /// The unfiltered source, for a reader who proved they are entitled to it.
+    ///
+    /// `None` when this deployment has no credential configured, which is the case where there is
+    /// nobody to be entitled: every reader is then served the filtered source.
+    privileged: Option<Arc<dyn PresenceSource>>,
+    /// The credential that distinguishes the two, if this deployment has one.
+    credential: Option<Arc<str>>,
     session: SessionProjection,
+}
+
+impl GatewayState {
+    /// The source this request is entitled to.
+    ///
+    /// Defaulting to the filtered source is what makes a missing, malformed or wrong credential
+    /// harmless: none of them is an entitlement, and they do not need to be told apart to be
+    /// refused. Nothing is rejected outright, because a public surface that answered 401 to
+    /// strangers would stop being a public surface.
+    fn source_for(&self, headers: &HeaderMap) -> &Arc<dyn PresenceSource> {
+        let (Some(expected), Some(privileged)) = (&self.credential, &self.privileged) else {
+            return &self.presence;
+        };
+        let offered = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .unwrap_or_default();
+        if constant_time_eq(offered.as_bytes(), expected.as_bytes()) {
+            privileged
+        } else {
+            &self.presence
+        }
+    }
+}
+
+/// Compare two secrets without letting the time taken say how much of one is right.
+///
+/// A short-circuiting comparison leaks the length of the matching prefix, which turns guessing a
+/// credential from an impossible problem into a long but ordinary one.
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut difference = 0u8;
+    for (left, right) in left.iter().zip(right.iter()) {
+        difference |= left ^ right;
+    }
+    difference == 0
 }
 
 /// Server-established browser trust context.
@@ -176,12 +222,29 @@ pub fn router_with_assets_and_session(
     web_root: Option<PathBuf>,
     session_context: SessionContext,
 ) -> Router {
+    router_with_privileged_access(presence, None, None, web_root, session_context)
+}
+
+/// Build the v1 router with a filtered source for everyone and a full source for a credential.
+///
+/// The two sources are separate objects rather than one source and a flag, so a route cannot ask
+/// the wrong question and get the privileged answer: what a request is entitled to is decided once,
+/// where the credential is read.
+pub fn router_with_privileged_access(
+    presence: Arc<dyn PresenceSource>,
+    privileged: Option<Arc<dyn PresenceSource>>,
+    credential: Option<Arc<str>>,
+    web_root: Option<PathBuf>,
+    session_context: SessionContext,
+) -> Router {
     let now = OffsetDateTime::now_utc();
     let expires_at = (now + TimeDuration::hours(8))
         .format(&Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into());
     let state = GatewayState {
         presence,
+        privileged,
+        credential,
         session: SessionProjection {
             schema_version: WEB_SCHEMA_V1,
             session_id: Uuid::new_v4(),
@@ -235,15 +298,19 @@ async fn session(State(state): State<GatewayState>) -> Json<SessionProjection> {
 
 async fn snapshot(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
 ) -> Result<Json<SnapshotProjection>, GatewayError> {
-    tokio::time::timeout(SNAPSHOT_BUDGET, state.presence.snapshot())
+    tokio::time::timeout(SNAPSHOT_BUDGET, state.source_for(&headers).snapshot())
         .await
         .map_err(|_| GatewayError::Timeout)?
         .map(Json)
 }
 
-async fn mind(State(state): State<GatewayState>) -> Result<Json<MindProjection>, GatewayError> {
-    tokio::time::timeout(SNAPSHOT_BUDGET, state.presence.mind())
+async fn mind(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+) -> Result<Json<MindProjection>, GatewayError> {
+    tokio::time::timeout(SNAPSHOT_BUDGET, state.source_for(&headers).mind())
         .await
         .map_err(|_| GatewayError::Timeout)?
         .map(Json)
@@ -342,6 +409,7 @@ mod tests {
 
     use async_trait::async_trait;
     use axum::{
+        Router,
         body::Body,
         http::{Request, StatusCode},
     };
@@ -351,10 +419,102 @@ mod tests {
     use tower::ServiceExt;
 
     use super::{
-        GatewayError, PresenceSource, SessionContext, router, router_with_assets,
-        router_with_assets_and_session,
+        GatewayError, PresenceSource, SessionContext, constant_time_eq, router, router_with_assets,
+        router_with_assets_and_session, router_with_privileged_access,
     };
     use crate::fixture::FixturePresenceSource;
+
+    /// A source that reports whether it was the one asked.
+    struct NamedSource {
+        name: &'static str,
+    }
+
+    #[async_trait]
+    impl PresenceSource for NamedSource {
+        async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError> {
+            let mut snapshot = FixturePresenceSource::nominal()
+                .snapshot()
+                .await
+                .expect("the fixture answers");
+            snapshot.cursor = self.name.to_owned();
+            Ok(snapshot)
+        }
+    }
+
+    async fn cursor_for(app: &Router, credential: Option<&str>) -> String {
+        let mut request = Request::builder().uri("/api/v1/snapshot");
+        if let Some(credential) = credential {
+            request = request.header("authorization", format!("Bearer {credential}"));
+        }
+        let response = app
+            .clone()
+            .oneshot(request.body(Body::empty()).expect("a request"))
+            .await
+            .expect("a response");
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let projection: SnapshotProjection = serde_json::from_slice(&body).expect("a projection");
+        projection.cursor
+    }
+
+    fn guarded_router() -> Router {
+        router_with_privileged_access(
+            Arc::new(NamedSource { name: "public" }),
+            Some(Arc::new(NamedSource { name: "privileged" })),
+            Some(Arc::from("the-credential")),
+            None,
+            SessionContext::public_preview(),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_reader_without_the_credential_is_served_the_public_source() {
+        let app = guarded_router();
+        assert_eq!(cursor_for(&app, None).await, "public");
+    }
+
+    #[tokio::test]
+    async fn a_wrong_credential_is_served_the_public_source_rather_than_refused() {
+        // Refusing would stop this being a public surface. A stranger gets what a stranger gets,
+        // and a wrong guess is a stranger.
+        let app = guarded_router();
+        assert_eq!(cursor_for(&app, Some("not-the-credential")).await, "public");
+        assert_eq!(cursor_for(&app, Some("")).await, "public");
+        // A prefix of the credential is still not the credential.
+        assert_eq!(cursor_for(&app, Some("the-credenti")).await, "public");
+    }
+
+    #[tokio::test]
+    async fn the_credential_is_served_the_unfiltered_source() {
+        let app = guarded_router();
+        assert_eq!(cursor_for(&app, Some("the-credential")).await, "privileged");
+    }
+
+    #[tokio::test]
+    async fn a_deployment_with_no_credential_serves_everyone_the_public_source() {
+        // Including a reader who arrives with one: there is nobody to be entitled here, and an
+        // unset credential must never be the same as a matching one.
+        let app = router_with_privileged_access(
+            Arc::new(NamedSource { name: "public" }),
+            None,
+            None,
+            None,
+            SessionContext::public_preview(),
+        );
+        assert_eq!(cursor_for(&app, None).await, "public");
+        assert_eq!(cursor_for(&app, Some("anything")).await, "public");
+        assert_eq!(cursor_for(&app, Some("")).await, "public");
+    }
+
+    #[test]
+    fn comparing_secrets_does_not_short_circuit_on_the_first_difference() {
+        assert!(constant_time_eq(b"abc", b"abc"));
+        assert!(!constant_time_eq(b"abc", b"abd"));
+        assert!(!constant_time_eq(b"abc", b"ab"));
+        assert!(!constant_time_eq(b"", b"a"));
+        assert!(constant_time_eq(b"", b""));
+    }
 
     #[tokio::test]
     async fn session_is_server_established_local_and_not_cached() {

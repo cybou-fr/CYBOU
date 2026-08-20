@@ -137,11 +137,12 @@ fn activate_from(
         OffsetDateTime::from_unix_timestamp_nanos(i128::from(envelope.wall_time_ms) * 1_000_000)
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
-    core.activate(
+    core.activate_classified(
         observation.subject.clone(),
         envelope.confidence,
         format!("observed by {}", envelope.origin_organ),
         now,
+        envelope.sensitivity,
     );
 
     if let Some(previous) = previous_in_episode.get(&envelope.correlation_id)

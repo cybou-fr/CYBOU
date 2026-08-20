@@ -27,7 +27,7 @@ pub struct PointV8 {
     pub z: u32,
 }
 
-/// Legacy CanvasLayout schema v8.
+/// Legacy `CanvasLayout` schema v8.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub struct CanvasLayoutV8 {
     /// Identity card position.
@@ -190,8 +190,10 @@ impl DesktopLayout {
     /// Get geometry for a given card ID (or default if missing).
     #[must_use]
     pub fn geometry(&self, id: CardId) -> CardGeometry {
-        self.card(id)
-            .map_or_else(|| CardGeometry::new(50.0, 50.0, id.spec().default_size, 1), |c| c.geometry)
+        self.card(id).map_or_else(
+            || CardGeometry::new(50.0, 50.0, id.spec().default_size, 1),
+            |c| c.geometry,
+        )
     }
 
     /// Get presentation state for a given card ID.
@@ -315,6 +317,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn default_layout_has_all_system_cards() {
         let layout = DesktopLayout::default();
         assert_eq!(layout.schema_version, 9);
@@ -330,6 +333,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn v8_to_v9_migration_preserves_coordinates() {
         let v8 = CanvasLayoutV8 {
             identity: PointV8 {

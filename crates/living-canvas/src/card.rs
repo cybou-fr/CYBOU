@@ -74,7 +74,7 @@ impl CardId {
         }
     }
 
-    /// Resolve string key to static CardId if matching.
+    /// Resolve string key to static `CardId` if matching.
     #[must_use]
     pub fn from_key(key: &str) -> Option<Self> {
         match key {
@@ -94,6 +94,7 @@ impl CardId {
     }
 
     /// Return static specification for this card type.
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub const fn spec(self) -> CardSpec {
         match self {
@@ -312,6 +313,7 @@ pub struct CardPresentation {
 }
 
 /// Static capabilities and bounds of a Card type.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CardSpec {
     /// The architectural category of this card.
@@ -348,7 +350,7 @@ pub struct CardInstance {
 }
 
 impl CardInstance {
-    /// Construct a new CardInstance at point (x, y) with default spec size.
+    /// Construct a new `CardInstance` at point (x, y) with default spec size.
     #[must_use]
     pub const fn new(id: CardId, x: f64, y: f64, z: u32) -> Self {
         let spec = id.spec();
@@ -368,6 +370,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn card_spec_defaults_and_keys() {
         for card_id in CardId::ALL_SYSTEM_CARDS {
             let spec = card_id.spec();
@@ -390,6 +393,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn geometry_center_and_clamp() {
         let geom = CardGeometry::new(100.0, 200.0, (300.0, 150.0), 5);
         assert_eq!(geom.center(), (250.0, 275.0));

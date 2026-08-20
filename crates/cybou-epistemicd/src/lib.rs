@@ -65,6 +65,12 @@ pub struct EpistemicBelief {
     /// any more: it is what was last seen, not what is the case.
     #[serde(default, with = "time::serde::rfc3339::option")]
     pub fresh_until: Option<OffsetDateTime>,
+    /// The highest sensitivity among the observations that produced this belief.
+    ///
+    /// A belief is derived and inherits what it was derived from. Without it a consumer deciding
+    /// what it may show cannot tell a claim about a kernel version from a claim about a person.
+    #[serde(default)]
+    pub sensitivity: u8,
 }
 
 /// Persistent snapshot of the epistemic projection state.
@@ -89,7 +95,7 @@ pub struct EpistemicState {
 /// The rule this build derives beliefs with.
 ///
 /// Raise it whenever `ingest_envelope` changes what it concludes from the same contribution.
-pub const BELIEF_RULE_VERSION: u32 = 2;
+pub const BELIEF_RULE_VERSION: u32 = 3;
 
 /// Errors occurring in the epistemic engine.
 #[derive(Debug, Error)]
@@ -257,6 +263,34 @@ impl EpistemicCore {
         at_sequence: Option<u64>,
         fresh_until: Option<OffsetDateTime>,
     ) {
+        self.ingest_classified(
+            subject,
+            value,
+            confidence,
+            evidence_id,
+            now,
+            at_sequence,
+            fresh_until,
+            0,
+        );
+    }
+
+    /// Ingest an observation together with how sensitive the contribution carrying it was.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "every part of an observation is needed to decide what it does to a belief"
+    )]
+    pub fn ingest_classified(
+        &self,
+        subject: impl Into<String>,
+        value: impl Into<String>,
+        confidence: f64,
+        evidence_id: Option<Uuid>,
+        now: OffsetDateTime,
+        at_sequence: Option<u64>,
+        fresh_until: Option<OffsetDateTime>,
+        sensitivity: u8,
+    ) {
         let subject_str = subject.into();
         let value_str = value.into();
 
@@ -271,6 +305,7 @@ impl EpistemicCore {
                 last_corroborated_at: now,
                 status: EpistemicStatus::Observed,
                 fresh_until,
+                sensitivity,
             });
 
         // Whether the belief being replaced still had anything vouching for it is the difference
@@ -296,6 +331,9 @@ impl EpistemicCore {
             entry.evidence.clear();
         }
         entry.fresh_until = fresh_until;
+        // Only ever upward: a belief restated by something ordinary does not stop having been
+        // formed from something that was not.
+        entry.sensitivity = entry.sensitivity.max(sensitivity);
 
         if let Some(id) = evidence_id
             && !entry.evidence.contains(&id)
@@ -355,7 +393,7 @@ impl EpistemicCore {
             )
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
-            self.ingest_at_until(
+            self.ingest_classified(
                 subject,
                 value,
                 envelope.confidence,
@@ -363,6 +401,7 @@ impl EpistemicCore {
                 now,
                 Some(sequence),
                 fresh_until,
+                envelope.sensitivity,
             );
         }
     }

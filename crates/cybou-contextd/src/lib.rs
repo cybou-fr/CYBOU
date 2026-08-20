@@ -82,6 +82,13 @@ pub struct ConceptNode {
     /// When this concept was last activated.
     #[serde(with = "time::serde::rfc3339")]
     pub last_activated_at: OffsetDateTime,
+    /// The highest sensitivity among the contributions that activated this concept.
+    ///
+    /// A concept is derived, and it inherits what it was derived from: the label of something a
+    /// person said is about the person even when the label itself looks innocuous. Without this a
+    /// consumer deciding what it may show has no way to tell one from a kernel version.
+    #[serde(default)]
+    pub sensitivity: u8,
 }
 
 /// Bounded context bundle returned for cognitive queries.
@@ -239,6 +246,18 @@ impl ContextCore {
         reason: impl Into<String>,
         now: OffsetDateTime,
     ) {
+        self.activate_classified(label, salience, reason, now, 0);
+    }
+
+    /// Activate a concept, carrying the sensitivity of the contribution that activated it.
+    pub fn activate_classified(
+        &self,
+        label: impl Into<String>,
+        salience: f64,
+        reason: impl Into<String>,
+        now: OffsetDateTime,
+        sensitivity: u8,
+    ) {
         let label_str = label.into();
         let reason_str = reason.into();
 
@@ -256,11 +275,15 @@ impl ContextCore {
                 salience,
                 activation_reason: reason_str.clone(),
                 last_activated_at: now,
+                sensitivity,
             });
 
         node.salience = (node.salience * 0.5 + salience * 0.5).clamp(0.0, 1.0);
         node.activation_reason = reason_str;
         node.last_activated_at = now;
+        // Only ever upward: a concept re-activated by something ordinary does not stop having been
+        // activated by something that was not.
+        node.sensitivity = node.sensitivity.max(sensitivity);
 
         let dropped = enforce_node_budget(&mut candidate_nodes, self.budget.nodes);
         let assocs = if dropped.is_empty() {

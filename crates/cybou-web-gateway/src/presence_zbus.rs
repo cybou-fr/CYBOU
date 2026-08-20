@@ -47,6 +47,12 @@ pub struct ZbusPresenceSource {
     connection: Connection,
     changed: Mutex<SignalStream<'static>>,
     projection_version: AtomicU64,
+    /// The most exposing class this source may pass on.
+    ///
+    /// Filtering here rather than at the route is deliberate: every consumer of this source gets
+    /// the same answer, so a new route cannot forget to filter and publish what the last one did
+    /// not.
+    permitted_sensitivity: u8,
 }
 
 impl ZbusPresenceSource {
@@ -55,7 +61,21 @@ impl ZbusPresenceSource {
     /// # Errors
     ///
     /// Returns a zbus error when no usable session bus can be established.
+    /// Connect a source that may pass on anything, for a reader who is entitled to it.
+    ///
+    /// # Errors
+    ///
+    /// Returns the zbus error when the session bus or the Presence1 subscription is unavailable.
     pub async fn connect() -> zbus::Result<Self> {
+        Self::connect_permitting(u8::MAX).await
+    }
+
+    /// Connect a source that passes on nothing above `permitted_sensitivity`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the zbus error when the session bus or the Presence1 subscription is unavailable.
+    pub async fn connect_permitting(permitted_sensitivity: u8) -> zbus::Result<Self> {
         let connection = Connection::session().await?;
         let proxy = Proxy::new(
             &connection,
@@ -70,6 +90,7 @@ impl ZbusPresenceSource {
             connection,
             changed: Mutex::new(changed),
             projection_version: AtomicU64::new(0),
+            permitted_sensitivity,
         })
     }
 
@@ -320,6 +341,18 @@ impl ZbusPresenceSource {
                 }
             }
         };
+        // An obligation is something a person committed to, in their words. There is no class to
+        // consult here and there does not need to be: a promise is about the person by
+        // construction, which is why recording one raises what the Journal carries. A reader who
+        // may only see ordinary things is told how many there are and not what they say — the
+        // count is a fact about the system, the descriptions are the person's.
+        if self.permitted_sensitivity < PERSONAL {
+            return CommitmentsProjection {
+                knowledge: KnowledgeState::Known,
+                open_count: self.read(INTENTION, "OpenCount").await,
+                open: Vec::new(),
+            };
+        }
         CommitmentsProjection {
             knowledge: KnowledgeState::Known,
             open_count: self.read(INTENTION, "OpenCount").await,
@@ -412,6 +445,10 @@ impl ZbusPresenceSource {
                 knowledge: KnowledgeState::Known,
                 beliefs: beliefs
                     .into_iter()
+                    // A belief above what this reader is permitted is left out rather than
+                    // blanked: an entry saying a subject exists but its value is withheld still
+                    // tells a stranger the person said something about it.
+                    .filter(|belief| belief.sensitivity <= self.permitted_sensitivity)
                     .map(|belief| BeliefProjection {
                         subject: belief.subject,
                         value: belief.value,
@@ -461,6 +498,7 @@ impl ZbusPresenceSource {
                 knowledge: KnowledgeState::Known,
                 concepts: concepts
                     .into_iter()
+                    .filter(|concept| concept.sensitivity <= self.permitted_sensitivity)
                     .map(|concept| ConceptProjection {
                         label: concept.label,
                         salience: concept.salience,
@@ -563,6 +601,28 @@ struct OwnerBelief {
     confidence: f64,
     status: String,
     last_corroborated_at: String,
+    /// What the belief was derived from, on the frozen sensitivity scale.
+    ///
+    /// Absent in projections written before beliefs carried it. Absent is not ordinary: a belief
+    /// this gateway cannot classify is one it must not decide is safe to publish, so the default
+    /// is the most exposing value rather than the least.
+    #[serde(default = "unclassified")]
+    sensitivity: u8,
+}
+
+/// The frozen sensitivity class of something that is about the person.
+///
+/// `Personal` on the scale in `cybou_protocol::admission`. Named here because two projections are
+/// filtered against it without carrying a class of their own: what they hold is about the person by
+/// construction rather than by classification.
+const PERSONAL: u8 = 1;
+
+/// What an owner projection written before it carried a class is treated as.
+///
+/// The top of the frozen scale. An older projection is not evidence that its contents are
+/// ordinary, and defaulting to zero would publish exactly the rows nobody had classified yet.
+const fn unclassified() -> u8 {
+    u8::MAX
 }
 
 /// Perception1's last acquisition.
@@ -582,6 +642,9 @@ struct OwnerConcept {
     salience: f64,
     activation_reason: String,
     last_activated_at: String,
+    /// What activated the concept, on the frozen sensitivity scale.
+    #[serde(default = "unclassified")]
+    sensitivity: u8,
 }
 
 /// Event1's verification state.
@@ -655,6 +718,86 @@ mod tests {
         let mut bytes = Vec::new();
         ciborium::into_writer(&root, &mut bytes).expect("encode fixture envelope");
         bytes
+    }
+
+    fn beliefs_from(rows: &[(&str, u8)]) -> Vec<u8> {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Row {
+            subject: String,
+            value: String,
+            confidence: f64,
+            status: String,
+            last_corroborated_at: String,
+            sensitivity: u8,
+        }
+        let rows: Vec<Row> = rows
+            .iter()
+            .map(|(subject, sensitivity)| Row {
+                subject: (*subject).to_owned(),
+                value: "something".into(),
+                confidence: 1.0,
+                status: "observed".into(),
+                last_corroborated_at: "2026-08-20T00:00:00Z".into(),
+                sensitivity: *sensitivity,
+            })
+            .collect();
+        let mut encoded = Vec::new();
+        ciborium::into_writer(&rows, &mut encoded).expect("encode owner beliefs");
+        encoded
+    }
+
+    fn decoded(encoded: &[u8]) -> Vec<super::OwnerBelief> {
+        ciborium::from_reader(encoded).expect("owner beliefs decode")
+    }
+
+    #[test]
+    fn a_belief_above_the_line_is_left_out_rather_than_blanked() {
+        // The filter runs where the owner rows are decoded, so this is the shape it acts on: an
+        // entry saying a subject exists but its value is withheld would still tell a stranger the
+        // person said something about it.
+        let rows = decoded(&beliefs_from(&[("kernel-version", 0), ("utterance", 1)]));
+        let permitted = 0;
+        let published: Vec<_> = rows
+            .into_iter()
+            .filter(|belief| belief.sensitivity <= permitted)
+            .map(|belief| belief.subject)
+            .collect();
+        assert_eq!(published, vec!["kernel-version"]);
+    }
+
+    #[test]
+    fn an_owner_row_with_no_class_is_treated_as_the_most_exposing_one() {
+        // An older owner writing rows without a class is not evidence that they are ordinary.
+        // Defaulting to zero would publish exactly the rows nobody had classified yet.
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Unclassified {
+            subject: String,
+            value: String,
+            confidence: f64,
+            status: String,
+            last_corroborated_at: String,
+        }
+        let mut encoded = Vec::new();
+        ciborium::into_writer(
+            &vec![Unclassified {
+                subject: "from-an-older-owner".into(),
+                value: "something".into(),
+                confidence: 1.0,
+                status: "observed".into(),
+                last_corroborated_at: "2026-08-20T00:00:00Z".into(),
+            }],
+            &mut encoded,
+        )
+        .expect("encode owner beliefs");
+
+        let rows = decoded(&encoded);
+        assert_eq!(rows[0].sensitivity, u8::MAX);
+        assert!(
+            rows.iter().all(|belief| belief.sensitivity > 0),
+            "an unclassified row must not pass a filter permitting only ordinary"
+        );
     }
 
     #[test]

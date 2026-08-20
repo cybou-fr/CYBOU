@@ -12,9 +12,9 @@ pub mod layout;
 
 #[cfg(target_arch = "wasm32")]
 mod gateway_client;
+pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
-pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
 pub use layout::DesktopLayout;
 
 /// Error returned by a typed Mind client operation.
