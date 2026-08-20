@@ -755,7 +755,7 @@ pub fn App() -> impl IntoView {
                             <b>{lifecycle_mode}</b>
                         </header>
                         <strong>"Sleep and wake"</strong>
-                        <p>"The mode is the owner's own spelling, not a summary of it. Nothing schedules a change of it yet: it moves when something tells it to, and no consolidation runs on its own."</p>
+                        <p>"The mode is the owner's own spelling, not a summary of it. After fifteen idle minutes the system re-verifies its whole chain, and stops the moment someone arrives."</p>
                         <span class="row"><b>"Last user activity"</b><i>{lifecycle_activity}</i></span>
                         <span class="lifecycle-source">{mind_observed}</span>
                     </article>

@@ -66,12 +66,16 @@ wakes the gateway's event stream. `eventd` replays a bounded page of the hash ch
 seconds from a persisted checkpoint, and reports verification as a position rather than a verdict,
 so `Verified` means the chain was replayed to the head and nothing weaker.
 
-`Lifecycle1` records a mode and nothing schedules a change of it. The organ is described as a
-sleep/wake lifecycle and consolidation scheduler; it has no loop, no idle evaluation and no run
-execution, and `LifecycleRun` is a shape nothing constructs. The mode moves when `Transition` or
-`NotifyUserActivity` is called and at no other time, so consolidation does not run unattended
-because there is no consolidation to run. What such a run should do is a design decision, not a
-missing wire.
+`Lifecycle1` schedules one piece of maintenance and only one. After fifteen minutes without a
+person, and at most once every six hours, it moves to `Consolidating` and asks Event1 to
+re-verify the whole chain page by page, then returns to `Awake`. Both conditions are required:
+on a machine nobody touches, idleness alone means always.
+
+The sweep exists because the incremental pass trusts a checkpoint and never looks behind it, so a
+row that rots after it was verified would never be questioned again. It rewrites nothing —
+consolidation is not permission to revise a biography — it never writes the checkpoint the
+incremental pass trusts, and it stops between pages the moment someone arrives. `LifecycleRun`
+remains a shape nothing constructs, and no other mode has work behind it yet.
 
 `presenced` accepts commands by asking owners: Promise reaches Intention1, Reflect asks Self1 for an
 assessment, Observe and Predict reach Predictor1, InterruptLifecycle tells Lifecycle1 a person is

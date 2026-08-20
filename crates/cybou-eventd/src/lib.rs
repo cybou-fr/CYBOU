@@ -130,6 +130,7 @@ pub struct EventCore {
     checkpoint_path: PathBuf,
     journal_path: PathBuf,
     verification: Mutex<Option<VerificationState>>,
+    full_sweep: Mutex<Option<JournalCheckpoint>>,
 }
 
 /// What the last incremental verification established about the Journal.
@@ -161,6 +162,20 @@ impl VerificationState {
     pub const fn is_complete(&self) -> bool {
         self.broken_at.is_none() && self.verified_through >= self.head
     }
+}
+
+/// One page of a full re-verification.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FullSweepStep {
+    /// Last sequence this sweep has replayed.
+    pub verified_through: u64,
+    /// Journal head when the page ran.
+    pub head: u64,
+    /// Whether rows remain in this sweep.
+    pub has_more: bool,
+    /// Sequence where the chain first failed, if it did.
+    pub broken_at: Option<u64>,
 }
 
 /// The checkpoint as persisted between runs.
@@ -198,6 +213,7 @@ impl EventCore {
             checkpoint_path,
             journal_path: journal_path.to_path_buf(),
             verification: Mutex::new(None),
+            full_sweep: Mutex::new(None),
         };
 
         core.load_offsets();
@@ -253,6 +269,50 @@ impl EventCore {
             *guard = Some(state.clone());
         }
         Some(state)
+    }
+
+    /// Advance a full re-verification of the chain by one page, starting over once it completes.
+    ///
+    /// The incremental pass trusts a checkpoint and never looks behind it, so a row that rots after
+    /// it was verified is never questioned again. This sweep exists for that: it re-reads the whole
+    /// chain from the beginning, and because it costs the length of the biography it belongs to a
+    /// moment when nobody is waiting.
+    ///
+    /// It never writes the trusted checkpoint. Its own position lives only in memory, so a sweep
+    /// abandoned halfway leaves nothing behind and the next one starts from the beginning, which is
+    /// the only position a full sweep can honestly start from.
+    pub fn verify_fully_step(&self, max_rows: u64) -> FullSweepStep {
+        let resume = self.full_sweep.lock().ok().and_then(|guard| guard.clone());
+        let head = self.count();
+
+        let Ok(verification) =
+            cybou_storage::verify_journal_page(&self.journal_path, resume.as_ref(), max_rows)
+        else {
+            // A sweep that failed has nowhere honest to resume from, so it starts over. The
+            // trusted checkpoint is untouched either way: this sweep never writes it.
+            let resumed_from = resume.as_ref().map_or(0, |checkpoint| checkpoint.sequence);
+            if let Ok(mut guard) = self.full_sweep.lock() {
+                *guard = None;
+            }
+            return FullSweepStep {
+                verified_through: resumed_from,
+                head,
+                has_more: false,
+                broken_at: Some(resumed_from + 1),
+            };
+        };
+
+        if let Ok(mut guard) = self.full_sweep.lock() {
+            *guard = verification
+                .has_more
+                .then(|| verification.checkpoint.clone());
+        }
+        FullSweepStep {
+            verified_through: verification.verified_through,
+            head,
+            has_more: verification.has_more,
+            broken_at: None,
+        }
     }
 
     fn load_checkpoint(&self) -> Option<JournalCheckpoint> {
@@ -545,6 +605,27 @@ fn decode_hex(text: &str) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_full_sweep_never_moves_the_trusted_checkpoint() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db_path = dir.path().join("journal.sqlite3");
+        let core = super::EventCore::open(&db_path).expect("open event core");
+
+        // No trusted checkpoint exists yet, and a full sweep must not create one: its position is
+        // its own, so an interrupted sweep can never be mistaken for verified history.
+        let checkpoint_path = core.checkpoint_path().to_path_buf();
+        let step = core.verify_fully_step(8);
+        assert!(step.broken_at.is_none());
+        assert!(
+            !checkpoint_path.exists(),
+            "a full sweep must not write the checkpoint the incremental pass trusts"
+        );
+
+        // The incremental pass is what establishes trust, and it still does.
+        let _ = core.verify_page(8, time::OffsetDateTime::now_utc());
+        assert!(checkpoint_path.exists());
+    }
+
     #[test]
     fn hex_round_trips_the_checkpoint_hash() {
         let hash = vec![0x00, 0x0f, 0xa5, 0xff];

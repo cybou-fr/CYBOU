@@ -95,6 +95,17 @@ impl Event1Service {
             .map_or_else(Vec::new, |state| encode(&state))
     }
 
+    /// Advance a full re-verification of the chain by one page, as CBOR.
+    ///
+    /// Bounded per call so the caller decides how much of a quiet moment to spend on it and can
+    /// stop between pages when the moment ends.
+    async fn verify_fully_step(&self, max_rows: u32) -> Vec<u8> {
+        let step = self
+            .core
+            .verify_fully_step(u64::from(max_rows.clamp(1, 4096)));
+        encode(&step)
+    }
+
     /// Current erasure epoch.
     async fn erasure_epoch(&self) -> u64 {
         self.core.erasure_epoch()
