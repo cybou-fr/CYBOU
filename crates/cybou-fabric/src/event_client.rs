@@ -239,6 +239,28 @@ impl EventClient {
         Ok(Some(envelope))
     }
 
+    /// Retrieve the current erasure epoch.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventClientError::Rpc`] if the call fails.
+    #[cfg(target_os = "linux")]
+    pub async fn erasure_epoch(&self) -> Result<u64, EventClientError> {
+        self.connection
+            .call_method(
+                Some(EVENT.service),
+                EVENT.object_path,
+                Some(EVENT.interface),
+                "ErasureEpoch",
+                &(),
+            )
+            .await
+            .map_err(|e| EventClientError::Rpc(e.to_string()))?
+            .body()
+            .deserialize()
+            .map_err(|e| EventClientError::Rpc(e.to_string()))
+    }
+
     /// Retrieve the total number of contributions in the Journal.
     ///
     /// # Errors

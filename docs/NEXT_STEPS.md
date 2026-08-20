@@ -37,10 +37,11 @@ true while the chain underneath it was broken.
    restarting a target is not a reboot. That needs a host that can be rebooted on demand.
    See [Testing](TESTING.md).
 
-3. **ADR-0029 completeness for `Context1`.** Live and reconstructible today; still missing node,
-   edge, depth, time and token budgets, privacy and retention inheritance, epistemic status, and
-   invalidation on an erasure epoch. Until those exist the capability is partial and is described
-   that way.
+3. **ADR-0029 completeness for `Context1`.** Bounded by node and edge budgets and invalidated by an
+   erasure epoch. Still missing depth, time and token budgets, which need the activation session
+   this version does not have; privacy and retention inheritance from evidence; and epistemic
+   status, which defers to `Epistemic1` by design. Until those exist the capability is partial and
+   is described that way.
 
 4. **A Debian-native desktop launcher, or an honest absence.** The Plasma packaging that stood in
    for the shell is gone. Either a small Cage/Chromium launcher lands in this tree, or the README

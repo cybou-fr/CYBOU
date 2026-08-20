@@ -37,6 +37,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Association is built from the biography, so this follows the same primitive every other
         // derived organ follows: subscribe, catch up to the head in pages, then stay live. The
         // graph is derived state and is rebuilt from the Journal rather than remembered.
+        // ADR-0029 A7: the projection is invalid once the Journal has erased anything it was
+        // derived from. Checked before following, so a restart after an erasure rebuilds rather
+        // than resuming on associations whose evidence is gone.
+        let epoch_core = core.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                let Ok(client) = cybou_fabric::event_client::EventClient::session().await else {
+                    continue;
+                };
+                let Ok(epoch) = client.erasure_epoch().await else {
+                    continue;
+                };
+                if epoch_core.invalidate_for_epoch(epoch) {
+                    println!(
+                        "[cybou-contextd] Erasure epoch {epoch}: associative projection discarded"
+                    );
+                }
+            }
+        });
+
         let context_core = core.clone();
         tokio::spawn(async move {
             let mut previous_in_episode: HashMap<uuid::Uuid, (String, uuid::Uuid)> = HashMap::new();

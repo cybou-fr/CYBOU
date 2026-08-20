@@ -71,10 +71,13 @@ seconds from a persisted checkpoint, and reports verification as a position rath
 so `Verified` means the chain was replayed to the head and nothing weaker.
 
 Two organs are wired but not complete against their ADRs, and the difference matters more than the
-wiring did. `Context1` is live and reconstructible — it rebuilds from sequence zero — but ADR-0029
-also asks for node, edge, depth, time and token budgets, privacy and retention inheritance,
-epistemic status and invalidation on an erasure epoch. None of those exist, so its status is
-`live integration implemented, ADR-0029 partial`. `Predictor1` has calibration and settlement and
+wiring did. `Context1` is live and reconstructible — it rebuilds from sequence zero — and now holds
+two of ADR-0029's invariants: the graph is bounded by node and edge budgets, dropping the least
+salient concept and the weakest link rather than whatever arrived first (A2, A11), and an erasure
+epoch discards the projection so a derived index cannot outlive the evidence a person destroyed
+(A7). Still missing: depth, time and token budgets, which belong to an activation session this
+version does not have; privacy and retention inheritance from evidence (A9); and epistemic status.
+Its status is `live integration implemented, ADR-0029 partial`. `Predictor1` has calibration and settlement and
 no source of its own beyond what a person reports through Presence1.
 
 `Lifecycle1` schedules one piece of maintenance and only one. After fifteen minutes without a

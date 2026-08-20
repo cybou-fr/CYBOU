@@ -94,6 +94,12 @@ pub struct ContextState {
     pub nodes: HashMap<String, ConceptNode>,
     /// Associative links.
     pub associations: Vec<Association>,
+    /// The erasure epoch these associations were derived under.
+    ///
+    /// Absent in state written before this field existed, which is state that was never checked
+    /// against an erasure and therefore must be rebuilt rather than trusted.
+    #[serde(default)]
+    pub erasure_epoch: u64,
 }
 
 /// Errors occurring in the context organ.
@@ -115,6 +121,37 @@ pub struct ContextCore {
     state_path: Option<PathBuf>,
     nodes: RwLock<HashMap<String, ConceptNode>>,
     associations: RwLock<Vec<Association>>,
+    /// The budget this projection is held within.
+    budget: ContextBudget,
+    /// The erasure epoch this projection was derived under.
+    ///
+    /// ADR-0029 A7: an erasure epoch invalidates the associative projection. A derived index that
+    /// outlives an erasure keeps associations whose evidence has been destroyed, which is the one
+    /// way an index can resurrect what a person asked to be gone.
+    erasure_epoch: RwLock<u64>,
+}
+
+/// How much of an associative graph is allowed to exist at once.
+///
+/// ADR-0029 A2 and A11: activation is bounded by explicit budgets, and the workspace stays bounded
+/// even when activation would return thousands of associations. Only the node and edge dimensions
+/// are enforced here; depth, time and token budgets belong to the activation session this version
+/// does not have, and claiming them would be worse than admitting their absence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ContextBudget {
+    /// Most concepts retained.
+    pub nodes: usize,
+    /// Most associations retained.
+    pub edges: usize,
+}
+
+impl Default for ContextBudget {
+    fn default() -> Self {
+        Self {
+            nodes: 512,
+            edges: 2048,
+        }
+    }
 }
 
 impl Default for ContextCore {
@@ -131,6 +168,8 @@ impl ContextCore {
             state_path: None,
             nodes: RwLock::new(HashMap::new()),
             associations: RwLock::new(Vec::new()),
+            budget: ContextBudget::default(),
+            erasure_epoch: RwLock::new(0),
         }
     }
 
@@ -140,22 +179,71 @@ impl ContextCore {
     ///
     /// Returns [`ContextError`] on I/O error or state corruption.
     pub fn open(path: &Path) -> Result<Self, ContextError> {
-        let (nodes, associations) = if path.exists() {
+        let (nodes, associations, erasure_epoch) = if path.exists() {
             let mut file = File::open(path)?;
             let mut content = String::new();
             file.read_to_string(&mut content)?;
             let state: ContextState = serde_json::from_str(&content)
                 .map_err(|e| ContextError::CorruptState(e.to_string()))?;
-            (state.nodes, state.associations)
+            (state.nodes, state.associations, state.erasure_epoch)
         } else {
-            (HashMap::new(), Vec::new())
+            (HashMap::new(), Vec::new(), 0)
         };
 
         Ok(Self {
             state_path: Some(path.to_path_buf()),
             nodes: RwLock::new(nodes),
             associations: RwLock::new(associations),
+            budget: ContextBudget::default(),
+            erasure_epoch: RwLock::new(erasure_epoch),
         })
+    }
+
+    /// The budget this projection is held within.
+    #[must_use]
+    pub const fn budget(&self) -> ContextBudget {
+        self.budget
+    }
+
+    /// Discard the projection when the Journal reports an erasure epoch this one predates.
+    ///
+    /// ADR-0029 A7. An index that survives an erasure keeps associations whose evidence no longer
+    /// exists, which is how a derived structure resurrects what a person asked to be gone. It is
+    /// rebuilt from the Journal afterwards, so nothing that still exists is lost.
+    ///
+    /// Returns whether the projection was discarded.
+    pub fn invalidate_for_epoch(&self, epoch: u64) -> bool {
+        let known = self.erasure_epoch.read().map_or(0, |guard| *guard);
+        if epoch <= known {
+            return false;
+        }
+        if let Ok(mut nodes) = self.nodes.write() {
+            nodes.clear();
+        }
+        if let Ok(mut associations) = self.associations.write() {
+            associations.clear();
+        }
+        if let Ok(mut current) = self.erasure_epoch.write() {
+            *current = epoch;
+        }
+        let _ = self.persist_current();
+        true
+    }
+
+    /// The erasure epoch this projection was last derived under.
+    #[must_use]
+    pub fn erasure_epoch(&self) -> u64 {
+        self.erasure_epoch.read().map_or(0, |guard| *guard)
+    }
+
+    fn persist_current(&self) -> Result<(), ContextError> {
+        let nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
+        let associations = self
+            .associations
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        self.persist_candidate(&nodes, &associations)
     }
 
     fn persist_candidate(
@@ -167,6 +255,7 @@ impl ContextCore {
             let state = ContextState {
                 nodes: nodes.clone(),
                 associations: associations.to_vec(),
+                erasure_epoch: self.erasure_epoch(),
             };
             let serialized = serde_json::to_string_pretty(&state)
                 .map_err(|e| ContextError::CorruptState(e.to_string()))?;
@@ -216,10 +305,25 @@ impl ContextCore {
         node.activation_reason = reason_str;
         node.last_activated_at = now;
 
-        if self.persist_candidate(&candidate_nodes, &assocs).is_ok()
-            && let Ok(mut lock) = self.nodes.write()
-        {
-            *lock = candidate_nodes;
+        let dropped = enforce_node_budget(&mut candidate_nodes, self.budget.nodes);
+        let assocs = if dropped.is_empty() {
+            assocs
+        } else {
+            // An association whose end no longer exists is not an association. Dropping the edge
+            // with the node keeps the graph from holding links into nothing.
+            assocs
+                .into_iter()
+                .filter(|link| !dropped.contains(&link.source) && !dropped.contains(&link.target))
+                .collect()
+        };
+
+        if self.persist_candidate(&candidate_nodes, &assocs).is_ok() {
+            if let Ok(mut lock) = self.nodes.write() {
+                *lock = candidate_nodes;
+            }
+            if let Ok(mut lock) = self.associations.write() {
+                *lock = assocs;
+            }
         }
     }
 
@@ -262,6 +366,8 @@ impl ContextCore {
                 evidence,
             });
         }
+
+        enforce_edge_budget(&mut candidate_assocs, self.budget.edges);
 
         if self.persist_candidate(&nodes, &candidate_assocs).is_ok()
             && let Ok(mut lock) = self.associations.write()
@@ -336,8 +442,100 @@ impl ContextCore {
     }
 }
 
+/// Hold the concept count within its budget, returning the labels that were dropped.
+///
+/// Least salient first, and oldest first among equals. A budget that dropped by insertion order
+/// would forget what the system is attending to in favour of what it happened to see first.
+fn enforce_node_budget(nodes: &mut HashMap<String, ConceptNode>, budget: usize) -> Vec<String> {
+    if nodes.len() <= budget {
+        return Vec::new();
+    }
+    let mut ranked: Vec<_> = nodes
+        .values()
+        .map(|node| (node.label.clone(), node.salience, node.last_activated_at))
+        .collect();
+    ranked.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.2.cmp(&b.2))
+    });
+
+    let dropped: Vec<String> = ranked
+        .into_iter()
+        .take(nodes.len() - budget)
+        .map(|(label, _, _)| label)
+        .collect();
+    for label in &dropped {
+        nodes.remove(label);
+    }
+    dropped
+}
+
+/// Hold the association count within its budget, weakest first.
+fn enforce_edge_budget(associations: &mut Vec<Association>, budget: usize) {
+    if associations.len() <= budget {
+        return;
+    }
+    associations.sort_by(|a, b| {
+        b.strength
+            .partial_cmp(&a.strength)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    associations.truncate(budget);
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_graph_is_held_within_its_budget_and_keeps_what_is_salient() {
+        let core = super::ContextCore::new();
+        let now = time::OffsetDateTime::now_utc();
+        let budget = core.budget().nodes;
+
+        // One more concept than the budget allows, with salience rising as they are added.
+        for index in 0..=budget {
+            let salience = f64::from(u32::try_from(index).expect("test budget fits"))
+                / f64::from(u32::try_from(budget + 1).expect("test budget fits"));
+            core.activate(format!("concept-{index}"), salience, "test", now);
+        }
+
+        let held = core.active_context();
+        assert_eq!(held.len(), budget, "the graph must stay within its budget");
+        assert!(
+            !held.iter().any(|node| node.label == "concept-0"),
+            "the least salient concept is the one that goes"
+        );
+        assert!(
+            held.iter()
+                .any(|node| node.label == format!("concept-{budget}")),
+            "the most salient concept must survive"
+        );
+    }
+
+    #[test]
+    fn an_erasure_epoch_discards_the_projection_rather_than_outliving_it() {
+        let core = super::ContextCore::new();
+        let now = time::OffsetDateTime::now_utc();
+        core.activate("operating-system", 1.0, "observed by perceptiond", now);
+        core.associate(
+            "operating-system",
+            "kernel-version",
+            1.0,
+            super::AssociationOrigin::TemporalCooccurrence,
+            vec![uuid::Uuid::new_v4()],
+        );
+        assert!(!core.active_context().is_empty());
+
+        // An index that survives an erasure keeps associations whose evidence is gone, which is
+        // how a derived structure resurrects what a person asked to be destroyed.
+        assert!(core.invalidate_for_epoch(1));
+        assert!(core.active_context().is_empty());
+        assert_eq!(core.erasure_epoch(), 1);
+
+        // The same epoch twice is not a second erasure.
+        assert!(!core.invalidate_for_epoch(1));
+    }
+
     use tempfile::tempdir;
 
     use super::*;
