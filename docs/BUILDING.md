@@ -13,11 +13,22 @@ were removed on 2026-08-20; see [Current State](CURRENT_STATE.md) for why.
 
 Debian 13 is the target and the only supported build host for the daemons, because they use a D-Bus
 session bus and systemd user units. `scripts/bootstrap-debian-builder.sh` installs everything needed
-on a fresh machine.
+on a fresh remote builder.
 
 ```bash
 bash scripts/bootstrap-debian-builder.sh
 ```
+
+A local Debian 13 is worth having, and on Windows a WSL image is enough:
+
+```bash
+wsl --install Debian
+```
+
+It runs the daemons and `dbus-run-session`, so the multi-daemon gate can be run there instead of
+against a deployment. That matters more than convenience: the gate starts twelve owners and, since
+it also exercises the guard that stops a public surface publishing personal state, running it
+against the deployed host would mean proving that guard by making the deployment trip it.
 
 The workspace itself is portable: `cargo test` and `cargo clippy` run on any platform the toolchain
 supports, and that is what the GitHub workflow does. Everything behind `cfg(target_os = "linux")` —
