@@ -93,7 +93,6 @@ async fn consolidate_when_idle(core: Arc<LifecycleCore>) {
         return;
     };
 
-    let mut last_completed: Option<OffsetDateTime> = None;
     let mut interval = tokio::time::interval(std::time::Duration::from_mins(1));
 
     loop {
@@ -104,7 +103,13 @@ async fn consolidate_when_idle(core: Arc<LifecycleCore>) {
         if now - state.last_user_activity_at < IDLE_BEFORE_CONSOLIDATION {
             continue;
         }
-        if last_completed.is_some_and(|last| now - last < BETWEEN_CONSOLIDATIONS) {
+        // Read the interval from the state, not from this process's memory. A scheduler that
+        // forgets when it restarts runs on every restart, and the interval it was given stops
+        // meaning anything — which is what happened: a deploy triggered a full sweep each time.
+        if core
+            .last_consolidated_at()
+            .is_some_and(|last| now - last < BETWEEN_CONSOLIDATIONS)
+        {
             continue;
         }
 
@@ -145,7 +150,9 @@ async fn consolidate_when_idle(core: Arc<LifecycleCore>) {
 
         let _ = core.transition(LifecycleMode::Awake);
         if !interrupted {
-            last_completed = Some(OffsetDateTime::now_utc());
+            // An interrupted run establishes nothing about the chain, so it does not reset the
+            // interval: the next quiet moment should still be spent finishing what it started.
+            let _ = core.record_consolidation(OffsetDateTime::now_utc());
         }
     }
 }

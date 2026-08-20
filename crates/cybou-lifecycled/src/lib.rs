@@ -85,6 +85,13 @@ pub struct LifecycleState {
     pub last_user_activity_at: OffsetDateTime,
     /// Active run, if any.
     pub run: Option<LifecycleRun>,
+    /// When maintenance last completed.
+    ///
+    /// Persisted because the interval between runs is a property of the system, not of a process:
+    /// a scheduler that forgets on restart runs again on every restart, and the interval it was
+    /// given stops meaning anything.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub last_consolidated_at: Option<OffsetDateTime>,
 }
 
 /// Errors occurring within the lifecycle organ.
@@ -110,6 +117,7 @@ pub struct LifecycleCore {
     mode: RwLock<LifecycleMode>,
     last_user_activity: RwLock<OffsetDateTime>,
     active_run: RwLock<Option<LifecycleRun>>,
+    last_consolidated_at: RwLock<Option<OffsetDateTime>>,
 }
 
 impl Default for LifecycleCore {
@@ -127,6 +135,7 @@ impl LifecycleCore {
             mode: RwLock::new(LifecycleMode::Awake),
             last_user_activity: RwLock::new(OffsetDateTime::now_utc()),
             active_run: RwLock::new(None),
+            last_consolidated_at: RwLock::new(None),
         }
     }
 
@@ -136,15 +145,20 @@ impl LifecycleCore {
     ///
     /// Returns [`LifecycleError`] on I/O or corrupted file structure (fail-closed).
     pub fn open(path: &Path) -> Result<Self, LifecycleError> {
-        let (mode, last_user_activity, active_run) = if path.exists() {
+        let (mode, last_user_activity, active_run, last_consolidated_at) = if path.exists() {
             let mut file = File::open(path)?;
             let mut content = String::new();
             file.read_to_string(&mut content)?;
             let state: LifecycleState = serde_json::from_str(&content)
                 .map_err(|e| LifecycleError::CorruptState(e.to_string()))?;
-            (state.mode, state.last_user_activity_at, state.run)
+            (
+                state.mode,
+                state.last_user_activity_at,
+                state.run,
+                state.last_consolidated_at,
+            )
         } else {
-            (LifecycleMode::Awake, OffsetDateTime::now_utc(), None)
+            (LifecycleMode::Awake, OffsetDateTime::now_utc(), None, None)
         };
 
         Ok(Self {
@@ -152,6 +166,7 @@ impl LifecycleCore {
             mode: RwLock::new(mode),
             last_user_activity: RwLock::new(last_user_activity),
             active_run: RwLock::new(active_run),
+            last_consolidated_at: RwLock::new(last_consolidated_at),
         })
     }
 
@@ -209,6 +224,32 @@ impl LifecycleCore {
         Ok(())
     }
 
+    /// Record that maintenance completed, durably.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LifecycleError`] when the state could not be persisted; the previous instant is
+    /// restored before returning, so a failed write never makes a run look finished.
+    pub fn record_consolidation(&self, now: OffsetDateTime) -> Result<(), LifecycleError> {
+        let previous = self.last_consolidated_at();
+        if let Ok(mut lock) = self.last_consolidated_at.write() {
+            *lock = Some(now);
+        }
+        if let Err(error) = self.persist() {
+            if let Ok(mut lock) = self.last_consolidated_at.write() {
+                *lock = previous;
+            }
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// When maintenance last completed, if it ever has.
+    #[must_use]
+    pub fn last_consolidated_at(&self) -> Option<OffsetDateTime> {
+        self.last_consolidated_at.read().ok().and_then(|g| *g)
+    }
+
     /// Manually transition lifecycle mode (durable before visible).
     ///
     /// # Errors
@@ -245,6 +286,7 @@ impl LifecycleCore {
             mode,
             last_user_activity_at,
             run,
+            last_consolidated_at: self.last_consolidated_at(),
         }
     }
 
@@ -257,6 +299,24 @@ impl LifecycleCore {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_interval_between_maintenance_runs_survives_a_restart() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("lifecycle.json");
+        let ran_at = time::OffsetDateTime::now_utc();
+
+        {
+            let core = super::LifecycleCore::open(&path).expect("open lifecycle state");
+            assert_eq!(core.last_consolidated_at(), None);
+            core.record_consolidation(ran_at).expect("record the run");
+        }
+
+        // A scheduler that forgets on restart runs again on every restart, and the interval it
+        // was given stops meaning anything.
+        let restarted = super::LifecycleCore::open(&path).expect("reopen lifecycle state");
+        assert_eq!(restarted.last_consolidated_at(), Some(ran_at));
+    }
+
     use tempfile::tempdir;
 
     use super::*;
