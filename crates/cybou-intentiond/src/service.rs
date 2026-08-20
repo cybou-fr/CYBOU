@@ -186,14 +186,20 @@ impl Intention1Service {
         // own state and does not enter the biography — which is the rule working, not a failure
         // to record it.
         if let Some(cause) = cause {
-            match submit_intention(&id, &description, &trigger, cause, now).await {
-                Some(contribution_id) => {
-                    let _ = self.core.record_contribution(id, contribution_id);
-                }
-                None => {
-                    println!("[cybou-intentiond] Intention {id} was not accepted into the Journal");
-                }
-            }
+            let Some(contribution_id) =
+                submit_intention(&id, &description, &trigger, cause, now).await
+            else {
+                // A caused intention the Journal refused is not a commitment this organ may report
+                // as made. Keeping it locally and answering with an identity would tell the caller
+                // a biography holds something it does not, so it is withdrawn and the answer says
+                // nothing was formed.
+                println!("[cybou-intentiond] Intention {id} was not accepted into the Journal");
+                let _ = self
+                    .core
+                    .close(id, Resolution::Obsolete, Some("not recorded"));
+                return String::new();
+            };
+            let _ = self.core.record_contribution(id, contribution_id);
         }
 
         id.to_string()

@@ -220,19 +220,19 @@ impl EventCore {
         Ok(core)
     }
 
-    /// The most exposing sensitivity anything in the Journal carries.
+    /// The most exposing sensitivity anything in the Journal carries, or `None` if that could not
+    /// be established.
     ///
-    /// Zero when the Journal is empty or unreadable: a surface deciding what it may publish should
-    /// not be told a Journal it cannot read is full of secrets, nor that it is safe. It is told the
-    /// least alarming answer, and the surface's own rule decides what to do with a Journal it could
-    /// not consult.
+    /// The distinction is the whole value of the answer. Reporting the least alarming number for a
+    /// Journal that could not be read tells a surface deciding what it may publish that publishing
+    /// is safe, on the strength of a question that failed. A caller that cannot learn what it
+    /// would be disclosing has to refuse, and it can only do that if it is told.
     #[must_use]
-    pub fn highest_sensitivity(&self) -> u8 {
+    pub fn highest_sensitivity(&self) -> Option<u8> {
         self.writer
             .lock()
             .ok()
             .and_then(|writer| writer.highest_sensitivity().ok())
-            .unwrap_or(0)
     }
 
     /// The verification established by the last incremental pass, if one has run.

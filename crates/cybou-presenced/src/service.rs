@@ -280,10 +280,18 @@ impl Presence1Service {
             // to leave it outside the biography entirely. What a person asked for is itself
             // something that happened outside the Journal, which is what a root Observation
             // records, and the intention is caused by it.
-            let cause =
+            // If the request cannot be recorded there is no cause to form the intention against,
+            // and Intention1 accepts an uncaused intention by keeping it out of the Journal. The
+            // person would be handed an identity for a commitment the biography never heard of —
+            // an answer that looks like success and records nothing. Refuse instead.
+            let Some(cause) =
                 record_observation("user-promise", ciborium::Value::Text(description.clone()))
-                    .await;
-            let cause = cause.map(|id| id.to_string()).unwrap_or_default();
+                    .await
+            else {
+                println!("[cybou-presenced] Promise refused: the request could not be recorded");
+                return String::new();
+            };
+            let cause = cause.to_string();
 
             return call(
                 conn,

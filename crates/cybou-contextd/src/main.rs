@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let context_core = core.clone();
         tokio::spawn(async move {
-            let mut previous_in_episode: HashMap<uuid::Uuid, (String, uuid::Uuid)> = HashMap::new();
+            let mut previous_in_episode: HashMap<uuid::Uuid, ObservedConcept> = HashMap::new();
             if let Err(error) =
                 cybou_fabric::event_client::follow_contributions(0, move |_sequence, envelope| {
                     activate_from(&context_core, envelope, &mut previous_in_episode);
@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn activate_from(
     core: &ContextCore,
     envelope: &cybou_protocol::canonical::CanonicalEnvelope,
-    previous_in_episode: &mut std::collections::HashMap<uuid::Uuid, (String, uuid::Uuid)>,
+    previous_in_episode: &mut std::collections::HashMap<uuid::Uuid, ObservedConcept>,
 ) -> bool {
     use cybou_contextd::AssociationOrigin;
     use cybou_protocol::observation::ObservationV1;
@@ -136,28 +136,63 @@ fn activate_from(
         now,
     );
 
-    if let Some((previous, previous_message)) = previous_in_episode.get(&envelope.correlation_id)
-        && previous != &observation.subject
+    if let Some(previous) = previous_in_episode.get(&envelope.correlation_id)
+        && previous.subject != observation.subject
     {
         // TemporalCooccurrence, deliberately: these two were seen in one episode and nothing more
         // was established. ADR-0029 keeps the origin a closed set exactly so co-occurrence cannot
         // quietly become knowledge.
-        // ADR-0029 A9: the link inherits what its evidence carries. Only this contribution's
-        // classes are known here; the earlier one tightened them when it was seen, and the
-        // strictest of the two survives the merge.
-        core.associate_with_class(
-            previous.clone(),
-            observation.subject.clone(),
-            envelope.confidence,
-            AssociationOrigin::TemporalCooccurrence,
-            vec![*previous_message, envelope.message_id],
-            envelope.privacy,
-            envelope.retention_class,
-        );
+        //
+        // Both ends' classes are applied, because a link is derived from both contributions.
+        // Passing only this one's meant the earlier observation's privacy never reached the link
+        // it was half of: the association did not exist when that contribution was seen, so there
+        // was nothing for it to have tightened.
+        for (privacy, sensitivity, retention_class) in [
+            (
+                previous.privacy,
+                previous.sensitivity,
+                previous.retention_class,
+            ),
+            (
+                envelope.privacy,
+                envelope.sensitivity,
+                envelope.retention_class,
+            ),
+        ] {
+            core.associate_with_class(
+                previous.subject.clone(),
+                observation.subject.clone(),
+                envelope.confidence,
+                AssociationOrigin::TemporalCooccurrence,
+                vec![previous.message_id, envelope.message_id],
+                privacy,
+                sensitivity,
+                retention_class,
+            );
+        }
     }
     previous_in_episode.insert(
         envelope.correlation_id,
-        (observation.subject.clone(), envelope.message_id),
+        ObservedConcept {
+            subject: observation.subject.clone(),
+            message_id: envelope.message_id,
+            privacy: envelope.privacy,
+            sensitivity: envelope.sensitivity,
+            retention_class: envelope.retention_class,
+        },
     );
     true
+}
+
+/// What an episode remembers about the contribution before this one.
+///
+/// The classes travel with it because an association inherits from both ends, and the earlier end
+/// is gone by the time the link is formed.
+#[cfg(target_os = "linux")]
+struct ObservedConcept {
+    subject: String,
+    message_id: uuid::Uuid,
+    privacy: u8,
+    sensitivity: u8,
+    retention_class: u8,
 }

@@ -136,13 +136,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Judge Event1 by what its verification established, not only by its willingness to answer.
 ///
-/// A chain that has been replayed to the head and found intact is healthy. A chain with a known
-/// break is conflicted: the process is alive and its contents contradict themselves, which is a
-/// different failure from a process that is gone. A verification that has not reached the head yet
-/// says nothing either way, so it says nothing.
+/// Not proven is not healthy. Every path that could not establish the state of the chain used to
+/// end in `Healthy`, so a Journal verified through 100 rows of 10 000 — or one whose verification
+/// could not be read at all — reported as sound. That is the same failure as a readiness answer
+/// that ignores what it is ready to do, one level down.
+///
+/// A chain replayed to the head and found intact is healthy. A known break is conflicted: the
+/// process is alive and its contents contradict themselves, which is a different failure from a
+/// process that is gone. Anything else — unreadable, unanswered, or still catching up — is
+/// `Recovering`, which reads as unknown rather than as either verdict.
 #[cfg(target_os = "linux")]
 async fn journal_integrity(connection: &zbus::Connection) -> ComponentHealth {
     use cybou_fabric::EVENT;
+
+    let unproven = ComponentHealth::Recovering;
 
     let Ok(reply) = connection
         .call_method(
@@ -154,22 +161,25 @@ async fn journal_integrity(connection: &zbus::Connection) -> ComponentHealth {
         )
         .await
     else {
-        return ComponentHealth::Healthy;
+        return unproven;
     };
     let Ok(encoded) = reply.body().deserialize::<Vec<u8>>() else {
-        return ComponentHealth::Healthy;
+        return unproven;
     };
     if encoded.is_empty() {
-        return ComponentHealth::Healthy;
+        // No pass has run yet. The chain may be perfect; nobody has looked.
+        return unproven;
     }
     let Ok(state) = ciborium::from_reader::<JournalVerification, _>(encoded.as_slice()) else {
-        return ComponentHealth::Healthy;
+        return unproven;
     };
 
     if state.broken_at.is_some() {
         ComponentHealth::Conflicted
-    } else {
+    } else if state.verified_through >= state.head {
         ComponentHealth::Healthy
+    } else {
+        unproven
     }
 }
 
@@ -178,5 +188,7 @@ async fn journal_integrity(connection: &zbus::Connection) -> ComponentHealth {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JournalVerification {
+    verified_through: u64,
+    head: u64,
     broken_at: Option<u64>,
 }

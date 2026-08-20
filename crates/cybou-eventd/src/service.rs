@@ -107,8 +107,13 @@ impl Event1Service {
     }
 
     /// The most exposing sensitivity anything in the Journal carries, on the frozen scale.
-    async fn highest_sensitivity(&self) -> u8 {
-        self.core.highest_sensitivity()
+    ///
+    /// Answers -1 when that could not be established, because the wire has no option type here and
+    /// a caller must be able to tell "nothing sensitive" from "could not be read". Silently sending
+    /// the safest-looking number would make an unreadable Journal indistinguishable from an
+    /// innocuous one.
+    async fn highest_sensitivity(&self) -> i16 {
+        self.core.highest_sensitivity().map_or(-1, i16::from)
     }
 
     /// Current erasure epoch.

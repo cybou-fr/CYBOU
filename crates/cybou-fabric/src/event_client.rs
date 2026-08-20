@@ -291,6 +291,42 @@ impl EventClient {
 #[cfg(target_os = "linux")]
 const REPLAY_PAGE: u32 = 512;
 
+/// How long to wait before following again after the connection to Event1 is lost.
+#[cfg(target_os = "linux")]
+const RECONNECT_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Deliver everything between a cursor and an announced sequence, from the Journal.
+///
+/// Returns how far it got. A caller that does not reach `up_to - 1` must not treat the announced
+/// contribution as the next one, because the rows before it have not been seen.
+#[cfg(target_os = "linux")]
+async fn deliver_gap<F>(
+    client: &EventClient,
+    mut cursor: u64,
+    up_to: u64,
+    on_contribution: &mut F,
+) -> u64
+where
+    F: FnMut(u64, &CanonicalEnvelope),
+{
+    while cursor + 1 < up_to {
+        let Ok(page) = client.replay(cursor, REPLAY_PAGE).await else {
+            break;
+        };
+        if page.is_empty() {
+            break;
+        }
+        for envelope in &page {
+            if cursor + 1 >= up_to {
+                break;
+            }
+            cursor += 1;
+            on_contribution(cursor, envelope);
+        }
+    }
+    cursor
+}
+
 /// Follow every contribution from a position, catching up first and then staying current.
 ///
 /// Each of the derived organs had written its own version of this and each got it wrong in a
@@ -307,17 +343,15 @@ const REPLAY_PAGE: u32 = 512;
 /// enforces it and the verifier checks it — and `Replay` answers with rows after a sequence in
 /// order.
 ///
-/// This never returns while the bus is alive; callers spawn it.
+/// One attempt: it returns when the connection, the subscription, or the stream itself is lost,
+/// leaving `cursor` at the last contribution actually delivered so the next attempt resumes there.
 ///
 /// # Errors
 ///
-/// Returns [`EventClientError`] when the session bus, the subscription, or the first read of the
-/// head cannot be established. Failures after that are per-message and skip that message.
+/// Returns [`EventClientError`] when the session bus, the subscription, or a catch-up read fails,
+/// and when the acceptance stream ends. Per-message failures skip that message without advancing.
 #[cfg(target_os = "linux")]
-pub async fn follow_contributions<F>(
-    from_sequence: u64,
-    mut on_contribution: F,
-) -> Result<(), EventClientError>
+async fn follow_once<F>(cursor: &mut u64, on_contribution: &mut F) -> Result<(), EventClientError>
 where
     F: FnMut(u64, &CanonicalEnvelope),
 {
@@ -344,34 +378,80 @@ where
     let client = EventClient { connection };
     let head = client.count().await?;
 
-    let mut cursor = from_sequence;
-    while cursor < head {
-        let page = client.replay(cursor, REPLAY_PAGE).await?;
+    while *cursor < head {
+        let page = client.replay(*cursor, REPLAY_PAGE).await?;
         if page.is_empty() {
             break;
         }
         for envelope in &page {
-            cursor += 1;
-            on_contribution(cursor, envelope);
+            *cursor += 1;
+            on_contribution(*cursor, envelope);
         }
     }
 
     while let Some(message) = accepted.next().await {
         let Ok((encoded, sequence)) = message.body().deserialize::<(Vec<u8>, u64)>() else {
+            // An announcement that cannot be read is not an announcement that nothing happened.
+            // The cursor stays put, and the gap is filled from the Journal on the next one.
             continue;
         };
         // Already delivered by the catch-up: the stream held it while that ran.
-        if sequence <= cursor {
+        if sequence <= *cursor {
             continue;
         }
+
+        // Signals are not a delivery guarantee. One arriving out of order, or one lost between a
+        // sender and a subscriber, would otherwise move the cursor past a contribution nobody
+        // read — silently, for ever, because nothing looks back. Anything missing is fetched from
+        // the Journal, which is the record, before the announcement is acted on.
+        if sequence > *cursor + 1 {
+            *cursor = deliver_gap(&client, *cursor, sequence, on_contribution).await;
+            if *cursor + 1 != sequence {
+                // The gap could not be closed. Leaving the cursor behind means the next signal
+                // tries again rather than declaring the missing rows delivered.
+                continue;
+            }
+        }
+
         let Ok(envelope) = ciborium::from_reader::<CanonicalEnvelope, _>(encoded.as_slice()) else {
             continue;
         };
-        cursor = sequence;
+        *cursor = sequence;
         on_contribution(sequence, &envelope);
     }
 
-    Ok(())
+    // The stream ending is not the end of the biography: the bus went away while this organ is
+    // still expected to be following. Say so rather than returning as though the work were done.
+    Err(EventClientError::Rpc(
+        "the Event1 acceptance stream ended".into(),
+    ))
+}
+
+/// Follow every contribution from `from_sequence` onwards, for as long as this process runs.
+///
+/// A follower that stopped at the first lost connection would leave its organ answering from a
+/// projection frozen at whatever moment the bus blinked, with nothing saying so. Instead each
+/// attempt resumes from the cursor the last one reached, so a reconnection replays exactly what
+/// was missed and no contribution is delivered twice.
+///
+/// # Errors
+///
+/// Only when following is abandoned entirely, which today means never: it retries indefinitely.
+#[cfg(target_os = "linux")]
+pub async fn follow_contributions<F>(
+    from_sequence: u64,
+    mut on_contribution: F,
+) -> Result<(), EventClientError>
+where
+    F: FnMut(u64, &CanonicalEnvelope),
+{
+    let mut cursor = from_sequence;
+    loop {
+        if let Err(error) = follow_once(&mut cursor, &mut on_contribution).await {
+            println!("[cybou-fabric] Following Event1 stopped at {cursor}: {error}; reconnecting");
+        }
+        tokio::time::sleep(RECONNECT_DELAY).await;
+    }
 }
 
 #[cfg(test)]

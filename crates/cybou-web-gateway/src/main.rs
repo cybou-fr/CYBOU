@@ -109,24 +109,12 @@ fn publishable_sensitivity() -> u8 {
 /// giving Event1 time to come up.
 #[cfg(target_os = "linux")]
 async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Error>> {
-    use cybou_fabric::EVENT;
-
     let permitted = publishable_sensitivity();
     let connection = zbus::Connection::session().await?;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
 
     loop {
-        let answer: Option<u8> = connection
-            .call_method(
-                Some(EVENT.service),
-                EVENT.object_path,
-                Some(EVENT.interface),
-                "HighestSensitivity",
-                &(),
-            )
-            .await
-            .ok()
-            .and_then(|reply| reply.body().deserialize().ok());
+        let answer = highest_sensitivity(&connection).await;
 
         match answer {
             Some(highest) if highest > permitted => {
@@ -140,7 +128,7 @@ async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Er
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
             None => {
-                return Err("refusing to serve an unauthenticated public surface: Event1 did not                             answer, so what this deployment would publish is unknown"
+                return Err("refusing to serve an unauthenticated public surface: what this deployment would publish could not be established"
                     .into());
             }
         }
@@ -150,6 +138,35 @@ async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Er
 /// How often a running surface re-asks what it would be publishing.
 #[cfg(target_os = "linux")]
 const RECHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// How many consecutive unestablished answers a running surface tolerates before stopping.
+#[cfg(target_os = "linux")]
+const UNKNOWN_TOLERANCE: u32 = 4;
+
+/// Ask Event1 what the most exposing thing in the Journal is.
+///
+/// `None` covers both a call that failed and an answer of -1, which is how Event1 says it could
+/// not establish one. To a caller they are the same fact: what would be published is unknown, and
+/// not knowing is not permission.
+#[cfg(target_os = "linux")]
+async fn highest_sensitivity(connection: &zbus::Connection) -> Option<u8> {
+    use cybou_fabric::EVENT;
+
+    let answer: i16 = connection
+        .call_method(
+            Some(EVENT.service),
+            EVENT.object_path,
+            Some(EVENT.interface),
+            "HighestSensitivity",
+            &(),
+        )
+        .await
+        .ok()?
+        .body()
+        .deserialize()
+        .ok()?;
+    u8::try_from(answer).ok()
+}
 
 /// Stop serving once the Journal holds more than this deployment permits.
 ///
@@ -163,28 +180,31 @@ const RECHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15)
 /// on an unknown Journal; this one only reacts to an answer it actually received.
 #[cfg(target_os = "linux")]
 async fn stop_when_the_journal_turns_personal() {
-    use cybou_fabric::EVENT;
-
     let permitted = publishable_sensitivity();
     let Ok(connection) = zbus::Connection::session().await else {
         return;
     };
     let mut interval = tokio::time::interval(RECHECK_INTERVAL);
+    let mut unknown_for: u32 = 0;
 
     loop {
         interval.tick().await;
 
-        let answer: Option<u8> = connection
-            .call_method(
-                Some(EVENT.service),
-                EVENT.object_path,
-                Some(EVENT.interface),
-                "HighestSensitivity",
-                &(),
-            )
-            .await
-            .ok()
-            .and_then(|reply| reply.body().deserialize().ok());
+        // A Journal that does not answer for a moment is a hiccup, not a disclosure: an outage in
+        // one owner should not take another down. A Journal that keeps not answering is different,
+        // because a surface that cannot learn what it is publishing is publishing blind.
+        let answer = highest_sensitivity(&connection).await;
+        if answer.is_none() {
+            unknown_for = unknown_for.saturating_add(1);
+            if unknown_for >= UNKNOWN_TOLERANCE {
+                eprintln!(
+                    "what this deployment is publishing has been unestablished for {unknown_for} checks; a public surface stops rather than publishing blind"
+                );
+                std::process::exit(1);
+            }
+            continue;
+        }
+        unknown_for = 0;
 
         if let Some(highest) = answer
             && highest > permitted
