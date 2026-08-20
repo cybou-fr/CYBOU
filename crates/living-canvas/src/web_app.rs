@@ -526,7 +526,9 @@ pub fn App() -> impl IntoView {
                     class="canvas"
                     aria-label="CYBOU Desktop"
                     on:pointermove=move |event: PointerEvent| {
-                        move_drag(event, layout, dragging);
+                        // One pointer move can be both: a card being dragged and another being
+                        // resized are separate gestures, and each helper reads the same event.
+                        move_drag(event.clone(), layout, dragging);
                         move_resize(event, layout, resizing);
                     }
                     on:pointerup=move |_| {
