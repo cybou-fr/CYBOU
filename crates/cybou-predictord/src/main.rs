@@ -31,6 +31,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use cybou_fabric::PREDICTOR;
         use cybou_predictord::service::Predictor1Service;
 
+        // Until now this organ had a replay routine and a persisted cursor but nothing that ever
+        // called them: every forecast it could make came from whatever a caller happened to push
+        // in through Observe, and a restart forecast from nothing. It follows the Journal, which
+        // is where the observations actually are, and resumes from where its samples stand.
+        let follow_core = Arc::clone(&core);
+        tokio::spawn(async move {
+            let from = follow_core.cursor();
+            if let Err(error) =
+                cybou_fabric::event_client::follow_contributions(from, move |sequence, envelope| {
+                    follow_core.ingest_envelope(envelope, sequence);
+                })
+                .await
+            {
+                println!("[cybou-predictord] Cannot follow Event1: {error}");
+            }
+        });
+
         println!("[cybou-predictord] Connecting to D-Bus session bus...");
         let service = Predictor1Service::new(core);
         // Bound, not discarded: dropping the connection would release the well-known name.

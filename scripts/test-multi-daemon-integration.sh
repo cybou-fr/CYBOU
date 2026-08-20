@@ -304,6 +304,25 @@ echo "    Context1 activated at least one concept"
 # Keying them by organ collapsed everything one organ ever said into a single self-disputing
 # belief, and printed a payload where a claim belonged. Both derived organs are checked, because
 # both take the subject from the same place and both were wrong in the same way.
+echo "==> Verifying the forecaster learns from the biography rather than from callers..."
+# perceptiond contributes cpu-count and memory-total-kib as numbers, so a forecast about one of
+# them can only exist if predictord read the Journal. It had a replay routine and a cursor and
+# nothing that ever called them, so every forecast came from whatever a caller pushed in by hand.
+forecast="ay 0"
+deadline=$((SECONDS + 30))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    forecast="$(busctl --user call org.cybou.Mind.Predictor1 /org/cybou/Mind/Predictor1 org.cybou.Mind.Predictor1 Predict s cpu-count)"
+    if [ "$forecast" != "ay 0" ]; then
+        break
+    fi
+    sleep 1
+done
+if [ "$forecast" = "ay 0" ]; then
+    echo "ERROR: the Journal holds measured observations, yet Predictor1 forecasts nothing." >&2
+    exit 1
+fi
+echo "    Predictor1 forecasts a subject it only knows from the Journal"
+
 echo "==> Verifying the derived organs name what was observed, not who observed it..."
 observed_subject="operating-system"
 for owner in Epistemic1:Beliefs Context1:ActiveContext; do

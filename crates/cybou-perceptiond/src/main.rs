@@ -60,12 +60,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let episode = Uuid::new_v4();
             for observation in host_source.acquire(now) {
                 let subject = observation.subject;
+                // What is contributed is decided by the value the source read, not by how it
+                // happens to be encoded on the wire: skipping anything that was not text meant a
+                // count or a size was acquired every sweep and never contributed once.
+                let value = observation.value.display();
                 let Ok(observation) = observation.into_protocol() else {
                     continue;
-                };
-                let value = match &observation.value {
-                    ciborium::Value::Text(text) => text.clone(),
-                    _ => continue,
                 };
                 if contributed.get(subject) == Some(&value) {
                     continue;

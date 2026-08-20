@@ -14,7 +14,7 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
+use cybou_protocol::{Kind, canonical::CanonicalEnvelope, observation::ObservationV1};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -26,8 +26,6 @@ pub mod service;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Forecast {
-    /// Generated contribution ID.
-    pub id: Uuid,
     /// Prediction subject.
     pub subject: String,
     /// Point estimate value.
@@ -184,6 +182,15 @@ impl PredictorCore {
 
     /// Record an observation sample for a subject (durable before visible).
     pub fn observe(&self, subject: &str, value: f64, contribution_id: Uuid) {
+        self.observe_at(subject, value, contribution_id, self.cursor());
+    }
+
+    /// Record an observation sample together with the Journal position it came from.
+    ///
+    /// The samples and the cursor are one write. Advancing the cursor separately would let a
+    /// restart find a position that claims contributions the samples do not contain, or contain
+    /// samples for contributions it will replay again.
+    fn observe_at(&self, subject: &str, value: f64, contribution_id: Uuid, sequence: u64) {
         let subject = subject.trim().to_string();
         if subject.is_empty() {
             return;
@@ -200,11 +207,19 @@ impl PredictorCore {
             value,
         });
 
-        let cur = self.cursor();
-        if self.persist_candidate(cur, &candidate).is_ok()
+        if self.persist_candidate(sequence, &candidate).is_ok()
             && let Ok(mut lock) = self.by_subject.write()
         {
             *lock = candidate;
+            self.set_cursor(sequence);
+        }
+    }
+
+    fn set_cursor(&self, sequence: u64) {
+        if let Ok(mut cursor) = self.cursor.write()
+            && sequence > *cursor
+        {
+            *cursor = sequence;
         }
     }
 
@@ -248,7 +263,6 @@ impl PredictorCore {
         let confidence = count as f64 / (count as f64 + 3.0);
 
         Ok(Forecast {
-            id: Uuid::new_v4(),
             subject: subject.to_string(),
             estimate,
             margin,
@@ -285,21 +299,27 @@ impl PredictorCore {
 
     /// Replay an envelope from Journal.
     pub fn ingest_envelope(&self, envelope: &CanonicalEnvelope, sequence: u64) {
-        let Some(kind) = Kind::from_u16(envelope.kind) else {
+        if Kind::from_u16(envelope.kind) == Some(Kind::Observation)
+            // A forecast is about a subject — free disk, battery charge — not about which process
+            // happened to write the row down. Keying by origin organ averaged every number one
+            // organ ever reported into one meaningless series, and it read the payload as a bare
+            // float, which is not what an observation is on the wire, so nothing ever matched.
+            && let Some((subject, value)) = observed_measurement(&envelope.payload)
+        {
+            self.observe_at(&subject, value, envelope.message_id, sequence);
             return;
-        };
-
-        if kind == Kind::Observation {
-            // Check for numeric observation payload
-            if let Ok(val) = ciborium::from_reader::<f64, _>(envelope.payload.as_slice()) {
-                self.observe(&envelope.origin_organ, val, envelope.message_id);
-            }
         }
 
-        if let Ok(mut cur) = self.cursor.write()
-            && sequence > *cur
-        {
-            *cur = sequence;
+        // Nothing here to learn from, but the position was still read: persisting it means a
+        // restart resumes after it rather than replaying the whole Journal to reach the same
+        // samples. It is only recorded once it is on disk with the samples that stand at it.
+        let candidate = self
+            .by_subject
+            .read()
+            .map(|guard| guard.clone())
+            .unwrap_or_default();
+        if self.persist_candidate(sequence, &candidate).is_ok() {
+            self.set_cursor(sequence);
         }
     }
 
@@ -346,11 +366,116 @@ impl PredictorCore {
     }
 }
 
+/// The subject and number an observation reports, or `None` when it reports neither.
+///
+/// A forecast can only be made about something measurable. An observation whose value is text or
+/// a flag is a fact about the world, not a series, and is left to the organs that reason about
+/// facts rather than being coerced into a number that would forecast nothing.
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    reason = "the round trip below is exactly the check that neither happened"
+)]
+fn observed_measurement(payload: &[u8]) -> Option<(String, f64)> {
+    let observation: ObservationV1 = ciborium::from_reader(payload).ok()?;
+    if observation.subject.is_empty() {
+        return None;
+    }
+    let value = match &observation.value {
+        ciborium::Value::Integer(number) => {
+            let number = i128::from(*number);
+            let approximate = number as f64;
+            // A magnitude past what a float represents exactly would be recorded as a different
+            // number than the one observed, and every forecast built on it would be about that
+            // different number instead.
+            if approximate as i128 != number {
+                return None;
+            }
+            approximate
+        }
+        ciborium::Value::Float(number) if number.is_finite() => *number,
+        _ => return None,
+    };
+    Some((observation.subject, value))
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    fn observation_row(subject: &str, value: ciborium::Value, sequence: u64) -> CanonicalEnvelope {
+        let observation = ObservationV1 {
+            source_id: "test".into(),
+            subject: subject.into(),
+            value,
+            acquired_at: "2026-08-20T00:00:00.000Z".into(),
+            freshness_until: "2026-08-21T00:00:00.000Z".into(),
+            provenance: "a fixture".into(),
+        };
+        let mut payload = Vec::new();
+        ciborium::into_writer(&observation, &mut payload).expect("encode observation");
+        CanonicalEnvelope {
+            schema_version: 4,
+            message_id: Uuid::from_u128(u128::from(sequence)),
+            correlation_id: Uuid::nil(),
+            causation_id: Uuid::nil(),
+            origin_organ: "cybou-perceptiond".into(),
+            origin_node: "node".into(),
+            kind: Kind::Observation as u16,
+            wall_time_ms: 0,
+            monotonic_time: 0,
+            logical_clock: sequence,
+            confidence: 1.0,
+            evidence: Vec::new(),
+            payload,
+            privacy: 0,
+            capability_scope: String::new(),
+            sealed: false,
+            key_domain_id: Uuid::nil(),
+            key_epoch: 0,
+            retention_class: 0,
+            retention_policy_version: 1,
+            retain_until_ms: 0,
+            sensitivity: 0,
+        }
+    }
+
+    #[test]
+    fn a_forecast_is_about_what_was_observed_and_survives_where_it_stood() {
+        let dir = tempdir().expect("tempdir");
+        let state_path = dir.path().join("predictor.json");
+        let core = PredictorCore::open(&state_path).expect("open");
+
+        core.ingest_envelope(&observation_row("disk-free", 100.into(), 1), 1);
+        core.ingest_envelope(&observation_row("disk-free", 200.into(), 2), 2);
+        // Not a measurement: a forecast cannot be made from it, and it must not become one.
+        core.ingest_envelope(
+            &observation_row("hostname", ciborium::Value::Text("node".into()), 3),
+            3,
+        );
+
+        // Keyed by what was observed, not by the process that wrote it down.
+        let forecast = core.predict("disk-free").expect("a subject with history");
+        assert_eq!(forecast.samples, 2);
+        assert!((forecast.estimate - 150.0).abs() < 1e-6);
+        assert!(core.predict("cybou-perceptiond").is_err());
+        assert!(core.predict("hostname").is_err());
+
+        // The position and the samples standing at it are one write: a restart resumes after the
+        // row it last learned from, rather than replaying it or skipping past what it never read.
+        assert_eq!(core.cursor(), 3);
+        let reopened = PredictorCore::open(&state_path).expect("reopen");
+        assert_eq!(reopened.cursor(), 3);
+        assert_eq!(
+            reopened
+                .predict("disk-free")
+                .expect("history survived")
+                .samples,
+            2
+        );
+    }
 
     #[test]
     fn forecast_and_calibration_persistence() {

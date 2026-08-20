@@ -600,14 +600,17 @@ reading is re-affirmed at most once per declared freshness horizon rather than o
 `local-perception` is declared in the capability registry, so healthd graphs it like any other owner.
 A process test runs the real
 adapter against real eventd over a real bus and confirms the contribution arrives with provenance
-eventd verified rather than accepted; a restart re-reads and records once, then falls silent. The epistemic projection exists as a
-library: it derives `unknown`, `observed`, `stale`, `disputed` and `superseded` from accepted
-observations against a caller-supplied instant, keeps a stale value rather than discarding it,
-treats an unchanged restatement as re-affirmation rather than replacement, refuses to resolve a
-disagreement between sources, and orders by acquisition so a late-arriving older reading cannot
-unseat a newer one. The projection is also persistable: a restored checkpoint answers exactly as a
-replay would, at any instant, because status is derived rather than stored, and a corrupt or
-unrecognised checkpoint is refused whole rather than partly applied.
+eventd verified rather than accepted; a restart re-reads and records once, then falls silent. The epistemic projection lives in
+`cybou-epistemicd` itself; there is no separate library. It derives `observed`, `stale`, `disputed`
+and `superseded` from accepted observations: an unchanged restatement is re-affirmation rather than
+replacement, a different value from a source that is still within its declared freshness horizon is
+a disagreement it refuses to resolve, and a different value arriving after that horizon has passed
+is the newer report taking the place of the older one rather than an argument with it. Staleness is
+decided when a belief is read, against the reader's clock and the horizon the observation itself
+named, so a belief nothing has restated does not go on reading `observed` for as long as the system
+happens to stay quiet. Beliefs and the cursor that produced them are written as one value, and
+beliefs derived by an older rule version are rebuilt from the Journal rather than trusted because
+they are on disk.
 
 `cybou-epistemicd` is the eleventh process and the owner ADR-0027 requires. It reads accepted
 observations and answers what is known; it never writes to Event1, owns no perception source, and

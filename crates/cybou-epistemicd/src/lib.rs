@@ -54,8 +54,17 @@ pub struct EpistemicBelief {
     /// When this belief was last corroborated.
     #[serde(with = "time::serde::rfc3339")]
     pub last_corroborated_at: OffsetDateTime,
-    /// Epistemic validity status.
+    /// Epistemic validity status as it stood when the belief was last written.
+    ///
+    /// Read through [`EpistemicCore::query`] or [`EpistemicCore::projection`], which decide
+    /// staleness against the clock rather than against whenever the last observation arrived.
     pub status: EpistemicStatus,
+    /// When the observation behind this belief stops vouching for it, if it said.
+    ///
+    /// An observation names its own freshness horizon. Past it, nothing is asserting the belief
+    /// any more: it is what was last seen, not what is the case.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub fresh_until: Option<OffsetDateTime>,
 }
 
 /// Persistent snapshot of the epistemic projection state.
@@ -80,7 +89,7 @@ pub struct EpistemicState {
 /// The rule this build derives beliefs with.
 ///
 /// Raise it whenever `ingest_envelope` changes what it concludes from the same contribution.
-pub const BELIEF_RULE_VERSION: u32 = 1;
+pub const BELIEF_RULE_VERSION: u32 = 2;
 
 /// Errors occurring in the epistemic engine.
 #[derive(Debug, Error)]
@@ -203,6 +212,32 @@ impl EpistemicCore {
         now: OffsetDateTime,
         at_sequence: Option<u64>,
     ) {
+        self.ingest_at_until(
+            subject,
+            value,
+            confidence,
+            evidence_id,
+            now,
+            at_sequence,
+            None,
+        );
+    }
+
+    /// Ingest an observation that names how long it vouches for what it reports.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "every part of an observation is needed to decide what it does to a belief"
+    )]
+    pub fn ingest_at_until(
+        &self,
+        subject: impl Into<String>,
+        value: impl Into<String>,
+        confidence: f64,
+        evidence_id: Option<Uuid>,
+        now: OffsetDateTime,
+        at_sequence: Option<u64>,
+        fresh_until: Option<OffsetDateTime>,
+    ) {
         let subject_str = subject.into();
         let value_str = value.into();
 
@@ -216,16 +251,32 @@ impl EpistemicCore {
                 evidence: Vec::new(),
                 last_corroborated_at: now,
                 status: EpistemicStatus::Observed,
+                fresh_until,
             });
+
+        // Whether the belief being replaced still had anything vouching for it is the difference
+        // between two sources contradicting each other and one report simply outliving another.
+        // Calling both a dispute made every ordinary change of a clock, a battery reading or a
+        // hostname look like the system arguing with itself.
+        let was_still_vouched_for = entry.fresh_until.is_none_or(|until| now < until);
 
         if entry.value == value_str {
             entry.confidence = (entry.confidence * 0.7 + confidence * 0.3).clamp(0.0, 1.0);
             entry.last_corroborated_at = now;
             entry.status = EpistemicStatus::Observed;
-        } else {
+        } else if was_still_vouched_for {
             entry.status = EpistemicStatus::Disputed;
             entry.confidence = (entry.confidence * 0.5).clamp(0.0, 1.0);
+        } else {
+            // Nothing was standing behind the old value any more, so this is not a contradiction
+            // to hold open: it is the newer report taking the place of the older one.
+            entry.value.clone_from(&value_str);
+            entry.confidence = confidence.clamp(0.0, 1.0);
+            entry.last_corroborated_at = now;
+            entry.status = EpistemicStatus::Superseded;
+            entry.evidence.clear();
         }
+        entry.fresh_until = fresh_until;
 
         if let Some(id) = evidence_id
             && !entry.evidence.contains(&id)
@@ -273,7 +324,7 @@ impl EpistemicCore {
             // or contradict each other about the same thing. Keying beliefs by origin organ
             // instead collapsed everything one organ ever observed into a single belief that
             // disputed itself on every new observation.
-            let Some((subject, value)) = observed_claim(&envelope.payload) else {
+            let Some((subject, value, fresh_until)) = observed_claim(&envelope.payload) else {
                 // A payload that does not decode is not a belief about anything. Storing its
                 // bytes as the asserted value would put an unreadable string where a claim
                 // belongs — and publish whatever the payload happened to contain.
@@ -285,13 +336,14 @@ impl EpistemicCore {
             )
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
-            self.ingest_at(
+            self.ingest_at_until(
                 subject,
                 value,
                 envelope.confidence,
                 Some(envelope.message_id),
                 now,
                 Some(sequence),
+                fresh_until,
             );
         }
     }
@@ -312,7 +364,8 @@ impl EpistemicCore {
     /// Query a single belief by subject.
     #[must_use]
     pub fn query(&self, subject: &str) -> Option<EpistemicBelief> {
-        self.beliefs.read().ok()?.get(subject).cloned()
+        let belief = self.beliefs.read().ok()?.get(subject).cloned()?;
+        Some(as_of(belief, OffsetDateTime::now_utc()))
     }
 
     /// Full epistemic projection sorted by subject.
@@ -322,7 +375,8 @@ impl EpistemicCore {
             Ok(g) => g.clone(),
             Err(_) => return vec![],
         };
-        let mut list: Vec<_> = map.into_values().collect();
+        let now = OffsetDateTime::now_utc();
+        let mut list: Vec<_> = map.into_values().map(|belief| as_of(belief, now)).collect();
         list.sort_by(|a, b| a.subject.cmp(&b.subject));
         list
     }
@@ -333,7 +387,7 @@ impl EpistemicCore {
 /// Returns `None` when the payload is not an observation this version can read. Refusing is the
 /// point: a belief whose value is undecodable bytes asserts nothing, and rendering it anywhere
 /// would show a reader the payload rather than the claim.
-fn observed_claim(payload: &[u8]) -> Option<(String, String)> {
+fn observed_claim(payload: &[u8]) -> Option<(String, String, Option<OffsetDateTime>)> {
     let observation: ObservationV1 = ciborium::from_reader(payload).ok()?;
     let value = match &observation.value {
         ciborium::Value::Text(text) => text.clone(),
@@ -345,7 +399,29 @@ fn observed_claim(payload: &[u8]) -> Option<(String, String)> {
     if observation.subject.is_empty() || value.is_empty() {
         return None;
     }
-    Some((observation.subject, value))
+    // An unreadable horizon is not an unlimited one, but neither is it grounds to throw the
+    // observation away: the belief simply carries no horizon and is never called stale on the
+    // strength of a field nobody could read.
+    let fresh_until = OffsetDateTime::parse(
+        &observation.freshness_until,
+        &time::format_description::well_known::Rfc3339,
+    )
+    .ok();
+    Some((observation.subject, value, fresh_until))
+}
+
+/// A belief as it stands at `now`.
+///
+/// Staleness is a fact about the clock, not about the last time an observation happened to arrive.
+/// Deciding it at write time would have left a belief reading `observed` for as long as nothing
+/// else was written about the subject, which is precisely the case where it is least true.
+fn as_of(mut belief: EpistemicBelief, now: OffsetDateTime) -> EpistemicBelief {
+    if belief.status != EpistemicStatus::Disputed
+        && belief.fresh_until.is_some_and(|until| now >= until)
+    {
+        belief.status = EpistemicStatus::Stale;
+    }
+    belief
 }
 
 #[cfg(test)]
@@ -406,12 +482,20 @@ mod tests {
         let mut payload = Vec::new();
         ciborium::into_writer(&observation, &mut payload).expect("encode observation");
 
+        let (subject, value, fresh_until) =
+            super::observed_claim(&payload).expect("a readable observation");
+        assert_eq!(subject, "operating-system");
+        assert_eq!(value, "Debian GNU/Linux 13 (trixie)");
+        // The horizon the observation named is carried, not discarded: it is what makes the belief
+        // become stale on its own rather than reading `observed` until something else arrives.
         assert_eq!(
-            super::observed_claim(&payload),
-            Some((
-                "operating-system".to_owned(),
-                "Debian GNU/Linux 13 (trixie)".to_owned()
-            ))
+            fresh_until.expect("the horizon was read").unix_timestamp(),
+            time::OffsetDateTime::parse(
+                "2026-08-19T17:59:15.103Z",
+                &time::format_description::well_known::Rfc3339
+            )
+            .expect("fixture parses")
+            .unix_timestamp()
         );
 
         // Anything that is not a readable observation asserts nothing and must not become one.
@@ -422,6 +506,54 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    #[test]
+    fn a_report_that_outlived_its_horizon_is_replaced_rather_than_disputed() {
+        let core = EpistemicCore::new();
+        let rfc = &time::format_description::well_known::Rfc3339;
+        let at = |text: &str| OffsetDateTime::parse(text, rfc).expect("fixture parses");
+
+        let observed = at("2026-08-20T12:00:00Z");
+        let horizon = at("2026-08-20T12:05:00Z");
+        core.ingest_at_until("battery", "80", 1.0, None, observed, None, Some(horizon));
+        assert_eq!(
+            core.query("battery").expect("a belief").status,
+            EpistemicStatus::Stale,
+            "the horizon is long past, so nothing is vouching for it now"
+        );
+
+        // Within the horizon two different values are two sources contradicting each other.
+        core.ingest_at_until(
+            "battery",
+            "60",
+            1.0,
+            None,
+            at("2026-08-20T12:01:00Z"),
+            None,
+            Some(horizon),
+        );
+        assert_eq!(
+            core.query("battery").expect("a belief").status,
+            EpistemicStatus::Disputed
+        );
+
+        // Past it, a new reading is not an argument: it takes the place of the old one. The new
+        // horizon is ahead of the reader's clock, because a belief whose horizon has also passed
+        // is stale to a reader no matter how it came to hold the value it holds.
+        let now = OffsetDateTime::now_utc();
+        core.ingest_at_until(
+            "battery",
+            "42",
+            1.0,
+            None,
+            now,
+            None,
+            Some(now + time::Duration::hours(1)),
+        );
+        let replaced = core.query("battery").expect("a belief");
+        assert_eq!(replaced.value, "42");
+        assert_eq!(replaced.status, EpistemicStatus::Superseded);
+    }
 
     #[test]
     fn epistemic_reconstruction_and_persistence() {

@@ -57,15 +57,48 @@ impl AcquisitionStatus {
     }
 }
 
+/// What an observation reports: a fact stated in words, or a measured quantity.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ObservedValue {
+    /// A fact whose value is words: a kernel release, a hostname.
+    Text(String),
+    /// A measured quantity: a count, a size, a duration.
+    Number(i64),
+}
+
+impl ObservedValue {
+    /// The value as a person would read it.
+    #[must_use]
+    pub fn display(&self) -> String {
+        match self {
+            Self::Text(text) => text.clone(),
+            Self::Number(number) => number.to_string(),
+        }
+    }
+}
+
+impl From<ObservedValue> for ciborium::Value {
+    fn from(value: ObservedValue) -> Self {
+        match value {
+            ObservedValue::Text(text) => Self::Text(text),
+            ObservedValue::Number(number) => Self::Integer(number.into()),
+        }
+    }
+}
+
 /// One valid non-sensitive system observation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SystemObservation {
     /// Stable source identifier, distinct from the producing organ.
     pub source_id: &'static str,
     /// Subject whose value was observed.
     pub subject: &'static str,
-    /// String value representing the observed state.
-    pub value: String,
+    /// Value representing the observed state.
+    ///
+    /// A count is a number and is carried as one. Rendering it as text made every consumer that
+    /// reasons about quantities — forecasting, calibration, anything comparing two readings —
+    /// unable to see it as a quantity at all, and the ones that only display it lose nothing.
+    pub value: ObservedValue,
     /// Acquisition instant supplied by the caller's clock.
     pub acquired_at: OffsetDateTime,
     /// End of the observation's declared freshness horizon.
@@ -84,7 +117,7 @@ impl SystemObservation {
         Ok(ObservationV1 {
             source_id: self.source_id.into(),
             subject: self.subject.into(),
-            value: ciborium::Value::Text(self.value),
+            value: self.value.into(),
             acquired_at: qt_utc_milliseconds(self.acquired_at)?,
             freshness_until: qt_utc_milliseconds(self.freshness_until)?,
             provenance: self.provenance,
@@ -101,7 +134,7 @@ fn qt_utc_milliseconds(value: OffsetDateTime) -> Result<String, time::error::For
 }
 
 /// Typed result that never turns inability to observe into an observed empty value.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AcquisitionResult {
     /// Acquisition classification.
     pub status: AcquisitionStatus,
@@ -184,7 +217,7 @@ impl LinuxSystemSource {
             observation: Some(SystemObservation {
                 source_id: LINUX_SYSTEM_SOURCE_ID,
                 subject: LINUX_SYSTEM_SUBJECT,
-                value: pretty_or_name.trim().to_string(),
+                value: ObservedValue::Text(pretty_or_name.trim().to_string()),
                 acquired_at: now,
                 freshness_until: now + Duration::seconds(self.freshness_seconds),
                 provenance,
@@ -280,7 +313,7 @@ impl SystemGenerationSource {
             observation: Some(SystemObservation {
                 source_id: NIXOS_SYSTEM_SOURCE_ID,
                 subject: NIXOS_SYSTEM_SUBJECT,
-                value: build_identity.to_owned(),
+                value: ObservedValue::Text(build_identity.to_owned()),
                 acquired_at: now,
                 freshness_until: now + Duration::seconds(self.freshness_seconds),
                 provenance: format!(
@@ -350,9 +383,14 @@ MemFree:  1 kB
             subjects,
             vec!["kernel-version", "cpu-count", "memory-total-kib"]
         );
-        assert_eq!(observed[0].value, "6.12.0-amd64");
-        assert_eq!(observed[1].value, "2");
-        assert_eq!(observed[2].value, "8039284");
+        assert_eq!(
+            observed[0].value,
+            super::ObservedValue::Text("6.12.0-amd64".into())
+        );
+        // Counts and sizes are carried as numbers, which is what makes them comparable to the
+        // next reading rather than two strings that happen to differ.
+        assert_eq!(observed[1].value, super::ObservedValue::Number(2));
+        assert_eq!(observed[2].value, super::ObservedValue::Number(8_039_284));
     }
 
     use std::fs;
@@ -390,7 +428,10 @@ ID=debian
         let observation = result.observation.expect("typed observation");
         assert_eq!(observation.source_id, LINUX_SYSTEM_SOURCE_ID);
         assert_eq!(observation.subject, LINUX_SYSTEM_SUBJECT);
-        assert_eq!(observation.value, "Debian GNU/Linux 13 (trixie)");
+        assert_eq!(
+            observation.value,
+            super::ObservedValue::Text("Debian GNU/Linux 13 (trixie)".into())
+        );
         assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
         assert!(
             observation
@@ -448,7 +489,10 @@ ID=debian
         let observation = result.observation.expect("typed observation");
         assert_eq!(observation.source_id, NIXOS_SYSTEM_SOURCE_ID);
         assert_eq!(observation.subject, NIXOS_SYSTEM_SUBJECT);
-        assert_eq!(observation.value, "abc-nixos-system-host-26.05");
+        assert_eq!(
+            observation.value,
+            super::ObservedValue::Text("abc-nixos-system-host-26.05".into())
+        );
         assert_eq!((observation.freshness_until - now).whole_seconds(), 300);
 
         let protocol = observation.into_protocol().expect("protocol observation");
@@ -519,7 +563,7 @@ impl LinuxHostSource {
         if let Some(value) = read_trimmed(&self.kernel_version_path) {
             observations.push(self.observe(
                 "kernel-version",
-                value,
+                ObservedValue::Text(value),
                 &self.kernel_version_path,
                 now,
                 freshness_until,
@@ -528,7 +572,7 @@ impl LinuxHostSource {
         if let Some(value) = read_trimmed(&self.hostname_path) {
             observations.push(self.observe(
                 "hostname",
-                value,
+                ObservedValue::Text(value),
                 &self.hostname_path,
                 now,
                 freshness_until,
@@ -537,7 +581,7 @@ impl LinuxHostSource {
         if let Some(count) = read_cpu_count(&self.cpuinfo_path) {
             observations.push(self.observe(
                 "cpu-count",
-                count.to_string(),
+                ObservedValue::Number(i64::try_from(count).unwrap_or(i64::MAX)),
                 &self.cpuinfo_path,
                 now,
                 freshness_until,
@@ -546,7 +590,7 @@ impl LinuxHostSource {
         if let Some(kib) = read_total_memory_kib(&self.meminfo_path) {
             observations.push(self.observe(
                 "memory-total-kib",
-                kib.to_string(),
+                ObservedValue::Number(i64::try_from(kib).unwrap_or(i64::MAX)),
                 &self.meminfo_path,
                 now,
                 freshness_until,
@@ -559,7 +603,7 @@ impl LinuxHostSource {
     fn observe(
         &self,
         subject: &'static str,
-        value: String,
+        value: ObservedValue,
         path: &Path,
         acquired_at: OffsetDateTime,
         freshness_until: OffsetDateTime,
