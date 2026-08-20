@@ -24,7 +24,7 @@ Findings are ordered by how directly they contradict a stated invariant, not by 
 
 ## A1 — Journal acceptance is not durable across power loss
 
-**Where:** [`Journal.cpp`](../mind/foundation/storage/src/Journal.cpp) constructor, `PRAGMA
+**Where:** ``Journal.cpp`` constructor, `PRAGMA
 synchronous=NORMAL` alongside `journal_mode=WAL`; acceptance is published from `Journal::append`
 after `COMMIT`.
 
@@ -48,14 +48,14 @@ silently.
 
 ## A2 — The resilient RPC stack is not used on the presentation path
 
-**Where:** [`RpcClient.cpp`](../mind/foundation/fabric/src/RpcClient.cpp) `RpcClient::call` uses
-`QDBusPendingCall::waitForFinished()`. [`PresenceService.cpp`](../mind/organs/presenced/service/PresenceService.cpp)
+**Where:** ``RpcClient.cpp`` `RpcClient::call` uses
+`QDBusPendingCall::waitForFinished()`. ``PresenceService.cpp``
 performs its compound reads and mutations through that client.
 
 **Claim under test:** the checkpoint's "RPC resilience: 3" and "responsive async paths".
 
 **What the code does:** the project has two RPC stacks. `AsyncRpcClient`
-([`RpcResilience.cpp`](../mind/foundation/fabric/src/RpcResilience.cpp)) implements typed outcomes,
+(``RpcResilience.cpp``) implements typed outcomes,
 retry with deterministic jitter, and a circuit breaker, and is covered by `tst_rpc_resilience`. The
 Presence path does not use it: every downstream call blocks the presenced main thread.
 
@@ -67,7 +67,7 @@ other caller — the Plasma applet, a second surface, or healthd.
 **Correction — the claim originally made here about healthd was false.** This section first stated
 that healthd probes its endpoints with the same synchronous client, and that a Presence aggregation
 and a health refresh therefore stall each other. That is not what the code does.
-[`HealthService::Refresh`](../mind/services/healthd/HealthService.cpp) uses `AsyncRpcClient`
+``HealthService::Refresh`` uses `AsyncRpcClient`
 exclusively: it issues every probe concurrently with a 750 ms per-probe timeout under a 2 s refresh
 deadline, driven by a nested event loop that keeps serving healthd's own callers. healthd was
 already doing what A2 asks of presenced. The error came from reading `endpoints()` and the probe
@@ -133,7 +133,7 @@ disturbance is to the *graph*, not to healthd's responsiveness.
 
 ## A3 — presenced cannot be reported as degraded
 
-**Where:** [`PresenceService.cpp`](../mind/organs/presenced/service/PresenceService.cpp),
+**Where:** ``PresenceService.cpp``,
 `PresenceService::Ready()` returns `true` unconditionally and `PresenceService::Health()` returns
 `"healthy"` unconditionally.
 
@@ -155,8 +155,8 @@ a stated reason rather than a coincidence.
 
 ## A4 — Unbounded read paths on the single-writer process
 
-**Where:** [`EventService.cpp`](../mind/services/eventd/src/EventService.cpp) and
-[`Journal.cpp`](../mind/foundation/storage/src/Journal.cpp).
+**Where:** ``EventService.cpp`` and
+``Journal.cpp``.
 
 Three separate paths on `cybou-eventd` have no size bound, and each is a synchronous D-Bus method on
 the process that owns the only write path to the Journal:
@@ -198,9 +198,9 @@ None of this closes the same-user authorization gap; that needs caller checks in
 
 ## A5 — Fault injection is compiled into shipped binaries
 
-**Where:** [`RpcResilience.cpp`](../mind/foundation/fabric/src/RpcResilience.cpp) reads
+**Where:** ``RpcResilience.cpp`` reads
 `CYBOU_RPC_FAILPOINT` and `CYBOU_RPC_FAILPOINT_METHOD`;
-[`LifecycleService.cpp`](../mind/services/lifecycled/LifecycleService.cpp) reads
+``LifecycleService.cpp`` reads
 `CYBOU_LIFECYCLE_FAILPOINT`. Both call `qFatal` when the variable matches.
 
 **What the code does:** an environment variable crashes a Mind process in the installed build.
@@ -227,7 +227,7 @@ threat, not a finding on its own.
 
 ## A6 — Mind units carry no hardening directives
 
-**Where:** [`mind-services.nix`](../modules/mind-services.nix).
+**Where:** ``mind-services.nix``.
 
 Every unit sets `Type`, `BusName`, `ExecStart`, and restart policy, and nothing else. There is no
 `NoNewPrivileges`, no filesystem protection, no address-family restriction, and no memory bound.
@@ -282,7 +282,7 @@ state is the third option without the statement.
 ## A8 — One bounded-budget assertion tested ordering rather than the contract
 
 **Where:** `presenceSnapshotHasOneBoundedOwnerBudget` in
-[`tst_m4_process_integration.cpp`](../mind/tests/tst_m4_process_integration.cpp).
+``tst_m4_process_integration.cpp``.
 
 Found while fixing A1, not by reading: raising the Journal commit mode shifted timing by roughly
 sixteen milliseconds and turned this test red.

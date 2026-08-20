@@ -1,9 +1,0 @@
-# SPDX-FileCopyrightText: 2026 Cybou contributors
-# SPDX-License-Identifier: MIT
-
-[Desktop Entry]
-Name=Cybou Living Canvas
-Comment=Single-surface Cybou web desktop preview
-Exec=@SESSION@
-Type=Application
-DesktopNames=Cybou

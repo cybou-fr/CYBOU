@@ -10,7 +10,10 @@ SPDX-License-Identifier: MIT
 > `cybou-healthd`, `cybou-selfd`, `cybou-predictord`, `cybou-intentiond`, `cybou-perceptiond`,
 > `cybou-epistemicd`, `cybou-contextd`, `cybou-workspaced`, `cybou-lifecycled`, and `cybou-presenced`,
 > complete with systemd user units and zbus D-Bus service implementations. The C++/Qt/NixOS
-> implementation is retained as a frozen behavioral and compatibility reference oracle. See
+> implementation has been removed: nothing installed its packages and no Journal it wrote exists,
+> so the compatibility it proved had no data to protect. The canonical byte fixtures it produced
+> remain under `fixtures/` and the Rust tests still verify against them — which is weaker, because
+> fixtures can drift together with the code that reads them, and stronger than nothing. See
 > [ADR-0038](adr/ADR-0038-rust-first-codebase.md) and [ADR-0039](adr/ADR-0039-debian-13-base-system.md).
 
 ## Rust Mind foundation status
@@ -19,7 +22,8 @@ SPDX-License-Identifier: MIT
 > that compiles on any platform. Everything behind `cfg(target_os = "linux")` — the twelve daemons,
 > their D-Bus surfaces and the Event1 origin-authentication path — had drifted out of sync with
 > zbus 5 and did not build at all, because `cybou-fabric` failed first and thirteen crates depend
-> on it. The journal-writer oracle did not compile either, and the multi-daemon integration script
+> on it. The journal-writer oracle did not compile either — it has since been removed with the
+> rest of the C++ tree — and the multi-daemon integration script
 > had never run. All of these now pass on the Debian 13 builder, which is what "builds" below is
 > claiming. A daemon listed as complete means its gate runs and passes, not that its behaviour has
 > been exercised beyond what that gate covers.

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 <div align="center">
 
-![Cybou Logo](packages/horizon-assets/cybou-aperture.svg)
+![Cybou Logo](www/assets/cybou-aperture.svg)
 
 # Cybou
 

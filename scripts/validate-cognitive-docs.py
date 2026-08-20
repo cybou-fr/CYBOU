@@ -71,21 +71,15 @@ def check_relative_markdown_links(repo: Path, path: Path) -> None:
 
 
 
-# The installed daemons are declared once, in the package's own install check. Counting them there
-# means the documentation is measured against what actually ships rather than against a number
-# somebody remembered to update.
-# Test suites are declared once, in the tests CMakeLists. Counting them there is the same discipline
-# as counting daemons in the package: the documentation is measured against what the build actually
-# registers rather than against a number somebody remembered to update.
-def count_test_suites(repo):
-    text = (repo / "mind/tests/CMakeLists.txt").read_text(encoding="utf-8")
-    return len(re.findall(r"add_test\(", text))
-
-
+# The installed daemons are declared once, in the systemd user units that ship them. Counting them
+# there means the documentation is measured against what actually starts rather than against a
+# number somebody remembered to update.
+#
+# This used to count them in the Nix package's install check, and the test suites in the C++
+# CMakeLists. Both are gone with the implementation they described; the discipline is the same, so
+# it moved to the units rather than being dropped with them.
 def count_installed_daemons(repo):
-    text = (repo / "packages/cybou-mind/default.nix").read_text(encoding="utf-8")
-    body = text.split("for daemon in", 1)[1].split("; do", 1)[0]
-    return len(re.findall("cybou-[a-z]+d", body))
+    return len(list((repo / "systemd/user").glob("cybou-*d.service")))
 
 
 NUMBER_WORDS = {
@@ -296,11 +290,9 @@ def main(argv: list[str]) -> int:
         ("Rust completion definition", "## Definition of done"),
     ):
         require(paths["rust_migration"], label, needle)
-    require(
-        paths["current"],
-        "Rust target versus current implementation",
-        "no Rust Mind owner or complete desktop has cut over yet",
-    )
+    # The claim this used to pin — that no Rust owner had cut over — stopped being true when they
+    # did. Its own warning above applies to itself: a validator that pins the wrong answer turns a
+    # documentation fix into a build failure.
     require(
         paths["building"],
         "Rust build migration notice",
@@ -359,11 +351,6 @@ def main(argv: list[str]) -> int:
         paths["current"],
         "current Mind owner count",
         f"{number_word(daemon_count)} Mind owners",
-    )
-    require(
-        paths["current"],
-        "current test suite count",
-        f"{number_word(count_test_suites(repo))} CTest suites",
     )
     require(
         paths["installation"],

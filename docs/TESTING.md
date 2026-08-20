@@ -148,8 +148,9 @@ interruption cannot invent a lifecycle transition, then verifies successful reco
 suspends eventd, refreshes Health1, and restarts presenced with a one-second compound-command
 budget. Promise must fail closed inside a three-second external client deadline; the same owner is
 then resumed and Event1 count and Plasma PID must remain unchanged. The current bounded transport
-and remaining-budget implementation returns in under one second in this gate. Run it
-with `nix build .#checks.x86_64-linux.m6-recovery-boundary --print-build-logs` on a KVM host.
+and remaining-budget implementation returns in under one second in this gate. It ran on a KVM host
+against the NixOS composition, which no longer exists; the assertions it made about Plasma and
+about eventd suspension have no replacement on Debian yet.
 
 `eventd-integration` proves consumer registration, exact backlog, idempotent/monotonic advancement,
 rejection of backward and ahead-of-head offsets, invalid-ID rejection, and persistence across an
@@ -224,17 +225,17 @@ scripts/vps-checks.sh fast
 scripts/vps-checks.sh release
 ```
 
-A green run is evidence about the Debian/Rust target itself. NixOS VM gates remain legacy evidence
-until the hard cutover replaces them with Debian service and reboot integration tests.
+A green run is evidence about the Debian/Rust target itself, and it is now the only such evidence:
+the NixOS VM gates were removed with the NixOS composition they booted. They described a system
+nothing is aimed at, so what they proved was true of nothing that ships. Debian service and reboot
+integration is the coverage that replaces them, and it does not exist yet — that gap is real and is
+recorded here rather than hidden by a gate that passed about something else.
 
 ## Build order
 
 ```bash
-nix build .#packages.x86_64-linux.cybou-mind --print-build-logs
-nix build .#packages.x86_64-linux.cybou-presence-applet --print-build-logs
-nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
-nix build .#checks.x86_64-linux.lifecycle-continuity --print-build-logs
-nix build .#checks.x86_64-linux.vm-smoke --print-build-logs
+cargo build --workspace --release --locked
+cd crates/living-canvas && trunk build --release
 ```
 
 Do not mark a milestone complete from compilation alone. `CURRENT_STATE.md` and `ROADMAP.md` may

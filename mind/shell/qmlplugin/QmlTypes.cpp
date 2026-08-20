@@ -1,4 +1,0 @@
-// SPDX-FileCopyrightText: 2026 Stanislav Saveliev
-// SPDX-License-Identifier: MIT
-
-#include "QmlTypes.h"
