@@ -188,6 +188,21 @@ impl EpistemicCore {
         evidence_id: Option<Uuid>,
         now: OffsetDateTime,
     ) {
+        self.ingest_at(subject, value, confidence, evidence_id, now, None);
+    }
+
+    /// Ingest an observation that came from a known position in the Journal.
+    ///
+    /// The sequence travels with the beliefs so both are written in one step.
+    pub fn ingest_at(
+        &self,
+        subject: impl Into<String>,
+        value: impl Into<String>,
+        confidence: f64,
+        evidence_id: Option<Uuid>,
+        now: OffsetDateTime,
+        at_sequence: Option<u64>,
+    ) {
         let subject_str = subject.into();
         let value_str = value.into();
 
@@ -218,11 +233,28 @@ impl EpistemicCore {
             entry.evidence.push(id);
         }
 
-        let cur = self.cursor();
-        if self.persist_candidate(cur, &candidate).is_ok()
-            && let Ok(mut lock) = self.beliefs.write()
+        self.commit(candidate, at_sequence);
+    }
+
+    /// Persist beliefs and the cursor that produced them as one value, then publish both.
+    ///
+    /// They have to move together. Persisting beliefs against the old cursor left the disk saying
+    /// "these beliefs, through event 41" when they were formed through 42, so a restart re-ingested
+    /// 42 — and the blending and dispute rules are not idempotent, so replaying one contribution
+    /// twice can change what the system believes.
+    fn commit(&self, beliefs: HashMap<String, EpistemicBelief>, at_sequence: Option<u64>) {
+        let cursor = at_sequence.unwrap_or_else(|| self.cursor());
+        if self.persist_candidate(cursor, &beliefs).is_err() {
+            return;
+        }
+        if let Ok(mut lock) = self.beliefs.write() {
+            *lock = beliefs;
+        }
+        if let Some(sequence) = at_sequence
+            && let Ok(mut cur) = self.cursor.write()
+            && sequence > *cur
         {
-            *lock = candidate;
+            *cur = sequence;
         }
     }
 
@@ -253,19 +285,14 @@ impl EpistemicCore {
             )
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
-            self.ingest(
+            self.ingest_at(
                 subject,
                 value,
                 envelope.confidence,
                 Some(envelope.message_id),
                 now,
+                Some(sequence),
             );
-
-            if let Ok(mut cur) = self.cursor.write()
-                && sequence > *cur
-            {
-                *cur = sequence;
-            }
         }
     }
 
@@ -323,6 +350,29 @@ fn observed_claim(payload: &[u8]) -> Option<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn beliefs_and_the_cursor_that_produced_them_are_written_together() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("epistemic-state.json");
+        let core = super::EpistemicCore::open(&path).expect("open state");
+
+        core.ingest_at(
+            "operating-system",
+            "Debian GNU/Linux 13 (trixie)",
+            1.0,
+            None,
+            time::OffsetDateTime::now_utc(),
+            Some(42),
+        );
+
+        // Persisting beliefs against the previous cursor left the disk claiming the beliefs of
+        // event 42 had been formed through 41, so a restart ingested 42 a second time — and the
+        // blending and dispute rules are not idempotent.
+        let restarted = super::EpistemicCore::open(&path).expect("reopen state");
+        assert_eq!(restarted.cursor(), 42);
+        assert_eq!(restarted.projection().len(), 1);
+    }
+
     #[test]
     fn beliefs_derived_by_an_older_rule_are_rebuilt_rather_than_trusted() {
         let dir = tempfile::tempdir().expect("temp dir");

@@ -18,6 +18,7 @@ thiserror.workspace = true
 uuid.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
+futures-util.workspace = true
 tokio.workspace = true
 zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
 

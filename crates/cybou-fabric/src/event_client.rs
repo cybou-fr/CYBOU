@@ -265,6 +265,93 @@ impl EventClient {
     }
 }
 
+/// How many rows one replay page asks for while catching up.
+#[cfg(target_os = "linux")]
+const REPLAY_PAGE: u32 = 512;
+
+/// Follow every contribution from a position, catching up first and then staying current.
+///
+/// Each of the derived organs had written its own version of this and each got it wrong in a
+/// different way: one replayed a single page and called it caught up, one subscribed without
+/// replaying at all, and all of them replayed before subscribing, so a contribution accepted
+/// between the two steps belonged to neither.
+///
+/// The order here is the whole point. Subscribing first means the stream already holds anything
+/// accepted while the catch-up runs; the catch-up then reads pages until it reaches the head it
+/// saw; and the live phase skips sequences the catch-up already delivered. Nothing arrives twice
+/// and nothing falls between the two.
+///
+/// Sequence numbers are derived from position because the Journal is contiguous — the writer
+/// enforces it and the verifier checks it — and `Replay` answers with rows after a sequence in
+/// order.
+///
+/// This never returns while the bus is alive; callers spawn it.
+///
+/// # Errors
+///
+/// Returns [`EventClientError`] when the session bus, the subscription, or the first read of the
+/// head cannot be established. Failures after that are per-message and skip that message.
+#[cfg(target_os = "linux")]
+pub async fn follow_contributions<F>(
+    from_sequence: u64,
+    mut on_contribution: F,
+) -> Result<(), EventClientError>
+where
+    F: FnMut(u64, &CanonicalEnvelope),
+{
+    use futures_util::StreamExt as _;
+
+    let connection = zbus::Connection::session()
+        .await
+        .map_err(|e| EventClientError::Rpc(e.to_string()))?;
+    let proxy = zbus::Proxy::new(
+        &connection,
+        EVENT.service,
+        EVENT.object_path,
+        EVENT.interface,
+    )
+    .await
+    .map_err(|e| EventClientError::Rpc(e.to_string()))?;
+
+    // Subscribe before reading the head, so the gap between them is covered by the stream.
+    let mut accepted = proxy
+        .receive_signal("Accepted")
+        .await
+        .map_err(|e| EventClientError::Rpc(e.to_string()))?;
+
+    let client = EventClient { connection };
+    let head = client.count().await?;
+
+    let mut cursor = from_sequence;
+    while cursor < head {
+        let page = client.replay(cursor, REPLAY_PAGE).await?;
+        if page.is_empty() {
+            break;
+        }
+        for envelope in &page {
+            cursor += 1;
+            on_contribution(cursor, envelope);
+        }
+    }
+
+    while let Some(message) = accepted.next().await {
+        let Ok((encoded, sequence)) = message.body().deserialize::<(Vec<u8>, u64)>() else {
+            continue;
+        };
+        // Already delivered by the catch-up: the stream held it while that ran.
+        if sequence <= cursor {
+            continue;
+        }
+        let Ok(envelope) = ciborium::from_reader::<CanonicalEnvelope, _>(encoded.as_slice()) else {
+            continue;
+        };
+        cursor = sequence;
+        on_contribution(sequence, &envelope);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EventClientError, decode_submit_reply};

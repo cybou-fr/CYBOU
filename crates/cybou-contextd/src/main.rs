@@ -5,11 +5,10 @@
 
 use std::{env, path::PathBuf, sync::Arc};
 
-use cybou_contextd::ContextCore;
-
-/// How many recent contributions a restarting organ catches up on.
 #[cfg(target_os = "linux")]
-const SEED_CONTRIBUTIONS: u32 = 32;
+use std::collections::HashMap;
+
+use cybou_contextd::ContextCore;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -35,10 +34,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use cybou_contextd::service::Context1Service;
         use cybou_fabric::CONTEXT;
 
-        // Nothing has ever fed this organ: its graph could only change if someone called its
-        // mutation methods over the bus, and nobody does. Association is built from the
-        // biography, so follow the same acceptance signal the workspace follows.
-        tokio::spawn(follow_acceptances(core.clone()));
+        // Association is built from the biography, so this follows the same primitive every other
+        // derived organ follows: subscribe, catch up to the head in pages, then stay live. The
+        // graph is derived state and is rebuilt from the Journal rather than remembered.
+        let context_core = core.clone();
+        tokio::spawn(async move {
+            let mut previous_in_episode: HashMap<uuid::Uuid, (String, uuid::Uuid)> = HashMap::new();
+            if let Err(error) =
+                cybou_fabric::event_client::follow_contributions(0, move |_sequence, envelope| {
+                    activate_from(&context_core, envelope, &mut previous_in_episode);
+                })
+                .await
+            {
+                println!("[cybou-contextd] Cannot follow Event1: {error}");
+            }
+        });
 
         println!("[cybou-contextd] Connecting to D-Bus session bus...");
         let service = Context1Service::new(core);
@@ -66,82 +76,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-/// Build associative context from the biography as it is written.
-///
-/// Association is not knowledge. What this follows is what occurred, and what it records is that
-/// two subjects occurred in one episode — nothing stronger.
-#[cfg(target_os = "linux")]
-async fn follow_acceptances(core: Arc<ContextCore>) {
-    use std::collections::HashMap;
-
-    use cybou_fabric::EVENT;
-    use cybou_protocol::canonical::CanonicalEnvelope;
-    use futures_util::StreamExt;
-    use uuid::Uuid;
-
-    let context_core = core;
-    let Ok(connection) = zbus::Connection::session().await else {
-        println!("[cybou-contextd] Cannot observe Event1: no session bus");
-        return;
-    };
-
-    // Subscribe before catching up, so a contribution accepted between the two is seen by the
-    // stream rather than falling into the gap between them.
-    let proxy = match zbus::Proxy::new(
-        &connection,
-        EVENT.service,
-        EVENT.object_path,
-        EVENT.interface,
-    )
-    .await
-    {
-        Ok(proxy) => proxy,
-        Err(error) => {
-            println!("[cybou-contextd] Cannot observe Event1: {error}");
-            return;
-        }
-    };
-    let mut accepted = match proxy.receive_signal("Accepted").await {
-        Ok(stream) => stream,
-        Err(error) => {
-            println!("[cybou-contextd] Cannot subscribe to Event1 Accepted: {error}");
-            return;
-        }
-    };
-    println!("[cybou-contextd] Following Event1 acceptances");
-
-    // The previous subject seen in each episode, so two subjects that occurred in the
-    // same episode can be linked. Only the previous one: a chain of pairs, not a clique,
-    // because "these two followed one another" is a weaker and more defensible claim than
-    // "all of these belong together".
-    let mut previous_in_episode: HashMap<Uuid, (String, Uuid)> = HashMap::new();
-
-    // Catch up on what was accepted before this organ was listening. Following alone leaves the
-    // graph empty until the next contribution, and the host facts this system observes are
-    // contributed only when they change — so after a restart the next one may never come.
-    if let Ok(client) = cybou_fabric::event_client::EventClient::session().await
-        && let Ok(envelopes) = client.recent(SEED_CONTRIBUTIONS).await
-    {
-        let mut seeded = 0usize;
-        for envelope in envelopes {
-            if activate_from(&context_core, &envelope, &mut previous_in_episode) {
-                seeded += 1;
-            }
-        }
-        println!("[cybou-contextd] Seeded associative context from {seeded} contributions");
-    }
-
-    while let Some(message) = accepted.next().await {
-        let Ok((encoded, _sequence)) = message.body().deserialize::<(Vec<u8>, u64)>() else {
-            continue;
-        };
-        let Ok(envelope) = ciborium::from_reader::<CanonicalEnvelope, _>(encoded.as_slice()) else {
-            continue;
-        };
-        activate_from(&context_core, &envelope, &mut previous_in_episode);
-    }
 }
 
 /// Activate the concept an envelope observed, and link it to the previous subject of its episode.

@@ -17,14 +17,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     {
-        use cybou_fabric::{EVENT, WORKSPACE, event_client::EventClient};
-        use cybou_protocol::canonical::CanonicalEnvelope;
+        use cybou_fabric::{WORKSPACE, event_client::EventClient};
         use cybou_workspaced::service::Workspace1Service;
-        use futures_util::StreamExt;
 
-        // Seed from the newest contributions, not the oldest. `replay(0, …)` returns the
-        // beginning of the Journal, so a workspace seeded that way opens attention on whatever
-        // the system did first and, with a two-minute half-life, weighs it at nothing.
+        // Attention is about what is recent, so this seeds from the tail rather than replaying the
+        // whole biography: a workspace that starts by weighing the system's opening moments
+        // deliberates over nothing. Live updates then arrive through the shared follower, which
+        // subscribes before it reads, so nothing accepted during startup is missed.
         let seed_core = core.clone();
         tokio::spawn(async move {
             if let Ok(client) = EventClient::session().await
@@ -38,47 +37,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
 
-        // A workspace that only ever sees its seed is not global: it would keep deliberating over
-        // the same contributions while the system moved on. Event1 announces every acceptance, so
-        // follow that instead of polling for it.
         let stream_core = core.clone();
         tokio::spawn(async move {
-            let Ok(connection) = zbus::Connection::session().await else {
-                println!("[cybou-workspaced] Cannot observe Event1: no session bus");
-                return;
+            // Only what arrives from now on: the tail above is the starting point, and the
+            // follower's own catch-up would re-read the whole Journal into a bounded buffer.
+            let from = match EventClient::session().await {
+                Ok(client) => client.count().await.unwrap_or(0),
+                Err(_) => 0,
             };
-            let proxy = match zbus::Proxy::new(
-                &connection,
-                EVENT.service,
-                EVENT.object_path,
-                EVENT.interface,
+            if let Err(error) = cybou_fabric::event_client::follow_contributions(
+                from,
+                move |_sequence, envelope| {
+                    stream_core.accept(envelope.clone());
+                },
             )
             .await
             {
-                Ok(proxy) => proxy,
-                Err(error) => {
-                    println!("[cybou-workspaced] Cannot observe Event1: {error}");
-                    return;
-                }
-            };
-            let mut accepted = match proxy.receive_signal("Accepted").await {
-                Ok(stream) => stream,
-                Err(error) => {
-                    println!("[cybou-workspaced] Cannot subscribe to Event1 Accepted: {error}");
-                    return;
-                }
-            };
-            println!("[cybou-workspaced] Following Event1 acceptances");
-            while let Some(message) = accepted.next().await {
-                let Ok((encoded, _sequence)) = message.body().deserialize::<(Vec<u8>, u64)>()
-                else {
-                    continue;
-                };
-                if let Ok(envelope) =
-                    ciborium::from_reader::<CanonicalEnvelope, _>(encoded.as_slice())
-                {
-                    stream_core.accept(envelope);
-                }
+                println!("[cybou-workspaced] Cannot follow Event1: {error}");
             }
         });
 
