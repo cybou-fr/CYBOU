@@ -34,6 +34,7 @@ cybou_ssh "
     cybou-perceptiond
     cybou-epistemicd
     cybou-contextd
+    cybou-meaningd
     cybou-workspaced
     cybou-lifecycled
     cybou-selfd

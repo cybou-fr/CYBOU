@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-meaningd"
+description = "Meaning1 owner: utterances become typed cognitive acts the Journal can be asked about"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ciborium.workspace = true
+cybou-fabric = { path = "../cybou-fabric" }
+cybou-meaning = { path = "../cybou-meaning" }
+cybou-protocol = { path = "../cybou-protocol" }
+serde.workspace = true
+time.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+cybou-meaning = { path = "../cybou-meaning" }

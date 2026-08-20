@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "linux")]
     {
         use cybou_fabric::{
-            CONTEXT, EPISTEMIC, EVENT, HEALTH, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION,
+            CONTEXT, EPISTEMIC, EVENT, HEALTH, IDENTITY, INTENTION, LIFECYCLE, MEANING, PERCEPTION,
             PREDICTOR, PRESENCE, SELF, WORKSPACE,
         };
         use cybou_healthd::service::{Health1Service, emit_changed};
@@ -65,6 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ("perceptiond", PERCEPTION),
                 ("epistemicd", EPISTEMIC),
                 ("contextd", CONTEXT),
+                ("meaningd", MEANING),
                 ("lifecycled", LIFECYCLE),
                 ("presenced", PRESENCE),
             ];

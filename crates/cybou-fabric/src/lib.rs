@@ -53,6 +53,7 @@ endpoint!(SELF, "Self", "cybou-selfd.service");
 endpoint!(WORKSPACE, "Workspace", "cybou-workspaced.service");
 endpoint!(PRESENCE, "Presence", "cybou-presenced.service");
 endpoint!(LIFECYCLE, "Lifecycle", "cybou-lifecycled.service");
+endpoint!(MEANING, "Meaning", "cybou-meaningd.service");
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

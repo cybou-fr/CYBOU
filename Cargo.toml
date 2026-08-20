@@ -12,6 +12,8 @@ members = [
     "crates/cybou-identityd",
     "crates/cybou-intentiond",
     "crates/cybou-lifecycled",
+    "crates/cybou-meaning",
+    "crates/cybou-meaningd",
     "crates/cybou-perception",
     "crates/cybou-perceptiond",
     "crates/cybou-predictord",

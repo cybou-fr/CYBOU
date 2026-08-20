@@ -25,7 +25,7 @@ SPDX-License-Identifier: MIT
 ## Rust Mind foundation status
 
 > Verification note (2026-08-19). Until this date the statement below was true only of the code
-> that compiles on any platform. Everything behind `cfg(target_os = "linux")` — the twelve daemons,
+> that compiles on any platform. Everything behind `cfg(target_os = "linux")` — the daemons,
 > their D-Bus surfaces and the Event1 origin-authentication path — had drifted out of sync with
 > zbus 5 and did not build at all, because `cybou-fabric` failed first and thirteen crates depend
 > on it. The journal-writer oracle did not compile either — it has since been removed with the
@@ -44,6 +44,7 @@ The repository builds all Mind services from one locked workspace:
 - `cybou-predictord`: Empirical forecasting, calibration, and outcome settlement (`org.cybou.Mind.Predictor1`).
 - `cybou-intentiond`: Commitments and obligations tracking (`org.cybou.Mind.Intention1`).
 - `cybou-perceptiond`: Linux system perception adapter (`org.cybou.Mind.Perception1`).
+- `cybou-meaningd`: The meaning boundary of ADR-0031 (`org.cybou.Mind.Meaning1`).
 - `cybou-epistemicd`: Epistemic proposition projection and belief validity (`org.cybou.Mind.Epistemic1`).
 - `cybou-contextd`: Associative and situational context management (`org.cybou.Mind.Context1`).
 - `cybou-workspaced`: Global Workspace Theory attention coalitions and focus selection (`org.cybou.Mind.Workspace1`).
@@ -271,7 +272,7 @@ Debian-to-NixOS conversion remains permanently forbidden.
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs thirty-seven CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and multi-process integration across the twelve Mind owners. Both counts
+Lifecycle1 process restart, and multi-process integration across the thirteen Mind owners. Both counts
 are checked against the build rather than trusted: the documentation validator derives them from the
 package's daemon list and the tests CMakeLists, so a document that falls behind the code fails the
 build instead of quietly misdescribing it. The process suite also proves a
@@ -655,9 +656,38 @@ that model. P6.7 is post-M6 latency hardening; the tree does not yet contain the
 the M9 learning runtime, the M10 authorized executor, the M11 agent, worker and model runtime, or
 the M12 security control plane.
 
+## The meaning boundary
+
+`cybou-meaningd` is the thirteenth process and the owner ADR-0031 asks for. It turns an utterance
+into a typed `CognitiveAct` and refuses to turn anything else into one: an utterance outside the
+vocabulary this build recognises produces no interpretation rather than a guess, and a reference it
+cannot settle stays unresolved rather than resolving to whichever candidate happened to score
+highest. Nothing in it is a generative model, and the two refusals are why it does not need one.
+
+An interpretation enters the biography as a pair. What the person said is an `Observation`, because
+it happened outside the Journal; what this organ took it to mean is a `Hypothesis` caused by that
+observation. No new contribution kind was needed, and a meaning layer that had required one would
+have been claiming something the rest of Mind has no way to reason about. It also means an act
+stays inspectable after the interpreter that produced it is stopped: the act is a row, beside the
+sentence it came from.
+
+A correction names the interpretation it disagrees with as evidence and is itself caused by its own
+sentence. The earlier reading stays exactly as recorded. A correction of an act the Journal does not
+hold is refused before it reaches Event1, so an ordinary rejection stays distinguishable from an
+unreachable Journal.
+
+Prose comes from a `ResponsePlan` and from nothing else: the realizer takes the plan and a language
+and has no other input, so a fluent sentence cannot acquire a claim Mind never made. Two languages
+render the same plan today.
+
+What is not there: composition operators (`Sequence`, `Conditional`, `Alternative`, `Constraint`,
+`Negation`), dialogue state across turns, and a planner — nothing yet builds a `ResponsePlan` from
+Mind state, so `Realize` is reachable and unused. ADR-0031's C5 is therefore not met, and the
+milestone is partial rather than complete.
+
 ## Process topology
 
-Mind now has twelve real user-session processes:
+Mind now has thirteen real user-session processes:
 
 ```text
 cybou-eventd
@@ -672,6 +702,7 @@ cybou-presenced
 cybou-perceptiond
 cybou-epistemicd
 cybou-contextd
+cybou-meaningd
 ```
 
 `plasmashell` no longer constructs Identity, Intentions, Predictor, SelfModel, Workspace, Journal,

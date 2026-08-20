@@ -83,6 +83,7 @@ spawn cybou-predictord
 spawn cybou-perceptiond
 spawn cybou-epistemicd
 spawn cybou-contextd
+spawn cybou-meaningd
 spawn cybou-workspaced
 spawn cybou-lifecycled
 
@@ -100,6 +101,7 @@ NAMES=(
     org.cybou.Mind.Perception1
     org.cybou.Mind.Epistemic1
     org.cybou.Mind.Context1
+    org.cybou.Mind.Meaning1
     org.cybou.Mind.Workspace1
     org.cybou.Mind.Lifecycle1
     org.cybou.Mind.Self1
@@ -316,6 +318,105 @@ echo "    Context1 activated at least one concept"
 # Keying them by organ collapsed everything one organ ever said into a single self-disputing
 # belief, and printed a payload where a claim belonged. Both derived organs are checked, because
 # both take the subject from the same place and both were wrong in the same way.
+echo "==> Verifying language crosses the meaning boundary as a typed act..."
+# ADR-0031 C1: what reaches Mind is an act, not the sentence. An empty answer means the utterance
+# was refused, which is what this build does with anything outside its vocabulary.
+interpreted="$(busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Interpret ss "Verify the chain" person)"
+if [ "$interpreted" = "ay 0" ]; then
+    echo "ERROR: Meaning1 could not interpret an utterance in its own vocabulary." >&2
+    exit 1
+fi
+echo "    Meaning1 turned an utterance into a typed act"
+
+# C8: nothing here is a generative model, and an utterance outside the vocabulary is refused rather
+# than guessed at. A layer that answered something for every input would have nothing to refuse
+# with, and every wrong reading would look exactly like a right one.
+guessed="$(busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Interpret ss "the kettle is boiling over there" person)"
+if [ "$guessed" != "ay 0" ]; then
+    echo "ERROR: Meaning1 produced an act for an utterance it has no vocabulary for." >&2
+    exit 1
+fi
+echo "    Meaning1 refused an utterance it has no vocabulary for"
+
+# C4: the act outlives whatever produced it, because it is a row. The Journal holds an Observation
+# for what was said and a Hypothesis for what it was taken to mean, and a Hypothesis is a derived
+# kind — Event1 accepted it only because it cited the utterance.
+speech_rows="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Count | awk '{print $2}')"
+if [ "$speech_rows" -lt 2 ]; then
+    echo "ERROR: an interpretation was reported and the Journal holds fewer than two rows." >&2
+    exit 1
+fi
+echo "    The utterance and its interpretation are in the biography"
+
+# C3: a correction appends rather than rewriting. It has to name a real prior act, so the act
+# identity is read out of the interpretation that was just recorded. It is the sixteen bytes that
+# follow the "actId" key in the CBOR the owner answered with; nothing else in the reply is needed.
+act_id_of() {
+    # busctl prints a byte array as decimal fields. The key "actId" is CBOR text-6 followed by a
+    # 16-byte string header, so 101 97 99 116 73 100 80 locates the identity that follows it.
+    printf '%s' "$1" | awk '
+    {
+        for (i = 1; i <= NF - 22; i++) {
+            if ($i == 101 && $(i+1) == 97 && $(i+2) == 99 && $(i+3) == 116 &&
+                $(i+4) == 73 && $(i+5) == 100 && $(i+6) == 80) {
+                out = ""
+                for (b = 0; b < 16; b++) {
+                    out = out sprintf("%02x", $(i + 7 + b))
+                    if (b == 3 || b == 5 || b == 7 || b == 9) {
+                        out = out "-"
+                    }
+                }
+                print out
+                exit
+            }
+        }
+    }'
+}
+
+prior_act="$(act_id_of "$interpreted")"
+if [ -z "$prior_act" ]; then
+    echo "ERROR: the interpretation Meaning1 answered with carries no act identity." >&2
+    exit 1
+fi
+
+# A correction naming an act the Journal does not hold corrects nothing, and is refused before it
+# reaches Event1 so an ordinary rejection stays distinguishable from an unreachable Journal.
+invented_correction="$(busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Correct sss 00000000-0000-4000-8000-000000000000 "No, the disk was fine" person)"
+if [ "$invented_correction" != "ay 0" ]; then
+    echo "ERROR: Meaning1 corrected an interpretation the Journal does not hold." >&2
+    exit 1
+fi
+echo "    Meaning1 refused to correct an interpretation the Journal does not hold"
+
+before_correction="$speech_rows"
+corrected="$(busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Correct sss "$prior_act" "No, the disk was fine" person)"
+if [ "$corrected" = "ay 0" ]; then
+    echo "ERROR: Meaning1 refused a correction of an act the Journal holds." >&2
+    exit 1
+fi
+after_correction="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Count | awk '{print $2}')"
+if [ "$after_correction" -le "$before_correction" ]; then
+    echo "ERROR: a correction was reported and the Journal did not grow: $before_correction -> $after_correction." >&2
+    exit 1
+fi
+# Appending, not rewriting: what was previously understood is still there to be argued with.
+still_held="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Contains s "$prior_act" | awk '{print $2}')"
+if [ "$still_held" != "true" ]; then
+    echo "ERROR: correcting an interpretation removed the interpretation it corrected." >&2
+    exit 1
+fi
+echo "    A correction appended and left what it corrected in place: $before_correction -> $after_correction"
+
+# C6: prose comes from a plan and from nothing else. Handed bytes that are not a plan, the
+# renderer says nothing rather than falling back on a sentence — a fallback is exactly how a claim
+# Mind never made would get into an answer, and it would read like every other answer.
+not_a_plan="$(busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Realize ays 0 en | awk '{print $2}')"
+if [ "$not_a_plan" != '""' ]; then
+    echo "ERROR: the renderer produced $not_a_plan from something that is not a plan." >&2
+    exit 1
+fi
+echo "    The renderer says nothing when handed something that is not a plan"
+
 echo "==> Verifying an assessment cannot cite a cause the Journal does not hold..."
 # Assess took a cause and ignored it, so an assessment naming a contribution that never existed
 # was indistinguishable from one naming a real cause.

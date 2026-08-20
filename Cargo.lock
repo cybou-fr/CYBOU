@@ -625,6 +625,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-meaning"
+version = "0.1.0"
+dependencies = [
+ "cybou-protocol",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "cybou-meaningd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-meaning",
+ "cybou-protocol",
+ "serde",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [

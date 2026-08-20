@@ -113,7 +113,7 @@ future autonomous actions independently testable.
                            SQLite Journal v2
 ```
 
-All twelve Mind services are separate `systemd --user` D-Bus daemons written in Rust. `cybou-eventd`
+All thirteen Mind services are separate `systemd --user` D-Bus daemons written in Rust. `cybou-eventd`
 is the only canonical Journal writer. Living Canvas is a pure read-model projection and user command
 gateway that cannot become a second cognitive owner.
 
@@ -135,7 +135,7 @@ gateway that cannot become a second cognitive owner.
 | Journal v3 commitments and crash-safe transitive erasure | Implemented — M7 slices |
 | Sensitivity as a durable schema axis | Implemented — M7 slices |
 | Distributed Mind prototype | Planned — M7 |
-| Structured language and meaning boundary | Planned — M8 |
+| Structured language and meaning boundary | Partial — ADR-0031, no generative model |
 | Lifelong learning and learned-artifact governance | Planned — M9 |
 | Governed action and remediation boundary | Planned — M10 |
 | Agent/worker runtime, model broker, and governed tool/MCP use | Planned — M11 |
