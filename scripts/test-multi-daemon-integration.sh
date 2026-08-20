@@ -167,11 +167,19 @@ if [ "$after" -le "$before" ]; then
 fi
 echo "    Promise reached Intention1: open obligations $before -> $after"
 
-if [ "$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 FulfillIndex i 0)" != "b true" ]; then
+# Close the obligation that was just promised, not whichever one happens to be first: Intention1
+# appends, so the new one is last. Fulfilling index 0 would have closed an unrelated obligation and
+# still looked like a passing check.
+if [ "$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 FulfillIndex i $((after - 1)))" != "b true" ]; then
     echo "ERROR: Presence1 could not fulfil the obligation it had just created." >&2
     exit 1
 fi
-echo "    FulfillIndex closed it through its owner"
+restored="$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 OpenCount | awk '{print $2}')"
+if [ "$restored" != "$before" ]; then
+    echo "ERROR: fulfilling the promised obligation left $restored open, expected $before." >&2
+    exit 1
+fi
+echo "    FulfillIndex closed it through its owner: open obligations $after -> $restored"
 
 echo "==> Verifying the associative context is built from what was accepted..."
 context="ay 1 128"
