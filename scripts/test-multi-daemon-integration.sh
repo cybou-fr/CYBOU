@@ -189,6 +189,43 @@ if [ "$context" = "ay 1 128" ]; then
 fi
 echo "    Context1 activated at least one concept"
 
+# The subject of a belief is the subject of what was observed, never the organ that reported it.
+# Keying them by organ collapsed everything one organ ever said into a single self-disputing
+# belief, and printed a payload where a claim belonged. Both derived organs are checked, because
+# both take the subject from the same place and both were wrong in the same way.
+echo "==> Verifying the derived organs name what was observed, not who observed it..."
+observed_subject="operating-system"
+for owner in Epistemic1:Beliefs Context1:ActiveContext; do
+    name="org.cybou.Mind.${owner%%:*}"
+    method="${owner##*:}"
+    path="/$(printf '%s' "$name" | tr . /)"
+    text=""
+    deadline=$((SECONDS + 30))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        # The reply is CBOR; the subjects inside it are plain text, which is all this needs to see.
+        text="$(busctl --user call "$name" "$path" "$name" "$method"             | tr ' ' '
+' | awk '$1 > 31 && $1 < 127 { printf "%c", $1 }')"
+        case "$text" in
+            *"$observed_subject"*) break ;;
+        esac
+        sleep 1
+    done
+    case "$text" in
+        *"$observed_subject"*) ;;
+        *)
+            echo "ERROR: $name never named the observed subject '$observed_subject'." >&2
+            exit 1
+            ;;
+    esac
+    case "$text" in
+        *organ.*)
+            echo "ERROR: $name named an organ as a subject; a claim is about what was observed." >&2
+            exit 1
+            ;;
+    esac
+    echo "    $name names '$observed_subject'"
+done
+
 echo "==> Verifying the global workspace follows new contributions..."
 moment="$(busctl --user call org.cybou.Mind.Workspace1 /org/cybou/Mind/Workspace1 org.cybou.Mind.Workspace1 MomentState)"
 if [ "$moment" = "ay 0" ]; then
