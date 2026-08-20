@@ -27,6 +27,82 @@ impl Presence1Service {
     pub fn new(core: Arc<PresenceCore>) -> Self {
         Self { core }
     }
+
+    /// Close the obligation at a position in the open list.
+    ///
+    /// Presence1 presents a list, so a person points at a position in it. Resolving that position
+    /// to an identity has to happen against the list Intention1 currently holds, or the command
+    /// would close whichever obligation had drifted into that slot.
+    async fn close_at(&self, conn: &zbus::Connection, index: i32, resolution: &str) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::INTENTION;
+
+            let Ok(index) = usize::try_from(index) else {
+                return false;
+            };
+            let Some(encoded) = call::<Vec<u8>, _>(conn, INTENTION, "Open", &()).await else {
+                return false;
+            };
+            let Ok(open) = ciborium::from_reader::<Vec<OpenIntention>, _>(encoded.as_slice())
+            else {
+                return false;
+            };
+            let Some(target) = open.get(index) else {
+                return false;
+            };
+            return call(
+                conn,
+                INTENTION,
+                "Close",
+                &(target.id.to_string().as_str(), resolution, ""),
+            )
+            .await
+            .unwrap_or(false);
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (conn, index, resolution);
+            false
+        }
+    }
+}
+
+/// Only the identity is needed to close an obligation someone pointed at.
+#[cfg(target_os = "linux")]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenIntention {
+    id: uuid::Uuid,
+}
+
+/// Ask one owner for something, treating any failure as no answer.
+///
+/// Presence1 presents and asks; it never holds the state it is talking about. Every command here
+/// is a call to the owner that does.
+#[cfg(target_os = "linux")]
+async fn call<T, A>(
+    conn: &zbus::Connection,
+    endpoint: cybou_fabric::BusEndpoint,
+    method: &str,
+    args: &A,
+) -> Option<T>
+where
+    T: serde::de::DeserializeOwned + zbus::zvariant::Type,
+    A: serde::Serialize + zbus::zvariant::DynamicType,
+{
+    conn.call_method(
+        Some(endpoint.service),
+        endpoint.object_path,
+        Some(endpoint.interface),
+        method,
+        args,
+    )
+    .await
+    .ok()?
+    .body()
+    .deserialize()
+    .ok()
 }
 
 #[allow(
@@ -96,49 +172,158 @@ impl Presence1Service {
         buf
     }
 
-    /// Recent activity envelopes encoded as CBOR.
-    async fn activity(&self, _limit: i32) -> Vec<u8> {
-        vec![]
+    /// Recent contributions as CBOR, as Event1 holds them.
+    async fn activity(&self, #[zbus(connection)] conn: &zbus::Connection, limit: i32) -> Vec<u8> {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::EVENT;
+            return call(conn, EVENT, "Recent", &(limit.clamp(1, 128),))
+                .await
+                .unwrap_or_default();
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (conn, limit);
+            Vec::new()
+        }
     }
 
-    /// Detailed obligations list encoded as CBOR.
-    async fn detailed_obligations(&self) -> Vec<u8> {
-        vec![]
+    /// Open obligations as CBOR, as Intention1 holds them.
+    async fn detailed_obligations(&self, #[zbus(connection)] conn: &zbus::Connection) -> Vec<u8> {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::INTENTION;
+            return call(conn, INTENTION, "Open", &()).await.unwrap_or_default();
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = conn;
+            Vec::new()
+        }
     }
 
-    /// User mutation: promise an obligation (fails closed with empty string when unexecuted).
-    async fn promise(&self, _description: String) -> String {
-        String::new()
+    /// Promise an obligation. Intention1 owns it; this only asks.
+    async fn promise(
+        &self,
+        #[zbus(connection)] conn: &zbus::Connection,
+        description: String,
+    ) -> String {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::INTENTION;
+            return call(
+                conn,
+                INTENTION,
+                "Form",
+                &(description.as_str(), "user promise", ""),
+            )
+            .await
+            .unwrap_or_default();
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (conn, description);
+            String::new()
+        }
     }
 
-    /// User mutation: trigger self reflection (fails closed with false when unexecuted).
-    async fn reflect(&self) -> bool {
-        false
+    /// Ask Self1 to assess itself. The assessment is its own; this only asks for one.
+    async fn reflect(&self, #[zbus(connection)] conn: &zbus::Connection) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::SELF;
+            return call::<Vec<u8>, _>(conn, SELF, "Measure", &())
+                .await
+                .is_some_and(|report| !report.is_empty());
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = conn;
+            false
+        }
     }
 
-    /// User mutation: fulfill intention at index (fails closed with false when unexecuted).
-    async fn fulfill_index(&self, _index: i32) -> bool {
-        false
+    /// Fulfil the obligation at a position in the open list.
+    async fn fulfill_index(&self, #[zbus(connection)] conn: &zbus::Connection, index: i32) -> bool {
+        self.close_at(conn, index, "fulfilled").await
     }
 
-    /// User mutation: abandon intention at index (fails closed with false when unexecuted).
-    async fn abandon_index(&self, _index: i32) -> bool {
-        false
+    /// Abandon the obligation at a position in the open list.
+    async fn abandon_index(&self, #[zbus(connection)] conn: &zbus::Connection, index: i32) -> bool {
+        self.close_at(conn, index, "abandoned").await
     }
 
-    /// User mutation: record observation (fails closed with false when unexecuted).
-    async fn observe(&self, _subject: String, _value: f64) -> bool {
-        false
+    /// Record a numeric observation for Predictor1 to calibrate against.
+    ///
+    /// The subject is whatever the person chose to track, which is why nothing in the system
+    /// invents one: a forecast is only worth making about something someone cares about.
+    async fn observe(
+        &self,
+        #[zbus(connection)] conn: &zbus::Connection,
+        subject: String,
+        value: f64,
+    ) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::PREDICTOR;
+            // Predictor1 requires a contributing identity for every sample, so an observation
+            // arriving through Presence1 says it came from here rather than borrowing a
+            // contribution that did not produce it.
+            let origin = uuid::Uuid::new_v4().to_string();
+            return call(
+                conn,
+                PREDICTOR,
+                "Observe",
+                &(subject.as_str(), value, origin.as_str()),
+            )
+            .await
+            .unwrap_or(false);
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (conn, subject, value);
+            false
+        }
     }
 
-    /// User mutation: produce forecast (returns empty vec when unexecuted).
-    async fn predict(&self, _subject: String) -> Vec<u8> {
-        vec![]
+    /// Ask Predictor1 for a forecast as CBOR. Empty when it has no history to forecast from.
+    async fn predict(
+        &self,
+        #[zbus(connection)] conn: &zbus::Connection,
+        subject: String,
+    ) -> Vec<u8> {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::PREDICTOR;
+            return call(conn, PREDICTOR, "Predict", &(subject.as_str(),))
+                .await
+                .unwrap_or_default();
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (conn, subject);
+            Vec::new()
+        }
     }
 
-    /// User mutation: interrupt background lifecycle (fails closed with false when unexecuted).
-    async fn interrupt_lifecycle(&self, _cause: String) -> bool {
-        false
+    /// Tell Lifecycle1 a person is present, which is what interrupts consolidation.
+    async fn interrupt_lifecycle(
+        &self,
+        #[zbus(connection)] conn: &zbus::Connection,
+        cause: String,
+    ) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            use cybou_fabric::LIFECYCLE;
+            return call(conn, LIFECYCLE, "NotifyUserActivity", &(cause.as_str(),))
+                .await
+                .unwrap_or(false);
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (conn, cause);
+            false
+        }
     }
 
     /// Signal emitted when compound projection changes.

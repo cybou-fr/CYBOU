@@ -150,6 +150,29 @@ busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybo
 # contextd derives its graph from accepted contributions. An organ that subscribed but never
 # ingested, or ingested but never activated a concept, is indistinguishable from one that started
 # correctly — until something asks it what it holds.
+# Presence1 is a command gateway that owned nothing and did nothing: every mutation returned a
+# fail-closed default. Exercise one command end to end — Presence1 asks Intention1, Intention1
+# holds the obligation — and require the obligation to appear where its owner keeps it.
+echo "==> Verifying a Presence1 command reaches the owner that holds the state..."
+before="$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 OpenCount | awk '{print $2}')"
+promised="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Promise s "Verify the command path" | awk '{print $2}' | tr -d '"')"
+if [ -z "$promised" ]; then
+    echo "ERROR: Presence1 Promise returned no intention identity." >&2
+    exit 1
+fi
+after="$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 OpenCount | awk '{print $2}')"
+if [ "$after" -le "$before" ]; then
+    echo "ERROR: Presence1 answered with an identity, yet Intention1 holds no new obligation." >&2
+    exit 1
+fi
+echo "    Promise reached Intention1: open obligations $before -> $after"
+
+if [ "$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 FulfillIndex i 0)" != "b true" ]; then
+    echo "ERROR: Presence1 could not fulfil the obligation it had just created." >&2
+    exit 1
+fi
+echo "    FulfillIndex closed it through its owner"
+
 echo "==> Verifying the associative context is built from what was accepted..."
 context="ay 1 128"
 deadline=$((SECONDS + 30))

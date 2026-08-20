@@ -27,6 +27,13 @@ pub struct SubmitOutcome {
 /// [`EventClientError::Encoding`] when the reply cannot be read at all. A refusal is an answer,
 /// not a transport failure: the caller has to be able to tell "the Journal would not take this"
 /// from "the Journal could not be reached".
+#[cfg_attr(
+    not(target_os = "linux"),
+    allow(
+        dead_code,
+        reason = "the submit path that calls this is Linux-only, while the decoding itself is                   transport-independent and stays testable on every platform"
+    )
+)]
 fn decode_submit_reply(reply: &[u8]) -> Result<SubmitOutcome, EventClientError> {
     let decoded: SubmitReply =
         ciborium::from_reader(reply).map_err(|e| EventClientError::Encoding(e.to_string()))?;
@@ -47,6 +54,13 @@ fn decode_submit_reply(reply: &[u8]) -> Result<SubmitOutcome, EventClientError> 
 /// The sequence is a string because that is the Qt wire spelling Event1 kept, and `error` is empty
 /// on acceptance. Decoding some other shape here would report every accepted contribution as a
 /// failure while the row sat in the Journal.
+#[cfg_attr(
+    not(target_os = "linux"),
+    allow(
+        dead_code,
+        reason = "the submit path that calls this is Linux-only, while the decoding itself is                   transport-independent and stays testable on every platform"
+    )
+)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SubmitReply {
