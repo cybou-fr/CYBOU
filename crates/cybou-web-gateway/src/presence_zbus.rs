@@ -664,7 +664,7 @@ mod tests {
         let projection = SnapshotProjection {
             schema_version: WEB_SCHEMA_V1,
             projection_version: 98,
-            cursor: "0".into(),
+            cursor: "presence:98".into(),
             observed_at: "2026-08-19T17:56:40.069132466Z".into(),
             freshness: Freshness::Current,
             knowledge: KnowledgeState::Known,
@@ -681,7 +681,7 @@ mod tests {
 
         let decoded = ZbusPresenceSource::decode_snapshot(&bytes, 1).expect("typed projection");
         assert_eq!(decoded.projection_version, 98);
-        assert_eq!(decoded.cursor, "0");
+        assert_eq!(decoded.cursor, "presence:98");
         assert_eq!(decoded.capabilities.len(), 1);
         assert_eq!(decoded.capabilities[0].id, "identity-continuity");
         assert_eq!(decoded.capabilities[0].state, CapabilityState::Available);

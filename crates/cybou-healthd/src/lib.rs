@@ -202,10 +202,15 @@ impl HealthCore {
         let new_states = Self::state_fingerprint_of(&capability_projections);
         let changed = previous_states.as_ref() != Some(&new_states);
 
+        // A version that advanced on every probe counted probes, not projections: it said the
+        // view of the system was new when nothing about the system had changed. It advances when
+        // the capability states do, which is what a consumer resumes against.
         let Ok(mut version_guard) = self.projection_version.write() else {
             return false;
         };
-        *version_guard += 1;
+        if changed {
+            *version_guard += 1;
+        }
         let new_version = *version_guard;
 
         let observed_at = now.format(&Rfc3339).unwrap_or_default();
@@ -213,7 +218,11 @@ impl HealthCore {
         let snapshot = SnapshotProjection {
             schema_version: WEB_SCHEMA_V1,
             projection_version: new_version,
-            cursor: "0".into(),
+            // The cursor names the projection a consumer has already seen, so it has to move when
+            // the projection does. A constant meant a client resuming with it was told nothing had
+            // happened since — for ever — and that a projection built from a whole biography stood
+            // at position zero. It is not a Journal sequence and does not pretend to be one.
+            cursor: format!("presence:{new_version}"),
             observed_at,
             freshness: Freshness::Current,
             knowledge: KnowledgeState::Known,
@@ -300,6 +309,45 @@ fn evaluate_capability(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_cursor_moves_only_when_the_projection_does() {
+        let core = super::HealthCore::new();
+        let now = time::OffsetDateTime::now_utc();
+        let records: std::collections::HashMap<_, _> = [(
+            "eventd".to_string(),
+            super::ComponentHealthRecord {
+                health: super::ComponentHealth::Healthy,
+                detail: None,
+            },
+        )]
+        .into_iter()
+        .collect();
+
+        assert!(core.set_components(records.clone(), now));
+        let first = core.current_snapshot().expect("a projection was built");
+
+        // Probing again without anything changing must not claim a newer projection: a consumer
+        // resuming at `first` would be handed the same states under a cursor saying they are new.
+        assert!(!core.set_components(records.clone(), now));
+        let unchanged = core.current_snapshot().expect("a projection was built");
+        assert_eq!(unchanged.cursor, first.cursor);
+        assert_eq!(unchanged.projection_version, first.projection_version);
+
+        // A state that actually changed has to be reachable by a client resuming at the old
+        // cursor, which it only is if the cursor is different.
+        let mut changed_records = records;
+        changed_records.insert(
+            "eventd".to_string(),
+            super::ComponentHealthRecord {
+                health: super::ComponentHealth::Conflicted,
+                detail: Some("chain broken".into()),
+            },
+        );
+        assert!(core.set_components(changed_records, now));
+        let changed = core.current_snapshot().expect("a projection was built");
+        assert_ne!(changed.cursor, first.cursor);
+    }
+
     #[test]
     fn a_conflicted_journal_takes_the_biography_capability_down() {
         let core = super::HealthCore::new();

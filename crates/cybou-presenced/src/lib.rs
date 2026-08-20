@@ -99,8 +99,9 @@ impl PresenceCore {
     ) -> SnapshotProjection {
         SnapshotProjection {
             schema_version: WEB_SCHEMA_V1,
-            projection_version: 1,
-            cursor: "0".into(),
+            // Nothing was observed to build this from, so it stands at no projection at all.
+            projection_version: 0,
+            cursor: "presence:0".into(),
             observed_at: now.format(&Rfc3339).unwrap_or_default(),
             freshness,
             knowledge,
