@@ -320,7 +320,7 @@ async fn session(State(state): State<GatewayState>, headers: HeaderMap) -> Json<
     // and would state a trust level that is no longer the one that was established.
     if let Some(session) = state.session_for(&headers) {
         projection.mode = SessionMode::RemoteBrowser;
-        projection.consumer_id = format!("living-canvas:{}", session.username);
+        projection.consumer_id.clone_from(&session.username);
         projection.expires_at = session
             .expires_at
             .format(&Rfc3339)
@@ -725,7 +725,7 @@ mod tests {
             .expect("a body");
         let projection: SessionProjection = serde_json::from_slice(&body).expect("a projection");
         assert_eq!(projection.mode, SessionMode::RemoteBrowser);
-        assert_eq!(projection.consumer_id, "living-canvas:alice");
+        assert_eq!(projection.consumer_id, "alice");
     }
 
     #[tokio::test]
@@ -775,7 +775,7 @@ mod tests {
             .to_bytes();
         let session: SessionProjection = serde_json::from_slice(&bytes).expect("typed session");
         assert_eq!(session.mode, SessionMode::PublicPreview);
-        assert_eq!(session.consumer_id, "living-canvas:public-preview");
+        assert_eq!(session.consumer_id, "public-preview");
     }
 
     #[tokio::test]
