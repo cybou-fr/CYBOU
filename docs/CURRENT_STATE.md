@@ -66,6 +66,13 @@ wakes the gateway's event stream. `eventd` replays a bounded page of the hash ch
 seconds from a persisted checkpoint, and reports verification as a position rather than a verdict,
 so `Verified` means the chain was replayed to the head and nothing weaker.
 
+Two organs are wired but not complete against their ADRs, and the difference matters more than the
+wiring did. `Context1` is live and reconstructible — it rebuilds from sequence zero — but ADR-0029
+also asks for node, edge, depth, time and token budgets, privacy and retention inheritance,
+epistemic status and invalidation on an erasure epoch. None of those exist, so its status is
+`live integration implemented, ADR-0029 partial`. `Predictor1` has calibration and settlement and
+no source of its own beyond what a person reports through Presence1.
+
 `Lifecycle1` schedules one piece of maintenance and only one. After fifteen minutes without a
 person, and at most once every six hours, it moves to `Consolidating` and asks Event1 to
 re-verify the whole chain page by page, then returns to `Awake`. Both conditions are required:

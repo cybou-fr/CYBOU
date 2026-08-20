@@ -78,7 +78,11 @@ pub struct ContextBundle {
     pub items: Vec<ConceptNode>,
     /// Relevant associative links between items.
     pub associations: Vec<Association>,
-    /// Whether the context search was complete within its query budget.
+    /// Whether the search covered everything the query asked for within its budget.
+    ///
+    /// Answering `true` unconditionally would claim a completeness nobody established. ADR-0029
+    /// gives this a node, edge, depth, time and token budget; today the only bound is a salience
+    /// floor, so a bundle is complete exactly when nothing was left out by that floor.
     pub complete: bool,
 }
 
@@ -292,10 +296,16 @@ impl ContextCore {
             .filter(|a| item_labels.contains(&a.source) || item_labels.contains(&a.target))
             .collect();
 
+        // Complete against the only budget this version applies. When the bounded activation of
+        // ADR-0029 arrives, this is where its budgets decide the same field.
+        let excluded_by_salience = self.nodes.read().map_or(0, |nodes| {
+            nodes.values().filter(|n| n.salience < min_salience).count()
+        });
+
         ContextBundle {
             items,
             associations: relevant_assocs,
-            complete: true,
+            complete: excluded_by_salience == 0,
         }
     }
 

@@ -314,6 +314,11 @@ impl JournalWriter {
     /// Returns [`WriteError::Refused`] when a rule declines the contribution, leaving the Journal
     /// exactly as it was, or another [`WriteError`] when the database itself failed.
     pub fn append(&mut self, envelope: &CanonicalEnvelope) -> Result<Appended, WriteError> {
+        // A data key created for a contribution the Journal then refuses is a key protecting
+        // nothing, left behind by a decision that did not happen. It is removed on every path out
+        // of this function that does not end in a committed row.
+        let mut key_to_clean = None;
+
         let envelope_to_write;
         let target_envelope = if envelope.sealed {
             let (Some(store), Some(kek), Some(domain)) =
@@ -322,6 +327,7 @@ impl JournalWriter {
                 return Err(WriteError::SealedWithoutKeyStore);
             };
             let data_key = store.create_key_for(&envelope.message_id, kek)?;
+            key_to_clean = Some(envelope.message_id);
             let sealed = cybou_crypto::Seal::seal(&envelope.payload, &data_key)?;
             let mut stored = envelope.clone();
             let mut payload_bytes =
@@ -340,11 +346,25 @@ impl JournalWriter {
         // Immediate rather than deferred: the write lock is taken before the reference reads, so
         // a concurrent writer is refused here, at the start, rather than at the commit after the
         // admission rules have already been decided against state that moved.
+        let result = self.append_committed(target_envelope);
+        if result.is_err()
+            && let Some(contribution_id) = key_to_clean
+            && let Some(store) = &self.key_store
+        {
+            // Best effort: a key that outlives its failed contribution is unreachable rather than
+            // dangerous, and refusing the whole write because cleanup failed would turn a
+            // recoverable rejection into a lost contribution.
+            let _ = store.destroy_key_for(&contribution_id);
+        }
+        result
+    }
+
+    fn append_committed(&mut self, envelope: &CanonicalEnvelope) -> Result<Appended, WriteError> {
         let transaction = self
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(write_error)?;
-        let appended = append_within_transaction(&transaction, target_envelope)?;
+        let appended = append_within_transaction(&transaction, envelope)?;
         transaction.commit().map_err(write_error)?;
         Ok(appended)
     }
