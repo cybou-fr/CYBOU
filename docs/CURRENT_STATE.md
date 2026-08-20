@@ -97,7 +97,7 @@ is read-only.
 the host facts were chosen to be stable so the Journal stays a biography rather than a metrics
 stream — so a forecast has to be about something a person asked to track, through `Presence1.Observe`.
 
-R4 now also contains the bounded RPC policy and the `cybou-runtime` state foundation. Retry
+`cybou-fabric` and `cybou-runtime` carry the bounded RPC policy and the state foundation. Retry
 eligibility distinguishes read-only, idempotent, and non-idempotent operations; one outer deadline
 bounds all attempts, delay is capped with deterministic jitter, and the circuit breaker admits only
 one half-open probe. Runtime paths follow the predecessor XDG contract. Legacy-state migration
@@ -110,20 +110,19 @@ timeout, unavailable, rejected, unknown-outcome, and circuit-open results and co
 bus dispatches as attempts. Presence `Snapshot` is the first production caller and uses a single
 900 ms outer budget across proxy creation, dispatch, retries, and delays.
 
-R5 has begun with a deliberately non-authoritative `cybou-perception` library. It reproduces the
-first owner's pure system-generation acquisition boundary while excluding Event1 writes and D-Bus
-name ownership. Missing paths and regular files yield `source-unavailable` with no observation;
-valid symlinks yield the same `nixos.system` / `current-system` identity, target basename, provenance,
-and freshness semantics as the predecessor. This is replacement preparation, not a cutover.
+`cybou-perception` is the acquisition boundary. `LinuxSystemSource` reads `/etc/os-release`, and
+`LinuxHostSource` reads the kernel version, hostname, CPU count and total memory. A source that
+cannot be read yields no observation for that subject rather than an observation of nothing. The
+facts are deliberately ones that stay put: load and free memory change on every read, and a Journal
+that is a biography should not fill with the fact that a number moved.
 
-`cybou-protocol` now owns the first byte-proven cognitive payload: Observation v1. The Debian gate
-compiles the actual Qt `Observation.cpp` and requires both its bare-CBOR payload and deterministic
-UUID-v5 acquisition identity to match Rust fixtures. Rust validates RFC3339 instants, a strictly
-forward freshness horizon, non-null typed evidence, and non-empty provenance before encoding; UUID
-identity is derived from the validated acquisition time rather than a second caller-supplied clock.
-The Rust system-generation adapter converts successful acquisition directly into this protocol
-type, including Qt-compatible UTC millisecond timestamp spelling. It still has no Event1 write
-capability and remains safe to run as a non-authoritative comparison.
+`cybou-protocol` owns Observation v1, the first byte-proven cognitive payload. Rust validates
+RFC3339 instants, a strictly forward freshness horizon, non-null typed evidence, and non-empty
+provenance before encoding; UUID identity is derived from the validated acquisition time rather
+than a second caller-supplied clock. Its canonical bytes were proven against the Qt implementation
+while that existed; the fixtures produced then are checked in and the tests still verify against
+them, which is weaker than a second implementation answering live and is what remains once there is
+no Qt-written data left to be compatible with.
 
 The Rust storage foundation is `cybou-storage`. It opens existing Journals with explicit SQLite
 read-only and no-follow flags, requires `user_version=2`, verifies required tables and contribution

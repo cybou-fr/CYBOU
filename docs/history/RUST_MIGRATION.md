@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Rust Migration Plan
 
+> **Historical.** This plan is finished. The migration it describes completed on 2026-08-20: every
+> Mind owner is Rust, and the C++/Qt/NixOS implementation it calls a frozen reference was removed
+> once nothing installed its packages and no Journal it had written existed. Nothing here describes
+> the current system — [Current State](../CURRENT_STATE.md) does — and it is kept because a plan
+> that was followed is evidence about how the system came to be shaped this way.
+
 ## Mandate and current truth
 
 ADR-0038 declares the target: all authored executable product code moves to Rust on Debian 13,
@@ -229,7 +235,7 @@ part of one large cutover.
   open transaction.
 
   `cybou-journal-scale` measures the paths that grow with history against the budgets in
-  [Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md), which until now described only the
+  [Journal Scale Baseline and Budgets](../mind/SCALE_BUDGETS.md), which until now described only the
   C++ Journal. Build, verification, paged verification and row size are all flat per contribution
   across an order of magnitude, reproducing the predecessor's linearity finding through an
   independent implementation. The absolute numbers are from a different host and are recorded as

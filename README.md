@@ -11,19 +11,25 @@ SPDX-License-Identifier: MIT
 
 **An experimental agent-native operating system with a persistent cognitive control plane**
 
-Debian 13 · Rust/WebAssembly · Wayland/Chromium · one frontend for web and desktop · local-first
+Debian 13 · Rust/WebAssembly · one frontend for web and, as a target, desktop · local-first
 
 </div>
 
 ## What Cybou is
 
 Cybou is an experimental agent-native environment targeting Debian 13. The architecture builds one
-Rust/WebAssembly frontend (Living Canvas) shared by ordinary browsers and a lightweight Chromium/Wayland
-desktop shell. Its long-term target is an **agent-native computing environment** in which a persistent
+Rust/WebAssembly frontend (Living Canvas) shared by ordinary browsers and, as a target, a lightweight
+Chromium/Wayland desktop shell. The shell has no implementation in this tree: the Plasma packaging
+that once stood in for it was removed with the rest of the C++/Nix legacy, and a Debian-native
+launcher has not replaced it yet. Its long-term target is an **agent-native computing environment** in which a persistent
 **Mind** remembers and governs the system while models, agents, workers, tools, and user interfaces
 remain replaceable.
 
-All Linux builds, tests, and deployments run on Debian 13; see [Debian Build and Deployment](docs/DEPLOYMENT.md).
+Debian 13 is the production and integration authority: the daemons, the multi-daemon gate and every
+deployment run there, because they need a session bus and systemd user units. The portable half of
+the workspace — everything that is not behind `cfg(target_os = "linux")` — is also checked on an
+ordinary CI runner, which proves the code and nothing about the daemons. See
+[Debian Build and Deployment](docs/DEPLOYMENT.md) and [Testing](docs/TESTING.md).
 
 Mind owns durable cognitive continuity: biography, identity, commitments, prediction/calibration,
 epistemic state, associative context, learning, policy inputs, and the future authorization boundary.
@@ -124,7 +130,7 @@ gateway that cannot become a second cognitive owner.
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
 | Grounded local perception and epistemic projection (`cybou-epistemicd`) | Implemented — ADR-0027 |
-| Associative context engine (`cybou-contextd`) | Implemented — ADR-0029 |
+| Associative context live integration (`cybou-contextd`) | Partial — ADR-0029 |
 | Journal v3 commitments and crash-safe transitive erasure | Implemented — M7 slices |
 | Sensitivity as a durable schema axis | Implemented — M7 slices |
 | Distributed Mind prototype | Planned — M7 |

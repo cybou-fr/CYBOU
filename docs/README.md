@@ -29,7 +29,7 @@ with [Current State](CURRENT_STATE.md).
 - [Glossary](GLOSSARY.md) — normative vocabulary
 - [ADR index](adr/README.md) — decisions and their acceptance status
 - [Living Canvas Web UI Architecture](WEB_UI_ARCHITECTURE.md) — proposed single-frontend local/remote integration and migration plan
-- [Rust Migration Plan](RUST_MIGRATION.md) — Rust/WASM frontend and contract-preserving migration of all product code
+- [Rust Migration Plan](history/RUST_MIGRATION.md) — Rust/WASM frontend and contract-preserving migration of all product code
 
 ### Build, test, and release
 

@@ -123,7 +123,7 @@ def main(argv: list[str]) -> int:
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
         "web_ui_architecture": repo / "docs/WEB_UI_ARCHITECTURE.md",
-        "rust_migration": repo / "docs/RUST_MIGRATION.md",
+        "rust_migration": repo / "docs/history/RUST_MIGRATION.md",
         "current": repo / "docs/CURRENT_STATE.md",
         "building": repo / "docs/BUILDING.md",
         "deployment": repo / "docs/DEPLOYMENT.md",
@@ -198,11 +198,6 @@ def main(argv: list[str]) -> int:
         paths["deployment"],
         "active Debian target",
         "debian@vps-d0669a91.vps.ovh.net",
-    )
-    require(
-        paths["deployment"],
-        "forbidden NixOS conversion",
-        "Never attempt another in-place Debian-to-NixOS conversion",
     )
     require(
         paths["deployment"],
@@ -282,21 +277,14 @@ def main(argv: list[str]) -> int:
     ):
         require(paths["adr38"], label, needle)
 
-    for label, needle in (
-        ("Rust migration invariants", "## Non-negotiable invariants"),
-        ("Rust target stack", "## Target stack"),
-        ("Rust workstreams", "## Workstreams"),
-        ("component cutover", "## Cutover protocol for every component"),
-        ("Rust completion definition", "## Definition of done"),
-    ):
-        require(paths["rust_migration"], label, needle)
-    # The claim this used to pin — that no Rust owner had cut over — stopped being true when they
-    # did. Its own warning above applies to itself: a validator that pins the wrong answer turns a
-    # documentation fix into a build failure.
+    # What this section used to pin belonged to the migration: the sections of RUST_MIGRATION and
+    # a notice in BUILDING that the commands described the C++/Qt implementation. The migration is
+    # over and that implementation is gone, so pinning either would hold a finished transition open.
+    # BUILDING is now checked for what it must always answer: how to build the thing that ships.
     require(
         paths["building"],
-        "Rust build migration notice",
-        "The commands below describe the current C++/Qt implementation.",
+        "Rust build entry point",
+        "cargo build --workspace --release --locked",
     )
     require(
         paths["current"],

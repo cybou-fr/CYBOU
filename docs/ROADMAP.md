@@ -233,7 +233,7 @@ All new product implementation targets Rust; Living Canvas targets Rust/WASM. Ex
 owners are replaced incrementally through shared fixtures and reversible, one-owner cutovers rather
 than a flag-day rewrite. The sequence is foundation and contracts, web UI/gateway, shared runtime,
 leaf/derived organs, lifecycle and Journal owners, then removal of QML/Qt/CMake after parity and
-continuity evidence. See [Rust Migration Plan](RUST_MIGRATION.md) and
+continuity evidence. See [Rust Migration Plan](history/RUST_MIGRATION.md) and
 [ADR-0038](adr/ADR-0038-rust-first-codebase.md).
 
 Like Presence modernization, this does not reorder cognitive milestones. A milestone may advance

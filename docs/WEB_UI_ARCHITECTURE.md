@@ -557,4 +557,4 @@ The initial Rust types, fixtures, mock client, and browser shell now create that
 W0 is not complete until current `Presence1` projections and canonical cross-language values are
 captured and checked against the Rust representation.
 The wider native migration and component cutover rules are defined in
-[Rust Migration Plan](RUST_MIGRATION.md).
+[Rust Migration Plan](history/RUST_MIGRATION.md).

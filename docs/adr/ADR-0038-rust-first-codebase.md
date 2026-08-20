@@ -148,7 +148,7 @@ native wrapper may not introduce a second capability path around the gateway.
 
 ## Related documents
 
-- [Rust Migration Plan](../RUST_MIGRATION.md)
+- [Rust Migration Plan](../history/RUST_MIGRATION.md)
 - [Web UI Architecture](../WEB_UI_ARCHITECTURE.md)
 - [ADR-0037](ADR-0037-web-first-presence-and-desktop.md)
 - [ADR-0010](ADR-0010-journal-v2-schema-and-canonical-hashing.md)
