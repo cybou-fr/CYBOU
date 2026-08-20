@@ -9,6 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::card::{CardGeometry, CardId, CardInstance, CardPresentation};
+use crate::deck::DeckInstance;
 
 /// Desktop layout schema version 9 storage key in browser `localStorage`.
 pub const LAYOUT_KEY_V9: &str = "cybou.desktop.layout.v9";
@@ -123,6 +124,9 @@ pub struct DesktopLayout {
     pub schema_version: u32,
     /// Ordered list of card instances.
     pub cards: Vec<CardInstance>,
+    /// Optional decks grouping cards into tabbed presentation containers.
+    #[serde(default)]
+    pub decks: Vec<DeckInstance>,
 }
 
 impl Default for DesktopLayout {
@@ -138,6 +142,7 @@ impl DesktopLayout {
         Self {
             schema_version: 9,
             cards: Vec::new(),
+            decks: Vec::new(),
         }
     }
 
@@ -173,6 +178,7 @@ impl DesktopLayout {
         Self {
             schema_version: 9,
             cards,
+            decks: Vec::new(),
         }
     }
 
@@ -267,7 +273,94 @@ impl DesktopLayout {
     pub fn close_card(&mut self, id: CardId) {
         if id.spec().closable {
             self.cards.retain(|c| c.id != id);
+            for deck in &mut self.decks {
+                deck.remove_card(id);
+            }
+            self.decks.retain(|d| !d.is_empty());
         }
+    }
+
+    /// Create a new deck grouping given cards and position it on desktop.
+    pub fn create_deck(
+        &mut self,
+        title: impl Into<String>,
+        cards: Vec<CardId>,
+        x: f64,
+        y: f64,
+    ) -> String {
+        let id = format!("deck-{}", uuid::Uuid::new_v4());
+        let deck = DeckInstance::new(&id, title, cards, x, y);
+        self.decks.push(deck);
+        id
+    }
+
+    /// Add a card into an existing deck.
+    pub fn add_to_deck(&mut self, deck_id: &str, card: CardId) {
+        if let Some(deck) = self.decks.iter_mut().find(|d| d.id == deck_id) {
+            deck.add_card(card);
+        }
+    }
+
+    /// Detach a card from a deck, restoring it as an independent card next to the deck.
+    pub fn detach_from_deck(&mut self, deck_id: &str, card: CardId) {
+        let mut should_dissolve = false;
+        let mut detach_x = 50.0;
+        let mut detach_y = 50.0;
+
+        if let Some(deck) = self.decks.iter_mut().find(|d| d.id == deck_id) {
+            detach_x = deck.geometry.x + deck.geometry.width + 24.0;
+            detach_y = deck.geometry.y;
+            deck.remove_card(card);
+            if deck.len() <= 1 {
+                should_dissolve = true;
+            }
+        }
+
+        self.set_position(card, detach_x, detach_y);
+
+        if should_dissolve {
+            self.dissolve_deck(deck_id);
+        }
+    }
+
+    /// Dissolve a deck and restore its cards as independent spatial cards.
+    pub fn dissolve_deck(&mut self, deck_id: &str) {
+        if let Some(pos) = self.decks.iter().position(|d| d.id == deck_id) {
+            let deck = self.decks.remove(pos);
+            let mut offset = 0.0;
+            for c in deck.card_ids {
+                self.set_position(c, deck.geometry.x + offset, deck.geometry.y + offset);
+                offset += 40.0;
+            }
+        }
+    }
+
+    /// Find deck containing a given card, if any.
+    #[must_use]
+    pub fn deck_for_card(&self, card: CardId) -> Option<&DeckInstance> {
+        self.decks.iter().find(|d| d.contains(card))
+    }
+
+    /// Find mutable deck containing a given card, if any.
+    pub fn deck_for_card_mut(&mut self, card: CardId) -> Option<&mut DeckInstance> {
+        self.decks.iter_mut().find(|d| d.contains(card))
+    }
+
+    /// Check if a card is currently docked in any deck.
+    #[must_use]
+    pub fn is_in_deck(&self, card: CardId) -> bool {
+        self.decks.iter().any(|d| d.contains(card))
+    }
+
+    /// Get deck by ID.
+    #[must_use]
+    pub fn deck(&self, id: &str) -> Option<&DeckInstance> {
+        self.decks.iter().find(|d| d.id == id)
+    }
+
+    /// Get mutable deck by ID.
+    pub fn deck_mut(&mut self, id: &str) -> Option<&mut DeckInstance> {
+        self.decks.iter_mut().find(|d| d.id == id)
     }
 
     /// Parse layout from raw JSON string, supporting both v9 and v8 formats.
@@ -500,6 +593,71 @@ impl DesktopLayout {
     pub fn save(&self) {}
 }
 
+/// Undo/Redo stack for desktop layout modifications.
+#[derive(Clone, Debug, Default)]
+pub struct LayoutHistory {
+    undo_stack: Vec<DesktopLayout>,
+    redo_stack: Vec<DesktopLayout>,
+}
+
+impl LayoutHistory {
+    /// Maximum number of undo states retained in memory.
+    pub const MAX_HISTORY: usize = 25;
+
+    /// Construct a new empty history stack.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+        }
+    }
+
+    /// Record current layout state before an arrangement or significant mutation.
+    pub fn push(&mut self, layout: DesktopLayout) {
+        if self.undo_stack.last() == Some(&layout) {
+            return;
+        }
+        self.undo_stack.push(layout);
+        if self.undo_stack.len() > Self::MAX_HISTORY {
+            self.undo_stack.remove(0);
+        }
+        self.redo_stack.clear();
+    }
+
+    /// Undo to previous layout state.
+    pub fn undo(&mut self, current: DesktopLayout) -> Option<DesktopLayout> {
+        if let Some(prev) = self.undo_stack.pop() {
+            self.redo_stack.push(current);
+            Some(prev)
+        } else {
+            None
+        }
+    }
+
+    /// Redo to next layout state.
+    pub fn redo(&mut self, current: DesktopLayout) -> Option<DesktopLayout> {
+        if let Some(next) = self.redo_stack.pop() {
+            self.undo_stack.push(current);
+            Some(next)
+        } else {
+            None
+        }
+    }
+
+    /// Whether undo is available.
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Whether redo is available.
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,5 +771,58 @@ mod tests {
 
         // Other non-pinned cards are collapsed
         assert!(layout.presentation(CardId::Identity).collapsed);
+    }
+
+    #[test]
+    fn deck_management_and_dissolution() {
+        let mut layout = DesktopLayout::default();
+        let deck_id = layout.create_deck(
+            "System Overview",
+            vec![CardId::Identity, CardId::Session],
+            100.0,
+            100.0,
+        );
+
+        assert_eq!(layout.decks.len(), 1);
+        assert!(layout.is_in_deck(CardId::Identity));
+        assert!(layout.is_in_deck(CardId::Session));
+        assert!(!layout.is_in_deck(CardId::Capabilities));
+
+        layout.add_to_deck(&deck_id, CardId::Capabilities);
+        assert!(layout.is_in_deck(CardId::Capabilities));
+
+        // Detach one card
+        layout.detach_from_deck(&deck_id, CardId::Capabilities);
+        assert!(!layout.is_in_deck(CardId::Capabilities));
+        assert_eq!(layout.decks.len(), 1);
+
+        // Detach another, deck dissolves when 1 card left
+        layout.detach_from_deck(&deck_id, CardId::Session);
+        assert!(!layout.is_in_deck(CardId::Session));
+        assert!(!layout.is_in_deck(CardId::Identity));
+        assert_eq!(layout.decks.len(), 0);
+    }
+
+    #[test]
+    fn layout_history_undo_redo() {
+        let mut history = LayoutHistory::new();
+        let initial = DesktopLayout::default();
+
+        let mut modified = initial.clone();
+        modified.set_position(CardId::Identity, 999.0, 999.0);
+
+        history.push(initial.clone());
+        assert!(history.can_undo());
+        assert!(!history.can_redo());
+
+        let reverted = history.undo(modified.clone()).expect("undo succeeds");
+        // Compared with a tolerance: these are coordinates carried through a clone and back, and
+        // asserting bit equality on a float is a test that can fail for reasons the code is not
+        // about.
+        assert!((reverted.geometry(CardId::Identity).x - 70.0).abs() < f64::EPSILON);
+        assert!(history.can_redo());
+
+        let redone = history.redo(reverted).expect("redo succeeds");
+        assert!((redone.geometry(CardId::Identity).x - 999.0).abs() < f64::EPSILON);
     }
 }

@@ -239,6 +239,26 @@ CYBOU Shell is an isolated, unprivileged capability surface to the Debian 13 hos
 
 ---
 
+## Gateway architecture
+
+### What a stranger receives
+
+The gateway holds two sources of the same projection rather than one source and a flag. The public
+one drops anything above the sensitivity this deployment permits and withholds obligations
+entirely, because a promise is about the person by construction. The unfiltered one is reachable
+only by signing in. Every route reads whichever the request is entitled to, decided once where the
+session is read, so a route added later cannot forget to filter: filtering is not something a route
+does.
+
+### Who is entitled to the rest
+
+A reader signs in with a Linux account. The gateway never checks the password — that needs the
+shadow database, which it must not be able to read — so it asks `cybou-authd`, the one process that
+runs as root, over a socket only the gateway's user can open, and receives one bit. Membership in
+`cybou-access` is the grant and `usermod -L` is the revocation. A missing, expired or invented
+session is served the public projection rather than refused, because a public surface that answered
+401 to strangers would stop being a public surface.
+
 ### Why a separate process
 
 The current same-user D-Bus boundary is not a general authorization boundary. Adding HTTP parsing,

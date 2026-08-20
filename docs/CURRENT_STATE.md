@@ -275,7 +275,7 @@ Debian-to-NixOS conversion remains permanently forbidden.
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs thirty-seven CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and multi-process integration across the thirteen Mind owners. Both counts
+Lifecycle1 process restart, and multi-process integration across the fourteen Mind owners. Both counts
 are checked against the build rather than trusted: the documentation validator derives them from the
 package's daemon list and the tests CMakeLists, so a document that falls behind the code fails the
 build instead of quietly misdescribing it. The process suite also proves a
@@ -690,7 +690,7 @@ milestone is partial rather than complete.
 
 ## Process topology
 
-Mind now has thirteen real user-session processes:
+Mind now has fourteen real user-session processes:
 
 ```text
 cybou-eventd
@@ -706,6 +706,7 @@ cybou-perceptiond
 cybou-epistemicd
 cybou-contextd
 cybou-meaningd
+cybou-shelld
 ```
 
 `plasmashell` no longer constructs Identity, Intentions, Predictor, SelfModel, Workspace, Journal,

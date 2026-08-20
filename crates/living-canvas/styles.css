@@ -230,6 +230,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .shell-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #edf4f6; font-family: inherit; font-size: 11px; }
 .shell-input::placeholder { color: #64748b; }
 
+/* Deck Container & Tabbed Presentation */
+.deck-container { display: flex; flex-direction: column; padding: 12px 16px 16px 16px; border: 1px solid rgba(154,167,184,.36); background: rgba(10,17,26,.92); border-radius: 16px; box-shadow: 0 16px 45px rgba(0,0,0,.45); }
+.deck-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid rgba(154,167,184,.14); padding-bottom: 8px; margin-bottom: 8px; }
+.deck-tabs { display: flex; align-items: center; gap: 4px; overflow-x: auto; flex: 1; min-width: 0; }
+.deck-tab { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; border: 1px solid transparent; background: rgba(255,255,255,.04); color: var(--muted); font-size: 11px; cursor: pointer; transition: all 120ms ease; }
+.deck-tab:hover { background: rgba(255,255,255,.08); color: #dfe8ed; }
+.deck-tab.active { background: rgba(112,225,200,.12); border-color: rgba(112,225,200,.35); color: var(--accent); font-weight: 550; }
+.deck-tab-detach { display: inline-flex; align-items: center; justify-content: center; padding: 2px; border: 0; background: transparent; color: inherit; cursor: pointer; opacity: .7; border-radius: 4px; }
+.deck-tab-detach:hover { opacity: 1; background: rgba(255,255,255,.15); }
+.deck-controls { display: flex; align-items: center; gap: 4px; }
+.deck-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
 @media (max-width: 760px) {
   .topbar { grid-template-columns: 1fr auto; padding: 0 14px; }
   .runtime-switch { display: none; }

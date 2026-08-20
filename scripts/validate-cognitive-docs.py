@@ -88,6 +88,7 @@ NUMBER_WORDS = {
     11: "eleven",
     12: "twelve",
     13: "thirteen",
+    14: "fourteen",
     26: "twenty-six",
     27: "twenty-seven",
     28: "twenty-eight",

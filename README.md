@@ -113,7 +113,7 @@ future autonomous actions independently testable.
                            SQLite Journal v2
 ```
 
-All thirteen Mind services are separate `systemd --user` D-Bus daemons written in Rust. `cybou-eventd`
+All fourteen Mind services are separate `systemd --user` D-Bus daemons written in Rust. `cybou-eventd`
 is the only canonical Journal writer. Living Canvas is a pure read-model projection and user command
 gateway that cannot become a second cognitive owner.
 

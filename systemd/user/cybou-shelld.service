@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# cybou-shelld provides bounded Body capability execution inside cybou-jailfs.
+# Runs in the user manager with sandboxing protections enabled.
+
+[Unit]
+Description=CYBOU Bounded Body Shell Daemon
+Documentation=https://github.com/cybou-fr/CYBOU
+After=cybou-presenced.service
+PartOf=cybou-mind.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/cybou/cybou-shelld
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=default.target

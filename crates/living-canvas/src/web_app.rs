@@ -133,6 +133,50 @@ fn IconResizeGrip() -> impl IntoView {
 }
 
 #[component]
+fn IconUndo(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7v6h6"></path>
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconRedo(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 7v6h-6"></path>
+            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+        </svg>
+    }
+}
+
+#[allow(dead_code)]
+#[component]
+fn IconExternalLink(#[prop(default = 12)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h6v6"></path>
+            <path d="M10 14 21 3"></path>
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+        </svg>
+    }
+}
+
+#[allow(dead_code)]
+#[component]
+fn IconLayers(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"></path>
+            <path d="m2 12 8.58 3.91a2 2 0 0 0 1.66 0L21 12"></path>
+            <path d="m2 17 8.58 3.91a2 2 0 0 0 1.66 0L21 17"></path>
+        </svg>
+    }
+}
+
+#[component]
 fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
@@ -190,7 +234,27 @@ fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView 
                     </button>
                 }.into_any()
             } else {
-                ().into_any()
+                let in_deck = move || layout.get().is_in_deck(card);
+                view! {
+                    <Show when=in_deck>
+                        <button
+                            class="card-control-btn detach-btn"
+                            title="Detach from Deck"
+                            aria-label="Detach from Deck"
+                            on:click=move |_| {
+                                layout.update(|l| {
+                                    if let Some(d) = l.deck_for_card(card) {
+                                        let d_id = d.id.clone();
+                                        l.detach_from_deck(&d_id, card);
+                                    }
+                                });
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconExternalLink size=12 />
+                        </button>
+                    </Show>
+                }.into_any()
             }}
         </div>
     }
@@ -385,6 +449,34 @@ fn RelationshipEdge(
     }
 }
 
+fn apply_undo(
+    history: RwSignal<living_canvas::LayoutHistory>,
+    layout: RwSignal<living_canvas::DesktopLayout>,
+) {
+    let mut target = None;
+    history.update(|h| {
+        target = h.undo(layout.get_untracked());
+    });
+    if let Some(prev) = target {
+        layout.set(prev);
+        layout.get_untracked().save();
+    }
+}
+
+fn apply_redo(
+    history: RwSignal<living_canvas::LayoutHistory>,
+    layout: RwSignal<living_canvas::DesktopLayout>,
+) {
+    let mut target = None;
+    history.update(|h| {
+        target = h.redo(layout.get_untracked());
+    });
+    if let Some(next) = target {
+        layout.set(next);
+        layout.get_untracked().save();
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let (selected, set_selected) = signal("capabilities");
@@ -395,6 +487,7 @@ pub fn App() -> impl IntoView {
     let (capabilities_open, set_capabilities_open) = signal(false);
     let command_input = NodeRef::<leptos::html::Input>::new();
     let layout = RwSignal::new(load_layout());
+    let history = RwSignal::new(living_canvas::LayoutHistory::new());
     let dragging = RwSignal::new(None::<DragState>);
     let resizing = RwSignal::new(None::<ResizeState>);
     let runtime = RwSignal::new(RuntimeState::Loading);
@@ -456,6 +549,20 @@ pub fn App() -> impl IntoView {
                 if let Some(input) = command_input.get() {
                     let _ = input.focus();
                 }
+            } else if (event.ctrl_key() || event.meta_key())
+                && event.key().eq_ignore_ascii_case("z")
+            {
+                event.prevent_default();
+                if event.shift_key() {
+                    apply_redo(history, layout);
+                } else {
+                    apply_undo(history, layout);
+                }
+            } else if (event.ctrl_key() || event.meta_key())
+                && event.key().eq_ignore_ascii_case("y")
+            {
+                event.prevent_default();
+                apply_redo(history, layout);
             } else if event.key() == "Escape" {
                 set_command_open.set(false);
                 set_command_query.set(String::new());
@@ -724,22 +831,46 @@ pub fn App() -> impl IntoView {
                                     set_runtime_menu_open.set(false);
                                 }><IconTerminal size=15 /><span>"Open Shell"</span></button>
                                 <hr />
+                                <Show when=move || history.get().can_undo()>
+                                    <button on:click=move |_| {
+                                        apply_undo(history, layout);
+                                        set_runtime_menu_open.set(false);
+                                    }><IconUndo size=15 /><span>"Undo layout"</span></button>
+                                </Show>
+                                <Show when=move || history.get().can_redo()>
+                                    <button on:click=move |_| {
+                                        apply_redo(history, layout);
+                                        set_runtime_menu_open.set(false);
+                                    }><IconRedo size=15 /><span>"Redo layout"</span></button>
+                                </Show>
                                 <button on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
+                                    layout.update(|l| {
+                                        l.create_deck("Mind Core", vec![CardId::Identity, CardId::Session], 70.0, 50.0);
+                                    });
+                                    layout.get_untracked().save();
+                                    set_runtime_menu_open.set(false);
+                                }><IconLayers size=15 /><span>"Group: Mind Deck"</span></button>
+                                <button on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
                                     layout.get_untracked().save();
                                     set_runtime_menu_open.set(false);
                                 }><IconGrid size=15 /><span>"Arrange: Grid"</span></button>
                                 <button on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
                                     layout.get_untracked().save();
                                     set_runtime_menu_open.set(false);
                                 }><IconMinimize size=15 /><span>"Arrange: Compact"</span></button>
                                 <button on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
                                     layout.get_untracked().save();
                                     set_runtime_menu_open.set(false);
                                 }><Link size=15 /><span>"Arrange: Relations"</span></button>
                                 <button on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.set(DesktopLayout::default());
                                     layout.get_untracked().save();
                                     set_runtime_menu_open.set(false);
@@ -1316,8 +1447,25 @@ pub fn App() -> impl IntoView {
                             <hr style="width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16);" />
                             <small>"Arrange"</small>
                             <button
+                                class:hidden=move || !command_matches(&command_query.get(), "undo layout revert")
+                                on:click=move |_| {
+                                    apply_undo(history, layout);
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconUndo size=15 /><span><b>"Undo Layout Arrangement"</b><i>"Revert previous spatial state"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "redo layout forward")
+                                on:click=move |_| {
+                                    apply_redo(history, layout);
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconRedo size=15 /><span><b>"Redo Layout Arrangement"</b><i>"Restore spatial state"</i></span></button>
+                            <button
                                 class:hidden=move || !command_matches(&command_query.get(), "arrange grid")
                                 on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
@@ -1327,6 +1475,7 @@ pub fn App() -> impl IntoView {
                             <button
                                 class:hidden=move || !command_matches(&command_query.get(), "arrange compact")
                                 on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
@@ -1336,6 +1485,7 @@ pub fn App() -> impl IntoView {
                             <button
                                 class:hidden=move || !command_matches(&command_query.get(), "arrange relations")
                                 on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
@@ -1345,6 +1495,7 @@ pub fn App() -> impl IntoView {
                             <button
                                 class:hidden=move || !command_matches(&command_query.get(), "reset layout")
                                 on:click=move |_| {
+                                    history.update(|h| h.push(layout.get_untracked()));
                                     layout.set(DesktopLayout::default());
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
@@ -1366,26 +1517,40 @@ pub fn App() -> impl IntoView {
                             on:keydown=move |event: KeyboardEvent| {
                                 if event.key() == "Enter" {
                                     let q = command_query.get();
-                                    if command_matches(&q, "arrange grid") {
+                                    if command_matches(&q, "undo") {
                                         event.prevent_default();
+                                        apply_undo(history, layout);
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if command_matches(&q, "redo") {
+                                        event.prevent_default();
+                                        apply_redo(history, layout);
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if command_matches(&q, "arrange grid") {
+                                        event.prevent_default();
+                                        history.update(|h| h.push(layout.get_untracked()));
                                         layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
                                         layout.get_untracked().save();
                                         set_command_open.set(false);
                                         set_command_query.set(String::new());
                                     } else if command_matches(&q, "arrange compact") {
                                         event.prevent_default();
+                                        history.update(|h| h.push(layout.get_untracked()));
                                         layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
                                         layout.get_untracked().save();
                                         set_command_open.set(false);
                                         set_command_query.set(String::new());
                                     } else if command_matches(&q, "arrange relations") {
                                         event.prevent_default();
+                                        history.update(|h| h.push(layout.get_untracked()));
                                         layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
                                         layout.get_untracked().save();
                                         set_command_open.set(false);
                                         set_command_query.set(String::new());
                                     } else if command_matches(&q, "reset layout") {
                                         event.prevent_default();
+                                        history.update(|h| h.push(layout.get_untracked()));
                                         layout.set(DesktopLayout::default());
                                         layout.get_untracked().save();
                                         set_command_open.set(false);

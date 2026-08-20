@@ -10,14 +10,16 @@ use cybou_web_contracts::{
 use thiserror::Error;
 
 pub mod card;
+pub mod deck;
 pub mod layout;
 
 #[cfg(target_arch = "wasm32")]
 mod gateway_client;
 pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
+pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
-pub use layout::{ArrangementMode, DesktopLayout};
+pub use layout::{ArrangementMode, DesktopLayout, LayoutHistory};
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
