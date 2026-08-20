@@ -7,6 +7,10 @@ use std::{env, path::PathBuf, sync::Arc};
 
 use cybou_contextd::ContextCore;
 
+/// How many recent contributions a restarting organ catches up on.
+#[cfg(target_os = "linux")]
+const SEED_CONTRIBUTIONS: u32 = 32;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[cybou-contextd] Initializing Associative Context engine (association != truth)...");
@@ -72,11 +76,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn follow_acceptances(core: Arc<ContextCore>) {
     use std::collections::HashMap;
 
-    use cybou_contextd::AssociationOrigin;
     use cybou_fabric::EVENT;
-    use cybou_protocol::{canonical::CanonicalEnvelope, observation::ObservationV1};
+    use cybou_protocol::canonical::CanonicalEnvelope;
     use futures_util::StreamExt;
-    use time::OffsetDateTime;
     use uuid::Uuid;
 
     let context_core = core;
@@ -84,6 +86,9 @@ async fn follow_acceptances(core: Arc<ContextCore>) {
         println!("[cybou-contextd] Cannot observe Event1: no session bus");
         return;
     };
+
+    // Subscribe before catching up, so a contribution accepted between the two is seen by the
+    // stream rather than falling into the gap between them.
     let proxy = match zbus::Proxy::new(
         &connection,
         EVENT.service,
@@ -113,6 +118,21 @@ async fn follow_acceptances(core: Arc<ContextCore>) {
     // "all of these belong together".
     let mut previous_in_episode: HashMap<Uuid, (String, Uuid)> = HashMap::new();
 
+    // Catch up on what was accepted before this organ was listening. Following alone leaves the
+    // graph empty until the next contribution, and the host facts this system observes are
+    // contributed only when they change — so after a restart the next one may never come.
+    if let Ok(client) = cybou_fabric::event_client::EventClient::session().await
+        && let Ok(envelopes) = client.recent(SEED_CONTRIBUTIONS).await
+    {
+        let mut seeded = 0usize;
+        for envelope in envelopes {
+            if activate_from(&context_core, &envelope, &mut previous_in_episode) {
+                seeded += 1;
+            }
+        }
+        println!("[cybou-contextd] Seeded associative context from {seeded} contributions");
+    }
+
     while let Some(message) = accepted.next().await {
         let Ok((encoded, _sequence)) = message.body().deserialize::<(Vec<u8>, u64)>() else {
             continue;
@@ -120,47 +140,63 @@ async fn follow_acceptances(core: Arc<ContextCore>) {
         let Ok(envelope) = ciborium::from_reader::<CanonicalEnvelope, _>(encoded.as_slice()) else {
             continue;
         };
-        // The subject of the observation, not the organ that reported it: an association
-        // between concepts is only meaningful if both ends name something observed.
-        let Ok(observation) =
-            ciborium::from_reader::<ObservationV1, _>(envelope.payload.as_slice())
-        else {
-            continue;
-        };
-        if observation.subject.is_empty() {
-            continue;
-        }
+        activate_from(&context_core, &envelope, &mut previous_in_episode);
+    }
+}
 
-        let now = OffsetDateTime::from_unix_timestamp_nanos(
-            i128::from(envelope.wall_time_ms) * 1_000_000,
-        )
-        .unwrap_or_else(|_| OffsetDateTime::now_utc());
+/// Activate the concept an envelope observed, and link it to the previous subject of its episode.
+///
+/// Returns whether anything was activated, which is false for a contribution that carries no
+/// readable observation — a payload that does not decode names no subject, and a concept has to be
+/// about something.
+#[cfg(target_os = "linux")]
+fn activate_from(
+    core: &ContextCore,
+    envelope: &cybou_protocol::canonical::CanonicalEnvelope,
+    previous_in_episode: &mut std::collections::HashMap<uuid::Uuid, (String, uuid::Uuid)>,
+) -> bool {
+    use cybou_contextd::AssociationOrigin;
+    use cybou_protocol::observation::ObservationV1;
+    use time::OffsetDateTime;
 
-        context_core.activate(
+    // The subject of the observation, not the organ that reported it: an association between
+    // concepts is only meaningful if both ends name something observed.
+    let Ok(observation) = ciborium::from_reader::<ObservationV1, _>(envelope.payload.as_slice())
+    else {
+        return false;
+    };
+    if observation.subject.is_empty() {
+        return false;
+    }
+
+    let now =
+        OffsetDateTime::from_unix_timestamp_nanos(i128::from(envelope.wall_time_ms) * 1_000_000)
+            .unwrap_or_else(|_| OffsetDateTime::now_utc());
+
+    core.activate(
+        observation.subject.clone(),
+        envelope.confidence,
+        format!("observed by {}", envelope.origin_organ),
+        now,
+    );
+
+    if let Some((previous, previous_message)) = previous_in_episode.get(&envelope.correlation_id)
+        && previous != &observation.subject
+    {
+        // TemporalCooccurrence, deliberately: these two were seen in one episode and nothing more
+        // was established. ADR-0029 keeps the origin a closed set exactly so co-occurrence cannot
+        // quietly become knowledge.
+        core.associate(
+            previous.clone(),
             observation.subject.clone(),
             envelope.confidence,
-            format!("observed by {}", envelope.origin_organ),
-            now,
-        );
-
-        if let Some((previous, previous_message)) =
-            previous_in_episode.get(&envelope.correlation_id)
-            && previous != &observation.subject
-        {
-            // TemporalCooccurrence, deliberately: these two were seen in one episode and
-            // nothing more was established. ADR-0029 keeps the origin a closed set exactly
-            // so co-occurrence cannot quietly become knowledge.
-            context_core.associate(
-                previous.clone(),
-                observation.subject.clone(),
-                envelope.confidence,
-                AssociationOrigin::TemporalCooccurrence,
-                vec![*previous_message, envelope.message_id],
-            );
-        }
-        previous_in_episode.insert(
-            envelope.correlation_id,
-            (observation.subject, envelope.message_id),
+            AssociationOrigin::TemporalCooccurrence,
+            vec![*previous_message, envelope.message_id],
         );
     }
+    previous_in_episode.insert(
+        envelope.correlation_id,
+        (observation.subject.clone(), envelope.message_id),
+    );
+    true
 }
