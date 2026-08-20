@@ -15,6 +15,12 @@ SPDX-License-Identifier: MIT
 > remain under `fixtures/` and the Rust tests still verify against them — which is weaker, because
 > fixtures can drift together with the code that reads them, and stronger than nothing. See
 > [ADR-0038](adr/ADR-0038-rust-first-codebase.md) and [ADR-0039](adr/ADR-0039-debian-13-base-system.md).
+>
+> Passages further down describe Plasma, NixOS VM/KVM gates and the Qt Presence proxy. They record
+> what that platform did and what its gates proved, and none of it is evidence about the current
+> one: those gates were removed with the platform they ran on. Where a Debian replacement exists it
+> is named in place; where none exists, the property is unproven rather than inherited. The gates
+> that run today are listed in [TESTING.md](TESTING.md).
 
 ## Rust Mind foundation status
 
@@ -275,9 +281,12 @@ logical session count, and that compound Presence reads and mutations obey one b
 The M5 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
 run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, D-Bus run requests, and restart
 recovery of an active run into `Recovering`. Legacy v0 state is backed up and migrated to v1;
-unknown future versions fail closed. The focused headless NixOS gate proves that a real reboot
-preserves the exact persisted run and identity ID, enters `Recovering`, and increments the logical
-session count.
+unknown future versions fail closed. A real reboot preserving the exact persisted run and identity
+ID was proven by a headless NixOS gate, which was removed with the NixOS platform. On Debian, what
+is proven today is `scripts/test-systemd-continuity.sh`, run against the deployed host: identity and
+Journal survive `systemctl restart cybou-mind.target`, the session count advances, and the start it
+counted is a contribution Event1 holds. A machine coming back from being powered off is not proven
+by anything, and needs a host that can be rebooted on demand.
 
 The P3 transaction substrate now includes deterministic per-capability operation keys,
 high-water-mark-bound idempotent acknowledgements, optional capability deficits, required-work
@@ -305,15 +314,14 @@ exposes these as read-only properties; Mind Header and Dashboard give lifecycle 
 visual treatment while runtime availability remains a separate `awake` dimension. Projection age
 does not claim that underlying evidence is epistemically fresh.
 
-The focused headless NixOS gate now covers three boot cycles: baseline active-run/identity
-continuity, reboot after an owner Event1 commit but before coordinator acknowledgement, and reboot
-after terminal Event1 commit but before terminal run-state persistence. Both split-commit replays
-reuse their deterministic contributions and leave Event1 count unchanged. This closes the P3
-consolidation transaction exit gate.
+Three boot cycles were covered by the headless NixOS gate — baseline active-run/identity
+continuity, and both split-commit recovery windows — and that gate went with the platform. The
+split-commit behaviour it exercised is still implemented and still covered by unit and process
+tests; what is no longer covered is the same behaviour across a real boot.
 
-The focused P4 Plasma VM gate restarts the shipped `plasma-plasmashell.service` around an active
-run, observes a replacement PID and restored Plasma D-Bus surface, and proves that neither the
-exact persisted lifecycle run nor Event1 count changes across UI recreation.
+Plasma was the desktop of the removed Qt/NixOS platform, and the VM gate that restarted it around
+an active run went with it. There is no shipped desktop shell on Debian yet, so there is nothing
+for a UI-recreation gate to be about.
 
 P6.1 introduced `CapabilitySnapshot`; the current schema v2 keeps component health, capability state, typed
 deficit cause, recovery policy, observation/verification time, impact, and evidence/error reference
@@ -718,9 +726,10 @@ Identity uses a volatile runtime-session marker. Restarting `identityd` inside t
 reloads the current identity without incrementing `sessionCount`.
 
 The process integration suite additionally simulates a new login by removing only the volatile
-session marker and restarting the process graph. Focused booted NixOS gates prove identity, exact
-active-run continuity, both split-commit recovery windows, Plasma recreation, required-owner
-failure, and capability-specific recovery across real system transitions. Stronger in-place
+session marker and restarting the process graph. Booted NixOS gates once proved identity, exact
+active-run continuity, both split-commit recovery windows, required-owner failure, and
+capability-specific recovery across real system transitions; they were removed with NixOS and have
+no Debian replacement for the boot-crossing part. Stronger in-place
 upgrade reconciliation remains an explicit hardening track.
 
 ## Durable-to-visible ordering
@@ -854,8 +863,9 @@ the corresponding milestone is implemented and gated.
 - M2: complete.
 - M3: complete after the M3 compile repair included by M4.
 - M4: implementation present; repository gates remain the acceptance authority.
-- M5: evaluation milestone complete; lifecycle, continuity, consolidation transaction, Presence
-  projection, process/Plasma/reboot fault injection, and clean VM/ISO evidence are implemented.
+- M5: lifecycle, restart continuity, the consolidation transaction and the Presence projection are
+  implemented and gated on Debian. The reboot and VM/ISO evidence behind the original evaluation
+  belonged to the NixOS platform and does not stand for the current one.
 - M6: complete. P6.1–P6.6 implement the health graph, persistent snapshots, typed homeostasis,
   capability-aware Presence, authorized evidence-bound automatic scheduling, degraded behavior,
   recovery fault matrix, and focused KVM gate.

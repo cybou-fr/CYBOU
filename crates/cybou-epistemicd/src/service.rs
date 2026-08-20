@@ -43,7 +43,14 @@ impl Epistemic1Service {
 
     /// Overall health.
     async fn health(&self) -> String {
-        "healthy".to_string()
+        // A projection that has not read the whole Journal is working, not healthy: its answers
+        // are about part of a biography while claiming to be about all of it. Saying "healthy"
+        // regardless made the one state worth reporting the one state it could not report.
+        if self.core.is_caught_up() {
+            "healthy".to_string()
+        } else {
+            "degraded".to_string()
+        }
     }
 
     /// Last error diagnostic.
