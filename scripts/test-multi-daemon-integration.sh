@@ -194,6 +194,18 @@ if [ "$after" -le "$before" ]; then
 fi
 echo "    Promise reached Intention1: open obligations $before -> $after"
 
+# A promise the biography never heard of is the failure this path had: Kind::Intention is derived,
+# so an intention with no cause cannot enter the Journal, and a promise made through Presence1 had
+# no cause at all. Require the Journal to have grown by both the request and the intention.
+kinds="$(sqlite3 "$XDG_DATA_HOME/cybou/journal.sqlite3"     'SELECT group_concat(DISTINCT kind) FROM contribution;' 2>/dev/null || echo '')"
+case ",$kinds," in
+    *,11,*) echo "    The promise is in the biography as an Intention contribution" ;;
+    *)
+        echo "ERROR: a promise was made and the Journal holds no Intention contribution." >&2
+        exit 1
+        ;;
+esac
+
 # Close the obligation that was just promised, not whichever one happens to be first: Intention1
 # appends, so the new one is last. Fulfilling index 0 would have closed an unrelated obligation and
 # still looked like a passing check.

@@ -51,14 +51,21 @@ impl Presence1Service {
             let Some(target) = open.get(index) else {
                 return false;
             };
-            return call(
+            // The obligation is closed either way; only the record may be missing. Presence1
+            // reports the command as done and leaves the biography's own account to the Journal
+            // panel, rather than telling a person their promise did not close when it did.
+            let outcome: String = call(
                 conn,
                 INTENTION,
                 "Close",
                 &(target.id.to_string().as_str(), resolution, ""),
             )
             .await
-            .unwrap_or(false);
+            .unwrap_or_default();
+            if outcome == "closed-but-unrecorded" {
+                println!("[cybou-presenced] An obligation closed without reaching the Journal");
+            }
+            outcome.starts_with("closed")
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -73,7 +80,7 @@ impl Presence1Service {
 /// An observation is a root kind: it records something that happened outside the Journal and has
 /// no prior contribution to cite, which is exactly what a person reporting a measurement is.
 #[cfg(target_os = "linux")]
-async fn record_observation(subject: &str, value: f64) -> Option<uuid::Uuid> {
+async fn record_observation(subject: &str, value: ciborium::Value) -> Option<uuid::Uuid> {
     use cybou_fabric::event_client::EventClient;
     use cybou_protocol::{canonical::CanonicalEnvelope, observation::ObservationV1, unix_millis};
     use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -83,7 +90,7 @@ async fn record_observation(subject: &str, value: f64) -> Option<uuid::Uuid> {
     let observation = ObservationV1 {
         source_id: "presence.user".into(),
         subject: subject.to_owned(),
-        value: ciborium::Value::Float(value),
+        value,
         acquired_at: instant.clone(),
         // A person's report is about now; it says nothing about how long it stays true.
         freshness_until: instant,
@@ -266,11 +273,22 @@ impl Presence1Service {
         #[cfg(target_os = "linux")]
         {
             use cybou_fabric::INTENTION;
+
+            // A promise made with no cause cannot enter the Journal — Kind::Intention is derived
+            // and must name what it came from — so the main way a person creates a commitment used
+            // to leave it outside the biography entirely. What a person asked for is itself
+            // something that happened outside the Journal, which is what a root Observation
+            // records, and the intention is caused by it.
+            let cause =
+                record_observation("user-promise", ciborium::Value::Text(description.clone()))
+                    .await;
+            let cause = cause.map(|id| id.to_string()).unwrap_or_default();
+
             return call(
                 conn,
                 INTENTION,
                 "Form",
-                &(description.as_str(), "user promise", ""),
+                &(description.as_str(), "user promise", cause.as_str()),
             )
             .await
             .unwrap_or_default();
@@ -326,7 +344,9 @@ impl Presence1Service {
             // the type and lies about the fact: it names no contribution, so nothing could ever be
             // traced back to what was actually observed. Record the observation first and pass the
             // identity the Journal gave it.
-            let Some(contribution_id) = record_observation(&subject, value).await else {
+            let Some(contribution_id) =
+                record_observation(&subject, ciborium::Value::Float(value)).await
+            else {
                 return false;
             };
             return call(

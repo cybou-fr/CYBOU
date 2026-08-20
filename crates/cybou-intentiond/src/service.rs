@@ -197,16 +197,21 @@ impl Intention1Service {
         id.to_string()
     }
 
-    /// Close an intention by resolution ("fulfilled", "abandoned", "obsolete") or reject.
-    async fn close(&self, intention_id: String, resolution: String, note: String) -> bool {
+    /// Close an intention and say what became of the record, not only of the obligation.
+    ///
+    /// Answers `closed-and-recorded`, `closed-but-unrecorded`, or `not-closed`. A boolean could
+    /// only say the obligation was closed, and a caller told `true` while the Journal never
+    /// received the terminal Outcome has been told that a command was sent, not that its outcome
+    /// was observed — the exact confusion this system exists to refuse.
+    async fn close(&self, intention_id: String, resolution: String, note: String) -> String {
         let Ok(id) = Uuid::parse_str(&intention_id) else {
-            return false;
+            return "not-closed".to_string();
         };
         let res = match resolution.to_lowercase().as_str() {
             "fulfilled" => Resolution::Fulfilled,
             "abandoned" => Resolution::Abandoned,
             "obsolete" => Resolution::Obsolete,
-            _ => return false, // reject unknown resolution
+            _ => return "not-closed".to_string(), // reject unknown resolution
         };
         let note_opt = if note.is_empty() {
             None
@@ -218,19 +223,31 @@ impl Intention1Service {
         let contribution_id = self.core.contribution_of(id);
 
         if self.core.close(id, res, note_opt).is_err() {
-            return false;
+            return "not-closed".to_string();
         }
 
-        if let Some(contribution_id) = contribution_id {
-            let now = OffsetDateTime::now_utc();
-            if !submit_outcome(contribution_id, res, note_opt, now).await {
-                println!(
-                    "[cybou-intentiond] Outcome for contribution {contribution_id} was not accepted"
-                );
+        // An intention the Journal never took has no contribution to conclude, so there is nothing
+        // to record and nothing was lost. One the Journal did take, whose Outcome it then refused,
+        // leaves a biography that says an obligation was formed and never says how it ended.
+        let recorded = match contribution_id {
+            None => true,
+            Some(contribution_id) => {
+                let now = OffsetDateTime::now_utc();
+                let accepted = submit_outcome(contribution_id, res, note_opt, now).await;
+                if !accepted {
+                    println!(
+                        "[cybou-intentiond] Outcome for contribution {contribution_id} was not accepted"
+                    );
+                }
+                accepted
             }
-        }
+        };
 
-        true
+        if recorded {
+            "closed-and-recorded".to_string()
+        } else {
+            "closed-but-unrecorded".to_string()
+        }
     }
 
     /// Return open intentions encoded as CBOR.
