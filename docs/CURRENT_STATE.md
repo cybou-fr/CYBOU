@@ -281,12 +281,15 @@ logical session count, and that compound Presence reads and mutations obey one b
 The M5 lifecycle owner is present: lifecycle schema v1, legal mode transitions, atomic persistent
 run state, `org.cybou.Mind.Lifecycle1`, D-Bus/systemd activation, D-Bus run requests, and restart
 recovery of an active run into `Recovering`. Legacy v0 state is backed up and migrated to v1;
-unknown future versions fail closed. A real reboot preserving the exact persisted run and identity
-ID was proven by a headless NixOS gate, which was removed with the NixOS platform. On Debian, what
-is proven today is `scripts/test-systemd-continuity.sh`, run against the deployed host: identity and
+unknown future versions fail closed. Two gates run against the deployed host.
+`scripts/test-systemd-continuity.sh` proves the owners recover from process death: identity and
 Journal survive `systemctl restart cybou-mind.target`, the session count advances, and the start it
-counted is a contribution Event1 holds. A machine coming back from being powered off is not proven
-by anything, and needs a host that can be rebooted on demand.
+counted is a contribution Event1 holds. `scripts/test-reboot-continuity.sh` reboots the machine and
+proves the Mind comes back on its own with nobody logged in — which is what lingering, unit
+enablement and a user manager without a session amount to — with the same subject, an advanced
+session whose start Event1 holds, a Journal that did not shrink, a chain Event1 can still answer
+for, and the read-only surface serving again. The boot id is compared on both sides, so a reboot
+that silently did not happen fails rather than passes.
 
 The P3 transaction substrate now includes deterministic per-capability operation keys,
 high-water-mark-bound idempotent acknowledgements, optional capability deficits, required-work

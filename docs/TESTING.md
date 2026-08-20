@@ -81,11 +81,29 @@ It touches the live Mind — it restarts the target and stops one owner — so i
 post-deploy check rather than part of every gate run, and it puts the owner back even when an
 assertion fails.
 
+## What proves continuity across a real reboot
+
+```bash
+bash scripts/test-reboot-continuity.sh
+```
+
+Restarting the target proves the owners recover from process death. It cannot prove the machine can
+come back: lingering, unit enablement, a user manager starting with nobody logged in, and state that
+only exists because a directory happened to be warm are all untouched by restarting a target inside
+a session that is already running.
+
+This gate reboots the deployed host and then asserts that the Mind came back on its own, that the
+identity is the same subject, that the session advanced and its start is a contribution Event1
+holds, that the Journal did not shrink, that Event1 can still answer for its own chain, that the
+control plane reaches healthy, and that the read-only surface serves again. The boot id is read on
+both sides, because a gate that asserted continuity without establishing that the machine went down
+would pass most convincingly when the reboot silently failed.
+
+It takes the service down for as long as the host takes to come back, so it is run deliberately and
+is not part of any other gate.
+
 ## What is not covered
 
-- **A real reboot.** Restarting the target proves the owners recover from process death; it does
-  not prove the machine can come back. That needs a host that can be rebooted on demand, which the
-  removed NixOS VM gates used to provide.
 - **The desktop session**, which has no implementation in this tree at all.
 
 That is a real gap. It is recorded here rather than left to be inferred from a green run that was

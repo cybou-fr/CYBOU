@@ -126,7 +126,7 @@ gateway that cannot become a second cognitive owner.
 | Single canonical Journal writer (`cybou-eventd`) | Implemented — M3 |
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
 | Restart continuity and lifecycle/consolidation core | Implemented — M5 |
-| Continuity across a real reboot | Unproven — gate belonged to the removed NixOS platform |
+| Continuity across a real reboot | Implemented — gated on the deployed Debian host |
 | Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 |
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
