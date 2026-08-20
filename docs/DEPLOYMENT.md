@@ -37,12 +37,20 @@ bash scripts/deploy-vps.sh
 The public URLs are `https://vps-d0669a91.vps.ovh.net` and `https://51.255.46.58`; neither requires
 a login. The IP endpoint uses a renewable Let's Encrypt `shortlived` certificate.
 
-The gateway refuses to start in `public-preview` mode if the Journal holds anything above ordinary
-sensitivity. That is not authentication; it is the tripwire that decides when authentication stops
+The gateway refuses to start in `public-preview` mode if the Journal holds anything above the
+sensitivity this deployment permits, which is `CYBOU_PUBLISHABLE_SENSITIVITY` in the unit and
+ordinary by default. That is not authentication; it is the tripwire that decides when authentication stops
 being optional. Today every contribution is a fact about the machine and the surface serves it. The
 first time a person records something of their own — a promise, an observation they asked to track —
 the public surface stops instead of publishing it, and the choice becomes explicit rather than
 forgotten.
+
+This deployment currently permits sensitivity 1, and the reason is written in the unit: its Journal
+predates the classification rule, so 1252 machine facts carry a Personal label a constant put there.
+Those labels cannot be corrected in place — sensitivity is inside the canonical envelope the hash
+chain covers, which is the Journal refusing to let its past be quietly rewritten, working exactly as
+intended and against us here. The alternatives are to keep the deployment as it is, or to begin a
+new biography; both are the owner's call, and neither is a code change.
 
 **The public deployment serves the live Mind, without authentication.** This is a deliberate,
 temporary decision by the owner: the point of the deployment is a working desktop anyone can look

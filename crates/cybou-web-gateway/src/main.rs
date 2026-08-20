@@ -59,13 +59,26 @@ async fn source() -> Result<Arc<dyn PresenceSource>, Box<dyn std::error::Error>>
     }
 }
 
-/// The most a public, unauthenticated surface may publish.
+/// The most a public, unauthenticated surface may publish unless the owner says otherwise.
 ///
 /// `Ordinary` on the frozen scale: no particular exposure concern. Anything above it is about the
 /// person — theirs to release — and releasing it to everyone is not a decision a running process
 /// should make on their behalf.
 #[cfg(target_os = "linux")]
-const PUBLISHABLE_SENSITIVITY: u8 = 0;
+const DEFAULT_PUBLISHABLE_SENSITIVITY: u8 = 0;
+
+/// What this deployment's owner has decided a public surface may publish.
+///
+/// Raising it is a decision, and it is taken where decisions belong: in the unit that starts the
+/// process, visible to whoever reads it, not in a constant somebody would have to recompile. The
+/// default refuses everything above ordinary, so an unset value is the strict one.
+#[cfg(target_os = "linux")]
+fn publishable_sensitivity() -> u8 {
+    std::env::var("CYBOU_PUBLISHABLE_SENSITIVITY")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(DEFAULT_PUBLISHABLE_SENSITIVITY)
+}
 
 /// Refuse to serve an unauthenticated public surface over a Journal that holds personal state.
 ///
@@ -84,6 +97,7 @@ const PUBLISHABLE_SENSITIVITY: u8 = 0;
 async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Error>> {
     use cybou_fabric::EVENT;
 
+    let permitted = publishable_sensitivity();
     let connection = zbus::Connection::session().await?;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
 
@@ -101,9 +115,9 @@ async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Er
             .and_then(|reply| reply.body().deserialize().ok());
 
         match answer {
-            Some(highest) if highest > PUBLISHABLE_SENSITIVITY => {
+            Some(highest) if highest > permitted => {
                 return Err(format!(
-                    "refusing to serve an unauthenticated public surface: the Journal holds                      contributions at sensitivity {highest}, above the {PUBLISHABLE_SENSITIVITY}                      a public surface may publish. Serve this deployment behind authentication,                      or run it in local-desktop mode."
+                    "refusing to serve an unauthenticated public surface: the Journal holds                      contributions at sensitivity {highest}, above the {permitted} this                      deployment permits. Serve it behind authentication, run it in local-desktop                      mode, or raise CYBOU_PUBLISHABLE_SENSITIVITY if publishing that is a decision                      you are making."
                 )
                 .into());
             }
