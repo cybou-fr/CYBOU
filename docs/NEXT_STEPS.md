@@ -31,10 +31,11 @@ true while the chain underneath it was broken.
    attention. Read-only is not privacy-safe. This is the gate before the deployment holds anything
    that matters to a person.
 
-2. **Debian service and reboot integration.** The NixOS VM gates made continuity and recovery
-   claims and were removed with the composition they booted. Identity and lifecycle continuity
-   across a real reboot, and recovery when a required owner is lost and returns under systemd, are
-   currently proven by nothing. See [Testing](TESTING.md).
+2. **Reboot integration.** `scripts/test-systemd-continuity.sh` now proves identity continuity, a
+   noticed restart, an unshrinking Journal and recovery from the loss of a required owner — under
+   the real units, against a deployed host. What it cannot prove is that the machine comes back:
+   restarting a target is not a reboot. That needs a host that can be rebooted on demand.
+   See [Testing](TESTING.md).
 
 3. **ADR-0029 completeness for `Context1`.** Live and reconstructible today; still missing node,
    edge, depth, time and token budgets, privacy and retention inheritance, epistemic status, and

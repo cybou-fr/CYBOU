@@ -58,16 +58,35 @@ all twelve owners, and then asserts:
 Each of those assertions exists because the property it names was once broken while everything
 looked fine.
 
+## What proves continuity under systemd
+
+```bash
+bash scripts/test-systemd-continuity.sh
+```
+
+Run against a deployed host, after a deploy. The integration gate starts the owners by hand under
+`dbus-run-session`: a different manager, a different startup order, no unit dependencies. This one
+uses the units that actually run, and asserts what only a real restart can falsify:
+
+- the subject is the same after `systemctl restart cybou-mind.target` — an identity that changes
+  across a restart is a different subject wearing the same biography;
+- the session count advanced, because a restart the system did not notice is a restart it cannot
+  account for;
+- the Journal did not shrink;
+- the control plane returns to healthy;
+- stopping a required owner makes it stop calling itself healthy, and starting that owner again
+  brings it back without intervention.
+
+It touches the live Mind — it restarts the target and stops one owner — so it is a deliberate
+post-deploy check rather than part of every gate run, and it puts the owner back even when an
+assertion fails.
+
 ## What is not covered
 
-Service and reboot integration on Debian. The NixOS VM gates that used to make continuity and
-recovery claims were removed with the NixOS composition they booted, because it described a system
-nothing is aimed at. Nothing has replaced them, so the following are currently unproven by any gate:
-
-- identity and lifecycle continuity across a real reboot;
-- recovery behaviour when a required owner is lost and returns under systemd rather than under a
-  test harness;
-- the desktop session, which has no implementation in this tree at all.
+- **A real reboot.** Restarting the target proves the owners recover from process death; it does
+  not prove the machine can come back. That needs a host that can be rebooted on demand, which the
+  removed NixOS VM gates used to provide.
+- **The desktop session**, which has no implementation in this tree at all.
 
 That is a real gap. It is recorded here rather than left to be inferred from a green run that was
 answering a different question.
