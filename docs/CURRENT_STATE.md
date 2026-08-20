@@ -71,17 +71,19 @@ seconds from a persisted checkpoint, and reports verification as a position rath
 so `Verified` means the chain was replayed to the head and nothing weaker.
 
 Two organs are wired but not complete against their ADRs, and the difference matters more than the
-wiring did. `Context1` is live and reconstructible — it rebuilds from sequence zero — and now holds
+wiring did. `Context1` is live and reconstructible: it rebuilds from sequence zero on every start and keeps
+nothing on disk, because a saved graph is the one structure in the system that could outlive the
+evidence behind it. It now holds
 two of ADR-0029's invariants: the graph is bounded by node and edge budgets, dropping the least
 salient concept and the weakest link rather than whatever arrived first (A2, A11), and an erasure
-epoch discards the projection so a derived index cannot outlive the evidence a person destroyed
+epoch discards the projection and rebuilds it from the surviving Journal, so a derived index
+neither outlives the evidence a person destroyed nor loses the context that erasure did not touch
 (A7). An association also inherits the most restrictive privacy and the shortest retention of its
 evidence, and corroboration can only tighten them (A9): a derived claim that came out looser than
 what it was derived from would be a way to launder a private fact by observing it twice. Still
 missing: depth, time and token budgets, which belong to an activation session this version does not
 have, and epistemic status, which defers to `Epistemic1` by design. Its status is
-`live integration implemented, ADR-0029 partial`. `Predictor1` has calibration and settlement and
-no source of its own beyond what a person reports through Presence1.
+`live integration implemented, ADR-0029 partial`.
 
 `Lifecycle1` schedules one piece of maintenance and only one. After fifteen minutes without a
 person, and at most once every six hours, it moves to `Consolidating` and asks Event1 to
@@ -99,9 +101,13 @@ assessment, Observe and Predict reach Predictor1, InterruptLifecycle tells Lifec
 present. It holds none of that state itself. No gateway route exposes any command; the web surface
 is read-only.
 
-`Predictor1` has no source of its own and this is deliberate. Nothing the system observes varies —
-the host facts were chosen to be stable so the Journal stays a biography rather than a metrics
-stream — so a forecast has to be about something a person asked to track, through `Presence1.Observe`.
+`Predictor1` follows Event1 and forecasts the subjects the Journal actually holds measurements for.
+It reads an observation's own subject and its numeric value; observations whose value is words are
+facts about the world rather than a series, and are left to `Epistemic1`. Today that means
+`cpu-count` and `memory-total-kib` from `perceptiond`, plus whatever a person asks to track through
+`Presence1.Observe`. Its samples and the Journal position they stand at are one write, so a restart
+resumes after the row it last learned from. Calibration still needs a person to settle a forecast
+against an outcome: nothing in the system settles its own predictions yet.
 
 `cybou-fabric` and `cybou-runtime` carry the bounded RPC policy and the state foundation. Retry
 eligibility distinguishes read-only, idempotent, and non-idempotent operations; one outer deadline

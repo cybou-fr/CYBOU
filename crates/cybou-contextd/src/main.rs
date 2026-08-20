@@ -3,7 +3,7 @@
 
 //! `cybou-contextd` daemon entrypoint.
 
-use std::{env, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 #[cfg(target_os = "linux")]
 use std::collections::HashMap;
@@ -13,21 +13,19 @@ use cybou_contextd::ContextCore;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[cybou-contextd] Initializing Associative Context engine (association != truth)...");
-    let state_path = env::var("CYBOU_CONTEXT_PATH").map_or_else(
-        |_| {
-            let state_dir = env::var("XDG_STATE_HOME").map_or_else(
-                |_| {
-                    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
-                    PathBuf::from(home).join(".local/state")
-                },
-                PathBuf::from,
-            );
-            state_dir.join("cybou/context.json")
-        },
-        PathBuf::from,
-    );
 
-    let core = Arc::new(ContextCore::open(&state_path)?);
+    // The epoch the Journal is already at, asked for before anything is built. It is the one thing
+    // here that cannot be derived from the contributions themselves, and starting from zero would
+    // make the first check read a long-finished erasure as a fresh one.
+    #[cfg(target_os = "linux")]
+    let epoch = match cybou_fabric::event_client::EventClient::session().await {
+        Ok(client) => client.erasure_epoch().await.unwrap_or(0),
+        Err(_) => 0,
+    };
+    #[cfg(not(target_os = "linux"))]
+    let epoch = 0;
+
+    let core = Arc::new(ContextCore::resuming_at_epoch(epoch));
 
     #[cfg(target_os = "linux")]
     {
@@ -52,9 +50,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     continue;
                 };
                 if epoch_core.invalidate_for_epoch(epoch) {
+                    // Discarding is only half of A7. Everything the erasure did not touch is still
+                    // in the Journal and still associates, and an organ that answered from an empty
+                    // graph until something new happened would be reporting an absence of context
+                    // that is not there. The rebuild is a replay from the start, which is what this
+                    // organ does on every start, so it is done by starting again.
                     println!(
-                        "[cybou-contextd] Erasure epoch {epoch}: associative projection discarded"
+                        "[cybou-contextd] Erasure epoch {epoch}: discarding the associative projection and rebuilding it from the surviving Journal"
                     );
+                    std::process::exit(1);
                 }
             }
         });

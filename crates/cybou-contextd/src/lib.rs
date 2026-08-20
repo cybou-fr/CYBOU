@@ -7,17 +7,10 @@
 //! tracking explicit provenance (`why?`, `origin`, `evidence`) and producing inspectable
 //! bounded `ContextBundle` projections.
 
-use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use cybou_protocol::admission::Privacy;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -107,39 +100,8 @@ pub struct ContextBundle {
     pub complete: bool,
 }
 
-/// Persistent snapshot of context state.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ContextState {
-    /// Active concepts.
-    pub nodes: HashMap<String, ConceptNode>,
-    /// Associative links.
-    pub associations: Vec<Association>,
-    /// The erasure epoch these associations were derived under.
-    ///
-    /// Absent in state written before this field existed, which is state that was never checked
-    /// against an erasure and therefore must be rebuilt rather than trusted.
-    #[serde(default)]
-    pub erasure_epoch: u64,
-}
-
-/// Errors occurring in the context organ.
-#[derive(Debug, Error)]
-pub enum ContextError {
-    /// I/O error reading or writing state.
-    #[error("context state i/o error: {0}")]
-    Io(#[from] std::io::Error),
-    /// State file corrupted.
-    #[error("context state file corrupted: {0}")]
-    CorruptState(String),
-    /// Internal lock poisoned.
-    #[error("context lock poisoned")]
-    LockPoisoned,
-}
-
 /// Core domain logic of the associative context organ.
 pub struct ContextCore {
-    state_path: Option<PathBuf>,
     nodes: RwLock<HashMap<String, ConceptNode>>,
     associations: RwLock<Vec<Association>>,
     /// The budget this projection is held within.
@@ -186,7 +148,6 @@ impl ContextCore {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            state_path: None,
             nodes: RwLock::new(HashMap::new()),
             associations: RwLock::new(Vec::new()),
             budget: ContextBudget::default(),
@@ -194,30 +155,24 @@ impl ContextCore {
         }
     }
 
-    /// Open `ContextCore` with persistent JSON storage.
+    /// Begin from the erasure epoch the Journal is currently at.
     ///
-    /// # Errors
+    /// The graph itself is not carried across a restart, because it is not remembered: every node
+    /// and every link is derived from contributions the Journal still holds, and the organ rebuilds
+    /// it by replaying them. A saved copy would have been the one thing in the system able to
+    /// outlive its own evidence — the associations it holds are exactly what ADR-0029 A7 says must
+    /// not survive an erasure, and reloading it put them back for as long as it took to notice.
     ///
-    /// Returns [`ContextError`] on I/O error or state corruption.
-    pub fn open(path: &Path) -> Result<Self, ContextError> {
-        let (nodes, associations, erasure_epoch) = if path.exists() {
-            let mut file = File::open(path)?;
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
-            let state: ContextState = serde_json::from_str(&content)
-                .map_err(|e| ContextError::CorruptState(e.to_string()))?;
-            (state.nodes, state.associations, state.erasure_epoch)
-        } else {
-            (HashMap::new(), Vec::new(), 0)
-        };
-
-        Ok(Self {
-            state_path: Some(path.to_path_buf()),
-            nodes: RwLock::new(nodes),
-            associations: RwLock::new(associations),
+    /// The epoch is not derived, so it is given: starting at zero would make the first check after
+    /// a start look like a fresh erasure of a graph that was built after it.
+    #[must_use]
+    pub fn resuming_at_epoch(epoch: u64) -> Self {
+        Self {
+            nodes: RwLock::new(HashMap::new()),
+            associations: RwLock::new(Vec::new()),
             budget: ContextBudget::default(),
-            erasure_epoch: RwLock::new(erasure_epoch),
-        })
+            erasure_epoch: RwLock::new(epoch),
+        }
     }
 
     /// The budget this projection is held within.
@@ -247,7 +202,6 @@ impl ContextCore {
         if let Ok(mut current) = self.erasure_epoch.write() {
             *current = epoch;
         }
-        let _ = self.persist_current();
         true
     }
 
@@ -255,44 +209,6 @@ impl ContextCore {
     #[must_use]
     pub fn erasure_epoch(&self) -> u64 {
         self.erasure_epoch.read().map_or(0, |guard| *guard)
-    }
-
-    fn persist_current(&self) -> Result<(), ContextError> {
-        let nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
-        let associations = self
-            .associations
-            .read()
-            .map(|g| g.clone())
-            .unwrap_or_default();
-        self.persist_candidate(&nodes, &associations)
-    }
-
-    fn persist_candidate(
-        &self,
-        nodes: &HashMap<String, ConceptNode>,
-        associations: &[Association],
-    ) -> Result<(), ContextError> {
-        if let Some(path) = &self.state_path {
-            let state = ContextState {
-                nodes: nodes.clone(),
-                associations: associations.to_vec(),
-                erasure_epoch: self.erasure_epoch(),
-            };
-            let serialized = serde_json::to_string_pretty(&state)
-                .map_err(|e| ContextError::CorruptState(e.to_string()))?;
-
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            let temp_path = path.with_extension("tmp");
-            {
-                let mut temp_file = File::create(&temp_path)?;
-                temp_file.write_all(serialized.as_bytes())?;
-                temp_file.sync_all()?;
-            }
-            fs::rename(&temp_path, path)?;
-        }
-        Ok(())
     }
 
     /// Activate or update a situational concept node.
@@ -338,13 +254,11 @@ impl ContextCore {
                 .collect()
         };
 
-        if self.persist_candidate(&candidate_nodes, &assocs).is_ok() {
-            if let Ok(mut lock) = self.nodes.write() {
-                *lock = candidate_nodes;
-            }
-            if let Ok(mut lock) = self.associations.write() {
-                *lock = assocs;
-            }
+        if let Ok(mut lock) = self.nodes.write() {
+            *lock = candidate_nodes;
+        }
+        if let Ok(mut lock) = self.associations.write() {
+            *lock = assocs;
         }
     }
 
@@ -385,7 +299,6 @@ impl ContextCore {
         let source_str = source.into();
         let target_str = target.into();
 
-        let nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
         let mut candidate_assocs = self
             .associations
             .read()
@@ -424,9 +337,7 @@ impl ContextCore {
 
         enforce_edge_budget(&mut candidate_assocs, self.budget.edges);
 
-        if self.persist_candidate(&nodes, &candidate_assocs).is_ok()
-            && let Ok(mut lock) = self.associations.write()
-        {
+        if let Ok(mut lock) = self.associations.write() {
             *lock = candidate_assocs;
         }
     }
@@ -662,16 +573,11 @@ mod tests {
         assert!(!core.invalidate_for_epoch(1));
     }
 
-    use tempfile::tempdir;
-
     use super::*;
 
     #[test]
-    fn context_bundle_provenance_and_persistence() {
-        let dir = tempdir().expect("tempdir");
-        let state_path = dir.path().join("context.json");
-
-        let core = ContextCore::open(&state_path).expect("open");
+    fn context_bundle_carries_the_provenance_of_what_activated_it() {
+        let core = ContextCore::new();
         let now = OffsetDateTime::now_utc();
         let ev1 = Uuid::new_v4();
 
@@ -690,11 +596,18 @@ mod tests {
         assert_eq!(bundle.items[0].activation_reason, "scheduled cron trigger");
         assert_eq!(bundle.associations.len(), 1);
         assert_eq!(bundle.associations[0].origin, AssociationOrigin::Episodic);
+    }
 
-        // Reopen from disk: survives restart
-        let reopened = ContextCore::open(&state_path).expect("reopen");
-        let reopened_bundle = reopened.bundle(0.5);
-        assert_eq!(reopened_bundle.items.len(), 1);
-        assert_eq!(reopened_bundle.associations.len(), 1);
+    #[test]
+    fn a_restarted_projection_starts_empty_at_the_epoch_it_was_given() {
+        // Nothing is carried across a restart: the graph is rebuilt from the Journal, and a saved
+        // copy would keep associations whose evidence an erasure has already destroyed.
+        let core = ContextCore::resuming_at_epoch(7);
+        assert!(core.active_context().is_empty());
+
+        // The epoch it starts at is one it already knows about, so the next check does not read a
+        // completed erasure as a fresh one and discard a graph built after it.
+        assert!(!core.invalidate_for_epoch(7));
+        assert!(core.invalidate_for_epoch(8));
     }
 }
