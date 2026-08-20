@@ -7,10 +7,15 @@ use async_trait::async_trait;
 use cybou_web_contracts::{MindProjection, SessionProjection, SnapshotProjection};
 use thiserror::Error;
 
+pub mod card;
+pub mod layout;
+
 #[cfg(target_arch = "wasm32")]
 mod gateway_client;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
+pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
+pub use layout::DesktopLayout;
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
