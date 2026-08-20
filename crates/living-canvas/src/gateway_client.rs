@@ -4,7 +4,9 @@
 //! Browser implementation of the typed Mind boundary.
 
 use async_trait::async_trait;
-use cybou_web_contracts::{MindProjection, SessionProjection, SnapshotProjection};
+use cybou_web_contracts::{
+    MindProjection, SessionProjection, ShellExecRequest, ShellExecResponse, SnapshotProjection,
+};
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
 
@@ -45,5 +47,26 @@ impl MindClient for GatewayMindClient {
 
     async fn mind(&self) -> Result<MindProjection, ClientError> {
         Self::get("/api/v1/mind").await
+    }
+
+    async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError> {
+        let response = Request::post("/api/v1/shell/exec")
+            .json(&ShellExecRequest {
+                command: command.to_owned(),
+            })
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/shell/exec returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 }

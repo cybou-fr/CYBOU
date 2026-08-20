@@ -3,7 +3,9 @@
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use living_canvas::{CardGeometry, CardId, DesktopLayout, GatewayMindClient, MindClient};
+use living_canvas::{
+    ArrangementMode, CardGeometry, CardId, DesktopLayout, GatewayMindClient, MindClient,
+};
 use lucide_leptos::{
     Ellipsis, FileCheck, Files, FolderOpen, Link, ListChecks, Map, Search, Sparkles, UsersRound,
 };
@@ -76,6 +78,50 @@ fn IconMaximize(#[prop(default = 12)] size: u32) -> impl IntoView {
 }
 
 #[component]
+fn IconGrid(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+    }
+}
+
+#[component]
+fn IconRefresh(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+            <path d="M21 3v5h-5"></path>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+            <path d="M8 16H3v5"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconClose(#[prop(default = 12)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    }
+}
+
+#[component]
+fn IconTerminal(#[prop(default = 15)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+    }
+}
+
+#[component]
 fn IconResizeGrip() -> impl IntoView {
     view! {
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
@@ -127,6 +173,25 @@ fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView 
                     view! { <IconMinimize size=12 /> }.into_any()
                 }}
             </button>
+            {if card.spec().closable {
+                view! {
+                    <button
+                        class="card-control-btn close-btn"
+                        title="Close card"
+                        aria-label="Close card"
+                        on:click=move |_| {
+                            layout.update(|current| {
+                                current.close_card(card);
+                            });
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <IconClose size=12 />
+                    </button>
+                }.into_any()
+            } else {
+                ().into_any()
+            }}
         </div>
     }
 }
@@ -148,6 +213,142 @@ fn CardResizeHandle(
                 on:click=move |e: web_sys::MouseEvent| e.stop_propagation()
             >
                 <IconResizeGrip />
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn ShellCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::Shell(0);
+    let card_open = move || layout.get().contains_card(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+    let (history, set_history) = signal(vec![(
+        String::new(),
+        "CYBOU Shell (Zone 3 bounded Body capabilities)\nType 'help' for available capabilities.\n"
+            .to_string(),
+        0,
+    )]);
+    let (input_val, set_input_val) = signal(String::new());
+    let (cwd, set_cwd) = signal("/".to_string());
+    let (running, set_running) = signal(false);
+
+    let submit_command = move || {
+        let cmd = input_val.get();
+        let trimmed = cmd.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        if trimmed == "clear" {
+            set_history.set(Vec::new());
+            set_input_val.set(String::new());
+            return;
+        }
+        let cmd_str = trimmed.to_string();
+        set_running.set(true);
+        set_input_val.set(String::new());
+        spawn_local(async move {
+            let client = GatewayMindClient;
+            match client.execute_shell(&cmd_str).await {
+                Ok(resp) => {
+                    let text = if !resp.stdout.is_empty() {
+                        resp.stdout
+                    } else if !resp.stderr.is_empty() {
+                        resp.stderr
+                    } else {
+                        String::new()
+                    };
+                    set_cwd.set(resp.cwd);
+                    set_history.update(|h| h.push((cmd_str, text, resp.exit_code)));
+                }
+                Err(e) => {
+                    set_history.update(|h| h.push((cmd_str, format!("Error: {e}\n"), 1)));
+                }
+            }
+            set_running.set(false);
+        });
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                tabindex="0"
+                role="region"
+                aria-label="CYBOU Shell capability surface. Drag to reposition; use arrow keys for keyboard movement."
+                class="object shell-card"
+                class:selected=move || selected.get() == "shell"
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class:collapsed=is_collapsed
+                style=move || card_style(layout.get(), card_id)
+                on:focus=move |_| set_selected.set("shell")
+                on:click=move |_| {
+                    set_selected.set("shell");
+                    layout.update(|l| l.bring_forward(card_id));
+                }
+                on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
+                on:keydown=move |event: KeyboardEvent| keyboard_move(event, card_id, layout)
+            >
+                <header class="card-header">
+                    <small class="panel-kicker"><IconTerminal size=14 /><span>"Shell · Zone 3 Body"</span></small>
+                    <CardControls card=card_id layout=layout />
+                </header>
+                <Show
+                    when=move || !is_collapsed()
+                    fallback=move || {
+                        let current_cwd = cwd.get();
+                        view! {
+                            <div class="card-collapsed-summary">
+                                <b>"Shell"</b>
+                                <span>{current_cwd}</span>
+                            </div>
+                        }
+                    }
+                >
+                    <div class="shell-body">
+                        <div class="shell-output">
+                            <For
+                                each=move || history.get()
+                                key=|(cmd, out, code)| format!("{cmd}-{out}-{code}")
+                                children=move |(cmd, out, code)| {
+                                    view! {
+                                        <div class="shell-entry">
+                                            {if !cmd.is_empty() {
+                                                view! { <div class="shell-cmd-echo"><span class="shell-prompt-char">"$"</span>" "{cmd}</div> }.into_any()
+                                            } else {
+                                                ().into_any()
+                                            }}
+                                            <pre class="shell-out-text" class:error=move || code != 0>{out}</pre>
+                                        </div>
+                                    }
+                                }
+                            />
+                        </div>
+                        <div class="shell-input-line">
+                            <span class="shell-prompt">{move || format!("cybou:{} $", cwd.get())}</span>
+                            <input
+                                type="text"
+                                class="shell-input"
+                                placeholder=move || if running.get() { "running…" } else { "type a command ('help')…" }
+                                disabled=move || running.get()
+                                prop:value=move || input_val.get()
+                                on:input=move |e| set_input_val.set(event_target_value(&e))
+                                on:keydown=move |e: KeyboardEvent| {
+                                    if e.key() == "Enter" {
+                                        e.prevent_default();
+                                        submit_command();
+                                    }
+                                }
+                            />
+                        </div>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
             </div>
         </Show>
     }
@@ -516,6 +717,33 @@ pub fn App() -> impl IntoView {
                                 ><Map size=15 /><span>"Minimap"</span></button>
                                 <hr />
                                 <button on:click=move |_| navigate_from_menu("journal", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Journal"</span></button>
+                                <button on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("shell");
+                                    set_runtime_menu_open.set(false);
+                                }><IconTerminal size=15 /><span>"Open Shell"</span></button>
+                                <hr />
+                                <button on:click=move |_| {
+                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                                    layout.get_untracked().save();
+                                    set_runtime_menu_open.set(false);
+                                }><IconGrid size=15 /><span>"Arrange: Grid"</span></button>
+                                <button on:click=move |_| {
+                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                                    layout.get_untracked().save();
+                                    set_runtime_menu_open.set(false);
+                                }><IconMinimize size=15 /><span>"Arrange: Compact"</span></button>
+                                <button on:click=move |_| {
+                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                                    layout.get_untracked().save();
+                                    set_runtime_menu_open.set(false);
+                                }><Link size=15 /><span>"Arrange: Relations"</span></button>
+                                <button on:click=move |_| {
+                                    layout.set(DesktopLayout::default());
+                                    layout.get_untracked().save();
+                                    set_runtime_menu_open.set(false);
+                                }><IconRefresh size=15 /><span>"Reset layout"</span></button>
                             </nav>
                         </Show>
                     </div>
@@ -1026,6 +1254,8 @@ pub fn App() -> impl IntoView {
                         <CardResizeHandle card=CardId::Attention layout=layout resizing=resizing />
                     </div>
 
+                    <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+
                     <Show when=move || command_open.get()>
                         <nav class="command-palette" aria-label="Desktop commands">
                             <small>"Jump to"</small>
@@ -1073,6 +1303,54 @@ pub fn App() -> impl IntoView {
                                 class:hidden=move || !command_matches(&command_query.get(), "context association concepts context1")
                                 on:click=move |_| select_from_command("context", set_selected, set_command_open, set_command_query)
                             ><Link size=15 /><span><b>"Context"</b><i>"Context1"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "shell terminal body capability")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("shell");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconTerminal size=15 /><span><b>"CYBOU Shell"</b><i>"Zone 3 Body capability"</i></span></button>
+                            <hr style="width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16);" />
+                            <small>"Arrange"</small>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "arrange grid")
+                                on:click=move |_| {
+                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                                    layout.get_untracked().save();
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconGrid size=15 /><span><b>"Arrange: Grid"</b><i>"Structured alignment"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "arrange compact")
+                                on:click=move |_| {
+                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                                    layout.get_untracked().save();
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconMinimize size=15 /><span><b>"Arrange: Compact"</b><i>"Dense packing"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "arrange relations")
+                                on:click=move |_| {
+                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                                    layout.get_untracked().save();
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><Link size=15 /><span><b>"Arrange: Relations"</b><i>"Causal graph topology"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "reset layout")
+                                on:click=move |_| {
+                                    layout.set(DesktopLayout::default());
+                                    layout.get_untracked().save();
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconRefresh size=15 /><span><b>"Reset Desktop Layout"</b><i>"Default coordinates"</i></span></button>
                         </nav>
                     </Show>
 
@@ -1086,16 +1364,48 @@ pub fn App() -> impl IntoView {
                             on:focus=move |_| set_command_open.set(true)
                             on:input=move |event| set_command_query.set(event_target_value(&event))
                             on:keydown=move |event: KeyboardEvent| {
-                                if event.key() == "Enter"
-                                    && let Some(panel) = first_command_match(&command_query.get())
-                                {
-                                    event.prevent_default();
-                                    select_from_command(
-                                        panel,
-                                        set_selected,
-                                        set_command_open,
-                                        set_command_query,
-                                    );
+                                if event.key() == "Enter" {
+                                    let q = command_query.get();
+                                    if command_matches(&q, "arrange grid") {
+                                        event.prevent_default();
+                                        layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                                        layout.get_untracked().save();
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if command_matches(&q, "arrange compact") {
+                                        event.prevent_default();
+                                        layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                                        layout.get_untracked().save();
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if command_matches(&q, "arrange relations") {
+                                        event.prevent_default();
+                                        layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                                        layout.get_untracked().save();
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if command_matches(&q, "reset layout") {
+                                        event.prevent_default();
+                                        layout.set(DesktopLayout::default());
+                                        layout.get_untracked().save();
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if command_matches(&q, "shell") {
+                                        event.prevent_default();
+                                        layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                        layout.get_untracked().save();
+                                        set_selected.set("shell");
+                                        set_command_open.set(false);
+                                        set_command_query.set(String::new());
+                                    } else if let Some(panel) = first_command_match(&q) {
+                                        event.prevent_default();
+                                        select_from_command(
+                                            panel,
+                                            set_selected,
+                                            set_command_open,
+                                            set_command_query,
+                                        );
+                                    }
                                 }
                             }
                         />
@@ -1183,6 +1493,15 @@ pub fn App() -> impl IntoView {
                                     aria-label="Select associative context card"
                                     on:click=move |_| set_selected.set("context")
                                 ></button>
+                                <Show when=move || layout.get().contains_card(CardId::Shell(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "shell"
+                                        class="mini-node shell-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Shell(0)))
+                                        aria-label="Select shell card"
+                                        on:click=move |_| set_selected.set("shell")
+                                    ></button>
+                                </Show>
                             </div>
                         </nav>
                     </Show>
@@ -1299,6 +1618,7 @@ fn first_command_match(query: &str) -> Option<&'static str> {
         ("beliefs", "beliefs epistemic1 validity"),
         ("perception", "perception host observation"),
         ("context", "context association concepts context1"),
+        ("shell", "shell terminal body capability"),
     ]
     .into_iter()
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))
@@ -1371,7 +1691,14 @@ fn relationship_points(
 
     let (x1, y1) = edge_anchor(from_center, from_size, to_center);
     let (x2, y2) = edge_anchor(to_center, to_size, from_center);
-    (x1, y1, x2, y2, (x1 + x2) / 2.0, (y1 + y2) / 2.0 - 7.0)
+    (
+        x1,
+        y1,
+        x2,
+        y2,
+        f64::midpoint(x1, x2),
+        f64::midpoint(y1, y2) - 7.0,
+    )
 }
 
 fn edge_anchor(center: (f64, f64), size: (f64, f64), target: (f64, f64)) -> (f64, f64) {

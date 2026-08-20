@@ -102,6 +102,28 @@ would pass most convincingly when the reboot silently failed.
 It takes the service down for as long as the host takes to come back, so it is run deliberately and
 is not part of any other gate.
 
+## What proves an account gets in and a stranger does not
+
+```bash
+sudo -E bash scripts/test-pam-access.sh
+```
+
+Every other gate here can run against fixtures. This one cannot: the point of `cybou-authd` is that
+it consults the real shadow database through the real PAM stack, and a stub would prove only that
+the stub agrees with itself. So it creates two throwaway accounts on the host it runs on, gives them
+the same password, puts one in `cybou-access`, and checks what each gets. It refuses to run if those
+accounts already exist, and removes them afterwards — run it on the disposable local builder, not on
+a host anyone depends on.
+
+It asserts that the permitted account is accepted, the same account with a wrong password is not,
+a valid account outside the group is refused despite a correct password, `root` is refused, an empty
+password is refused, an account that does not exist is refused, a locked account is refused, an
+account removed from the group is refused, the socket is not world-reachable, and no password
+reaches the helper's output.
+
+The two that matter most are the ones a stub could not have told you: a correct password on a real
+account outside the group is refused, and `usermod -L` closes the door.
+
 ## What is not covered
 
 - **The desktop session**, which has no implementation in this tree at all.

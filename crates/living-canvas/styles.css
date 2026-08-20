@@ -216,6 +216,20 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .mini-node.selected { transform: translate(-50%,-50%) scale(1.35); border-color: var(--accent); box-shadow: 0 0 13px rgba(112,225,200,.7); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
+/* CYBOU Shell Card & Terminal Styles */
+.shell-card { padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.shell-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; margin-top: 6px; }
+.shell-output { flex: 1; min-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 11px; line-height: 1.4; color: #a9b8c5; }
+.shell-entry { display: flex; flex-direction: column; gap: 2px; }
+.shell-cmd-echo { color: var(--accent); font-weight: 550; display: flex; gap: 6px; }
+.shell-prompt-char { color: #d9a62f; }
+.shell-out-text { margin: 0; white-space: pre-wrap; font-family: inherit; font-size: 11px; color: #c4d2dc; }
+.shell-out-text.error { color: #f87171; }
+.shell-input-line { display: flex; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px solid rgba(154,167,184,.14); }
+.shell-prompt { color: #d9a62f; font-size: 11px; white-space: nowrap; font-weight: 500; }
+.shell-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #edf4f6; font-family: inherit; font-size: 11px; }
+.shell-input::placeholder { color: #64748b; }
+
 @media (max-width: 760px) {
   .topbar { grid-template-columns: 1fr auto; padding: 0 14px; }
   .runtime-switch { display: none; }

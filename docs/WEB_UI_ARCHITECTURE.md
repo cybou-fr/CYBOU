@@ -3,18 +3,18 @@ SPDX-FileCopyrightText: 2026 Cybou contributors
 SPDX-License-Identifier: MIT
 -->
 
-# Living Canvas Web UI Integration Architecture
+# CYBOU Desktop (Living Canvas) Web UI Integration Architecture
 
 ## Purpose and status
 
-This document is the implementation blueprint for the Proposed
-[ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md). It describes target architecture, not
-current behavior. [Current State](CURRENT_STATE.md) remains authoritative until each migration gate
-is demonstrated.
+This document is the implementation blueprint for [ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md)
+and [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md). It describes the
+target architecture and operational boundaries of **CYBOU Desktop**. [Current State](CURRENT_STATE.md)
+remains authoritative for implemented capabilities.
 
-The objective is not to port the Plasma dock to HTML. It is to make the Rust/WASM Living Canvas the complete
-web-first Cybou environment while preserving the ownership, continuity, failure, privacy, and
-authorization properties already proved by Mind.
+The objective is to make the Rust/WASM CYBOU Desktop the complete, extensible spatial environment
+for CYBOU while preserving the ownership, continuity, failure, privacy, and authorization properties
+already proved by Mind, and introducing bounded Body capability surfaces such as CYBOU Shell.
 
 ## Documentation analysis
 
@@ -171,7 +171,73 @@ The same frontend supports:
 
 Responsive behavior changes layout, not domain capability.
 
-## Gateway architecture
+### CYBOU Desktop Spatial Card Model (vNext)
+
+In accordance with ADR-0040, CYBOU Desktop transitions from hardcoded fixed panels to an extensible
+spatial **Card** architecture:
+
+```text
+Debian 13       = Body (host execution, kernel, storage)
+CYBOU Mind      = continuity + cognition + governance (canonical owner)
+CYBOU Desktop   = Presence (spatial interactive surface)
+
+Card            = primary interactive surface
+Deck            = presentation composition (tabs), not identity
+Relationship    = semantic system causality, not physical proximity
+Arrangement     = deterministic spatial presentation, not cognition
+Desktop Map     = spatial navigation and cluster overview
+Ctrl+K          = Desktop command palette (Desktop command ≠ Body command)
+CYBOU Shell     = bounded Body capability exploration (typed capability, not arbitrary execution)
+Desktop state   ≠ biography (DOM/localStorage ≠ truth)
+Public preview  = no Shell capability (strict boundary)
+```
+
+#### Generic Card Model
+
+Every visible surface implements `CardInstance`:
+- `CardId`: Stable identifier (System cards: `Identity`, `Session`, `Capabilities`, `Journal`, `Lifecycle`, `Commitments`, `SelfModel`, `Attention`, `Beliefs`, `Perception`, `Context`; Tool cards: `Shell(u32)`).
+- `CardGeometry`: Spatial offset `(x, y)`, mutable dimensions `(width, height)`, and stacking order `z`.
+- `CardPresentation`: Display mode flags (`collapsed: bool`, `pinned: bool`).
+- `CardSpec`: Static contract defining `kind` (`System`, `Tool`, `Ephemeral`), capabilities (`movable`, `resizable`, `collapsible`, `closable`, `deckable`), and size constraints (`default_size`, `min_size`, `max_size`).
+
+#### Layout Schema v9 and Migration
+
+Layout persistence uses schema version 9 (`cybou.desktop.layout.v9`):
+1. Loads `cybou.desktop.layout.v9` if present in browser `localStorage`.
+2. Falls back to legacy schema v8 (`cybou.living-canvas.layout.v8`), migrating all fixed point positions into full `CardGeometry` with default spec dimensions, uncollapsed, unpinned presentation.
+3. Transparently commits migrated state to v9 without breaking user coordinates or disrupting active sessions.
+
+#### Spatial Dynamics and Multi-Mode Arrangement Engine
+
+- **Interactive Resize**: Real-time pointer resizing constrained to `[min_size, max_size]` with dynamic edge anchor recalculation for relationship vectors.
+- **Collapse / Expand**: Single-line summary pill toggle to reclaim canvas space while maintaining presence.
+- **Pinning**: Pinned cards (`pinned: true`) are locked against auto-arrangement transforms.
+- **Deterministic Arrangement**: Pure function `arrange(mode, cards, relationships, bounds)` providing `Free`, `Compact`, `Grid`, `Relations` (causal graph clustering), and `Focus` (radial attention orbit) modes.
+- **Decks (Tabs)**: Ephemeral grouping of multiple cards into a single tabbed container without mutating card identity.
+
+#### Bounded Body Capability: CYBOU Shell
+
+CYBOU Shell is an isolated, unprivileged capability surface to the Debian 13 host:
+- Builtins only: `help`, `pwd`, `ls`, `cd`, `cat`, `clear`.
+- No arbitrary execution, fork/exec, pipes, redirects, or background subshells.
+- Filesystem operations strictly jailed via `cybou-jailfs` (`RESOLVE_BENEATH` / `openat2`) rooted at `/home/demo` (`DemoReadOnly` profile).
+- Gateway isolation: Shell endpoints are disabled and refused in `PublicPreview` mode; accessible only in authenticated `LocalDesktop` sessions.
+
+#### Four Isolated Security Zones
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Zone 1: Mind Projection (Read-only aggregation of canonical owners)    │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Zone 4: Governed Actions (Future authorized mutation/execution runtime) │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ### Why a separate process
 

@@ -5,8 +5,30 @@ SPDX-License-Identifier: MIT
 
 # Glossary
 
-**Living Canvas** — Proposed single web frontend for Cybou's complete local Chromium desktop and
-hosted browser surface. It is Presence, not Mind, and is not an authorization authority.
+**CYBOU Desktop** — The primary spatial interactive surface and Presence layer for CYBOU. It organizes
+system projections and bounded capabilities as interactive Cards across a unified spatial canvas.
+It is Presence, not Mind, and is not an authorization authority.
+
+**Living Canvas** — The underlying web-first frontend package and renderer for CYBOU Desktop, built in
+Rust/WebAssembly and delivered via `cybou-web-gateway`.
+
+**Card** — The primary interactive surface unit in CYBOU Desktop representing system projections
+(System cards), interactive capabilities (Tool cards), or temporary previews (Ephemeral cards).
+
+**CardSpec** — Static specification defining the architectural kind, capabilities (movable, resizable,
+collapsible, closable, deckable), and dimensional bounds (min/max/default sizes) of a Card.
+
+**Deck** — A spatial presentation container grouping multiple Cards into tabbed views without mutating
+underlying card identities or domain state.
+
+**Arrangement** — A pure, deterministic algorithm that calculates spatial placement for unpinned Cards
+across modes including Free, Compact, Grid, Relations (causal graph clustering), and Focus (radial orbit).
+
+**CYBOU Shell** — A strictly bounded, typed capability surface to the Debian 13 host (Body), executing
+only builtins (`help`, `pwd`, `ls`, `cd`, `cat`, `clear`) inside a jailed filesystem without arbitrary execution.
+
+**cybou-jailfs** — Safe filesystem isolation library providing strict path normalization, fd-relative
+directory resolution (`RESOLVE_BENEATH`), symlink escape protection, and resource budgeting.
 
 **Web gateway** — Proposed separate browser/network boundary that authenticates sessions, serves
 the frontend, validates versioned web requests, enforces transport policy, and maps only explicit
@@ -16,7 +38,7 @@ operations to local Presence/Mind APIs. It is not a cognitive state owner.
 Canvas compiled to WebAssembly, are implemented in Rust. It does not describe the current C++/Qt
 tree or exempt a rewrite from compatibility and continuity gates.
 
-**Body** — NixOS, Plasma, hardware, processes, and system/external state that Cybou can observe or
+**Body** — Debian 13, hardware, kernel, storage, processes, and system/external state that Cybou can observe or
 eventually affect through explicit capabilities.
 
 **Mind** — the persistent cognitive substrate: typed state and processes for biography, identity,

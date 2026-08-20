@@ -43,12 +43,32 @@ promise is about the person by construction, and everything above `CYBOU_PUBLISH
 ordinary by default — is dropped before the projection is built. There is one filtered source and
 every route reads it, so a route added later cannot forget: filtering is not something a route does.
 
-A reader presenting the credential named by `CYBOU_ACCESS_CREDENTIAL_FILE` is served the unfiltered
-projection instead. The path is in the unit and the secret is not, because a unit file is
-world-readable; `deploy-vps.sh` generates the file once, readable only by the `cybou` user, and
-never regenerates it. An unset path means this deployment entitles nobody, which is a valid way to
-run a demo. A wrong or missing credential is served the public projection rather than refused: a
-public surface that answered 401 to strangers would stop being a public surface.
+A reader who signs in with a Linux account is served the unfiltered projection instead. The gateway
+never checks the password itself — that means reading the shadow database, which it must not be able
+to do. It asks `cybou-authd` over the socket named by `CYBOU_AUTH_SOCKET`, and receives one bit.
+
+`cybou-authd` is the only Cybou process that runs as root. Its whole vocabulary is a name and a
+secret in, a yes or no out: it cannot be asked to read a file, run a command, or say anything about
+an account beyond whether it accepted that password. A failed attempt is answered identically
+whether the account is wrong, the password is wrong, or the account is not permitted, so the socket
+is not a way to enumerate the host. The socket is group-owned by `cybou`, so only the gateway can
+attempt a password at all; failures are held 750ms before answering.
+
+Membership in the `cybou-access` group is the grant. Being a valid Linux account is not the same as
+being someone this system answers to — without that gate, every service account on the host and
+`root` would be a way in. The PAM stack in `/etc/pam.d/cybou` is ordinary Unix password checking
+plus `account`, which is what makes `usermod -L` revoke access rather than appear to.
+
+Granting and revoking are ordinary administration:
+
+```bash
+sudo useradd --no-create-home --shell /usr/sbin/nologin alice && sudo passwd alice && sudo gpasswd -a alice cybou-access
+```
+
+A session is a cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, eight hours, no sliding renewal, and
+held in memory so restarting the gateway ends every one. A missing, expired or invented cookie is
+served the public projection rather than refused: a public surface that answered 401 to strangers
+would stop being a public surface.
 
 This replaced a tripwire that refused to start at all whenever the Journal held anything above
 ordinary. It fired correctly on 2026-08-20, on the first sentence spoken to `Meaning1`, and took the
@@ -66,13 +86,12 @@ would have been a migration that rebuilds rather than edits.
 
 **The public deployment serves the live Mind, and what it serves publicly is machine facts.** That
 is a deliberate decision by the owner: the point of the deployment is a working desktop anyone can
-look at. What has changed is that it no longer requires the host to hold nothing personal — the
-surface withholds what is the person's, and the owner reaches it with the credential.
+look at. It no longer requires the host to hold nothing personal — the surface withholds what is the
+person's, and someone with an account reaches the rest.
 
-The credential is a single shared secret, not accounts. It is enough to separate the owner from
-everyone else and it is not enough for more than one person: there is no per-reader identity, no
-revocation short of regenerating the file, and no record of who read what. A demo user on the Linux
-side, so access can be granted per request, is still the shape this should take.
+What is still missing: nothing records who read what. Access can be granted and revoked per person,
+and a person's reading leaves no trace in the biography, which for a system whose whole argument is
+that claims should be traceable to a source is a gap worth naming rather than discovering later.
 
 The gateway runs as a user unit inside the `cybou` user manager, on the same session bus as the
 organs. That is what makes live data possible at all: as a system service it had no session bus and
@@ -96,7 +115,7 @@ They may be overridden with `CYBOU_VPS_SRC` and `CYBOU_VPS_TARGET`.
 - Deployment does not modify the bootloader or replace Debian.
 - Package/service activation will be added as part of the Debian hard cutover.
 - Public access is unauthenticated by decision, behind TLS, and shows live Mind state with
-  everything above ordinary withheld. The owner reaches the rest with the credential in
-  `/var/lib/cybou/access-credential`, readable only by the `cybou` user.
-- Per-reader identity, revocation and an access record do not exist. One shared secret separates
-  the owner from strangers and nothing separates one holder of it from another.
+  everything above ordinary withheld. Signing in with an account in `cybou-access` reaches the rest.
+- `cybou-authd` runs as root and is the only process that does. Its socket is group-owned by
+  `cybou`; it answers one bit and never says why an attempt failed.
+- No record is kept of who read what.

@@ -327,10 +327,49 @@ observation + outcome
       └──────────────► Mind
 ```
 
-The return path matters: action outcome must re-enter cognition as observed state rather than being
-treated as a fire-and-forget shell side effect.
+## Presence and Desktop boundary
 
-The normative direction is ADR-0022.
+Under ADR-0037 and ADR-0040, Presence is rendered via **CYBOU Desktop** (WebAssembly) delivered by
+`cybou-web-gateway`:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    CYBOU Desktop (WASM)                     │
+│               Cards · Decks · Spatial Canvas                │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTP / SSE / WebSocket
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      cybou-web-gateway                      │
+│        Auth · Session · Schema · Static delivery · CSP      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Presence1 / Shell1 D-Bus
+                               ▼
+┌──────────────────────────────┴──────────────────────────────┐
+│                       Mind & Body Hosts                     │
+│     cybou-presenced (Mind)     cybou-shelld / jailfs (Body) │
+└─────────────────────────────────────────────────────────────┘
+```
+
+CYBOU Desktop establishes:
+- **Generic Cards**: Every surface is a `CardInstance` governed by a static `CardSpec`.
+- **Layout v9 Schema**: Persisted spatial positions with transparent migration from legacy v8.
+- **Spatial Dynamics**: Real-time bounded resize, collapse/expand pills, pinning, and deterministic multi-mode arrangement (`Free`, `Compact`, `Grid`, `Relations`, `Focus`).
+- **Bounded Body Capabilities**: Interactive exploration of host state via `CYBOU Shell` powered by `cybou-jailfs` (`DemoReadOnly` profile, builtins only, strict jail isolation, refused in public preview).
+
+### Four Isolated Security Zones
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Zone 1: Mind Projection (Read-only aggregation of canonical owners)    │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Zone 4: Governed Actions (Future authorized mutation/execution runtime) │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Next
 

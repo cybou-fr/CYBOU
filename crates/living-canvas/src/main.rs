@@ -1,6 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
+#![allow(
+    clippy::too_many_lines,
+    clippy::needless_pass_by_value,
+    clippy::large_enum_variant,
+    clippy::unit_arg,
+    clippy::if_not_else
+)]
+
 //! Browser entry point for the Living Canvas WebAssembly application.
 
 #[cfg(target_arch = "wasm32")]

@@ -4,7 +4,9 @@
 //! Runtime-independent client boundary for Living Canvas.
 
 use async_trait::async_trait;
-use cybou_web_contracts::{MindProjection, SessionProjection, SnapshotProjection};
+use cybou_web_contracts::{
+    MindProjection, SessionProjection, ShellExecResponse, SnapshotProjection,
+};
 use thiserror::Error;
 
 pub mod card;
@@ -15,7 +17,7 @@ mod gateway_client;
 pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
-pub use layout::DesktopLayout;
+pub use layout::{ArrangementMode, DesktopLayout};
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -57,6 +59,13 @@ pub trait MindClient {
     ///
     /// Returns [`ClientError`] when the gateway cannot produce the projection.
     async fn mind(&self) -> Result<MindProjection, ClientError>;
+
+    /// Execute a bounded Shell capability inside the Body host sandbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on gateway transport failure or if forbidden in public preview.
+    async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError>;
 }
 
 /// Deterministic client for component, visual, and state-vocabulary tests.
@@ -118,6 +127,16 @@ impl MindClient for MockMindClient {
     async fn mind(&self) -> Result<MindProjection, ClientError> {
         self.mind.clone().ok_or_else(|| {
             ClientError::GatewayRequest("mock client holds no owner projection".into())
+        })
+    }
+
+    async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError> {
+        Ok(ShellExecResponse {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            exit_code: 0,
+            stdout: format!("mock shell output for: {command}\n"),
+            stderr: String::new(),
+            cwd: "/".to_owned(),
         })
     }
 }

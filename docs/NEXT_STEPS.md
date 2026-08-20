@@ -25,12 +25,12 @@ true while the chain underneath it was broken.
 
 ## In order
 
-1. **Per-reader access, not one shared secret.** The tripwire fired on 2026-08-20, on the first
-   sentence spoken to `Meaning1` on the deployed host, and what came out of it is in place: the
-   public projection withholds anything above ordinary and withholds obligations entirely, and the
-   owner reaches the rest with a credential. What that is not is authentication in any full sense —
-   there is no per-reader identity, no revocation short of regenerating the file, and no record of
-   who read what. A demo user on the Linux side, granted per request, is the shape this should take.
+1. **A record of who read what.** Access is now a Linux account: `cybou-authd` checks a password
+   through PAM, membership in `cybou-access` is the grant, `usermod -L` is the revocation, and
+   `scripts/test-pam-access.sh` proves each of those against real accounts rather than a stub. What
+   is still missing is the part this repository's whole argument depends on: nothing records that a
+   person read anything. A biography that can say what the system did and not who looked at it is
+   traceable in one direction only.
 
    Do not reach for `CYBOU_PUBLISHABLE_SENSITIVITY` to solve anything. It was raised on 2026-08-20
    for one stated reason — 1252 rows in the first Journal carried a constant sensitivity their

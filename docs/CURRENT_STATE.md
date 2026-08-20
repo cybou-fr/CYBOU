@@ -50,7 +50,10 @@ The repository builds all Mind services from one locked workspace:
 - `cybou-workspaced`: Global Workspace Theory attention coalitions and focus selection (`org.cybou.Mind.Workspace1`).
 - `cybou-lifecycled`: Sleep/wake lifecycle and consolidation scheduler (`org.cybou.Mind.Lifecycle1`).
 - `cybou-presenced`: Unified Mind presentation and command gateway (`org.cybou.Mind.Presence1`).
-- `cybou-web-gateway` & `living-canvas`: Unified browser and desktop frontend.
+- `cybou-jailfs`: Sandboxed filesystem containment library with canonical root validation, symlink traversal prevention, and bounded quota enforcement.
+- `cybou-shelld`: Bounded Body capability engine and command parser (`pwd`, `cd`, `ls`, `cat`, `echo`, `grep`, `mkdir`, `touch`, `write`, `status`, `help`, `clear`).
+- `cybou-web-gateway`: Loopback-bound HTTP & SSE server providing read-only projections (`/api/v1/snapshot`, `/api/v1/mind`, `/api/v1/events`), and sandboxed execution endpoint (`POST /api/v1/shell/exec`) with strict refusal in `SessionMode::PublicPreview` (HTTP 403) and execution in `SessionMode::LocalDesktop`.
+- `living-canvas`: Unified browser and desktop frontend (**CYBOU Desktop**), implementing the generic Card model, Layout schema v9 with transparent v8 migration, interactive resize, card pinning & collapsing, automated multi-mode Arrangement Engine (`Grid`, `Compact`, `Relations`, `Focus`, and `Ctrl+K` command palette actions), and interactive terminal Shell Card UI (Phases 0, 1, 2, and 3 completed; see [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md)).
 
 ## What is wired to what (2026-08-20)
 

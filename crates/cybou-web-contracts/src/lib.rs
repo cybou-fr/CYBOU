@@ -321,6 +321,30 @@ pub struct MindProjection {
     pub context: ContextProjection,
 }
 
+/// Typed request payload to execute a bounded Shell capability.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShellExecRequest {
+    /// Full command line string.
+    pub command: String,
+}
+
+/// Typed response from executing a bounded Shell capability.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShellExecResponse {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// Standard execution exit code (0 for success).
+    pub exit_code: i32,
+    /// Standard output text.
+    pub stdout: String,
+    /// Standard error text.
+    pub stderr: String,
+    /// Sandbox working directory after command.
+    pub cwd: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

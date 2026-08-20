@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-shelld"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CYBOU bounded Body Shell capability engine and daemon"
+
+[dependencies]
+cybou-jailfs = { workspace = true }
+cybou-protocol = { path = "../cybou-protocol" }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+
+[lints]
+workspace = true

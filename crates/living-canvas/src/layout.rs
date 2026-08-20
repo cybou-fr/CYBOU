@@ -242,6 +242,34 @@ impl DesktopLayout {
         }
     }
 
+    /// Check if a card is currently present in the layout.
+    #[must_use]
+    pub fn contains_card(&self, id: CardId) -> bool {
+        self.cards.iter().any(|c| c.id == id)
+    }
+
+    /// Open or focus a dynamic card instance.
+    pub fn open_card(&mut self, id: CardId, x: f64, y: f64) {
+        if self.contains_card(id) {
+            self.bring_forward(id);
+            return;
+        }
+        let spec = id.spec();
+        let max_z = self.cards.iter().map(|c| c.geometry.z).max().unwrap_or(0);
+        self.cards.push(CardInstance {
+            id,
+            geometry: CardGeometry::new(x, y, spec.default_size, max_z + 1),
+            presentation: CardPresentation::default(),
+        });
+    }
+
+    /// Close and remove a card from the layout if closable.
+    pub fn close_card(&mut self, id: CardId) {
+        if id.spec().closable {
+            self.cards.retain(|c| c.id != id);
+        }
+    }
+
     /// Parse layout from raw JSON string, supporting both v9 and v8 formats.
     #[must_use]
     pub fn parse_json(json: &str) -> Option<Self> {
@@ -255,6 +283,166 @@ impl DesktopLayout {
         }
         None
     }
+
+    /// Apply an automated spatial arrangement algorithm.
+    ///
+    /// Pinned cards are strictly preserved at their current spatial coordinates.
+    pub fn apply_arrangement(&mut self, mode: ArrangementMode) {
+        match mode {
+            ArrangementMode::Free => {}
+            ArrangementMode::Grid => self.arrange_grid(),
+            ArrangementMode::Compact => self.arrange_compact(),
+            ArrangementMode::Relations => self.arrange_relations(),
+            ArrangementMode::Focus(target) => self.arrange_focus(target),
+        }
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn arrange_grid(&mut self) {
+        let col_width = 380.0;
+        let col_gap = 24.0;
+        let row_gap = 20.0;
+        let start_x = 40.0;
+        let start_y = 40.0;
+        let num_cols = 3;
+
+        let mut col_heights = [start_y; 3];
+
+        for card in &mut self.cards {
+            if card.presentation.pinned {
+                continue;
+            }
+            let mut min_col = 0;
+            for (col_idx, &h) in col_heights.iter().enumerate().take(num_cols) {
+                if h < col_heights[min_col] {
+                    min_col = col_idx;
+                }
+            }
+
+            let x = start_x + (min_col as f64) * (col_width + col_gap);
+            let y = col_heights[min_col];
+            card.geometry.x = x;
+            card.geometry.y = y;
+
+            let h = if card.presentation.collapsed {
+                44.0
+            } else {
+                card.geometry.height
+            };
+            col_heights[min_col] += h + row_gap;
+        }
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn arrange_compact(&mut self) {
+        let col_width = 350.0;
+        let col_gap = 16.0;
+        let row_gap = 14.0;
+        let start_x = 30.0;
+        let start_y = 30.0;
+        let num_cols = 3;
+
+        let mut col_heights = [start_y; 3];
+
+        for card in &mut self.cards {
+            if card.presentation.pinned {
+                continue;
+            }
+            let mut min_col = 0;
+            for (col_idx, &h) in col_heights.iter().enumerate().take(num_cols) {
+                if h < col_heights[min_col] {
+                    min_col = col_idx;
+                }
+            }
+
+            let x = start_x + (min_col as f64) * (col_width + col_gap);
+            let y = col_heights[min_col];
+            card.geometry.x = x;
+            card.geometry.y = y;
+
+            let h = if card.presentation.collapsed {
+                44.0
+            } else {
+                card.geometry.height
+            };
+            col_heights[min_col] += h + row_gap;
+        }
+    }
+
+    fn arrange_relations(&mut self) {
+        let topology = [
+            (CardId::Session, 50.0, 50.0),
+            (CardId::Identity, 50.0, 320.0),
+            (CardId::Perception, 50.0, 580.0),
+            (CardId::SelfModel, 50.0, 800.0),
+            (CardId::Capabilities, 440.0, 50.0),
+            (CardId::Commitments, 440.0, 420.0),
+            (CardId::Attention, 440.0, 680.0),
+            (CardId::Context, 440.0, 900.0),
+            (CardId::Journal, 880.0, 50.0),
+            (CardId::Lifecycle, 880.0, 400.0),
+            (CardId::Beliefs, 880.0, 680.0),
+        ];
+
+        for (id, tx, ty) in topology {
+            if let Some(card) = self.card_mut(id)
+                && !card.presentation.pinned
+            {
+                card.geometry.x = tx;
+                card.geometry.y = ty;
+            }
+        }
+    }
+
+    fn arrange_focus(&mut self, target_id: CardId) {
+        let center_x = 420.0;
+        let center_y = 60.0;
+
+        if let Some(target) = self.card_mut(target_id)
+            && !target.presentation.pinned
+        {
+            target.geometry.x = center_x;
+            target.geometry.y = center_y;
+            target.presentation.collapsed = false;
+        }
+
+        let mut left_y = 40.0;
+        let mut right_y = 40.0;
+        let mut toggle = false;
+
+        for card in &mut self.cards {
+            if card.id == target_id || card.presentation.pinned {
+                continue;
+            }
+            card.presentation.collapsed = true;
+
+            if toggle {
+                card.geometry.x = 40.0;
+                card.geometry.y = left_y;
+                left_y += 52.0;
+            } else {
+                card.geometry.x = 920.0;
+                card.geometry.y = right_y;
+                right_y += 52.0;
+            }
+            toggle = !toggle;
+        }
+    }
+}
+
+/// Spatial arrangement algorithm mode.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ArrangementMode {
+    /// Free-form unconstrained positioning.
+    Free,
+    /// Compact packing with top-left gravity.
+    Compact,
+    /// Structured multi-column grid alignment.
+    Grid,
+    /// Force-directed / clustered layout around canonical causal relationships.
+    Relations,
+    /// Focused presentation centering target card enlarged, others placed around borders.
+    Focus(CardId),
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -373,5 +561,57 @@ mod tests {
         layout.bring_forward(CardId::Identity);
         let new_z = layout.geometry(CardId::Identity).z;
         assert!(new_z > old_z);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn arrangement_preserves_pinned_cards() {
+        let mut layout = DesktopLayout::default();
+        layout.set_pinned(CardId::Identity, true);
+        layout.set_position(CardId::Identity, 777.0, 888.0);
+
+        // Apply grid
+        layout.apply_arrangement(ArrangementMode::Grid);
+        let id_geom = layout.geometry(CardId::Identity);
+        assert_eq!(id_geom.x, 777.0);
+        assert_eq!(id_geom.y, 888.0);
+
+        // Apply compact
+        layout.apply_arrangement(ArrangementMode::Compact);
+        let id_geom = layout.geometry(CardId::Identity);
+        assert_eq!(id_geom.x, 777.0);
+        assert_eq!(id_geom.y, 888.0);
+
+        // Apply relations
+        layout.apply_arrangement(ArrangementMode::Relations);
+        let id_geom = layout.geometry(CardId::Identity);
+        assert_eq!(id_geom.x, 777.0);
+        assert_eq!(id_geom.y, 888.0);
+
+        // Apply focus
+        layout.apply_arrangement(ArrangementMode::Focus(CardId::Capabilities));
+        let id_geom = layout.geometry(CardId::Identity);
+        assert_eq!(id_geom.x, 777.0);
+        assert_eq!(id_geom.y, 888.0);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn arrangement_relations_and_focus_positioning() {
+        let mut layout = DesktopLayout::default();
+
+        layout.apply_arrangement(ArrangementMode::Relations);
+        let cap_geom = layout.geometry(CardId::Capabilities);
+        assert_eq!(cap_geom.x, 440.0);
+        assert_eq!(cap_geom.y, 50.0);
+
+        layout.apply_arrangement(ArrangementMode::Focus(CardId::Journal));
+        let journal_geom = layout.geometry(CardId::Journal);
+        assert_eq!(journal_geom.x, 420.0);
+        assert_eq!(journal_geom.y, 60.0);
+        assert!(!layout.presentation(CardId::Journal).collapsed);
+
+        // Other non-pinned cards are collapsed
+        assert!(layout.presentation(CardId::Identity).collapsed);
     }
 }
