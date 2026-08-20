@@ -14,7 +14,17 @@ use cybou_web_gateway::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let presence: Arc<dyn PresenceSource> = source().await?;
-    let address = SocketAddr::from(([127, 0, 0, 1], 8787));
+    // Loopback always; the port is settable so a gate can start one of these beside a deployment
+    // instead of having to stop the deployment to test the thing that protects it.
+    let address: SocketAddr = match std::env::var("CYBOU_GATEWAY_ADDR") {
+        Ok(value) => value
+            .parse()
+            .map_err(|_| format!("CYBOU_GATEWAY_ADDR is not an address: {value}"))?,
+        Err(_) => SocketAddr::from(([127, 0, 0, 1], 8787)),
+    };
+    if !address.ip().is_loopback() {
+        return Err(format!("refusing to bind {address}: this gateway is loopback only").into());
+    }
     let listener = tokio::net::TcpListener::bind(address).await?;
     let web_root = std::env::var_os("CYBOU_WEB_ROOT").map(std::path::PathBuf::from);
     let session_context = match std::env::var("CYBOU_SESSION_MODE") {
@@ -29,6 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         && std::env::var_os("CYBOU_GATEWAY_FIXTURE").is_none()
     {
         refuse_publishing_personal_state().await?;
+        // Checking once at startup guards the door of a room somebody is already in: a promise
+        // recorded a minute after this process came up would be published by it for as long as it
+        // kept running. The same question is asked again while it serves.
+        tokio::spawn(stop_when_the_journal_turns_personal());
     }
 
     println!("cybou-web-gateway listening on http://{address}");
@@ -117,7 +131,7 @@ async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Er
         match answer {
             Some(highest) if highest > permitted => {
                 return Err(format!(
-                    "refusing to serve an unauthenticated public surface: the Journal holds                      contributions at sensitivity {highest}, above the {permitted} this                      deployment permits. Serve it behind authentication, run it in local-desktop                      mode, or raise CYBOU_PUBLISHABLE_SENSITIVITY if publishing that is a decision                      you are making."
+                    "refusing to serve an unauthenticated public surface: the Journal holds contributions at sensitivity {highest}, above the {permitted} this deployment permits. Serve it behind authentication, run it in local-desktop mode, or raise CYBOU_PUBLISHABLE_SENSITIVITY if publishing that is a decision you are making."
                 )
                 .into());
             }
@@ -129,6 +143,56 @@ async fn refuse_publishing_personal_state() -> Result<(), Box<dyn std::error::Er
                 return Err("refusing to serve an unauthenticated public surface: Event1 did not                             answer, so what this deployment would publish is unknown"
                     .into());
             }
+        }
+    }
+}
+
+/// How often a running surface re-asks what it would be publishing.
+#[cfg(target_os = "linux")]
+const RECHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Stop serving once the Journal holds more than this deployment permits.
+///
+/// Exiting rather than refusing individual requests: a public surface that has started publishing
+/// personal state should stop being a public surface, not answer some routes and not others. The
+/// unit restarts it, the startup check refuses, and it lands in failed with the reason in the
+/// journal — the same place an operator would look, saying the same thing.
+///
+/// A Journal that stops answering does not stop the surface. That would turn every transient
+/// hiccup in one owner into an outage of another, and the startup check already refuses to begin
+/// on an unknown Journal; this one only reacts to an answer it actually received.
+#[cfg(target_os = "linux")]
+async fn stop_when_the_journal_turns_personal() {
+    use cybou_fabric::EVENT;
+
+    let permitted = publishable_sensitivity();
+    let Ok(connection) = zbus::Connection::session().await else {
+        return;
+    };
+    let mut interval = tokio::time::interval(RECHECK_INTERVAL);
+
+    loop {
+        interval.tick().await;
+
+        let answer: Option<u8> = connection
+            .call_method(
+                Some(EVENT.service),
+                EVENT.object_path,
+                Some(EVENT.interface),
+                "HighestSensitivity",
+                &(),
+            )
+            .await
+            .ok()
+            .and_then(|reply| reply.body().deserialize().ok());
+
+        if let Some(highest) = answer
+            && highest > permitted
+        {
+            eprintln!(
+                "the Journal now holds contributions at sensitivity {highest}, above the {permitted} this deployment permits; a public surface stops rather than publishing them"
+            );
+            std::process::exit(1);
         }
     }
 }

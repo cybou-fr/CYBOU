@@ -191,6 +191,29 @@ if [ "$sensitivity_before" != "0" ]; then
 fi
 echo "    Journal sensitivity is ordinary; a public surface may serve it"
 
+# The public surface refuses to publish personal state. A guard that can only be tested by making
+# a deployment publish something personal is a guard nobody tests, so it is exercised here: a
+# gateway of our own, on its own port, beside the twelve owners this gate already runs.
+echo "==> Verifying a public surface serves a Journal of machine facts..."
+GATEWAY_ADDR="127.0.0.1:8799"
+CYBOU_SESSION_MODE=public-preview CYBOU_GATEWAY_ADDR="$GATEWAY_ADDR"     "$BIN_DIR/cybou-web-gateway" >"$TMP_DIR/gateway.log" 2>&1 &
+GATEWAY_PID="$!"
+PIDS+=("$GATEWAY_PID")
+
+deadline=$((SECONDS + 30))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    if curl -fsS "http://$GATEWAY_ADDR/api/v1/session" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+if ! curl -fsS "http://$GATEWAY_ADDR/api/v1/session" >/dev/null 2>&1; then
+    echo "ERROR: the gateway refused to serve a Journal that holds only machine facts." >&2
+    sed -n '1,5p' "$TMP_DIR/gateway.log" >&2
+    exit 1
+fi
+echo "    Public surface is serving"
+
 echo "==> Verifying a Presence1 command reaches the owner that holds the state..."
 before="$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 OpenCount | awk '{print $2}')"
 promised="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Promise s "Verify the command path" | awk '{print $2}' | tr -d '"')"
@@ -214,6 +237,26 @@ if [ "$sensitivity_after" -le "$sensitivity_before" ]; then
     exit 1
 fi
 echo "    A promise raised Journal sensitivity $sensitivity_before -> $sensitivity_after"
+
+# And that is the transition the surface must not keep serving across. Checking only at startup
+# would guard the door of a room somebody is already in.
+deadline=$((SECONDS + 45))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    if ! kill -0 "$GATEWAY_PID" 2>/dev/null; then
+        break
+    fi
+    sleep 1
+done
+if kill -0 "$GATEWAY_PID" 2>/dev/null; then
+    echo "ERROR: a promise was recorded and the public surface kept serving it." >&2
+    exit 1
+fi
+if ! grep -q "a public surface stops rather than publishing" "$TMP_DIR/gateway.log"; then
+    echo "ERROR: the public surface stopped, but not for the reason it was supposed to:" >&2
+    sed -n '1,10p' "$TMP_DIR/gateway.log" >&2
+    exit 1
+fi
+echo "    Public surface stopped once the Journal turned personal"
 
 # A promise the biography never heard of is the failure this path had: Kind::Intention is derived,
 # so an intention with no cause cannot enter the Journal, and a promise made through Presence1 had
