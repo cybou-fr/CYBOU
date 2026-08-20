@@ -80,6 +80,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // An erasure interrupted between the request and the redaction leaves a person believing
+    // something was forgotten that is still there. The request is durable precisely so nobody has
+    // to remember, and this is what reads it: before anything else can be served.
+    match core.resume_erasures() {
+        Ok(0) => {}
+        Ok(resumed) => println!("[cybou-eventd] Finished {resumed} interrupted erasure(s)"),
+        Err(error) => {
+            // Serving a Journal whose erasures did not finish would answer readers with content
+            // somebody asked to have destroyed.
+            eprintln!("[cybou-eventd] Cannot finish an interrupted erasure: {error}");
+            return Err(error.into());
+        }
+    }
+
     #[cfg(target_os = "linux")]
     {
         use cybou_eventd::service::Event1Service;

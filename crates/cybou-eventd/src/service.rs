@@ -121,6 +121,40 @@ impl Event1Service {
         self.core.erasure_epoch()
     }
 
+    /// Forget a contribution and everything derived from it, and say what was reached.
+    ///
+    /// ADR-0028 keeps this off `Submit` on purpose: destroying biography must never be reachable
+    /// by the same call that records a thought about it. The reason is a closed set, because an
+    /// erasure record is permanent and free text would let the thing being forgotten be restated
+    /// in the one place that can never be erased.
+    ///
+    /// Answers the number of contributions whose payload was actually redacted, or -1 when the
+    /// erasure was refused. Zero is a real answer: a target already erased is not an error.
+    async fn request_erasure(&self, message_id: String, reason: String) -> i64 {
+        let Ok(target) = uuid::Uuid::parse_str(&message_id) else {
+            return -1;
+        };
+        let Some(reason) = cybou_protocol::admission::ErasureReason::from_name(&reason) else {
+            println!("[cybou-eventd] Erasure refused: '{reason}' is not a reason this build knows");
+            return -1;
+        };
+        match self.core.request_erasure(&target, reason) {
+            Ok(outcome) => {
+                println!(
+                    "[cybou-eventd] Erased {} of {} contributions in the closure of {target}; epoch {}",
+                    outcome.redacted.len(),
+                    outcome.closure.len(),
+                    outcome.epoch
+                );
+                i64::try_from(outcome.redacted.len()).unwrap_or(i64::MAX)
+            }
+            Err(error) => {
+                println!("[cybou-eventd] Erasure refused: {error}");
+                -1
+            }
+        }
+    }
+
     /// Retrieve an envelope at a specific sequence number.
     async fn at_sequence(&self, sequence: u64) -> Vec<u8> {
         self.core

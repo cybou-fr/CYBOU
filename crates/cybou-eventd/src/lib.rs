@@ -15,10 +15,10 @@ use std::{
 };
 
 use cybou_crypto::{KeyDomain, KeyStore};
-use cybou_protocol::{Kind, canonical::CanonicalEnvelope};
+use cybou_protocol::{Kind, admission::ErasureReason, canonical::CanonicalEnvelope};
 use cybou_storage::{
     JournalCheckpoint,
-    writer::{Appended, JournalWriter, WriteError},
+    writer::{Appended, Erased, JournalWriter, WriteError},
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -404,6 +404,178 @@ impl EventCore {
         writer.append(envelope).map_err(EventError::Storage)
     }
 
+    /// Forget a contribution and everything derived from it.
+    ///
+    /// ADR-0028's three steps, in the order that makes every crash recoverable:
+    ///
+    /// 1. an `ErasureRequested` contribution, committed before anything irreversible happens, so
+    ///    a crash leaves a Journal that can say what it was in the middle of and why;
+    /// 2. the keys are destroyed and the payloads redacted, which is idempotent and therefore safe
+    ///    to repeat after a crash;
+    /// 3. an `ErasureApplied` contribution, which is what makes the pair complete.
+    ///
+    /// A request with no matching applied record is an erasure that was interrupted. It is
+    /// resumed from step 2 rather than reported as done, which is what [`Self::resume_erasures`]
+    /// is for.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventError`] when the request cannot be recorded, the redaction cannot commit, or
+    /// the target is not a contribution this Journal holds.
+    pub fn request_erasure(
+        &self,
+        target: &uuid::Uuid,
+        reason: ErasureReason,
+    ) -> Result<Erased, EventError> {
+        if self.find_by_message_id(target).is_none() {
+            return Err(EventError::Decode(
+                "the Journal does not hold that contribution".into(),
+            ));
+        }
+
+        let requested = self.record_erasure_step(Kind::ErasureRequested, target, reason, None)?;
+        let outcome = self.carry_out_erasure(target)?;
+        self.record_erasure_step(Kind::ErasureApplied, target, reason, Some(requested))?;
+        Ok(outcome)
+    }
+
+    /// Finish any erasure that was interrupted before it recorded that it had happened.
+    ///
+    /// Called at startup. An organ that only noticed on the next explicit request would leave a
+    /// person believing something was forgotten when the process died halfway through forgetting
+    /// it — and the request is on record precisely so that nobody has to remember.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventError`] when the Journal cannot be read or a resumed erasure cannot finish.
+    pub fn resume_erasures(&self) -> Result<usize, EventError> {
+        let mut resumed = 0;
+        for (target, reason, request_id) in self.unfinished_erasures() {
+            self.carry_out_erasure(&target)?;
+            self.record_erasure_step(Kind::ErasureApplied, &target, reason, Some(request_id))?;
+            resumed += 1;
+        }
+        Ok(resumed)
+    }
+
+    /// Erasure requests with no applied record beside them.
+    fn unfinished_erasures(&self) -> Vec<(uuid::Uuid, ErasureReason, uuid::Uuid)> {
+        let mut requested = Vec::new();
+        let mut applied = Vec::new();
+        let mut after = 0_u64;
+        loop {
+            let page = self.replay(after, 512);
+            if page.is_empty() {
+                break;
+            }
+            for envelope in &page {
+                match Kind::from_u16(envelope.kind) {
+                    Some(Kind::ErasureRequested) => {
+                        if let Some(record) = decode_erasure_record(envelope) {
+                            requested.push((envelope.message_id, record));
+                        }
+                    }
+                    Some(Kind::ErasureApplied) => applied.push(envelope.causation_id),
+                    _ => {}
+                }
+            }
+            after += page.len() as u64;
+        }
+        requested
+            .into_iter()
+            .filter(|(request_id, _)| !applied.contains(request_id))
+            .map(|(request_id, (target, reason))| (target, reason, request_id))
+            .collect()
+    }
+
+    /// Steps 2 and 3 of the sequence, which the writer performs as one operation.
+    fn carry_out_erasure(&self, target: &uuid::Uuid) -> Result<Erased, EventError> {
+        let mut writer = self
+            .writer
+            .lock()
+            .map_err(|_| EventError::Storage(WriteError::Malformed("lock poisoned")))?;
+        writer.apply_erasure(target).map_err(EventError::Storage)
+    }
+
+    /// Append one of the two erasure records.
+    ///
+    /// These do not go through `submit`, which refuses erasure kinds by design: destroying
+    /// biography must never be reachable by the call that records a thought about it.
+    fn record_erasure_step(
+        &self,
+        kind: Kind,
+        target: &uuid::Uuid,
+        reason: ErasureReason,
+        caused_by: Option<uuid::Uuid>,
+    ) -> Result<uuid::Uuid, EventError> {
+        // An erasure record cites what it is about, so it inherits that contribution's classes:
+        // the Journal refuses a derived contribution that is less restricted than its references,
+        // and it is right to. That a person asked for something personal to be forgotten is itself
+        // about the person, even though the record says nothing about what it was.
+        let (privacy, sensitivity) = self
+            .find_by_message_id(target)
+            .map_or((1, 1), |envelope| (envelope.privacy, envelope.sensitivity));
+
+        let mut payload = Vec::new();
+        // The target and the reason, and nothing else. Whatever the payload said is exactly what
+        // this record must not repeat.
+        let record = ciborium::Value::Map(vec![
+            (
+                ciborium::Value::Text("target".into()),
+                ciborium::Value::Text(target.to_string()),
+            ),
+            (
+                ciborium::Value::Text("reason".into()),
+                ciborium::Value::Text(reason.name().into()),
+            ),
+        ]);
+        ciborium::into_writer(&record, &mut payload)
+            .map_err(|error| EventError::Decode(error.to_string()))?;
+
+        let envelope = CanonicalEnvelope {
+            schema_version: 4,
+            message_id: uuid::Uuid::new_v4(),
+            correlation_id: *target,
+            causation_id: caused_by.unwrap_or_else(uuid::Uuid::nil),
+            origin_organ: "eventd".to_owned(),
+            origin_node: String::new(),
+            kind: kind as u16,
+            wall_time_ms: cybou_protocol::unix_millis(time::OffsetDateTime::now_utc()),
+            monotonic_time: 0,
+            logical_clock: 1,
+            confidence: 1.0,
+            // The request cites what it is about. `ErasureRequested` is a derived kind and the
+            // Journal refuses one that references nothing — rightly, because a request to forget
+            // that named nothing would be unaccountable afterwards. The applied record cites the
+            // request instead, through causation, which is what pairs the two.
+            evidence: if caused_by.is_some() {
+                Vec::new()
+            } else {
+                vec![*target]
+            },
+            payload,
+            privacy,
+            capability_scope: String::new(),
+            sealed: false,
+            key_domain_id: uuid::Uuid::nil(),
+            key_epoch: 0,
+            // An erasure record is never itself erasable, so it is not given a retention that
+            // could expire it: a forgetting that could be forgotten would make the audit trail a
+            // suggestion.
+            retention_class: 0,
+            retention_policy_version: 0,
+            retain_until_ms: 0,
+            sensitivity,
+        };
+
+        let mut writer = self
+            .writer
+            .lock()
+            .map_err(|_| EventError::Storage(WriteError::Malformed("lock poisoned")))?;
+        writer.append(&envelope).map_err(EventError::Storage)?;
+        Ok(envelope.message_id)
+    }
+
     /// Return total contribution count in the Journal.
     pub fn count(&self) -> u64 {
         self.writer
@@ -618,8 +790,258 @@ fn decode_hex(text: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
+/// The target and reason an erasure record carries.
+///
+/// Returns `None` for a record this build cannot read, which is treated as an erasure nobody can
+/// account for rather than one to guess at.
+fn decode_erasure_record(envelope: &CanonicalEnvelope) -> Option<(uuid::Uuid, ErasureReason)> {
+    let value: ciborium::Value = ciborium::from_reader(envelope.payload.as_slice()).ok()?;
+    let map = value.as_map()?;
+    let field = |name: &str| {
+        map.iter()
+            .find(|(key, _)| key.as_text() == Some(name))
+            .and_then(|(_, value)| value.as_text())
+    };
+    let target = uuid::Uuid::parse_str(field("target")?).ok()?;
+    let reason = ErasureReason::from_name(field("reason")?)?;
+    Some((target, reason))
+}
+
 #[cfg(test)]
 mod tests {
+    /// A contribution caused by another, so the closure has a causation edge to travel.
+    fn caused_by(cause: &CanonicalEnvelope, kind: Kind, text: &str) -> CanonicalEnvelope {
+        let mut envelope = observation(text);
+        envelope.kind = kind as u16;
+        envelope.causation_id = cause.message_id;
+        envelope
+    }
+
+    /// A contribution citing another as evidence, which is the other edge the closure travels.
+    ///
+    /// Its cause is something else entirely: evidence may not restate the cause, and this is the
+    /// case that proves the closure does not only follow causation.
+    fn citing(
+        evidence: &CanonicalEnvelope,
+        cause: &CanonicalEnvelope,
+        kind: Kind,
+        text: &str,
+    ) -> CanonicalEnvelope {
+        let mut envelope = observation(text);
+        envelope.kind = kind as u16;
+        envelope.causation_id = cause.message_id;
+        envelope.evidence = vec![evidence.message_id];
+        envelope
+    }
+
+    fn observation(text: &str) -> CanonicalEnvelope {
+        let observation = cybou_protocol::observation::ObservationV1 {
+            source_id: "test".into(),
+            subject: "a-subject".into(),
+            value: ciborium::Value::Text(text.into()),
+            acquired_at: "2026-08-21T00:00:00.000Z".into(),
+            freshness_until: "2026-08-22T00:00:00.000Z".into(),
+            provenance: "a fixture".into(),
+        };
+        let mut payload = Vec::new();
+        ciborium::into_writer(&observation, &mut payload).expect("encode");
+        CanonicalEnvelope {
+            schema_version: 4,
+            message_id: Uuid::new_v4(),
+            correlation_id: Uuid::new_v4(),
+            causation_id: Uuid::nil(),
+            origin_organ: "testd".into(),
+            origin_node: String::new(),
+            kind: Kind::Observation as u16,
+            wall_time_ms: 0,
+            monotonic_time: 0,
+            logical_clock: 1,
+            confidence: 1.0,
+            evidence: Vec::new(),
+            payload,
+            privacy: 1,
+            capability_scope: String::new(),
+            sealed: false,
+            key_domain_id: Uuid::nil(),
+            key_epoch: 0,
+            retention_class: 2,
+            retention_policy_version: 0,
+            retain_until_ms: 0,
+            sensitivity: 1,
+        }
+    }
+
+    fn core_in(dir: &std::path::Path) -> EventCore {
+        EventCore::open(dir.join("journal.sqlite3")).expect("a journal")
+    }
+
+    #[test]
+    fn forgetting_something_forgets_what_was_derived_from_it() {
+        // ADR-0028 E7: erasing a diagnosis and keeping the reasoning that restates it would have
+        // destroyed the record a person asked to forget and kept the sentence that repeats it.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let core = core_in(dir.path());
+
+        let root = observation("the thing to forget");
+        core.submit(&root, None).expect("root accepted");
+        let derived = caused_by(&root, Kind::Hypothesis, "because of the thing to forget");
+        core.submit(&derived, None).expect("derived accepted");
+        let unrelated = observation("nothing to do with it");
+        core.submit(&unrelated, None).expect("unrelated accepted");
+        let citing_it = citing(
+            &root,
+            &unrelated,
+            Kind::Learning,
+            "learned from the thing to forget",
+        );
+        core.submit(&citing_it, None).expect("citing accepted");
+
+        let outcome = core
+            .request_erasure(&root.message_id, ErasureReason::UserRequested)
+            .expect("the erasure runs");
+
+        assert!(outcome.closure.contains(&root.message_id));
+        assert!(
+            outcome.closure.contains(&derived.message_id),
+            "a contribution caused by the target is part of what must be forgotten"
+        );
+        assert!(
+            outcome.closure.contains(&citing_it.message_id),
+            "a contribution citing the target as evidence is a dependent too"
+        );
+        assert!(
+            !outcome.closure.contains(&unrelated.message_id),
+            "something that merely happened afterwards is not a descendant"
+        );
+
+        // The payloads are gone and the rows are not.
+        for id in [root.message_id, derived.message_id, citing_it.message_id] {
+            let envelope = core.find_by_message_id(&id).expect("the row survives");
+            assert!(envelope.payload.is_empty(), "the payload must be redacted");
+            assert_eq!(envelope.origin_organ, "testd", "provenance must survive");
+        }
+        let untouched = core
+            .find_by_message_id(&unrelated.message_id)
+            .expect("the row survives");
+        assert!(!untouched.payload.is_empty());
+    }
+
+    #[test]
+    fn an_erasure_is_recorded_at_both_ends_and_says_why_without_saying_what() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let core = core_in(dir.path());
+        let root = observation("something private");
+        core.submit(&root, None).expect("accepted");
+
+        let before = core.erasure_epoch();
+        core.request_erasure(&root.message_id, ErasureReason::ConsentWithdrawn)
+            .expect("the erasure runs");
+        assert!(core.erasure_epoch() > before, "the epoch has to advance");
+
+        let all = core.replay(0, 128);
+        let requested: Vec<_> = all
+            .iter()
+            .filter(|e| Kind::from_u16(e.kind) == Some(Kind::ErasureRequested))
+            .collect();
+        let applied: Vec<_> = all
+            .iter()
+            .filter(|e| Kind::from_u16(e.kind) == Some(Kind::ErasureApplied))
+            .collect();
+        assert_eq!(requested.len(), 1);
+        assert_eq!(applied.len(), 1);
+        assert_eq!(
+            applied[0].causation_id, requested[0].message_id,
+            "the applied record has to name the request it completes"
+        );
+
+        // The reason is on the record and the erased content is not.
+        let (target, reason) = decode_erasure_record(requested[0]).expect("a readable record");
+        assert_eq!(target, root.message_id);
+        assert_eq!(reason, ErasureReason::ConsentWithdrawn);
+        let text = String::from_utf8_lossy(&requested[0].payload).to_string();
+        assert!(
+            !text.contains("something private"),
+            "an erasure record must never restate what it erased"
+        );
+    }
+
+    #[test]
+    fn an_erasure_record_cannot_itself_be_erased() {
+        // A forgetting that could be forgotten would make the audit trail a suggestion.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let core = core_in(dir.path());
+        let root = observation("something private");
+        core.submit(&root, None).expect("accepted");
+        core.request_erasure(&root.message_id, ErasureReason::UserRequested)
+            .expect("the first erasure runs");
+
+        let record = core
+            .replay(0, 128)
+            .into_iter()
+            .find(|e| Kind::from_u16(e.kind) == Some(Kind::ErasureRequested))
+            .expect("an erasure record");
+
+        core.request_erasure(&record.message_id, ErasureReason::UserRequested)
+            .expect("the request is accepted");
+        let after = core
+            .find_by_message_id(&record.message_id)
+            .expect("the record survives");
+        assert!(
+            !after.payload.is_empty(),
+            "an erasure record keeps its payload however often it is targeted"
+        );
+    }
+
+    #[test]
+    fn an_erasure_interrupted_before_it_finished_is_finished_on_the_next_start() {
+        // ADR-0028 E4: a request with no applied record is resumed rather than reported as done.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let core = core_in(dir.path());
+        let root = observation("something private");
+        core.submit(&root, None).expect("accepted");
+
+        // Exactly what a crash between step 1 and step 3 leaves behind: the request is durable and
+        // nothing else happened.
+        core.record_erasure_step(
+            Kind::ErasureRequested,
+            &root.message_id,
+            ErasureReason::UserRequested,
+            None,
+        )
+        .expect("the request is recorded");
+        assert!(
+            !core
+                .find_by_message_id(&root.message_id)
+                .expect("the row")
+                .payload
+                .is_empty(),
+            "nothing has been erased yet"
+        );
+
+        assert_eq!(core.resume_erasures().expect("resumption runs"), 1);
+        assert!(
+            core.find_by_message_id(&root.message_id)
+                .expect("the row")
+                .payload
+                .is_empty(),
+            "the interrupted erasure has to complete"
+        );
+
+        // And a second start finds nothing left to resume, because the pair is now complete.
+        assert_eq!(core.resume_erasures().expect("resumption runs"), 0);
+    }
+
+    #[test]
+    fn erasing_something_the_journal_does_not_hold_is_refused() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let core = core_in(dir.path());
+        assert!(
+            core.request_erasure(&Uuid::new_v4(), ErasureReason::UserRequested)
+                .is_err(),
+            "there is nothing to forget, and saying otherwise would be a false record"
+        );
+    }
+
     #[test]
     fn a_full_sweep_never_moves_the_trusted_checkpoint() {
         let dir = tempfile::tempdir().expect("temp dir");

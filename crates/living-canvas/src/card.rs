@@ -74,6 +74,25 @@ impl CardId {
         }
     }
 
+    /// Human-readable title of the card.
+    #[must_use]
+    pub const fn title(self) -> &'static str {
+        match self {
+            Self::Identity => "Identity",
+            Self::Session => "Session",
+            Self::Capabilities => "Capabilities",
+            Self::Journal => "Journal",
+            Self::Lifecycle => "Lifecycle",
+            Self::Commitments => "Commitments",
+            Self::SelfModel => "Self-assessment",
+            Self::Attention => "Attention",
+            Self::Beliefs => "Beliefs",
+            Self::Perception => "Perception",
+            Self::Context => "Context",
+            Self::Shell(_) => "CYBOU Shell",
+        }
+    }
+
     /// Resolve string key to static `CardId` if matching.
     #[must_use]
     pub fn from_key(key: &str) -> Option<Self> {

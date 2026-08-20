@@ -39,13 +39,13 @@ true while the chain underneath it was broken.
    published without anyone deciding to. A temporary permission that survives its reason is the same
    failure as a claim that survives its evidence.
 
-2. **An executor for erasure.** ADR-0028 defines erasure, `Kind` has `ErasureRequested` and
-   `ErasureApplied`, `Context1` discards its projection when the epoch advances, and the storage
-   layer can read the epoch. Nothing raises it, and nothing removes a row: there is no path, at any
-   level, from a person asking for something to be gone to it being gone. This was found the way
-   the rest of the list was — by needing it. One test sentence on the deployed host could not be
-   taken back, and the only available remedy was discarding the whole Journal. A system that keeps
-   an append-only biography of a person and cannot delete from it is not finished being designed.
+2. **Erasure beyond the live database.** The executor exists: `Event1.RequestErasure` records a
+   durable request, destroys the keys, redacts the payload of the target and everything derived
+   from it, advances the epoch, and records that it happened. An interrupted erasure finishes on
+   the next start, because the request is on record precisely so nobody has to remember. What is
+   not covered is what ADR-0028 says plainly: a backup taken before an erasure still holds the
+   ciphertext, and only a destroyed key reaches it. Nothing in this tree yet takes a backup, so
+   nothing yet declares which rotation is inside the guarantee (E11, E12).
 
 3. **ADR-0029 completeness for `Context1`.** Bounded by node and edge budgets, invalidated by an
    erasure epoch, and inheriting privacy and retention from evidence. What remains needs the

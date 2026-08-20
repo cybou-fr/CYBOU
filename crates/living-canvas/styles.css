@@ -242,6 +242,33 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .deck-controls { display: flex; align-items: center; gap: 4px; }
 .deck-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
+/* Magnet Drop Target (Tab Merge Preview) */
+.object.magnet-target {
+  outline: 2px dashed var(--accent) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 30px rgba(112,225,200,.5) !important;
+  background: rgba(12,25,36,.96) !important;
+  transform: scale(1.02) !important;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.object.magnet-target::after {
+  content: "＋ Drop to combine tabs";
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #04090e;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .topbar { grid-template-columns: 1fr auto; padding: 0 14px; }
   .runtime-switch { display: none; }

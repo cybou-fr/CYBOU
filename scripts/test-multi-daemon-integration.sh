@@ -457,6 +457,97 @@ if [ "$not_a_plan" != '""' ]; then
 fi
 echo "    The renderer says nothing when handed something that is not a plan"
 
+causation_of() {
+    # The same trick as act_id_of, for what a contribution was caused by. The envelope is serialised
+    # with its Rust field names, so the key is CBOR text-12 "causation_id"
+    # (108 99 97 117 115 97 116 105 111 110 95 105 100) followed by a 16-byte string header (80).
+    printf '%s' "$1" | awk '
+    {
+        for (i = 1; i <= NF - 30; i++) {
+            if ($i == 108 && $(i+1) == 99 && $(i+2) == 97 && $(i+3) == 117 &&
+                $(i+4) == 115 && $(i+5) == 97 && $(i+6) == 116 && $(i+7) == 105 &&
+                $(i+8) == 111 && $(i+9) == 110 && $(i+10) == 95 && $(i+11) == 105 &&
+                $(i+12) == 100 && $(i+13) == 80) {
+                out = ""
+                for (b = 0; b < 16; b++) {
+                    out = out sprintf("%02x", $(i + 14 + b))
+                    if (b == 3 || b == 5 || b == 7 || b == 9) { out = out "-" }
+                }
+                print out
+                exit
+            }
+        }
+    }'
+}
+
+echo "==> Verifying a person can take back what they said..."
+# Until now nothing anywhere raised the erasure epoch or removed a payload: ADR-0028 was described,
+# its kinds existed, Context1 reacted to the epoch, and there was no path from a person asking for
+# something to be gone to it being gone. This is that path.
+#
+# The target is the utterance rather than the reading of it, because the closure travels downward:
+# erasing what a person said has to take the interpretation with it, and erasing the interpretation
+# would leave the sentence. The interpretation names its cause, which is the utterance.
+interpreted_to_forget="$(busctl --user call org.cybou.Mind.Meaning1 /org/cybou/Mind/Meaning1 org.cybou.Mind.Meaning1 Interpret ss "Remember that this has to be forgettable" person)"
+act_to_forget="$(act_id_of "$interpreted_to_forget")"
+if [ -z "$act_to_forget" ]; then
+    echo "ERROR: the sentence was not interpreted, so there is nothing to erase." >&2
+    exit 1
+fi
+interpretation_row="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Contribution s "$act_to_forget")"
+target="$(causation_of "$interpretation_row")"
+if [ -z "$target" ]; then
+    echo "ERROR: the interpretation names no cause, so the utterance cannot be found." >&2
+    exit 1
+fi
+echo "    The sentence is in the Journal as $target"
+
+epoch_before="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 ErasureEpoch | awk '{print $2}')"
+
+# A reason outside the closed set is refused: an erasure record is permanent, and free text would
+# let the thing being forgotten be restated where nothing can ever be erased.
+invented="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 RequestErasure ss "$target" "because I said so" | awk '{print $2}')"
+if [ "$invented" != "-1" ]; then
+    echo "ERROR: Event1 accepted an erasure reason it does not know." >&2
+    exit 1
+fi
+echo "    Event1 refused a reason outside the closed set"
+
+# Two contributions have to go: the utterance and the reading derived from it. One would mean the
+# closure is not travelling, which is the failure that leaves the reasoning that restates what was
+# erased.
+erased="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 RequestErasure ss "$target" user-requested | awk '{print $2}')"
+if [ "$erased" -lt 2 ]; then
+    echo "ERROR: erasing an utterance redacted $erased contributions; the interpretation derived from it should have gone too." >&2
+    exit 1
+fi
+echo "    Erasure redacted $erased contributions: the sentence and what was derived from it"
+
+epoch_after="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 ErasureEpoch | awk '{print $2}')"
+if [ "$epoch_after" -le "$epoch_before" ]; then
+    echo "ERROR: an erasure happened and the epoch stayed at $epoch_after." >&2
+    exit 1
+fi
+echo "    Erasure epoch advanced: $epoch_before -> $epoch_after"
+
+# The rows are still there. Identity, author, causality and position are never erased: a Mind that
+# could forget that it once concluded something could not be audited afterwards.
+for surviving in "$target" "$act_to_forget"; do
+    if [ "$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Contains s "$surviving" | awk '{print $2}')" != "true" ]; then
+        echo "ERROR: erasing a payload removed the contribution $surviving itself." >&2
+        exit 1
+    fi
+done
+echo "    Both contributions survive as records of what happened"
+
+# And the chain still verifies. Erasure that broke the biography's structure would be corruption
+# with a nicer name.
+if [ "$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 VerifyFullyStep u 4096)" = "ay 0" ]; then
+    echo "ERROR: Event1 cannot verify its chain after an erasure." >&2
+    exit 1
+fi
+echo "    The chain still verifies with the payloads gone"
+
 echo "==> Verifying an assessment cannot cite a cause the Journal does not hold..."
 # Assess took a cause and ignored it, so an assessment naming a contribution that never existed
 # was indistinguishable from one naming a real cause.

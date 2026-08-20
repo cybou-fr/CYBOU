@@ -157,6 +157,21 @@ pub struct Appended {
     pub hash: [u8; 32],
 }
 
+/// What one erasure actually reached.
+///
+/// The three numbers are different facts and are kept apart on purpose. A closure larger than the
+/// redacted set means some descendants were written before hash version 3 and cannot be erased,
+/// which is something an operator has to be told rather than left to infer from a success.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Erased {
+    /// Everything the erasure applied to, including the target itself.
+    pub closure: Vec<Uuid>,
+    /// Those whose payload was actually redacted by this call.
+    pub redacted: Vec<Uuid>,
+    /// The erasure epoch the Journal now stands at.
+    pub epoch: u64,
+}
+
 /// A read-write Journal connection that can append contributions.
 #[derive(Debug)]
 pub struct JournalWriter {
@@ -654,6 +669,159 @@ impl JournalWriter {
             )
             .map_err(WriteError::Query)?;
         u64::try_from(epoch).map_err(|_| WriteError::Malformed("negative erasure epoch"))
+    }
+
+    /// Every contribution that must be forgotten along with `target`.
+    ///
+    /// ADR-0028: an erasure applies to the dependency closure of its target, not to one row. A
+    /// `Learning` that says "because X" restates X; erasing X and keeping the Learning would
+    /// destroy the record a person asked to forget and keep the reasoning that repeats it.
+    ///
+    /// The closure travels causation and evidence, which is where derivation actually goes. A
+    /// contribution that merely happened afterwards is not a descendant of what was erased.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] on database query failure.
+    pub fn retention_closure(&self, target: &Uuid) -> Result<Vec<Uuid>, WriteError> {
+        let mut closure = vec![*target];
+        let mut frontier = vec![*target];
+
+        while let Some(current) = frontier.pop() {
+            let mut statement = self
+                .connection
+                .prepare(
+                    "SELECT message_id FROM contribution WHERE causation_id = ?1 \
+                     UNION \
+                     SELECT c.message_id FROM contribution c \
+                     JOIN contribution_evidence e ON e.contribution_id = c.message_id \
+                     WHERE e.evidence_id = ?2",
+                )
+                .map_err(WriteError::Query)?;
+            let current_text = current.to_string();
+            let mut rows = statement
+                .query(rusqlite::params![current_text, current_text])
+                .map_err(WriteError::Query)?;
+            while let Some(row) = rows.next().map_err(WriteError::Query)? {
+                let raw: String = row.get(0).map_err(WriteError::Query)?;
+                let Ok(dependent) = Uuid::parse_str(&raw) else {
+                    continue;
+                };
+                // A cycle would loop for ever, and the check that prevents it is the same one that
+                // keeps a diamond-shaped derivation from being visited twice.
+                if closure.contains(&dependent) {
+                    continue;
+                }
+                closure.push(dependent);
+                frontier.push(dependent);
+            }
+        }
+
+        Ok(closure)
+    }
+
+    /// Redact the payloads of a closure, destroy their keys, and advance the erasure epoch.
+    ///
+    /// This is step 2 and step 3 of ADR-0028's sequence. Step 1 — the durable `ErasureRequested`
+    /// contribution that says what is about to happen and why — belongs to the caller, and has to
+    /// be committed before this is entered: an erasure that destroyed a key and then crashed with
+    /// nothing on record would be irrecoverable loss nobody could explain.
+    ///
+    /// Destroying keys before the redaction commits is deliberate and is the safe order. A crash
+    /// between them leaves ciphertext whose key is gone — unreadable, and still marked unerased,
+    /// so recovery repeats the whole thing and finishes it. The other order would leave a row
+    /// claiming to be erased while its ciphertext was still decryptable, which is a lie the
+    /// Journal would keep telling.
+    ///
+    /// Key destruction is idempotent, which is what makes resumption after a crash always safe.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] when the closure cannot be read, a key cannot be destroyed, or the
+    /// transaction cannot commit.
+    pub fn apply_erasure(&mut self, target: &Uuid) -> Result<Erased, WriteError> {
+        let closure = self.retention_closure(target)?;
+
+        // An erasure record is never itself erasable: a forgetting that could be forgotten would
+        // make the audit trail a suggestion. These are filtered out of the closure rather than
+        // refused, because a descendant that happens to be an erasure record should not stop the
+        // erasure of everything else.
+        let mut erasable = Vec::new();
+        for id in &closure {
+            let kind: Option<i64> = self
+                .connection
+                .query_row(
+                    "SELECT kind FROM contribution WHERE message_id = ?1",
+                    rusqlite::params![id.to_string()],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(WriteError::Query)?;
+            let Some(kind) = kind else {
+                continue;
+            };
+            let Ok(kind) = u16::try_from(kind) else {
+                continue;
+            };
+            if Kind::from_u16(kind).is_some_and(Kind::is_erasure) {
+                continue;
+            }
+            erasable.push(*id);
+        }
+
+        if let Some(store) = &self.key_store {
+            for id in &erasable {
+                store
+                    .destroy_key_for(id)
+                    .map_err(|_| WriteError::Malformed("a data key could not be destroyed"))?;
+            }
+        }
+
+        let redacted_at = OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .map_err(|_| WriteError::Malformed("the current instant is not representable"))?;
+
+        let transaction = self.connection.transaction().map_err(write_error)?;
+        let mut redacted = Vec::new();
+        for id in &erasable {
+            // Only rows written under hash version 3 can be erased: a v1 or v2 row's hash covers
+            // its payload by value, so removing the payload would break a chain that cannot be
+            // recomputed without it. Older rows are reported rather than silently skipped.
+            let changed = transaction
+                .execute(
+                    "UPDATE contribution SET payload = NULL, erased_at = ?1 \
+                     WHERE message_id = ?2 AND hash_version = 3 AND erased_at IS NULL",
+                    rusqlite::params![redacted_at, id.to_string()],
+                )
+                .map_err(write_error)?;
+            if changed == 1 {
+                redacted.push(*id);
+            }
+        }
+
+        // The epoch advances once per erasure, not once per row: it is the signal that derived
+        // state is stale, and every projection behind it rebuilds whether or not it happened to
+        // hold anything from these particular rows.
+        transaction
+            .execute(
+                "UPDATE journal_meta SET erasure_epoch = erasure_epoch + 1 WHERE id = 1",
+                [],
+            )
+            .map_err(write_error)?;
+        let epoch: i64 = transaction
+            .query_row(
+                "SELECT erasure_epoch FROM journal_meta WHERE id=1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(WriteError::Query)?;
+        transaction.commit().map_err(write_error)?;
+
+        Ok(Erased {
+            closure,
+            redacted,
+            epoch: u64::try_from(epoch).map_err(|_| WriteError::Malformed("negative epoch"))?,
+        })
     }
 
     /// Append many contributions under one transaction, returning the last accepted position.

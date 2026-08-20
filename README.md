@@ -133,6 +133,7 @@ gateway that cannot become a second cognitive owner.
 | Grounded local perception and epistemic projection (`cybou-epistemicd`) | Implemented — ADR-0027 |
 | Associative context live integration (`cybou-contextd`) | Partial — ADR-0029 |
 | Journal v3 commitments and crash-safe transitive erasure | Implemented — M7 slices |
+| Erasure a person can ask for, reaching what was derived | Implemented — ADR-0028, live-bus gated |
 | Sensitivity as a durable schema axis | Implemented — M7 slices |
 | Distributed Mind prototype | Planned — M7 |
 | Structured language and meaning boundary | Partial — ADR-0031, no generative model |

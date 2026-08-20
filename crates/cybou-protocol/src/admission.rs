@@ -792,3 +792,94 @@ mod tests {
         assert!(Sensitivity::Sensitive.may_be_training_target());
     }
 }
+
+/// Why something was erased.
+///
+/// A closed set, never free text. An erasure record is permanent, so a free-text reason would let
+/// the thing being forgotten be restated in the one place that can never be erased: "remove the
+/// record of diagnosis X" defeats the erasure it requests. A typed reason says why without saying
+/// what.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u16)]
+pub enum ErasureReason {
+    /// A person asked for it.
+    UserRequested = 1,
+    /// The retention this contribution was accepted under has elapsed.
+    RetentionExpired = 2,
+    /// Consent that made the recording legitimate was taken back.
+    ConsentWithdrawn = 3,
+    /// A policy the contribution was accepted under has changed.
+    PolicyChange = 4,
+    /// The source that produced it is no longer trusted to have produced it.
+    SourceRevoked = 5,
+}
+
+impl ErasureReason {
+    /// The reason for a frozen numeric value, or `None` for one this build does not know.
+    ///
+    /// Unknown is not "probably a user request". An erasure whose reason cannot be read is one
+    /// nobody can later account for, and accounting for it is the whole purpose of recording it.
+    #[must_use]
+    pub const fn from_u16(value: u16) -> Option<Self> {
+        Some(match value {
+            1 => Self::UserRequested,
+            2 => Self::RetentionExpired,
+            3 => Self::ConsentWithdrawn,
+            4 => Self::PolicyChange,
+            5 => Self::SourceRevoked,
+            _ => return None,
+        })
+    }
+
+    /// The reason for the spelling a caller uses on the wire.
+    #[must_use]
+    pub fn from_name(value: &str) -> Option<Self> {
+        Some(match value {
+            "user-requested" => Self::UserRequested,
+            "retention-expired" => Self::RetentionExpired,
+            "consent-withdrawn" => Self::ConsentWithdrawn,
+            "policy-change" => Self::PolicyChange,
+            "source-revoked" => Self::SourceRevoked,
+            _ => return None,
+        })
+    }
+
+    /// How this reason is spelled on the wire.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::UserRequested => "user-requested",
+            Self::RetentionExpired => "retention-expired",
+            Self::ConsentWithdrawn => "consent-withdrawn",
+            Self::PolicyChange => "policy-change",
+            Self::SourceRevoked => "source-revoked",
+        }
+    }
+}
+
+#[cfg(test)]
+mod erasure_reason_tests {
+    use super::ErasureReason;
+
+    #[test]
+    fn a_reason_this_build_does_not_know_is_not_guessed_at() {
+        assert_eq!(ErasureReason::from_u16(0), None);
+        assert_eq!(ErasureReason::from_u16(6), None);
+        assert_eq!(ErasureReason::from_name("because I said so"), None);
+        assert_eq!(ErasureReason::from_name(""), None);
+    }
+
+    #[test]
+    fn every_reason_round_trips_through_its_wire_spelling() {
+        for reason in [
+            ErasureReason::UserRequested,
+            ErasureReason::RetentionExpired,
+            ErasureReason::ConsentWithdrawn,
+            ErasureReason::PolicyChange,
+            ErasureReason::SourceRevoked,
+        ] {
+            assert_eq!(ErasureReason::from_name(reason.name()), Some(reason));
+            assert_eq!(ErasureReason::from_u16(reason as u16), Some(reason));
+        }
+    }
+}
