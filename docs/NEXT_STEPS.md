@@ -25,20 +25,19 @@ true while the chain underneath it was broken.
 
 ## In order
 
-1. **Authentication. The tripwire has said so.** It tripped on 2026-08-20, on the first sentence
-   spoken to `Meaning1` on the deployed host: the utterance and its interpretation are sensitivity
-   1, the surface refused to publish them, and the public site went to 502. That is the mechanism
-   working, and it is also the end of the arrangement it was protecting. A public surface and a
-   Mind anyone can talk to are mutually exclusive while there is no login, because everything a
-   person says is about the person. Either the deployment gets authentication, or nobody speaks to
-   the deployed Mind — and the second is not a stable answer once there is anything to say.
+1. **Per-reader access, not one shared secret.** The tripwire fired on 2026-08-20, on the first
+   sentence spoken to `Meaning1` on the deployed host, and what came out of it is in place: the
+   public projection withholds anything above ordinary and withholds obligations entirely, and the
+   owner reaches the rest with a credential. What that is not is authentication in any full sense —
+   there is no per-reader identity, no revocation short of regenerating the file, and no record of
+   who read what. A demo user on the Linux side, granted per request, is the shape this should take.
 
-   Do not reach for `CYBOU_PUBLISHABLE_SENSITIVITY` again. It was raised on 2026-08-20 for one
-   stated reason — 1252 rows in the first Journal carried a constant sensitivity their content did
-   not justify — with a comment saying to remove it once those rows were gone. The rows were
-   discarded that same day and the raise outlived them, so the next thing above ordinary was
-   published without anyone deciding to. A temporary permission that survives its reason is the
-   same failure as a claim that survives its evidence.
+   Do not reach for `CYBOU_PUBLISHABLE_SENSITIVITY` to solve anything. It was raised on 2026-08-20
+   for one stated reason — 1252 rows in the first Journal carried a constant sensitivity their
+   content did not justify — with a comment saying to remove it once those rows were gone. The rows
+   were discarded that same day and the raise outlived them, so the next thing above ordinary was
+   published without anyone deciding to. A temporary permission that survives its reason is the same
+   failure as a claim that survives its evidence.
 
 2. **An executor for erasure.** ADR-0028 defines erasure, `Kind` has `ErasureRequested` and
    `ErasureApplied`, `Context1` discards its projection when the epoch advances, and the storage

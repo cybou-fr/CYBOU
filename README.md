@@ -136,6 +136,7 @@ gateway that cannot become a second cognitive owner.
 | Sensitivity as a durable schema axis | Implemented — M7 slices |
 | Distributed Mind prototype | Planned — M7 |
 | Structured language and meaning boundary | Partial — ADR-0031, no generative model |
+| Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
 | Lifelong learning and learned-artifact governance | Planned — M9 |
 | Governed action and remediation boundary | Planned — M10 |
 | Agent/worker runtime, model broker, and governed tool/MCP use | Planned — M11 |

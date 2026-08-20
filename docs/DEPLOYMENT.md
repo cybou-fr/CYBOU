@@ -37,13 +37,24 @@ bash scripts/deploy-vps.sh
 The public URLs are `https://vps-d0669a91.vps.ovh.net` and `https://51.255.46.58`; neither requires
 a login. The IP endpoint uses a renewable Let's Encrypt `shortlived` certificate.
 
-The gateway refuses to start in `public-preview` mode if the Journal holds anything above the
-sensitivity this deployment permits, which is `CYBOU_PUBLISHABLE_SENSITIVITY` in the unit and
-ordinary by default. That is not authentication; it is the tripwire that decides when authentication stops
-being optional. Today every contribution is a fact about the machine and the surface serves it. The
-first time a person records something of their own — a promise, an observation they asked to track —
-the public surface stops instead of publishing it, and the choice becomes explicit rather than
-forgotten.
+What a stranger receives is filtered rather than all-or-nothing. Beliefs and concepts carry the
+sensitivity of the contributions they were derived from, obligations are withheld entirely because a
+promise is about the person by construction, and everything above `CYBOU_PUBLISHABLE_SENSITIVITY` —
+ordinary by default — is dropped before the projection is built. There is one filtered source and
+every route reads it, so a route added later cannot forget: filtering is not something a route does.
+
+A reader presenting the credential named by `CYBOU_ACCESS_CREDENTIAL_FILE` is served the unfiltered
+projection instead. The path is in the unit and the secret is not, because a unit file is
+world-readable; `deploy-vps.sh` generates the file once, readable only by the `cybou` user, and
+never regenerates it. An unset path means this deployment entitles nobody, which is a valid way to
+run a demo. A wrong or missing credential is served the public projection rather than refused: a
+public surface that answered 401 to strangers would stop being a public surface.
+
+This replaced a tripwire that refused to start at all whenever the Journal held anything above
+ordinary. It fired correctly on 2026-08-20, on the first sentence spoken to `Meaning1`, and took the
+whole site down over rows it would never have shown — and the pressure to bring the site back is
+what had earlier produced a raised threshold that outlived its reason and published a person's words
+verbatim. Withholding the rows is the answer that survives being inconvenient.
 
 This deployment permits ordinary only, the strict default. Its first Journal was discarded on
 2026-08-20 rather than carried: 1252 rows written before the classification rule carried a Personal
@@ -53,13 +64,15 @@ past be quietly rewritten. Discarding a development biography of machine facts w
 answer; on a Journal that held anything a person cared about it would not have been, and the choice
 would have been a migration that rebuilds rather than edits.
 
-**The public deployment serves the live Mind, without authentication.** This is a deliberate,
-temporary decision by the owner: the point of the deployment is a working desktop anyone can look
-at, and there is nothing on that host worth protecting yet. It is not an oversight and not a
-default — it was chosen while authentication does not exist. Two things must land before that
-stops being true: an authentication boundary, and a demo user on the Linux side so access can be
-granted per request rather than to everyone. Until then, treat everything the deployed Mind
-observes as public, and put nothing on that host you would not publish.
+**The public deployment serves the live Mind, and what it serves publicly is machine facts.** That
+is a deliberate decision by the owner: the point of the deployment is a working desktop anyone can
+look at. What has changed is that it no longer requires the host to hold nothing personal — the
+surface withholds what is the person's, and the owner reaches it with the credential.
+
+The credential is a single shared secret, not accounts. It is enough to separate the owner from
+everyone else and it is not enough for more than one person: there is no per-reader identity, no
+revocation short of regenerating the file, and no record of who read what. A demo user on the Linux
+side, so access can be granted per request, is still the shape this should take.
 
 The gateway runs as a user unit inside the `cybou` user manager, on the same session bus as the
 organs. That is what makes live data possible at all: as a system service it had no session bus and
@@ -82,6 +95,8 @@ They may be overridden with `CYBOU_VPS_SRC` and `CYBOU_VPS_TARGET`.
   than left in the tree as a script whose only behaviour was to refuse to run.
 - Deployment does not modify the bootloader or replace Debian.
 - Package/service activation will be added as part of the Debian hard cutover.
-- Public access is unauthenticated by decision, behind TLS, and currently shows live Mind state.
-  The boundary that will replace it is authentication plus a demo user granted on request; until
-  that exists, the deployed host must hold nothing its owner would not publish.
+- Public access is unauthenticated by decision, behind TLS, and shows live Mind state with
+  everything above ordinary withheld. The owner reaches the rest with the credential in
+  `/var/lib/cybou/access-credential`, readable only by the `cybou` user.
+- Per-reader identity, revocation and an access record do not exist. One shared secret separates
+  the owner from strangers and nothing separates one holder of it from another.
