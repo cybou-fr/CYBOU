@@ -7,7 +7,6 @@
 //! producing verifiable self-assessment contributions for the Journal.
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use time::OffsetDateTime;
 
 #[cfg(target_os = "linux")]
@@ -181,17 +180,6 @@ pub fn narrate_self_report(report: &SelfReport) -> String {
     }
 
     lines.join("\n")
-}
-
-/// Errors during self-model assessment.
-#[derive(Debug, Error)]
-pub enum SelfError {
-    /// Assessment cause does not exist.
-    #[error("assessment cause does not exist")]
-    CauseMissing,
-    /// Self model is uninitialized.
-    #[error("self model is uninitialized")]
-    Uninitialized,
 }
 
 /// Core domain logic of the self organ.

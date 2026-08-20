@@ -122,10 +122,11 @@ async fn consolidate_when_idle(core: Arc<LifecycleCore>) {
         // the signal to stop: the run is interruptible between pages precisely because each page
         // is bounded and the sweep's position is never trusted.
         let began_after = state.last_user_activity_at;
-        let mut interrupted = false;
+        let mut verified = false;
 
         loop {
             let Some(step) = read_step(&connection, EVENT).await else {
+                println!("[cybou-lifecycled] Consolidation could not reach Event1");
                 break;
             };
             if let Some(broken_at) = step.broken_at {
@@ -139,19 +140,23 @@ async fn consolidate_when_idle(core: Arc<LifecycleCore>) {
                     "[cybou-lifecycled] Consolidation verified the whole chain through {}",
                     step.verified_through
                 );
+                verified = true;
                 break;
             }
             if core.state().last_user_activity_at != began_after {
                 println!("[cybou-lifecycled] Consolidation interrupted: someone is here");
-                interrupted = true;
                 break;
             }
         }
 
         let _ = core.transition(LifecycleMode::Awake);
-        if !interrupted {
-            // An interrupted run establishes nothing about the chain, so it does not reset the
-            // interval: the next quiet moment should still be spent finishing what it started.
+        if verified {
+            // Only a run that reached the head has consolidated anything. Recording every run that
+            // ended for any reason meant a chain found broken, or an Event1 that could not be
+            // reached at all, reset the interval exactly as a clean sweep did — so the one outcome
+            // that most needs looking at again was the one guaranteed not to be looked at for
+            // another six hours. An interrupted run is the same: the next quiet moment should be
+            // spent finishing what it started.
             let _ = core.record_consolidation(OffsetDateTime::now_utc());
         }
     }

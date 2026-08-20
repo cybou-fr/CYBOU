@@ -136,6 +136,25 @@ struct OwnerCalibration {
 }
 
 /// Call one owner method and decode its reply, treating any failure as "not answered".
+/// Whether the Journal holds the contribution a caller named.
+///
+/// An Event1 that cannot be reached answers nothing, and nothing is not confirmation: a cause this
+/// organ could not check is one it has no grounds to assess against.
+#[cfg(target_os = "linux")]
+async fn journal_holds(conn: &zbus::Connection, message_id: &str) -> bool {
+    conn.call_method(
+        Some(EVENT.service),
+        EVENT.object_path,
+        Some(EVENT.interface),
+        "Contains",
+        &(message_id,),
+    )
+    .await
+    .ok()
+    .and_then(|reply| reply.body().deserialize::<bool>().ok())
+    .unwrap_or(false)
+}
+
 async fn read<T>(
     conn: &zbus::Connection,
     endpoint: cybou_fabric::BusEndpoint,
@@ -179,11 +198,20 @@ impl Self1Service {
     }
 
     /// Assess self against a specific cause contribution and return `SelfReport` CBOR.
+    ///
+    /// The cause is checked against the Journal rather than accepted on the caller's word. It was
+    /// taken and ignored, so an assessment could name a contribution that does not exist and be
+    /// indistinguishable from one that names a real cause — which is the whole difference between
+    /// an assessment prompted by something and an assessment with a plausible reference attached.
     async fn assess(
         &self,
         #[zbus(connection)] conn: &zbus::Connection,
-        _cause_id: String,
+        cause_id: String,
     ) -> Vec<u8> {
+        if !journal_holds(conn, &cause_id).await {
+            println!("[cybou-selfd] Assess refused: the Journal does not hold cause {cause_id}");
+            return Vec::new();
+        }
         let now = OffsetDateTime::now_utc();
         let report = self.measure_now(conn, now).await;
         let mut buf = Vec::new();

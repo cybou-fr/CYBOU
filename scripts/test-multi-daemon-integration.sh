@@ -316,6 +316,25 @@ echo "    Context1 activated at least one concept"
 # Keying them by organ collapsed everything one organ ever said into a single self-disputing
 # belief, and printed a payload where a claim belonged. Both derived organs are checked, because
 # both take the subject from the same place and both were wrong in the same way.
+echo "==> Verifying an assessment cannot cite a cause the Journal does not hold..."
+# Assess took a cause and ignored it, so an assessment naming a contribution that never existed
+# was indistinguishable from one naming a real cause.
+invented="$(busctl --user call org.cybou.Mind.Self1 /org/cybou/Mind/Self1 org.cybou.Mind.Self1 Assess s 00000000-0000-4000-8000-000000000000)"
+if [ "$invented" != "ay 0" ]; then
+    echo "ERROR: Self1 assessed against a cause the Journal does not hold." >&2
+    exit 1
+fi
+echo "    Self1 refused a cause the Journal does not hold"
+
+# The same measurement without a cause has to still work, or the refusal above would pass just as
+# well on an organ whose assessment is broken outright.
+measured="$(busctl --user call org.cybou.Mind.Self1 /org/cybou/Mind/Self1 org.cybou.Mind.Self1 Measure)"
+if [ "$measured" = "ay 0" ]; then
+    echo "ERROR: Self1 cannot measure at all, so refusing an invented cause proves nothing." >&2
+    exit 1
+fi
+echo "    Self1 still measures when it is not asked about a cause"
+
 echo "==> Verifying the forecaster learns from the biography rather than from callers..."
 # perceptiond contributes cpu-count and memory-total-kib as numbers, so a forecast about one of
 # them can only exist if predictord read the Journal. It had a replay routine and a cursor and
