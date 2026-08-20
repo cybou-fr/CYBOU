@@ -97,6 +97,76 @@ impl KeyDomain {
     }
 }
 
+/// The master secret and key domain as persisted between runs.
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredMaster {
+    version: u8,
+    secret: String,
+    key_domain_id: Uuid,
+    key_epoch: u32,
+}
+
+impl StoredMaster {
+    fn into_material(self) -> Result<([u8; SEAL_KEY_BYTES], KeyDomain), KeyStoreError> {
+        if self.version != 1 {
+            return Err(KeyStoreError::MasterUnreadable);
+        }
+        let bytes = decode_hex(&self.secret).ok_or(KeyStoreError::MasterUnreadable)?;
+        let secret: [u8; SEAL_KEY_BYTES] = bytes
+            .try_into()
+            .map_err(|_| KeyStoreError::MasterUnreadable)?;
+        let domain = KeyDomain::new(self.key_domain_id, self.key_epoch);
+        if !domain.is_valid() {
+            return Err(KeyStoreError::MasterUnreadable);
+        }
+        Ok((secret, domain))
+    }
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+
+    bytes.iter().fold(String::new(), |mut text, byte| {
+        let _ = write!(text, "{byte:02x}");
+        text
+    })
+}
+
+fn decode_hex(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(text.get(index..index + 2)?, 16).ok())
+        .collect()
+}
+
+/// Write a secret to disk readable only by its owner.
+fn write_secret_file(path: &Path, bytes: &[u8]) -> Result<(), KeyStoreError> {
+    use std::io::Write as _;
+
+    let mut file = fs::File::create(path).map_err(|source| KeyStoreError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = file.set_permissions(fs::Permissions::from_mode(0o600));
+    }
+    file.write_all(bytes).map_err(|source| KeyStoreError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    file.sync_all().map_err(|source| KeyStoreError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(())
+}
+
 /// Sealing and key wrapping primitives using XChaCha20-Poly1305.
 pub struct Seal;
 
@@ -221,6 +291,13 @@ pub enum KeyStoreError {
     /// Invalid contribution ID (nil UUID).
     #[error("invalid nil contribution UUID")]
     InvalidContributionId,
+    /// The stored master secret is absent, malformed, or of an unknown version.
+    ///
+    /// Refused rather than replaced: generating a fresh secret over an unreadable one would
+    /// destroy every sealed payload it had wrapped, without anything recording that a biography
+    /// had been erased.
+    #[error("stored master secret cannot be read and will not be replaced")]
+    MasterUnreadable,
 }
 
 /// File-based `KeyStore` for per-contribution data keys.
@@ -254,6 +331,58 @@ impl KeyStore {
         }
 
         Ok(Self { root })
+    }
+
+    /// Load the master secret and key domain this store was opened with, creating them once.
+    ///
+    /// The key-encryption key must outlive the process. Every data key in this store is wrapped
+    /// with it, so a KEK generated at startup can unwrap only what the same run wrote: restarting
+    /// would silently make every earlier sealed payload unreadable, with no `ErasureRequested` and
+    /// no `ErasureApplied` to say a biography had been destroyed. Erasure has to be a decision,
+    /// never a side effect of a process dying.
+    ///
+    /// The key domain is durable for the same reason and the epoch is monotonic, so a payload can
+    /// always name which domain and epoch produced it.
+    ///
+    /// This is continuity, not protection from someone who can read the directory: the secret sits
+    /// beside the keys it wraps, in a `0700` directory with a `0600` file. It keeps the master
+    /// secret out of the Journal and out of backups of the Journal, and it is where an OS keyring,
+    /// a TPM or a passphrase-derived key belongs when one is available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KeyStoreError`] when the material cannot be created, read, or written.
+    pub fn master(&self) -> Result<([u8; SEAL_KEY_BYTES], KeyDomain), KeyStoreError> {
+        let path = self.root.join("master.json");
+        if path.exists() {
+            let raw = fs::read_to_string(&path).map_err(|source| KeyStoreError::Io {
+                path: path.clone(),
+                source,
+            })?;
+            let stored: StoredMaster =
+                serde_json::from_str(&raw).map_err(|_| KeyStoreError::MasterUnreadable)?;
+            return stored.into_material();
+        }
+
+        let secret = Seal::generate_key()?;
+        let domain = KeyDomain::generate(1);
+        let stored = StoredMaster {
+            version: 1,
+            secret: encode_hex(&secret),
+            key_domain_id: domain.key_domain_id,
+            key_epoch: domain.key_epoch,
+        };
+        let encoded =
+            serde_json::to_string(&stored).map_err(|_| KeyStoreError::MasterUnreadable)?;
+
+        let temp = path.with_extension("tmp");
+        write_secret_file(&temp, encoded.as_bytes())?;
+        fs::rename(&temp, &path).map_err(|source| KeyStoreError::Io {
+            path: path.clone(),
+            source,
+        })?;
+
+        Ok((secret, domain))
     }
 
     /// Path to the key file for a contribution ID.
@@ -368,6 +497,35 @@ impl KeyStore {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_sealed_payload_survives_the_process_that_sealed_it() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let contribution = uuid::Uuid::from_u128(0x8f14_e45f_ceea_467a_9c9e_4d3f_2a1b_7c60);
+
+        // One run seals something.
+        let (wrapped_domain, ciphertext) = {
+            let store = super::KeyStore::open(dir.path()).expect("open store");
+            let (kek, domain) = store.master().expect("establish master material");
+            let data_key = store
+                .create_key_for(&contribution, &kek)
+                .expect("create data key");
+            let sealed = super::Seal::seal(b"a thought worth keeping", &data_key).expect("seal");
+            (domain, sealed)
+        };
+
+        // The next run must be able to open it. A fresh key-encryption key here would make the
+        // payload unreadable for ever, with nothing recording that anything had been erased.
+        let store = super::KeyStore::open(dir.path()).expect("reopen store");
+        let (kek, domain) = store.master().expect("reload master material");
+        assert_eq!(domain, wrapped_domain, "the key domain must be continuous");
+
+        let data_key = store
+            .key_for(&contribution, &kek)
+            .expect("the data key must still unwrap with the persisted secret");
+        let recovered = super::Seal::unseal(&ciphertext, &data_key).expect("unseal");
+        assert_eq!(recovered, b"a thought worth keeping");
+    }
+
     use tempfile::tempdir;
     use uuid::Uuid;
 

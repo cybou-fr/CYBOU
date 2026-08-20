@@ -14,6 +14,7 @@ repository.workspace = true
 chacha20poly1305 = { workspace = true, features = ["alloc"] }
 cybou-protocol = { path = "../cybou-protocol" }
 getrandom = { workspace = true }
+serde_json.workspace = true
 serde = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }

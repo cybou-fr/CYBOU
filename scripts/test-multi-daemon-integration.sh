@@ -153,6 +153,33 @@ busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybo
 # Presence1 is a command gateway that owned nothing and did nothing: every mutation returned a
 # fail-closed default. Exercise one command end to end — Presence1 asks Intention1, Intention1
 # holds the obligation — and require the obligation to appear where its owner keeps it.
+# Key continuity, checked the only way that means anything: across processes. eventd wraps every
+# contribution's data key with a key-encryption key, so a KEK generated per run can unwrap only
+# what that run wrote. A restart would then make earlier sealed payloads unreadable with no
+# ErasureRequested and no ErasureApplied — erasure as a side effect of a process dying.
+echo "==> Verifying key material survives a restart of the organ that owns it..."
+master="$XDG_DATA_HOME/cybou/keys/master.json"
+if [ ! -f "$master" ]; then
+    echo "ERROR: eventd established no durable master key material." >&2
+    exit 1
+fi
+domain_before="$(tr -d ' 
+' < "$master")"
+
+EVENT_PID="${PIDS[0]}"
+kill "$EVENT_PID" 2>/dev/null || true
+wait "$EVENT_PID" 2>/dev/null || true
+spawn cybou-eventd
+wait_for_name org.cybou.Mind.Event1
+
+domain_after="$(tr -d ' 
+' < "$master")"
+if [ "$domain_before" != "$domain_after" ]; then
+    echo "ERROR: restarting eventd replaced the key material that wraps existing data keys." >&2
+    exit 1
+fi
+echo "    Key domain and master secret survived the restart"
+
 echo "==> Verifying a Presence1 command reaches the owner that holds the state..."
 before="$(busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybou.Mind.Intention1 OpenCount | awk '{print $2}')"
 promised="$(busctl --user call org.cybou.Mind.Presence1 /org/cybou/Mind/Presence1 org.cybou.Mind.Presence1 Promise s "Verify the command path" | awk '{print $2}' | tr -d '"')"

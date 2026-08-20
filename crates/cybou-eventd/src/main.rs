@@ -5,7 +5,7 @@
 
 use std::{env, path::PathBuf, sync::Arc};
 
-use cybou_crypto::{KeyDomain, KeyStore, Seal};
+use cybou_crypto::KeyStore;
 use cybou_eventd::EventCore;
 #[cfg(target_os = "linux")]
 use time::OffsetDateTime;
@@ -55,16 +55,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let core = Arc::new(EventCore::open(&journal_path)?);
 
-    // Initialize KeyStore if available
-    if let Ok(key_store) = KeyStore::open(&keys_dir)
-        && let Ok(kek) = Seal::generate_key()
-    {
-        let domain = KeyDomain::generate(1);
-        core.set_key_store(key_store, kek, domain);
-        println!(
-            "[cybou-eventd] KeyStore initialized at {}",
-            keys_dir.display()
-        );
+    // The key-encryption key and key domain come from the store, which keeps them across runs.
+    // Generating them here made every restart wrap new data keys with a secret that could not
+    // unwrap the old ones, so yesterday's sealed payloads became unreadable with nothing recording
+    // that anything had been erased.
+    match KeyStore::open(&keys_dir).and_then(|store| {
+        let (kek, domain) = store.master()?;
+        Ok((store, kek, domain))
+    }) {
+        Ok((key_store, kek, domain)) => {
+            println!(
+                "[cybou-eventd] KeyStore at {} in domain {} epoch {}",
+                keys_dir.display(),
+                domain.key_domain_id,
+                domain.key_epoch
+            );
+            core.set_key_store(key_store, kek, domain);
+        }
+        Err(error) => {
+            // Refuse rather than continue with a fresh secret: a Journal that seals payloads it
+            // will never be able to open is worse than one that will not seal them at all.
+            eprintln!("[cybou-eventd] Cannot establish key continuity: {error}");
+            return Err(error.into());
+        }
     }
 
     #[cfg(target_os = "linux")]
