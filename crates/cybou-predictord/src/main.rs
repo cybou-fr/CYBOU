@@ -38,11 +38,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let follow_core = Arc::clone(&core);
         tokio::spawn(async move {
             let from = follow_core.cursor();
-            if let Err(error) =
-                cybou_fabric::event_client::follow_contributions(from, move |sequence, envelope| {
+            let caught_up_core = Arc::clone(&follow_core);
+            if let Err(error) = cybou_fabric::event_client::follow_contributions_reporting(
+                from,
+                move |sequence, envelope| {
                     follow_core.ingest_envelope(envelope, sequence);
-                })
-                .await
+                },
+                move || caught_up_core.mark_caught_up(),
+            )
+            .await
             {
                 println!("[cybou-predictord] Cannot follow Event1: {error}");
             }

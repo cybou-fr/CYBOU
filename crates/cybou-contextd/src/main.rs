@@ -66,11 +66,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let context_core = core.clone();
         tokio::spawn(async move {
             let mut previous_in_episode: HashMap<uuid::Uuid, ObservedConcept> = HashMap::new();
-            if let Err(error) =
-                cybou_fabric::event_client::follow_contributions(0, move |_sequence, envelope| {
+            let caught_up_core = context_core.clone();
+            if let Err(error) = cybou_fabric::event_client::follow_contributions_reporting(
+                0,
+                move |_sequence, envelope| {
                     activate_from(&context_core, envelope, &mut previous_in_episode);
-                })
-                .await
+                },
+                move || caught_up_core.mark_caught_up(),
+            )
+            .await
             {
                 println!("[cybou-contextd] Cannot follow Event1: {error}");
             }

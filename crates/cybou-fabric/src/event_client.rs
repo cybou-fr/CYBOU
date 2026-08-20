@@ -351,9 +351,14 @@ where
 /// Returns [`EventClientError`] when the session bus, the subscription, or a catch-up read fails,
 /// and when the acceptance stream ends. Per-message failures skip that message without advancing.
 #[cfg(target_os = "linux")]
-async fn follow_once<F>(cursor: &mut u64, on_contribution: &mut F) -> Result<(), EventClientError>
+async fn follow_once<F, C>(
+    cursor: &mut u64,
+    on_contribution: &mut F,
+    on_caught_up: &mut C,
+) -> Result<(), EventClientError>
 where
     F: FnMut(u64, &CanonicalEnvelope),
+    C: FnMut(),
 {
     use futures_util::StreamExt as _;
 
@@ -388,6 +393,11 @@ where
             on_contribution(*cursor, envelope);
         }
     }
+
+    // Everything the Journal held when this attempt began has now been delivered. Until this
+    // point the organ can answer, but its answers are about part of a biography, which is not what
+    // they claim to be about.
+    on_caught_up();
 
     while let Some(message) = accepted.next().await {
         let Ok((encoded, sequence)) = message.body().deserialize::<(Vec<u8>, u64)>() else {
@@ -440,14 +450,37 @@ where
 #[cfg(target_os = "linux")]
 pub async fn follow_contributions<F>(
     from_sequence: u64,
-    mut on_contribution: F,
+    on_contribution: F,
 ) -> Result<(), EventClientError>
 where
     F: FnMut(u64, &CanonicalEnvelope),
 {
+    follow_contributions_reporting(from_sequence, on_contribution, || {}).await
+}
+
+/// Follow every contribution, and say when everything already in the Journal has been delivered.
+///
+/// `on_caught_up` runs each time an attempt finishes its replay, which is the moment the organ's
+/// answers stop being about part of a biography. It runs again after a reconnection, because a
+/// reconnection means there was a stretch during which they were about part of one again.
+///
+/// # Errors
+///
+/// Only when following is abandoned entirely, which today means never: it retries indefinitely.
+#[cfg(target_os = "linux")]
+pub async fn follow_contributions_reporting<F, C>(
+    from_sequence: u64,
+    mut on_contribution: F,
+    mut on_caught_up: C,
+) -> Result<(), EventClientError>
+where
+    F: FnMut(u64, &CanonicalEnvelope),
+    C: FnMut(),
+{
     let mut cursor = from_sequence;
     loop {
-        if let Err(error) = follow_once(&mut cursor, &mut on_contribution).await {
+        if let Err(error) = follow_once(&mut cursor, &mut on_contribution, &mut on_caught_up).await
+        {
             println!("[cybou-fabric] Following Event1 stopped at {cursor}: {error}; reconnecting");
         }
         tokio::time::sleep(RECONNECT_DELAY).await;

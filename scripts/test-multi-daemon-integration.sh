@@ -112,12 +112,24 @@ done
 
 # Health1 probes Ready on every organ, so an organ that does not export it is indistinguishable
 # from one that is down and pins the whole control plane at "unavailable". Check all of them.
+#
+# Readiness is waited for rather than asserted at once: for an organ derived from the Journal it
+# means the whole Journal has been read, which takes as long as the Journal is long. An organ that
+# answered immediately would be answering about something that costs nothing to establish.
 echo "==> Testing that every organ answers the Health1 readiness probe..."
 for name in "${NAMES[@]}"; do
     path="/$(printf '%s' "$name" | tr . /)"
-    answer="$(busctl --user call "$name" "$path" "$name" Ready)"
+    answer=""
+    deadline=$((SECONDS + 60))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        answer="$(busctl --user call "$name" "$path" "$name" Ready 2>/dev/null || true)"
+        if [ "$answer" = "b true" ]; then
+            break
+        fi
+        sleep 1
+    done
     if [ "$answer" != "b true" ]; then
-        echo "ERROR: $name Ready answered '$answer', expected 'b true'." >&2
+        echo "ERROR: $name Ready answered '${answer:-nothing}', expected 'b true'." >&2
         exit 1
     fi
     echo "    $name Ready -> $answer"

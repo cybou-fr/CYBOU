@@ -93,6 +93,8 @@ pub enum WorkspaceError {
 
 /// Core domain logic of the global workspace organ.
 pub struct WorkspaceCore {
+    /// Whether the tail of the Journal has been reached at least once.
+    caught_up: std::sync::atomic::AtomicBool,
     capacity: usize,
     moment: RwLock<Vec<CanonicalEnvelope>>,
     last_focus: RwLock<Option<Uuid>>,
@@ -105,10 +107,23 @@ impl Default for WorkspaceCore {
 }
 
 impl WorkspaceCore {
+    /// Record that every contribution the Journal already held has now been delivered.
+    pub fn mark_caught_up(&self) {
+        self.caught_up
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Whether this projection has seen the whole Journal at least once.
+    #[must_use]
+    pub fn is_caught_up(&self) -> bool {
+        self.caught_up.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     /// Create a new `WorkspaceCore` with bounded capacity.
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             capacity: capacity.max(1),
             moment: RwLock::new(Vec::new()),
             last_focus: RwLock::new(None),

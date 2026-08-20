@@ -39,11 +39,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let follow_core = core.clone();
         tokio::spawn(async move {
             let from = follow_core.cursor();
-            if let Err(error) =
-                cybou_fabric::event_client::follow_contributions(from, move |sequence, envelope| {
+            let caught_up_core = follow_core.clone();
+            if let Err(error) = cybou_fabric::event_client::follow_contributions_reporting(
+                from,
+                move |sequence, envelope| {
                     follow_core.ingest_envelope(envelope, sequence);
-                })
-                .await
+                },
+                move || caught_up_core.mark_caught_up(),
+            )
+            .await
             {
                 println!("[cybou-epistemicd] Cannot follow Event1: {error}");
             }

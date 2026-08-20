@@ -107,6 +107,11 @@ pub enum PredictorError {
 
 /// Core domain logic of the predictor organ.
 pub struct PredictorCore {
+    /// Whether every contribution the Journal already held has been delivered here.
+    ///
+    /// A forecast made from part of the history is a forecast about a different series than the
+    /// one it names.
+    caught_up: std::sync::atomic::AtomicBool,
     state_path: Option<PathBuf>,
     cursor: RwLock<u64>,
     by_subject: RwLock<HashMap<String, SubjectState>>,
@@ -119,10 +124,23 @@ impl Default for PredictorCore {
 }
 
 impl PredictorCore {
+    /// Record that every contribution the Journal already held has now been delivered.
+    pub fn mark_caught_up(&self) {
+        self.caught_up
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Whether this projection has seen the whole Journal at least once.
+    #[must_use]
+    pub fn is_caught_up(&self) -> bool {
+        self.caught_up.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     /// Create a transient in-memory `PredictorCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             state_path: None,
             cursor: RwLock::new(0),
             by_subject: RwLock::new(HashMap::new()),
@@ -147,6 +165,7 @@ impl PredictorCore {
         };
 
         Ok(Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             state_path: Some(path.to_path_buf()),
             cursor: RwLock::new(cursor),
             by_subject: RwLock::new(subjects),

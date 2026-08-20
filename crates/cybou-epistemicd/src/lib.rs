@@ -107,6 +107,11 @@ pub enum EpistemicError {
 
 /// Core domain logic of the epistemic organ.
 pub struct EpistemicCore {
+    /// Whether every contribution the Journal already held has been delivered here.
+    ///
+    /// Until it has, a belief this organ does not hold may simply be one it has not read yet, and
+    /// answering as though the projection were complete would make that indistinguishable.
+    caught_up: std::sync::atomic::AtomicBool,
     state_path: Option<PathBuf>,
     cursor: RwLock<u64>,
     beliefs: RwLock<HashMap<String, EpistemicBelief>>,
@@ -119,10 +124,23 @@ impl Default for EpistemicCore {
 }
 
 impl EpistemicCore {
+    /// Record that every contribution the Journal already held has now been delivered.
+    pub fn mark_caught_up(&self) {
+        self.caught_up
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Whether this projection has seen the whole Journal at least once.
+    #[must_use]
+    pub fn is_caught_up(&self) -> bool {
+        self.caught_up.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     /// Create a new transient `EpistemicCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             state_path: None,
             cursor: RwLock::new(0),
             beliefs: RwLock::new(HashMap::new()),
@@ -154,6 +172,7 @@ impl EpistemicCore {
         };
 
         Ok(Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             state_path: Some(path.to_path_buf()),
             cursor: RwLock::new(cursor),
             beliefs: RwLock::new(beliefs),

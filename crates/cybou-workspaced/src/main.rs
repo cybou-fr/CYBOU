@@ -45,11 +45,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(client) => client.count().await.unwrap_or(0),
                 Err(_) => 0,
             };
-            if let Err(error) = cybou_fabric::event_client::follow_contributions(
+            let caught_up_core = stream_core.clone();
+            if let Err(error) = cybou_fabric::event_client::follow_contributions_reporting(
                 from,
                 move |_sequence, envelope| {
                     stream_core.accept(envelope.clone());
                 },
+                move || caught_up_core.mark_caught_up(),
             )
             .await
             {

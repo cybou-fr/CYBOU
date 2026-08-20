@@ -102,6 +102,12 @@ pub struct ContextBundle {
 
 /// Core domain logic of the associative context organ.
 pub struct ContextCore {
+    /// Whether every contribution the Journal already held has been delivered here.
+    ///
+    /// Until it has, this organ can answer, but its answers are about part of a biography while
+    /// claiming to be about the associations that exist. Saying so is the difference between an
+    /// organ that is starting and one that is wrong.
+    caught_up: std::sync::atomic::AtomicBool,
     nodes: RwLock<HashMap<String, ConceptNode>>,
     associations: RwLock<Vec<Association>>,
     /// The budget this projection is held within.
@@ -144,10 +150,23 @@ impl Default for ContextCore {
 }
 
 impl ContextCore {
+    /// Record that every contribution the Journal already held has now been delivered.
+    pub fn mark_caught_up(&self) {
+        self.caught_up
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Whether this projection has seen the whole Journal at least once.
+    #[must_use]
+    pub fn is_caught_up(&self) -> bool {
+        self.caught_up.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     /// Create a new transient `ContextCore` engine.
     #[must_use]
     pub fn new() -> Self {
         Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             nodes: RwLock::new(HashMap::new()),
             associations: RwLock::new(Vec::new()),
             budget: ContextBudget::default(),
@@ -168,6 +187,7 @@ impl ContextCore {
     #[must_use]
     pub fn resuming_at_epoch(epoch: u64) -> Self {
         Self {
+            caught_up: std::sync::atomic::AtomicBool::new(false),
             nodes: RwLock::new(HashMap::new()),
             associations: RwLock::new(Vec::new()),
             budget: ContextBudget::default(),

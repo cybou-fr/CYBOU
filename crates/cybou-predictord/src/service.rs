@@ -33,9 +33,13 @@ impl Predictor1Service {
 )]
 #[interface(name = "org.cybou.Mind.Predictor1")]
 impl Predictor1Service {
-    /// Service readiness.
+    /// Whether this organ has read the whole Journal it derives from.
+    ///
+    /// Answering `true` unconditionally made readiness meaningless: an organ that had just started
+    /// and had read nothing reported exactly what one holding the complete projection reported, so
+    /// a control plane could not tell a system coming up from a system that is up.
     async fn ready(&self) -> bool {
-        true
+        self.core.is_caught_up()
     }
 
     /// Record an empirical observation on a subject with its authentic contribution identity.
