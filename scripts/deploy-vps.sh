@@ -40,6 +40,7 @@ cybou_ssh "
     cybou-lifecycled
     cybou-selfd
     cybou-presenced
+    cybou-shelld
   )
   for daemon in \"\${DAEMONS[@]}\"; do
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
@@ -55,6 +56,9 @@ cybou_ssh "
   sudo getent group cybou >/dev/null || sudo groupadd --system cybou
   sudo id cybou >/dev/null 2>&1 || sudo useradd --system --gid cybou \
     --home-dir /var/lib/cybou --create-home --shell /usr/sbin/nologin cybou
+
+  # Create shell jail root
+  sudo install -d -m 0755 -o cybou -g cybou /var/lib/cybou/shell-jail
 
   # The gateway used to be a system service, which is why it could only serve fixtures: a system
   # service has no session bus and therefore no way to reach Presence1. It is a user unit now,
