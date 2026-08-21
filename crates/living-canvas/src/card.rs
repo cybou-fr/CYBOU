@@ -310,7 +310,7 @@ impl CardId {
                 resizable: true,
                 collapsible: true,
                 closable: true,
-                deckable: true,
+                deckable: false,
                 default_size: (580.0, 360.0),
                 min_size: (360.0, 240.0),
                 max_size: (1200.0, 800.0),

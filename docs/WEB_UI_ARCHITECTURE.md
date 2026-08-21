@@ -212,21 +212,26 @@ Layout persistence uses schema version 9 (`cybou.desktop.layout.v9`):
    - **Monotonic Z-Ordering**: Re-indexes z-order monotonically starting from 1.
 4. Commits verified state without breaking user coordinates or disrupting active sessions.
 
-#### Spatial Dynamics, Focus Mode, and Invariant-Safe Decks
+#### Spatial Dynamics, Compositor Invariants (L1–L15), and Invariant-Safe Decks
 
-- **Interactive & Keyboard Resize**: Pointer resizing and `Alt+Shift+Arrow` keyboard resize constrained to `[min_size, max_size]` with dynamic edge anchor recalculation for relationship vectors.
-- **Accessible Keyboard Spatial Navigation**: `Alt+Arrow` moves cards while leaving plain Arrow keys free for internal controls, text editing, and terminal history.
+- **Compositor Invariants (L1–L15)**:
+  - **L1–L4 (Deck Containment & Exclusivity)**: Cards in a Deck share the Deck's bounding box and z-index; switching tabs mutates only `active_card` without altering geometry. A card belongs to at most one Deck at any time.
+  - **L5–L7 (Pinned Obstacles & Collision Avoidance)**: Pinned cards act as immoveable obstacles during auto-arrangement. Candidate placement via `PlacementResolver` scans spiral/grid offsets to prevent overlapping unpinned and pinned surfaces.
+  - **L8–L10 (Multi-Deck Safety & Deterministic Geometry)**: A deck must contain at least 2 distinct cards. Decks cannot be nested within other decks.
+  - **L11–L13 (Idempotent Transforms & Non-Destructive Focus)**: Layout arrangements are deterministic pure functions. Focus mode expands the target card to fill the viewport without mutating persisted canvas coordinates.
+  - **L14–L15 (Unified Monotonic Z-Index & Presentation Layer)**: Z-index values form a strict monotonically increasing sequence across both cards and decks.
+- **Magnetic Snap Guides (`compute_snap`)**: Dragging or resizing cards automatically snaps candidate boundaries against other desktop items within an 8px threshold, rendering real-time cyan alignment guides (`SnapGuide::Vertical`, `SnapGuide::Horizontal`).
+- **Spatial Viewport Scaling ("Fit All")**: `DesktopLayout::fit_to_viewport` calculates the global bounding box of all active surfaces and centers the viewport with optimal zoom (0.4–1.2) via `Ctrl+0`, canvas double-click, floating toolbar, or command palette.
+- **Interactive Minimap Navigation**: Mini-nodes on the desktop minimap provide pan-to-card and pan-to-deck viewport centering on click.
+- **Accessible Keyboard Spatial Navigation**: `Alt+Arrow` moves cards while leaving plain Arrow keys free for internal controls, text editing, and terminal history. Pointer resizing and `Alt+Shift+Arrow` keyboard resize constrained to `[min_size, max_size]` with dynamic edge anchor recalculation for relationship vectors.
 - **Collapse / Expand**: Single-line summary pill toggle to reclaim canvas space while maintaining presence.
-- **Pinning**: Pinned cards (`pinned: true`) are locked against auto-arrangement transforms.
-- **Deterministic Arrangement**: Pure function `arrange(mode, cards, relationships, bounds)` providing `Free`, `Compact`, `Grid`, `Relations` (causal graph clustering), and `Focus` (radial attention orbit) modes.
-- **Non-Destructive Focus Mode**: Focus expands cards to fill the active viewport without mutating persisted spatial coordinates; `Escape` cleanly returns to previous layout.
 - **Invariant-Safe Decks (Tabs)**: Grouping of cards governed by typed `DeckError` rules (minimum 2 distinct deckable cards, no duplicate or cross-deck assignments, valid `active_card` membership). Equipped with WAI-ARIA `role="tablist"` and keyboard navigation (`ArrowLeft`/`ArrowRight`/`Home`/`End`).
 - **Resource Lifecycle Management**: External reactive handles (e.g. SSE `EventSource` in `JournalFeedCard`) are explicitly managed and closed on teardown to eliminate socket leaks.
 
 #### Bounded Body Capability: CYBOU Shell
 
 CYBOU Shell is an isolated, unprivileged capability surface to the Debian 13 host:
-- Builtins strictly limited to ADR-0040 DemoReadOnly: `help`, `pwd`, `ls`, `cd`, `cat`, `clear`.
+- Builtins strictly limited to ADR-0040 DemoReadOnly safe utilities: `pwd`, `cd`, `ls`, `cat`, `echo`, `whoami`, `uname`, `stat`, `head`, `tail`, `grep`, `clear`, `help`.
 - No arbitrary execution, fork/exec, pipes, redirects, or background subshells.
 - Filesystem operations strictly jailed via `cybou-jailfs` (`RESOLVE_BENEATH` / `openat2`) rooted at `/home/demo` (`DemoReadOnly` profile).
 - Gateway isolation: Shell endpoints are disabled and refused in `PublicPreview` mode (HTTP 403); accessible only in authenticated `LocalDesktop` sessions.

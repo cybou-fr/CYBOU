@@ -19,7 +19,10 @@ pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, C
 pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
-pub use layout::{ArrangementMode, DesktopLayout, LayoutHistory};
+pub use layout::{
+    ArrangementMode, DesktopItem, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory,
+    PlacementResolver, Rect, SnapGuide, SnapResult, UsableViewport,
+};
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

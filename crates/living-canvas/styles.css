@@ -1155,7 +1155,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   color: var(--accent);
   font-weight: 600;
 }
-.eg-hypo-form { display: flex; align-items: center; gap: 6px; flex: 1; max-width: 280px; }
 .eg-hypo-input {
   flex: 1;
   background: rgba(4, 9, 14, 0.5);
@@ -1166,5 +1165,23 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   padding: 3px 8px;
 }
 
-
-
+/* Spatial Compositor Snap Guides */
+.snap-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 850;
+}
+.snap-guide-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(112, 225, 200, 0.75);
+  box-shadow: 0 0 6px rgba(112, 225, 200, 0.6);
+}
+.snap-guide-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(112, 225, 200, 0.75);
+  box-shadow: 0 0 6px rgba(112, 225, 200, 0.6);
+}
