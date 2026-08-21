@@ -289,7 +289,16 @@ impl DesktopLayout {
         y: f64,
     ) -> String {
         let id = format!("deck-{}", uuid::Uuid::new_v4());
-        let deck = DeckInstance::new(&id, title, cards, x, y);
+        let first_card = cards.first().copied();
+        let (w, h) = if let Some(fc) = first_card {
+            let spec = fc.spec();
+            (spec.default_size.0.max(340.0), (spec.default_size.1 + 36.0).max(220.0))
+        } else {
+            (360.0, 240.0)
+        };
+        let mut deck = DeckInstance::new(&id, title, cards, x, y);
+        deck.geometry.width = w;
+        deck.geometry.height = h;
         self.decks.push(deck);
         id
     }
@@ -361,6 +370,50 @@ impl DesktopLayout {
     /// Get mutable deck by ID.
     pub fn deck_mut(&mut self, id: &str) -> Option<&mut DeckInstance> {
         self.decks.iter_mut().find(|d| d.id == id)
+    }
+
+    /// Update position for a deck.
+    pub fn set_deck_position(&mut self, id: &str, x: f64, y: f64) {
+        if let Some(deck) = self.deck_mut(id) {
+            deck.geometry.x = x.clamp(12.0, 3800.0);
+            deck.geometry.y = y.clamp(12.0, 3800.0);
+        }
+    }
+
+    /// Update size for a deck.
+    pub fn set_deck_size(&mut self, id: &str, width: f64, height: f64) {
+        if let Some(deck) = self.deck_mut(id) {
+            deck.geometry.width = width.clamp(280.0, 800.0);
+            deck.geometry.height = height.clamp(160.0, 700.0);
+        }
+    }
+
+    /// Bring deck forward in stacking order.
+    pub fn bring_deck_forward(&mut self, id: &str) {
+        let max_z = self
+            .cards
+            .iter()
+            .map(|c| c.geometry.z)
+            .chain(self.decks.iter().map(|d| d.geometry.z))
+            .max()
+            .unwrap_or(1);
+        if let Some(deck) = self.deck_mut(id) {
+            deck.geometry.z = max_z + 1;
+        }
+    }
+
+    /// Toggle collapsed state for a deck.
+    pub fn toggle_deck_collapse(&mut self, id: &str) {
+        if let Some(deck) = self.deck_mut(id) {
+            deck.presentation.collapsed = !deck.presentation.collapsed;
+        }
+    }
+
+    /// Toggle pinned state for a deck.
+    pub fn toggle_deck_pinned(&mut self, id: &str) {
+        if let Some(deck) = self.deck_mut(id) {
+            deck.presentation.pinned = !deck.presentation.pinned;
+        }
     }
 
     /// Parse layout from raw JSON string, supporting both v9 and v8 formats.

@@ -12,9 +12,15 @@ use lucide_leptos::{
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, HtmlElement, KeyboardEvent, MessageEvent, PointerEvent};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+enum DragTarget {
+    Card(CardId),
+    Deck(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct DragState {
-    card: CardId,
+    target: DragTarget,
     offset_x: f64,
     offset_y: f64,
     width: f64,
@@ -22,9 +28,15 @@ struct DragState {
     drop_target: Option<CardId>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq)]
+enum ResizeTarget {
+    Card(CardId),
+    Deck(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct ResizeState {
-    card: CardId,
+    target: ResizeTarget,
     start_pointer_x: f64,
     start_pointer_y: f64,
     start_width: f64,
@@ -284,6 +296,35 @@ fn CardResizeHandle(
 }
 
 #[component]
+fn DeckResizeHandle(
+    deck_id: String,
+    layout: RwSignal<DesktopLayout>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let d_id = deck_id.clone();
+    let d_id_res = deck_id;
+    let is_collapsed = move || layout.get().deck(&d_id).is_some_and(|d| d.presentation.collapsed);
+    view! {
+        <Show when=move || !is_collapsed()>
+            {
+                let d_id_click = d_id_res.clone();
+                view! {
+                    <div
+                        class="card-resize-handle"
+                        title="Resize deck"
+                        aria-label="Resize deck"
+                        on:pointerdown=move |event| start_deck_resize(event, d_id_click.clone(), layout, resizing)
+                        on:click=move |e: web_sys::MouseEvent| e.stop_propagation()
+                    >
+                        <IconResizeGrip />
+                    </div>
+                }
+            }
+        </Show>
+    }
+}
+
+#[component]
 fn ShellCard(
     layout: RwSignal<DesktopLayout>,
     selected: ReadSignal<&'static str>,
@@ -475,6 +516,337 @@ fn apply_redo(
     if let Some(next) = target {
         layout.set(next);
         layout.get_untracked().save();
+    }
+}
+
+#[component]
+fn DeckContainerView(
+    deck_id: String,
+    layout: RwSignal<DesktopLayout>,
+    history: RwSignal<living_canvas::LayoutHistory>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+    runtime: RwSignal<RuntimeState>,
+) -> impl IntoView {
+    let d_id = StoredValue::new(deck_id);
+
+    let deck_opt = Signal::derive(move || layout.get().deck(&d_id.get_value()).cloned());
+    let is_collapsed = Signal::derive(move || deck_opt.get().is_some_and(|d| d.presentation.collapsed));
+    let is_pinned = Signal::derive(move || deck_opt.get().is_some_and(|d| d.presentation.pinned));
+    let active_card = Signal::derive(move || deck_opt.get().map_or(CardId::Identity, |d| d.active_card));
+    let cards = Signal::derive(move || deck_opt.get().map_or_else(Vec::new, |d| d.card_ids));
+
+    let is_magnet = Signal::derive(move || {
+        let target_opt = dragging.get().and_then(|drag| drag.drop_target);
+        target_opt.is_some_and(|target| cards.get().contains(&target))
+    });
+
+    let deck_style = Signal::derive(move || {
+        if let Some(deck) = deck_opt.get() {
+            let geom = deck.geometry;
+            let h = if deck.presentation.collapsed { 44.0 } else { geom.height };
+            format!(
+                "transform: translate3d({:.1}px, {:.1}px, 0); width: {:.1}px; height: {:.1}px; z-index: {};",
+                geom.x, geom.y, geom.width, h, geom.z
+            )
+        } else {
+            String::new()
+        }
+    });
+
+    let runtime_label = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting".to_owned(),
+        RuntimeState::Ready { mode, .. } => match mode {
+            cybou_web_contracts::SessionMode::LocalDesktop => "Local".to_owned(),
+            cybou_web_contracts::SessionMode::PublicPreview => "Preview".to_owned(),
+            cybou_web_contracts::SessionMode::RemoteBrowser => "Remote".to_owned(),
+        },
+        RuntimeState::Error(_) => "Unavailable".to_owned(),
+    };
+    let system_label = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting…".into(),
+        RuntimeState::Ready { snapshot, .. } => {
+            let available = snapshot
+                .capabilities
+                .iter()
+                .filter(|capability| capability.state == cybou_protocol::CapabilityState::Available)
+                .count();
+            format!("{available}/{} capabilities", snapshot.capabilities.len())
+        }
+        RuntimeState::Error(_) => "Gateway unavailable".into(),
+    };
+    let observed_label = move || match runtime.get() {
+        RuntimeState::Ready { snapshot, .. } => format!("Observed {}", snapshot.observed_at),
+        RuntimeState::Loading => "Waiting for snapshot".into(),
+        RuntimeState::Error(_) => "No snapshot".into(),
+    };
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+    let identity_id = move || {
+        mind()
+            .and_then(|m| m.identity.identity_id)
+            .unwrap_or_else(unread)
+    };
+    let identity_origin = move || {
+        mind()
+            .and_then(|m| m.identity.origin)
+            .unwrap_or_else(unread)
+    };
+    let identity_sessions = move || {
+        mind()
+            .and_then(|m| m.identity.session_count)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let identity_age = move || {
+        mind()
+            .and_then(|m| m.identity.age_in_days)
+            .map_or_else(unread, |value| format!("{value} d"))
+    };
+    let identity_architecture = move || {
+        mind()
+            .and_then(|m| m.identity.architecture_version)
+            .unwrap_or_else(unread)
+    };
+    let session_consumer = move || {
+        mind()
+            .and_then(|m| m.identity.origin)
+            .unwrap_or_else(unread)
+    };
+    let journal_count = move || {
+        mind()
+            .and_then(|m| m.journal.contribution_count)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let journal_epoch = move || {
+        mind()
+            .and_then(|m| m.journal.erasure_epoch)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let journal_integrity = move || {
+        mind()
+            .and_then(|m| m.journal.integrity)
+            .unwrap_or_else(|| "not verified yet".to_owned())
+    };
+    let lifecycle_mode = move || mind().and_then(|m| m.lifecycle.mode).unwrap_or_else(unread);
+    let lifecycle_activity = move || {
+        mind()
+            .and_then(|m| m.lifecycle.last_user_activity_at)
+            .unwrap_or_else(unread)
+    };
+    let commitments_label = move || {
+        mind()
+            .and_then(|m| m.commitments.open_count)
+            .map_or_else(unread, |value| format!("{value} active commitments"))
+    };
+    let self_narration = move || {
+        mind()
+            .and_then(|m| m.self_model.narration)
+            .unwrap_or_else(|| "Self1 has not been read.".to_owned())
+    };
+    let attention_focus = move || match mind() {
+        None => "Workspace1 not read".to_owned(),
+        Some(m) if m.attention.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Workspace1 not read".to_owned()
+        }
+        Some(m) => m
+            .attention
+            .focus
+            .unwrap_or_else(|| "Nothing holds focus".to_owned()),
+    };
+    let beliefs_label = move || match mind() {
+        None => "Epistemic1 not read".to_owned(),
+        Some(m) if m.beliefs.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Epistemic1 not read".to_owned()
+        }
+        Some(m) => match m.beliefs.beliefs.len() {
+            0 => "Believes nothing yet".to_owned(),
+            1 => "1 belief".to_owned(),
+            count => format!("{count} beliefs"),
+        },
+    };
+    let perception_status = move || {
+        mind()
+            .and_then(|m| m.perception.status)
+            .unwrap_or_else(unread)
+    };
+    let context_label = move || match mind() {
+        None => "Context1 not read".to_owned(),
+        Some(m) if m.context.knowledge != cybou_protocol::KnowledgeState::Known => {
+            "Context1 not read".to_owned()
+        }
+        Some(m) => match m.context.concepts.len() {
+            0 => "No concepts indexed".to_owned(),
+            1 => "1 concept indexed".to_owned(),
+            count => format!("{count} concepts indexed"),
+        },
+    };
+
+    view! {
+        <Show when=move || deck_opt.get().is_some()>
+            <div
+                class="object deck-container"
+                class:magnet-target=move || is_magnet.get()
+                class:pinned=move || is_pinned.get()
+                class:collapsed=move || is_collapsed.get()
+                style=move || deck_style.get()
+                tabindex="0"
+                role="region"
+                aria-label=move || format!("Deck container: {}", deck_opt.get().map_or_else(String::new, |d| d.title))
+                on:click=move |_| {
+                    layout.update(|l| l.bring_deck_forward(&d_id.get_value()));
+                }
+            >
+                <header
+                    class="deck-header"
+                    on:pointerdown=move |event: PointerEvent| {
+                        start_deck_drag(event, d_id.get_value(), layout, dragging);
+                    }
+                >
+                    <div class="deck-tabs">
+                        <For
+                            each=move || cards.get()
+                            key=|card| *card
+                            children=move |card| {
+                                let is_active = move || active_card.get() == card;
+                                view! {
+                                    <div
+                                        class="deck-tab"
+                                        class:active=is_active
+                                        on:click=move |e: web_sys::MouseEvent| {
+                                            e.stop_propagation();
+                                            layout.update(|l| {
+                                                if let Some(d) = l.deck_mut(&d_id.get_value()) {
+                                                    d.set_active(card);
+                                                }
+                                            });
+                                            layout.get_untracked().save();
+                                        }
+                                    >
+                                        <span>{card.title()}</span>
+                                        <button
+                                            class="deck-tab-detach"
+                                            title="Detach tab to canvas"
+                                            aria-label="Detach tab"
+                                            on:click=move |e: web_sys::MouseEvent| {
+                                                e.stop_propagation();
+                                                history.update(|h| h.push(layout.get_untracked()));
+                                                layout.update(|l| l.detach_from_deck(&d_id.get_value(), card));
+                                                layout.get_untracked().save();
+                                            }
+                                        >
+                                            <IconExternalLink size=10 />
+                                        </button>
+                                    </div>
+                                }
+                            }
+                        />
+                    </div>
+                    <div class="deck-controls">
+                        <button
+                            class="card-control-btn"
+                            title="Ungroup deck into separate cards"
+                            on:click=move |e: web_sys::MouseEvent| {
+                                e.stop_propagation();
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.dissolve_deck(&d_id.get_value()));
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconLayers size=13 />
+                        </button>
+                        <button
+                            class="card-control-btn"
+                            title=move || if is_pinned.get() { "Unpin deck" } else { "Pin deck" }
+                            on:click=move |e: web_sys::MouseEvent| {
+                                e.stop_propagation();
+                                layout.update(|l| l.toggle_deck_pinned(&d_id.get_value()));
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconPin size=13 />
+                        </button>
+                        <button
+                            class="card-control-btn"
+                            title=move || if is_collapsed.get() { "Expand deck" } else { "Collapse deck" }
+                            on:click=move |e: web_sys::MouseEvent| {
+                                e.stop_propagation();
+                                layout.update(|l| l.toggle_deck_collapse(&d_id.get_value()));
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <Show when=move || is_collapsed.get() fallback=|| view! { <IconMinimize size=13 /> }>
+                                <IconMaximize size=13 />
+                            </Show>
+                        </button>
+                    </div>
+                </header>
+                <Show when=move || !is_collapsed.get()>
+                    <div class="deck-body">
+                        {move || match active_card.get() {
+                            CardId::Identity => view! {
+                                <strong>"Subject continuity"</strong>
+                                <span class="identity-digest">{identity_id()}</span>
+                                <span class="identity-badges"><i>{identity_sessions()}" sessions"</i><i>{identity_age()}</i></span>
+                                <span class="identity-meta">"Origin "{identity_origin()}" · "{identity_architecture()}</span>
+                            }.into_any(),
+                            CardId::Session => view! {
+                                <strong>"Established trust"</strong>
+                                <span class="row"><b>"Mode"</b><i>{runtime_label()}</i></span>
+                                <span class="row"><b>"Consumer"</b><i>{session_consumer()}</i></span>
+                                <span class="panel-link">"Established by the gateway"</span>
+                            }.into_any(),
+                            CardId::Capabilities => view! {
+                                <h1>{system_label()}</h1>
+                                <span class="capabilities-kind">"Capability health"</span>
+                                <footer class="capabilities-meta"><span><small>"Observed"</small><b>{observed_label()}</b></span></footer>
+                            }.into_any(),
+                            CardId::Journal => view! {
+                                <strong>"Canonical Journal"</strong>
+                                <span class="row"><b>"Contributions"</b><i>{journal_count()}</i></span>
+                                <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch()}</i></span>
+                                <span class="row"><b>"Integrity"</b><i>{journal_integrity()}</i></span>
+                            }.into_any(),
+                            CardId::Lifecycle => view! {
+                                <strong>"Lifecycle state"</strong>
+                                <span class="row"><b>"Mode"</b><i>{lifecycle_mode()}</i></span>
+                                <span class="row"><b>"User activity"</b><i>{lifecycle_activity()}</i></span>
+                            }.into_any(),
+                            CardId::Commitments => view! {
+                                <strong>"Active commitments"</strong>
+                                <span class="commitments-meta">{commitments_label()}</span>
+                            }.into_any(),
+                            CardId::SelfModel => view! {
+                                <strong>"Self-model narrative"</strong>
+                                <p class="self-narration">{self_narration()}</p>
+                            }.into_any(),
+                            CardId::Attention => view! {
+                                <strong>"Attention focus"</strong>
+                                <span class="attention-focus">{attention_focus()}</span>
+                            }.into_any(),
+                            CardId::Beliefs => view! {
+                                <strong>"Beliefs & propositions"</strong>
+                                <span class="beliefs-meta">{beliefs_label()}</span>
+                            }.into_any(),
+                            CardId::Perception => view! {
+                                <strong>"Perception facts"</strong>
+                                <span class="row"><b>"Status"</b><i>{perception_status()}</i></span>
+                            }.into_any(),
+                            CardId::Context => view! {
+                                <strong>"Associative context"</strong>
+                                <span class="context-meta">{context_label()}</span>
+                            }.into_any(),
+                            CardId::Shell(_) => view! {
+                                <strong>"CYBOU Shell"</strong>
+                                <span>"Zone 3 Body capability"</span>
+                            }.into_any(),
+                        }}
+                    </div>
+                </Show>
+                <DeckResizeHandle deck_id=d_id.get_value() layout=layout resizing=resizing />
+            </div>
+        </Show>
     }
 }
 
@@ -1422,156 +1794,18 @@ pub fn App() -> impl IntoView {
                     <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
 
                     <For
-                        each=move || layout.get().decks
-                        key=|deck| deck.id.clone()
-                        children=move |deck| {
-                            let deck_id = deck.id.clone();
-                            let is_pinned = deck.presentation.pinned;
-                            let is_collapsed = deck.presentation.collapsed;
-                            let active_card = deck.active_card;
-                            let cards = deck.card_ids.clone();
-                            let magnet_cards = cards.clone();
-                            let is_magnet = move || {
-                                dragging
-                                    .get()
-                                    .and_then(|drag| drag.drop_target)
-                                    .is_some_and(|target| magnet_cards.contains(&target))
-                            };
-
+                        each={move || layout.get().decks.into_iter().map(|d| d.id).collect::<Vec<_>>()}
+                        key=|id| id.clone()
+                        children=move |deck_id| {
                             view! {
-                                <div
-                                    class="object deck-container"
-                                    class:magnet-target=is_magnet
-                                    class:pinned=is_pinned
-                                    class:collapsed=is_collapsed
-                                    style=move || {
-                                        let geom = deck.geometry;
-                                        let h = if is_collapsed { 44.0 } else { geom.height };
-                                        format!("transform: translate3d({:.1}px, {:.1}px, 0); width: {:.1}px; height: {:.1}px; z-index: {};", geom.x, geom.y, geom.width, h, geom.z)
-                                    }
-                                    tabindex="0"
-                                    role="region"
-                                    aria-label=format!("Deck container: {}", deck.title)
-                                >
-                                    <header class="deck-header">
-                                        <div class="deck-tabs">
-                                            {cards.into_iter().map(|card| {
-                                                let is_active = card == active_card;
-                                                let d_id = deck_id.clone();
-                                                let d_id_detach = deck_id.clone();
-                                                view! {
-                                                    <button
-                                                        class="deck-tab"
-                                                        class:active=is_active
-                                                        on:click=move |_| {
-                                                            layout.update(|l| {
-                                                                if let Some(d) = l.deck_mut(&d_id) {
-                                                                    d.set_active(card);
-                                                                }
-                                                            });
-                                                            layout.get_untracked().save();
-                                                        }
-                                                    >
-                                                        <span>{card.title()}</span>
-                                                        {if is_active {
-                                                            view! {
-                                                                <button
-                                                                    class="deck-tab-detach"
-                                                                    title="Detach from deck"
-                                                                    on:click=move |e: web_sys::MouseEvent| {
-                                                                        e.stop_propagation();
-                                                                        history.update(|h| h.push(layout.get_untracked()));
-                                                                        layout.update(|l| l.detach_from_deck(&d_id_detach, card));
-                                                                        layout.get_untracked().save();
-                                                                    }
-                                                                >
-                                                                    <IconExternalLink size=10 />
-                                                                </button>
-                                                            }.into_any()
-                                                        } else {
-                                                            ().into_any()
-                                                        }}
-                                                    </button>
-                                                }
-                                            }).collect::<Vec<_>>()}
-                                        </div>
-                                        <div class="deck-controls">
-                                            <button
-                                                class="card-control-btn dissolve-btn"
-                                                title="Dissolve deck into individual cards"
-                                                on:click=move |_| {
-                                                    history.update(|h| h.push(layout.get_untracked()));
-                                                    layout.update(|l| l.dissolve_deck(&deck_id));
-                                                    layout.get_untracked().save();
-                                                }
-                                            >
-                                                <IconClose size=12 />
-                                            </button>
-                                        </div>
-                                    </header>
-                                    <Show when=move || !is_collapsed>
-                                        <div class="deck-body">
-                                            {match active_card {
-                                                CardId::Identity => view! {
-                                                    <strong>"Subject continuity"</strong>
-                                                    <span class="identity-digest">{identity_id()}</span>
-                                                    <span class="identity-badges"><i>{identity_sessions()}" sessions"</i><i>{identity_age()}</i></span>
-                                                    <span class="identity-meta">"Origin "{identity_origin()}" · "{identity_architecture()}</span>
-                                                }.into_any(),
-                                                CardId::Session => view! {
-                                                    <strong>"Established trust"</strong>
-                                                    <span class="row"><b>"Mode"</b><i>{runtime_label()}</i></span>
-                                                    <span class="row"><b>"Consumer"</b><i>{session_consumer()}</i></span>
-                                                    <span class="panel-link">"Established by the gateway"</span>
-                                                }.into_any(),
-                                                CardId::Capabilities => view! {
-                                                    <h1>{system_label()}</h1>
-                                                    <span class="capabilities-kind">"Capability health"</span>
-                                                    <footer class="capabilities-meta"><span><small>"Observed"</small><b>{observed_label()}</b></span></footer>
-                                                }.into_any(),
-                                                CardId::Journal => view! {
-                                                    <strong>"Canonical Journal"</strong>
-                                                    <span class="row"><b>"Contributions"</b><i>{journal_count()}</i></span>
-                                                    <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch()}</i></span>
-                                                    <span class="row"><b>"Integrity"</b><i>{journal_integrity()}</i></span>
-                                                }.into_any(),
-                                                CardId::Lifecycle => view! {
-                                                    <strong>"Lifecycle state"</strong>
-                                                    <span class="row"><b>"Mode"</b><i>{lifecycle_mode()}</i></span>
-                                                    <span class="row"><b>"User activity"</b><i>{lifecycle_activity()}</i></span>
-                                                }.into_any(),
-                                                CardId::Commitments => view! {
-                                                    <strong>"Active commitments"</strong>
-                                                    <span class="commitments-meta">{commitments_label()}</span>
-                                                }.into_any(),
-                                                CardId::SelfModel => view! {
-                                                    <strong>"Self-model narrative"</strong>
-                                                    <p class="self-narration">{self_narration()}</p>
-                                                }.into_any(),
-                                                CardId::Attention => view! {
-                                                    <strong>"Attention focus"</strong>
-                                                    <span class="attention-focus">{attention_focus()}</span>
-                                                }.into_any(),
-                                                CardId::Beliefs => view! {
-                                                    <strong>"Beliefs & propositions"</strong>
-                                                    <span class="beliefs-meta">{beliefs_label()}</span>
-                                                }.into_any(),
-                                                CardId::Perception => view! {
-                                                    <strong>"Perception facts"</strong>
-                                                    <span class="row"><b>"Status"</b><i>{perception_status()}</i></span>
-                                                }.into_any(),
-                                                CardId::Context => view! {
-                                                    <strong>"Associative context"</strong>
-                                                    <span class="context-meta">{context_label()}</span>
-                                                }.into_any(),
-                                                CardId::Shell(_) => view! {
-                                                    <strong>"CYBOU Shell"</strong>
-                                                    <span>"Zone 3 Body capability"</span>
-                                                }.into_any(),
-                                            }}
-                                        </div>
-                                    </Show>
-                                </div>
+                                <DeckContainerView
+                                    deck_id=deck_id
+                                    layout=layout
+                                    history=history
+                                    dragging=dragging
+                                    resizing=resizing
+                                    runtime=runtime
+                                />
                             }
                         }
                     />
@@ -2098,7 +2332,7 @@ fn start_drag(
     let rect = target.get_bounding_client_rect();
     layout.update(|current| current.bring_forward(card));
     dragging.set(Some(DragState {
-        card,
+        target: DragTarget::Card(card),
         offset_x: f64::from(event.client_x()) - rect.left(),
         offset_y: f64::from(event.client_y()) - rect.top(),
         width: rect.width(),
@@ -2106,6 +2340,42 @@ fn start_drag(
         drop_target: None,
     }));
     event.prevent_default();
+}
+
+fn start_deck_drag(
+    event: PointerEvent,
+    deck_id: String,
+    layout: RwSignal<DesktopLayout>,
+    dragging: RwSignal<Option<DragState>>,
+) {
+    if event.button() != 0 {
+        return;
+    }
+    let current_layout = layout.get_untracked();
+    if let Some(deck) = current_layout.deck(&deck_id) {
+        if deck.presentation.pinned {
+            return;
+        }
+        let Some(target) = event
+            .current_target()
+            .and_then(|target| target.dyn_into::<HtmlElement>().ok())
+        else {
+            return;
+        };
+        let _ = target.focus();
+        let _ = target.set_pointer_capture(event.pointer_id());
+        let rect = target.get_bounding_client_rect();
+        layout.update(|current| current.bring_deck_forward(&deck_id));
+        dragging.set(Some(DragState {
+            target: DragTarget::Deck(deck_id),
+            offset_x: f64::from(event.client_x()) - rect.left(),
+            offset_y: f64::from(event.client_y()) - rect.top(),
+            width: rect.width(),
+            height: rect.height(),
+            drop_target: None,
+        }));
+        event.prevent_default();
+    }
 }
 
 fn move_drag(
@@ -2127,37 +2397,48 @@ fn move_drag(
         .clamp(12.0, (bounds.width() - drag.width - 12.0).max(12.0));
     let y = (f64::from(event.client_y()) - bounds.top() - drag.offset_y)
         .clamp(12.0, (bounds.height() - drag.height - 12.0).max(12.0));
-    layout.update(|current| {
-        current.set_position(drag.card, x, y);
-    });
 
-    let current_layout = layout.get_untracked();
-    let drag_center_x = x + drag.width / 2.0;
-    let drag_center_y = y + drag.height / 2.0;
+    match &drag.target {
+        DragTarget::Card(card) => {
+            let dragged_card = *card;
+            layout.update(|current| {
+                current.set_position(dragged_card, x, y);
+            });
 
-    let mut found_target = None;
-    for card_inst in &current_layout.cards {
-        if card_inst.id == drag.card {
-            continue;
+            let current_layout = layout.get_untracked();
+            let drag_center_x = x + drag.width / 2.0;
+            let drag_center_y = y + drag.height / 2.0;
+
+            let mut found_target = None;
+            for card_inst in &current_layout.cards {
+                if card_inst.id == dragged_card {
+                    continue;
+                }
+                let geom = card_inst.geometry;
+                let is_collapsed = card_inst.presentation.collapsed;
+                let target_h = if is_collapsed { 44.0 } else { geom.height };
+                if drag_center_x >= geom.x - 24.0
+                    && drag_center_x <= geom.x + geom.width + 24.0
+                    && drag_center_y >= geom.y - 24.0
+                    && drag_center_y <= geom.y + target_h + 24.0
+                {
+                    found_target = Some(card_inst.id);
+                    break;
+                }
+            }
+
+            dragging.update(|d| {
+                if let Some(d) = d {
+                    d.drop_target = found_target;
+                }
+            });
         }
-        let geom = card_inst.geometry;
-        let is_collapsed = card_inst.presentation.collapsed;
-        let target_h = if is_collapsed { 44.0 } else { geom.height };
-        if drag_center_x >= geom.x - 24.0
-            && drag_center_x <= geom.x + geom.width + 24.0
-            && drag_center_y >= geom.y - 24.0
-            && drag_center_y <= geom.y + target_h + 24.0
-        {
-            found_target = Some(card_inst.id);
-            break;
+        DragTarget::Deck(deck_id) => {
+            layout.update(|current| {
+                current.set_deck_position(deck_id, x, y);
+            });
         }
     }
-
-    dragging.update(|d| {
-        if let Some(d) = d {
-            d.drop_target = found_target;
-        }
-    });
 }
 
 fn finish_drag(
@@ -2170,18 +2451,20 @@ fn finish_drag(
     };
     dragging.set(None);
 
-    if let Some(target_card) = drag.drop_target {
+    if let DragTarget::Card(dragged_card) = drag.target
+        && let Some(target_card) = drag.drop_target
+    {
         history.update(|h| h.push(layout.get_untracked()));
         layout.update(|current| {
             let deck_id_opt = current.deck_for_card(target_card).map(|d| d.id.clone());
             if let Some(d_id) = deck_id_opt {
-                current.add_to_deck(&d_id, drag.card);
+                current.add_to_deck(&d_id, dragged_card);
             } else {
                 let target_geom = current.geometry(target_card);
-                let title = format!("{} + {}", target_card.title(), drag.card.title());
+                let title = format!("{} + {}", target_card.title(), dragged_card.title());
                 current.create_deck(
                     title,
-                    vec![target_card, drag.card],
+                    vec![target_card, dragged_card],
                     target_geom.x,
                     target_geom.y,
                 );
@@ -2216,12 +2499,46 @@ fn start_resize(
     layout.update(|current| current.bring_forward(card));
     let geom = layout.get_untracked().geometry(card);
     resizing.set(Some(ResizeState {
-        card,
+        target: ResizeTarget::Card(card),
         start_pointer_x: f64::from(event.client_x()),
         start_pointer_y: f64::from(event.client_y()),
         start_width: geom.width,
         start_height: geom.height,
     }));
+}
+
+fn start_deck_resize(
+    event: PointerEvent,
+    deck_id: String,
+    layout: RwSignal<DesktopLayout>,
+    resizing: RwSignal<Option<ResizeState>>,
+) {
+    if event.button() != 0 {
+        return;
+    }
+    if let Some(deck) = layout.get_untracked().deck(&deck_id) {
+        if deck.presentation.pinned {
+            return;
+        }
+        let Some(target) = event
+            .current_target()
+            .and_then(|target| target.dyn_into::<HtmlElement>().ok())
+        else {
+            return;
+        };
+        event.stop_propagation();
+        event.prevent_default();
+        let _ = target.set_pointer_capture(event.pointer_id());
+        layout.update(|current| current.bring_deck_forward(&deck_id));
+        let geom = deck.geometry;
+        resizing.set(Some(ResizeState {
+            target: ResizeTarget::Deck(deck_id),
+            start_pointer_x: f64::from(event.client_x()),
+            start_pointer_y: f64::from(event.client_y()),
+            start_width: geom.width,
+            start_height: geom.height,
+        }));
+    }
 }
 
 fn move_resize(
@@ -2234,13 +2551,26 @@ fn move_resize(
     };
     let dx = f64::from(event.client_x()) - resize.start_pointer_x;
     let dy = f64::from(event.client_y()) - resize.start_pointer_y;
-    let spec = resize.card.spec();
-    let new_width = (resize.start_width + dx).clamp(spec.min_size.0, spec.max_size.0);
-    let new_height = (resize.start_height + dy).clamp(spec.min_size.1, spec.max_size.1);
 
-    layout.update(|current| {
-        current.set_size(resize.card, new_width, new_height);
-    });
+    match &resize.target {
+        ResizeTarget::Card(card) => {
+            let spec = card.spec();
+            let new_width = (resize.start_width + dx).clamp(spec.min_size.0, spec.max_size.0);
+            let new_height = (resize.start_height + dy).clamp(spec.min_size.1, spec.max_size.1);
+
+            layout.update(|current| {
+                current.set_size(*card, new_width, new_height);
+            });
+        }
+        ResizeTarget::Deck(deck_id) => {
+            let new_width = (resize.start_width + dx).clamp(280.0, 800.0);
+            let new_height = (resize.start_height + dy).clamp(160.0, 700.0);
+
+            layout.update(|current| {
+                current.set_deck_size(deck_id, new_width, new_height);
+            });
+        }
+    }
 }
 
 fn finish_resize(layout: RwSignal<DesktopLayout>, resizing: RwSignal<Option<ResizeState>>) {
