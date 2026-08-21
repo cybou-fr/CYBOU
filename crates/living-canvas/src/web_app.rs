@@ -324,6 +324,13 @@ fn DeckResizeHandle(
     }
 }
 
+const SHELL_AUTOCOMPLETE: &[&str] = &[
+    "help", "clear", "status", "capabilities", "mind", "identity", "journal",
+    "lifecycle", "commitments", "self", "attention", "beliefs", "perception",
+    "context", "ls", "cat", "echo", "pwd", "cd", "ps", "uptime", "whoami",
+    "date", "version",
+];
+
 #[component]
 fn ShellCard(
     layout: RwSignal<DesktopLayout>,
@@ -341,9 +348,20 @@ fn ShellCard(
             .to_string(),
         0,
     )]);
+    let (cmd_history, set_cmd_history) = signal(Vec::<String>::new());
+    let (history_idx, set_history_idx) = signal(Option::<usize>::None);
+    let (temp_draft, set_temp_draft) = signal(String::new());
+
     let (input_val, set_input_val) = signal(String::new());
     let (cwd, set_cwd) = signal("/".to_string());
     let (running, set_running) = signal(false);
+    let output_ref = NodeRef::<leptos::html::Div>::new();
+
+    let scroll_output_to_bottom = move || {
+        if let Some(el) = output_ref.get() {
+            el.set_scroll_top(el.scroll_height());
+        }
+    };
 
     let submit_command = move || {
         let cmd = input_val.get();
@@ -354,9 +372,18 @@ fn ShellCard(
         if trimmed == "clear" {
             set_history.set(Vec::new());
             set_input_val.set(String::new());
+            set_history_idx.set(None);
+            set_temp_draft.set(String::new());
             return;
         }
         let cmd_str = trimmed.to_string();
+        set_cmd_history.update(|h| {
+            if h.last() != Some(&cmd_str) {
+                h.push(cmd_str.clone());
+            }
+        });
+        set_history_idx.set(None);
+        set_temp_draft.set(String::new());
         set_running.set(true);
         set_input_val.set(String::new());
         spawn_local(async move {
@@ -378,6 +405,7 @@ fn ShellCard(
                 }
             }
             set_running.set(false);
+            scroll_output_to_bottom();
         });
     };
 
@@ -417,7 +445,7 @@ fn ShellCard(
                     }
                 >
                     <div class="shell-body">
-                        <div class="shell-output">
+                        <div class="shell-output" node_ref=output_ref>
                             <For
                                 each=move || history.get()
                                 key=|(cmd, out, code)| format!("{cmd}-{out}-{code}")
@@ -443,11 +471,61 @@ fn ShellCard(
                                 placeholder=move || if running.get() { "running…" } else { "type a command ('help')…" }
                                 disabled=move || running.get()
                                 prop:value=move || input_val.get()
-                                on:input=move |e| set_input_val.set(event_target_value(&e))
+                                on:input=move |e| {
+                                    set_input_val.set(event_target_value(&e));
+                                    set_history_idx.set(None);
+                                }
                                 on:keydown=move |e: KeyboardEvent| {
-                                    if e.key() == "Enter" {
+                                    let key = e.key();
+                                    if key == "Enter" {
                                         e.prevent_default();
                                         submit_command();
+                                    } else if key == "ArrowUp" {
+                                        e.prevent_default();
+                                        let cmds = cmd_history.get();
+                                        if cmds.is_empty() {
+                                            return;
+                                        }
+                                        let current_idx = history_idx.get();
+                                        let next_idx = match current_idx {
+                                            None => {
+                                                set_temp_draft.set(input_val.get());
+                                                cmds.len().saturating_sub(1)
+                                            }
+                                            Some(idx) => idx.saturating_sub(1),
+                                        };
+                                        set_history_idx.set(Some(next_idx));
+                                        if let Some(cmd) = cmds.get(next_idx) {
+                                            set_input_val.set(cmd.clone());
+                                        }
+                                    } else if key == "ArrowDown" {
+                                        e.prevent_default();
+                                        let cmds = cmd_history.get();
+                                        if let Some(idx) = history_idx.get() {
+                                            if idx + 1 < cmds.len() {
+                                                let next_idx = idx + 1;
+                                                set_history_idx.set(Some(next_idx));
+                                                if let Some(cmd) = cmds.get(next_idx) {
+                                                    set_input_val.set(cmd.clone());
+                                                }
+                                            } else {
+                                                set_history_idx.set(None);
+                                                set_input_val.set(temp_draft.get());
+                                            }
+                                        }
+                                    } else if key == "Tab" {
+                                        e.prevent_default();
+                                        let current = input_val.get();
+                                        let trimmed = current.trim();
+                                        if !trimmed.is_empty() && !trimmed.contains(' ') {
+                                            let matches: Vec<&&str> = SHELL_AUTOCOMPLETE
+                                                .iter()
+                                                .filter(|c| c.starts_with(trimmed))
+                                                .collect();
+                                            if matches.len() == 1 {
+                                                set_input_val.set(format!("{} ", matches[0]));
+                                            }
+                                        }
                                     }
                                 }
                             />
@@ -2004,84 +2082,124 @@ pub fn App() -> impl IntoView {
                         <nav class="minimap" aria-label="Desktop map">
                             <header><Map size=15 /><strong>"Desktop map"</strong></header>
                             <div class="minimap-field">
-                                <button
-                                    class:selected=move || selected.get() == "identity"
-                                    class="mini-node identity-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Identity))
-                                    aria-label="Select identity card"
-                                    on:click=move |_| set_selected.set("identity")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "session"
-                                    class="mini-node session-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Session))
-                                    aria-label="Select session card"
-                                    on:click=move |_| set_selected.set("session")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "capabilities"
-                                    class="mini-node capabilities-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Capabilities))
-                                    aria-label="Select capabilities card"
-                                    on:click=move |_| set_selected.set("capabilities")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "journal"
-                                    class="mini-node journal-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Journal))
-                                    aria-label="Select journal card"
-                                    on:click=move |_| set_selected.set("journal")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "lifecycle"
-                                    class="mini-node lifecycle-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Lifecycle))
-                                    aria-label="Select lifecycle card"
-                                    on:click=move |_| set_selected.set("lifecycle")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "commitments"
-                                    class="mini-node commitments-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Commitments))
-                                    aria-label="Select commitments card"
-                                    on:click=move |_| set_selected.set("commitments")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "self"
-                                    class="mini-node self-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::SelfModel))
-                                    aria-label="Select self-assessment card"
-                                    on:click=move |_| set_selected.set("self")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "attention"
-                                    class="mini-node attention-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Attention))
-                                    aria-label="Select attention card"
-                                    on:click=move |_| set_selected.set("attention")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "beliefs"
-                                    class="mini-node beliefs-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Beliefs))
-                                    aria-label="Select beliefs card"
-                                    on:click=move |_| set_selected.set("beliefs")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "perception"
-                                    class="mini-node perception-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Perception))
-                                    aria-label="Select perception card"
-                                    on:click=move |_| set_selected.set("perception")
-                                ></button>
-                                <button
-                                    class:selected=move || selected.get() == "context"
-                                    class="mini-node context-node"
-                                    style=move || minimap_style(layout.get().geometry(CardId::Context))
-                                    aria-label="Select associative context card"
-                                    on:click=move |_| set_selected.set("context")
-                                ></button>
-                                <Show when=move || layout.get().contains_card(CardId::Shell(0))>
+                                <For
+                                    each={move || layout.get().decks.into_iter().map(|d| (d.id, d.title, d.geometry)).collect::<Vec<_>>()}
+                                    key=|(id, _, _)| id.clone()
+                                    children=move |(d_id, title, geom)| {
+                                        let id_click = d_id.clone();
+                                        view! {
+                                            <button
+                                                class="mini-node deck-node"
+                                                style=move || minimap_style(geom)
+                                                title=format!("Deck: {title}")
+                                                aria-label=format!("Select deck {title}")
+                                                on:click=move |_| {
+                                                    layout.update(|l| l.bring_deck_forward(&id_click));
+                                                }
+                                            ></button>
+                                        }
+                                    }
+                                />
+                                <Show when=move || !layout.get().is_in_deck(CardId::Identity)>
+                                    <button
+                                        class:selected=move || selected.get() == "identity"
+                                        class="mini-node identity-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Identity))
+                                        aria-label="Select identity card"
+                                        on:click=move |_| set_selected.set("identity")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Session)>
+                                    <button
+                                        class:selected=move || selected.get() == "session"
+                                        class="mini-node session-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Session))
+                                        aria-label="Select session card"
+                                        on:click=move |_| set_selected.set("session")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Capabilities)>
+                                    <button
+                                        class:selected=move || selected.get() == "capabilities"
+                                        class="mini-node capabilities-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Capabilities))
+                                        aria-label="Select capabilities card"
+                                        on:click=move |_| set_selected.set("capabilities")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Journal)>
+                                    <button
+                                        class:selected=move || selected.get() == "journal"
+                                        class="mini-node journal-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Journal))
+                                        aria-label="Select journal card"
+                                        on:click=move |_| set_selected.set("journal")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Lifecycle)>
+                                    <button
+                                        class:selected=move || selected.get() == "lifecycle"
+                                        class="mini-node lifecycle-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Lifecycle))
+                                        aria-label="Select lifecycle card"
+                                        on:click=move |_| set_selected.set("lifecycle")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Commitments)>
+                                    <button
+                                        class:selected=move || selected.get() == "commitments"
+                                        class="mini-node commitments-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Commitments))
+                                        aria-label="Select commitments card"
+                                        on:click=move |_| set_selected.set("commitments")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::SelfModel)>
+                                    <button
+                                        class:selected=move || selected.get() == "self"
+                                        class="mini-node self-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::SelfModel))
+                                        aria-label="Select self-assessment card"
+                                        on:click=move |_| set_selected.set("self")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Attention)>
+                                    <button
+                                        class:selected=move || selected.get() == "attention"
+                                        class="mini-node attention-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Attention))
+                                        aria-label="Select attention card"
+                                        on:click=move |_| set_selected.set("attention")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Beliefs)>
+                                    <button
+                                        class:selected=move || selected.get() == "beliefs"
+                                        class="mini-node beliefs-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Beliefs))
+                                        aria-label="Select beliefs card"
+                                        on:click=move |_| set_selected.set("beliefs")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Perception)>
+                                    <button
+                                        class:selected=move || selected.get() == "perception"
+                                        class="mini-node perception-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Perception))
+                                        aria-label="Select perception card"
+                                        on:click=move |_| set_selected.set("perception")
+                                    ></button>
+                                </Show>
+                                <Show when=move || !layout.get().is_in_deck(CardId::Context)>
+                                    <button
+                                        class:selected=move || selected.get() == "context"
+                                        class="mini-node context-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Context))
+                                        aria-label="Select associative context card"
+                                        on:click=move |_| set_selected.set("context")
+                                    ></button>
+                                </Show>
+                                <Show when=move || layout.get().contains_card(CardId::Shell(0)) && !layout.get().is_in_deck(CardId::Shell(0))>
                                     <button
                                         class:selected=move || selected.get() == "shell"
                                         class="mini-node shell-node"
@@ -2124,6 +2242,81 @@ pub fn App() -> impl IntoView {
                             />
                         </aside>
                     </Show>
+
+                    <nav class="desktop-floating-bar" aria-label="Desktop quick actions">
+                        <button
+                            title="Undo layout movement (Ctrl+Z)"
+                            on:click=move |_| apply_undo(history, layout)
+                        >
+                            <IconUndo size=13 />
+                            <span>"Undo"</span>
+                        </button>
+                        <button
+                            title="Redo layout movement (Ctrl+Y)"
+                            on:click=move |_| apply_redo(history, layout)
+                        >
+                            <IconRedo size=13 />
+                            <span>"Redo"</span>
+                        </button>
+                        <div class="toolbar-separator"></div>
+                        <button
+                            title="Arrange in grid layout"
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconGrid size=13 />
+                            <span>"Grid"</span>
+                        </button>
+                        <button
+                            title="Arrange in compact layout"
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconMinimize size=13 />
+                            <span>"Compact"</span>
+                        </button>
+                        <button
+                            title="Arrange in causal relations layout"
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <Link size=13 />
+                            <span>"Relations"</span>
+                        </button>
+                        <div class="toolbar-separator"></div>
+                        <button
+                            title="Toggle CYBOU Shell terminal"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::Shell(0)) {
+                                    layout.update(|l| l.close_card(CardId::Shell(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                    set_selected.set("shell");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconTerminal size=13 />
+                            <span>"Shell"</span>
+                        </button>
+                        <button
+                            class:active=move || minimap_visible.get()
+                            title="Toggle Desktop Minimap"
+                            on:click=move |_| set_minimap_visible.update(|v| *v = !*v)
+                        >
+                            <Map size=13 />
+                            <span>"Map"</span>
+                        </button>
+                    </nav>
 
                     <button
                         class:open=move || capabilities_open.get()
