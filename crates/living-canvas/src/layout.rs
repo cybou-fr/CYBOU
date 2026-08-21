@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::card::{CardGeometry, CardId, CardInstance, CardPresentation};
-use crate::deck::DeckInstance;
+use crate::deck::{DeckError, DeckInstance};
 
 /// Desktop layout schema version 9 storage key in browser `localStorage`.
 pub const LAYOUT_KEY_V9: &str = "cybou.desktop.layout.v9";
@@ -291,32 +291,116 @@ impl DesktopLayout {
     }
 
     /// Create a new deck grouping given cards and position it on desktop.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DeckError` if cards cannot be grouped into a valid deck.
     pub fn create_deck(
         &mut self,
         title: impl Into<String>,
         cards: Vec<CardId>,
         x: f64,
         y: f64,
-    ) -> String {
+    ) -> Result<String, DeckError> {
         let id = format!("deck-{}", uuid::Uuid::new_v4());
         let first_card = cards.first().copied();
         let (w, h) = if let Some(fc) = first_card {
             let spec = fc.spec();
-            (spec.default_size.0.max(340.0), (spec.default_size.1 + 36.0).max(220.0))
+            (
+                spec.default_size.0.max(340.0),
+                (spec.default_size.1 + 36.0).max(220.0),
+            )
         } else {
             (360.0, 240.0)
         };
-        let mut deck = DeckInstance::new(&id, title, cards, x, y);
+        let mut deck = DeckInstance::try_new(&id, title, cards, x, y)?;
         deck.geometry.width = w;
         deck.geometry.height = h;
         self.decks.push(deck);
-        id
+        Ok(id)
     }
 
     /// Add a card into an existing deck.
-    pub fn add_to_deck(&mut self, deck_id: &str, card: CardId) {
+    ///
+    /// # Errors
+    ///
+    /// Returns `DeckError::CardAlreadyInDeck` if card is already docked, or
+    /// `DeckError::DeckNotFound` if the deck ID does not exist in layout.
+    pub fn add_to_deck(&mut self, deck_id: &str, card: CardId) -> Result<(), DeckError> {
+        if self.is_in_deck(card) {
+            return Err(DeckError::CardAlreadyInDeck(card));
+        }
         if let Some(deck) = self.decks.iter_mut().find(|d| d.id == deck_id) {
-            deck.add_card(card);
+            deck.add_card(card)
+        } else {
+            Err(DeckError::DeckNotFound(deck_id.to_string()))
+        }
+    }
+
+    /// Validate all desktop layout invariants and normalize state:
+    /// 1. Ensures all 11 Mind organ system cards are present (instantiating defaults if missing).
+    /// 2. Clamps all card and deck dimensions to spec min/max bounds and reachable positions.
+    /// 3. Normalizes z-order monotonically to prevent gaps and overflow.
+    /// 4. Validates decks: dissolves invalid/empty/<2 card decks, removes duplicate cards, ensures `active_card` is in deck.
+    /// 5. Ensures no card is in multiple decks simultaneously.
+    pub fn validate_and_normalize(&mut self) {
+        // 1. Ensure all system cards exist
+        for sys_id in CardId::ALL_SYSTEM_CARDS {
+            if !self.cards.iter().any(|c| c.id == sys_id) {
+                let spec = sys_id.spec();
+                let max_z = self.cards.iter().map(|c| c.geometry.z).max().unwrap_or(0);
+                self.cards.push(CardInstance {
+                    id: sys_id,
+                    geometry: CardGeometry::new(60.0, 60.0, spec.default_size, max_z + 1),
+                    presentation: CardPresentation::default(),
+                });
+            }
+        }
+
+        // 2. Clamp and normalize all card geometries
+        for card in &mut self.cards {
+            let spec = card.id.spec();
+            card.geometry.width = card.geometry.width.clamp(spec.min_size.0, spec.max_size.0);
+            card.geometry.height = card.geometry.height.clamp(spec.min_size.1, spec.max_size.1);
+            card.geometry.x = card.geometry.x.clamp(0.0, 5000.0);
+            card.geometry.y = card.geometry.y.clamp(0.0, 5000.0);
+        }
+
+        // 3. Validate decks and resolve multi-deck card conflicts
+        let mut assigned_cards = std::collections::HashSet::new();
+        let mut valid_decks = Vec::new();
+
+        for mut deck in self.decks.drain(..) {
+            // Remove cards already claimed by another deck
+            deck.card_ids.retain(|c| assigned_cards.insert(*c));
+
+            if deck.validate_and_normalize() {
+                deck.geometry.x = deck.geometry.x.clamp(0.0, 5000.0);
+                deck.geometry.y = deck.geometry.y.clamp(0.0, 5000.0);
+                deck.geometry.width = deck.geometry.width.clamp(280.0, 1200.0);
+                deck.geometry.height = deck.geometry.height.clamp(160.0, 900.0);
+                valid_decks.push(deck);
+            }
+        }
+        self.decks = valid_decks;
+
+        // 4. Normalize z-indices monotonically starting at 1
+        let mut z_items: Vec<(u32, bool, usize)> = Vec::new(); // (current_z, is_deck, index)
+        for (i, c) in self.cards.iter().enumerate() {
+            z_items.push((c.geometry.z, false, i));
+        }
+        for (i, d) in self.decks.iter().enumerate() {
+            z_items.push((d.geometry.z, true, i));
+        }
+        z_items.sort_by_key(|item| item.0);
+
+        for (new_z, (_, is_deck, idx)) in z_items.into_iter().enumerate() {
+            let assigned_z = u32::try_from(new_z + 1).unwrap_or(u32::MAX);
+            if is_deck {
+                self.decks[idx].geometry.z = assigned_z;
+            } else {
+                self.cards[idx].geometry.z = assigned_z;
+            }
         }
     }
 
@@ -610,14 +694,17 @@ impl DesktopLayout {
     pub fn load() -> Self {
         let storage = web_sys::window().and_then(|w| w.local_storage().ok().flatten());
         let Some(storage) = storage else {
-            return Self::default();
+            let mut def = Self::default();
+            def.validate_and_normalize();
+            return def;
         };
 
         // 1. Try v9 key first
         if let Ok(Some(v9_str)) = storage.get_item(LAYOUT_KEY_V9)
-            && let Ok(v9) = serde_json::from_str::<Self>(&v9_str)
+            && let Ok(mut v9) = serde_json::from_str::<Self>(&v9_str)
             && v9.schema_version == 9
         {
+            v9.validate_and_normalize();
             return v9;
         }
 
@@ -625,12 +712,14 @@ impl DesktopLayout {
         if let Ok(Some(v8_str)) = storage.get_item(LAYOUT_KEY_V8)
             && let Ok(v8) = serde_json::from_str::<CanvasLayoutV8>(&v8_str)
         {
-            let migrated = Self::from_v8(&v8);
+            let mut migrated = Self::from_v8(&v8);
+            migrated.validate_and_normalize();
             migrated.save();
             return migrated;
         }
 
-        let default_layout = Self::default();
+        let mut default_layout = Self::default();
+        default_layout.validate_and_normalize();
         default_layout.save();
         default_layout
     }
@@ -648,13 +737,15 @@ impl DesktopLayout {
 
 #[cfg(not(target_arch = "wasm32"))]
 impl DesktopLayout {
-    /// Non-WASM dummy loader returning default layout.
+    /// Non-WASM loader returning validated default layout.
     #[must_use]
     pub fn load() -> Self {
-        Self::default()
+        let mut def = Self::default();
+        def.validate_and_normalize();
+        def
     }
 
-    /// Non-WASM dummy save no-op.
+    /// Non-WASM save no-op.
     pub fn save(&self) {}
 }
 
@@ -841,19 +932,23 @@ mod tests {
     #[test]
     fn deck_management_and_dissolution() {
         let mut layout = DesktopLayout::default();
-        let deck_id = layout.create_deck(
-            "System Overview",
-            vec![CardId::Identity, CardId::Session],
-            100.0,
-            100.0,
-        );
+        let deck_id = layout
+            .create_deck(
+                "System Overview",
+                vec![CardId::Identity, CardId::Session],
+                100.0,
+                100.0,
+            )
+            .expect("create deck");
 
         assert_eq!(layout.decks.len(), 1);
         assert!(layout.is_in_deck(CardId::Identity));
         assert!(layout.is_in_deck(CardId::Session));
         assert!(!layout.is_in_deck(CardId::Capabilities));
 
-        layout.add_to_deck(&deck_id, CardId::Capabilities);
+        layout
+            .add_to_deck(&deck_id, CardId::Capabilities)
+            .expect("add card to deck");
         assert!(layout.is_in_deck(CardId::Capabilities));
 
         // Detach one card
@@ -865,6 +960,37 @@ mod tests {
         layout.detach_from_deck(&deck_id, CardId::Session);
         assert!(!layout.is_in_deck(CardId::Session));
         assert!(!layout.is_in_deck(CardId::Identity));
+        assert_eq!(layout.decks.len(), 0);
+    }
+
+    #[test]
+    fn validate_and_normalize_recovers_missing_cards_and_corrupt_decks() {
+        let mut layout = DesktopLayout::default();
+        // Remove 2 system cards
+        layout
+            .cards
+            .retain(|c| c.id != CardId::Identity && c.id != CardId::Context);
+        assert_eq!(layout.cards.len(), 9);
+
+        // Add a corrupted 1-card deck
+        let bad_deck = DeckInstance {
+            id: "bad-deck".into(),
+            title: "Corrupt".into(),
+            card_ids: vec![CardId::Session],
+            active_card: CardId::Session,
+            geometry: CardGeometry::new(10.0, 10.0, (300.0, 300.0), 1),
+            presentation: CardPresentation::default(),
+        };
+        layout.decks.push(bad_deck);
+
+        layout.validate_and_normalize();
+
+        // System cards restored
+        assert_eq!(layout.cards.len(), 11);
+        assert!(layout.contains_card(CardId::Identity));
+        assert!(layout.contains_card(CardId::Context));
+
+        // Corrupt deck dissolved
         assert_eq!(layout.decks.len(), 0);
     }
 

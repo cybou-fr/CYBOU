@@ -75,25 +75,26 @@ Cards are classified into three architectural categories (`CardKind`):
 
 Each card type is governed by a static `CardSpec` defining bounds (`default_size`, `min_size`, `max_size`) and capabilities (`movable`, `resizable`, `collapsible`, `closable`, `deckable`).
 
-### 2. Layout Schema v9 and Transparent Migration
+### 2. Layout Schema v9 and Self-Healing Startup Pass
 
 The browser storage schema is upgraded to `cybou.desktop.layout.v9`:
-- `DesktopLayout` holds `schema_version: 9` and `cards: Vec<CardInstance>`.
-- Seamless backward compatibility: When `v9` is absent in browser `localStorage`, `DesktopLayout::load()` inspects `cybou.living-canvas.layout.v8`, imports exact coordinate offsets, applies default `CardSpec` dimensions and uncollapsed presentation, persists to `v9`, and continues without user interruption.
+- `DesktopLayout` holds `schema_version: 9`, `cards: Vec<CardInstance>`, and `decks: Vec<DeckInstance>`.
+- **Seamless Backward Compatibility**: When `v9` is absent in browser `localStorage`, `DesktopLayout::load()` inspects `cybou.living-canvas.layout.v8`, imports exact coordinate offsets, applies default `CardSpec` dimensions and uncollapsed presentation, persists to `v9`, and continues without user interruption.
+- **Invariant-Safe Startup Normalization (`validate_and_normalize`)**:
+  - Automatically instantiates default geometries for any missing canonical system cards.
+  - Clamps dimensions to `[min_size, max_size]` and bounds spatial coordinates within visible/reachable limits.
+  - Enforces deck integrity: dissolves decks with `< 2` cards, resolves cross-deck card conflicts, and normalizes z-order monotonically.
 
-### 3. Spatial Dynamics and Arrangement Engine
+### 3. Spatial Dynamics, Focus Mode, and Deck Composition
 
 CYBOU Desktop provides spatial freedom combined with deterministic structure:
-- **Interactive Resize**: Geometry clamps to `CardSpec.min_size` and `CardSpec.max_size`. Relationship lines continuously track dynamic card boundaries using center-to-edge anchor projection.
+- **Interactive & Keyboard Resize**: Geometry clamps to `CardSpec.min_size` and `CardSpec.max_size`. Relationship lines continuously track dynamic card boundaries using center-to-edge anchor projection. Supports `Alt+Shift+Arrow` keyboard resize.
+- **Accessible Spatial Movement**: `Alt+Arrow` moves cards, preserving standard Arrow keys for terminal and form input.
 - **Collapse / Expand**: Cards can collapse into single-line summary pills to save canvas real estate while preserving presence.
 - **Pinning**: Pinned cards (`pinned: true`) are locked against auto-arrangement algorithms.
-- **Arrangement Modes**: Pure, deterministic function `arrange(mode, cards, relationships, bounds)` supporting:
-  - `Free`: Unconstrained spatial dragging.
-  - `Compact`: Removes dead space while preserving topological intent.
-  - `Grid`: Structured modular alignment.
-  - `Relations`: Force-directed graph positioning driven by actual causal system relationships (`writes to`, `evaluates`, `consolidates into`).
-  - `Focus`: Radial focus on a selected card with related cards placed in orbit.
-- **Decks**: Tabbed grouping allowing multiple cards to share one window frame without merging or mutating underlying card identities.
+- **Non-Destructive Focus Mode**: Focus expands cards to fill the active viewport without mutating underlying persisted spatial coordinates; `Escape` cleanly restores the previous desktop state.
+- **Arrangement Modes**: Pure, deterministic function `arrange(mode, cards, relationships, bounds)` supporting `Free`, `Compact`, `Grid`, `Relations`, and `Focus`.
+- **Invariant-Safe Decks**: Tabbed grouping governed by typed `DeckError` invariants, ensuring minimum 2 cards per deck, no duplicate cards, and WAI-ARIA `role="tablist"` keyboard traversal (`ArrowLeft`/`ArrowRight`/`Home`/`End`).
 
 ### 4. Bounded Body Capability: CYBOU Shell
 

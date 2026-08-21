@@ -200,28 +200,36 @@ Every visible surface implements `CardInstance`:
 - `CardPresentation`: Display mode flags (`collapsed: bool`, `pinned: bool`).
 - `CardSpec`: Static contract defining `kind` (`System`, `Tool`, `Ephemeral`), capabilities (`movable`, `resizable`, `collapsible`, `closable`, `deckable`), and size constraints (`default_size`, `min_size`, `max_size`).
 
-#### Layout Schema v9 and Migration
+#### Layout Schema v9, Self-Healing Normalization and Migration
 
 Layout persistence uses schema version 9 (`cybou.desktop.layout.v9`):
 1. Loads `cybou.desktop.layout.v9` if present in browser `localStorage`.
 2. Falls back to legacy schema v8 (`cybou.living-canvas.layout.v8`), migrating all fixed point positions into full `CardGeometry` with default spec dimensions, uncollapsed, unpinned presentation.
-3. Transparently commits migrated state to v9 without breaking user coordinates or disrupting active sessions.
+3. Transparently runs `validate_and_normalize()` on boot:
+   - **System Cards Guarantee**: Instantiates defaults if any of the 11 Mind system cards are missing from storage.
+   - **Bounds & Anchors Clamping**: Clamps dimensions to `[min_size, max_size]` and bounds offsets to reachable coordinates.
+   - **Deck Resolution**: Deduplicates cards, dissolves single-card or corrupt decks, and enforces multi-deck exclusivity.
+   - **Monotonic Z-Ordering**: Re-indexes z-order monotonically starting from 1.
+4. Commits verified state without breaking user coordinates or disrupting active sessions.
 
-#### Spatial Dynamics and Multi-Mode Arrangement Engine
+#### Spatial Dynamics, Focus Mode, and Invariant-Safe Decks
 
-- **Interactive Resize**: Real-time pointer resizing constrained to `[min_size, max_size]` with dynamic edge anchor recalculation for relationship vectors.
+- **Interactive & Keyboard Resize**: Pointer resizing and `Alt+Shift+Arrow` keyboard resize constrained to `[min_size, max_size]` with dynamic edge anchor recalculation for relationship vectors.
+- **Accessible Keyboard Spatial Navigation**: `Alt+Arrow` moves cards while leaving plain Arrow keys free for internal controls, text editing, and terminal history.
 - **Collapse / Expand**: Single-line summary pill toggle to reclaim canvas space while maintaining presence.
 - **Pinning**: Pinned cards (`pinned: true`) are locked against auto-arrangement transforms.
 - **Deterministic Arrangement**: Pure function `arrange(mode, cards, relationships, bounds)` providing `Free`, `Compact`, `Grid`, `Relations` (causal graph clustering), and `Focus` (radial attention orbit) modes.
-- **Decks (Tabs)**: Ephemeral grouping of multiple cards into a single tabbed container without mutating card identity.
+- **Non-Destructive Focus Mode**: Focus expands cards to fill the active viewport without mutating persisted spatial coordinates; `Escape` cleanly returns to previous layout.
+- **Invariant-Safe Decks (Tabs)**: Grouping of cards governed by typed `DeckError` rules (minimum 2 distinct deckable cards, no duplicate or cross-deck assignments, valid `active_card` membership). Equipped with WAI-ARIA `role="tablist"` and keyboard navigation (`ArrowLeft`/`ArrowRight`/`Home`/`End`).
+- **Resource Lifecycle Management**: External reactive handles (e.g. SSE `EventSource` in `JournalFeedCard`) are explicitly managed and closed on teardown to eliminate socket leaks.
 
 #### Bounded Body Capability: CYBOU Shell
 
 CYBOU Shell is an isolated, unprivileged capability surface to the Debian 13 host:
-- Builtins only: `help`, `pwd`, `ls`, `cd`, `cat`, `clear`.
+- Builtins strictly limited to ADR-0040 DemoReadOnly: `help`, `pwd`, `ls`, `cd`, `cat`, `clear`.
 - No arbitrary execution, fork/exec, pipes, redirects, or background subshells.
 - Filesystem operations strictly jailed via `cybou-jailfs` (`RESOLVE_BENEATH` / `openat2`) rooted at `/home/demo` (`DemoReadOnly` profile).
-- Gateway isolation: Shell endpoints are disabled and refused in `PublicPreview` mode; accessible only in authenticated `LocalDesktop` sessions.
+- Gateway isolation: Shell endpoints are disabled and refused in `PublicPreview` mode (HTTP 403); accessible only in authenticated `LocalDesktop` sessions.
 
 #### Four Isolated Security Zones
 

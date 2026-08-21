@@ -41,6 +41,7 @@ cybou_ssh "
     cybou-lifecycled
     cybou-selfd
     cybou-presenced
+    cybou-shelld
   )
   for daemon in \"\${DAEMONS[@]}\"; do
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
@@ -78,13 +79,13 @@ cybou_ssh "
   # Provision demo user for live desktop authentication
   if ! id demo >/dev/null 2>&1; then
     sudo useradd -m -s /bin/bash -G cybou-access demo
-    echo "demo:cybou2026" | sudo chpasswd
+    echo \"demo:cybou2026\" | sudo chpasswd
   else
     sudo usermod -a -G cybou-access demo
-    echo "demo:cybou2026" | sudo chpasswd
+    echo \"demo:cybou2026\" | sudo chpasswd
   fi
   sudo -u demo mkdir -p /home/demo/documents /home/demo/downloads /home/demo/projects
-  sudo -u demo sh -c 'echo -e "# Welcome to CYBOU Sovereign Desktop\n\nThis is your bounded home directory.\nYou can create files, run commands, and manage your sovereign environment." > /home/demo/welcome.md'
+  sudo -u demo sh -c 'echo -e \"# Welcome to CYBOU Sovereign Desktop\n\nThis is your bounded read-only home directory.\nYou can inspect files, navigate directories, and explore your sovereign environment.\" > /home/demo/welcome.md'
 
   # The PAM stack the helper opens. Ordinary Unix password checking and nothing else; the account
   # module is what makes locking an account actually revoke access rather than only look like it.

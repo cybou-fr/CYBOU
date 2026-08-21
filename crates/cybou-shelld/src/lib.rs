@@ -127,12 +127,6 @@ impl ShellEngine {
             "cd" => self.exec_cd(args),
             "ls" => self.exec_ls(args),
             "cat" => self.exec_cat(args),
-            "echo" => self.exec_echo(args),
-            "grep" => self.exec_grep(args),
-            "mkdir" => self.exec_mkdir(args),
-            "touch" => self.exec_touch(args),
-            "write" => self.exec_write(args),
-            "status" => self.exec_status(),
             "help" => self.exec_help(args),
             "clear" => ShellOutput::success("\x1b[2J\x1b[H", self.cwd()),
             unknown => ShellOutput::error(
@@ -273,89 +267,6 @@ impl ShellEngine {
         }
     }
 
-    fn exec_echo(&self, args: &[String]) -> ShellOutput {
-        let joined = args.join(" ");
-        ShellOutput::success(format!("{joined}\n"), self.cwd())
-    }
-
-    fn exec_grep(&self, args: &[String]) -> ShellOutput {
-        if args.len() < 2 {
-            return ShellOutput::error(1, "grep: usage: grep <pattern> <file>\n", self.cwd());
-        }
-        let pattern = &args[0];
-        let file_path = self.resolve_path(&args[1]);
-
-        match self.jail.read_to_string(&file_path, MAX_FILE_PAYLOAD_BYTES) {
-            Ok(content) => {
-                let mut out = String::new();
-                for (idx, line) in content.lines().enumerate() {
-                    if line.contains(pattern) {
-                        let _ = writeln!(out, "{}:{line}", idx + 1);
-                    }
-                }
-                ShellOutput::success(out, self.cwd())
-            }
-            Err(e) => ShellOutput::error(1, format!("grep: {e}\n"), self.cwd()),
-        }
-    }
-
-    fn exec_mkdir(&self, args: &[String]) -> ShellOutput {
-        if args.is_empty() {
-            return ShellOutput::error(1, "mkdir: missing directory operand\n", self.cwd());
-        }
-        let full_path = self.resolve_path(&args[0]);
-        match self.jail.create_dir_all(&full_path) {
-            Ok(()) => ShellOutput::success(String::new(), self.cwd()),
-            Err(e) => ShellOutput::error(1, format!("mkdir: {e}\n"), self.cwd()),
-        }
-    }
-
-    fn exec_touch(&self, args: &[String]) -> ShellOutput {
-        if args.is_empty() {
-            return ShellOutput::error(1, "touch: missing file operand\n", self.cwd());
-        }
-        let full_path = self.resolve_path(&args[0]);
-        if self.jail.exists(&full_path) {
-            return ShellOutput::success(String::new(), self.cwd());
-        }
-        match self
-            .jail
-            .write_bytes(&full_path, b"", MAX_FILE_PAYLOAD_BYTES)
-        {
-            Ok(()) => ShellOutput::success(String::new(), self.cwd()),
-            Err(e) => ShellOutput::error(1, format!("touch: {e}\n"), self.cwd()),
-        }
-    }
-
-    fn exec_write(&self, args: &[String]) -> ShellOutput {
-        if args.len() < 2 {
-            return ShellOutput::error(1, "write: usage: write <file> <content...>\n", self.cwd());
-        }
-        let file_path = self.resolve_path(&args[0]);
-        let content = args[1..].join(" ");
-        match self
-            .jail
-            .write_bytes(&file_path, content.as_bytes(), MAX_FILE_PAYLOAD_BYTES)
-        {
-            Ok(()) => ShellOutput::success(String::new(), self.cwd()),
-            Err(e) => ShellOutput::error(1, format!("write: {e}\n"), self.cwd()),
-        }
-    }
-
-    fn exec_status(&self) -> ShellOutput {
-        let status = format!(
-            "CYBOU Body Host: Debian 13 (Trixie)\n\
-             Mind Architecture: Rust-First (ADR-0038/0039)\n\
-             Desktop: CYBOU Desktop Spatial Cards (ADR-0040)\n\
-             Sandbox Root: {}\n\
-             Virtual CWD: {}\n\
-             Security Zone: Zone 3 (Bounded Body Capabilities)\n",
-            self.jail.root().display(),
-            self.cwd()
-        );
-        ShellOutput::success(status, self.cwd())
-    }
-
     fn exec_help(&self, args: &[String]) -> ShellOutput {
         if let Some(cmd) = args.first() {
             let desc = match cmd.as_str() {
@@ -363,33 +274,21 @@ impl ShellEngine {
                 "cd" => "cd <dir> - change virtual working directory inside sandbox",
                 "ls" => "ls [-l] [dir] - list directory contents",
                 "cat" => "cat <file> - concatenate and display file content",
-                "echo" => "echo [text...] - display a line of text",
-                "grep" => "grep <pattern> <file> - print lines matching a pattern",
-                "mkdir" => "mkdir <dir> - create directory inside sandbox",
-                "touch" => "touch <file> - change file timestamp or create empty file",
-                "write" => "write <file> <content...> - write text into a sandboxed file",
-                "status" => "status - show CYBOU Body host and sandbox status",
                 "clear" => "clear - clear terminal screen buffer",
-                "help" => "help [command] - display information about builtin commands",
-                _ => "Unknown command. Type 'help' to list all commands.",
+                "help" => "help [command] - display information about builtin capabilities",
+                _ => "Unknown command. Type 'help' to list available capabilities.",
             };
             return ShellOutput::success(format!("{desc}\n"), self.cwd());
         }
 
         let help = "\
-CYBOU Bounded Body Shell (Zone 3 capability exploration)
-These shell commands are defined internally. Type 'help <command>' for details.
+CYBOU Bounded Body Shell (Zone 3 capability exploration · ADR-0040 DemoReadOnly)
+Available builtin capabilities:
 
   pwd             Print working directory
   cd <dir>        Change directory inside sandbox
   ls [-l] [dir]   List directory contents
   cat <file>      Display file contents
-  echo [text...]  Print text to output
-  grep <pat> <f>  Search pattern in file
-  mkdir <dir>     Create directory
-  touch <file>    Create empty file
-  write <f> <txt> Write text to file
-  status          Display Body and Mind status
   clear           Clear screen
   help [cmd]      Display command help
 ";
@@ -449,6 +348,8 @@ mod tests {
         );
         let path = std::env::temp_dir().join(unique);
         let jail = JailFs::new(&path).expect("create test jail");
+        // Create initial test file
+        let _ = jail.write_bytes("/welcome.txt", b"Welcome to CYBOU Bounded Shell", 1024);
         (ShellEngine::new(jail), path)
     }
 
@@ -461,36 +362,25 @@ mod tests {
         assert_eq!(out.exit_code, 0);
         assert_eq!(out.stdout.trim(), "/");
 
-        // 2. mkdir and cd
-        let out = engine.execute("mkdir workspace");
+        // 2. ls
+        let out = engine.execute("ls");
         assert_eq!(out.exit_code, 0);
+        assert!(out.stdout.contains("welcome.txt"));
 
-        let out = engine.execute("cd workspace");
+        // 3. cat
+        let out = engine.execute("cat welcome.txt");
         assert_eq!(out.exit_code, 0);
-        assert_eq!(engine.cwd(), "/workspace");
+        assert_eq!(out.stdout.trim(), "Welcome to CYBOU Bounded Shell");
 
-        // 3. write and cat
-        let out = engine.execute("write notes.txt \"System check passed\"");
+        // 4. help
+        let out = engine.execute("help");
         assert_eq!(out.exit_code, 0);
+        assert!(out.stdout.contains("pwd"));
+        assert!(out.stdout.contains("cat"));
 
-        let out = engine.execute("cat notes.txt");
+        // 5. clear
+        let out = engine.execute("clear");
         assert_eq!(out.exit_code, 0);
-        assert_eq!(out.stdout.trim(), "System check passed");
-
-        // 4. grep
-        let out = engine.execute("grep check notes.txt");
-        assert_eq!(out.exit_code, 0);
-        assert!(out.stdout.contains("System check passed"));
-
-        // 5. ls -l
-        let out = engine.execute("ls -l");
-        assert_eq!(out.exit_code, 0);
-        assert!(out.stdout.contains("notes.txt"));
-
-        // 6. cd back
-        let out = engine.execute("cd ..");
-        assert_eq!(out.exit_code, 0);
-        assert_eq!(engine.cwd(), "/");
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -499,7 +389,15 @@ mod tests {
     fn shell_blocks_unauthorized_commands_and_traversals() {
         let (mut engine, dir) = test_engine();
 
-        // Unknown command
+        // Unknown / disallowed command (e.g. echo, write, rm, sudo)
+        let out = engine.execute("echo test");
+        assert_eq!(out.exit_code, 127);
+        assert!(out.stderr.contains("command not found"));
+
+        let out = engine.execute("write test.txt hello");
+        assert_eq!(out.exit_code, 127);
+        assert!(out.stderr.contains("command not found"));
+
         let out = engine.execute("sudo rm -rf /");
         assert_eq!(out.exit_code, 127);
         assert!(out.stderr.contains("command not found"));
@@ -514,9 +412,9 @@ mod tests {
 
     #[test]
     fn tokenize_handles_quotes_and_escapes() {
-        let tokens = ShellEngine::tokenize("write \"hello world.txt\" 'foo bar' simple\\ name");
+        let tokens = ShellEngine::tokenize("cat \"hello world.txt\" 'foo bar' simple\\ name");
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0], "write");
+        assert_eq!(tokens[0], "cat");
         assert_eq!(tokens[1], "hello world.txt");
         assert_eq!(tokens[2], "foo bar");
         assert_eq!(tokens[3], "simple name");

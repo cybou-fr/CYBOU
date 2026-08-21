@@ -35,20 +35,12 @@ pub enum CardId {
     Perception,
     /// Context1 associative context graph.
     Context,
-    /// Dynamic bounded CYBOU Shell instance.
+    /// Dynamic bounded CYBOU Shell instance (Zone 3 `DemoReadOnly` capability).
     Shell(u32),
-    /// Dynamic bounded File Manager instance (Zone 3 capability).
+    /// Dynamic bounded File Manager instance (Zone 3 Read-Only storage).
     FileManager(u32),
-    /// Dynamic sandboxed Web Browser instance.
-    WebBrowser(u32),
-    /// Real-time Journal event stream & cryptographic hash integrity.
+    /// Real-time Journal event stream.
     JournalFeed(u32),
-    /// Host Telemetry, daemon metrics & D-Bus status.
-    Telemetry(u32),
-    /// Interactive Epistemic Knowledge Graph visualization.
-    EpistemicGraph(u32),
-    /// Agent Intent & Goal Dispatcher.
-    IntentLauncher(u32),
 }
 
 impl CardId {
@@ -84,11 +76,7 @@ impl CardId {
             Self::Context => "context",
             Self::Shell(_) => "shell",
             Self::FileManager(_) => "files",
-            Self::WebBrowser(_) => "browser",
             Self::JournalFeed(_) => "journal-feed",
-            Self::Telemetry(_) => "telemetry",
-            Self::EpistemicGraph(_) => "epistemic-graph",
-            Self::IntentLauncher(_) => "intent",
         }
     }
 
@@ -109,11 +97,7 @@ impl CardId {
             Self::Context => "Context",
             Self::Shell(_) => "CYBOU Shell",
             Self::FileManager(_) => "File Manager",
-            Self::WebBrowser(_) => "Web Browser",
-            Self::JournalFeed(_) => "Event Stream & Integrity",
-            Self::Telemetry(_) => "Host Telemetry & Daemons",
-            Self::EpistemicGraph(_) => "Epistemic Knowledge Graph",
-            Self::IntentLauncher(_) => "Intent & Goal Dispatcher",
+            Self::JournalFeed(_) => "Event Stream",
         }
     }
 
@@ -134,11 +118,7 @@ impl CardId {
             "context" => Some(Self::Context),
             "shell" => Some(Self::Shell(0)),
             "files" => Some(Self::FileManager(0)),
-            "browser" => Some(Self::WebBrowser(0)),
             "journal-feed" => Some(Self::JournalFeed(0)),
-            "telemetry" => Some(Self::Telemetry(0)),
-            "epistemic-graph" => Some(Self::EpistemicGraph(0)),
-            "intent" => Some(Self::IntentLauncher(0)),
             _ => None,
         }
     }
@@ -323,18 +303,6 @@ impl CardId {
                 min_size: (360.0, 240.0),
                 max_size: (1200.0, 800.0),
             },
-            Self::WebBrowser(_) => CardSpec {
-                kind: CardKind::Tool,
-                singleton: false,
-                movable: true,
-                resizable: true,
-                collapsible: true,
-                closable: true,
-                deckable: true,
-                default_size: (640.0, 480.0),
-                min_size: (380.0, 300.0),
-                max_size: (1600.0, 1200.0),
-            },
             Self::JournalFeed(_) => CardSpec {
                 kind: CardKind::Tool,
                 singleton: false,
@@ -346,42 +314,6 @@ impl CardId {
                 default_size: (580.0, 360.0),
                 min_size: (360.0, 240.0),
                 max_size: (1200.0, 800.0),
-            },
-            Self::Telemetry(_) => CardSpec {
-                kind: CardKind::Tool,
-                singleton: false,
-                movable: true,
-                resizable: true,
-                collapsible: true,
-                closable: true,
-                deckable: true,
-                default_size: (520.0, 340.0),
-                min_size: (360.0, 220.0),
-                max_size: (1000.0, 700.0),
-            },
-            Self::EpistemicGraph(_) => CardSpec {
-                kind: CardKind::Tool,
-                singleton: false,
-                movable: true,
-                resizable: true,
-                collapsible: true,
-                closable: true,
-                deckable: true,
-                default_size: (640.0, 440.0),
-                min_size: (400.0, 300.0),
-                max_size: (1400.0, 1000.0),
-            },
-            Self::IntentLauncher(_) => CardSpec {
-                kind: CardKind::Tool,
-                singleton: false,
-                movable: true,
-                resizable: true,
-                collapsible: true,
-                closable: true,
-                deckable: true,
-                default_size: (600.0, 420.0),
-                min_size: (380.0, 260.0),
-                max_size: (1400.0, 900.0),
             },
         }
     }

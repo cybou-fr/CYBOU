@@ -88,9 +88,7 @@ impl GatewayMindClient {
 
     /// Terminate current session.
     pub async fn logout(&self) -> Result<(), ClientError> {
-        let _ = Request::post("/api/v1/logout")
-            .send()
-            .await;
+        let _ = Request::post("/api/v1/logout").send().await;
         Ok(())
     }
 }

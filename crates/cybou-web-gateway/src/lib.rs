@@ -377,7 +377,13 @@ pub fn router_recording_disclosures(
         .format(&Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into());
 
-    let sandbox_path = std::env::temp_dir().join(format!("cybou_sandbox_{}", std::process::id()));
+    let default_jail = if std::path::Path::new("/home/demo").exists() {
+        std::path::PathBuf::from("/home/demo")
+    } else {
+        std::env::temp_dir().join(format!("cybou_sandbox_{}", std::process::id()))
+    };
+    let sandbox_path =
+        std::env::var("CYBOU_SHELL_JAIL").map_or(default_jail, std::path::PathBuf::from);
     let jail = cybou_jailfs::JailFs::new(&sandbox_path).expect("initialize gateway sandbox jail");
     let shell = Arc::new(tokio::sync::Mutex::new(cybou_shelld::ShellEngine::new(
         jail,

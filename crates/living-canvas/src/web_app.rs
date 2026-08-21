@@ -218,32 +218,11 @@ fn IconFile(#[prop(default = 14)] size: u32) -> impl IntoView {
 }
 
 #[component]
-fn IconGlobe(#[prop(default = 14)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
-            <path d="M2 12h20"></path>
-        </svg>
-    }
-}
-
-#[component]
 fn IconArrowLeft(#[prop(default = 13)] size: u32) -> impl IntoView {
     view! {
         <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m12 19-7-7 7-7"></path>
             <path d="M19 12H5"></path>
-        </svg>
-    }
-}
-
-#[component]
-fn IconArrowRight(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 12h14"></path>
-            <path d="m12 5 7 7-7 7"></path>
         </svg>
     }
 }
@@ -282,65 +261,6 @@ fn IconZoomOut(#[prop(default = 13)] size: u32) -> impl IntoView {
 }
 
 #[component]
-fn IconPlus(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-    }
-}
-
-#[component]
-fn IconTrash(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-    }
-}
-
-#[component]
-fn IconSave(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-        </svg>
-    }
-}
-
-#[component]
-fn IconEdit(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-        </svg>
-    }
-}
-
-#[component]
-fn IconCopy(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-    }
-}
-
-#[component]
-fn IconCheck(#[prop(default = 13)] size: u32) -> impl IntoView {
-    view! {
-        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-    }
-}
-
-#[component]
 fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
@@ -366,8 +286,8 @@ fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView 
             <button
                 class:active=is_maximized
                 class="card-control-btn maximize-btn"
-                title=move || if is_maximized() { "Restore window size" } else { "Maximize window" }
-                aria-label=move || if is_maximized() { "Restore window size" } else { "Maximize window" }
+                title=move || if is_maximized() { "Leave focus" } else { "Focus window" }
+                aria-label=move || if is_maximized() { "Leave focus" } else { "Focus window" }
                 on:click=move |_| {
                     layout.update(|current| {
                         let p = current.presentation(card);
@@ -470,7 +390,12 @@ fn DeckResizeHandle(
 ) -> impl IntoView {
     let d_id = deck_id.clone();
     let d_id_res = deck_id;
-    let is_collapsed = move || layout.get().deck(&d_id).is_some_and(|d| d.presentation.collapsed);
+    let is_collapsed = move || {
+        layout
+            .get()
+            .deck(&d_id)
+            .is_some_and(|d| d.presentation.collapsed)
+    };
     view! {
         <Show when=move || !is_collapsed()>
             {
@@ -491,12 +416,7 @@ fn DeckResizeHandle(
     }
 }
 
-const SHELL_AUTOCOMPLETE: &[&str] = &[
-    "help", "clear", "status", "capabilities", "mind", "identity", "journal",
-    "lifecycle", "commitments", "self", "attention", "beliefs", "perception",
-    "context", "ls", "cat", "echo", "pwd", "cd", "ps", "uptime", "whoami",
-    "date", "version",
-];
+const SHELL_AUTOCOMPLETE: &[&str] = &["help", "pwd", "ls", "cd", "cat", "clear"];
 
 #[component]
 fn ShellCard(
@@ -505,13 +425,21 @@ fn ShellCard(
     set_selected: WriteSignal<&'static str>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
+    auth_modal_open: RwSignal<bool>,
+    runtime: RwSignal<RuntimeState>,
 ) -> impl IntoView {
     let card_id = CardId::Shell(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let card_open =
+        move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
     let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+    let is_public_preview = move || match runtime.get() {
+        RuntimeState::Ready { mode, .. } => mode == cybou_web_contracts::SessionMode::PublicPreview,
+        _ => false,
+    };
+
     let (history, set_history) = signal(vec![(
         String::new(),
-        "CYBOU Shell (Zone 3 bounded Body capabilities)\nType 'help' for available capabilities.\n"
+        "CYBOU Bounded Body Shell (ADR-0040 DemoReadOnly)\nType 'help' for available capabilities.\n"
             .to_string(),
         0,
     )]);
@@ -577,13 +505,6 @@ fn ShellCard(
         });
     };
 
-    let (active_tab, set_active_tab) = signal(0usize);
-
-    let run_snippet = move |snippet: &'static str| {
-        set_input_val.set(snippet.to_string());
-        submit_command();
-    };
-
     view! {
         <Show when=card_open>
             <div
@@ -609,18 +530,7 @@ fn ShellCard(
                     class="object-header card-header"
                     on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
                 >
-                    <small class="panel-kicker"><IconTerminal size=14 /><span>"Shell · Zone 3 Body"</span></small>
-                    <div class="shell-tabs-bar" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                        <button class="shell-tab" class:active=move || active_tab.get() == 0 on:click=move |_| set_active_tab.set(0)>"Host #1"</button>
-                        <button class="shell-tab" class:active=move || active_tab.get() == 1 on:click=move |_| {
-                            set_active_tab.set(1);
-                            run_snippet("busctl --user list | grep cybou");
-                        }>"Mind IPC"</button>
-                        <button class="shell-tab" class:active=move || active_tab.get() == 2 on:click=move |_| {
-                            set_active_tab.set(2);
-                            run_snippet("journalctl --user -u cybou-* -n 12 --no-pager");
-                        }>"Logs"</button>
-                    </div>
+                    <small class="panel-kicker"><IconTerminal size=14 /><span>"CYBOU Shell · Zone 3 Body"</span></small>
                     <CardControls card=card_id layout=layout />
                 </header>
                 <Show
@@ -635,110 +545,115 @@ fn ShellCard(
                         }
                     }
                 >
-                    <div
-                        class="shell-body"
-                        on:pointerdown=move |e: PointerEvent| e.stop_propagation()
-                        on:click=move |_| {
-                            if let Some(inp) = input_ref.get() {
-                                let _ = inp.focus();
-                            }
+                    <Show
+                        when=move || !is_public_preview()
+                        fallback=move || view! {
+                            <div class="card-auth-gate">
+                                <IconShield size=26 />
+                                <strong>"CYBOU Shell Locked"</strong>
+                                <p>"Public preview does not permit Body capabilities execution. Sign in with Linux PAM credentials to unlock."</p>
+                                <button class="primary-btn" on:click=move |_| auth_modal_open.set(true)>"Sign in"</button>
+                            </div>
                         }
                     >
-                        <div class="shell-snippets-bar">
-                            <span class="snippets-label">"Quick:"</span>
-                            <button class="shell-chip" on:click=move |_| run_snippet("ps aux | grep cybou")>"ps aux"</button>
-                            <button class="shell-chip" on:click=move |_| run_snippet("df -h /home/demo")>"df -h"</button>
-                            <button class="shell-chip" on:click=move |_| run_snippet("busctl --user list")>"busctl"</button>
-                            <button class="shell-chip" on:click=move |_| run_snippet("whoami && id")>"whoami"</button>
-                        </div>
-                        <div class="shell-output" node_ref=output_ref>
-                            <For
-                                each=move || history.get()
-                                key=|(cmd, out, code)| format!("{cmd}-{out}-{code}")
-                                children=move |(cmd, out, code)| {
-                                    view! {
-                                        <div class="shell-entry">
-                                            {if !cmd.is_empty() {
-                                                view! { <div class="shell-cmd-echo"><span class="shell-prompt-char">"$"</span>" "{cmd}</div> }.into_any()
-                                            } else {
-                                                ().into_any()
-                                            }}
-                                            <pre class="shell-out-text" class:error=move || code != 0>{out}</pre>
-                                        </div>
+                        <div
+                            class="shell-body"
+                            on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                            on:click=move |_| {
+                                if let Some(inp) = input_ref.get() {
+                                    let _ = inp.focus();
+                                }
+                            }
+                        >
+                            <div class="shell-output" node_ref=output_ref>
+                                <For
+                                    each=move || history.get()
+                                    key=|(cmd, out, code)| format!("{cmd}-{out}-{code}")
+                                    children=move |(cmd, out, code)| {
+                                        view! {
+                                            <div class="shell-entry">
+                                                {if !cmd.is_empty() {
+                                                    view! { <div class="shell-cmd-echo"><span class="shell-prompt-char">"›"</span>" "{cmd}</div> }.into_any()
+                                                } else {
+                                                    ().into_any()
+                                                }}
+                                                <pre class="shell-out-text" class:error=move || code != 0>{out}</pre>
+                                            </div>
+                                        }
                                     }
-                                }
-                            />
-                        </div>
-                        <div class="shell-input-line" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                            <span class="shell-prompt">{move || format!("cybou:{} $", cwd.get())}</span>
-                            <input
-                                node_ref=input_ref
-                                type="text"
-                                class="shell-input"
-                                placeholder=move || if running.get() { "running…" } else { "type a command ('help')…" }
-                                disabled=move || running.get()
-                                prop:value=move || input_val.get()
-                                on:pointerdown=move |e: PointerEvent| e.stop_propagation()
-                                on:input=move |e| {
-                                    set_input_val.set(event_target_value(&e));
-                                    set_history_idx.set(None);
-                                }
-                                on:keydown=move |e: KeyboardEvent| {
-                                    let key = e.key();
-                                    if key == "Enter" {
-                                        e.prevent_default();
-                                        submit_command();
-                                    } else if key == "ArrowUp" {
-                                        e.prevent_default();
-                                        let cmds = cmd_history.get();
-                                        if cmds.is_empty() {
-                                            return;
-                                        }
-                                        let current_idx = history_idx.get();
-                                        let next_idx = match current_idx {
-                                            None => {
-                                                set_temp_draft.set(input_val.get());
-                                                cmds.len().saturating_sub(1)
+                                />
+                            </div>
+                            <div class="shell-input-line" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                                <span class="shell-prompt">{move || format!("cybou:{} ›", cwd.get())}</span>
+                                <input
+                                    node_ref=input_ref
+                                    type="text"
+                                    class="shell-input"
+                                    placeholder=move || if running.get() { "running…" } else { "type a command ('help')…" }
+                                    disabled=move || running.get()
+                                    prop:value=move || input_val.get()
+                                    on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                                    on:input=move |e| {
+                                        set_input_val.set(event_target_value(&e));
+                                        set_history_idx.set(None);
+                                    }
+                                    on:keydown=move |e: KeyboardEvent| {
+                                        let key = e.key();
+                                        if key == "Enter" {
+                                            e.prevent_default();
+                                            submit_command();
+                                        } else if key == "ArrowUp" {
+                                            e.prevent_default();
+                                            let cmds = cmd_history.get();
+                                            if cmds.is_empty() {
+                                                return;
                                             }
-                                            Some(idx) => idx.saturating_sub(1),
-                                        };
-                                        set_history_idx.set(Some(next_idx));
-                                        if let Some(cmd) = cmds.get(next_idx) {
-                                            set_input_val.set(cmd.clone());
-                                        }
-                                    } else if key == "ArrowDown" {
-                                        e.prevent_default();
-                                        let cmds = cmd_history.get();
-                                        if let Some(idx) = history_idx.get() {
-                                            if idx + 1 < cmds.len() {
-                                                let next_idx = idx + 1;
-                                                set_history_idx.set(Some(next_idx));
-                                                if let Some(cmd) = cmds.get(next_idx) {
-                                                    set_input_val.set(cmd.clone());
+                                            let current_idx = history_idx.get();
+                                            let next_idx = match current_idx {
+                                                None => {
+                                                    set_temp_draft.set(input_val.get());
+                                                    cmds.len().saturating_sub(1)
                                                 }
-                                            } else {
-                                                set_history_idx.set(None);
-                                                set_input_val.set(temp_draft.get());
+                                                Some(idx) => idx.saturating_sub(1),
+                                            };
+                                            set_history_idx.set(Some(next_idx));
+                                            if let Some(cmd) = cmds.get(next_idx) {
+                                                set_input_val.set(cmd.clone());
                                             }
-                                        }
-                                    } else if key == "Tab" {
-                                        e.prevent_default();
-                                        let current = input_val.get();
-                                        let trimmed = current.trim();
-                                        if !trimmed.is_empty() && !trimmed.contains(' ') {
-                                            let matches: Vec<&&str> = SHELL_AUTOCOMPLETE
-                                                .iter()
-                                                .filter(|c| c.starts_with(trimmed))
-                                                .collect();
-                                            if matches.len() == 1 {
-                                                set_input_val.set(format!("{} ", matches[0]));
+                                        } else if key == "ArrowDown" {
+                                            e.prevent_default();
+                                            let cmds = cmd_history.get();
+                                            if let Some(idx) = history_idx.get() {
+                                                if idx + 1 < cmds.len() {
+                                                    let next_idx = idx + 1;
+                                                    set_history_idx.set(Some(next_idx));
+                                                    if let Some(cmd) = cmds.get(next_idx) {
+                                                        set_input_val.set(cmd.clone());
+                                                    }
+                                                } else {
+                                                    set_history_idx.set(None);
+                                                    set_input_val.set(temp_draft.get());
+                                                }
+                                            }
+                                        } else if key == "Tab" {
+                                            e.prevent_default();
+                                            let current = input_val.get();
+                                            let trimmed = current.trim();
+                                            if !trimmed.is_empty() && !trimmed.contains(' ') {
+                                                let matches: Vec<&&str> = SHELL_AUTOCOMPLETE
+                                                    .iter()
+                                                    .filter(|c| c.starts_with(trimmed))
+                                                    .collect();
+                                                if matches.len() == 1 {
+                                                    set_input_val.set(format!("{} ", matches[0]));
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            />
+                                />
+                            </div>
                         </div>
-                    </div>
+                    </Show>
                 </Show>
                 <CardResizeHandle card=card_id layout=layout resizing=resizing />
             </div>
@@ -753,90 +668,103 @@ fn FileManagerCard(
     set_selected: WriteSignal<&'static str>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
+    auth_modal_open: RwSignal<bool>,
+    runtime: RwSignal<RuntimeState>,
 ) -> impl IntoView {
     let card_id = CardId::FileManager(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let card_open =
+        move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
     let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+    let is_public_preview = move || match runtime.get() {
+        RuntimeState::Ready { mode, .. } => mode == cybou_web_contracts::SessionMode::PublicPreview,
+        _ => false,
+    };
 
-    let (current_path, set_current_path) = signal("/home/demo".to_string());
-    let (entries, set_entries) = signal(Vec::<(String, bool, String)>::new());
+    let (current_path, set_current_path) = signal("/".to_string());
+    let (entries, set_entries) = signal(Vec::<(String, bool, u64)>::new());
     let (selected_file, set_selected_file) = signal(Option::<String>::None);
     let (file_content, set_file_content) = signal(String::new());
-    let (is_editing, set_is_editing) = signal(false);
-    let (edit_content, set_edit_content) = signal(String::new());
     let (loading, set_loading) = signal(false);
-    let (saving, set_saving) = signal(false);
     let (error_msg, set_error_msg) = signal(Option::<String>::None);
-    let (prompt_mode, set_prompt_mode) = signal(Option::<&'static str>::None);
-    let (prompt_val, set_prompt_val) = signal(String::new());
 
     let load_dir = move |path: String| {
         set_loading.set(true);
         set_error_msg.set(None);
         set_selected_file.set(None);
-        set_file_content.set(String::new());
-        set_is_editing.set(false);
-        let p = path.clone();
+        let target_p = path.clone();
+        set_current_path.set(path);
         spawn_local(async move {
             let client = GatewayMindClient;
-            let cmd = format!("ls -la {p}");
+            let cmd = if target_p == "/" || target_p.is_empty() {
+                "ls -la".to_string()
+            } else {
+                format!("ls -la {target_p}")
+            };
             match client.execute_shell(&cmd).await {
                 Ok(resp) => {
                     set_loading.set(false);
                     if resp.exit_code == 0 {
-                        set_current_path.set(p);
                         let mut list = Vec::new();
-                        for line in resp.stdout.lines().skip(1) {
-                            let parts: Vec<&str> = line.split_whitespace().collect();
+                        for line in resp.stdout.lines() {
+                            let trimmed = line.trim();
+                            if trimmed.is_empty() || trimmed.starts_with("total") {
+                                continue;
+                            }
+                            let parts: Vec<&str> = trimmed.split_whitespace().collect();
                             if parts.len() >= 9 {
                                 let is_dir = parts[0].starts_with('d');
-                                let size = parts[4].to_string();
+                                let size: u64 = parts[4].parse().unwrap_or(0);
                                 let name = parts[8..].join(" ");
                                 if name != "." && name != ".." {
                                     list.push((name, is_dir, size));
                                 }
+                            } else if parts.len() == 1 {
+                                let is_dir = parts[0].ends_with('/');
+                                let name = parts[0].trim_end_matches('/').to_string();
+                                if name != "." && name != ".." {
+                                    list.push((name, is_dir, 0));
+                                }
                             }
                         }
+                        list.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
                         set_entries.set(list);
                     } else {
                         set_error_msg.set(Some(if !resp.stderr.is_empty() {
                             resp.stderr
                         } else {
-                            "Failed to list directory".to_string()
+                            "Directory read error".to_string()
                         }));
                     }
                 }
                 Err(err) => {
                     set_loading.set(false);
-                    set_error_msg.set(Some(err.to_string()));
+                    set_error_msg.set(Some(format!("Network error: {err}")));
                 }
             }
         });
     };
 
-    let p_initial = current_path.get_untracked();
-    Effect::new(move |_| {
-        if card_open() {
-            load_dir(p_initial.clone());
-        }
-    });
-
-    let view_file = move |filename: String| {
-        let p = format!("{}/{}", current_path.get(), filename);
+    let view_file = move |name: String| {
+        set_selected_file.set(Some(name.clone()));
         set_loading.set(true);
-        set_selected_file.set(Some(filename));
-        set_is_editing.set(false);
+        let p = if current_path.get() == "/" {
+            format!("/{name}")
+        } else {
+            format!("{}/{name}", current_path.get())
+        };
         spawn_local(async move {
             let client = GatewayMindClient;
-            let cmd = format!("cat {p}");
-            match client.execute_shell(&cmd).await {
+            match client.execute_shell(&format!("cat {p}")).await {
                 Ok(resp) => {
                     set_loading.set(false);
                     if resp.exit_code == 0 {
-                        set_file_content.set(resp.stdout.clone());
-                        set_edit_content.set(resp.stdout);
+                        set_file_content.set(resp.stdout);
                     } else {
-                        set_file_content.set(format!("Error reading file: {}", resp.stderr));
+                        set_file_content.set(if !resp.stderr.is_empty() {
+                            resp.stderr
+                        } else {
+                            "Could not read file".to_string()
+                        });
                     }
                 }
                 Err(err) => {
@@ -847,53 +775,15 @@ fn FileManagerCard(
         });
     };
 
-    let save_file = move || {
-        if let Some(file_name) = selected_file.get() {
-            let p = format!("{}/{}", current_path.get(), file_name);
-            let content = edit_content.get();
-            set_saving.set(true);
-            spawn_local(async move {
-                let client = GatewayMindClient;
-                let b64 = js_sys::encode_uri_component(&content).as_string().unwrap_or_default();
-                let cmd = format!("node -e 'fs.writeFileSync(process.argv[1], decodeURIComponent(process.argv[2]))' {p} \"{b64}\" 2>/dev/null || python3 -c 'import sys, urllib.parse; open(sys.argv[1], \"w\").write(urllib.parse.unquote(sys.argv[2]))' {p} \"{b64}\"");
-                let _ = client.execute_shell(&cmd).await;
-                set_file_content.set(content);
-                set_saving.set(false);
-                set_is_editing.set(false);
-            });
-        }
-    };
-
-    let execute_prompt_action = move || {
-        let mode = prompt_mode.get();
-        let val = prompt_val.get().trim().to_string();
-        let cur = current_path.get();
-        if let Some(m) = mode {
-            if !val.is_empty() {
-                spawn_local(async move {
-                    let client = GatewayMindClient;
-                    let cmd = match m {
-                        "new_file" => format!("touch {}/{}", cur, val),
-                        "new_dir" => format!("mkdir -p {}/{}", cur, val),
-                        "delete" => format!("rm -rf {}/{}", cur, val),
-                        _ => String::new(),
-                    };
-                    if !cmd.is_empty() {
-                        let _ = client.execute_shell(&cmd).await;
-                        load_dir(cur);
-                    }
-                });
-            }
-        }
-        set_prompt_mode.set(None);
-        set_prompt_val.set(String::new());
-    };
-
     let go_up = move || {
         let cur = current_path.get();
-        if cur != "/home/demo" && cur != "/" {
+        if cur != "/" && !cur.is_empty() {
             if let Some(pos) = cur.rfind('/') {
-                let parent = if pos == 0 { "/".to_string() } else { cur[..pos].to_string() };
+                let parent = if pos == 0 {
+                    "/".to_string()
+                } else {
+                    cur[..pos].to_string()
+                };
                 load_dir(parent);
             }
         }
@@ -924,382 +814,111 @@ fn FileManagerCard(
                     <span class="card-title-group">
                         <IconFolder size=13 />
                         <strong class="card-title">"File Manager"</strong>
-                        <small class="card-badge">"Zone 3 Bounded"</small>
+                        <small class="card-badge">"Zone 3 Read-Only"</small>
                     </span>
                     <CardControls card=card_id layout=layout />
                 </header>
 
                 <Show when=move || !is_collapsed()>
-                    <div class="fm-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                        <div class="fm-path-bar">
-                            <div class="fm-crumbs">
-                                <span>{move || current_path.get()}</span>
+                    <Show
+                        when=move || !is_public_preview()
+                        fallback=move || view! {
+                            <div class="card-auth-gate">
+                                <IconShield size=26 />
+                                <strong>"File Manager Locked"</strong>
+                                <p>"Public preview does not permit sandboxed storage browsing. Sign in with Linux PAM credentials to unlock."</p>
+                                <button class="primary-btn" on:click=move |_| auth_modal_open.set(true)>"Sign in"</button>
                             </div>
-                            <div class="fm-toolbar">
-                                <button class="fm-btn" title="Go to home" on:click=move |_| load_dir("/home/demo".to_string())>
-                                    <IconHome size=12 />
-                                    <span>"Home"</span>
-                                </button>
-                                <button class="fm-btn" title="Up one level" on:click=move |_| go_up()>
-                                    <IconArrowLeft size=12 />
-                                    <span>"Up"</span>
-                                </button>
-                                <button class="fm-btn" title="New file" on:click=move |_| {
-                                    set_prompt_mode.set(Some("new_file"));
-                                    set_prompt_val.set("new_file.txt".into());
-                                }>
-                                    <IconPlus size=12 />
-                                    <span>"New File"</span>
-                                </button>
-                                <button class="fm-btn" title="New folder" on:click=move |_| {
-                                    set_prompt_mode.set(Some("new_dir"));
-                                    set_prompt_val.set("new_folder".into());
-                                }>
-                                    <IconFolder size=12 />
-                                    <span>"Folder"</span>
-                                </button>
-                                <button class="fm-btn" title="Refresh folder" on:click=move |_| load_dir(current_path.get())>
-                                    <IconRefresh size=12 />
-                                </button>
-                            </div>
-                        </div>
-
-                        <Show when=move || prompt_mode.get().is_some()>
-                            <div class="fm-prompt-bar">
-                                <span class="fm-prompt-title">
-                                    {move || match prompt_mode.get() {
-                                        Some("new_file") => "Create New File:",
-                                        Some("new_dir") => "Create New Folder:",
-                                        Some("delete") => "Confirm Deletion:",
-                                        _ => "",
-                                    }}
-                                </span>
-                                <input
-                                    type="text"
-                                    class="fm-prompt-input"
-                                    prop:value=prompt_val
-                                    on:input=move |e| set_prompt_val.set(event_target_value(&e))
-                                    on:keydown=move |e: KeyboardEvent| {
-                                        if e.key() == "Enter" {
-                                            execute_prompt_action();
-                                        }
-                                    }
-                                />
-                                <button class="fm-btn" on:click=move |_| execute_prompt_action()>"Confirm"</button>
-                                <button class="fm-btn" on:click=move |_| set_prompt_mode.set(None)>"Cancel"</button>
-                            </div>
-                        </Show>
-
-                        <Show when=move || error_msg.get().is_some()>
-                            <div class="auth-error">
-                                {move || error_msg.get().unwrap_or_default()}
-                            </div>
-                        </Show>
-
-                        <div class="fm-content">
-                            <div class="fm-grid">
-                                <Show when=move || loading.get()>
-                                    <div class="fm-empty">"Loading directory…"</div>
-                                </Show>
-                                <Show when=move || !loading.get() && entries.get().is_empty() && error_msg.get().is_none()>
-                                    <div class="fm-empty">"Empty directory"</div>
-                                </Show>
-                                <For
-                                    each=move || entries.get()
-                                    key=|(name, is_dir, _)| format!("{name}-{is_dir}")
-                                    children=move |(name, is_dir, size)| {
-                                        let n = name.clone();
-                                        let n_click = name.clone();
-                                        let p = current_path.get();
-                                        view! {
-                                            <div
-                                                class="fm-item"
-                                                class:is-dir=is_dir
-                                                class:is-file=!is_dir
-                                                on:click=move |_| {
-                                                    if is_dir {
-                                                        let new_p = format!("{}/{}", p, n_click);
-                                                        load_dir(new_p);
-                                                    } else {
-                                                        view_file(n_click.clone());
-                                                    }
-                                                }
-                                            >
-                                                {if is_dir {
-                                                    view! { <IconFolder size=24 /> }.into_any()
-                                                } else {
-                                                    view! { <IconFile size=24 /> }.into_any()
-                                                }}
-                                                <span class="fm-item-name">{n}</span>
-                                                <span class="fm-item-size">{if is_dir { "dir".to_string() } else { format!("{size} B") }}</span>
-                                            </div>
-                                        }
-                                    }
-                                />
-                            </div>
-
-                            <Show when=move || selected_file.get().is_some()>
-                                <aside class="fm-preview">
-                                    <header class="fm-preview-header">
-                                        <span><IconFile size=12 /> " " {move || selected_file.get().unwrap_or_default()}</span>
-                                        <div class="fm-preview-actions">
-                                            <Show when=move || !is_editing.get()>
-                                                <button class="fm-btn" title="Edit file" on:click=move |_| set_is_editing.set(true)>
-                                                    <IconEdit size=11 />
-                                                    <span>"Edit"</span>
-                                                </button>
-                                            </Show>
-                                            <Show when=move || is_editing.get()>
-                                                <button class="fm-btn btn-save" disabled=move || saving.get() on:click=move |_| save_file()>
-                                                    <IconSave size=11 />
-                                                    <span>{move || if saving.get() { "Saving…" } else { "Save" }}</span>
-                                                </button>
-                                                <button class="fm-btn" on:click=move |_| set_is_editing.set(false)>"Cancel"</button>
-                                            </Show>
-                                            <button
-                                                class="fm-btn btn-delete"
-                                                title="Delete file"
-                                                on:click=move |_| {
-                                                    if let Some(f) = selected_file.get() {
-                                                        set_prompt_mode.set(Some("delete"));
-                                                        set_prompt_val.set(f);
-                                                    }
-                                                }
-                                            >
-                                                <IconTrash size=11 />
-                                            </button>
-                                            <button class="fm-btn" on:click=move |_| set_selected_file.set(None)>"×"</button>
-                                        </div>
-                                    </header>
-                                    <Show
-                                        when=move || is_editing.get()
-                                        fallback=move || view! { <pre class="fm-preview-text">{move || file_content.get()}</pre> }
-                                    >
-                                        <textarea
-                                            class="fm-editor-textarea"
-                                            prop:value=edit_content
-                                            on:input=move |e| set_edit_content.set(event_target_value(&e))
-                                        ></textarea>
-                                    </Show>
-                                </aside>
-                            </Show>
-                        </div>
-                    </div>
-                </Show>
-                <CardResizeHandle card=card_id layout=layout resizing=resizing />
-            </div>
-        </Show>
-    }
-}
-
-#[component]
-fn WebBrowserCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-) -> impl IntoView {
-    let card_id = CardId::WebBrowser(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
-    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
-
-    let (url, set_url) = signal("/api/v1/session".to_string());
-    let (input_url, set_input_url) = signal("/api/v1/session".to_string());
-    let (history, set_history) = signal(vec!["/api/v1/session".to_string()]);
-    let (hist_idx, set_hist_idx) = signal(0usize);
-
-    let (reader_mode, set_reader_mode) = signal(false);
-    let (reader_text, set_reader_text) = signal(String::new());
-    let (loading, set_loading) = signal(false);
-
-    let load_reader_content = move |target: String| {
-        if !reader_mode.get() {
-            return;
-        }
-        set_loading.set(true);
-        spawn_local(async move {
-            if let Ok(resp) = gloo_net::http::Request::get(&target).send().await {
-                if let Ok(txt) = resp.text().await {
-                    // Pretty format if JSON
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&txt) {
-                        set_reader_text.set(serde_json::to_string_pretty(&val).unwrap_or(txt));
-                    } else {
-                        set_reader_text.set(txt);
-                    }
-                } else {
-                    set_reader_text.set("Failed to read response body".into());
-                }
-            } else {
-                set_reader_text.set(format!("Could not fetch {target} for Reader Mode."));
-            }
-            set_loading.set(false);
-        });
-    };
-
-    let navigate = move |target: String| {
-        let clean = target.trim().to_string();
-        if !clean.is_empty() {
-            set_url.set(clean.clone());
-            set_input_url.set(clean.clone());
-            set_history.update(|h| {
-                h.push(clean.clone());
-                set_hist_idx.set(h.len() - 1);
-            });
-            load_reader_content(clean);
-        }
-    };
-
-    let go_back = move || {
-        let idx = hist_idx.get();
-        if idx > 0 {
-            let next_idx = idx - 1;
-            set_hist_idx.set(next_idx);
-            let h = history.get();
-            if let Some(prev) = h.get(next_idx) {
-                set_url.set(prev.clone());
-                set_input_url.set(prev.clone());
-                load_reader_content(prev.clone());
-            }
-        }
-    };
-
-    let go_forward = move || {
-        let idx = hist_idx.get();
-        let h = history.get();
-        if idx + 1 < h.len() {
-            let next_idx = idx + 1;
-            set_hist_idx.set(next_idx);
-            if let Some(next) = h.get(next_idx) {
-                set_url.set(next.clone());
-                set_input_url.set(next.clone());
-                load_reader_content(next.clone());
-            }
-        }
-    };
-
-    view! {
-        <Show when=card_open>
-            <div
-                class:selected=move || selected.get() == "browser"
-                class:collapsed=is_collapsed
-                class:pinned=move || layout.get().presentation(card_id).pinned
-                class="object web-browser-card"
-                style=move || card_style(layout.get(), card_id)
-                tabindex="0"
-                role="region"
-                aria-label="Bounded Web Browser"
-                on:click=move |_| {
-                    set_selected.set("browser");
-                    layout.update(|current| current.bring_forward(card_id));
-                }
-            >
-                <header
-                    class="object-header"
-                    on:pointerdown=move |event: PointerEvent| {
-                        start_drag(event, card_id, layout, dragging);
-                    }
-                >
-                    <span class="card-title-group">
-                        <IconGlobe size=13 />
-                        <strong class="card-title">"Web Browser"</strong>
-                        <small class="card-badge">"Sandboxed"</small>
-                    </span>
-                    <CardControls card=card_id layout=layout />
-                </header>
-
-                <Show when=move || !is_collapsed()>
-                    <div class="wb-body">
-                        <div class="wb-nav-bar">
-                            <button class="wb-btn" title="Back" on:click=move |_| go_back()>
-                                <IconArrowLeft size=13 />
-                            </button>
-                            <button class="wb-btn" title="Forward" on:click=move |_| go_forward()>
-                                <IconArrowRight size=13 />
-                            </button>
-                            <button class="wb-btn" title="Reload" on:click=move |_| {
-                                let cur = url.get();
-                                navigate(cur);
-                            }>
-                                <IconRefresh size=13 />
-                            </button>
-                            <button class="wb-btn" title="Home" on:click=move |_| navigate("/api/v1/session".to_string())>
-                                <IconHome size=13 />
-                            </button>
-
-                            <form class="wb-url-form" on:submit=move |e: web_sys::SubmitEvent| {
-                                e.prevent_default();
-                                navigate(input_url.get());
-                            }>
-                                <input
-                                    type="text"
-                                    class="wb-url-input"
-                                    placeholder="Enter URL or endpoint (e.g. /api/v1/snapshot)…"
-                                    prop:value=input_url
-                                    on:input=move |e| set_input_url.set(event_target_value(&e))
-                                />
-                            </form>
-
-                            <button
-                                class="wb-btn wb-reader-toggle"
-                                class:active=move || reader_mode.get()
-                                title="Toggle Formatted Reader Mode"
-                                on:click=move |_| {
-                                    let next = !reader_mode.get_untracked();
-                                    set_reader_mode.set(next);
-                                    if next {
-                                        load_reader_content(url.get_untracked());
-                                    }
-                                }
-                            >
-                                <IconFile size=13 />
-                                <span>{move || if reader_mode.get() { "Frame" } else { "Reader" }}</span>
-                            </button>
-                        </div>
-
-                        <div class="wb-bookmarks">
-                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/session".to_string())>
-                                <IconGlobe size=10 /><span>"Session"</span>
-                            </button>
-                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/snapshot".to_string())>
-                                <IconGlobe size=10 /><span>"Snapshot"</span>
-                            </button>
-                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/capabilities".to_string())>
-                                <IconGlobe size=10 /><span>"Capabilities"</span>
-                            </button>
-                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/mind".to_string())>
-                                <IconGlobe size=10 /><span>"Mind State"</span>
-                            </button>
-                            <button class="wb-bookmark" on:click=move |_| navigate("https://www.debian.org".to_string())>
-                                <IconExternalLink size=10 /><span>"Debian"</span>
-                            </button>
-                            <button class="wb-bookmark" on:click=move |_| navigate("https://www.rust-lang.org".to_string())>
-                                <IconExternalLink size=10 /><span>"Rust"</span>
-                            </button>
-                        </div>
-
-                        <Show
-                            when=move || reader_mode.get()
-                            fallback=move || view! {
-                                <div class="wb-frame-container">
-                                    <iframe
-                                        class="wb-frame"
-                                        src=move || url.get()
-                                        sandbox="allow-scripts allow-same-origin allow-forms"
-                                        title="Web browser frame"
-                                    ></iframe>
+                        }
+                    >
+                        <div class="fm-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                            <div class="fm-path-bar">
+                                <div class="fm-crumbs">
+                                    <span>{move || current_path.get()}</span>
                                 </div>
-                            }
-                        >
-                            <div class="wb-reader-container">
-                                <header class="wb-reader-header">
-                                    <span><b>"Reader View:"</b> <code>{move || url.get()}</code></span>
-                                    <small>{move || if loading.get() { "Loading content…" } else { "Structured payload" }}</small>
-                                </header>
-                                <pre class="wb-reader-content">{move || reader_text.get()}</pre>
+                                <div class="fm-toolbar">
+                                    <button class="fm-btn" title="Root" on:click=move |_| load_dir("/".to_string())>
+                                        <IconHome size=12 />
+                                        <span>"Root"</span>
+                                    </button>
+                                    <button class="fm-btn" title="Up one level" on:click=move |_| go_up()>
+                                        <IconArrowLeft size=12 />
+                                        <span>"Up"</span>
+                                    </button>
+                                    <button class="fm-btn" title="Refresh folder" on:click=move |_| load_dir(current_path.get())>
+                                        <IconRefresh size=12 />
+                                        <span>"Refresh"</span>
+                                    </button>
+                                </div>
                             </div>
-                        </Show>
-                    </div>
+
+                            <Show when=move || error_msg.get().is_some()>
+                                <div class="auth-error">
+                                    {move || error_msg.get().unwrap_or_default()}
+                                </div>
+                            </Show>
+
+                            <div class="fm-content">
+                                <div class="fm-grid">
+                                    <Show when=move || loading.get()>
+                                        <div class="fm-empty">"Loading directory…"</div>
+                                    </Show>
+                                    <Show when=move || !loading.get() && entries.get().is_empty() && error_msg.get().is_none()>
+                                        <div class="fm-empty">"Empty directory"</div>
+                                    </Show>
+                                    <For
+                                        each=move || entries.get()
+                                        key=|(name, is_dir, _)| format!("{name}-{is_dir}")
+                                        children=move |(name, is_dir, size)| {
+                                            let n = name.clone();
+                                            let n_click = name.clone();
+                                            let p = current_path.get();
+                                            view! {
+                                                <div
+                                                    class="fm-item"
+                                                    class:is-dir=is_dir
+                                                    class:is-file=!is_dir
+                                                    on:click=move |_| {
+                                                        if is_dir {
+                                                            let new_p = if p == "/" {
+                                                                format!("/{}", n_click)
+                                                            } else {
+                                                                format!("{}/{}", p, n_click)
+                                                            };
+                                                            load_dir(new_p);
+                                                        } else {
+                                                            view_file(n_click.clone());
+                                                        }
+                                                    }
+                                                >
+                                                    {if is_dir {
+                                                        view! { <IconFolder size=24 /> }.into_any()
+                                                    } else {
+                                                        view! { <IconFile size=24 /> }.into_any()
+                                                    }}
+                                                    <span class="fm-item-name">{n}</span>
+                                                    <span class="fm-item-size">{if is_dir { "dir".to_string() } else { format!("{size} B") }}</span>
+                                                </div>
+                                            }
+                                        }
+                                    />
+                                </div>
+
+                                <Show when=move || selected_file.get().is_some()>
+                                    <aside class="fm-preview">
+                                        <header class="fm-preview-header">
+                                            <span><IconFile size=12 /> " " {move || selected_file.get().unwrap_or_default()}</span>
+                                            <div class="fm-preview-actions">
+                                                <small class="fm-readonly-pill">"Read-only"</small>
+                                                <button class="fm-btn" on:click=move |_| set_selected_file.set(None)>"×"</button>
+                                            </div>
+                                        </header>
+                                        <pre class="fm-preview-text">{move || file_content.get()}</pre>
+                                    </aside>
+                                </Show>
+                            </div>
+                        </div>
+                    </Show>
                 </Show>
                 <CardResizeHandle card=card_id layout=layout resizing=resizing />
             </div>
@@ -1329,44 +948,64 @@ fn JournalFeedCard(
     resizing: RwSignal<Option<ResizeState>>,
 ) -> impl IntoView {
     let card_id = CardId::JournalFeed(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let card_open =
+        move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
     let is_collapsed = move || layout.get().presentation(card_id).collapsed;
 
-    let (events, set_events) = signal(vec![
-        ("14:00:01".to_string(), "lifecycle.state".to_string(), "Awake · Mind operational".to_string(), "sha256:7f83b165...".to_string(), "{\"organ\":\"lifecycled\",\"state\":\"Awake\",\"epoch\":1,\"timestamp\":\"2026-08-21T14:00:01Z\"}".to_string()),
-        ("14:00:03".to_string(), "session.established".to_string(), "Local gateway session active".to_string(), "sha256:29e01a4b...".to_string(), "{\"organ\":\"cybou-web-gateway\",\"mode\":\"publicPreview\",\"trust\":\"established\"}".to_string()),
-        ("14:00:05".to_string(), "identity.digest".to_string(), "Self continuity verified (11 organs)".to_string(), "sha256:1a8f94c2...".to_string(), "{\"organ\":\"identityd\",\"subject\":\"sovereign\",\"continuity\":true}".to_string()),
-    ]);
+    let (events, set_events) = signal(Vec::<(String, String, String, String)>::new());
     let (filter, set_filter) = signal("all".to_string());
     let (search_query, set_search_query) = signal(String::new());
     let (is_paused, set_is_paused) = signal(false);
-    let (selected_event, set_selected_event) = signal(Option::<(String, String, String, String, String)>::None);
+    let (selected_event, set_selected_event) =
+        signal(Option::<(String, String, String, String)>::None);
     let (copied, set_copied) = signal(false);
 
+    let es_handle: StoredValue<Option<EventSource>> = StoredValue::new(None);
+
     Effect::new(move |_| {
-        if card_open() {
-            if let Ok(es) = EventSource::new("/api/v1/events") {
-                let on_snap = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
-                    if is_paused.get_untracked() {
-                        return;
-                    }
-                    if let Some(data) = event.data().as_string() {
-                        let now = js_sys::Date::new_0().to_locale_time_string("en-US");
-                        let hash = format!("sha256:{:x}...", data.len() * 31337);
-                        let payload = data.clone();
-                        set_events.update(|list| {
-                            list.push((now.into(), "snapshot.update".into(), "Mind state synchronized".into(), hash, payload));
-                            if list.len() > 100 {
-                                list.remove(0);
+        let is_open = card_open();
+        if is_open {
+            if es_handle.get_value().is_none() {
+                if let Ok(es) = EventSource::new("/api/v1/events") {
+                    let on_snap =
+                        Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
+                            if is_paused.get_untracked() {
+                                return;
+                            }
+                            if let Some(data) = event.data().as_string() {
+                                let now = js_sys::Date::new_0().to_locale_time_string("en-US");
+                                let payload = data.clone();
+                                set_events.update(|list| {
+                                    list.push((
+                                        now.into(),
+                                        "snapshot.update".into(),
+                                        "Mind state projection update".into(),
+                                        payload,
+                                    ));
+                                    if list.len() > 100 {
+                                        list.remove(0);
+                                    }
+                                });
                             }
                         });
-                    }
-                });
-                if es.add_event_listener_with_callback("snapshot", on_snap.as_ref().unchecked_ref()).is_ok() {
+                    let _ = es.add_event_listener_with_callback(
+                        "snapshot",
+                        on_snap.as_ref().unchecked_ref(),
+                    );
                     on_snap.forget();
-                    std::mem::forget(es);
+                    es_handle.set_value(Some(es));
                 }
             }
+        } else if let Some(es) = es_handle.get_value() {
+            es.close();
+            es_handle.set_value(None);
+        }
+    });
+
+    on_cleanup(move || {
+        if let Some(es) = es_handle.get_value() {
+            es.close();
+            es_handle.set_value(None);
         }
     });
 
@@ -1374,19 +1013,20 @@ fn JournalFeedCard(
         let f = filter.get();
         let q = search_query.get().to_lowercase();
         let list = events.get();
-        list.into_iter().filter(|(time, topic, desc, hash, payload)| {
-            let matches_filter = if f == "all" { true } else { topic.contains(&f) };
-            let matches_search = if q.is_empty() {
-                true
-            } else {
-                time.to_lowercase().contains(&q)
-                    || topic.to_lowercase().contains(&q)
-                    || desc.to_lowercase().contains(&q)
-                    || hash.to_lowercase().contains(&q)
-                    || payload.to_lowercase().contains(&q)
-            };
-            matches_filter && matches_search
-        }).collect::<Vec<_>>()
+        list.into_iter()
+            .filter(|(time, topic, desc, payload)| {
+                let matches_filter = if f == "all" { true } else { topic.contains(&f) };
+                let matches_search = if q.is_empty() {
+                    true
+                } else {
+                    time.to_lowercase().contains(&q)
+                        || topic.to_lowercase().contains(&q)
+                        || desc.to_lowercase().contains(&q)
+                        || payload.to_lowercase().contains(&q)
+                };
+                matches_filter && matches_search
+            })
+            .collect::<Vec<_>>()
     };
 
     let copy_json = move |payload: String| {
@@ -1406,7 +1046,7 @@ fn JournalFeedCard(
             <div
                 tabindex="0"
                 role="region"
-                aria-label="Journal Event Stream & Hash Integrity"
+                aria-label="Journal Event Stream"
                 class="object journal-feed-card"
                 class:selected=move || selected.get() == "journal-feed"
                 class:pinned=move || layout.get().presentation(card_id).pinned
@@ -1423,8 +1063,8 @@ fn JournalFeedCard(
                 >
                     <span class="card-title-group">
                         <IconFile size=13 />
-                        <strong class="card-title">"Event Stream & Integrity"</strong>
-                        <small class="card-badge success">"Chain Valid · Epoch 1"</small>
+                        <strong class="card-title">"Event Stream"</strong>
+                        <small class="card-badge">"Live SSE"</small>
                     </span>
                     <CardControls card=card_id layout=layout />
                 </header>
@@ -1434,8 +1074,6 @@ fn JournalFeedCard(
                         <div class="jf-toolbar">
                             <div class="jf-filter-group">
                                 <button class="jf-filter-btn" class:active=move || filter.get() == "all" on:click=move |_| set_filter.set("all".into())>"All"</button>
-                                <button class="jf-filter-btn" class:active=move || filter.get() == "lifecycle" on:click=move |_| set_filter.set("lifecycle".into())>"Lifecycle"</button>
-                                <button class="jf-filter-btn" class:active=move || filter.get() == "session" on:click=move |_| set_filter.set("session".into())>"Session"</button>
                                 <button class="jf-filter-btn" class:active=move || filter.get() == "snapshot" on:click=move |_| set_filter.set("snapshot".into())>"Snapshot"</button>
                             </div>
                             <input
@@ -1454,32 +1092,33 @@ fn JournalFeedCard(
                         </div>
 
                         <div class="jf-hash-banner">
-                            <span><b>"Merkle Root:"</b> <code>"sha256:7f83b165...e92f1b"</code></span>
-                            <span class="jf-integrity-pill">"✓ SHA-256 Digest Verified"</span>
+                            <span><b>"Integrity State:"</b> <code>"Live Event1 Projection"</code></span>
+                            <span class="jf-integrity-pill unverified">"Integrity details unavailable"</span>
                         </div>
 
                         <div class="jf-stream-list">
+                            <Show when=move || events.get().is_empty()>
+                                <div class="jf-empty">"Listening for live events from gateway…"</div>
+                            </Show>
                             <For
                                 each=filtered_events
-                                key=|(time, topic, _desc, hash, payload)| format!("{time}-{topic}-{hash}-{payload}")
-                                children=move |(time, topic, desc, hash, payload)| {
+                                key=|(time, topic, _desc, payload)| format!("{time}-{topic}-{payload}")
+                                children=move |(time, topic, desc, payload)| {
                                     let t = time.clone();
                                     let top = topic.clone();
                                     let d = desc.clone();
-                                    let h = hash.clone();
                                     let pl = payload.clone();
                                     view! {
                                         <div
                                             class="jf-event-row"
-                                            title="Click to inspect event JSON"
+                                            title="Click to inspect event payload"
                                             on:click=move |_| {
-                                                set_selected_event.set(Some((t.clone(), top.clone(), d.clone(), h.clone(), pl.clone())));
+                                                set_selected_event.set(Some((t.clone(), top.clone(), d.clone(), pl.clone())));
                                             }
                                         >
                                             <span class="jf-event-time">{time}</span>
                                             <span class="jf-event-topic">{topic}</span>
                                             <span class="jf-event-desc">{desc}</span>
-                                            <code class="jf-event-hash">{hash}</code>
                                         </div>
                                     }
                                 }
@@ -1487,29 +1126,40 @@ fn JournalFeedCard(
                         </div>
 
                         <Show when=move || selected_event.get().is_some()>
-                            <div class="jf-inspect-modal" on:click=move |_| set_selected_event.set(None)>
-                                <div class="jf-inspect-content" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
-                                    <header class="jf-inspect-header">
-                                        <div class="jf-inspect-title">
-                                            <strong>"Event Details: "{move || selected_event.get().unwrap().1}</strong>
-                                            <small>{move || selected_event.get().unwrap().0}</small>
-                                        </div>
-                                        <div class="jf-inspect-actions">
-                                            <button class="fm-btn" on:click=move |_| copy_json(selected_event.get().unwrap().4)>
-                                                {move || if copied.get() { "✓ Copied" } else { "Copy JSON" }}
-                                            </button>
-                                            <button class="fm-btn" on:click=move |_| set_selected_event.set(None)>"×"</button>
-                                        </div>
-                                    </header>
-                                    <div class="jf-inspect-body">
-                                        <div class="jf-inspect-meta">
-                                            <span><b>"Merkle Digest:"</b> <code>{move || selected_event.get().unwrap().3}</code></span>
-                                            <span><b>"Description:"</b> {move || selected_event.get().unwrap().2}</span>
-                                        </div>
-                                        <pre class="jf-inspect-json">{move || selected_event.get().unwrap().4}</pre>
+                            <aside class="jf-inspector">
+                                <header class="jf-insp-header">
+                                    <div class="jf-insp-title">
+                                        <IconFile size=12 />
+                                        <span><b>{move || selected_event.get().unwrap().1}</b> " · " {move || selected_event.get().unwrap().0}</span>
                                     </div>
-                                </div>
-                            </div>
+                                    <div class="jf-insp-actions">
+                                        <button
+                                            class="fm-btn"
+                                            on:click=move |_| {
+                                                if let Some(ev) = selected_event.get() {
+                                                    copy_json(ev.3);
+                                                }
+                                            }
+                                        >
+                                            {move || if copied.get() { "Copied!" } else { "Copy JSON" }}
+                                        </button>
+                                        <button class="fm-btn" on:click=move |_| set_selected_event.set(None)>"×"</button>
+                                    </div>
+                                </header>
+                                <pre class="jf-json-view">
+                                    {move || {
+                                        if let Some(ev) = selected_event.get() {
+                                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&ev.3) {
+                                                serde_json::to_string_pretty(&parsed).unwrap_or(ev.3)
+                                            } else {
+                                                ev.3
+                                            }
+                                        } else {
+                                            String::new()
+                                        }
+                                    }}
+                                </pre>
+                            </aside>
                         </Show>
                     </div>
                 </Show>
@@ -1520,455 +1170,9 @@ fn JournalFeedCard(
 }
 
 #[component]
-fn IntentLauncherCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-) -> impl IntoView {
-    let card_id = CardId::IntentLauncher(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
-    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
-
-    let (goal_input, set_goal_input) = signal("Inspect host security & verify daemon health".to_string());
-    let (running, set_running) = signal(false);
-    let (stage, set_stage) = signal(0u8);
-    let (logs, set_logs) = signal(vec![
-        ("14:20:00".to_string(), "Intention1: Autonomous goal formulation engine online.".to_string()),
-    ]);
-
-    let dispatch_goal = move || {
-        let goal = goal_input.get();
-        if goal.trim().is_empty() {
-            return;
-        }
-        set_running.set(true);
-        set_stage.set(1);
-        let g_str = goal.clone();
-        set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), format!("Goal received: '{g_str}'"))));
-
-        spawn_local(async move {
-            async_sleep(600).await;
-            set_stage.set(2);
-            set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), "Intention1 decomposed goal into 2 sub-tasks: [PerceptionProbe, PolicyCheck]".into())));
-
-            async_sleep(800).await;
-            set_stage.set(3);
-            let client = GatewayMindClient;
-            let res = client.execute_shell("ps aux | grep cybou | head -n 8").await;
-            let output = match res {
-                Ok(r) => format!("Tools executed successfully (exit code {}):\n{}", r.exit_code, r.stdout),
-                Err(e) => format!("Tool execution warning: {e}"),
-            };
-            set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), output)));
-
-            async_sleep(600).await;
-            set_stage.set(4);
-            set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), "Predictor1 & SelfModel verified: Goal achieved within security envelope.".into())));
-            set_running.set(false);
-        });
-    };
-
-    view! {
-        <Show when=card_open>
-            <div
-                tabindex="0"
-                role="region"
-                aria-label="Intent & Goal Dispatcher"
-                class="object intent-launcher-card"
-                class:selected=move || selected.get() == "intent"
-                class:pinned=move || layout.get().presentation(card_id).pinned
-                class:collapsed=is_collapsed
-                style=move || card_style(layout.get(), card_id)
-                on:click=move |_| {
-                    set_selected.set("intent");
-                    layout.update(|l| l.bring_forward(card_id));
-                }
-            >
-                <header
-                    class="object-header card-header"
-                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
-                >
-                    <span class="card-title-group">
-                        <Sparkles size=13 />
-                        <strong class="card-title">"Intent & Goal Dispatcher"</strong>
-                        <small class="card-badge">"Autonomous Engine"</small>
-                    </span>
-                    <CardControls card=card_id layout=layout />
-                </header>
-
-                <Show when=move || !is_collapsed()>
-                    <div class="intent-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                        <div class="intent-input-section">
-                            <label class="intent-label">"High-level Autonomous Goal / Directives"</label>
-                            <div class="intent-input-row">
-                                <input
-                                    type="text"
-                                    class="intent-input"
-                                    placeholder="Enter goal for the Mind agent (e.g. Audit Linux PAM security)…"
-                                    prop:value=goal_input
-                                    on:input=move |e| set_goal_input.set(event_target_value(&e))
-                                    on:keydown=move |e: KeyboardEvent| {
-                                        if e.key() == "Enter" {
-                                            dispatch_goal();
-                                        }
-                                    }
-                                />
-                                <button class="intent-dispatch-btn" disabled=move || running.get() on:click=move |_| dispatch_goal()>
-                                    {move || if running.get() { "Executing…" } else { "⚡ Dispatch Goal" }}
-                                </button>
-                            </div>
-                            <div class="intent-presets">
-                                <span class="preset-title">"Quick Goals:"</span>
-                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Inspect host security & verify daemon health".into())>"Security Audit"</button>
-                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Scan /home/demo storage and report disk usage".into())>"Storage Scan"</button>
-                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Verify Mind Journal Merkle integrity chain".into())>"Merkle Chain"</button>
-                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Measure D-Bus IPC round-trip latency & memory RSS".into())>"IPC Diagnostics"</button>
-                            </div>
-                        </div>
-
-                        <div class="intent-pipeline">
-                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 1 { " active" } else { "" }, if stage.get() == 1 { " current" } else { "" })>
-                                <span class="step-num">"1"</span>
-                                <div class="step-info">
-                                    <b>"Perception"</b>
-                                    <small>"Observe environment"</small>
-                                </div>
-                            </div>
-                            <div class="pipeline-arrow">"→"</div>
-                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 2 { " active" } else { "" }, if stage.get() == 2 { " current" } else { "" })>
-                                <span class="step-num">"2"</span>
-                                <div class="step-info">
-                                    <b>"Intention"</b>
-                                    <small>"Decompose goals"</small>
-                                </div>
-                            </div>
-                            <div class="pipeline-arrow">"→"</div>
-                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 3 { " active" } else { "" }, if stage.get() == 3 { " current" } else { "" })>
-                                <span class="step-num">"3"</span>
-                                <div class="step-info">
-                                    <b>"Tool Action"</b>
-                                    <small>"Execute capabilities"</small>
-                                </div>
-                            </div>
-                            <div class="pipeline-arrow">"→"</div>
-                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 4 { " active" } else { "" }, if stage.get() == 4 { " current" } else { "" })>
-                                <span class="step-num">"4"</span>
-                                <div class="step-info">
-                                    <b>"Verification"</b>
-                                    <small>"Predictor1 validated"</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="intent-logs">
-                            <For
-                                each=move || logs.get()
-                                key=|(time, msg)| format!("{time}-{msg}")
-                                children=move |(time, msg)| {
-                                    view! {
-                                        <div class="intent-log-row">
-                                            <span class="log-time">{time}</span>
-                                            <pre class="log-msg">{msg}</pre>
-                                        </div>
-                                    }
-                                }
-                            />
-                        </div>
-                    </div>
-                </Show>
-                <CardResizeHandle card=card_id layout=layout resizing=resizing />
-            </div>
-        </Show>
-    }
-}
-
-#[component]
-fn TelemetryCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-) -> impl IntoView {
-    let card_id = CardId::Telemetry(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
-    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
-
-    let daemons = [
-        "cybou-eventd", "cybou-identityd", "cybou-healthd",
-        "cybou-intentiond", "cybou-predictord", "cybou-perceptiond",
-        "cybou-epistemicd", "cybou-contextd", "cybou-meaningd",
-        "cybou-authd", "cybou-workspaced", "cybou-lifecycled",
-        "cybou-selfd", "cybou-presenced"
-    ];
-
-    let (active_probe, set_active_probe) = signal(Option::<(String, String, bool)>::None);
-
-    let probe_daemon = move |d_name: &'static str| {
-        set_active_probe.set(Some((d_name.to_string(), "Probing systemd and D-Bus status…".to_string(), true)));
-        spawn_local(async move {
-            let client = GatewayMindClient;
-            let cmd = format!("systemctl --user status {d_name} --no-pager | head -n 14");
-            match client.execute_shell(&cmd).await {
-                Ok(res) => {
-                    let out = if !res.stdout.is_empty() { res.stdout } else { res.stderr };
-                    set_active_probe.set(Some((d_name.to_string(), out, false)));
-                }
-                Err(e) => {
-                    set_active_probe.set(Some((d_name.to_string(), format!("Probe error: {e}"), false)));
-                }
-            }
-        });
-    };
-
-    view! {
-        <Show when=card_open>
-            <div
-                tabindex="0"
-                role="region"
-                aria-label="Host Telemetry & System Inspector"
-                class="object telemetry-card"
-                class:selected=move || selected.get() == "telemetry"
-                class:pinned=move || layout.get().presentation(card_id).pinned
-                class:collapsed=is_collapsed
-                style=move || card_style(layout.get(), card_id)
-                on:click=move |_| {
-                    set_selected.set("telemetry");
-                    layout.update(|l| l.bring_forward(card_id));
-                }
-            >
-                <header
-                    class="object-header card-header"
-                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
-                >
-                    <span class="card-title-group">
-                        <IconTerminal size=13 />
-                        <strong class="card-title">"Host Telemetry & Daemons"</strong>
-                        <small class="card-badge">"14 Organs Active"</small>
-                    </span>
-                    <CardControls card=card_id layout=layout />
-                </header>
-
-                <Show when=move || !is_collapsed()>
-                    <div class="tel-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                        <div class="tel-stats-row">
-                            <div class="tel-stat-card">
-                                <b>"D-Bus Latency"</b>
-                                <span>"0.68 ms"</span>
-                            </div>
-                            <div class="tel-stat-card">
-                                <b>"IPC Bus"</b>
-                                <span>"Session /run/user"</span>
-                            </div>
-                            <div class="tel-stat-card">
-                                <b>"Memory Footprint"</b>
-                                <span>"34.2 MB RSS"</span>
-                            </div>
-                            <div class="tel-stat-card">
-                                <b>"Health State"</b>
-                                <span class="tel-health-ok">"100% Nominal"</span>
-                            </div>
-                        </div>
-
-                        <div class="tel-section-header">
-                            <strong>"Mind Daemon Cluster (systemd --user · Click to Probe)"</strong>
-                        </div>
-
-                        <div class="tel-daemons-grid">
-                            {daemons.iter().map(|d| {
-                                let name = *d;
-                                view! {
-                                    <div
-                                        class="tel-daemon-pill"
-                                        title="Click to probe daemon status"
-                                        on:click=move |_| probe_daemon(name)
-                                    >
-                                        <span class="status-dot online"></span>
-                                        <span class="tel-daemon-name">{name}</span>
-                                        <small class="tel-daemon-active">"probe"</small>
-                                    </div>
-                                }
-                            }).collect::<Vec<_>>()}
-                        </div>
-
-                        <Show when=move || active_probe.get().is_some()>
-                            <div class="tel-probe-modal" on:click=move |_| set_active_probe.set(None)>
-                                <div class="tel-probe-content" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
-                                    <header class="tel-probe-header">
-                                        <div class="tel-probe-title">
-                                            <IconTerminal size=13 />
-                                            <strong>{move || active_probe.get().unwrap().0}</strong>
-                                        </div>
-                                        <button class="fm-btn" on:click=move |_| set_active_probe.set(None)>"×"</button>
-                                    </header>
-                                    <div class="tel-probe-body">
-                                        <pre class="tel-probe-text">{move || active_probe.get().unwrap().1}</pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </Show>
-                    </div>
-                </Show>
-                <CardResizeHandle card=card_id layout=layout resizing=resizing />
-            </div>
-        </Show>
-    }
-}
-
-#[component]
-fn EpistemicGraphCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-) -> impl IntoView {
-    let card_id = CardId::EpistemicGraph(0);
-    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
-    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
-
-    let (active_node, set_active_node) = signal(Option::<(&'static str, &'static str, &'static str)>::None);
-    let (node_filter, set_node_filter) = signal("all".to_string());
-    let (hypo_input, set_hypo_input) = signal(String::new());
-    let (custom_nodes, set_custom_nodes) = signal(Vec::<(String, String)>::new());
-
-    let add_hypo = move || {
-        let text = hypo_input.get();
-        if !text.trim().is_empty() {
-            set_custom_nodes.update(|nodes| nodes.push((text.clone(), "Cognitive hypothesis validated by Epistemic1 & Predictor1".to_string())));
-            set_hypo_input.set(String::new());
-        }
-    };
-
-    view! {
-        <Show when=card_open>
-            <div
-                tabindex="0"
-                role="region"
-                aria-label="Epistemic Knowledge Graph"
-                class="object epistemic-graph-card"
-                class:selected=move || selected.get() == "epistemic-graph"
-                class:pinned=move || layout.get().presentation(card_id).pinned
-                class:collapsed=is_collapsed
-                style=move || card_style(layout.get(), card_id)
-                on:click=move |_| {
-                    set_selected.set("epistemic-graph");
-                    layout.update(|l| l.bring_forward(card_id));
-                }
-            >
-                <header
-                    class="object-header card-header"
-                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
-                >
-                    <span class="card-title-group">
-                        <Link size=13 />
-                        <strong class="card-title">"Epistemic Knowledge Graph"</strong>
-                        <small class="card-badge">"Topological Causal Map"</small>
-                    </span>
-                    <CardControls card=card_id layout=layout />
-                </header>
-
-                <Show when=move || !is_collapsed()>
-                    <div class="eg-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                        <div class="eg-toolbar">
-                            <div class="eg-filter-chips">
-                                <button class="eg-chip" class:active=move || node_filter.get() == "all" on:click=move |_| set_node_filter.set("all".into())>"All"</button>
-                                <button class="eg-chip" class:active=move || node_filter.get() == "perceptions" on:click=move |_| set_node_filter.set("perceptions".into())>"Perceptions"</button>
-                                <button class="eg-chip" class:active=move || node_filter.get() == "beliefs" on:click=move |_| set_node_filter.set("beliefs".into())>"Beliefs"</button>
-                                <button class="eg-chip" class:active=move || node_filter.get() == "workspace" on:click=move |_| set_node_filter.set("workspace".into())>"Workspace"</button>
-                            </div>
-                            <div class="eg-hypo-form">
-                                <input
-                                    type="text"
-                                    class="eg-hypo-input"
-                                    placeholder="Formulate hypothesis (e.g. PAM policy strict)…"
-                                    prop:value=hypo_input
-                                    on:input=move |e| set_hypo_input.set(event_target_value(&e))
-                                    on:keydown=move |e: KeyboardEvent| {
-                                        if e.key() == "Enter" {
-                                            add_hypo();
-                                        }
-                                    }
-                                />
-                                <button class="fm-btn" on:click=move |_| add_hypo()>"Test"</button>
-                            </div>
-                        </div>
-
-                        <div class="eg-canvas-wrap">
-                            <svg class="eg-svg" viewBox="0 0 540 320">
-                                <defs>
-                                    <linearGradient id="edge-glow" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stop-color="rgba(112, 225, 200, 0.6)" />
-                                        <stop offset="100%" stop-color="rgba(217, 166, 47, 0.6)" />
-                                    </linearGradient>
-                                    <linearGradient id="edge-purple" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stop-color="rgba(168, 85, 247, 0.6)" />
-                                        <stop offset="100%" stop-color="rgba(112, 225, 200, 0.6)" />
-                                    </linearGradient>
-                                </defs>
-
-                                <line x1="80" y1="80" x2="200" y2="150" stroke="url(#edge-purple)" stroke-width="2" stroke-dasharray="4" />
-                                <line x1="80" y1="220" x2="200" y2="150" stroke="url(#edge-purple)" stroke-width="2" stroke-dasharray="4" />
-                                <line x1="200" y1="150" x2="340" y2="150" stroke="url(#edge-glow)" stroke-width="2.5" />
-                                <line x1="340" y1="150" x2="460" y2="90" stroke="url(#edge-glow)" stroke-width="2" />
-                                <line x1="340" y1="150" x2="460" y2="210" stroke="url(#edge-glow)" stroke-width="2" />
-
-                                <g class="eg-node eg-node-perception" on:click=move |_| set_active_node.set(Some(("Perception #1", "Host observations: Linux PAM + Debian 13 environment verified", "Perception1")))>
-                                    <circle cx="80" cy="80" r="22" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" stroke-width="2" />
-                                    <text x="80" y="84" text-anchor="middle" font-size="10" fill="#e9d5ff">"Host PAM"</text>
-                                </g>
-                                <g class="eg-node eg-node-perception" on:click=move |_| set_active_node.set(Some(("Perception #2", "JailFS bounded root in /var/lib/cybou/shell-jail", "Perception1")))>
-                                    <circle cx="80" cy="220" r="22" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" stroke-width="2" />
-                                    <text x="80" y="224" text-anchor="middle" font-size="10" fill="#e9d5ff">"JailFS"</text>
-                                </g>
-
-                                <g class="eg-node eg-node-belief" on:click=move |_| set_active_node.set(Some(("Epistemic Belief", "Derives capability boundaries from confirmed runtime perceptions", "Epistemic1")))>
-                                    <circle cx="200" cy="150" r="28" fill="rgba(217, 166, 47, 0.2)" stroke="#d9a62f" stroke-width="2" />
-                                    <text x="200" y="154" text-anchor="middle" font-size="10" fill="#fde68a">"Belief: Valid"</text>
-                                </g>
-
-                                <g class="eg-node eg-node-attention" on:click=move |_| set_active_node.set(Some(("Attention Focus", "Workspace1 Global Attention: Desktop spatial interaction", "Workspace1")))>
-                                    <circle cx="340" cy="150" r="32" fill="rgba(112, 225, 200, 0.25)" stroke="#70e1c8" stroke-width="2.5" />
-                                    <text x="340" y="154" text-anchor="middle" font-size="11" font-weight="600" fill="#70e1c8">"Attention"</text>
-                                </g>
-
-                                <g class="eg-node eg-node-identity" on:click=move |_| set_active_node.set(Some(("Subject Continuity", "Identity1: Sovereign subject persistence across restart cycles", "Identity1")))>
-                                    <circle cx="460" cy="90" r="24" fill="rgba(56, 189, 248, 0.2)" stroke="#38bdf8" stroke-width="2" />
-                                    <text x="460" y="94" text-anchor="middle" font-size="10" fill="#bae6fd">"Identity"</text>
-                                </g>
-                                <g class="eg-node eg-node-context" on:click=move |_| set_active_node.set(Some(("Context Graph", "Context1: Associative memory activated for sovereign autonomy", "Context1")))>
-                                    <circle cx="460" cy="210" r="24" fill="rgba(34, 197, 94, 0.2)" stroke="#22c55e" stroke-width="2" />
-                                    <text x="460" y="214" text-anchor="middle" font-size="10" fill="#bbf7d0">"Context"</text>
-                                </g>
-                            </svg>
-
-                            <Show when=move || active_node.get().is_some()>
-                                <div class="eg-inspector">
-                                    <div class="eg-insp-header">
-                                        <strong>{move || active_node.get().unwrap().0}</strong>
-                                        <small>{move || active_node.get().unwrap().2}</small>
-                                        <button class="fm-btn" on:click=move |_| set_active_node.set(None)>"×"</button>
-                                    </div>
-                                    <p class="eg-insp-body">{move || active_node.get().unwrap().1}</p>
-                                </div>
-                            </Show>
-                        </div>
-                    </div>
-                </Show>
-                <CardResizeHandle card=card_id layout=layout resizing=resizing />
-            </div>
-        </Show>
-    }
-}
-
-#[component]
-fn AuthModal(
-    open: RwSignal<bool>,
-) -> impl IntoView {
-    let (username, set_username) = signal("demo".to_string());
-    let (password, set_password) = signal("cybou2026".to_string());
+fn AuthModal(open: RwSignal<bool>) -> impl IntoView {
+    let (username, set_username) = signal(String::new());
+    let (password, set_password) = signal(String::new());
     let (error_msg, set_error_msg) = signal(Option::<String>::None);
     let (submitting, set_submitting) = signal(false);
 
@@ -1993,7 +1197,10 @@ fn AuthModal(
                 }
                 Ok(false) => {
                     set_submitting.set(false);
-                    set_error_msg.set(Some("Authentication failed. Ensure account is in 'cybou-access' group.".to_string()));
+                    set_error_msg.set(Some(
+                        "Authentication failed. Ensure account is in 'cybou-access' group."
+                            .to_string(),
+                    ));
                 }
                 Err(err) => {
                     set_submitting.set(false);
@@ -2016,7 +1223,7 @@ fn AuthModal(
                     </header>
                     <div class="auth-body">
                         <p class="auth-desc">"Sign in with a Linux host account belonging to the " <code>"cybou-access"</code> " group to unlock Zone 3 Body capabilities."</p>
-                        
+
                         <Show when=move || error_msg.get().is_some()>
                             <div class="auth-error">
                                 {move || error_msg.get().unwrap_or_default()}
@@ -2032,7 +1239,7 @@ fn AuthModal(
                                 <input
                                     type="text"
                                     class="auth-input"
-                                    placeholder="e.g. demo"
+                                    placeholder="Username (e.g. demo)"
                                     prop:value=username
                                     on:input=move |e| set_username.set(event_target_value(&e))
                                 />
@@ -2043,15 +1250,11 @@ fn AuthModal(
                                 <input
                                     type="password"
                                     class="auth-input"
-                                    placeholder="Enter account password"
+                                    placeholder="Password"
                                     prop:value=password
                                     on:input=move |e| set_password.set(event_target_value(&e))
                                 />
                             </label>
-
-                            <div class="auth-hint">
-                                <small>"Demo credentials on VPS: " <b>"demo"</b> " / " <b>"cybou2026"</b></small>
-                            </div>
 
                             <footer class="auth-footer">
                                 <button type="button" class="btn-secondary" on:click=move |_| open.set(false)>"Cancel"</button>
@@ -2073,13 +1276,61 @@ fn DesktopDock(
     selected: ReadSignal<&'static str>,
     set_selected: WriteSignal<&'static str>,
     auth_modal_open: RwSignal<bool>,
+    runtime: RwSignal<RuntimeState>,
 ) -> impl IntoView {
     let (time_str, set_time_str) = signal(String::new());
 
-    Effect::new(move |_| {
-        let d = js_sys::Date::new_0();
-        set_time_str.set(format!("{:02}:{:02}:{:02} UTC", d.get_utc_hours(), d.get_utc_minutes(), d.get_utc_seconds()));
-    });
+    #[cfg(target_arch = "wasm32")]
+    {
+        let update_clock = move || {
+            let d = js_sys::Date::new_0();
+            set_time_str.set(format!(
+                "{:02}:{:02}:{:02} UTC",
+                d.get_utc_hours(),
+                d.get_utc_minutes(),
+                d.get_utc_seconds()
+            ));
+        };
+        update_clock();
+        if let Some(w) = web_sys::window() {
+            let cb = Closure::<dyn FnMut()>::new(update_clock);
+            let _ = w.set_interval_with_callback_and_timeout_and_arguments_0(
+                cb.as_ref().unchecked_ref(),
+                1000,
+            );
+            cb.forget();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        set_time_str.set("12:00:00 UTC".to_string());
+    }
+
+    let is_public_preview = move || match runtime.get() {
+        RuntimeState::Ready { mode, .. } => mode == cybou_web_contracts::SessionMode::PublicPreview,
+        _ => false,
+    };
+
+    let user_label = move || match runtime.get() {
+        RuntimeState::Ready { mode, mind, .. } => match mode {
+            cybou_web_contracts::SessionMode::PublicPreview => "Public Preview 🔒".to_string(),
+            cybou_web_contracts::SessionMode::LocalDesktop => "local · authenticated ●".to_string(),
+            cybou_web_contracts::SessionMode::RemoteBrowser => {
+                if let Some(m) = mind {
+                    if let Some(origin) = m.identity.origin {
+                        format!("{origin} · authenticated ●")
+                    } else {
+                        "authenticated ●".to_string()
+                    }
+                } else {
+                    "authenticated ●".to_string()
+                }
+            }
+        },
+        RuntimeState::Loading => "connecting…".to_string(),
+        RuntimeState::Error(_) => "offline ✕".to_string(),
+    };
 
     let open_or_focus = move |card_id: CardId, key: &'static str, def_w: f64, def_h: f64| {
         if !layout.get().contains_card(card_id) {
@@ -2093,7 +1344,7 @@ fn DesktopDock(
     };
 
     view! {
-        <footer class="desktop-dock" aria-label="Desktop Sovereign Taskbar Dock">
+        <footer class="desktop-dock" aria-label="Desktop Card Shelf and Taskbar">
             <div class="dock-apps">
                 <button class="dock-item" class:active=move || selected.get() == "shell" title="CYBOU Shell" on:click=move |_| open_or_focus(CardId::Shell(0), "shell", 400.0, 160.0)>
                     <IconTerminal size=18 />
@@ -2103,25 +1354,9 @@ fn DesktopDock(
                     <IconFolder size=18 />
                     <span class="dock-tooltip">"Files"</span>
                 </button>
-                <button class="dock-item" class:active=move || selected.get() == "browser" title="Web Browser" on:click=move |_| open_or_focus(CardId::WebBrowser(0), "browser", 460.0, 140.0)>
-                    <IconGlobe size=18 />
-                    <span class="dock-tooltip">"Browser"</span>
-                </button>
                 <button class="dock-item" class:active=move || selected.get() == "journal-feed" title="Event Stream" on:click=move |_| open_or_focus(CardId::JournalFeed(0), "journal-feed", 420.0, 150.0)>
                     <IconFile size=18 />
                     <span class="dock-tooltip">"Events"</span>
-                </button>
-                <button class="dock-item" class:active=move || selected.get() == "telemetry" title="Host Telemetry" on:click=move |_| open_or_focus(CardId::Telemetry(0), "telemetry", 440.0, 170.0)>
-                    <IconTerminal size=18 />
-                    <span class="dock-tooltip">"Telemetry"</span>
-                </button>
-                <button class="dock-item" class:active=move || selected.get() == "epistemic-graph" title="Knowledge Graph" on:click=move |_| open_or_focus(CardId::EpistemicGraph(0), "epistemic-graph", 480.0, 130.0)>
-                    <Link size=18 />
-                    <span class="dock-tooltip">"Graph"</span>
-                </button>
-                <button class="dock-item" class:active=move || selected.get() == "intent" title="Intent Dispatcher" on:click=move |_| open_or_focus(CardId::IntentLauncher(0), "intent", 450.0, 140.0)>
-                    <Sparkles size=18 />
-                    <span class="dock-tooltip">"Intent"</span>
                 </button>
             </div>
 
@@ -2160,9 +1395,14 @@ fn DesktopDock(
             </div>
 
             <div class="dock-tray">
-                <button class="dock-tray-user" title="Authenticate Linux PAM" on:click=move |_| auth_modal_open.set(true)>
+                <button
+                    class="dock-tray-user"
+                    class:public-preview=is_public_preview
+                    title="Session State / Sign In"
+                    on:click=move |_| auth_modal_open.set(true)
+                >
                     <IconShield size=13 />
-                    <span>"demo@cybou-host"</span>
+                    <span>{user_label}</span>
                 </button>
                 <div class="dock-tray-clock">
                     {move || time_str.get()}
@@ -2243,9 +1483,11 @@ fn DeckContainerView(
     let d_id = StoredValue::new(deck_id);
 
     let deck_opt = Signal::derive(move || layout.get().deck(&d_id.get_value()).cloned());
-    let is_collapsed = Signal::derive(move || deck_opt.get().is_some_and(|d| d.presentation.collapsed));
+    let is_collapsed =
+        Signal::derive(move || deck_opt.get().is_some_and(|d| d.presentation.collapsed));
     let is_pinned = Signal::derive(move || deck_opt.get().is_some_and(|d| d.presentation.pinned));
-    let active_card = Signal::derive(move || deck_opt.get().map_or(CardId::Identity, |d| d.active_card));
+    let active_card =
+        Signal::derive(move || deck_opt.get().map_or(CardId::Identity, |d| d.active_card));
     let cards = Signal::derive(move || deck_opt.get().map_or_else(Vec::new, |d| d.card_ids));
 
     let is_magnet = Signal::derive(move || {
@@ -2256,7 +1498,11 @@ fn DeckContainerView(
     let deck_style = Signal::derive(move || {
         if let Some(deck) = deck_opt.get() {
             let geom = deck.geometry;
-            let h = if deck.presentation.collapsed { 44.0 } else { geom.height };
+            let h = if deck.presentation.collapsed {
+                44.0
+            } else {
+                geom.height
+            };
             format!(
                 "transform: translate3d({:.1}px, {:.1}px, 0); width: {:.1}px; height: {:.1}px; z-index: {};",
                 geom.x, geom.y, geom.width, h, geom.z
@@ -2418,6 +1664,8 @@ fn DeckContainerView(
                 >
                     <div
                         class="deck-tabs"
+                        role="tablist"
+                        aria-label="Deck tabs"
                         on:pointerdown=move |e: PointerEvent| e.stop_propagation()
                     >
                         <For
@@ -2429,6 +1677,9 @@ fn DeckContainerView(
                                     <div
                                         class="deck-tab"
                                         class:active=is_active
+                                        role="tab"
+                                        tabindex="0"
+                                        aria-selected=move || is_active().to_string()
                                         on:pointerdown=move |e: PointerEvent| {
                                             e.stop_propagation();
                                         }
@@ -2440,6 +1691,30 @@ fn DeckContainerView(
                                                 }
                                             });
                                             layout.get_untracked().save();
+                                        }
+                                        on:keydown=move |e: web_sys::KeyboardEvent| {
+                                            let current_cards = cards.get_untracked();
+                                            if let Some(pos) = current_cards.iter().position(|&c| c == card) {
+                                                let target_idx = match e.key().as_str() {
+                                                    "ArrowLeft" | "ArrowUp" => {
+                                                        if pos == 0 { current_cards.len() - 1 } else { pos - 1 }
+                                                    }
+                                                    "ArrowRight" | "ArrowDown" => {
+                                                        (pos + 1) % current_cards.len()
+                                                    }
+                                                    "Home" => 0,
+                                                    "End" => current_cards.len() - 1,
+                                                    _ => return,
+                                                };
+                                                e.prevent_default();
+                                                let next_card = current_cards[target_idx];
+                                                layout.update(|l| {
+                                                    if let Some(d) = l.deck_mut(&d_id.get_value()) {
+                                                        d.set_active(next_card);
+                                                    }
+                                                });
+                                                layout.get_untracked().save();
+                                            }
                                         }
                                     >
                                         <span>{card.title()}</span>
@@ -2570,27 +1845,11 @@ fn DeckContainerView(
                             }.into_any(),
                             CardId::FileManager(_) => view! {
                                 <strong>"File Manager"</strong>
-                                <span>"Zone 3 Bounded Storage"</span>
-                            }.into_any(),
-                            CardId::WebBrowser(_) => view! {
-                                <strong>"Web Browser"</strong>
-                                <span>"Sandboxed Web Surface"</span>
+                                <span>"Zone 3 Read-Only Storage"</span>
                             }.into_any(),
                             CardId::JournalFeed(_) => view! {
-                                <strong>"Event Stream & Integrity"</strong>
+                                <strong>"Event Stream"</strong>
                                 <span>"Real-time Journal SSE stream"</span>
-                            }.into_any(),
-                            CardId::Telemetry(_) => view! {
-                                <strong>"Host Telemetry & Daemons"</strong>
-                                <span>"14 Mind organs & D-Bus metrics"</span>
-                            }.into_any(),
-                            CardId::EpistemicGraph(_) => view! {
-                                <strong>"Epistemic Knowledge Graph"</strong>
-                                <span>"Topological causal relations"</span>
-                            }.into_any(),
-                            CardId::IntentLauncher(_) => view! {
-                                <strong>"Intent & Goal Dispatcher"</strong>
-                                <span>"Autonomous reasoning & tool execution"</span>
                             }.into_any(),
                         }}
                     </div>
@@ -2695,6 +1954,11 @@ pub fn App() -> impl IntoView {
                 set_command_open.set(false);
                 set_command_query.set(String::new());
                 set_capabilities_open.set(false);
+                layout.update(|l| {
+                    for card in &mut l.cards {
+                        card.presentation.maximized = false;
+                    }
+                });
             }
         });
         if window
@@ -2907,1452 +2171,1288 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-            <main class="app-shell">
-                <header class="topbar">
-                    <a class="brand" href="#canvas" aria-label="Cybou home">
-                        <img class="brand-mark" src="/cybou-mark.svg" alt="" />
-                        <span>"Cybou"</span>
-                    </a>
-                    <div class="runtime-cluster">
-                        <div class="runtime" aria-label="Runtime connection" aria-live="polite">
-                            <span class="status-dot" aria-hidden="true"></span>
-                            <strong>{runtime_label}</strong>
-                            <small>{projection_label}</small>
-                        </div>
-                        {move || match runtime.get() {
-                            RuntimeState::Ready { mode, .. } if mode != cybou_web_contracts::SessionMode::PublicPreview => {
-                                view! {
-                                    <button
-                                        class="topbar-auth-btn sign-out-btn"
-                                        title="Sign out from host session"
-                                        on:click=move |_| {
-                                            spawn_local(async move {
-                                                let _ = GatewayMindClient.logout().await;
-                                                if let Some(w) = web_sys::window() {
-                                                    let _ = w.location().reload();
-                                                }
-                                            });
-                                        }
-                                    >
-                                        <IconShield size=12 />
-                                        <span>"Sign out"</span>
-                                    </button>
-                                }.into_any()
-                            }
-                            _ => {
-                                view! {
-                                    <button
-                                        class="topbar-auth-btn sign-in-btn"
-                                        title="Sign in with Linux account"
-                                        on:click=move |_| auth_modal_open.set(true)
-                                    >
-                                        <IconShield size=12 />
-                                        <span>"Sign in"</span>
-                                    </button>
-                                }.into_any()
-                            }
-                        }}
-                        <button
-                            class="runtime-switch"
-                            aria-expanded=move || runtime_menu_open.get().to_string()
-                            aria-controls="runtime-menu"
-                            on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
-                        >
-                            <span>"Local"</span>
-                            <span class="inactive">"Remote"</span>
-                        </button>
-                        <button
-                            class="profile-trigger"
-                            aria-label="Open Cybou workspace menu"
-                            aria-expanded=move || runtime_menu_open.get().to_string()
-                            on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
-                        >"C"</button>
-                        <Show when=move || runtime_menu_open.get()>
-                            <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
-                                <header><strong>"Cybou"</strong><small>{mind_observed}</small></header>
-                                <button on:click=move |_| navigate_from_menu("identity", set_selected, set_runtime_menu_open)><FileCheck size=15 /><span>"Identity"</span></button>
-                                <button on:click=move |_| navigate_from_menu("commitments", set_selected, set_runtime_menu_open)><ListChecks size=15 /><span>"Commitments"</span></button>
-                                <button on:click=move |_| navigate_from_menu("session", set_selected, set_runtime_menu_open)><UsersRound size=15 /><span>"Session"</span></button>
-                                <button on:click=move |_| navigate_from_menu("lifecycle", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Lifecycle"</span></button>
-                                <hr />
-                                <button on:click=move |_| navigate_from_menu("capabilities", set_selected, set_runtime_menu_open)><Map size=15 /><span>"Capabilities"</span></button>
-                                <button
-                                    aria-pressed=move || minimap_visible.get().to_string()
-                                    on:click=move |_| {
-                                        set_minimap_visible.set(!minimap_visible.get_untracked());
-                                        set_runtime_menu_open.set(false);
-                                    }
-                                ><Map size=15 /><span>"Minimap"</span></button>
-                                <hr />
-                                <button on:click=move |_| navigate_from_menu("journal", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Journal"</span></button>
-                                <button on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("shell");
-                                    set_runtime_menu_open.set(false);
-                                }><IconTerminal size=15 /><span>"Open Shell"</span></button>
-                                <button on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("files");
-                                    set_runtime_menu_open.set(false);
-                                }><IconFolder size=15 /><span>"File Manager"</span></button>
-                                <button on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::WebBrowser(0), 460.0, 140.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("browser");
-                                    set_runtime_menu_open.set(false);
-                                }><IconGlobe size=15 /><span>"Web Browser"</span></button>
-                                <hr />
-                                <Show when=move || history.get().can_undo()>
-                                    <button on:click=move |_| {
-                                        apply_undo(history, layout);
-                                        set_runtime_menu_open.set(false);
-                                    }><IconUndo size=15 /><span>"Undo layout"</span></button>
-                                </Show>
-                                <Show when=move || history.get().can_redo()>
-                                    <button on:click=move |_| {
-                                        apply_redo(history, layout);
-                                        set_runtime_menu_open.set(false);
-                                    }><IconRedo size=15 /><span>"Redo layout"</span></button>
-                                </Show>
-                                <button on:click=move |_| {
-                                    history.update(|h| h.push(layout.get_untracked()));
-                                    layout.update(|l| {
-                                        l.create_deck("Mind Core", vec![CardId::Identity, CardId::Session], 70.0, 50.0);
-                                    });
-                                    layout.get_untracked().save();
-                                    set_runtime_menu_open.set(false);
-                                }><IconLayers size=15 /><span>"Group: Mind Deck"</span></button>
-                                <button on:click=move |_| {
-                                    history.update(|h| h.push(layout.get_untracked()));
-                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
-                                    layout.get_untracked().save();
-                                    set_runtime_menu_open.set(false);
-                                }><IconGrid size=15 /><span>"Arrange: Grid"</span></button>
-                                <button on:click=move |_| {
-                                    history.update(|h| h.push(layout.get_untracked()));
-                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
-                                    layout.get_untracked().save();
-                                    set_runtime_menu_open.set(false);
-                                }><IconMinimize size=15 /><span>"Arrange: Compact"</span></button>
-                                <button on:click=move |_| {
-                                    history.update(|h| h.push(layout.get_untracked()));
-                                    layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
-                                    layout.get_untracked().save();
-                                    set_runtime_menu_open.set(false);
-                                }><Link size=15 /><span>"Arrange: Relations"</span></button>
-                                <button on:click=move |_| {
-                                    history.update(|h| h.push(layout.get_untracked()));
-                                    layout.set(DesktopLayout::default());
-                                    layout.get_untracked().save();
-                                    set_runtime_menu_open.set(false);
-                                }><IconRefresh size=15 /><span>"Reset layout"</span></button>
-                            </nav>
-                        </Show>
+        <main class="app-shell">
+            <header class="topbar">
+                <a class="brand" href="#canvas" aria-label="Cybou home">
+                    <img class="brand-mark" src="/cybou-mark.svg" alt="" />
+                    <span>"Cybou"</span>
+                </a>
+                <div class="runtime-cluster">
+                    <div class="runtime" aria-label="Runtime connection" aria-live="polite">
+                        <span class="status-dot" aria-hidden="true"></span>
+                        <strong>{runtime_label}</strong>
+                        <small>{projection_label}</small>
                     </div>
-                </header>
+                    {move || match runtime.get() {
+                        RuntimeState::Ready { mode, .. } if mode != cybou_web_contracts::SessionMode::PublicPreview => {
+                            view! {
+                                <button
+                                    class="topbar-auth-btn sign-out-btn"
+                                    title="Sign out from host session"
+                                    on:click=move |_| {
+                                        spawn_local(async move {
+                                            let _ = GatewayMindClient.logout().await;
+                                            if let Some(w) = web_sys::window() {
+                                                let _ = w.location().reload();
+                                            }
+                                        });
+                                    }
+                                >
+                                    <IconShield size=12 />
+                                    <span>"Sign out"</span>
+                                </button>
+                            }.into_any()
+                        }
+                        _ => {
+                            view! {
+                                <button
+                                    class="topbar-auth-btn sign-in-btn"
+                                    title="Sign in with Linux account"
+                                    on:click=move |_| auth_modal_open.set(true)
+                                >
+                                    <IconShield size=12 />
+                                    <span>"Sign in"</span>
+                                </button>
+                            }.into_any()
+                        }
+                    }}
+                    <button
+                        class="runtime-switch"
+                        aria-expanded=move || runtime_menu_open.get().to_string()
+                        aria-controls="runtime-menu"
+                        on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                    >
+                        <span>"Local"</span>
+                        <span class="inactive">"Remote"</span>
+                    </button>
+                    <button
+                        class="profile-trigger"
+                        aria-label="Open Cybou workspace menu"
+                        aria-expanded=move || runtime_menu_open.get().to_string()
+                        on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
+                    >"C"</button>
+                    <Show when=move || runtime_menu_open.get()>
+                        <nav id="runtime-menu" class="runtime-menu" aria-label="Cybou workspace menu">
+                            <header><strong>"Cybou"</strong><small>{mind_observed}</small></header>
+                            <button on:click=move |_| navigate_from_menu("identity", set_selected, set_runtime_menu_open)><FileCheck size=15 /><span>"Identity"</span></button>
+                            <button on:click=move |_| navigate_from_menu("commitments", set_selected, set_runtime_menu_open)><ListChecks size=15 /><span>"Commitments"</span></button>
+                            <button on:click=move |_| navigate_from_menu("session", set_selected, set_runtime_menu_open)><UsersRound size=15 /><span>"Session"</span></button>
+                            <button on:click=move |_| navigate_from_menu("lifecycle", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Lifecycle"</span></button>
+                            <hr />
+                            <button on:click=move |_| navigate_from_menu("capabilities", set_selected, set_runtime_menu_open)><Map size=15 /><span>"Capabilities"</span></button>
+                            <button
+                                aria-pressed=move || minimap_visible.get().to_string()
+                                on:click=move |_| {
+                                    set_minimap_visible.set(!minimap_visible.get_untracked());
+                                    set_runtime_menu_open.set(false);
+                                }
+                            ><Map size=15 /><span>"Minimap"</span></button>
+                            <hr />
+                            <button on:click=move |_| navigate_from_menu("journal", set_selected, set_runtime_menu_open)><Sparkles size=15 /><span>"Journal"</span></button>
+                            <button on:click=move |_| {
+                                layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                layout.get_untracked().save();
+                                set_selected.set("shell");
+                                set_runtime_menu_open.set(false);
+                            }><IconTerminal size=15 /><span>"Open Shell"</span></button>
+                            <button on:click=move |_| {
+                                layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                layout.get_untracked().save();
+                                set_selected.set("files");
+                                set_runtime_menu_open.set(false);
+                            }><IconFolder size=15 /><span>"File Manager"</span></button>
+                            <hr />
+                            <Show when=move || history.get().can_undo()>
+                                <button on:click=move |_| {
+                                    apply_undo(history, layout);
+                                    set_runtime_menu_open.set(false);
+                                }><IconUndo size=15 /><span>"Undo layout"</span></button>
+                            </Show>
+                            <Show when=move || history.get().can_redo()>
+                                <button on:click=move |_| {
+                                    apply_redo(history, layout);
+                                    set_runtime_menu_open.set(false);
+                                }><IconRedo size=15 /><span>"Redo layout"</span></button>
+                            </Show>
+                            <button on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| {
+                                    let _ = l.create_deck("Mind Core", vec![CardId::Identity, CardId::Session], 70.0, 50.0);
+                                });
+                                layout.get_untracked().save();
+                                set_runtime_menu_open.set(false);
+                            }><IconLayers size=15 /><span>"Group: Mind Deck"</span></button>
+                            <button on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                                layout.get_untracked().save();
+                                set_runtime_menu_open.set(false);
+                            }><IconGrid size=15 /><span>"Arrange: Grid"</span></button>
+                            <button on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                                layout.get_untracked().save();
+                                set_runtime_menu_open.set(false);
+                            }><IconMinimize size=15 /><span>"Arrange: Compact"</span></button>
+                            <button on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                                layout.get_untracked().save();
+                                set_runtime_menu_open.set(false);
+                            }><Link size=15 /><span>"Arrange: Relations"</span></button>
+                            <button on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.set(DesktopLayout::default());
+                                layout.get_untracked().save();
+                                set_runtime_menu_open.set(false);
+                            }><IconRefresh size=15 /><span>"Reset layout"</span></button>
+                        </nav>
+                    </Show>
+                </div>
+            </header>
 
-                <section
-                    id="canvas"
-                    class="canvas"
-                    class:panning=move || panning.get().is_some()
-                    aria-label="CYBOU Desktop"
-                    style=move || format!("transform: translate({:.1}px, {:.1}px) scale({:.2}); transform-origin: 0 0;", pan.get().0, pan.get().1, zoom.get())
-                    on:dblclick=move |e: web_sys::MouseEvent| {
-                        if e.target().and_then(|t| t.dyn_into::<web_sys::Element>().ok()).map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient")) {
-                            set_zoom.set(1.0);
-                            set_pan.set((0.0, 0.0));
-                        }
+            <section
+                id="canvas"
+                class="canvas"
+                class:panning=move || panning.get().is_some()
+                aria-label="CYBOU Desktop"
+                style=move || format!("transform: translate({:.1}px, {:.1}px) scale({:.2}); transform-origin: 0 0;", pan.get().0, pan.get().1, zoom.get())
+                on:dblclick=move |e: web_sys::MouseEvent| {
+                    if e.target().and_then(|t| t.dyn_into::<web_sys::Element>().ok()).map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient")) {
+                        set_zoom.set(1.0);
+                        set_pan.set((0.0, 0.0));
                     }
-                    on:wheel=move |event: web_sys::WheelEvent| {
-                        if event.ctrl_key() {
-                            event.prevent_default();
-                            if event.delta_y() < 0.0 {
-                                set_zoom.update(|z| *z = (*z + 0.05).min(2.0));
-                            } else {
-                                set_zoom.update(|z| *z = (*z - 0.05).max(0.4));
-                            }
+                }
+                on:wheel=move |event: web_sys::WheelEvent| {
+                    if event.ctrl_key() {
+                        event.prevent_default();
+                        if event.delta_y() < 0.0 {
+                            set_zoom.update(|z| *z = (*z + 0.05).min(2.0));
                         } else {
-                            event.prevent_default();
-                            set_pan.update(|(px, py)| {
-                                *px -= event.delta_x() * 0.8;
-                                *py -= event.delta_y() * 0.8;
-                            });
+                            set_zoom.update(|z| *z = (*z - 0.05).max(0.4));
                         }
+                    } else {
+                        event.prevent_default();
+                        set_pan.update(|(px, py)| {
+                            *px -= event.delta_x() * 0.8;
+                            *py -= event.delta_y() * 0.8;
+                        });
                     }
-                    on:pointerdown=move |event: PointerEvent| {
-                        let is_canvas_bg = event.target()
-                            .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
-                            .map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient") || el.tag_name().eq_ignore_ascii_case("svg"));
-                        if is_canvas_bg || event.button() == 1 {
-                            set_panning.set(Some((event.client_x() as f64, event.client_y() as f64, pan.get().0, pan.get().1)));
+                }
+                on:pointerdown=move |event: PointerEvent| {
+                    let is_canvas_bg = event.target()
+                        .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+                        .map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient") || el.tag_name().eq_ignore_ascii_case("svg"));
+                    if is_canvas_bg || event.button() == 1 {
+                        set_panning.set(Some((event.client_x() as f64, event.client_y() as f64, pan.get().0, pan.get().1)));
+                    }
+                }
+                on:pointermove=move |event: PointerEvent| {
+                    if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
+                        let cur_x = event.client_x() as f64;
+                        let cur_y = event.client_y() as f64;
+                        set_pan.set((init_px + (cur_x - start_x), init_py + (cur_y - start_y)));
+                    }
+                    move_drag(event.clone(), layout, dragging);
+                    move_resize(event, layout, resizing);
+                }
+                on:pointerup=move |_| {
+                    set_panning.set(None);
+                    finish_drag(layout, history, dragging);
+                    finish_resize(layout, resizing);
+                }
+                on:pointercancel=move |_| {
+                    set_panning.set(None);
+                    finish_drag(layout, history, dragging);
+                    finish_resize(layout, resizing);
+                }
+            >
+                <div class="ambient" aria-hidden="true"></div>
+                <svg class="relationship-layer" aria-label="Desktop relationships">
+                    // Each edge is a relationship the system actually has: every organ writes
+                    // its contributions into the one Journal, Health1 derives capabilities from
+                    // whether those organs answer, and the session only presents the result.
+                    <RelationshipEdge layout=layout selected=selected from=CardId::Identity to=CardId::Journal label="writes to" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=CardId::Commitments to=CardId::Journal label="writes to" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=CardId::Lifecycle to=CardId::Journal label="consolidates into" amber=true />
+                    <RelationshipEdge layout=layout selected=selected from=CardId::Capabilities to=CardId::Identity label="evaluates" amber=false />
+                    <RelationshipEdge layout=layout selected=selected from=CardId::Capabilities to=CardId::Session label="presented under" amber=false />
+                </svg>
+                <Show when=move || !layout.get().is_in_deck(CardId::Identity)>
+                    <div
+                        class:selected=move || selected.get() == "identity"
+                        class:pinned=move || layout.get().presentation(CardId::Identity).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Identity).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Identity)
+                        class="object identity"
+                        style=move || card_style(layout.get(), CardId::Identity)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Identity card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Identity, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Identity, layout)
+                        on:click=move |_| set_selected.set("identity")
+                    >
+                    <header class="card-header">
+                        <small class="panel-kicker"><FileCheck size=14 /><span>"Identity1"</span></small>
+                        <CardControls card=CardId::Identity layout=layout />
+                    </header>
+                    <Show
+                        when=move || !layout.get().presentation(CardId::Identity).collapsed
+                        fallback=move || view! {
+                            <div class="card-collapsed-summary">
+                                <b>"Subject continuity"</b>
+                                <span>{identity_id()}</span>
+                            </div>
                         }
-                    }
-                    on:pointermove=move |event: PointerEvent| {
-                        if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
-                            let cur_x = event.client_x() as f64;
-                            let cur_y = event.client_y() as f64;
-                            set_pan.set((init_px + (cur_x - start_x), init_py + (cur_y - start_y)));
-                        }
-                        move_drag(event.clone(), layout, dragging);
-                        move_resize(event, layout, resizing);
-                    }
-                    on:pointerup=move |_| {
-                        set_panning.set(None);
-                        finish_drag(layout, history, dragging);
-                        finish_resize(layout, resizing);
-                    }
-                    on:pointercancel=move |_| {
-                        set_panning.set(None);
-                        finish_drag(layout, history, dragging);
-                        finish_resize(layout, resizing);
-                    }
-                >
-                    <div class="ambient" aria-hidden="true"></div>
-                    <svg class="relationship-layer" aria-label="Desktop relationships">
-                        // Each edge is a relationship the system actually has: every organ writes
-                        // its contributions into the one Journal, Health1 derives capabilities from
-                        // whether those organs answer, and the session only presents the result.
-                        <RelationshipEdge layout=layout selected=selected from=CardId::Identity to=CardId::Journal label="writes to" amber=false />
-                        <RelationshipEdge layout=layout selected=selected from=CardId::Commitments to=CardId::Journal label="writes to" amber=false />
-                        <RelationshipEdge layout=layout selected=selected from=CardId::Lifecycle to=CardId::Journal label="consolidates into" amber=true />
-                        <RelationshipEdge layout=layout selected=selected from=CardId::Capabilities to=CardId::Identity label="evaluates" amber=false />
-                        <RelationshipEdge layout=layout selected=selected from=CardId::Capabilities to=CardId::Session label="presented under" amber=false />
-                    </svg>
-                    <Show when=move || !layout.get().is_in_deck(CardId::Identity)>
-                        <div
-                            class:selected=move || selected.get() == "identity"
-                            class:pinned=move || layout.get().presentation(CardId::Identity).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Identity).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Identity)
-                            class="object identity"
-                            style=move || card_style(layout.get(), CardId::Identity)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Identity card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Identity, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Identity, layout)
-                            on:click=move |_| set_selected.set("identity")
-                        >
+                    >
+                        <strong>"Subject continuity"</strong>
+                        <span class="identity-digest">{identity_id}</span>
+                        <span class="identity-badges"><i>{identity_sessions}" sessions"</i><i>{identity_age}</i></span>
+                        <span class="identity-meta">"Origin "{identity_origin}" · "{identity_architecture}</span>
+                    </Show>
+                    <CardResizeHandle card=CardId::Identity layout=layout resizing=resizing />
+                </div>
+            </Show>
+
+                <Show when=move || selected.get() == "capabilities">
+                    <nav
+                        class="object-actions"
+                        style=move || selection_actions_style(layout.get())
+                        aria-label="Selected release actions"
+                    >
+                        <button aria-label="Open capability health" on:click=move |_| set_selected.set("capabilities")><FolderOpen size=15 /><span>"Health"</span></button>
+                        <button aria-label="Open commitments" on:click=move |_| set_selected.set("commitments")><ListChecks size=15 /><span>"Promises"</span></button>
+                        <button aria-label="Open lifecycle" on:click=move |_| set_selected.set("lifecycle")><Sparkles size=15 /><span>"Lifecycle"</span></button>
+                        <button aria-label="Open the Journal" on:click=move |_| set_selected.set("journal")><Link size=15 /><span>"Journal"</span></button>
+                        <button
+                            aria-label="More release actions"
+                            on:click=move |_| {
+                                set_command_open.set(true);
+                                if let Some(input) = command_input.get() {
+                                    let _ = input.focus();
+                                }
+                            }
+                        ><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
+                    </nav>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::Session)>
+                    <div
+                        class:selected=move || selected.get() == "session"
+                        class:pinned=move || layout.get().presentation(CardId::Session).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Session).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Session)
+                        class="object session"
+                        style=move || card_style(layout.get(), CardId::Session)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Session card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Session, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Session, layout)
+                        on:click=move |_| set_selected.set("session")
+                    >
                         <header class="card-header">
-                            <small class="panel-kicker"><FileCheck size=14 /><span>"Identity1"</span></small>
-                            <CardControls card=CardId::Identity layout=layout />
+                            <small class="panel-kicker"><UsersRound size=14 /><span>"Session"</span></small>
+                            <CardControls card=CardId::Session layout=layout />
                         </header>
                         <Show
-                            when=move || !layout.get().presentation(CardId::Identity).collapsed
+                            when=move || !layout.get().presentation(CardId::Session).collapsed
                             fallback=move || view! {
                                 <div class="card-collapsed-summary">
-                                    <b>"Subject continuity"</b>
-                                    <span>{identity_id()}</span>
+                                    <b>"Session"</b>
+                                    <span>{runtime_label()}</span>
                                 </div>
                             }
                         >
-                            <strong>"Subject continuity"</strong>
-                            <span class="identity-digest">{identity_id}</span>
-                            <span class="identity-badges"><i>{identity_sessions}" sessions"</i><i>{identity_age}</i></span>
-                            <span class="identity-meta">"Origin "{identity_origin}" · "{identity_architecture}</span>
+                            <strong>"Established trust"</strong>
+                            <span class="row"><b>"Mode"</b><i>{runtime_label}</i></span>
+                            <span class="row"><b>"Consumer"</b><i>{session_consumer}</i></span>
+                            <span class="row"><b>"Authenticated"</b><i>"No"</i></span>
+                            <span class="row"><b>"Device bound"</b><i>"No"</i></span>
+                            <span class="panel-link">"Established by the gateway, never by this page"</span>
                         </Show>
-                        <CardResizeHandle card=CardId::Identity layout=layout resizing=resizing />
+                        <CardResizeHandle card=CardId::Session layout=layout resizing=resizing />
                     </div>
                 </Show>
 
-                    <Show when=move || selected.get() == "capabilities">
-                        <nav
-                            class="object-actions"
-                            style=move || selection_actions_style(layout.get())
-                            aria-label="Selected release actions"
-                        >
-                            <button aria-label="Open capability health" on:click=move |_| set_selected.set("capabilities")><FolderOpen size=15 /><span>"Health"</span></button>
-                            <button aria-label="Open commitments" on:click=move |_| set_selected.set("commitments")><ListChecks size=15 /><span>"Promises"</span></button>
-                            <button aria-label="Open lifecycle" on:click=move |_| set_selected.set("lifecycle")><Sparkles size=15 /><span>"Lifecycle"</span></button>
-                            <button aria-label="Open the Journal" on:click=move |_| set_selected.set("journal")><Link size=15 /><span>"Journal"</span></button>
-                            <button
-                                aria-label="More release actions"
-                                on:click=move |_| {
-                                    set_command_open.set(true);
-                                    if let Some(input) = command_input.get() {
-                                        let _ = input.focus();
-                                    }
-                                }
-                            ><Ellipsis size=16 /><span class="sr-only">"More"</span></button>
-                        </nav>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Session)>
-                        <div
-                            class:selected=move || selected.get() == "session"
-                            class:pinned=move || layout.get().presentation(CardId::Session).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Session).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Session)
-                            class="object session"
-                            style=move || card_style(layout.get(), CardId::Session)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Session card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Session, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Session, layout)
-                            on:click=move |_| set_selected.set("session")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><UsersRound size=14 /><span>"Session"</span></small>
-                                <CardControls card=CardId::Session layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Session).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Session"</b>
-                                        <span>{runtime_label()}</span>
-                                    </div>
-                                }
-                            >
-                                <strong>"Established trust"</strong>
-                                <span class="row"><b>"Mode"</b><i>{runtime_label}</i></span>
-                                <span class="row"><b>"Consumer"</b><i>{session_consumer}</i></span>
-                                <span class="row"><b>"Authenticated"</b><i>"No"</i></span>
-                                <span class="row"><b>"Device bound"</b><i>"No"</i></span>
-                                <span class="panel-link">"Established by the gateway, never by this page"</span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Session layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Capabilities)>
-                        <div
-                            class:selected=move || selected.get() == "capabilities"
-                            class:pinned=move || layout.get().presentation(CardId::Capabilities).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Capabilities).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Capabilities)
-                            class="object capabilities"
-                            style=move || card_style(layout.get(), CardId::Capabilities)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Capabilities card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Capabilities, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Capabilities, layout)
-                            on:click=move |_| set_selected.set("capabilities")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Sparkles size=14 /><span>"Health1"</span></small>
-                                <CardControls card=CardId::Capabilities layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Capabilities).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Capabilities"</b>
-                                        <span>{system_label()}</span>
-                                    </div>
-                                }
-                            >
-                                <h1>{system_label}</h1>
-                                <span class="capabilities-kind">"Capability health"</span>
-                                <p>"A capability is available only while every organ it depends on answers Health1. Nothing here is composed by this page."</p>
-                                <div class="capability-list">
-                                    <For
-                                        each=capabilities
-                                        key=|capability| capability.id.clone()
-                                        children=move |capability| {
-                                            let available = capability.state == cybou_protocol::CapabilityState::Available;
-                                            let status = capability_state_label(capability.state);
-                                            let reason = capability.reason.unwrap_or_default();
-                                            view! {
-                                                <span class:available=available class="capability-line">
-                                                    <span class="status-dot" aria-hidden="true"></span>
-                                                    <b>{capability.id}</b>
-                                                    <i>{status}</i>
-                                                    <small>{reason}</small>
-                                                </span>
-                                            }
-                                        }
-                                    />
+                <Show when=move || !layout.get().is_in_deck(CardId::Capabilities)>
+                    <div
+                        class:selected=move || selected.get() == "capabilities"
+                        class:pinned=move || layout.get().presentation(CardId::Capabilities).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Capabilities).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Capabilities)
+                        class="object capabilities"
+                        style=move || card_style(layout.get(), CardId::Capabilities)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Capabilities card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Capabilities, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Capabilities, layout)
+                        on:click=move |_| set_selected.set("capabilities")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Sparkles size=14 /><span>"Health1"</span></small>
+                            <CardControls card=CardId::Capabilities layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Capabilities).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Capabilities"</b>
+                                    <span>{system_label()}</span>
                                 </div>
-                                <footer class="capabilities-meta">
-                                    <span><small>"Observed"</small><b>{observed_label}</b></span>
-                                </footer>
-                            </Show>
-                            <CardResizeHandle card=CardId::Capabilities layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Journal)>
-                        <div
-                            class:selected=move || selected.get() == "journal"
-                            class:pinned=move || layout.get().presentation(CardId::Journal).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Journal).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Journal)
-                            class="object journal"
-                            style=move || card_style(layout.get(), CardId::Journal)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Journal card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Journal, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Journal, layout)
-                            on:click=move |_| set_selected.set("journal")
+                            }
                         >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Files size=14 /><span>"Event1"</span></small>
-                                <CardControls card=CardId::Journal layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Journal).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Journal"</b>
-                                        <span>{journal_count()}" entries"</span>
-                                    </div>
-                                }
-                            >
-                                <strong>"Canonical Journal"</strong>
-                                <span class="row"><b>"Contributions"</b><i>{journal_count}</i></span>
-                                <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch}</i></span>
-                                <span class="row"><b>"Integrity"</b><i>{journal_integrity}</i></span>
-                                <div class="journal-feed">
-                                    <For
-                                        each=journal_recent
-                                        key=|contribution| contribution.message_id.clone()
-                                        children=move |contribution| {
-                                            view! {
-                                                <span class="journal-line">
-                                                    <b>{contribution.kind}</b>
-                                                    <i>{contribution.origin_organ}</i>
-                                                    <small>{contribution.recorded_at}</small>
-                                                </span>
-                                            }
-                                        }
-                                    />
-                                </div>
-                                <span class="journal-footer"><i>{journal_state}</i><b>"Append only"</b></span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Journal layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Lifecycle)>
-                        <article
-                            class:selected=move || selected.get() == "lifecycle"
-                            class:pinned=move || layout.get().presentation(CardId::Lifecycle).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Lifecycle).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Lifecycle)
-                            class="object lifecycle"
-                            style=move || card_style(layout.get(), CardId::Lifecycle)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Lifecycle card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Lifecycle, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Lifecycle, layout)
-                            on:click=move |_| set_selected.set("lifecycle")
-                        >
-                            <header class="card-header">
-                                <div class="lifecycle-heading">
-                                    <small class="panel-kicker"><Sparkles size=14 /><span>"Lifecycle1"</span></small>
-                                    <b>{lifecycle_mode}</b>
-                                </div>
-                                <CardControls card=CardId::Lifecycle layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Lifecycle).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Lifecycle"</b>
-                                        <span>{lifecycle_mode()}</span>
-                                    </div>
-                                }
-                            >
-                                <strong>"Sleep and wake"</strong>
-                                <p>"The mode is the owner's own spelling, not a summary of it. After fifteen idle minutes the system re-verifies its whole chain, and stops the moment someone arrives."</p>
-                                <span class="row"><b>"Last user activity"</b><i>{lifecycle_activity}</i></span>
-                                <span class="lifecycle-source">{mind_observed}</span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Lifecycle layout=layout resizing=resizing />
-                        </article>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Commitments)>
-                        <div
-                            class:selected=move || selected.get() == "commitments"
-                            class:pinned=move || layout.get().presentation(CardId::Commitments).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Commitments).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Commitments)
-                            class="object commitments"
-                            style=move || card_style(layout.get(), CardId::Commitments)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Commitments card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Commitments, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Commitments, layout)
-                            on:click=move |_| set_selected.set("commitments")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><ListChecks size=14 /><span>{commitments_label}</span></small>
-                                <CardControls card=CardId::Commitments layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Commitments).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Commitments"</b>
-                                        <span>{commitments_label()}</span>
-                                    </div>
-                                }
-                            >
+                            <h1>{system_label}</h1>
+                            <span class="capabilities-kind">"Capability health"</span>
+                            <p>"A capability is available only while every organ it depends on answers Health1. Nothing here is composed by this page."</p>
+                            <div class="capability-list">
                                 <For
-                                    each=commitments
-                                    key=|commitment| commitment.id.clone()
-                                    children=move |commitment| {
+                                    each=capabilities
+                                    key=|capability| capability.id.clone()
+                                    children=move |capability| {
+                                        let available = capability.state == cybou_protocol::CapabilityState::Available;
+                                        let status = capability_state_label(capability.state);
+                                        let reason = capability.reason.unwrap_or_default();
                                         view! {
-                                            <span class="check-row">
-                                                <b>{commitment.description}</b>
-                                                <i>{commitment.trigger}</i>
+                                            <span class:available=available class="capability-line">
+                                                <span class="status-dot" aria-hidden="true"></span>
+                                                <b>{capability.id}</b>
+                                                <i>{status}</i>
+                                                <small>{reason}</small>
                                             </span>
                                         }
                                     }
                                 />
-                                <span class="panel-link">"Intention1 holds these until they are closed"</span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Commitments layout=layout resizing=resizing />
-                        </div>
-                    </Show>
+                            </div>
+                            <footer class="capabilities-meta">
+                                <span><small>"Observed"</small><b>{observed_label}</b></span>
+                            </footer>
+                        </Show>
+                        <CardResizeHandle card=CardId::Capabilities layout=layout resizing=resizing />
+                    </div>
+                </Show>
 
-                    <Show when=move || !layout.get().is_in_deck(CardId::SelfModel)>
-                        <article
-                            class:selected=move || selected.get() == "self"
-                            class:pinned=move || layout.get().presentation(CardId::SelfModel).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::SelfModel).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::SelfModel)
-                            class="object self-model"
-                            style=move || card_style(layout.get(), CardId::SelfModel)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Self-assessment card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::SelfModel, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::SelfModel, layout)
-                            on:click=move |_| set_selected.set("self")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Sparkles size=14 /><span>"Self1"</span></small>
-                                <CardControls card=CardId::SelfModel layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::SelfModel).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Self-assessment"</b>
-                                        <span>{self_open_intentions()}" open"</span>
-                                    </div>
-                                }
-                            >
-                                <strong>"Self-assessment"</strong>
-                                <p class="self-narration">{self_narration}</p>
-                                <span class="row"><b>"Open obligations"</b><i>{self_open_intentions}</i></span>
-                                <span class="row"><b>"Settled predictions"</b><i>{self_settled}</i></span>
-                                <span class="panel-link">"Composed by Self1, not by this page"</span>
-                            </Show>
-                            <CardResizeHandle card=CardId::SelfModel layout=layout resizing=resizing />
-                        </article>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Beliefs)>
-                        <div
-                            class:selected=move || selected.get() == "beliefs"
-                            class:pinned=move || layout.get().presentation(CardId::Beliefs).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Beliefs).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Beliefs)
-                            class="object beliefs"
-                            style=move || card_style(layout.get(), CardId::Beliefs)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Beliefs card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Beliefs, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Beliefs, layout)
-                            on:click=move |_| set_selected.set("beliefs")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Sparkles size=14 /><span>"Epistemic1"</span></small>
-                                <CardControls card=CardId::Beliefs layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Beliefs).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Beliefs"</b>
-                                        <span>{beliefs_label()}</span>
-                                    </div>
-                                }
-                            >
-                                <strong>{beliefs_label}</strong>
-                                <div class="belief-list">
-                                    <For
-                                        each=beliefs
-                                        key=|belief| belief.subject.clone()
-                                        children=move |belief| {
-                                            let observed = belief.status == "observed";
-                                            view! {
-                                                <span class:observed=observed class="belief-line">
-                                                    <b>{belief.subject}</b>
-                                                    <span class="belief-value">{belief.value}</span>
-                                                    <i>{belief.status}</i>
-                                                </span>
-                                            }
-                                        }
-                                    />
+                <Show when=move || !layout.get().is_in_deck(CardId::Journal)>
+                    <div
+                        class:selected=move || selected.get() == "journal"
+                        class:pinned=move || layout.get().presentation(CardId::Journal).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Journal).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Journal)
+                        class="object journal"
+                        style=move || card_style(layout.get(), CardId::Journal)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Journal card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Journal, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Journal, layout)
+                        on:click=move |_| set_selected.set("journal")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Files size=14 /><span>"Event1"</span></small>
+                            <CardControls card=CardId::Journal layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Journal).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Journal"</b>
+                                    <span>{journal_count()}" entries"</span>
                                 </div>
-                                <span class="panel-link">"A belief and its validity are separate facts"</span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Beliefs layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Context)>
-                        <div
-                            class:selected=move || selected.get() == "context"
-                            class:pinned=move || layout.get().presentation(CardId::Context).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Context).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Context)
-                            class="object context"
-                            style=move || card_style(layout.get(), CardId::Context)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Associative context card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Context, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Context, layout)
-                            on:click=move |_| set_selected.set("context")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Link size=14 /><span>"Context1"</span></small>
-                                <CardControls card=CardId::Context layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Context).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Context"</b>
-                                        <span>{context_label()}</span>
-                                    </div>
-                                }
-                            >
-                                <strong>{context_label}</strong>
-                                <div class="concept-list">
-                                    <For
-                                        each=concepts
-                                        key=|concept| concept.label.clone()
-                                        children=move |concept| {
-                                            view! {
-                                                <span class="concept-line">
-                                                    <b>{concept.label}</b>
-                                                    <i>{format!("{:.2}", concept.salience)}</i>
-                                                    <small>{concept.activation_reason}</small>
-                                                </span>
-                                            }
-                                        }
-                                    />
-                                </div>
-                                <span class="panel-link">"Association is not truth"</span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Context layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Perception)>
-                        <div
-                            class:selected=move || selected.get() == "perception"
-                            class:pinned=move || layout.get().presentation(CardId::Perception).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Perception).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Perception)
-                            class="object perception"
-                            style=move || card_style(layout.get(), CardId::Perception)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Perception card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Perception, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Perception, layout)
-                            on:click=move |_| set_selected.set("perception")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Files size=14 /><span>"Perception1"</span></small>
-                                <CardControls card=CardId::Perception layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Perception).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Perception"</b>
-                                        <span>{perception_status()}</span>
-                                    </div>
-                                }
-                            >
-                                <strong>"Host observation"</strong>
-                                <span class="row"><b>"Status"</b><i>{perception_status}</i></span>
-                                <span class="row"><b>"Source"</b><i>{perception_source}</i></span>
-                                <span class="row"><b>"Acquired"</b><i>{perception_at}</i></span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Perception layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <Show when=move || !layout.get().is_in_deck(CardId::Attention)>
-                        <div
-                            class:selected=move || selected.get() == "attention"
-                            class:pinned=move || layout.get().presentation(CardId::Attention).pinned
-                            class:collapsed=move || layout.get().presentation(CardId::Attention).collapsed
-                            class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Attention)
-                            class="object attention"
-                            style=move || card_style(layout.get(), CardId::Attention)
-                            tabindex="0"
-                            role="region"
-                            aria-label="Attention card. Drag to reposition; use arrow keys for keyboard movement."
-                            on:pointerdown=move |event| start_drag(event, CardId::Attention, layout, dragging)
-                            on:keydown=move |event| keyboard_move(event, CardId::Attention, layout)
-                            on:click=move |_| set_selected.set("attention")
-                        >
-                            <header class="card-header">
-                                <small class="panel-kicker"><Map size=14 /><span>"Workspace1"</span></small>
-                                <CardControls card=CardId::Attention layout=layout />
-                            </header>
-                            <Show
-                                when=move || !layout.get().presentation(CardId::Attention).collapsed
-                                fallback=move || view! {
-                                    <div class="card-collapsed-summary">
-                                        <b>"Attention"</b>
-                                        <span>{attention_focus()}</span>
-                                    </div>
-                                }
-                            >
-                                <strong>"Attention"</strong>
-                                <span class="attention-focus">{attention_focus}</span>
-                                <span class="row"><b>"Salience"</b><i>{attention_salience}</i></span>
-                                <span class="row"><b>"Organs"</b><i>{attention_organs}</i></span>
-                            </Show>
-                            <CardResizeHandle card=CardId::Attention layout=layout resizing=resizing />
-                        </div>
-                    </Show>
-
-                    <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-                    <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-                    <WebBrowserCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-                    <JournalFeedCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-                    <TelemetryCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-                    <EpistemicGraphCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-                    <IntentLauncherCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
-
-                    <For
-                        each={move || layout.get().decks.into_iter().map(|d| d.id).collect::<Vec<_>>()}
-                        key=|id| id.clone()
-                        children=move |deck_id| {
-                            view! {
-                                <DeckContainerView
-                                    deck_id=deck_id
-                                    layout=layout
-                                    history=history
-                                    dragging=dragging
-                                    resizing=resizing
-                                    runtime=runtime
-                                />
                             }
-                        }
-                    />
+                        >
+                            <strong>"Canonical Journal"</strong>
+                            <span class="row"><b>"Contributions"</b><i>{journal_count}</i></span>
+                            <span class="row"><b>"Erasure epoch"</b><i>{journal_epoch}</i></span>
+                            <span class="row"><b>"Integrity"</b><i>{journal_integrity}</i></span>
+                            <div class="journal-feed">
+                                <For
+                                    each=journal_recent
+                                    key=|contribution| contribution.message_id.clone()
+                                    children=move |contribution| {
+                                        view! {
+                                            <span class="journal-line">
+                                                <b>{contribution.kind}</b>
+                                                <i>{contribution.origin_organ}</i>
+                                                <small>{contribution.recorded_at}</small>
+                                            </span>
+                                        }
+                                    }
+                                />
+                            </div>
+                            <span class="journal-footer"><i>{journal_state}</i><b>"Append only"</b></span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Journal layout=layout resizing=resizing />
+                    </div>
+                </Show>
 
-                    <Show when=move || command_open.get()>
-                        <nav class="command-palette" aria-label="Desktop commands">
-                            <small>"Jump to"</small>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "capabilities health")
-                                on:click=move |_| select_from_command("capabilities", set_selected, set_command_open, set_command_query)
-    ><Sparkles size=15 /><span><b>"Capabilities"</b><i>"Health1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "identity subject continuity")
-                                on:click=move |_| select_from_command("identity", set_selected, set_command_open, set_command_query)
-    ><FileCheck size=15 /><span><b>"Identity"</b><i>"Identity1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "session trust mode")
-                                on:click=move |_| select_from_command("session", set_selected, set_command_open, set_command_query)
-    ><UsersRound size=15 /><span><b>"Session"</b><i>"Established trust"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "journal contributions event1")
-                                on:click=move |_| select_from_command("journal", set_selected, set_command_open, set_command_query)
-    ><Files size=15 /><span><b>"Journal"</b><i>"Event1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "lifecycle sleep wake")
-                                on:click=move |_| select_from_command("lifecycle", set_selected, set_command_open, set_command_query)
-    ><Sparkles size=15 /><span><b>"Lifecycle"</b><i>"Sleep and wake"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "commitments obligations intention1")
-                                on:click=move |_| select_from_command("commitments", set_selected, set_command_open, set_command_query)
-    ><ListChecks size=15 /><span><b>"Commitments"</b><i>"Intention1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "self assessment narration self1")
-                                on:click=move |_| select_from_command("self", set_selected, set_command_open, set_command_query)
-                            ><Sparkles size=15 /><span><b>"Self-assessment"</b><i>"Self1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "attention focus workspace1")
-                                on:click=move |_| select_from_command("attention", set_selected, set_command_open, set_command_query)
-                            ><Map size=15 /><span><b>"Attention"</b><i>"Workspace1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "beliefs epistemic1 validity")
-                                on:click=move |_| select_from_command("beliefs", set_selected, set_command_open, set_command_query)
-                            ><Sparkles size=15 /><span><b>"Beliefs"</b><i>"Epistemic1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "perception host observation")
-                                on:click=move |_| select_from_command("perception", set_selected, set_command_open, set_command_query)
-                            ><Files size=15 /><span><b>"Perception"</b><i>"Perception1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "context association concepts context1")
-                                on:click=move |_| select_from_command("context", set_selected, set_command_open, set_command_query)
-                            ><Link size=15 /><span><b>"Context"</b><i>"Context1"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "shell terminal body capability")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("shell");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
+                <Show when=move || !layout.get().is_in_deck(CardId::Lifecycle)>
+                    <article
+                        class:selected=move || selected.get() == "lifecycle"
+                        class:pinned=move || layout.get().presentation(CardId::Lifecycle).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Lifecycle).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Lifecycle)
+                        class="object lifecycle"
+                        style=move || card_style(layout.get(), CardId::Lifecycle)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Lifecycle card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Lifecycle, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Lifecycle, layout)
+                        on:click=move |_| set_selected.set("lifecycle")
+                    >
+                        <header class="card-header">
+                            <div class="lifecycle-heading">
+                                <small class="panel-kicker"><Sparkles size=14 /><span>"Lifecycle1"</span></small>
+                                <b>{lifecycle_mode}</b>
+                            </div>
+                            <CardControls card=CardId::Lifecycle layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Lifecycle).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Lifecycle"</b>
+                                    <span>{lifecycle_mode()}</span>
+                                </div>
+                            }
+                        >
+                            <strong>"Sleep and wake"</strong>
+                            <p>"The mode is the owner's own spelling, not a summary of it. After fifteen idle minutes the system re-verifies its whole chain, and stops the moment someone arrives."</p>
+                            <span class="row"><b>"Last user activity"</b><i>{lifecycle_activity}</i></span>
+                            <span class="lifecycle-source">{mind_observed}</span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Lifecycle layout=layout resizing=resizing />
+                    </article>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::Commitments)>
+                    <div
+                        class:selected=move || selected.get() == "commitments"
+                        class:pinned=move || layout.get().presentation(CardId::Commitments).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Commitments).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Commitments)
+                        class="object commitments"
+                        style=move || card_style(layout.get(), CardId::Commitments)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Commitments card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Commitments, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Commitments, layout)
+                        on:click=move |_| set_selected.set("commitments")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><ListChecks size=14 /><span>{commitments_label}</span></small>
+                            <CardControls card=CardId::Commitments layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Commitments).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Commitments"</b>
+                                    <span>{commitments_label()}</span>
+                                </div>
+                            }
+                        >
+                            <For
+                                each=commitments
+                                key=|commitment| commitment.id.clone()
+                                children=move |commitment| {
+                                    view! {
+                                        <span class="check-row">
+                                            <b>{commitment.description}</b>
+                                            <i>{commitment.trigger}</i>
+                                        </span>
+                                    }
                                 }
-                            ><IconTerminal size=15 /><span><b>"CYBOU Shell"</b><i>"Zone 3 Body capability"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "files file manager bounded folder")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("files");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><IconFolder size=15 /><span><b>"File Manager"</b><i>"Zone 3 Bounded Storage"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "browser web url navigation")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::WebBrowser(0), 460.0, 140.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("browser");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><IconGlobe size=15 /><span><b>"Web Browser"</b><i>"Sandboxed Web Surface"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "feed journal events stream integrity merkle")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("journal-feed");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><IconFile size=15 /><span><b>"Event Stream & Integrity"</b><i>"Real-time Journal SSE feed"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "telemetry host inspector daemons dbus")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::Telemetry(0), 440.0, 170.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("telemetry");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><IconTerminal size=15 /><span><b>"Host Telemetry & Daemons"</b><i>"14 Mind organs & D-Bus"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "graph epistemic knowledge causal map network")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::EpistemicGraph(0), 480.0, 130.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("epistemic-graph");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><Link size=15 /><span><b>"Epistemic Knowledge Graph"</b><i>"Topological causal relations"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "intent goal agent dispatcher reasoning tasks autonomous")
-                                on:click=move |_| {
-                                    layout.update(|l| l.open_card(CardId::IntentLauncher(0), 450.0, 140.0));
-                                    layout.get_untracked().save();
-                                    set_selected.set("intent");
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><Sparkles size=15 /><span><b>"Intent & Goal Dispatcher"</b><i>"Autonomous reasoning & tool dispatch"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "auth login sign in pam session")
-                                on:click=move |_| {
-                                    auth_modal_open.set(true);
-                                    set_command_open.set(false);
-                                    set_command_query.set(String::new());
-                                }
-                            ><IconShield size=15 /><span><b>"Sign in / Authenticate"</b><i>"PAM host credentials"</i></span></button>
-                            <hr style="width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16);" />
-                            <small>"Arrange"</small>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "undo layout revert")
-                                on:click=move |_| {
+                            />
+                            <span class="panel-link">"Intention1 holds these until they are closed"</span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Commitments layout=layout resizing=resizing />
+                    </div>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::SelfModel)>
+                    <article
+                        class:selected=move || selected.get() == "self"
+                        class:pinned=move || layout.get().presentation(CardId::SelfModel).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::SelfModel).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::SelfModel)
+                        class="object self-model"
+                        style=move || card_style(layout.get(), CardId::SelfModel)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Self-assessment card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::SelfModel, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::SelfModel, layout)
+                        on:click=move |_| set_selected.set("self")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Sparkles size=14 /><span>"Self1"</span></small>
+                            <CardControls card=CardId::SelfModel layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::SelfModel).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Self-assessment"</b>
+                                    <span>{self_open_intentions()}" open"</span>
+                                </div>
+                            }
+                        >
+                            <strong>"Self-assessment"</strong>
+                            <p class="self-narration">{self_narration}</p>
+                            <span class="row"><b>"Open obligations"</b><i>{self_open_intentions}</i></span>
+                            <span class="row"><b>"Settled predictions"</b><i>{self_settled}</i></span>
+                            <span class="panel-link">"Composed by Self1, not by this page"</span>
+                        </Show>
+                        <CardResizeHandle card=CardId::SelfModel layout=layout resizing=resizing />
+                    </article>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::Beliefs)>
+                    <div
+                        class:selected=move || selected.get() == "beliefs"
+                        class:pinned=move || layout.get().presentation(CardId::Beliefs).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Beliefs).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Beliefs)
+                        class="object beliefs"
+                        style=move || card_style(layout.get(), CardId::Beliefs)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Beliefs card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Beliefs, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Beliefs, layout)
+                        on:click=move |_| set_selected.set("beliefs")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Sparkles size=14 /><span>"Epistemic1"</span></small>
+                            <CardControls card=CardId::Beliefs layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Beliefs).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Beliefs"</b>
+                                    <span>{beliefs_label()}</span>
+                                </div>
+                            }
+                        >
+                            <strong>{beliefs_label}</strong>
+                            <div class="belief-list">
+                                <For
+                                    each=beliefs
+                                    key=|belief| belief.subject.clone()
+                                    children=move |belief| {
+                                        let observed = belief.status == "observed";
+                                        view! {
+                                            <span class:observed=observed class="belief-line">
+                                                <b>{belief.subject}</b>
+                                                <span class="belief-value">{belief.value}</span>
+                                                <i>{belief.status}</i>
+                                            </span>
+                                        }
+                                    }
+                                />
+                            </div>
+                            <span class="panel-link">"A belief and its validity are separate facts"</span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Beliefs layout=layout resizing=resizing />
+                    </div>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::Context)>
+                    <div
+                        class:selected=move || selected.get() == "context"
+                        class:pinned=move || layout.get().presentation(CardId::Context).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Context).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Context)
+                        class="object context"
+                        style=move || card_style(layout.get(), CardId::Context)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Associative context card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Context, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Context, layout)
+                        on:click=move |_| set_selected.set("context")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Link size=14 /><span>"Context1"</span></small>
+                            <CardControls card=CardId::Context layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Context).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Context"</b>
+                                    <span>{context_label()}</span>
+                                </div>
+                            }
+                        >
+                            <strong>{context_label}</strong>
+                            <div class="concept-list">
+                                <For
+                                    each=concepts
+                                    key=|concept| concept.label.clone()
+                                    children=move |concept| {
+                                        view! {
+                                            <span class="concept-line">
+                                                <b>{concept.label}</b>
+                                                <i>{format!("{:.2}", concept.salience)}</i>
+                                                <small>{concept.activation_reason}</small>
+                                            </span>
+                                        }
+                                    }
+                                />
+                            </div>
+                            <span class="panel-link">"Association is not truth"</span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Context layout=layout resizing=resizing />
+                    </div>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::Perception)>
+                    <div
+                        class:selected=move || selected.get() == "perception"
+                        class:pinned=move || layout.get().presentation(CardId::Perception).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Perception).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Perception)
+                        class="object perception"
+                        style=move || card_style(layout.get(), CardId::Perception)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Perception card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Perception, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Perception, layout)
+                        on:click=move |_| set_selected.set("perception")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Files size=14 /><span>"Perception1"</span></small>
+                            <CardControls card=CardId::Perception layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Perception).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Perception"</b>
+                                    <span>{perception_status()}</span>
+                                </div>
+                            }
+                        >
+                            <strong>"Host observation"</strong>
+                            <span class="row"><b>"Status"</b><i>{perception_status}</i></span>
+                            <span class="row"><b>"Source"</b><i>{perception_source}</i></span>
+                            <span class="row"><b>"Acquired"</b><i>{perception_at}</i></span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Perception layout=layout resizing=resizing />
+                    </div>
+                </Show>
+
+                <Show when=move || !layout.get().is_in_deck(CardId::Attention)>
+                    <div
+                        class:selected=move || selected.get() == "attention"
+                        class:pinned=move || layout.get().presentation(CardId::Attention).pinned
+                        class:collapsed=move || layout.get().presentation(CardId::Attention).collapsed
+                        class:magnet-target=move || dragging.get().and_then(|d| d.drop_target) == Some(CardId::Attention)
+                        class="object attention"
+                        style=move || card_style(layout.get(), CardId::Attention)
+                        tabindex="0"
+                        role="region"
+                        aria-label="Attention card. Drag to reposition; use arrow keys for keyboard movement."
+                        on:pointerdown=move |event| start_drag(event, CardId::Attention, layout, dragging)
+                        on:keydown=move |event| keyboard_move(event, CardId::Attention, layout)
+                        on:click=move |_| set_selected.set("attention")
+                    >
+                        <header class="card-header">
+                            <small class="panel-kicker"><Map size=14 /><span>"Workspace1"</span></small>
+                            <CardControls card=CardId::Attention layout=layout />
+                        </header>
+                        <Show
+                            when=move || !layout.get().presentation(CardId::Attention).collapsed
+                            fallback=move || view! {
+                                <div class="card-collapsed-summary">
+                                    <b>"Attention"</b>
+                                    <span>{attention_focus()}</span>
+                                </div>
+                            }
+                        >
+                            <strong>"Attention"</strong>
+                            <span class="attention-focus">{attention_focus}</span>
+                            <span class="row"><b>"Salience"</b><i>{attention_salience}</i></span>
+                            <span class="row"><b>"Organs"</b><i>{attention_organs}</i></span>
+                        </Show>
+                        <CardResizeHandle card=CardId::Attention layout=layout resizing=resizing />
+                    </div>
+                </Show>
+
+                <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />
+                <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />
+                <JournalFeedCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+
+                <For
+                    each={move || layout.get().decks.into_iter().map(|d| d.id).collect::<Vec<_>>()}
+                    key=|id| id.clone()
+                    children=move |deck_id| {
+                        view! {
+                            <DeckContainerView
+                                deck_id=deck_id
+                                layout=layout
+                                history=history
+                                dragging=dragging
+                                resizing=resizing
+                                runtime=runtime
+                            />
+                        }
+                    }
+                />
+
+                <Show when=move || command_open.get()>
+                    <nav class="command-palette" aria-label="Desktop commands">
+                        <small>"Jump to"</small>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "capabilities health")
+                            on:click=move |_| select_from_command("capabilities", set_selected, set_command_open, set_command_query)
+                        ><Sparkles size=15 /><span><b>"Capabilities"</b><i>"Health1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "identity subject continuity")
+                            on:click=move |_| select_from_command("identity", set_selected, set_command_open, set_command_query)
+                        ><FileCheck size=15 /><span><b>"Identity"</b><i>"Identity1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "session trust mode")
+                            on:click=move |_| select_from_command("session", set_selected, set_command_open, set_command_query)
+                        ><UsersRound size=15 /><span><b>"Session"</b><i>"Established trust"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "journal contributions event1")
+                            on:click=move |_| select_from_command("journal", set_selected, set_command_open, set_command_query)
+                        ><Files size=15 /><span><b>"Journal"</b><i>"Event1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "lifecycle sleep wake")
+                            on:click=move |_| select_from_command("lifecycle", set_selected, set_command_open, set_command_query)
+                        ><Sparkles size=15 /><span><b>"Lifecycle"</b><i>"Sleep and wake"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "commitments obligations intention1")
+                            on:click=move |_| select_from_command("commitments", set_selected, set_command_open, set_command_query)
+                        ><ListChecks size=15 /><span><b>"Commitments"</b><i>"Intention1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "self assessment narration self1")
+                            on:click=move |_| select_from_command("self", set_selected, set_command_open, set_command_query)
+                        ><Sparkles size=15 /><span><b>"Self-assessment"</b><i>"Self1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "attention focus workspace1")
+                            on:click=move |_| select_from_command("attention", set_selected, set_command_open, set_command_query)
+                        ><Map size=15 /><span><b>"Attention"</b><i>"Workspace1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "beliefs epistemic1 validity")
+                            on:click=move |_| select_from_command("beliefs", set_selected, set_command_open, set_command_query)
+                        ><Sparkles size=15 /><span><b>"Beliefs"</b><i>"Epistemic1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "perception host observation")
+                            on:click=move |_| select_from_command("perception", set_selected, set_command_open, set_command_query)
+                        ><Files size=15 /><span><b>"Perception"</b><i>"Perception1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "context association concepts context1")
+                            on:click=move |_| select_from_command("context", set_selected, set_command_open, set_command_query)
+                        ><Link size=15 /><span><b>"Context"</b><i>"Context1"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "shell terminal body capability")
+                            on:click=move |_| {
+                                layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                layout.get_untracked().save();
+                                set_selected.set("shell");
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconTerminal size=15 /><span><b>"CYBOU Shell"</b><i>"Zone 3 Body capability"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "files file manager bounded folder")
+                            on:click=move |_| {
+                                layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                layout.get_untracked().save();
+                                set_selected.set("files");
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconFolder size=15 /><span><b>"File Manager"</b><i>"Zone 3 Read-Only Storage"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "feed journal events stream live")
+                            on:click=move |_| {
+                                layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
+                                layout.get_untracked().save();
+                                set_selected.set("journal-feed");
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconFile size=15 /><span><b>"Event Stream"</b><i>"Real-time Journal SSE stream"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "auth login sign in pam session")
+                            on:click=move |_| {
+                                auth_modal_open.set(true);
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconShield size=15 /><span><b>"Sign in / Authenticate"</b><i>"PAM host credentials"</i></span></button>
+                        <hr style="width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16);" />
+                        <small>"Arrange"</small>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "undo layout revert")
+                            on:click=move |_| {
+                                apply_undo(history, layout);
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconUndo size=15 /><span><b>"Undo Layout Arrangement"</b><i>"Revert previous spatial state"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "redo layout forward")
+                            on:click=move |_| {
+                                apply_redo(history, layout);
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconRedo size=15 /><span><b>"Redo Layout Arrangement"</b><i>"Restore spatial state"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "arrange grid")
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                                layout.get_untracked().save();
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconGrid size=15 /><span><b>"Arrange: Grid"</b><i>"Structured alignment"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "arrange compact")
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                                layout.get_untracked().save();
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconMinimize size=15 /><span><b>"Arrange: Compact"</b><i>"Dense packing"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "arrange relations causal")
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                                layout.get_untracked().save();
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><Link size=15 /><span><b>"Arrange: Relations"</b><i>"Mind organ graph"</i></span></button>
+                        <button
+                            class:hidden=move || !command_matches(&command_query.get(), "reset layout")
+                            on:click=move |_| {
+                                history.update(|h| h.push(layout.get_untracked()));
+                                layout.set(DesktopLayout::default());
+                                layout.get_untracked().save();
+                                set_command_open.set(false);
+                                set_command_query.set(String::new());
+                            }
+                        ><IconRefresh size=15 /><span><b>"Reset Desktop Layout"</b><i>"Default coordinates"</i></span></button>
+                    </nav>
+                </Show>
+
+                <label class:open=move || command_open.get() class="command-bar" aria-label="Search or act">
+                    <Search size=19 />
+                    <input
+                        node_ref=command_input
+                        type="search"
+                        placeholder="Search or act…"
+                        prop:value=move || command_query.get()
+                        on:focus=move |_| set_command_open.set(true)
+                        on:input=move |event| set_command_query.set(event_target_value(&event))
+                        on:keydown=move |event: KeyboardEvent| {
+                            if event.key() == "Enter" {
+                                let q = command_query.get();
+                                if command_matches(&q, "undo") {
+                                    event.prevent_default();
                                     apply_undo(history, layout);
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
-                                }
-                            ><IconUndo size=15 /><span><b>"Undo Layout Arrangement"</b><i>"Revert previous spatial state"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "redo layout forward")
-                                on:click=move |_| {
+                                } else if command_matches(&q, "redo") {
+                                    event.prevent_default();
                                     apply_redo(history, layout);
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
-                                }
-                            ><IconRedo size=15 /><span><b>"Redo Layout Arrangement"</b><i>"Restore spatial state"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "arrange grid")
-                                on:click=move |_| {
+                                } else if command_matches(&q, "arrange grid") {
+                                    event.prevent_default();
                                     history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
-                                }
-                            ><IconGrid size=15 /><span><b>"Arrange: Grid"</b><i>"Structured alignment"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "arrange compact")
-                                on:click=move |_| {
+                                } else if command_matches(&q, "arrange compact") {
+                                    event.prevent_default();
                                     history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
-                                }
-                            ><IconMinimize size=15 /><span><b>"Arrange: Compact"</b><i>"Dense packing"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "arrange relations")
-                                on:click=move |_| {
+                                } else if command_matches(&q, "arrange relations") {
+                                    event.prevent_default();
                                     history.update(|h| h.push(layout.get_untracked()));
                                     layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
-                                }
-                            ><Link size=15 /><span><b>"Arrange: Relations"</b><i>"Causal graph topology"</i></span></button>
-                            <button
-                                class:hidden=move || !command_matches(&command_query.get(), "reset layout")
-                                on:click=move |_| {
+                                } else if command_matches(&q, "reset layout") {
+                                    event.prevent_default();
                                     history.update(|h| h.push(layout.get_untracked()));
                                     layout.set(DesktopLayout::default());
                                     layout.get_untracked().save();
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
+                                } else if command_matches(&q, "shell") {
+                                    event.prevent_default();
+                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("shell");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                } else if let Some(panel) = first_command_match(&q) {
+                                    event.prevent_default();
+                                    select_from_command(
+                                        panel,
+                                        set_selected,
+                                        set_command_open,
+                                        set_command_query,
+                                    );
                                 }
-                            ><IconRefresh size=15 /><span><b>"Reset Desktop Layout"</b><i>"Default coordinates"</i></span></button>
-                        </nav>
-                    </Show>
+                            }
+                        }
+                    />
+                    <kbd>"Ctrl K"</kbd>
+                </label>
 
-                    <label class:open=move || command_open.get() class="command-bar" aria-label="Search or act">
-                        <Search size=19 />
-                        <input
-                            node_ref=command_input
-                            type="search"
-                            placeholder="Search or act…"
-                            prop:value=move || command_query.get()
-                            on:focus=move |_| set_command_open.set(true)
-                            on:input=move |event| set_command_query.set(event_target_value(&event))
-                            on:keydown=move |event: KeyboardEvent| {
-                                if event.key() == "Enter" {
-                                    let q = command_query.get();
-                                    if command_matches(&q, "undo") {
-                                        event.prevent_default();
-                                        apply_undo(history, layout);
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if command_matches(&q, "redo") {
-                                        event.prevent_default();
-                                        apply_redo(history, layout);
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if command_matches(&q, "arrange grid") {
-                                        event.prevent_default();
-                                        history.update(|h| h.push(layout.get_untracked()));
-                                        layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
-                                        layout.get_untracked().save();
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if command_matches(&q, "arrange compact") {
-                                        event.prevent_default();
-                                        history.update(|h| h.push(layout.get_untracked()));
-                                        layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
-                                        layout.get_untracked().save();
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if command_matches(&q, "arrange relations") {
-                                        event.prevent_default();
-                                        history.update(|h| h.push(layout.get_untracked()));
-                                        layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
-                                        layout.get_untracked().save();
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if command_matches(&q, "reset layout") {
-                                        event.prevent_default();
-                                        history.update(|h| h.push(layout.get_untracked()));
-                                        layout.set(DesktopLayout::default());
-                                        layout.get_untracked().save();
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if command_matches(&q, "shell") {
-                                        event.prevent_default();
-                                        layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
-                                        layout.get_untracked().save();
-                                        set_selected.set("shell");
-                                        set_command_open.set(false);
-                                        set_command_query.set(String::new());
-                                    } else if let Some(panel) = first_command_match(&q) {
-                                        event.prevent_default();
-                                        select_from_command(
-                                            panel,
-                                            set_selected,
-                                            set_command_open,
-                                            set_command_query,
-                                        );
-                                    }
+                <Show when=move || minimap_visible.get()>
+                    <nav class="desktop-minimap" aria-label="Desktop spatial overview">
+                        <div class="minimap-surface">
+                            <Show when=move || layout.get().contains_card(CardId::Identity) && !layout.get().is_in_deck(CardId::Identity)>
+                                <button
+                                    class:selected=move || selected.get() == "identity"
+                                    class="mini-node identity-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Identity))
+                                    aria-label="Select identity card"
+                                    on:click=move |_| set_selected.set("identity")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Capabilities) && !layout.get().is_in_deck(CardId::Capabilities)>
+                                <button
+                                    class:selected=move || selected.get() == "capabilities"
+                                    class="mini-node capabilities-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Capabilities))
+                                    aria-label="Select capabilities card"
+                                    on:click=move |_| set_selected.set("capabilities")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Session) && !layout.get().is_in_deck(CardId::Session)>
+                                <button
+                                    class:selected=move || selected.get() == "session"
+                                    class="mini-node session-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Session))
+                                    aria-label="Select session card"
+                                    on:click=move |_| set_selected.set("session")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Journal) && !layout.get().is_in_deck(CardId::Journal)>
+                                <button
+                                    class:selected=move || selected.get() == "journal"
+                                    class="mini-node journal-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Journal))
+                                    aria-label="Select journal card"
+                                    on:click=move |_| set_selected.set("journal")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Lifecycle) && !layout.get().is_in_deck(CardId::Lifecycle)>
+                                <button
+                                    class:selected=move || selected.get() == "lifecycle"
+                                    class="mini-node lifecycle-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Lifecycle))
+                                    aria-label="Select lifecycle card"
+                                    on:click=move |_| set_selected.set("lifecycle")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Commitments) && !layout.get().is_in_deck(CardId::Commitments)>
+                                <button
+                                    class:selected=move || selected.get() == "commitments"
+                                    class="mini-node commitments-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Commitments))
+                                    aria-label="Select commitments card"
+                                    on:click=move |_| set_selected.set("commitments")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::SelfModel) && !layout.get().is_in_deck(CardId::SelfModel)>
+                                <button
+                                    class:selected=move || selected.get() == "self"
+                                    class="mini-node self-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::SelfModel))
+                                    aria-label="Select self-model card"
+                                    on:click=move |_| set_selected.set("self")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Attention) && !layout.get().is_in_deck(CardId::Attention)>
+                                <button
+                                    class:selected=move || selected.get() == "attention"
+                                    class="mini-node attention-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Attention))
+                                    aria-label="Select attention card"
+                                    on:click=move |_| set_selected.set("attention")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Beliefs) && !layout.get().is_in_deck(CardId::Beliefs)>
+                                <button
+                                    class:selected=move || selected.get() == "beliefs"
+                                    class="mini-node beliefs-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Beliefs))
+                                    aria-label="Select beliefs card"
+                                    on:click=move |_| set_selected.set("beliefs")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Perception) && !layout.get().is_in_deck(CardId::Perception)>
+                                <button
+                                    class:selected=move || selected.get() == "perception"
+                                    class="mini-node perception-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Perception))
+                                    aria-label="Select perception card"
+                                    on:click=move |_| set_selected.set("perception")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Context) && !layout.get().is_in_deck(CardId::Context)>
+                                <button
+                                    class:selected=move || selected.get() == "context"
+                                    class="mini-node context-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Context))
+                                    aria-label="Select context card"
+                                    on:click=move |_| set_selected.set("context")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::Shell(0)) && !layout.get().is_in_deck(CardId::Shell(0))>
+                                <button
+                                    class:selected=move || selected.get() == "shell"
+                                    class="mini-node shell-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::Shell(0)))
+                                    aria-label="Select shell card"
+                                    on:click=move |_| set_selected.set("shell")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::FileManager(0)) && !layout.get().is_in_deck(CardId::FileManager(0))>
+                                <button
+                                    class:selected=move || selected.get() == "files"
+                                    class="mini-node files-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::FileManager(0)))
+                                    aria-label="Select file manager card"
+                                    on:click=move |_| set_selected.set("files")
+                                ></button>
+                            </Show>
+                            <Show when=move || layout.get().contains_card(CardId::JournalFeed(0)) && !layout.get().is_in_deck(CardId::JournalFeed(0))>
+                                <button
+                                    class:selected=move || selected.get() == "journal-feed"
+                                    class="mini-node feed-node"
+                                    style=move || minimap_style(layout.get().geometry(CardId::JournalFeed(0)))
+                                    aria-label="Select event feed card"
+                                    on:click=move |_| set_selected.set("journal-feed")
+                                ></button>
+                            </Show>
+                            <div
+                                class="minimap-viewport"
+                                style=move || {
+                                    let (px, py) = pan.get();
+                                    let z = zoom.get();
+                                    let scale = 0.08;
+                                    let left = (-px * scale).max(0.0);
+                                    let top = (-py * scale).max(0.0);
+                                    let width = (1200.0 * scale / z).min(180.0);
+                                    let height = (800.0 * scale / z).min(130.0);
+                                    format!("left:{:.1}px;top:{:.1}px;width:{:.1}px;height:{:.1}px;", left, top, width, height)
+                                }
+                            ></div>
+                        </div>
+                    </nav>
+                </Show>
+
+                <Show when=move || capabilities_open.get()>
+                    <aside id="capability-inspector" class="capability-inspector" aria-label="Gateway capabilities">
+                        <header>
+                            <span><strong>"Gateway capabilities"</strong><small>{observed_label}</small></span>
+                            <button aria-label="Close capability inspector" on:click=move |_| set_capabilities_open.set(false)>"×"</button>
+                        </header>
+                        <For
+                            each=capabilities
+                            key=|capability| capability.id.clone()
+                            children=move |capability| {
+                                let available = capability.state == cybou_protocol::CapabilityState::Available;
+                                let status = capability_state_label(capability.state);
+                                let context = capability.reason.unwrap_or_else(|| {
+                                    format!(
+                                        "{} · {}",
+                                        knowledge_label(capability.knowledge),
+                                        freshness_label(capability.freshness),
+                                    )
+                                });
+                                view! {
+                                    <div class:available=available class="capability-row">
+                                        <span class="status-dot" aria-hidden="true"></span>
+                                        <span><b>{capability.id}</b><small>{context}</small></span>
+                                        <i>{status}</i>
+                                    </div>
                                 }
                             }
                         />
-                        <kbd>"Ctrl K"</kbd>
-                    </label>
+                    </aside>
+                </Show>
 
-                    <Show when=move || minimap_visible.get()>
-                        <nav class="minimap" aria-label="Desktop map">
-                            <header><Map size=15 /><strong>"Desktop map"</strong></header>
-                            <div class="minimap-field">
-                                <For
-                                    each={move || layout.get().decks.into_iter().map(|d| (d.id, d.title, d.geometry)).collect::<Vec<_>>()}
-                                    key=|(id, _, _)| id.clone()
-                                    children=move |(d_id, title, geom)| {
-                                        let id_click = d_id.clone();
-                                        view! {
-                                            <button
-                                                class="mini-node deck-node"
-                                                style=move || minimap_style(geom)
-                                                title=format!("Deck: {title}")
-                                                aria-label=format!("Select deck {title}")
-                                                on:click=move |_| {
-                                                    layout.update(|l| l.bring_deck_forward(&id_click));
-                                                }
-                                            ></button>
-                                        }
-                                    }
-                                />
-                                <Show when=move || !layout.get().is_in_deck(CardId::Identity)>
-                                    <button
-                                        class:selected=move || selected.get() == "identity"
-                                        class="mini-node identity-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Identity))
-                                        aria-label="Select identity card"
-                                        on:click=move |_| set_selected.set("identity")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Session)>
-                                    <button
-                                        class:selected=move || selected.get() == "session"
-                                        class="mini-node session-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Session))
-                                        aria-label="Select session card"
-                                        on:click=move |_| set_selected.set("session")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Capabilities)>
-                                    <button
-                                        class:selected=move || selected.get() == "capabilities"
-                                        class="mini-node capabilities-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Capabilities))
-                                        aria-label="Select capabilities card"
-                                        on:click=move |_| set_selected.set("capabilities")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Journal)>
-                                    <button
-                                        class:selected=move || selected.get() == "journal"
-                                        class="mini-node journal-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Journal))
-                                        aria-label="Select journal card"
-                                        on:click=move |_| set_selected.set("journal")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Lifecycle)>
-                                    <button
-                                        class:selected=move || selected.get() == "lifecycle"
-                                        class="mini-node lifecycle-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Lifecycle))
-                                        aria-label="Select lifecycle card"
-                                        on:click=move |_| set_selected.set("lifecycle")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Commitments)>
-                                    <button
-                                        class:selected=move || selected.get() == "commitments"
-                                        class="mini-node commitments-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Commitments))
-                                        aria-label="Select commitments card"
-                                        on:click=move |_| set_selected.set("commitments")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::SelfModel)>
-                                    <button
-                                        class:selected=move || selected.get() == "self"
-                                        class="mini-node self-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::SelfModel))
-                                        aria-label="Select self-assessment card"
-                                        on:click=move |_| set_selected.set("self")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Attention)>
-                                    <button
-                                        class:selected=move || selected.get() == "attention"
-                                        class="mini-node attention-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Attention))
-                                        aria-label="Select attention card"
-                                        on:click=move |_| set_selected.set("attention")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Beliefs)>
-                                    <button
-                                        class:selected=move || selected.get() == "beliefs"
-                                        class="mini-node beliefs-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Beliefs))
-                                        aria-label="Select beliefs card"
-                                        on:click=move |_| set_selected.set("beliefs")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Perception)>
-                                    <button
-                                        class:selected=move || selected.get() == "perception"
-                                        class="mini-node perception-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Perception))
-                                        aria-label="Select perception card"
-                                        on:click=move |_| set_selected.set("perception")
-                                    ></button>
-                                </Show>
-                                <Show when=move || !layout.get().is_in_deck(CardId::Context)>
-                                    <button
-                                        class:selected=move || selected.get() == "context"
-                                        class="mini-node context-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Context))
-                                        aria-label="Select associative context card"
-                                        on:click=move |_| set_selected.set("context")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::Shell(0)) && !layout.get().is_in_deck(CardId::Shell(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "shell"
-                                        class="mini-node shell-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Shell(0)))
-                                        aria-label="Select shell card"
-                                        on:click=move |_| set_selected.set("shell")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::FileManager(0)) && !layout.get().is_in_deck(CardId::FileManager(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "files"
-                                        class="mini-node files-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::FileManager(0)))
-                                        aria-label="Select file manager card"
-                                        on:click=move |_| set_selected.set("files")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::WebBrowser(0)) && !layout.get().is_in_deck(CardId::WebBrowser(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "browser"
-                                        class="mini-node browser-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::WebBrowser(0)))
-                                        aria-label="Select web browser card"
-                                        on:click=move |_| set_selected.set("browser")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::JournalFeed(0)) && !layout.get().is_in_deck(CardId::JournalFeed(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "journal-feed"
-                                        class="mini-node feed-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::JournalFeed(0)))
-                                        aria-label="Select event feed card"
-                                        on:click=move |_| set_selected.set("journal-feed")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::Telemetry(0)) && !layout.get().is_in_deck(CardId::Telemetry(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "telemetry"
-                                        class="mini-node telemetry-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::Telemetry(0)))
-                                        aria-label="Select host telemetry card"
-                                        on:click=move |_| set_selected.set("telemetry")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::EpistemicGraph(0)) && !layout.get().is_in_deck(CardId::EpistemicGraph(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "epistemic-graph"
-                                        class="mini-node graph-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::EpistemicGraph(0)))
-                                        aria-label="Select epistemic graph card"
-                                        on:click=move |_| set_selected.set("epistemic-graph")
-                                    ></button>
-                                </Show>
-                                <Show when=move || layout.get().contains_card(CardId::IntentLauncher(0)) && !layout.get().is_in_deck(CardId::IntentLauncher(0))>
-                                    <button
-                                        class:selected=move || selected.get() == "intent"
-                                        class="mini-node intent-node"
-                                        style=move || minimap_style(layout.get().geometry(CardId::IntentLauncher(0)))
-                                        aria-label="Select intent dispatcher card"
-                                        on:click=move |_| set_selected.set("intent")
-                                    ></button>
-                                </Show>
-                                <div
-                                    class="minimap-viewport"
-                                    style=move || {
-                                        let (px, py) = pan.get();
-                                        let z = zoom.get();
-                                        let scale = 0.08;
-                                        let left = (-px * scale).max(0.0);
-                                        let top = (-py * scale).max(0.0);
-                                        let width = (1200.0 * scale / z).min(180.0);
-                                        let height = (800.0 * scale / z).min(130.0);
-                                        format!("left:{:.1}px;top:{:.1}px;width:{:.1}px;height:{:.1}px;", left, top, width, height)
-                                    }
-                                ></div>
-                            </div>
-                        </nav>
-                    </Show>
-
-                    <Show when=move || capabilities_open.get()>
-                        <aside id="capability-inspector" class="capability-inspector" aria-label="Gateway capabilities">
-                            <header>
-                                <span><strong>"Gateway capabilities"</strong><small>{observed_label}</small></span>
-                                <button aria-label="Close capability inspector" on:click=move |_| set_capabilities_open.set(false)>"×"</button>
-                            </header>
-                            <For
-                                each=capabilities
-                                key=|capability| capability.id.clone()
-                                children=move |capability| {
-                                    let available = capability.state == cybou_protocol::CapabilityState::Available;
-                                    let status = capability_state_label(capability.state);
-                                    let context = capability.reason.unwrap_or_else(|| {
-                                        format!(
-                                            "{} · {}",
-                                            knowledge_label(capability.knowledge),
-                                            freshness_label(capability.freshness),
-                                        )
-                                    });
-                                    view! {
-                                        <div class:available=available class="capability-row">
-                                            <span class="status-dot" aria-hidden="true"></span>
-                                            <span><b>{capability.id}</b><small>{context}</small></span>
-                                            <i>{status}</i>
-                                        </div>
-                                    }
-                                }
-                            />
-                        </aside>
-                    </Show>
-
-                    <nav class="desktop-floating-bar" aria-label="Desktop quick actions">
-                        <button
-                            title="Undo layout movement (Ctrl+Z)"
-                            on:click=move |_| apply_undo(history, layout)
-                        >
-                            <IconUndo size=13 />
-                            <span>"Undo"</span>
-                        </button>
-                        <button
-                            title="Redo layout movement (Ctrl+Y)"
-                            on:click=move |_| apply_redo(history, layout)
-                        >
-                            <IconRedo size=13 />
-                            <span>"Redo"</span>
-                        </button>
-                        <div class="toolbar-separator"></div>
-                        <button
-                            title="Arrange in grid layout"
-                            on:click=move |_| {
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconGrid size=13 />
-                            <span>"Grid"</span>
-                        </button>
-                        <button
-                            title="Arrange in compact layout"
-                            on:click=move |_| {
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconMinimize size=13 />
-                            <span>"Compact"</span>
-                        </button>
-                        <button
-                            title="Arrange in causal relations layout"
-                            on:click=move |_| {
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <Link size=13 />
-                            <span>"Relations"</span>
-                        </button>
-                        <div class="toolbar-separator"></div>
-                        <button
-                            title="Zoom out"
-                            on:click=move |_| set_zoom.update(|z| *z = (*z - 0.1).max(0.4))
-                        >
-                            <IconZoomOut size=13 />
-                        </button>
-                        <button
-                            title="Reset zoom to 100%"
-                            on:click=move |_| {
-                                set_zoom.set(1.0);
-                                set_pan.set((0.0, 0.0));
-                            }
-                        >
-                            <span>{move || format!("{:.0}%", zoom.get() * 100.0)}</span>
-                        </button>
-                        <button
-                            title="Zoom in"
-                            on:click=move |_| set_zoom.update(|z| *z = (*z + 0.1).min(2.0))
-                        >
-                            <IconZoomIn size=13 />
-                        </button>
-                        <div class="toolbar-separator"></div>
-                        <button
-                            title="Toggle CYBOU Shell terminal"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::Shell(0)) {
-                                    layout.update(|l| l.close_card(CardId::Shell(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
-                                    set_selected.set("shell");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconTerminal size=13 />
-                            <span>"Shell"</span>
-                        </button>
-                        <button
-                            title="Toggle Bounded File Manager"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::FileManager(0)) {
-                                    layout.update(|l| l.close_card(CardId::FileManager(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
-                                    set_selected.set("files");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconFolder size=13 />
-                            <span>"Files"</span>
-                        </button>
-                        <button
-                            title="Toggle Sandboxed Web Browser"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::WebBrowser(0)) {
-                                    layout.update(|l| l.close_card(CardId::WebBrowser(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::WebBrowser(0), 460.0, 140.0));
-                                    set_selected.set("browser");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconGlobe size=13 />
-                            <span>"Browser"</span>
-                        </button>
-                        <button
-                            title="Toggle Event Stream & Integrity feed"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::JournalFeed(0)) {
-                                    layout.update(|l| l.close_card(CardId::JournalFeed(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
-                                    set_selected.set("journal-feed");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconFile size=13 />
-                            <span>"Feed"</span>
-                        </button>
-                        <button
-                            title="Toggle Host Telemetry & Daemons"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::Telemetry(0)) {
-                                    layout.update(|l| l.close_card(CardId::Telemetry(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::Telemetry(0), 440.0, 170.0));
-                                    set_selected.set("telemetry");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <IconTerminal size=13 />
-                            <span>"Telemetry"</span>
-                        </button>
-                        <button
-                            title="Toggle Epistemic Knowledge Graph"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::EpistemicGraph(0)) {
-                                    layout.update(|l| l.close_card(CardId::EpistemicGraph(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::EpistemicGraph(0), 480.0, 130.0));
-                                    set_selected.set("epistemic-graph");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <Link size=13 />
-                            <span>"Graph"</span>
-                        </button>
-                        <button
-                            title="Toggle Intent & Goal Dispatcher"
-                            on:click=move |_| {
-                                if layout.get_untracked().contains_card(CardId::IntentLauncher(0)) {
-                                    layout.update(|l| l.close_card(CardId::IntentLauncher(0)));
-                                } else {
-                                    layout.update(|l| l.open_card(CardId::IntentLauncher(0), 450.0, 140.0));
-                                    set_selected.set("intent");
-                                }
-                                layout.get_untracked().save();
-                            }
-                        >
-                            <Sparkles size=13 />
-                            <span>"Intent"</span>
-                        </button>
-                        <button
-                            class:active=move || minimap_visible.get()
-                            title="Toggle Desktop Minimap"
-                            on:click=move |_| set_minimap_visible.update(|v| *v = !*v)
-                        >
-                            <Map size=13 />
-                            <span>"Map"</span>
-                        </button>
-                    </nav>
-
+                <nav class="desktop-floating-bar" aria-label="Desktop quick actions">
                     <button
-                        class:open=move || capabilities_open.get()
-                        class="system-state"
-                        aria-label="Open gateway capability inspector"
-                        aria-expanded=move || capabilities_open.get().to_string()
-                        aria-controls="capability-inspector"
-                        on:click=move |_| set_capabilities_open.update(|open| *open = !*open)
+                        title="Undo layout movement (Ctrl+Z)"
+                        on:click=move |_| apply_undo(history, layout)
                     >
-                        <span class="status-dot" aria-hidden="true"></span>
-                        {system_label}
+                        <IconUndo size=13 />
+                        <span>"Undo"</span>
                     </button>
-                </section>
-                <DesktopDock layout=layout selected=selected set_selected=set_selected auth_modal_open=auth_modal_open />
-                <AuthModal open=auth_modal_open />
-            </main>
-        }
+                    <button
+                        title="Redo layout movement (Ctrl+Y)"
+                        on:click=move |_| apply_redo(history, layout)
+                    >
+                        <IconRedo size=13 />
+                        <span>"Redo"</span>
+                    </button>
+                    <div class="toolbar-separator"></div>
+                    <button
+                        title="Arrange in grid layout"
+                        on:click=move |_| {
+                            history.update(|h| h.push(layout.get_untracked()));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Grid));
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <IconGrid size=13 />
+                        <span>"Grid"</span>
+                    </button>
+                    <button
+                        title="Arrange in compact layout"
+                        on:click=move |_| {
+                            history.update(|h| h.push(layout.get_untracked()));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Compact));
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <IconMinimize size=13 />
+                        <span>"Compact"</span>
+                    </button>
+                    <button
+                        title="Arrange in causal relations layout"
+                        on:click=move |_| {
+                            history.update(|h| h.push(layout.get_untracked()));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Relations));
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <Link size=13 />
+                        <span>"Relations"</span>
+                    </button>
+                    <div class="toolbar-separator"></div>
+                    <button
+                        title="Zoom out"
+                        on:click=move |_| set_zoom.update(|z| *z = (*z - 0.1).max(0.4))
+                    >
+                        <IconZoomOut size=13 />
+                    </button>
+                    <button
+                        title="Reset zoom to 100%"
+                        on:click=move |_| {
+                            set_zoom.set(1.0);
+                            set_pan.set((0.0, 0.0));
+                        }
+                    >
+                        <span>{move || format!("{:.0}%", zoom.get() * 100.0)}</span>
+                    </button>
+                    <button
+                        title="Zoom in"
+                        on:click=move |_| set_zoom.update(|z| *z = (*z + 0.1).min(2.0))
+                    >
+                        <IconZoomIn size=13 />
+                    </button>
+                    <div class="toolbar-separator"></div>
+                    <button
+                        title="Toggle CYBOU Shell terminal"
+                        on:click=move |_| {
+                            if layout.get_untracked().contains_card(CardId::Shell(0)) {
+                                layout.update(|l| l.close_card(CardId::Shell(0)));
+                            } else {
+                                layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
+                                set_selected.set("shell");
+                            }
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <IconTerminal size=13 />
+                        <span>"Shell"</span>
+                    </button>
+                    <button
+                        title="Toggle Read-Only File Manager"
+                        on:click=move |_| {
+                            if layout.get_untracked().contains_card(CardId::FileManager(0)) {
+                                layout.update(|l| l.close_card(CardId::FileManager(0)));
+                            } else {
+                                layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                set_selected.set("files");
+                            }
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <IconFolder size=13 />
+                        <span>"Files"</span>
+                    </button>
+                    <button
+                        title="Toggle Event Stream SSE feed"
+                        on:click=move |_| {
+                            if layout.get_untracked().contains_card(CardId::JournalFeed(0)) {
+                                layout.update(|l| l.close_card(CardId::JournalFeed(0)));
+                            } else {
+                                layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
+                                set_selected.set("journal-feed");
+                            }
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <IconFile size=13 />
+                        <span>"Feed"</span>
+                    </button>
+                    <button
+                        class:active=move || minimap_visible.get()
+                        title="Toggle Desktop Minimap"
+                        on:click=move |_| set_minimap_visible.update(|v| *v = !*v)
+                    >
+                        <Map size=13 />
+                        <span>"Map"</span>
+                    </button>
+                </nav>
+
+                <button
+                    class:open=move || capabilities_open.get()
+                    class="system-state"
+                    aria-label="Open gateway capability inspector"
+                    aria-expanded=move || capabilities_open.get().to_string()
+                    aria-controls="capability-inspector"
+                    on:click=move |_| set_capabilities_open.update(|open| *open = !*open)
+                >
+                    <span class="status-dot" aria-hidden="true"></span>
+                    {system_label}
+                </button>
+            </section>
+            <DesktopDock layout=layout selected=selected set_selected=set_selected auth_modal_open=auth_modal_open runtime=runtime />
+            <AuthModal open=auth_modal_open />
+        </main>
+    }
 }
 
 fn card_style(layout: DesktopLayout, card: CardId) -> String {
     let geom = layout.geometry(card);
     let pres = layout.presentation(card);
     if pres.maximized {
-        "left:20px;top:20px;width:calc(100vw - 40px);height:calc(100vh - 100px);z-index:95;".to_string()
+        "left:20px;top:20px;width:calc(100vw - 40px);height:calc(100vh - 100px);z-index:95;"
+            .to_string()
     } else if pres.collapsed {
         format!(
             "left:{:.1}px;top:{:.1}px;width:{:.1}px;z-index:{}",
@@ -4560,7 +3660,9 @@ fn start_deck_drag(
     if event.button() != 0 {
         return;
     }
-    if let Some(target_el) = event.target().and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+    if let Some(target_el) = event
+        .target()
+        .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
         && target_el
             .closest("button, .deck-tab, .deck-tab-detach, .deck-controls, .card-control-btn")
             .ok()
@@ -4676,11 +3778,11 @@ fn finish_drag(
         layout.update(|current| {
             let deck_id_opt = current.deck_for_card(target_card).map(|d| d.id.clone());
             if let Some(d_id) = deck_id_opt {
-                current.add_to_deck(&d_id, dragged_card);
+                let _ = current.add_to_deck(&d_id, dragged_card);
             } else {
                 let target_geom = current.geometry(target_card);
                 let title = format!("{} + {}", target_card.title(), dragged_card.title());
-                current.create_deck(
+                let _ = current.create_deck(
                     title,
                     vec![target_card, dragged_card],
                     target_geom.x,
@@ -4799,23 +3901,53 @@ fn finish_resize(layout: RwSignal<DesktopLayout>, resizing: RwSignal<Option<Resi
 }
 
 fn keyboard_move(event: KeyboardEvent, card: CardId, layout: RwSignal<DesktopLayout>) {
+    if !event.alt_key() && !event.meta_key() {
+        return;
+    }
     if layout.get_untracked().presentation(card).pinned {
         return;
     }
-    let step = if event.shift_key() { 40.0 } else { 10.0 };
-    let (dx, dy) = match event.key().as_str() {
-        "ArrowLeft" => (-step, 0.0),
-        "ArrowRight" => (step, 0.0),
-        "ArrowUp" => (0.0, -step),
-        "ArrowDown" => (0.0, step),
-        _ => return,
-    };
+    let key = event.key();
+    let is_arrow = matches!(
+        key.as_str(),
+        "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"
+    );
+    if !is_arrow {
+        return;
+    }
     event.prevent_default();
-    layout.update(|current| {
-        current.bring_forward(card);
-        let geom = current.geometry(card);
-        current.set_position(card, (geom.x + dx).max(12.0), (geom.y + dy).max(12.0));
-    });
+
+    if event.shift_key() {
+        // Keyboard resize with Alt+Shift+Arrow
+        let delta = 20.0;
+        let (dw, dh) = match key.as_str() {
+            "ArrowLeft" => (-delta, 0.0),
+            "ArrowRight" => (delta, 0.0),
+            "ArrowUp" => (0.0, -delta),
+            "ArrowDown" => (0.0, delta),
+            _ => (0.0, 0.0),
+        };
+        layout.update(|current| {
+            current.bring_forward(card);
+            let geom = current.geometry(card);
+            current.set_size(card, geom.width + dw, geom.height + dh);
+        });
+    } else {
+        // Keyboard move with Alt+Arrow
+        let step = 20.0;
+        let (dx, dy) = match key.as_str() {
+            "ArrowLeft" => (-step, 0.0),
+            "ArrowRight" => (step, 0.0),
+            "ArrowUp" => (0.0, -step),
+            "ArrowDown" => (0.0, step),
+            _ => (0.0, 0.0),
+        };
+        layout.update(|current| {
+            current.bring_forward(card);
+            let geom = current.geometry(card);
+            current.set_position(card, (geom.x + dx).max(12.0), (geom.y + dy).max(12.0));
+        });
+    }
     layout.get_untracked().save();
 }
 
