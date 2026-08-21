@@ -22,6 +22,7 @@ pub mod observation;
 // and no daemon depends on them; see `docs/CURRENT_STATE.md`. Adding a type here is not evidence
 // that the corresponding behaviour exists.
 pub mod action;
+pub mod disclosure;
 pub mod governance;
 pub mod learning;
 pub mod meaning;

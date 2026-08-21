@@ -13,7 +13,11 @@ use cybou_fabric::{
     rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
     zbus_rpc::ResilientZbusClient,
 };
-use cybou_protocol::{CapabilityState, KnowledgeState, canonical::CanonicalEnvelope};
+use cybou_protocol::{
+    CapabilityState, KnowledgeState,
+    canonical::CanonicalEnvelope,
+    disclosure::{Withheld, WithheldBecause},
+};
 use cybou_web_contracts::{
     AttentionProjection, BeliefProjection, BeliefsProjection, CapabilityProjection,
     CommitmentProjection, CommitmentsProjection, ConceptProjection, ContextProjection,
@@ -23,9 +27,10 @@ use cybou_web_contracts::{
 use futures_util::StreamExt;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::sync::Mutex;
+use uuid::Uuid;
 use zbus::{Connection, Proxy, proxy::SignalStream};
 
-use crate::{GatewayError, PresenceSource};
+use crate::{Delivered, GatewayError, PresenceSource};
 
 fn field<'a>(map: &'a [(Value, Value)], name: &str) -> Option<&'a Value> {
     map.iter()
@@ -53,6 +58,16 @@ pub struct ZbusPresenceSource {
     /// the same answer, so a new route cannot forget to filter and publish what the last one did
     /// not.
     permitted_sensitivity: u8,
+    /// What the last projection this source built left out, and why.
+    ///
+    /// ADR-0030 B6: an item quietly dropped for policy reasons and an item that was never relevant
+    /// look identical unless something insists on the difference. The filter is the only place that
+    /// knows, so it is the place that records it.
+    withheld: Mutex<Vec<Withheld>>,
+    /// The contributions the last projection's items were derived from.
+    provenance: Mutex<Vec<Uuid>>,
+    /// How many items the last projection carried, whether or not their provenance was known.
+    supplied: AtomicU64,
 }
 
 impl ZbusPresenceSource {
@@ -91,7 +106,43 @@ impl ZbusPresenceSource {
             changed: Mutex::new(changed),
             projection_version: AtomicU64::new(0),
             permitted_sensitivity,
+            withheld: Mutex::new(Vec::new()),
+            provenance: Mutex::new(Vec::new()),
+            supplied: AtomicU64::new(0),
         })
+    }
+
+    /// Note that something was supplied, and what it came from.
+    fn note_supplied(&self, evidence: &[Uuid]) {
+        self.supplied.fetch_add(1, Ordering::Relaxed);
+        if evidence.is_empty() {
+            return;
+        }
+        if let Ok(mut provenance) = self.provenance.try_lock() {
+            for id in evidence {
+                if !provenance.contains(id) {
+                    provenance.push(*id);
+                }
+            }
+        }
+    }
+
+    /// Note that something was held back, and why.
+    fn note_withheld(&self, subject: Option<String>, because: WithheldBecause) {
+        if let Ok(mut withheld) = self.withheld.try_lock() {
+            withheld.push(Withheld { subject, because });
+        }
+    }
+
+    /// Start a fresh delivery, discarding what the last one recorded.
+    fn begin_delivery(&self) {
+        self.supplied.store(0, Ordering::Relaxed);
+        if let Ok(mut withheld) = self.withheld.try_lock() {
+            withheld.clear();
+        }
+        if let Ok(mut provenance) = self.provenance.try_lock() {
+            provenance.clear();
+        }
     }
 
     async fn encoded_snapshot(&self) -> Result<Vec<u8>, GatewayError> {
@@ -347,6 +398,12 @@ impl ZbusPresenceSource {
         // may only see ordinary things is told how many there are and not what they say — the
         // count is a fact about the system, the descriptions are the person's.
         if self.permitted_sensitivity < PERSONAL {
+            for _ in &open {
+                // Named by nothing at all. What a person promised is their words, and a subject
+                // here would be those words: the count is the fact about the system, and the
+                // descriptions are the person's.
+                self.note_withheld(None, WithheldBecause::BelongsToThePerson);
+            }
             return CommitmentsProjection {
                 knowledge: KnowledgeState::Known,
                 open_count: self.read(INTENTION, "OpenCount").await,
@@ -448,7 +505,21 @@ impl ZbusPresenceSource {
                     // A belief above what this reader is permitted is left out rather than
                     // blanked: an entry saying a subject exists but its value is withheld still
                     // tells a stranger the person said something about it.
-                    .filter(|belief| belief.sensitivity <= self.permitted_sensitivity)
+                    .filter(|belief| {
+                        let permitted = belief.sensitivity <= self.permitted_sensitivity;
+                        if permitted {
+                            self.note_supplied(&belief.evidence);
+                        } else {
+                            // The subject is named and the value is not. A person asking "why did
+                            // it not tell me that?" needs the subject; anyone else must not learn
+                            // the value from a record that outlives the erasure of the value.
+                            self.note_withheld(
+                                Some(belief.subject.clone()),
+                                WithheldBecause::AboveConsumerTrust,
+                            );
+                        }
+                        permitted
+                    })
                     .map(|belief| BeliefProjection {
                         subject: belief.subject,
                         value: belief.value,
@@ -498,7 +569,20 @@ impl ZbusPresenceSource {
                 knowledge: KnowledgeState::Known,
                 concepts: concepts
                     .into_iter()
-                    .filter(|concept| concept.sensitivity <= self.permitted_sensitivity)
+                    .filter(|concept| {
+                        let permitted = concept.sensitivity <= self.permitted_sensitivity;
+                        if permitted {
+                            // A concept does not carry what it was derived from, so it is counted
+                            // as supplied and cannot be accounted for. The record says both.
+                            self.note_supplied(&[]);
+                        } else {
+                            self.note_withheld(
+                                Some(concept.label.clone()),
+                                WithheldBecause::AboveConsumerTrust,
+                            );
+                        }
+                        permitted
+                    })
                     .map(|concept| ConceptProjection {
                         label: concept.label,
                         salience: concept.salience,
@@ -601,6 +685,12 @@ struct OwnerBelief {
     confidence: f64,
     status: String,
     last_corroborated_at: String,
+    /// The contributions this belief was formed from.
+    ///
+    /// Absent in projections written before beliefs carried it, which is treated as provenance that
+    /// cannot be accounted for rather than as a belief that came from nothing.
+    #[serde(default)]
+    evidence: Vec<Uuid>,
     /// What the belief was derived from, on the frozen sensitivity scale.
     ///
     /// Absent in projections written before beliefs carried it. Absent is not ordinary: a belief
@@ -673,6 +763,10 @@ impl PresenceSource for ZbusPresenceSource {
     }
 
     async fn mind(&self) -> Result<MindProjection, GatewayError> {
+        // One projection is one delivery, so what the last one withheld is cleared before this one
+        // starts. Accumulating across requests would report an item as held back long after the
+        // request it was held back from.
+        self.begin_delivery();
         Ok(MindProjection {
             schema_version: WEB_SCHEMA_V1,
             observed_at: OffsetDateTime::now_utc()
@@ -688,6 +782,22 @@ impl PresenceSource for ZbusPresenceSource {
             perception: self.perception().await,
             context: self.context().await,
         })
+    }
+
+    fn last_delivery(&self) -> Delivered {
+        Delivered {
+            items: self
+                .provenance
+                .try_lock()
+                .map(|held| held.clone())
+                .unwrap_or_default(),
+            item_count: u32::try_from(self.supplied.load(Ordering::Relaxed)).unwrap_or(u32::MAX),
+            withheld: self
+                .withheld
+                .try_lock()
+                .map(|held| held.clone())
+                .unwrap_or_default(),
+        }
     }
 
     async fn wait_for_change(&self) -> Result<(), GatewayError> {

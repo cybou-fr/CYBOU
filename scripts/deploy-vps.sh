@@ -40,7 +40,6 @@ cybou_ssh "
     cybou-lifecycled
     cybou-selfd
     cybou-presenced
-    cybou-shelld
   )
   for daemon in \"\${DAEMONS[@]}\"; do
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"

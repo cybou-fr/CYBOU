@@ -8,8 +8,8 @@ use std::{net::SocketAddr, sync::Arc};
 #[cfg(target_os = "linux")]
 use cybou_web_contracts::SessionMode;
 use cybou_web_gateway::{
-    PresenceSource, SessionContext, access::CredentialVerifier, fixture::FixturePresenceSource,
-    router_with_verifier_and_access,
+    DisclosureSink, PresenceSource, SessionContext, access::CredentialVerifier,
+    fixture::FixturePresenceSource, router_recording_disclosures,
 };
 
 #[tokio::main]
@@ -73,7 +73,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     axum::serve(
         listener,
-        router_with_verifier_and_access(presence, privileged, verifier, web_root, session_context),
+        router_recording_disclosures(
+            presence,
+            privileged,
+            verifier,
+            disclosure_sink(),
+            web_root,
+            session_context,
+        ),
     )
     .await?;
     Ok(())
@@ -122,6 +129,24 @@ fn credential_verifier() -> Option<Arc<dyn CredentialVerifier>> {
 #[cfg(not(target_os = "linux"))]
 fn credential_verifier() -> Option<Arc<dyn CredentialVerifier>> {
     // The helper is a unix socket and a PAM stack; there is neither here.
+    None
+}
+
+/// Where this deployment records what it supplied to whom.
+///
+/// `None` on a fixture-backed or non-Linux gateway: there is no Journal behind it, and a sink that
+/// silently discarded records would make a deployment that cannot say who read what look exactly
+/// like one that can.
+#[cfg(target_os = "linux")]
+fn disclosure_sink() -> Option<Arc<dyn DisclosureSink>> {
+    if std::env::var_os("CYBOU_GATEWAY_FIXTURE").is_some() {
+        return None;
+    }
+    Some(Arc::new(cybou_web_gateway::auth_socket::JournalSink))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn disclosure_sink() -> Option<Arc<dyn DisclosureSink>> {
     None
 }
 

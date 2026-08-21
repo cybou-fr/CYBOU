@@ -72,6 +72,21 @@ struct Answer {
     authenticated: bool,
 }
 
+/// Records disclosures by submitting them to Event1.
+pub struct JournalSink;
+
+#[async_trait]
+impl crate::DisclosureSink for JournalSink {
+    async fn record(&self, envelope: &cybou_protocol::canonical::CanonicalEnvelope) -> bool {
+        // A fresh connection per record. Deliveries are rare — one per change in what a consumer is
+        // being supplied — so a held connection would exist mostly to be stale.
+        let Ok(client) = cybou_fabric::event_client::EventClient::session().await else {
+            return false;
+        };
+        client.submit(envelope).await.is_ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

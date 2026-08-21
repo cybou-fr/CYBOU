@@ -4,6 +4,12 @@
 # cybou-shelld provides bounded Body capability execution inside cybou-jailfs.
 # Runs in the user manager with sandboxing protections enabled.
 
+# Not installed yet: cybou-shelld is a library and has no binary, so this unit describes a process
+# that does not exist. It is kept because the shape is decided; it is left out of the deploy and
+# out of cybou-mind.target until there is something for ExecStart to run, because a unit that
+# cannot start would make the control plane report a degraded Mind for a capability nobody has
+# built yet.
+
 [Unit]
 Description=CYBOU Bounded Body Shell Daemon
 Documentation=https://github.com/cybou-fr/CYBOU

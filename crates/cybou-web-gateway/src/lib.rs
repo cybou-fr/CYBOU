@@ -32,11 +32,18 @@ use uuid::Uuid;
 pub mod access;
 #[cfg(target_os = "linux")]
 pub mod auth_socket;
+pub mod disclose;
 pub mod fixture;
 #[cfg(target_os = "linux")]
 pub mod presence_zbus;
 
 pub use access::{CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions};
+pub use disclose::Disclosures;
+
+use cybou_protocol::{
+    canonical::CanonicalEnvelope,
+    disclosure::{ConsumerTrust, Destination},
+};
 
 /// Maximum time the gateway permits one Presence projection request to occupy.
 pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(1_500);
@@ -47,6 +54,36 @@ pub const EVENT_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const MAX_CURSOR_BYTES: usize = 256;
 
 /// Typed read-only source behind the HTTP boundary.
+/// What one projection supplied, and what it held back.
+///
+/// Read after a projection is built, by whoever is going to record the delivery. It is separate
+/// from the projection itself because a consumer must not be told what was withheld from it: that
+/// a concept exists is frequently the sensitive part of it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Delivered {
+    /// The contributions the supplied items were derived from.
+    pub items: Vec<Uuid>,
+    /// How many items were supplied, whether or not their provenance was known.
+    pub item_count: u32,
+    /// What was held back, and why.
+    pub withheld: Vec<cybou_protocol::disclosure::Withheld>,
+}
+
+/// Where a disclosure record goes.
+///
+/// A trait so the gateway's own tests can watch what it would have recorded without a Journal, and
+/// so a fixture-backed gateway can have none at all rather than pretend.
+#[async_trait]
+pub trait DisclosureSink: Send + Sync + 'static {
+    /// Record one disclosure, answering whether it was accepted.
+    ///
+    /// `false` is a fact worth acting on rather than an error to swallow: the reader is still
+    /// entitled to what they asked for, and the operator is entitled to know the audit trail has a
+    /// hole in it.
+    async fn record(&self, envelope: &CanonicalEnvelope) -> bool;
+}
+
+/// Where the gateway reads Mind from.
 #[async_trait]
 pub trait PresenceSource: Send + Sync + 'static {
     /// Return one atomic, presentation-ready snapshot.
@@ -56,6 +93,15 @@ pub trait PresenceSource: Send + Sync + 'static {
     /// Returns [`GatewayError`] when transport, decoding, or owner availability prevents a typed
     /// projection. It must never turn those failures into an empty successful snapshot.
     async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError>;
+
+    /// What the last projection this source built supplied, and what it left out.
+    ///
+    /// Defaulting to nothing is safe rather than convenient: a source that does not filter has
+    /// nothing to report, and a source that does must say so or the withholding is invisible —
+    /// which is the exact failure ADR-0030's B6 exists to prevent.
+    fn last_delivery(&self) -> Delivered {
+        Delivered::default()
+    }
 
     /// Wait until the source may have a newer projection.
     ///
@@ -139,11 +185,65 @@ struct GatewayState {
     verifier: Option<Arc<dyn CredentialVerifier>>,
     /// The sessions this process is honouring.
     sessions: Arc<Sessions>,
+    /// What has already been recorded as supplied to each consumer.
+    disclosures: Arc<Disclosures>,
+    /// Where a disclosure record is written, when there is one to write.
+    ///
+    /// `None` leaves deliveries unrecorded, which is what a fixture-backed gateway does: there is
+    /// no Journal behind it to record into. A deployment without this is a deployment that cannot
+    /// say who read what, and that is a fact about the deployment rather than a silent default.
+    journal: Option<Arc<dyn DisclosureSink>>,
     session: SessionProjection,
     shell: Arc<tokio::sync::Mutex<cybou_shelld::ShellEngine>>,
 }
 
 impl GatewayState {
+    /// Who this request is, as a consumer.
+    ///
+    /// The identity is the one the gateway established, never the one the caller offers: a
+    /// consumer that could name itself could also name somebody else, and the record would say so.
+    fn destination_for(session: Option<&Session>) -> Destination {
+        session.map_or_else(
+            || Destination {
+                id: "living-canvas:public".to_owned(),
+                trust: ConsumerTrust::Public,
+                // A browser renders and forgets; what makes this recordable is the boundary it
+                // crossed on the way out, which no later decision can call back.
+                retains: false,
+                external_boundary: true,
+            },
+            |session| Destination {
+                id: format!("living-canvas:{}", session.username),
+                trust: ConsumerTrust::Owner,
+                retains: false,
+                external_boundary: true,
+            },
+        )
+    }
+
+    /// Record that this consumer was supplied what the source just built, if that is new.
+    async fn record_delivery(&self, destination: &Destination, delivered: &Delivered) {
+        let Some(journal) = &self.journal else {
+            return;
+        };
+        let Some(record) =
+            self.disclosures
+                .record_for(destination, delivered, OffsetDateTime::now_utc())
+        else {
+            return;
+        };
+        // A delivery that could not be recorded is not a reason to withhold the answer: the reader
+        // is entitled to it either way, and refusing would trade an incomplete record for an
+        // outage. It is said out loud instead, because an audit trail with silent holes is worse
+        // than one with known ones.
+        if !journal.record(&record).await {
+            eprintln!(
+                "a delivery to {} could not be recorded; the audit trail is incomplete",
+                destination.id
+            );
+        }
+    }
+
     /// The session this request carries, if it carries a live one.
     fn session_for(&self, headers: &HeaderMap) -> Option<Session> {
         let token = headers
@@ -246,6 +346,32 @@ pub fn router_with_verifier_and_access(
     web_root: Option<PathBuf>,
     session_context: SessionContext,
 ) -> Router {
+    router_recording_disclosures(
+        presence,
+        privileged,
+        verifier,
+        None,
+        web_root,
+        session_context,
+    )
+}
+
+/// Build the v1 router that records what it supplies to whom.
+///
+/// The sink is where a disclosure record goes. Without one, deliveries are not recorded — which is
+/// what a fixture-backed gateway does, because there is no Journal behind it to record into.
+///
+/// # Panics
+///
+/// If the sandbox the shell surface runs in cannot be created.
+pub fn router_recording_disclosures(
+    presence: Arc<dyn PresenceSource>,
+    privileged: Option<Arc<dyn PresenceSource>>,
+    verifier: Option<Arc<dyn CredentialVerifier>>,
+    journal: Option<Arc<dyn DisclosureSink>>,
+    web_root: Option<PathBuf>,
+    session_context: SessionContext,
+) -> Router {
     let now = OffsetDateTime::now_utc();
     let expires_at = (now + TimeDuration::hours(8))
         .format(&Rfc3339)
@@ -262,6 +388,8 @@ pub fn router_with_verifier_and_access(
         privileged,
         verifier,
         sessions: Arc::new(Sessions::default()),
+        disclosures: Arc::new(Disclosures::new()),
+        journal,
         session: SessionProjection {
             schema_version: WEB_SCHEMA_V1,
             session_id: Uuid::new_v4(),
@@ -403,10 +531,21 @@ async fn mind(
     State(state): State<GatewayState>,
     headers: HeaderMap,
 ) -> Result<Json<MindProjection>, GatewayError> {
-    tokio::time::timeout(SNAPSHOT_BUDGET, state.source_for(&headers).mind())
+    let session = state.session_for(&headers);
+    let source = state.source_for(&headers);
+    let projection = tokio::time::timeout(SNAPSHOT_BUDGET, source.mind())
         .await
-        .map_err(|_| GatewayError::Timeout)?
-        .map(Json)
+        .map_err(|_| GatewayError::Timeout)??;
+
+    // Recorded after the projection is built and before it is answered, so what the record says
+    // was supplied is what this reader is about to receive.
+    state
+        .record_delivery(
+            &GatewayState::destination_for(session.as_ref()),
+            &source.last_delivery(),
+        )
+        .await;
+    Ok(Json(projection))
 }
 
 async fn shell_exec(

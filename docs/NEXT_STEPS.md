@@ -25,12 +25,19 @@ true while the chain underneath it was broken.
 
 ## In order
 
-1. **A record of who read what.** Access is now a Linux account: `cybou-authd` checks a password
-   through PAM, membership in `cybou-access` is the grant, `usermod -L` is the revocation, and
-   `scripts/test-pam-access.sh` proves each of those against real accounts rather than a stub. What
-   is still missing is the part this repository's whole argument depends on: nothing records that a
-   person read anything. A biography that can say what the system did and not who looked at it is
-   traceable in one direction only.
+1. **An inspector, so the record is readable by the person it is about.** Deliveries are recorded
+   now: every supply of a projection across a boundary writes a `ContextDisclosed` naming the
+   consumer, the contributions the supplied items came from, and what was held back and why. What
+   does not exist is the surface ADR-0030 asks for — the person cannot see the gap between what was
+   available and what was delivered, which is the interesting part and the one invisible in every
+   system that assembles context silently (B1, B6). The records are in the Journal and only a
+   developer with `busctl` can read them.
+
+   Two smaller gaps behind it. A concept does not carry what it was derived from, so a delivery
+   that supplied one says it supplied something it cannot account for; the count and the provenance
+   are deliberately separate so that shows rather than hides. And `retains` is false for every
+   consumer today because there are no learning consumers yet — when there are, ADR-0033's A6 needs
+   these records to find what an erased payload influenced.
 
    Do not reach for `CYBOU_PUBLISHABLE_SENSITIVITY` to solve anything. It was raised on 2026-08-20
    for one stated reason — 1252 rows in the first Journal carried a constant sensitivity their

@@ -480,6 +480,53 @@ causation_of() {
     }'
 }
 
+echo "==> Verifying the biography records who was supplied what..."
+# The Journal could say what the system did and not who looked at it, which made it traceable in
+# one direction only. ADR-0030 B4: every delivery that crosses a boundary is recorded with its
+# destination and the provenance of what was supplied, and no copy of the content.
+before_disclosures="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Count | awk '{print $2}')"
+curl -fsS --max-time 10 "http://$GATEWAY_ADDR/api/v1/mind" >/dev/null 2>&1 || true
+
+deadline=$((SECONDS + 20))
+disclosure=""
+while [ "$SECONDS" -lt "$deadline" ] && [ -z "$disclosure" ]; do
+    seq="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Count | awk '{print $2}')"
+    while [ "$seq" -gt "$before_disclosures" ]; do
+        row="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 AtSequence t "$seq")"
+        # Kind 17 is ContextDisclosed, and the origin is the surface that supplied it.
+        if printf '%s' "$row" | awk '{ for (i = 3; i <= NF; i++) printf "%c", $i }' | grep -q "web-gateway"; then
+            disclosure="$row"
+            break
+        fi
+        seq=$((seq - 1))
+    done
+    [ -z "$disclosure" ] && sleep 1
+done
+
+if [ -z "$disclosure" ]; then
+    echo "ERROR: a reader was supplied a projection and the Journal records no disclosure." >&2
+    exit 1
+fi
+echo "    A delivery to the public surface is in the biography"
+
+# What the record says is checked by the unit tests rather than here: it is sealed, as anything
+# about the person is, so the bytes on this side of Event1 are ciphertext. What is checkable here is
+# the thing those tests cannot reach — that a real delivery over a real bus produced one.
+#
+# Asking again for the same projection is not a second delivery. A reader watching the event stream
+# receives the same thing every few seconds, and a record per response would fill the Journal with
+# thousands of rows that answer no question anyone would ask.
+after_first="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Count | awk '{print $2}')"
+curl -fsS --max-time 10 "http://$GATEWAY_ADDR/api/v1/mind" >/dev/null 2>&1 || true
+curl -fsS --max-time 10 "http://$GATEWAY_ADDR/api/v1/mind" >/dev/null 2>&1 || true
+sleep 2
+after_repeat="$(busctl --user call org.cybou.Mind.Event1 /org/cybou/Mind/Event1 org.cybou.Mind.Event1 Count | awk '{print $2}')"
+if [ "$after_repeat" -gt "$after_first" ]; then
+    echo "ERROR: asking twice for the same projection recorded $((after_repeat - after_first)) further deliveries." >&2
+    exit 1
+fi
+echo "    Being supplied the same thing again is not recorded as a new delivery"
+
 echo "==> Verifying a person can take back what they said..."
 # Until now nothing anywhere raised the erasure epoch or removed a payload: ADR-0028 was described,
 # its kinds existed, Context1 reacted to the epoch, and there was no path from a person asking for
