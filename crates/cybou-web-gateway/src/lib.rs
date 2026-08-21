@@ -550,9 +550,12 @@ async fn mind(
 
 async fn shell_exec(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
     Json(payload): Json<ShellExecRequest>,
 ) -> Result<Json<ShellExecResponse>, (StatusCode, Json<ErrorBody>)> {
-    if state.session.mode == SessionMode::PublicPreview {
+    let is_authenticated =
+        state.session_for(&headers).is_some() || state.session.mode == SessionMode::LocalDesktop;
+    if !is_authenticated {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorBody {

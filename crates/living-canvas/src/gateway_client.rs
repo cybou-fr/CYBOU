@@ -70,3 +70,27 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 }
+
+impl GatewayMindClient {
+    /// Perform login attempt against the gateway.
+    pub async fn login(&self, username: &str, password: &str) -> Result<bool, ClientError> {
+        let response = Request::post("/api/v1/login")
+            .json(&serde_json::json!({
+                "username": username,
+                "password": password,
+            }))
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        Ok(response.status() == 200)
+    }
+
+    /// Terminate current session.
+    pub async fn logout(&self) -> Result<(), ClientError> {
+        let _ = Request::post("/api/v1/logout")
+            .send()
+            .await;
+        Ok(())
+    }
+}

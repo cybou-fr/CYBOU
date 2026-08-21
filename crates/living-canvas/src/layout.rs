@@ -240,6 +240,16 @@ impl DesktopLayout {
         }
     }
 
+    /// Toggle or set maximized state for a card.
+    pub fn set_maximized(&mut self, id: CardId, maximized: bool) {
+        if let Some(card) = self.card_mut(id) {
+            card.presentation.maximized = maximized;
+            if maximized {
+                card.presentation.collapsed = false;
+            }
+        }
+    }
+
     /// Bring a card to the front by setting its z-index above all others.
     pub fn bring_forward(&mut self, id: CardId) {
         let max_z = self.cards.iter().map(|c| c.geometry.z).max().unwrap_or(0);

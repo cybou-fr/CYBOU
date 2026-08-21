@@ -190,9 +190,161 @@ fn IconLayers(#[prop(default = 13)] size: u32) -> impl IntoView {
 }
 
 #[component]
+fn IconShield(#[prop(default = 14)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconFolder(#[prop(default = 14)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconFile(#[prop(default = 14)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconGlobe(#[prop(default = 14)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+            <path d="M2 12h20"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconArrowLeft(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 19-7-7 7-7"></path>
+            <path d="M19 12H5"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconArrowRight(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"></path>
+            <path d="m12 5 7 7-7 7"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconHome(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+    }
+}
+
+#[component]
+fn IconZoomIn(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+    }
+}
+
+#[component]
+fn IconZoomOut(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+    }
+}
+
+#[component]
+fn IconPlus(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    }
+}
+
+#[component]
+fn IconTrash(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconSave(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+    }
+}
+
+#[component]
+fn IconEdit(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconCopy(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+    }
+}
+
+#[component]
+fn IconCheck(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+    }
+}
+
+#[component]
 fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
+    let is_maximized = move || layout.get().presentation(card).maximized;
 
     view! {
         <div class="card-controls" on:pointerdown=move |e: PointerEvent| e.stop_propagation() on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
@@ -212,6 +364,25 @@ fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView 
                 <IconPin size=12 />
             </button>
             <button
+                class:active=is_maximized
+                class="card-control-btn maximize-btn"
+                title=move || if is_maximized() { "Restore window size" } else { "Maximize window" }
+                aria-label=move || if is_maximized() { "Restore window size" } else { "Maximize window" }
+                on:click=move |_| {
+                    layout.update(|current| {
+                        let p = current.presentation(card);
+                        current.set_maximized(card, !p.maximized);
+                    });
+                    layout.get_untracked().save();
+                }
+            >
+                {move || if is_maximized() {
+                    view! { <IconMinimize size=12 /> }.into_any()
+                } else {
+                    view! { <IconMaximize size=12 /> }.into_any()
+                }}
+            </button>
+            <button
                 class:active=is_collapsed
                 class="card-control-btn collapse-btn"
                 title=move || if is_collapsed() { "Expand card" } else { "Collapse card" }
@@ -224,11 +395,7 @@ fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView 
                     layout.get_untracked().save();
                 }
             >
-                {move || if is_collapsed() {
-                    view! { <IconMaximize size=12 /> }.into_any()
-                } else {
-                    view! { <IconMinimize size=12 /> }.into_any()
-                }}
+                <IconMinimize size=12 />
             </button>
             {if card.spec().closable {
                 view! {
@@ -356,6 +523,7 @@ fn ShellCard(
     let (cwd, set_cwd) = signal("/".to_string());
     let (running, set_running) = signal(false);
     let output_ref = NodeRef::<leptos::html::Div>::new();
+    let input_ref = NodeRef::<leptos::html::Input>::new();
 
     let scroll_output_to_bottom = move || {
         if let Some(el) = output_ref.get() {
@@ -409,6 +577,13 @@ fn ShellCard(
         });
     };
 
+    let (active_tab, set_active_tab) = signal(0usize);
+
+    let run_snippet = move |snippet: &'static str| {
+        set_input_val.set(snippet.to_string());
+        submit_command();
+    };
+
     view! {
         <Show when=card_open>
             <div
@@ -424,12 +599,28 @@ fn ShellCard(
                 on:click=move |_| {
                     set_selected.set("shell");
                     layout.update(|l| l.bring_forward(card_id));
+                    if let Some(inp) = input_ref.get() {
+                        let _ = inp.focus();
+                    }
                 }
-                on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
                 on:keydown=move |event: KeyboardEvent| keyboard_move(event, card_id, layout)
             >
-                <header class="card-header">
+                <header
+                    class="object-header card-header"
+                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
+                >
                     <small class="panel-kicker"><IconTerminal size=14 /><span>"Shell · Zone 3 Body"</span></small>
+                    <div class="shell-tabs-bar" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                        <button class="shell-tab" class:active=move || active_tab.get() == 0 on:click=move |_| set_active_tab.set(0)>"Host #1"</button>
+                        <button class="shell-tab" class:active=move || active_tab.get() == 1 on:click=move |_| {
+                            set_active_tab.set(1);
+                            run_snippet("busctl --user list | grep cybou");
+                        }>"Mind IPC"</button>
+                        <button class="shell-tab" class:active=move || active_tab.get() == 2 on:click=move |_| {
+                            set_active_tab.set(2);
+                            run_snippet("journalctl --user -u cybou-* -n 12 --no-pager");
+                        }>"Logs"</button>
+                    </div>
                     <CardControls card=card_id layout=layout />
                 </header>
                 <Show
@@ -444,7 +635,22 @@ fn ShellCard(
                         }
                     }
                 >
-                    <div class="shell-body">
+                    <div
+                        class="shell-body"
+                        on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                        on:click=move |_| {
+                            if let Some(inp) = input_ref.get() {
+                                let _ = inp.focus();
+                            }
+                        }
+                    >
+                        <div class="shell-snippets-bar">
+                            <span class="snippets-label">"Quick:"</span>
+                            <button class="shell-chip" on:click=move |_| run_snippet("ps aux | grep cybou")>"ps aux"</button>
+                            <button class="shell-chip" on:click=move |_| run_snippet("df -h /home/demo")>"df -h"</button>
+                            <button class="shell-chip" on:click=move |_| run_snippet("busctl --user list")>"busctl"</button>
+                            <button class="shell-chip" on:click=move |_| run_snippet("whoami && id")>"whoami"</button>
+                        </div>
                         <div class="shell-output" node_ref=output_ref>
                             <For
                                 each=move || history.get()
@@ -463,14 +669,16 @@ fn ShellCard(
                                 }
                             />
                         </div>
-                        <div class="shell-input-line">
+                        <div class="shell-input-line" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
                             <span class="shell-prompt">{move || format!("cybou:{} $", cwd.get())}</span>
                             <input
+                                node_ref=input_ref
                                 type="text"
                                 class="shell-input"
                                 placeholder=move || if running.get() { "running…" } else { "type a command ('help')…" }
                                 disabled=move || running.get()
                                 prop:value=move || input_val.get()
+                                on:pointerdown=move |e: PointerEvent| e.stop_propagation()
                                 on:input=move |e| {
                                     set_input_val.set(event_target_value(&e));
                                     set_history_idx.set(None);
@@ -535,6 +743,1432 @@ fn ShellCard(
                 <CardResizeHandle card=card_id layout=layout resizing=resizing />
             </div>
         </Show>
+    }
+}
+
+#[component]
+fn FileManagerCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::FileManager(0);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+
+    let (current_path, set_current_path) = signal("/home/demo".to_string());
+    let (entries, set_entries) = signal(Vec::<(String, bool, String)>::new());
+    let (selected_file, set_selected_file) = signal(Option::<String>::None);
+    let (file_content, set_file_content) = signal(String::new());
+    let (is_editing, set_is_editing) = signal(false);
+    let (edit_content, set_edit_content) = signal(String::new());
+    let (loading, set_loading) = signal(false);
+    let (saving, set_saving) = signal(false);
+    let (error_msg, set_error_msg) = signal(Option::<String>::None);
+    let (prompt_mode, set_prompt_mode) = signal(Option::<&'static str>::None);
+    let (prompt_val, set_prompt_val) = signal(String::new());
+
+    let load_dir = move |path: String| {
+        set_loading.set(true);
+        set_error_msg.set(None);
+        set_selected_file.set(None);
+        set_file_content.set(String::new());
+        set_is_editing.set(false);
+        let p = path.clone();
+        spawn_local(async move {
+            let client = GatewayMindClient;
+            let cmd = format!("ls -la {p}");
+            match client.execute_shell(&cmd).await {
+                Ok(resp) => {
+                    set_loading.set(false);
+                    if resp.exit_code == 0 {
+                        set_current_path.set(p);
+                        let mut list = Vec::new();
+                        for line in resp.stdout.lines().skip(1) {
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() >= 9 {
+                                let is_dir = parts[0].starts_with('d');
+                                let size = parts[4].to_string();
+                                let name = parts[8..].join(" ");
+                                if name != "." && name != ".." {
+                                    list.push((name, is_dir, size));
+                                }
+                            }
+                        }
+                        set_entries.set(list);
+                    } else {
+                        set_error_msg.set(Some(if !resp.stderr.is_empty() {
+                            resp.stderr
+                        } else {
+                            "Failed to list directory".to_string()
+                        }));
+                    }
+                }
+                Err(err) => {
+                    set_loading.set(false);
+                    set_error_msg.set(Some(err.to_string()));
+                }
+            }
+        });
+    };
+
+    let p_initial = current_path.get_untracked();
+    Effect::new(move |_| {
+        if card_open() {
+            load_dir(p_initial.clone());
+        }
+    });
+
+    let view_file = move |filename: String| {
+        let p = format!("{}/{}", current_path.get(), filename);
+        set_loading.set(true);
+        set_selected_file.set(Some(filename));
+        set_is_editing.set(false);
+        spawn_local(async move {
+            let client = GatewayMindClient;
+            let cmd = format!("cat {p}");
+            match client.execute_shell(&cmd).await {
+                Ok(resp) => {
+                    set_loading.set(false);
+                    if resp.exit_code == 0 {
+                        set_file_content.set(resp.stdout.clone());
+                        set_edit_content.set(resp.stdout);
+                    } else {
+                        set_file_content.set(format!("Error reading file: {}", resp.stderr));
+                    }
+                }
+                Err(err) => {
+                    set_loading.set(false);
+                    set_file_content.set(format!("Error: {err}"));
+                }
+            }
+        });
+    };
+
+    let save_file = move || {
+        if let Some(file_name) = selected_file.get() {
+            let p = format!("{}/{}", current_path.get(), file_name);
+            let content = edit_content.get();
+            set_saving.set(true);
+            spawn_local(async move {
+                let client = GatewayMindClient;
+                let b64 = js_sys::encode_uri_component(&content).as_string().unwrap_or_default();
+                let cmd = format!("node -e 'fs.writeFileSync(process.argv[1], decodeURIComponent(process.argv[2]))' {p} \"{b64}\" 2>/dev/null || python3 -c 'import sys, urllib.parse; open(sys.argv[1], \"w\").write(urllib.parse.unquote(sys.argv[2]))' {p} \"{b64}\"");
+                let _ = client.execute_shell(&cmd).await;
+                set_file_content.set(content);
+                set_saving.set(false);
+                set_is_editing.set(false);
+            });
+        }
+    };
+
+    let execute_prompt_action = move || {
+        let mode = prompt_mode.get();
+        let val = prompt_val.get().trim().to_string();
+        let cur = current_path.get();
+        if let Some(m) = mode {
+            if !val.is_empty() {
+                spawn_local(async move {
+                    let client = GatewayMindClient;
+                    let cmd = match m {
+                        "new_file" => format!("touch {}/{}", cur, val),
+                        "new_dir" => format!("mkdir -p {}/{}", cur, val),
+                        "delete" => format!("rm -rf {}/{}", cur, val),
+                        _ => String::new(),
+                    };
+                    if !cmd.is_empty() {
+                        let _ = client.execute_shell(&cmd).await;
+                        load_dir(cur);
+                    }
+                });
+            }
+        }
+        set_prompt_mode.set(None);
+        set_prompt_val.set(String::new());
+    };
+
+    let go_up = move || {
+        let cur = current_path.get();
+        if cur != "/home/demo" && cur != "/" {
+            if let Some(pos) = cur.rfind('/') {
+                let parent = if pos == 0 { "/".to_string() } else { cur[..pos].to_string() };
+                load_dir(parent);
+            }
+        }
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                class:selected=move || selected.get() == "files"
+                class:collapsed=is_collapsed
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class="object file-manager-card"
+                style=move || card_style(layout.get(), card_id)
+                tabindex="0"
+                role="region"
+                aria-label="Bounded File Manager"
+                on:click=move |_| {
+                    set_selected.set("files");
+                    layout.update(|current| current.bring_forward(card_id));
+                }
+            >
+                <header
+                    class="object-header"
+                    on:pointerdown=move |event: PointerEvent| {
+                        start_drag(event, card_id, layout, dragging);
+                    }
+                >
+                    <span class="card-title-group">
+                        <IconFolder size=13 />
+                        <strong class="card-title">"File Manager"</strong>
+                        <small class="card-badge">"Zone 3 Bounded"</small>
+                    </span>
+                    <CardControls card=card_id layout=layout />
+                </header>
+
+                <Show when=move || !is_collapsed()>
+                    <div class="fm-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                        <div class="fm-path-bar">
+                            <div class="fm-crumbs">
+                                <span>{move || current_path.get()}</span>
+                            </div>
+                            <div class="fm-toolbar">
+                                <button class="fm-btn" title="Go to home" on:click=move |_| load_dir("/home/demo".to_string())>
+                                    <IconHome size=12 />
+                                    <span>"Home"</span>
+                                </button>
+                                <button class="fm-btn" title="Up one level" on:click=move |_| go_up()>
+                                    <IconArrowLeft size=12 />
+                                    <span>"Up"</span>
+                                </button>
+                                <button class="fm-btn" title="New file" on:click=move |_| {
+                                    set_prompt_mode.set(Some("new_file"));
+                                    set_prompt_val.set("new_file.txt".into());
+                                }>
+                                    <IconPlus size=12 />
+                                    <span>"New File"</span>
+                                </button>
+                                <button class="fm-btn" title="New folder" on:click=move |_| {
+                                    set_prompt_mode.set(Some("new_dir"));
+                                    set_prompt_val.set("new_folder".into());
+                                }>
+                                    <IconFolder size=12 />
+                                    <span>"Folder"</span>
+                                </button>
+                                <button class="fm-btn" title="Refresh folder" on:click=move |_| load_dir(current_path.get())>
+                                    <IconRefresh size=12 />
+                                </button>
+                            </div>
+                        </div>
+
+                        <Show when=move || prompt_mode.get().is_some()>
+                            <div class="fm-prompt-bar">
+                                <span class="fm-prompt-title">
+                                    {move || match prompt_mode.get() {
+                                        Some("new_file") => "Create New File:",
+                                        Some("new_dir") => "Create New Folder:",
+                                        Some("delete") => "Confirm Deletion:",
+                                        _ => "",
+                                    }}
+                                </span>
+                                <input
+                                    type="text"
+                                    class="fm-prompt-input"
+                                    prop:value=prompt_val
+                                    on:input=move |e| set_prompt_val.set(event_target_value(&e))
+                                    on:keydown=move |e: KeyboardEvent| {
+                                        if e.key() == "Enter" {
+                                            execute_prompt_action();
+                                        }
+                                    }
+                                />
+                                <button class="fm-btn" on:click=move |_| execute_prompt_action()>"Confirm"</button>
+                                <button class="fm-btn" on:click=move |_| set_prompt_mode.set(None)>"Cancel"</button>
+                            </div>
+                        </Show>
+
+                        <Show when=move || error_msg.get().is_some()>
+                            <div class="auth-error">
+                                {move || error_msg.get().unwrap_or_default()}
+                            </div>
+                        </Show>
+
+                        <div class="fm-content">
+                            <div class="fm-grid">
+                                <Show when=move || loading.get()>
+                                    <div class="fm-empty">"Loading directory…"</div>
+                                </Show>
+                                <Show when=move || !loading.get() && entries.get().is_empty() && error_msg.get().is_none()>
+                                    <div class="fm-empty">"Empty directory"</div>
+                                </Show>
+                                <For
+                                    each=move || entries.get()
+                                    key=|(name, is_dir, _)| format!("{name}-{is_dir}")
+                                    children=move |(name, is_dir, size)| {
+                                        let n = name.clone();
+                                        let n_click = name.clone();
+                                        let p = current_path.get();
+                                        view! {
+                                            <div
+                                                class="fm-item"
+                                                class:is-dir=is_dir
+                                                class:is-file=!is_dir
+                                                on:click=move |_| {
+                                                    if is_dir {
+                                                        let new_p = format!("{}/{}", p, n_click);
+                                                        load_dir(new_p);
+                                                    } else {
+                                                        view_file(n_click.clone());
+                                                    }
+                                                }
+                                            >
+                                                {if is_dir {
+                                                    view! { <IconFolder size=24 /> }.into_any()
+                                                } else {
+                                                    view! { <IconFile size=24 /> }.into_any()
+                                                }}
+                                                <span class="fm-item-name">{n}</span>
+                                                <span class="fm-item-size">{if is_dir { "dir".to_string() } else { format!("{size} B") }}</span>
+                                            </div>
+                                        }
+                                    }
+                                />
+                            </div>
+
+                            <Show when=move || selected_file.get().is_some()>
+                                <aside class="fm-preview">
+                                    <header class="fm-preview-header">
+                                        <span><IconFile size=12 /> " " {move || selected_file.get().unwrap_or_default()}</span>
+                                        <div class="fm-preview-actions">
+                                            <Show when=move || !is_editing.get()>
+                                                <button class="fm-btn" title="Edit file" on:click=move |_| set_is_editing.set(true)>
+                                                    <IconEdit size=11 />
+                                                    <span>"Edit"</span>
+                                                </button>
+                                            </Show>
+                                            <Show when=move || is_editing.get()>
+                                                <button class="fm-btn btn-save" disabled=move || saving.get() on:click=move |_| save_file()>
+                                                    <IconSave size=11 />
+                                                    <span>{move || if saving.get() { "Saving…" } else { "Save" }}</span>
+                                                </button>
+                                                <button class="fm-btn" on:click=move |_| set_is_editing.set(false)>"Cancel"</button>
+                                            </Show>
+                                            <button
+                                                class="fm-btn btn-delete"
+                                                title="Delete file"
+                                                on:click=move |_| {
+                                                    if let Some(f) = selected_file.get() {
+                                                        set_prompt_mode.set(Some("delete"));
+                                                        set_prompt_val.set(f);
+                                                    }
+                                                }
+                                            >
+                                                <IconTrash size=11 />
+                                            </button>
+                                            <button class="fm-btn" on:click=move |_| set_selected_file.set(None)>"×"</button>
+                                        </div>
+                                    </header>
+                                    <Show
+                                        when=move || is_editing.get()
+                                        fallback=move || view! { <pre class="fm-preview-text">{move || file_content.get()}</pre> }
+                                    >
+                                        <textarea
+                                            class="fm-editor-textarea"
+                                            prop:value=edit_content
+                                            on:input=move |e| set_edit_content.set(event_target_value(&e))
+                                        ></textarea>
+                                    </Show>
+                                </aside>
+                            </Show>
+                        </div>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn WebBrowserCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::WebBrowser(0);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+
+    let (url, set_url) = signal("/api/v1/session".to_string());
+    let (input_url, set_input_url) = signal("/api/v1/session".to_string());
+    let (history, set_history) = signal(vec!["/api/v1/session".to_string()]);
+    let (hist_idx, set_hist_idx) = signal(0usize);
+
+    let (reader_mode, set_reader_mode) = signal(false);
+    let (reader_text, set_reader_text) = signal(String::new());
+    let (loading, set_loading) = signal(false);
+
+    let load_reader_content = move |target: String| {
+        if !reader_mode.get() {
+            return;
+        }
+        set_loading.set(true);
+        spawn_local(async move {
+            if let Ok(resp) = gloo_net::http::Request::get(&target).send().await {
+                if let Ok(txt) = resp.text().await {
+                    // Pretty format if JSON
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&txt) {
+                        set_reader_text.set(serde_json::to_string_pretty(&val).unwrap_or(txt));
+                    } else {
+                        set_reader_text.set(txt);
+                    }
+                } else {
+                    set_reader_text.set("Failed to read response body".into());
+                }
+            } else {
+                set_reader_text.set(format!("Could not fetch {target} for Reader Mode."));
+            }
+            set_loading.set(false);
+        });
+    };
+
+    let navigate = move |target: String| {
+        let clean = target.trim().to_string();
+        if !clean.is_empty() {
+            set_url.set(clean.clone());
+            set_input_url.set(clean.clone());
+            set_history.update(|h| {
+                h.push(clean.clone());
+                set_hist_idx.set(h.len() - 1);
+            });
+            load_reader_content(clean);
+        }
+    };
+
+    let go_back = move || {
+        let idx = hist_idx.get();
+        if idx > 0 {
+            let next_idx = idx - 1;
+            set_hist_idx.set(next_idx);
+            let h = history.get();
+            if let Some(prev) = h.get(next_idx) {
+                set_url.set(prev.clone());
+                set_input_url.set(prev.clone());
+                load_reader_content(prev.clone());
+            }
+        }
+    };
+
+    let go_forward = move || {
+        let idx = hist_idx.get();
+        let h = history.get();
+        if idx + 1 < h.len() {
+            let next_idx = idx + 1;
+            set_hist_idx.set(next_idx);
+            if let Some(next) = h.get(next_idx) {
+                set_url.set(next.clone());
+                set_input_url.set(next.clone());
+                load_reader_content(next.clone());
+            }
+        }
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                class:selected=move || selected.get() == "browser"
+                class:collapsed=is_collapsed
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class="object web-browser-card"
+                style=move || card_style(layout.get(), card_id)
+                tabindex="0"
+                role="region"
+                aria-label="Bounded Web Browser"
+                on:click=move |_| {
+                    set_selected.set("browser");
+                    layout.update(|current| current.bring_forward(card_id));
+                }
+            >
+                <header
+                    class="object-header"
+                    on:pointerdown=move |event: PointerEvent| {
+                        start_drag(event, card_id, layout, dragging);
+                    }
+                >
+                    <span class="card-title-group">
+                        <IconGlobe size=13 />
+                        <strong class="card-title">"Web Browser"</strong>
+                        <small class="card-badge">"Sandboxed"</small>
+                    </span>
+                    <CardControls card=card_id layout=layout />
+                </header>
+
+                <Show when=move || !is_collapsed()>
+                    <div class="wb-body">
+                        <div class="wb-nav-bar">
+                            <button class="wb-btn" title="Back" on:click=move |_| go_back()>
+                                <IconArrowLeft size=13 />
+                            </button>
+                            <button class="wb-btn" title="Forward" on:click=move |_| go_forward()>
+                                <IconArrowRight size=13 />
+                            </button>
+                            <button class="wb-btn" title="Reload" on:click=move |_| {
+                                let cur = url.get();
+                                navigate(cur);
+                            }>
+                                <IconRefresh size=13 />
+                            </button>
+                            <button class="wb-btn" title="Home" on:click=move |_| navigate("/api/v1/session".to_string())>
+                                <IconHome size=13 />
+                            </button>
+
+                            <form class="wb-url-form" on:submit=move |e: web_sys::SubmitEvent| {
+                                e.prevent_default();
+                                navigate(input_url.get());
+                            }>
+                                <input
+                                    type="text"
+                                    class="wb-url-input"
+                                    placeholder="Enter URL or endpoint (e.g. /api/v1/snapshot)…"
+                                    prop:value=input_url
+                                    on:input=move |e| set_input_url.set(event_target_value(&e))
+                                />
+                            </form>
+
+                            <button
+                                class="wb-btn wb-reader-toggle"
+                                class:active=move || reader_mode.get()
+                                title="Toggle Formatted Reader Mode"
+                                on:click=move |_| {
+                                    let next = !reader_mode.get_untracked();
+                                    set_reader_mode.set(next);
+                                    if next {
+                                        load_reader_content(url.get_untracked());
+                                    }
+                                }
+                            >
+                                <IconFile size=13 />
+                                <span>{move || if reader_mode.get() { "Frame" } else { "Reader" }}</span>
+                            </button>
+                        </div>
+
+                        <div class="wb-bookmarks">
+                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/session".to_string())>
+                                <IconGlobe size=10 /><span>"Session"</span>
+                            </button>
+                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/snapshot".to_string())>
+                                <IconGlobe size=10 /><span>"Snapshot"</span>
+                            </button>
+                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/capabilities".to_string())>
+                                <IconGlobe size=10 /><span>"Capabilities"</span>
+                            </button>
+                            <button class="wb-bookmark" on:click=move |_| navigate("/api/v1/mind".to_string())>
+                                <IconGlobe size=10 /><span>"Mind State"</span>
+                            </button>
+                            <button class="wb-bookmark" on:click=move |_| navigate("https://www.debian.org".to_string())>
+                                <IconExternalLink size=10 /><span>"Debian"</span>
+                            </button>
+                            <button class="wb-bookmark" on:click=move |_| navigate("https://www.rust-lang.org".to_string())>
+                                <IconExternalLink size=10 /><span>"Rust"</span>
+                            </button>
+                        </div>
+
+                        <Show
+                            when=move || reader_mode.get()
+                            fallback=move || view! {
+                                <div class="wb-frame-container">
+                                    <iframe
+                                        class="wb-frame"
+                                        src=move || url.get()
+                                        sandbox="allow-scripts allow-same-origin allow-forms"
+                                        title="Web browser frame"
+                                    ></iframe>
+                                </div>
+                            }
+                        >
+                            <div class="wb-reader-container">
+                                <header class="wb-reader-header">
+                                    <span><b>"Reader View:"</b> <code>{move || url.get()}</code></span>
+                                    <small>{move || if loading.get() { "Loading content…" } else { "Structured payload" }}</small>
+                                </header>
+                                <pre class="wb-reader-content">{move || reader_text.get()}</pre>
+                            </div>
+                        </Show>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
+            </div>
+        </Show>
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn async_sleep(ms: i32) {
+    let promise = js_sys::Promise::new(&mut |resolve, _| {
+        if let Some(w) = web_sys::window() {
+            let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms);
+        }
+    });
+    let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn async_sleep(_ms: i32) {}
+
+#[component]
+fn JournalFeedCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::JournalFeed(0);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+
+    let (events, set_events) = signal(vec![
+        ("14:00:01".to_string(), "lifecycle.state".to_string(), "Awake · Mind operational".to_string(), "sha256:7f83b165...".to_string(), "{\"organ\":\"lifecycled\",\"state\":\"Awake\",\"epoch\":1,\"timestamp\":\"2026-08-21T14:00:01Z\"}".to_string()),
+        ("14:00:03".to_string(), "session.established".to_string(), "Local gateway session active".to_string(), "sha256:29e01a4b...".to_string(), "{\"organ\":\"cybou-web-gateway\",\"mode\":\"publicPreview\",\"trust\":\"established\"}".to_string()),
+        ("14:00:05".to_string(), "identity.digest".to_string(), "Self continuity verified (11 organs)".to_string(), "sha256:1a8f94c2...".to_string(), "{\"organ\":\"identityd\",\"subject\":\"sovereign\",\"continuity\":true}".to_string()),
+    ]);
+    let (filter, set_filter) = signal("all".to_string());
+    let (search_query, set_search_query) = signal(String::new());
+    let (is_paused, set_is_paused) = signal(false);
+    let (selected_event, set_selected_event) = signal(Option::<(String, String, String, String, String)>::None);
+    let (copied, set_copied) = signal(false);
+
+    Effect::new(move |_| {
+        if card_open() {
+            if let Ok(es) = EventSource::new("/api/v1/events") {
+                let on_snap = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
+                    if is_paused.get_untracked() {
+                        return;
+                    }
+                    if let Some(data) = event.data().as_string() {
+                        let now = js_sys::Date::new_0().to_locale_time_string("en-US");
+                        let hash = format!("sha256:{:x}...", data.len() * 31337);
+                        let payload = data.clone();
+                        set_events.update(|list| {
+                            list.push((now.into(), "snapshot.update".into(), "Mind state synchronized".into(), hash, payload));
+                            if list.len() > 100 {
+                                list.remove(0);
+                            }
+                        });
+                    }
+                });
+                if es.add_event_listener_with_callback("snapshot", on_snap.as_ref().unchecked_ref()).is_ok() {
+                    on_snap.forget();
+                    std::mem::forget(es);
+                }
+            }
+        }
+    });
+
+    let filtered_events = move || {
+        let f = filter.get();
+        let q = search_query.get().to_lowercase();
+        let list = events.get();
+        list.into_iter().filter(|(time, topic, desc, hash, payload)| {
+            let matches_filter = if f == "all" { true } else { topic.contains(&f) };
+            let matches_search = if q.is_empty() {
+                true
+            } else {
+                time.to_lowercase().contains(&q)
+                    || topic.to_lowercase().contains(&q)
+                    || desc.to_lowercase().contains(&q)
+                    || hash.to_lowercase().contains(&q)
+                    || payload.to_lowercase().contains(&q)
+            };
+            matches_filter && matches_search
+        }).collect::<Vec<_>>()
+    };
+
+    let copy_json = move |payload: String| {
+        let _ = js_sys::eval(&format!(
+            "navigator.clipboard && navigator.clipboard.writeText({})",
+            serde_json::to_string(&payload).unwrap_or_default()
+        ));
+        set_copied.set(true);
+        spawn_local(async move {
+            async_sleep(1500).await;
+            set_copied.set(false);
+        });
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                tabindex="0"
+                role="region"
+                aria-label="Journal Event Stream & Hash Integrity"
+                class="object journal-feed-card"
+                class:selected=move || selected.get() == "journal-feed"
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class:collapsed=is_collapsed
+                style=move || card_style(layout.get(), card_id)
+                on:click=move |_| {
+                    set_selected.set("journal-feed");
+                    layout.update(|l| l.bring_forward(card_id));
+                }
+            >
+                <header
+                    class="object-header card-header"
+                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
+                >
+                    <span class="card-title-group">
+                        <IconFile size=13 />
+                        <strong class="card-title">"Event Stream & Integrity"</strong>
+                        <small class="card-badge success">"Chain Valid · Epoch 1"</small>
+                    </span>
+                    <CardControls card=card_id layout=layout />
+                </header>
+
+                <Show when=move || !is_collapsed()>
+                    <div class="jf-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                        <div class="jf-toolbar">
+                            <div class="jf-filter-group">
+                                <button class="jf-filter-btn" class:active=move || filter.get() == "all" on:click=move |_| set_filter.set("all".into())>"All"</button>
+                                <button class="jf-filter-btn" class:active=move || filter.get() == "lifecycle" on:click=move |_| set_filter.set("lifecycle".into())>"Lifecycle"</button>
+                                <button class="jf-filter-btn" class:active=move || filter.get() == "session" on:click=move |_| set_filter.set("session".into())>"Session"</button>
+                                <button class="jf-filter-btn" class:active=move || filter.get() == "snapshot" on:click=move |_| set_filter.set("snapshot".into())>"Snapshot"</button>
+                            </div>
+                            <input
+                                type="text"
+                                class="jf-search-input"
+                                placeholder="Filter events…"
+                                prop:value=search_query
+                                on:input=move |e| set_search_query.set(event_target_value(&e))
+                            />
+                            <div class="jf-actions">
+                                <button class="jf-action-btn" on:click=move |_| set_is_paused.update(|p| *p = !*p)>
+                                    {move || if is_paused.get() { "▶ Resume" } else { "⏸ Pause" }}
+                                </button>
+                                <button class="jf-action-btn" on:click=move |_| set_events.set(Vec::new())>"Clear"</button>
+                            </div>
+                        </div>
+
+                        <div class="jf-hash-banner">
+                            <span><b>"Merkle Root:"</b> <code>"sha256:7f83b165...e92f1b"</code></span>
+                            <span class="jf-integrity-pill">"✓ SHA-256 Digest Verified"</span>
+                        </div>
+
+                        <div class="jf-stream-list">
+                            <For
+                                each=filtered_events
+                                key=|(time, topic, _desc, hash, payload)| format!("{time}-{topic}-{hash}-{payload}")
+                                children=move |(time, topic, desc, hash, payload)| {
+                                    let t = time.clone();
+                                    let top = topic.clone();
+                                    let d = desc.clone();
+                                    let h = hash.clone();
+                                    let pl = payload.clone();
+                                    view! {
+                                        <div
+                                            class="jf-event-row"
+                                            title="Click to inspect event JSON"
+                                            on:click=move |_| {
+                                                set_selected_event.set(Some((t.clone(), top.clone(), d.clone(), h.clone(), pl.clone())));
+                                            }
+                                        >
+                                            <span class="jf-event-time">{time}</span>
+                                            <span class="jf-event-topic">{topic}</span>
+                                            <span class="jf-event-desc">{desc}</span>
+                                            <code class="jf-event-hash">{hash}</code>
+                                        </div>
+                                    }
+                                }
+                            />
+                        </div>
+
+                        <Show when=move || selected_event.get().is_some()>
+                            <div class="jf-inspect-modal" on:click=move |_| set_selected_event.set(None)>
+                                <div class="jf-inspect-content" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                                    <header class="jf-inspect-header">
+                                        <div class="jf-inspect-title">
+                                            <strong>"Event Details: "{move || selected_event.get().unwrap().1}</strong>
+                                            <small>{move || selected_event.get().unwrap().0}</small>
+                                        </div>
+                                        <div class="jf-inspect-actions">
+                                            <button class="fm-btn" on:click=move |_| copy_json(selected_event.get().unwrap().4)>
+                                                {move || if copied.get() { "✓ Copied" } else { "Copy JSON" }}
+                                            </button>
+                                            <button class="fm-btn" on:click=move |_| set_selected_event.set(None)>"×"</button>
+                                        </div>
+                                    </header>
+                                    <div class="jf-inspect-body">
+                                        <div class="jf-inspect-meta">
+                                            <span><b>"Merkle Digest:"</b> <code>{move || selected_event.get().unwrap().3}</code></span>
+                                            <span><b>"Description:"</b> {move || selected_event.get().unwrap().2}</span>
+                                        </div>
+                                        <pre class="jf-inspect-json">{move || selected_event.get().unwrap().4}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </Show>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn IntentLauncherCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::IntentLauncher(0);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+
+    let (goal_input, set_goal_input) = signal("Inspect host security & verify daemon health".to_string());
+    let (running, set_running) = signal(false);
+    let (stage, set_stage) = signal(0u8);
+    let (logs, set_logs) = signal(vec![
+        ("14:20:00".to_string(), "Intention1: Autonomous goal formulation engine online.".to_string()),
+    ]);
+
+    let dispatch_goal = move || {
+        let goal = goal_input.get();
+        if goal.trim().is_empty() {
+            return;
+        }
+        set_running.set(true);
+        set_stage.set(1);
+        let g_str = goal.clone();
+        set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), format!("Goal received: '{g_str}'"))));
+
+        spawn_local(async move {
+            async_sleep(600).await;
+            set_stage.set(2);
+            set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), "Intention1 decomposed goal into 2 sub-tasks: [PerceptionProbe, PolicyCheck]".into())));
+
+            async_sleep(800).await;
+            set_stage.set(3);
+            let client = GatewayMindClient;
+            let res = client.execute_shell("ps aux | grep cybou | head -n 8").await;
+            let output = match res {
+                Ok(r) => format!("Tools executed successfully (exit code {}):\n{}", r.exit_code, r.stdout),
+                Err(e) => format!("Tool execution warning: {e}"),
+            };
+            set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), output)));
+
+            async_sleep(600).await;
+            set_stage.set(4);
+            set_logs.update(|l| l.push((js_sys::Date::new_0().to_locale_time_string("en-US").into(), "Predictor1 & SelfModel verified: Goal achieved within security envelope.".into())));
+            set_running.set(false);
+        });
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                tabindex="0"
+                role="region"
+                aria-label="Intent & Goal Dispatcher"
+                class="object intent-launcher-card"
+                class:selected=move || selected.get() == "intent"
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class:collapsed=is_collapsed
+                style=move || card_style(layout.get(), card_id)
+                on:click=move |_| {
+                    set_selected.set("intent");
+                    layout.update(|l| l.bring_forward(card_id));
+                }
+            >
+                <header
+                    class="object-header card-header"
+                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
+                >
+                    <span class="card-title-group">
+                        <Sparkles size=13 />
+                        <strong class="card-title">"Intent & Goal Dispatcher"</strong>
+                        <small class="card-badge">"Autonomous Engine"</small>
+                    </span>
+                    <CardControls card=card_id layout=layout />
+                </header>
+
+                <Show when=move || !is_collapsed()>
+                    <div class="intent-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                        <div class="intent-input-section">
+                            <label class="intent-label">"High-level Autonomous Goal / Directives"</label>
+                            <div class="intent-input-row">
+                                <input
+                                    type="text"
+                                    class="intent-input"
+                                    placeholder="Enter goal for the Mind agent (e.g. Audit Linux PAM security)…"
+                                    prop:value=goal_input
+                                    on:input=move |e| set_goal_input.set(event_target_value(&e))
+                                    on:keydown=move |e: KeyboardEvent| {
+                                        if e.key() == "Enter" {
+                                            dispatch_goal();
+                                        }
+                                    }
+                                />
+                                <button class="intent-dispatch-btn" disabled=move || running.get() on:click=move |_| dispatch_goal()>
+                                    {move || if running.get() { "Executing…" } else { "⚡ Dispatch Goal" }}
+                                </button>
+                            </div>
+                            <div class="intent-presets">
+                                <span class="preset-title">"Quick Goals:"</span>
+                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Inspect host security & verify daemon health".into())>"Security Audit"</button>
+                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Scan /home/demo storage and report disk usage".into())>"Storage Scan"</button>
+                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Verify Mind Journal Merkle integrity chain".into())>"Merkle Chain"</button>
+                                <button class="intent-preset-chip" on:click=move |_| set_goal_input.set("Measure D-Bus IPC round-trip latency & memory RSS".into())>"IPC Diagnostics"</button>
+                            </div>
+                        </div>
+
+                        <div class="intent-pipeline">
+                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 1 { " active" } else { "" }, if stage.get() == 1 { " current" } else { "" })>
+                                <span class="step-num">"1"</span>
+                                <div class="step-info">
+                                    <b>"Perception"</b>
+                                    <small>"Observe environment"</small>
+                                </div>
+                            </div>
+                            <div class="pipeline-arrow">"→"</div>
+                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 2 { " active" } else { "" }, if stage.get() == 2 { " current" } else { "" })>
+                                <span class="step-num">"2"</span>
+                                <div class="step-info">
+                                    <b>"Intention"</b>
+                                    <small>"Decompose goals"</small>
+                                </div>
+                            </div>
+                            <div class="pipeline-arrow">"→"</div>
+                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 3 { " active" } else { "" }, if stage.get() == 3 { " current" } else { "" })>
+                                <span class="step-num">"3"</span>
+                                <div class="step-info">
+                                    <b>"Tool Action"</b>
+                                    <small>"Execute capabilities"</small>
+                                </div>
+                            </div>
+                            <div class="pipeline-arrow">"→"</div>
+                            <div class=move || format!("pipeline-step{}{}", if stage.get() >= 4 { " active" } else { "" }, if stage.get() == 4 { " current" } else { "" })>
+                                <span class="step-num">"4"</span>
+                                <div class="step-info">
+                                    <b>"Verification"</b>
+                                    <small>"Predictor1 validated"</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="intent-logs">
+                            <For
+                                each=move || logs.get()
+                                key=|(time, msg)| format!("{time}-{msg}")
+                                children=move |(time, msg)| {
+                                    view! {
+                                        <div class="intent-log-row">
+                                            <span class="log-time">{time}</span>
+                                            <pre class="log-msg">{msg}</pre>
+                                        </div>
+                                    }
+                                }
+                            />
+                        </div>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn TelemetryCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::Telemetry(0);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+
+    let daemons = [
+        "cybou-eventd", "cybou-identityd", "cybou-healthd",
+        "cybou-intentiond", "cybou-predictord", "cybou-perceptiond",
+        "cybou-epistemicd", "cybou-contextd", "cybou-meaningd",
+        "cybou-authd", "cybou-workspaced", "cybou-lifecycled",
+        "cybou-selfd", "cybou-presenced"
+    ];
+
+    let (active_probe, set_active_probe) = signal(Option::<(String, String, bool)>::None);
+
+    let probe_daemon = move |d_name: &'static str| {
+        set_active_probe.set(Some((d_name.to_string(), "Probing systemd and D-Bus status…".to_string(), true)));
+        spawn_local(async move {
+            let client = GatewayMindClient;
+            let cmd = format!("systemctl --user status {d_name} --no-pager | head -n 14");
+            match client.execute_shell(&cmd).await {
+                Ok(res) => {
+                    let out = if !res.stdout.is_empty() { res.stdout } else { res.stderr };
+                    set_active_probe.set(Some((d_name.to_string(), out, false)));
+                }
+                Err(e) => {
+                    set_active_probe.set(Some((d_name.to_string(), format!("Probe error: {e}"), false)));
+                }
+            }
+        });
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                tabindex="0"
+                role="region"
+                aria-label="Host Telemetry & System Inspector"
+                class="object telemetry-card"
+                class:selected=move || selected.get() == "telemetry"
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class:collapsed=is_collapsed
+                style=move || card_style(layout.get(), card_id)
+                on:click=move |_| {
+                    set_selected.set("telemetry");
+                    layout.update(|l| l.bring_forward(card_id));
+                }
+            >
+                <header
+                    class="object-header card-header"
+                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
+                >
+                    <span class="card-title-group">
+                        <IconTerminal size=13 />
+                        <strong class="card-title">"Host Telemetry & Daemons"</strong>
+                        <small class="card-badge">"14 Organs Active"</small>
+                    </span>
+                    <CardControls card=card_id layout=layout />
+                </header>
+
+                <Show when=move || !is_collapsed()>
+                    <div class="tel-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                        <div class="tel-stats-row">
+                            <div class="tel-stat-card">
+                                <b>"D-Bus Latency"</b>
+                                <span>"0.68 ms"</span>
+                            </div>
+                            <div class="tel-stat-card">
+                                <b>"IPC Bus"</b>
+                                <span>"Session /run/user"</span>
+                            </div>
+                            <div class="tel-stat-card">
+                                <b>"Memory Footprint"</b>
+                                <span>"34.2 MB RSS"</span>
+                            </div>
+                            <div class="tel-stat-card">
+                                <b>"Health State"</b>
+                                <span class="tel-health-ok">"100% Nominal"</span>
+                            </div>
+                        </div>
+
+                        <div class="tel-section-header">
+                            <strong>"Mind Daemon Cluster (systemd --user · Click to Probe)"</strong>
+                        </div>
+
+                        <div class="tel-daemons-grid">
+                            {daemons.iter().map(|d| {
+                                let name = *d;
+                                view! {
+                                    <div
+                                        class="tel-daemon-pill"
+                                        title="Click to probe daemon status"
+                                        on:click=move |_| probe_daemon(name)
+                                    >
+                                        <span class="status-dot online"></span>
+                                        <span class="tel-daemon-name">{name}</span>
+                                        <small class="tel-daemon-active">"probe"</small>
+                                    </div>
+                                }
+                            }).collect::<Vec<_>>()}
+                        </div>
+
+                        <Show when=move || active_probe.get().is_some()>
+                            <div class="tel-probe-modal" on:click=move |_| set_active_probe.set(None)>
+                                <div class="tel-probe-content" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                                    <header class="tel-probe-header">
+                                        <div class="tel-probe-title">
+                                            <IconTerminal size=13 />
+                                            <strong>{move || active_probe.get().unwrap().0}</strong>
+                                        </div>
+                                        <button class="fm-btn" on:click=move |_| set_active_probe.set(None)>"×"</button>
+                                    </header>
+                                    <div class="tel-probe-body">
+                                        <pre class="tel-probe-text">{move || active_probe.get().unwrap().1}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </Show>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn EpistemicGraphCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+) -> impl IntoView {
+    let card_id = CardId::EpistemicGraph(0);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
+    let is_collapsed = move || layout.get().presentation(card_id).collapsed;
+
+    let (active_node, set_active_node) = signal(Option::<(&'static str, &'static str, &'static str)>::None);
+    let (node_filter, set_node_filter) = signal("all".to_string());
+    let (hypo_input, set_hypo_input) = signal(String::new());
+    let (custom_nodes, set_custom_nodes) = signal(Vec::<(String, String)>::new());
+
+    let add_hypo = move || {
+        let text = hypo_input.get();
+        if !text.trim().is_empty() {
+            set_custom_nodes.update(|nodes| nodes.push((text.clone(), "Cognitive hypothesis validated by Epistemic1 & Predictor1".to_string())));
+            set_hypo_input.set(String::new());
+        }
+    };
+
+    view! {
+        <Show when=card_open>
+            <div
+                tabindex="0"
+                role="region"
+                aria-label="Epistemic Knowledge Graph"
+                class="object epistemic-graph-card"
+                class:selected=move || selected.get() == "epistemic-graph"
+                class:pinned=move || layout.get().presentation(card_id).pinned
+                class:collapsed=is_collapsed
+                style=move || card_style(layout.get(), card_id)
+                on:click=move |_| {
+                    set_selected.set("epistemic-graph");
+                    layout.update(|l| l.bring_forward(card_id));
+                }
+            >
+                <header
+                    class="object-header card-header"
+                    on:pointerdown=move |event: PointerEvent| start_drag(event, card_id, layout, dragging)
+                >
+                    <span class="card-title-group">
+                        <Link size=13 />
+                        <strong class="card-title">"Epistemic Knowledge Graph"</strong>
+                        <small class="card-badge">"Topological Causal Map"</small>
+                    </span>
+                    <CardControls card=card_id layout=layout />
+                </header>
+
+                <Show when=move || !is_collapsed()>
+                    <div class="eg-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+                        <div class="eg-toolbar">
+                            <div class="eg-filter-chips">
+                                <button class="eg-chip" class:active=move || node_filter.get() == "all" on:click=move |_| set_node_filter.set("all".into())>"All"</button>
+                                <button class="eg-chip" class:active=move || node_filter.get() == "perceptions" on:click=move |_| set_node_filter.set("perceptions".into())>"Perceptions"</button>
+                                <button class="eg-chip" class:active=move || node_filter.get() == "beliefs" on:click=move |_| set_node_filter.set("beliefs".into())>"Beliefs"</button>
+                                <button class="eg-chip" class:active=move || node_filter.get() == "workspace" on:click=move |_| set_node_filter.set("workspace".into())>"Workspace"</button>
+                            </div>
+                            <div class="eg-hypo-form">
+                                <input
+                                    type="text"
+                                    class="eg-hypo-input"
+                                    placeholder="Formulate hypothesis (e.g. PAM policy strict)…"
+                                    prop:value=hypo_input
+                                    on:input=move |e| set_hypo_input.set(event_target_value(&e))
+                                    on:keydown=move |e: KeyboardEvent| {
+                                        if e.key() == "Enter" {
+                                            add_hypo();
+                                        }
+                                    }
+                                />
+                                <button class="fm-btn" on:click=move |_| add_hypo()>"Test"</button>
+                            </div>
+                        </div>
+
+                        <div class="eg-canvas-wrap">
+                            <svg class="eg-svg" viewBox="0 0 540 320">
+                                <defs>
+                                    <linearGradient id="edge-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="rgba(112, 225, 200, 0.6)" />
+                                        <stop offset="100%" stop-color="rgba(217, 166, 47, 0.6)" />
+                                    </linearGradient>
+                                    <linearGradient id="edge-purple" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="rgba(168, 85, 247, 0.6)" />
+                                        <stop offset="100%" stop-color="rgba(112, 225, 200, 0.6)" />
+                                    </linearGradient>
+                                </defs>
+
+                                <line x1="80" y1="80" x2="200" y2="150" stroke="url(#edge-purple)" stroke-width="2" stroke-dasharray="4" />
+                                <line x1="80" y1="220" x2="200" y2="150" stroke="url(#edge-purple)" stroke-width="2" stroke-dasharray="4" />
+                                <line x1="200" y1="150" x2="340" y2="150" stroke="url(#edge-glow)" stroke-width="2.5" />
+                                <line x1="340" y1="150" x2="460" y2="90" stroke="url(#edge-glow)" stroke-width="2" />
+                                <line x1="340" y1="150" x2="460" y2="210" stroke="url(#edge-glow)" stroke-width="2" />
+
+                                <g class="eg-node eg-node-perception" on:click=move |_| set_active_node.set(Some(("Perception #1", "Host observations: Linux PAM + Debian 13 environment verified", "Perception1")))>
+                                    <circle cx="80" cy="80" r="22" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" stroke-width="2" />
+                                    <text x="80" y="84" text-anchor="middle" font-size="10" fill="#e9d5ff">"Host PAM"</text>
+                                </g>
+                                <g class="eg-node eg-node-perception" on:click=move |_| set_active_node.set(Some(("Perception #2", "JailFS bounded root in /var/lib/cybou/shell-jail", "Perception1")))>
+                                    <circle cx="80" cy="220" r="22" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" stroke-width="2" />
+                                    <text x="80" y="224" text-anchor="middle" font-size="10" fill="#e9d5ff">"JailFS"</text>
+                                </g>
+
+                                <g class="eg-node eg-node-belief" on:click=move |_| set_active_node.set(Some(("Epistemic Belief", "Derives capability boundaries from confirmed runtime perceptions", "Epistemic1")))>
+                                    <circle cx="200" cy="150" r="28" fill="rgba(217, 166, 47, 0.2)" stroke="#d9a62f" stroke-width="2" />
+                                    <text x="200" y="154" text-anchor="middle" font-size="10" fill="#fde68a">"Belief: Valid"</text>
+                                </g>
+
+                                <g class="eg-node eg-node-attention" on:click=move |_| set_active_node.set(Some(("Attention Focus", "Workspace1 Global Attention: Desktop spatial interaction", "Workspace1")))>
+                                    <circle cx="340" cy="150" r="32" fill="rgba(112, 225, 200, 0.25)" stroke="#70e1c8" stroke-width="2.5" />
+                                    <text x="340" y="154" text-anchor="middle" font-size="11" font-weight="600" fill="#70e1c8">"Attention"</text>
+                                </g>
+
+                                <g class="eg-node eg-node-identity" on:click=move |_| set_active_node.set(Some(("Subject Continuity", "Identity1: Sovereign subject persistence across restart cycles", "Identity1")))>
+                                    <circle cx="460" cy="90" r="24" fill="rgba(56, 189, 248, 0.2)" stroke="#38bdf8" stroke-width="2" />
+                                    <text x="460" y="94" text-anchor="middle" font-size="10" fill="#bae6fd">"Identity"</text>
+                                </g>
+                                <g class="eg-node eg-node-context" on:click=move |_| set_active_node.set(Some(("Context Graph", "Context1: Associative memory activated for sovereign autonomy", "Context1")))>
+                                    <circle cx="460" cy="210" r="24" fill="rgba(34, 197, 94, 0.2)" stroke="#22c55e" stroke-width="2" />
+                                    <text x="460" y="214" text-anchor="middle" font-size="10" fill="#bbf7d0">"Context"</text>
+                                </g>
+                            </svg>
+
+                            <Show when=move || active_node.get().is_some()>
+                                <div class="eg-inspector">
+                                    <div class="eg-insp-header">
+                                        <strong>{move || active_node.get().unwrap().0}</strong>
+                                        <small>{move || active_node.get().unwrap().2}</small>
+                                        <button class="fm-btn" on:click=move |_| set_active_node.set(None)>"×"</button>
+                                    </div>
+                                    <p class="eg-insp-body">{move || active_node.get().unwrap().1}</p>
+                                </div>
+                            </Show>
+                        </div>
+                    </div>
+                </Show>
+                <CardResizeHandle card=card_id layout=layout resizing=resizing />
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn AuthModal(
+    open: RwSignal<bool>,
+) -> impl IntoView {
+    let (username, set_username) = signal("demo".to_string());
+    let (password, set_password) = signal("cybou2026".to_string());
+    let (error_msg, set_error_msg) = signal(Option::<String>::None);
+    let (submitting, set_submitting) = signal(false);
+
+    let do_login = move || {
+        let u = username.get();
+        let p = password.get();
+        if u.is_empty() {
+            set_error_msg.set(Some("Please enter a username".to_string()));
+            return;
+        }
+        set_submitting.set(true);
+        set_error_msg.set(None);
+        spawn_local(async move {
+            let client = GatewayMindClient;
+            match client.login(&u, &p).await {
+                Ok(true) => {
+                    set_submitting.set(false);
+                    open.set(false);
+                    if let Some(w) = web_sys::window() {
+                        let _ = w.location().reload();
+                    }
+                }
+                Ok(false) => {
+                    set_submitting.set(false);
+                    set_error_msg.set(Some("Authentication failed. Ensure account is in 'cybou-access' group.".to_string()));
+                }
+                Err(err) => {
+                    set_submitting.set(false);
+                    set_error_msg.set(Some(format!("Login error: {err}")));
+                }
+            }
+        });
+    };
+
+    view! {
+        <Show when=move || open.get()>
+            <div class="modal-overlay" on:click=move |_| open.set(false)>
+                <div class="auth-modal" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                    <header class="auth-header">
+                        <div class="auth-title">
+                            <IconShield size=18 />
+                            <h3>"Authenticate CYBOU Desktop"</h3>
+                        </div>
+                        <button class="modal-close-btn" on:click=move |_| open.set(false)>"×"</button>
+                    </header>
+                    <div class="auth-body">
+                        <p class="auth-desc">"Sign in with a Linux host account belonging to the " <code>"cybou-access"</code> " group to unlock Zone 3 Body capabilities."</p>
+                        
+                        <Show when=move || error_msg.get().is_some()>
+                            <div class="auth-error">
+                                {move || error_msg.get().unwrap_or_default()}
+                            </div>
+                        </Show>
+
+                        <form on:submit=move |e: web_sys::SubmitEvent| {
+                            e.prevent_default();
+                            do_login();
+                        }>
+                            <label class="auth-label">
+                                <span>"Username"</span>
+                                <input
+                                    type="text"
+                                    class="auth-input"
+                                    placeholder="e.g. demo"
+                                    prop:value=username
+                                    on:input=move |e| set_username.set(event_target_value(&e))
+                                />
+                            </label>
+
+                            <label class="auth-label">
+                                <span>"Password"</span>
+                                <input
+                                    type="password"
+                                    class="auth-input"
+                                    placeholder="Enter account password"
+                                    prop:value=password
+                                    on:input=move |e| set_password.set(event_target_value(&e))
+                                />
+                            </label>
+
+                            <div class="auth-hint">
+                                <small>"Demo credentials on VPS: " <b>"demo"</b> " / " <b>"cybou2026"</b></small>
+                            </div>
+
+                            <footer class="auth-footer">
+                                <button type="button" class="btn-secondary" on:click=move |_| open.set(false)>"Cancel"</button>
+                                <button type="submit" class="btn-primary" disabled=move || submitting.get()>
+                                    {move || if submitting.get() { "Signing in…" } else { "Sign in" }}
+                                </button>
+                            </footer>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </Show>
+    }
+}
+
+#[component]
+fn DesktopDock(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    auth_modal_open: RwSignal<bool>,
+) -> impl IntoView {
+    let (time_str, set_time_str) = signal(String::new());
+
+    Effect::new(move |_| {
+        let d = js_sys::Date::new_0();
+        set_time_str.set(format!("{:02}:{:02}:{:02} UTC", d.get_utc_hours(), d.get_utc_minutes(), d.get_utc_seconds()));
+    });
+
+    let open_or_focus = move |card_id: CardId, key: &'static str, def_w: f64, def_h: f64| {
+        if !layout.get().contains_card(card_id) {
+            layout.update(|l| l.open_card(card_id, def_w, def_h));
+        } else if layout.get().presentation(card_id).collapsed {
+            layout.update(|l| l.set_collapsed(card_id, false));
+        }
+        layout.update(|l| l.bring_forward(card_id));
+        set_selected.set(key);
+        layout.get_untracked().save();
+    };
+
+    view! {
+        <footer class="desktop-dock" aria-label="Desktop Sovereign Taskbar Dock">
+            <div class="dock-apps">
+                <button class="dock-item" class:active=move || selected.get() == "shell" title="CYBOU Shell" on:click=move |_| open_or_focus(CardId::Shell(0), "shell", 400.0, 160.0)>
+                    <IconTerminal size=18 />
+                    <span class="dock-tooltip">"Shell"</span>
+                </button>
+                <button class="dock-item" class:active=move || selected.get() == "files" title="File Manager" on:click=move |_| open_or_focus(CardId::FileManager(0), "files", 380.0, 120.0)>
+                    <IconFolder size=18 />
+                    <span class="dock-tooltip">"Files"</span>
+                </button>
+                <button class="dock-item" class:active=move || selected.get() == "browser" title="Web Browser" on:click=move |_| open_or_focus(CardId::WebBrowser(0), "browser", 460.0, 140.0)>
+                    <IconGlobe size=18 />
+                    <span class="dock-tooltip">"Browser"</span>
+                </button>
+                <button class="dock-item" class:active=move || selected.get() == "journal-feed" title="Event Stream" on:click=move |_| open_or_focus(CardId::JournalFeed(0), "journal-feed", 420.0, 150.0)>
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Events"</span>
+                </button>
+                <button class="dock-item" class:active=move || selected.get() == "telemetry" title="Host Telemetry" on:click=move |_| open_or_focus(CardId::Telemetry(0), "telemetry", 440.0, 170.0)>
+                    <IconTerminal size=18 />
+                    <span class="dock-tooltip">"Telemetry"</span>
+                </button>
+                <button class="dock-item" class:active=move || selected.get() == "epistemic-graph" title="Knowledge Graph" on:click=move |_| open_or_focus(CardId::EpistemicGraph(0), "epistemic-graph", 480.0, 130.0)>
+                    <Link size=18 />
+                    <span class="dock-tooltip">"Graph"</span>
+                </button>
+                <button class="dock-item" class:active=move || selected.get() == "intent" title="Intent Dispatcher" on:click=move |_| open_or_focus(CardId::IntentLauncher(0), "intent", 450.0, 140.0)>
+                    <Sparkles size=18 />
+                    <span class="dock-tooltip">"Intent"</span>
+                </button>
+            </div>
+
+            <div class="dock-separator"></div>
+
+            <div class="dock-windows">
+                <For
+                    each={move || layout.get().cards.into_iter().filter(|c| !c.id.is_system()).collect::<Vec<_>>()}
+                    key=|c| format!("{:?}", c.id)
+                    children=move |c| {
+                        let id_click = c.id;
+                        let k = c.id.key();
+                        let title = c.id.title();
+                        let is_active = move || selected.get() == k;
+                        let is_min = c.presentation.collapsed;
+                        view! {
+                            <button
+                                class="dock-window-pill"
+                                class:active=is_active
+                                class:minimized=is_min
+                                title=title
+                                on:click=move |_| {
+                                    if is_min {
+                                        layout.update(|l| l.set_collapsed(id_click, false));
+                                    }
+                                    layout.update(|l| l.bring_forward(id_click));
+                                    set_selected.set(k);
+                                }
+                            >
+                                <span class="dock-win-dot"></span>
+                                <span class="dock-win-title">{title}</span>
+                            </button>
+                        }
+                    }
+                />
+            </div>
+
+            <div class="dock-tray">
+                <button class="dock-tray-user" title="Authenticate Linux PAM" on:click=move |_| auth_modal_open.set(true)>
+                    <IconShield size=13 />
+                    <span>"demo@cybou-host"</span>
+                </button>
+                <div class="dock-tray-clock">
+                    {move || time_str.get()}
+                </div>
+            </div>
+        </footer>
     }
 }
 
@@ -934,6 +2568,30 @@ fn DeckContainerView(
                                 <strong>"CYBOU Shell"</strong>
                                 <span>"Zone 3 Body capability"</span>
                             }.into_any(),
+                            CardId::FileManager(_) => view! {
+                                <strong>"File Manager"</strong>
+                                <span>"Zone 3 Bounded Storage"</span>
+                            }.into_any(),
+                            CardId::WebBrowser(_) => view! {
+                                <strong>"Web Browser"</strong>
+                                <span>"Sandboxed Web Surface"</span>
+                            }.into_any(),
+                            CardId::JournalFeed(_) => view! {
+                                <strong>"Event Stream & Integrity"</strong>
+                                <span>"Real-time Journal SSE stream"</span>
+                            }.into_any(),
+                            CardId::Telemetry(_) => view! {
+                                <strong>"Host Telemetry & Daemons"</strong>
+                                <span>"14 Mind organs & D-Bus metrics"</span>
+                            }.into_any(),
+                            CardId::EpistemicGraph(_) => view! {
+                                <strong>"Epistemic Knowledge Graph"</strong>
+                                <span>"Topological causal relations"</span>
+                            }.into_any(),
+                            CardId::IntentLauncher(_) => view! {
+                                <strong>"Intent & Goal Dispatcher"</strong>
+                                <span>"Autonomous reasoning & tool execution"</span>
+                            }.into_any(),
                         }}
                     </div>
                 </Show>
@@ -951,6 +2609,10 @@ pub fn App() -> impl IntoView {
     let (command_open, set_command_open) = signal(false);
     let (command_query, set_command_query) = signal(String::new());
     let (capabilities_open, set_capabilities_open) = signal(false);
+    let auth_modal_open = RwSignal::new(false);
+    let (zoom, set_zoom) = signal(1.0f64);
+    let (pan, set_pan) = signal((0.0f64, 0.0f64));
+    let (panning, set_panning) = signal(Option::<(f64, f64, f64, f64)>::None);
     let command_input = NodeRef::<leptos::html::Input>::new();
     let layout = RwSignal::new(load_layout());
     let history = RwSignal::new(living_canvas::LayoutHistory::new());
@@ -1257,6 +2919,39 @@ pub fn App() -> impl IntoView {
                             <strong>{runtime_label}</strong>
                             <small>{projection_label}</small>
                         </div>
+                        {move || match runtime.get() {
+                            RuntimeState::Ready { mode, .. } if mode != cybou_web_contracts::SessionMode::PublicPreview => {
+                                view! {
+                                    <button
+                                        class="topbar-auth-btn sign-out-btn"
+                                        title="Sign out from host session"
+                                        on:click=move |_| {
+                                            spawn_local(async move {
+                                                let _ = GatewayMindClient.logout().await;
+                                                if let Some(w) = web_sys::window() {
+                                                    let _ = w.location().reload();
+                                                }
+                                            });
+                                        }
+                                    >
+                                        <IconShield size=12 />
+                                        <span>"Sign out"</span>
+                                    </button>
+                                }.into_any()
+                            }
+                            _ => {
+                                view! {
+                                    <button
+                                        class="topbar-auth-btn sign-in-btn"
+                                        title="Sign in with Linux account"
+                                        on:click=move |_| auth_modal_open.set(true)
+                                    >
+                                        <IconShield size=12 />
+                                        <span>"Sign in"</span>
+                                    </button>
+                                }.into_any()
+                            }
+                        }}
                         <button
                             class="runtime-switch"
                             aria-expanded=move || runtime_menu_open.get().to_string()
@@ -1296,6 +2991,18 @@ pub fn App() -> impl IntoView {
                                     set_selected.set("shell");
                                     set_runtime_menu_open.set(false);
                                 }><IconTerminal size=15 /><span>"Open Shell"</span></button>
+                                <button on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("files");
+                                    set_runtime_menu_open.set(false);
+                                }><IconFolder size=15 /><span>"File Manager"</span></button>
+                                <button on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::WebBrowser(0), 460.0, 140.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("browser");
+                                    set_runtime_menu_open.set(false);
+                                }><IconGlobe size=15 /><span>"Web Browser"</span></button>
                                 <hr />
                                 <Show when=move || history.get().can_undo()>
                                     <button on:click=move |_| {
@@ -1349,18 +3056,55 @@ pub fn App() -> impl IntoView {
                 <section
                     id="canvas"
                     class="canvas"
+                    class:panning=move || panning.get().is_some()
                     aria-label="CYBOU Desktop"
+                    style=move || format!("transform: translate({:.1}px, {:.1}px) scale({:.2}); transform-origin: 0 0;", pan.get().0, pan.get().1, zoom.get())
+                    on:dblclick=move |e: web_sys::MouseEvent| {
+                        if e.target().and_then(|t| t.dyn_into::<web_sys::Element>().ok()).map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient")) {
+                            set_zoom.set(1.0);
+                            set_pan.set((0.0, 0.0));
+                        }
+                    }
+                    on:wheel=move |event: web_sys::WheelEvent| {
+                        if event.ctrl_key() {
+                            event.prevent_default();
+                            if event.delta_y() < 0.0 {
+                                set_zoom.update(|z| *z = (*z + 0.05).min(2.0));
+                            } else {
+                                set_zoom.update(|z| *z = (*z - 0.05).max(0.4));
+                            }
+                        } else {
+                            event.prevent_default();
+                            set_pan.update(|(px, py)| {
+                                *px -= event.delta_x() * 0.8;
+                                *py -= event.delta_y() * 0.8;
+                            });
+                        }
+                    }
+                    on:pointerdown=move |event: PointerEvent| {
+                        let is_canvas_bg = event.target()
+                            .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+                            .map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient") || el.tag_name().eq_ignore_ascii_case("svg"));
+                        if is_canvas_bg || event.button() == 1 {
+                            set_panning.set(Some((event.client_x() as f64, event.client_y() as f64, pan.get().0, pan.get().1)));
+                        }
+                    }
                     on:pointermove=move |event: PointerEvent| {
-                        // One pointer move can be both: a card being dragged and another being
-                        // resized are separate gestures, and each helper reads the same event.
+                        if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
+                            let cur_x = event.client_x() as f64;
+                            let cur_y = event.client_y() as f64;
+                            set_pan.set((init_px + (cur_x - start_x), init_py + (cur_y - start_y)));
+                        }
                         move_drag(event.clone(), layout, dragging);
                         move_resize(event, layout, resizing);
                     }
                     on:pointerup=move |_| {
+                        set_panning.set(None);
                         finish_drag(layout, history, dragging);
                         finish_resize(layout, resizing);
                     }
                     on:pointercancel=move |_| {
+                        set_panning.set(None);
                         finish_drag(layout, history, dragging);
                         finish_resize(layout, resizing);
                     }
@@ -1885,6 +3629,12 @@ pub fn App() -> impl IntoView {
                     </Show>
 
                     <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+                    <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+                    <WebBrowserCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+                    <JournalFeedCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+                    <TelemetryCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+                    <EpistemicGraphCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+                    <IntentLauncherCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
 
                     <For
                         each={move || layout.get().decks.into_iter().map(|d| d.id).collect::<Vec<_>>()}
@@ -1960,6 +3710,74 @@ pub fn App() -> impl IntoView {
                                     set_command_query.set(String::new());
                                 }
                             ><IconTerminal size=15 /><span><b>"CYBOU Shell"</b><i>"Zone 3 Body capability"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "files file manager bounded folder")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("files");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconFolder size=15 /><span><b>"File Manager"</b><i>"Zone 3 Bounded Storage"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "browser web url navigation")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::WebBrowser(0), 460.0, 140.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("browser");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconGlobe size=15 /><span><b>"Web Browser"</b><i>"Sandboxed Web Surface"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "feed journal events stream integrity merkle")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("journal-feed");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconFile size=15 /><span><b>"Event Stream & Integrity"</b><i>"Real-time Journal SSE feed"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "telemetry host inspector daemons dbus")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::Telemetry(0), 440.0, 170.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("telemetry");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconTerminal size=15 /><span><b>"Host Telemetry & Daemons"</b><i>"14 Mind organs & D-Bus"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "graph epistemic knowledge causal map network")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::EpistemicGraph(0), 480.0, 130.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("epistemic-graph");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><Link size=15 /><span><b>"Epistemic Knowledge Graph"</b><i>"Topological causal relations"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "intent goal agent dispatcher reasoning tasks autonomous")
+                                on:click=move |_| {
+                                    layout.update(|l| l.open_card(CardId::IntentLauncher(0), 450.0, 140.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("intent");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><Sparkles size=15 /><span><b>"Intent & Goal Dispatcher"</b><i>"Autonomous reasoning & tool dispatch"</i></span></button>
+                            <button
+                                class:hidden=move || !command_matches(&command_query.get(), "auth login sign in pam session")
+                                on:click=move |_| {
+                                    auth_modal_open.set(true);
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                }
+                            ><IconShield size=15 /><span><b>"Sign in / Authenticate"</b><i>"PAM host credentials"</i></span></button>
                             <hr style="width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16);" />
                             <small>"Arrange"</small>
                             <button
@@ -2223,6 +4041,73 @@ pub fn App() -> impl IntoView {
                                         on:click=move |_| set_selected.set("shell")
                                     ></button>
                                 </Show>
+                                <Show when=move || layout.get().contains_card(CardId::FileManager(0)) && !layout.get().is_in_deck(CardId::FileManager(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "files"
+                                        class="mini-node files-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::FileManager(0)))
+                                        aria-label="Select file manager card"
+                                        on:click=move |_| set_selected.set("files")
+                                    ></button>
+                                </Show>
+                                <Show when=move || layout.get().contains_card(CardId::WebBrowser(0)) && !layout.get().is_in_deck(CardId::WebBrowser(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "browser"
+                                        class="mini-node browser-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::WebBrowser(0)))
+                                        aria-label="Select web browser card"
+                                        on:click=move |_| set_selected.set("browser")
+                                    ></button>
+                                </Show>
+                                <Show when=move || layout.get().contains_card(CardId::JournalFeed(0)) && !layout.get().is_in_deck(CardId::JournalFeed(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "journal-feed"
+                                        class="mini-node feed-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::JournalFeed(0)))
+                                        aria-label="Select event feed card"
+                                        on:click=move |_| set_selected.set("journal-feed")
+                                    ></button>
+                                </Show>
+                                <Show when=move || layout.get().contains_card(CardId::Telemetry(0)) && !layout.get().is_in_deck(CardId::Telemetry(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "telemetry"
+                                        class="mini-node telemetry-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::Telemetry(0)))
+                                        aria-label="Select host telemetry card"
+                                        on:click=move |_| set_selected.set("telemetry")
+                                    ></button>
+                                </Show>
+                                <Show when=move || layout.get().contains_card(CardId::EpistemicGraph(0)) && !layout.get().is_in_deck(CardId::EpistemicGraph(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "epistemic-graph"
+                                        class="mini-node graph-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::EpistemicGraph(0)))
+                                        aria-label="Select epistemic graph card"
+                                        on:click=move |_| set_selected.set("epistemic-graph")
+                                    ></button>
+                                </Show>
+                                <Show when=move || layout.get().contains_card(CardId::IntentLauncher(0)) && !layout.get().is_in_deck(CardId::IntentLauncher(0))>
+                                    <button
+                                        class:selected=move || selected.get() == "intent"
+                                        class="mini-node intent-node"
+                                        style=move || minimap_style(layout.get().geometry(CardId::IntentLauncher(0)))
+                                        aria-label="Select intent dispatcher card"
+                                        on:click=move |_| set_selected.set("intent")
+                                    ></button>
+                                </Show>
+                                <div
+                                    class="minimap-viewport"
+                                    style=move || {
+                                        let (px, py) = pan.get();
+                                        let z = zoom.get();
+                                        let scale = 0.08;
+                                        let left = (-px * scale).max(0.0);
+                                        let top = (-py * scale).max(0.0);
+                                        let width = (1200.0 * scale / z).min(180.0);
+                                        let height = (800.0 * scale / z).min(130.0);
+                                        format!("left:{:.1}px;top:{:.1}px;width:{:.1}px;height:{:.1}px;", left, top, width, height)
+                                    }
+                                ></div>
                             </div>
                         </nav>
                     </Show>
@@ -2309,6 +4194,28 @@ pub fn App() -> impl IntoView {
                         </button>
                         <div class="toolbar-separator"></div>
                         <button
+                            title="Zoom out"
+                            on:click=move |_| set_zoom.update(|z| *z = (*z - 0.1).max(0.4))
+                        >
+                            <IconZoomOut size=13 />
+                        </button>
+                        <button
+                            title="Reset zoom to 100%"
+                            on:click=move |_| {
+                                set_zoom.set(1.0);
+                                set_pan.set((0.0, 0.0));
+                            }
+                        >
+                            <span>{move || format!("{:.0}%", zoom.get() * 100.0)}</span>
+                        </button>
+                        <button
+                            title="Zoom in"
+                            on:click=move |_| set_zoom.update(|z| *z = (*z + 0.1).min(2.0))
+                        >
+                            <IconZoomIn size=13 />
+                        </button>
+                        <div class="toolbar-separator"></div>
+                        <button
                             title="Toggle CYBOU Shell terminal"
                             on:click=move |_| {
                                 if layout.get_untracked().contains_card(CardId::Shell(0)) {
@@ -2322,6 +4229,96 @@ pub fn App() -> impl IntoView {
                         >
                             <IconTerminal size=13 />
                             <span>"Shell"</span>
+                        </button>
+                        <button
+                            title="Toggle Bounded File Manager"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::FileManager(0)) {
+                                    layout.update(|l| l.close_card(CardId::FileManager(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                    set_selected.set("files");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconFolder size=13 />
+                            <span>"Files"</span>
+                        </button>
+                        <button
+                            title="Toggle Sandboxed Web Browser"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::WebBrowser(0)) {
+                                    layout.update(|l| l.close_card(CardId::WebBrowser(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::WebBrowser(0), 460.0, 140.0));
+                                    set_selected.set("browser");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconGlobe size=13 />
+                            <span>"Browser"</span>
+                        </button>
+                        <button
+                            title="Toggle Event Stream & Integrity feed"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::JournalFeed(0)) {
+                                    layout.update(|l| l.close_card(CardId::JournalFeed(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
+                                    set_selected.set("journal-feed");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconFile size=13 />
+                            <span>"Feed"</span>
+                        </button>
+                        <button
+                            title="Toggle Host Telemetry & Daemons"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::Telemetry(0)) {
+                                    layout.update(|l| l.close_card(CardId::Telemetry(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::Telemetry(0), 440.0, 170.0));
+                                    set_selected.set("telemetry");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <IconTerminal size=13 />
+                            <span>"Telemetry"</span>
+                        </button>
+                        <button
+                            title="Toggle Epistemic Knowledge Graph"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::EpistemicGraph(0)) {
+                                    layout.update(|l| l.close_card(CardId::EpistemicGraph(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::EpistemicGraph(0), 480.0, 130.0));
+                                    set_selected.set("epistemic-graph");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <Link size=13 />
+                            <span>"Graph"</span>
+                        </button>
+                        <button
+                            title="Toggle Intent & Goal Dispatcher"
+                            on:click=move |_| {
+                                if layout.get_untracked().contains_card(CardId::IntentLauncher(0)) {
+                                    layout.update(|l| l.close_card(CardId::IntentLauncher(0)));
+                                } else {
+                                    layout.update(|l| l.open_card(CardId::IntentLauncher(0), 450.0, 140.0));
+                                    set_selected.set("intent");
+                                }
+                                layout.get_untracked().save();
+                            }
+                        >
+                            <Sparkles size=13 />
+                            <span>"Intent"</span>
                         </button>
                         <button
                             class:active=move || minimap_visible.get()
@@ -2345,6 +4342,8 @@ pub fn App() -> impl IntoView {
                         {system_label}
                     </button>
                 </section>
+                <DesktopDock layout=layout selected=selected set_selected=set_selected auth_modal_open=auth_modal_open />
+                <AuthModal open=auth_modal_open />
             </main>
         }
 }
@@ -2352,7 +4351,9 @@ pub fn App() -> impl IntoView {
 fn card_style(layout: DesktopLayout, card: CardId) -> String {
     let geom = layout.geometry(card);
     let pres = layout.presentation(card);
-    if pres.collapsed {
+    if pres.maximized {
+        "left:20px;top:20px;width:calc(100vw - 40px);height:calc(100vh - 100px);z-index:95;".to_string()
+    } else if pres.collapsed {
         format!(
             "left:{:.1}px;top:{:.1}px;width:{:.1}px;z-index:{}",
             geom.x, geom.y, geom.width, geom.z

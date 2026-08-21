@@ -120,7 +120,11 @@ async fn source(
 /// valid way to run a public demo and is said at startup rather than left to be discovered.
 #[cfg(target_os = "linux")]
 fn credential_verifier() -> Option<Arc<dyn CredentialVerifier>> {
-    let path = std::env::var_os("CYBOU_AUTH_SOCKET")?;
+    if std::env::var_os("CYBOU_GATEWAY_FIXTURE").is_some() {
+        return None;
+    }
+    let path = std::env::var_os("CYBOU_AUTH_SOCKET")
+        .unwrap_or_else(|| std::ffi::OsString::from("/run/cybou/auth.sock"));
     Some(Arc::new(
         cybou_web_gateway::auth_socket::HelperVerifier::at(std::path::PathBuf::from(path)),
     ))

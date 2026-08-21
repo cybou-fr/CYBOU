@@ -37,6 +37,18 @@ pub enum CardId {
     Context,
     /// Dynamic bounded CYBOU Shell instance.
     Shell(u32),
+    /// Dynamic bounded File Manager instance (Zone 3 capability).
+    FileManager(u32),
+    /// Dynamic sandboxed Web Browser instance.
+    WebBrowser(u32),
+    /// Real-time Journal event stream & cryptographic hash integrity.
+    JournalFeed(u32),
+    /// Host Telemetry, daemon metrics & D-Bus status.
+    Telemetry(u32),
+    /// Interactive Epistemic Knowledge Graph visualization.
+    EpistemicGraph(u32),
+    /// Agent Intent & Goal Dispatcher.
+    IntentLauncher(u32),
 }
 
 impl CardId {
@@ -71,6 +83,12 @@ impl CardId {
             Self::Perception => "perception",
             Self::Context => "context",
             Self::Shell(_) => "shell",
+            Self::FileManager(_) => "files",
+            Self::WebBrowser(_) => "browser",
+            Self::JournalFeed(_) => "journal-feed",
+            Self::Telemetry(_) => "telemetry",
+            Self::EpistemicGraph(_) => "epistemic-graph",
+            Self::IntentLauncher(_) => "intent",
         }
     }
 
@@ -90,6 +108,12 @@ impl CardId {
             Self::Perception => "Perception",
             Self::Context => "Context",
             Self::Shell(_) => "CYBOU Shell",
+            Self::FileManager(_) => "File Manager",
+            Self::WebBrowser(_) => "Web Browser",
+            Self::JournalFeed(_) => "Event Stream & Integrity",
+            Self::Telemetry(_) => "Host Telemetry & Daemons",
+            Self::EpistemicGraph(_) => "Epistemic Knowledge Graph",
+            Self::IntentLauncher(_) => "Intent & Goal Dispatcher",
         }
     }
 
@@ -108,8 +132,34 @@ impl CardId {
             "beliefs" => Some(Self::Beliefs),
             "perception" => Some(Self::Perception),
             "context" => Some(Self::Context),
+            "shell" => Some(Self::Shell(0)),
+            "files" => Some(Self::FileManager(0)),
+            "browser" => Some(Self::WebBrowser(0)),
+            "journal-feed" => Some(Self::JournalFeed(0)),
+            "telemetry" => Some(Self::Telemetry(0)),
+            "epistemic-graph" => Some(Self::EpistemicGraph(0)),
+            "intent" => Some(Self::IntentLauncher(0)),
             _ => None,
         }
+    }
+
+    /// Whether this card is a permanent System Mind card.
+    #[must_use]
+    pub const fn is_system(self) -> bool {
+        matches!(
+            self,
+            Self::Identity
+                | Self::Session
+                | Self::Capabilities
+                | Self::Journal
+                | Self::Lifecycle
+                | Self::Commitments
+                | Self::SelfModel
+                | Self::Attention
+                | Self::Beliefs
+                | Self::Perception
+                | Self::Context
+        )
     }
 
     /// Return static specification for this card type.
@@ -261,6 +311,78 @@ impl CardId {
                 min_size: (320.0, 200.0),
                 max_size: (800.0, 600.0),
             },
+            Self::FileManager(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 380.0),
+                min_size: (360.0, 240.0),
+                max_size: (1200.0, 800.0),
+            },
+            Self::WebBrowser(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (640.0, 480.0),
+                min_size: (380.0, 300.0),
+                max_size: (1600.0, 1200.0),
+            },
+            Self::JournalFeed(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (580.0, 360.0),
+                min_size: (360.0, 240.0),
+                max_size: (1200.0, 800.0),
+            },
+            Self::Telemetry(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (520.0, 340.0),
+                min_size: (360.0, 220.0),
+                max_size: (1000.0, 700.0),
+            },
+            Self::EpistemicGraph(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (640.0, 440.0),
+                min_size: (400.0, 300.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::IntentLauncher(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (600.0, 420.0),
+                min_size: (380.0, 260.0),
+                max_size: (1400.0, 900.0),
+            },
         }
     }
 }
@@ -329,6 +451,8 @@ pub struct CardPresentation {
     pub collapsed: bool,
     /// Whether the card is pinned (locked against automatic arrangement).
     pub pinned: bool,
+    /// Whether the card is maximized to fill the viewport canvas.
+    pub maximized: bool,
 }
 
 /// Static capabilities and bounds of a Card type.
@@ -379,6 +503,7 @@ impl CardInstance {
             presentation: CardPresentation {
                 collapsed: false,
                 pinned: false,
+                maximized: false,
             },
         }
     }
