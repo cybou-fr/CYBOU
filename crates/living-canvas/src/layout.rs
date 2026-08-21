@@ -326,6 +326,7 @@ impl DesktopLayout {
         }
 
         self.set_position(card, detach_x, detach_y);
+        self.bring_forward(card);
 
         if should_dissolve {
             self.dissolve_deck(deck_id);
@@ -339,6 +340,7 @@ impl DesktopLayout {
             let mut offset = 0.0;
             for c in deck.card_ids {
                 self.set_position(c, deck.geometry.x + offset, deck.geometry.y + offset);
+                self.bring_forward(c);
                 offset += 40.0;
             }
         }

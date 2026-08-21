@@ -340,7 +340,7 @@ fn ShellCard(
     resizing: RwSignal<Option<ResizeState>>,
 ) -> impl IntoView {
     let card_id = CardId::Shell(0);
-    let card_open = move || layout.get().contains_card(card_id);
+    let card_open = move || layout.get().contains_card(card_id) && !layout.get().is_in_deck(card_id);
     let is_collapsed = move || layout.get().presentation(card_id).collapsed;
     let (history, set_history) = signal(vec![(
         String::new(),
@@ -782,7 +782,10 @@ fn DeckContainerView(
                         start_deck_drag(event, d_id.get_value(), layout, dragging);
                     }
                 >
-                    <div class="deck-tabs">
+                    <div
+                        class="deck-tabs"
+                        on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                    >
                         <For
                             each=move || cards.get()
                             key=|card| *card
@@ -792,6 +795,9 @@ fn DeckContainerView(
                                     <div
                                         class="deck-tab"
                                         class:active=is_active
+                                        on:pointerdown=move |e: PointerEvent| {
+                                            e.stop_propagation();
+                                        }
                                         on:click=move |e: web_sys::MouseEvent| {
                                             e.stop_propagation();
                                             layout.update(|l| {
@@ -807,6 +813,9 @@ fn DeckContainerView(
                                             class="deck-tab-detach"
                                             title="Detach tab to canvas"
                                             aria-label="Detach tab"
+                                            on:pointerdown=move |e: PointerEvent| {
+                                                e.stop_propagation();
+                                            }
                                             on:click=move |e: web_sys::MouseEvent| {
                                                 e.stop_propagation();
                                                 history.update(|h| h.push(layout.get_untracked()));
@@ -821,10 +830,14 @@ fn DeckContainerView(
                             }
                         />
                     </div>
-                    <div class="deck-controls">
+                    <div
+                        class="deck-controls"
+                        on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                    >
                         <button
                             class="card-control-btn"
                             title="Ungroup deck into separate cards"
+                            on:pointerdown=move |e: PointerEvent| e.stop_propagation()
                             on:click=move |e: web_sys::MouseEvent| {
                                 e.stop_propagation();
                                 history.update(|h| h.push(layout.get_untracked()));
@@ -837,6 +850,7 @@ fn DeckContainerView(
                         <button
                             class="card-control-btn"
                             title=move || if is_pinned.get() { "Unpin deck" } else { "Pin deck" }
+                            on:pointerdown=move |e: PointerEvent| e.stop_propagation()
                             on:click=move |e: web_sys::MouseEvent| {
                                 e.stop_propagation();
                                 layout.update(|l| l.toggle_deck_pinned(&d_id.get_value()));
@@ -848,6 +862,7 @@ fn DeckContainerView(
                         <button
                             class="card-control-btn"
                             title=move || if is_collapsed.get() { "Expand deck" } else { "Collapse deck" }
+                            on:pointerdown=move |e: PointerEvent| e.stop_propagation()
                             on:click=move |e: web_sys::MouseEvent| {
                                 e.stop_propagation();
                                 layout.update(|l| l.toggle_deck_collapse(&d_id.get_value()));
@@ -2542,6 +2557,15 @@ fn start_deck_drag(
     dragging: RwSignal<Option<DragState>>,
 ) {
     if event.button() != 0 {
+        return;
+    }
+    if let Some(target_el) = event.target().and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+        && target_el
+            .closest("button, .deck-tab, .deck-tab-detach, .deck-controls, .card-control-btn")
+            .ok()
+            .flatten()
+            .is_some()
+    {
         return;
     }
     let current_layout = layout.get_untracked();
