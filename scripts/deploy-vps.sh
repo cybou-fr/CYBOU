@@ -75,8 +75,8 @@ cybou_ssh "
   # the host would be a way in.
   sudo getent group cybou-access >/dev/null || sudo groupadd --system cybou-access
 
-  # The PAM stack the helper opens. Ordinary Unix password checking and nothing else; `account`
-  # is what makes `usermod -L` actually revoke access rather than only look like it.
+  # The PAM stack the helper opens. Ordinary Unix password checking and nothing else; the account
+  # module is what makes locking an account actually revoke access rather than only look like it.
   sudo install -m 0644 debian/pam-cybou /etc/pam.d/cybou
 
   # The helper is a system service because it is the one thing here that needs root. Its socket is
