@@ -17,6 +17,7 @@ cybou_ssh "
   export CARGO_TARGET_DIR='$CYBOU_VPS_TARGET'
   cargo test --workspace --locked
   cargo build --workspace --release --locked
+  mkdir -p target/living-canvas
   cd crates/living-canvas
   trunk build --release
   cd ../..
