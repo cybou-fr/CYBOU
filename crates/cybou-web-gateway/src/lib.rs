@@ -42,13 +42,11 @@ use routes::{
 use state::GatewayState;
 
 /// Build the v1 router around a single source.
-#[must_use]
 pub fn router(presence: Arc<dyn PresenceSource>) -> Router {
     router_with_verifier_and_access(presence, None, None, None, SessionContext::local_desktop())
 }
 
 /// Build the v1 router serving static assets when configured.
-#[must_use]
 pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<PathBuf>) -> Router {
     router_with_verifier_and_access(
         presence,
@@ -60,7 +58,6 @@ pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<Pa
 }
 
 /// Build the v1 router with an explicit server-established trust context.
-#[must_use]
 pub fn router_with_assets_and_session(
     presence: Arc<dyn PresenceSource>,
     web_root: Option<PathBuf>,
@@ -75,7 +72,6 @@ pub fn router_with_assets_and_session(
 /// # Panics
 ///
 /// If the sandbox jail the shell surface runs in cannot be created.
-#[must_use]
 pub fn router_with_verifier_and_access(
     presence: Arc<dyn PresenceSource>,
     privileged: Option<Arc<dyn PresenceSource>>,
@@ -98,7 +94,6 @@ pub fn router_with_verifier_and_access(
 /// # Panics
 ///
 /// If the sandbox the shell surface runs in cannot be created.
-#[must_use]
 pub fn router_recording_disclosures(
     presence: Arc<dyn PresenceSource>,
     privileged: Option<Arc<dyn PresenceSource>>,

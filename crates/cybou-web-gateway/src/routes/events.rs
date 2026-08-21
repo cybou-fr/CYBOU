@@ -17,6 +17,10 @@ use crate::state::{
 };
 
 /// Extract and validate resume cursor from request headers.
+///
+/// # Errors
+///
+/// Returns [`GatewayError::InvalidCursor`] if the header is malformed, contains control characters, or exceeds size limits.
 pub fn resume_cursor(headers: &HeaderMap) -> Result<Option<String>, GatewayError> {
     let Some(value) = headers.get("last-event-id") else {
         return Ok(None);
@@ -29,6 +33,10 @@ pub fn resume_cursor(headers: &HeaderMap) -> Result<Option<String>, GatewayError
 }
 
 /// SSE stream handler emitting snapshot events and projection errors.
+///
+/// # Errors
+///
+/// Returns [`GatewayError`] if initial cursor parsing fails.
 pub async fn events_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

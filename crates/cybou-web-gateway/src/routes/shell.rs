@@ -15,6 +15,10 @@ use cybou_web_contracts::{
 use crate::state::{ErrorBody, GatewayState};
 
 /// Execute a sandboxed shell command.
+///
+/// # Errors
+///
+/// Returns `StatusCode::FORBIDDEN` if executed outside authenticated or local desktop context.
 pub async fn shell_exec_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

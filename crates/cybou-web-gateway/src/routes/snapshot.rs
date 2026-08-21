@@ -13,6 +13,10 @@ use cybou_web_contracts::{MindProjection, SnapshotProjection};
 use crate::state::{GatewayError, GatewayState, SNAPSHOT_BUDGET};
 
 /// Return one atomic snapshot projection.
+///
+/// # Errors
+///
+/// Returns [`GatewayError`] if snapshot production times out or fails.
 pub async fn snapshot_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -24,6 +28,10 @@ pub async fn snapshot_handler(
 }
 
 /// Return the full Mind organ system state.
+///
+/// # Errors
+///
+/// Returns [`GatewayError`] if mind production times out or fails.
 pub async fn mind_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

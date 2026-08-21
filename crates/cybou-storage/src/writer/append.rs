@@ -36,6 +36,10 @@ pub struct Erased {
 }
 
 /// Validate, hash, chain and insert one contribution inside a transaction the caller opened.
+///
+/// # Errors
+///
+/// Returns [`WriteError`] if admission check fails or database insertion encounters an error.
 pub fn append_within_transaction(
     transaction: &Connection,
     envelope: &CanonicalEnvelope,
@@ -121,6 +125,10 @@ pub fn append_within_transaction(
 }
 
 /// Read back exactly what admission needs about everything this contribution names.
+///
+/// # Errors
+///
+/// Returns [`WriteError`] on database query failure.
 pub fn resolve(connection: &Connection, envelope: &CanonicalEnvelope) -> Result<Resolved, WriteError> {
     let message_id_exists = reference_facts(connection, envelope.message_id)?.is_some();
 
@@ -158,6 +166,10 @@ pub fn resolve(connection: &Connection, envelope: &CanonicalEnvelope) -> Result<
 }
 
 /// Sequence to assign and the hash it chains onto.
+///
+/// # Errors
+///
+/// Returns [`WriteError`] on database query failure.
 pub fn tail(connection: &Connection) -> Result<(u64, Vec<u8>), WriteError> {
     let row: Option<(i64, Vec<u8>)> = connection
         .query_row(
@@ -179,6 +191,10 @@ pub fn tail(connection: &Connection) -> Result<(u64, Vec<u8>), WriteError> {
 }
 
 /// Look up reference facts (privacy, retention, sensitivity) for a named message.
+///
+/// # Errors
+///
+/// Returns [`WriteError`] on database query failure or malformed fields.
 pub fn reference_facts(
     connection: &Connection,
     id: Uuid,

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Write errors and SQLite error classification.
+//! Write errors and `SQLite` error classification.
 
 use cybou_protocol::admission::Rejection;
 use crate::StorageError;
@@ -13,6 +13,7 @@ pub const JOURNAL_HASH_V3: i64 = 3;
 pub const REQUIRED_SYNCHRONOUS_LEVEL: i64 = 2;
 
 /// Whether a failure is another writer holding the database rather than a defective statement.
+#[must_use]
 pub fn is_busy(error: &rusqlite::Error) -> bool {
     matches!(
         error,
@@ -23,6 +24,7 @@ pub fn is_busy(error: &rusqlite::Error) -> bool {
 }
 
 /// Classify rusqlite error into [`WriteError`].
+#[must_use]
 pub fn write_error(error: rusqlite::Error) -> WriteError {
     if is_busy(&error) {
         WriteError::Concurrent

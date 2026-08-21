@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! PlacementResolver for locating collision-free layout positions for cards and detached items.
+//! `PlacementResolver` for locating collision-free layout positions for cards and detached items.
 
 use crate::layout::model::{DesktopItem, Rect, UsableViewport};
 

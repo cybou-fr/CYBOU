@@ -40,7 +40,11 @@ pub fn v2_indexes_ddl() -> String {
     )
 }
 
-/// Open an SQLite database file with required flags and pragmas.
+/// Open an `SQLite` database file with required flags and pragmas.
+///
+/// # Errors
+///
+/// Returns [`WriteError::Open`] or [`WriteError::Query`] if opening or applying pragmas fails.
 pub fn open_for_write(path: &Path) -> Result<Connection, WriteError> {
     let connection = Connection::open_with_flags(
         path,
@@ -68,6 +72,10 @@ pub fn open_for_write(path: &Path) -> Result<Connection, WriteError> {
 }
 
 /// Verify that the connection is running in WAL mode with sufficient synchronisation level.
+///
+/// # Errors
+///
+/// Returns [`WriteError::Durability`] if synchronous mode or WAL is insufficient.
 pub fn ensure_durability(connection: &Connection) -> Result<(), WriteError> {
     let mode: String = connection
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
@@ -92,6 +100,10 @@ pub fn ensure_durability(connection: &Connection) -> Result<(), WriteError> {
 }
 
 /// Check if a given table exists in the database.
+///
+/// # Errors
+///
+/// Returns [`WriteError`] on database query failure.
 pub fn table_exists(connection: &Connection, table: &str) -> Result<bool, WriteError> {
     connection
         .query_row(
@@ -105,6 +117,10 @@ pub fn table_exists(connection: &Connection, table: &str) -> Result<bool, WriteE
 }
 
 /// Check if a given column exists in a table.
+///
+/// # Errors
+///
+/// Returns [`WriteError`] on database query failure.
 pub fn column_exists(connection: &Connection, table: &str, column: &str) -> Result<bool, WriteError> {
     let mut statement = connection
         .prepare(&format!("PRAGMA table_info({table})"))
@@ -120,6 +136,10 @@ pub fn column_exists(connection: &Connection, table: &str, column: &str) -> Resu
 }
 
 /// Migrate a v1 Journal to schema v2, or refuse and leave it untouched.
+///
+/// # Errors
+///
+/// Returns [`WriteError::Migration`] if migration verification fails or schema is incompatible.
 pub fn migrate_v1_to_v2(path: &Path) -> Result<(), WriteError> {
     let connection = open_for_write(path)?;
     ensure_durability(&connection)?;
