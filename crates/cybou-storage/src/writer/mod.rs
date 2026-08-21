@@ -2,175 +2,25 @@
 // SPDX-License-Identifier: MIT
 
 //! The Rust Journal writer, in the two slices that do not need a key store.
-//!
-//! W2 opens or creates the predecessor's schema v2 and refuses to proceed when the durability the
-//! Journal claims did not actually take. W3 appends one contribution: it resolves the references
-//! the envelope names, applies [`cybou_protocol::admission`], chains hash v3 over its split
-//! commitment, and inserts the row with the predecessor's exact column spellings.
-//!
-//! This is not an owner. The C++ `eventd` remains the single canonical writer until the
-//! differential, interruption, recovery, scale, and rollback gates pass, and dual-running two
-//! canonical owners against the same writable state stays forbidden. What this type provides is a
-//! writer that can be compared against the predecessor, not one that may replace it.
-//!
-//! Sealing is deliberately absent. A sealed contribution is refused outright rather than stored in
-//! the clear: a payload written unsealed because no key store was reachable would be a payload
-//! nobody could later erase.
 
-use std::fmt::Write as _;
+pub mod append;
+pub mod error;
+pub mod schema;
+
 use std::path::Path;
-
-use cybou_protocol::admission::{
-    self, Kind, Privacy, ReferenceFacts, Rejection, Resolved, Sensitivity,
-};
-use cybou_protocol::canonical::{
-    CanonicalEnvelope, canonical_journal_row_v3, commitment_v3, sha256,
-};
-use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
+use cybou_protocol::admission::Kind;
+use cybou_protocol::canonical::CanonicalEnvelope;
+use rusqlite::{Connection, OptionalExtension};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{JOURNAL_SCHEMA_V2, StorageError};
+pub use append::{Appended, Erased, qt_instant};
+pub use error::{JOURNAL_HASH_V3, WriteError, write_error};
+pub use schema::{EVIDENCE_TABLE_DDL, migrate_v1_to_v2, v2_indexes_ddl};
 
-/// Journal hash version written by this build.
-pub const JOURNAL_HASH_V3: i64 = 3;
-
-/// `SQLite` `synchronous` level at or above which a returned `COMMIT` has reached storage.
-///
-/// Below this, acceptance would be published for a commit that a power loss can still discard.
-const REQUIRED_SYNCHRONOUS_LEVEL: i64 = 2;
-
-/// The evidence join table, shared by schema creation and the v1 migration.
-///
-/// One definition rather than two copies: a migration that produced a subtly different table from
-/// the one creation produces would leave two shapes of Journal in the world, and only one of them
-/// would be the shape the tests cover.
-const EVIDENCE_TABLE_DDL: &str = "CREATE TABLE contribution_evidence (
-     contribution_id TEXT    NOT NULL,
-     evidence_id     TEXT    NOT NULL,
-     ordinal         INTEGER NOT NULL,
-     PRIMARY KEY (contribution_id, evidence_id),
-     UNIQUE (contribution_id, ordinal),
-     FOREIGN KEY (contribution_id) REFERENCES contribution(message_id) ON DELETE RESTRICT,
-     FOREIGN KEY (evidence_id) REFERENCES contribution(message_id) ON DELETE RESTRICT
- );";
-
-/// The v2 indexes, including the partial unique index that makes one terminal `Outcome` per cause
-/// a constraint of the storage rather than only a rule the writer applies.
-fn v2_indexes_ddl() -> String {
-    format!(
-        "CREATE INDEX IF NOT EXISTS idx_correlation ON contribution(correlation_id);
-         CREATE INDEX IF NOT EXISTS idx_causation ON contribution(causation_id);
-         CREATE INDEX IF NOT EXISTS idx_kind ON contribution(kind);
-         CREATE INDEX IF NOT EXISTS idx_evidence_target ON contribution_evidence(evidence_id);
-         CREATE UNIQUE INDEX IF NOT EXISTS idx_one_outcome_per_cause
-             ON contribution(causation_id)
-             WHERE kind = {outcome} AND causation_id IS NOT NULL;",
-        outcome = Kind::Outcome as u16,
-    )
-}
-
-/// Whether a failure is another writer holding the database rather than a defective statement.
-///
-/// A caller must be able to tell "someone else is writing" from "this statement is wrong": the
-/// first is a retry, the second is a bug, and collapsing them into one error would have every
-/// concurrency stall look like corruption.
-fn is_busy(error: &rusqlite::Error) -> bool {
-    matches!(
-        error,
-        rusqlite::Error::SqliteFailure(inner, _)
-            if inner.code == rusqlite::ErrorCode::DatabaseBusy
-                || inner.code == rusqlite::ErrorCode::DatabaseLocked
-    )
-}
-
-fn write_error(error: rusqlite::Error) -> WriteError {
-    if is_busy(&error) {
-        WriteError::Concurrent
-    } else {
-        WriteError::Query(error)
-    }
-}
-
-/// Why the writer refused.
-#[derive(Debug, thiserror::Error)]
-pub enum WriteError {
-    /// The database could not be opened or created.
-    #[error("cannot open Journal for writing: {0}")]
-    Open(#[source] rusqlite::Error),
-    /// A statement failed.
-    #[error("Journal write failed: {0}")]
-    Query(#[source] rusqlite::Error),
-    /// The commit mode or synchronisation level is weaker than the durability claim requires.
-    #[error("Journal durability is weaker than required: {0}")]
-    Durability(String),
-    /// The existing schema is not one this slice may write to.
-    #[error("Journal schema {received} cannot be written by this build; expected {expected}")]
-    UnsupportedSchema {
-        /// Version read from `PRAGMA user_version`.
-        received: i64,
-        /// Version this build writes.
-        expected: i64,
-    },
-    /// A database declaring a schema but missing its tables must never be repaired implicitly.
-    #[error("Journal declares schema {0} but has no contribution table")]
-    InconsistentSchema(i64),
-    /// The contribution is not admissible.
-    #[error("contribution refused: {0}")]
-    Refused(#[from] Rejection),
-    /// A sealed contribution reached a writer with no key store.
-    #[error("refusing a sealed contribution: this journal has no key store")]
-    SealedWithoutKeyStore,
-    /// Cryptographic failure.
-    #[error("cryptographic failure: {0}")]
-    Crypto(#[from] cybou_crypto::CryptoError),
-    /// Key store failure.
-    #[error("key store failure: {0}")]
-    KeyStore(#[from] cybou_crypto::KeyStoreError),
-    /// A stored value could not be read back as the type its column promises.
-    #[error("Journal contains a malformed stored value: {0}")]
-    Malformed(&'static str),
-    /// Another writer holds the database.
-    #[error("another writer holds this Journal")]
-    Concurrent,
-    /// The v1 migration refused, leaving the database exactly as it was.
-    #[error("Journal migration refused: {0}")]
-    Migration(String),
-}
-
-impl From<StorageError> for WriteError {
-    fn from(value: StorageError) -> Self {
-        match value {
-            StorageError::Open(error) => Self::Open(error),
-            StorageError::Query(error) => Self::Query(error),
-            other => Self::Durability(other.to_string()),
-        }
-    }
-}
-
-/// One appended contribution.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Appended {
-    /// Sequence assigned by the chain, starting at one.
-    pub sequence: u64,
-    /// Row hash written at [`JOURNAL_HASH_V3`].
-    pub hash: [u8; 32],
-}
-
-/// What one erasure actually reached.
-///
-/// The three numbers are different facts and are kept apart on purpose. A closure larger than the
-/// redacted set means some descendants were written before hash version 3 and cannot be erased,
-/// which is something an operator has to be told rather than left to infer from a success.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Erased {
-    /// Everything the erasure applied to, including the target itself.
-    pub closure: Vec<Uuid>,
-    /// Those whose payload was actually redacted by this call.
-    pub redacted: Vec<Uuid>,
-    /// The erasure epoch the Journal now stands at.
-    pub epoch: u64,
-}
+use crate::JOURNAL_SCHEMA_V2;
+use append::append_within_transaction;
+use schema::{ensure_durability, open_for_write};
 
 /// A read-write Journal connection that can append contributions.
 #[derive(Debug)]
@@ -183,16 +33,6 @@ pub struct JournalWriter {
 
 impl JournalWriter {
     /// Open an existing Journal for writing, or create schema v2 when the file is new.
-    ///
-    /// Durability is verified rather than requested. `SQLite` silently keeps the previous mode when
-    /// it cannot apply one — a filesystem without shared-memory support falls back from WAL, for
-    /// instance — and a silent fallback would leave "durable before visible" stated more strongly
-    /// than the storage supports. Both pragmas are read back, and the writer refuses to open rather
-    /// than weakening the guarantee unannounced.
-    ///
-    /// A v1 database is refused, not migrated. Migration has its own backup, interruption, and
-    /// rollback evidence, and performing it as a side effect of opening a connection would run it
-    /// where none of that evidence is being collected.
     ///
     /// # Errors
     ///
@@ -315,23 +155,11 @@ impl JournalWriter {
 
     /// Append one contribution, or refuse it.
     ///
-    /// Everything happens inside one `BEGIN IMMEDIATE` transaction: the reference reads that
-    /// admission depends on, the tail read that assigns the sequence, and the insert. Reading the
-    /// references outside the transaction would let a concurrent writer erase or expire one between
-    /// the check and the row that rests on it.
-    ///
-    /// The returned sequence is not acceptance. Acceptance is published by the Event owner after
-    /// this call returns, which is what "durable before visible" means and why nothing here emits a
-    /// signal.
-    ///
     /// # Errors
     ///
     /// Returns [`WriteError::Refused`] when a rule declines the contribution, leaving the Journal
     /// exactly as it was, or another [`WriteError`] when the database itself failed.
     pub fn append(&mut self, envelope: &CanonicalEnvelope) -> Result<Appended, WriteError> {
-        // A data key created for a contribution the Journal then refuses is a key protecting
-        // nothing, left behind by a decision that did not happen. It is removed on every path out
-        // of this function that does not end in a committed row.
         let mut key_to_clean = None;
 
         let envelope_to_write;
@@ -358,17 +186,11 @@ impl JournalWriter {
             envelope
         };
 
-        // Immediate rather than deferred: the write lock is taken before the reference reads, so
-        // a concurrent writer is refused here, at the start, rather than at the commit after the
-        // admission rules have already been decided against state that moved.
         let result = self.append_committed(target_envelope);
         if result.is_err()
             && let Some(contribution_id) = key_to_clean
             && let Some(store) = &self.key_store
         {
-            // Best effort: a key that outlives its failed contribution is unreachable rather than
-            // dangerous, and refusing the whole write because cleanup failed would turn a
-            // recoverable rejection into a lost contribution.
             let _ = store.destroy_key_for(&contribution_id);
         }
         result
@@ -385,9 +207,6 @@ impl JournalWriter {
     }
 
     /// Return the most exposing sensitivity anything in the Journal carries.
-    ///
-    /// One question, asked of the owner of the data rather than of a second reader: what is the
-    /// most a surface would be publishing if it published everything here?
     ///
     /// # Errors
     ///
@@ -673,13 +492,6 @@ impl JournalWriter {
 
     /// Every contribution that must be forgotten along with `target`.
     ///
-    /// ADR-0028: an erasure applies to the dependency closure of its target, not to one row. A
-    /// `Learning` that says "because X" restates X; erasing X and keeping the Learning would
-    /// destroy the record a person asked to forget and keep the reasoning that repeats it.
-    ///
-    /// The closure travels causation and evidence, which is where derivation actually goes. A
-    /// contribution that merely happened afterwards is not a descendant of what was erased.
-    ///
     /// # Errors
     ///
     /// Returns [`WriteError`] on database query failure.
@@ -707,8 +519,6 @@ impl JournalWriter {
                 let Ok(dependent) = Uuid::parse_str(&raw) else {
                     continue;
                 };
-                // A cycle would loop for ever, and the check that prevents it is the same one that
-                // keeps a diamond-shaped derivation from being visited twice.
                 if closure.contains(&dependent) {
                     continue;
                 }
@@ -722,19 +532,6 @@ impl JournalWriter {
 
     /// Redact the payloads of a closure, destroy their keys, and advance the erasure epoch.
     ///
-    /// This is step 2 and step 3 of ADR-0028's sequence. Step 1 — the durable `ErasureRequested`
-    /// contribution that says what is about to happen and why — belongs to the caller, and has to
-    /// be committed before this is entered: an erasure that destroyed a key and then crashed with
-    /// nothing on record would be irrecoverable loss nobody could explain.
-    ///
-    /// Destroying keys before the redaction commits is deliberate and is the safe order. A crash
-    /// between them leaves ciphertext whose key is gone — unreadable, and still marked unerased,
-    /// so recovery repeats the whole thing and finishes it. The other order would leave a row
-    /// claiming to be erased while its ciphertext was still decryptable, which is a lie the
-    /// Journal would keep telling.
-    ///
-    /// Key destruction is idempotent, which is what makes resumption after a crash always safe.
-    ///
     /// # Errors
     ///
     /// Returns [`WriteError`] when the closure cannot be read, a key cannot be destroyed, or the
@@ -742,10 +539,6 @@ impl JournalWriter {
     pub fn apply_erasure(&mut self, target: &Uuid) -> Result<Erased, WriteError> {
         let closure = self.retention_closure(target)?;
 
-        // An erasure record is never itself erasable: a forgetting that could be forgotten would
-        // make the audit trail a suggestion. These are filtered out of the closure rather than
-        // refused, because a descendant that happens to be an erasure record should not stop the
-        // erasure of everything else.
         let mut erasable = Vec::new();
         for id in &closure {
             let kind: Option<i64> = self
@@ -784,9 +577,6 @@ impl JournalWriter {
         let transaction = self.connection.transaction().map_err(write_error)?;
         let mut redacted = Vec::new();
         for id in &erasable {
-            // Only rows written under hash version 3 can be erased: a v1 or v2 row's hash covers
-            // its payload by value, so removing the payload would break a chain that cannot be
-            // recomputed without it. Older rows are reported rather than silently skipped.
             let changed = transaction
                 .execute(
                     "UPDATE contribution SET payload = NULL, erased_at = ?1 \
@@ -799,9 +589,6 @@ impl JournalWriter {
             }
         }
 
-        // The epoch advances once per erasure, not once per row: it is the signal that derived
-        // state is stale, and every projection behind it rebuilds whether or not it happened to
-        // hold anything from these particular rows.
         transaction
             .execute(
                 "UPDATE journal_meta SET erasure_epoch = erasure_epoch + 1 WHERE id = 1",
@@ -825,19 +612,6 @@ impl JournalWriter {
     }
 
     /// Append many contributions under one transaction, returning the last accepted position.
-    ///
-    /// Every contribution is validated, hashed and chained exactly as [`Self::append`] does; only
-    /// the commit — and therefore the fsync — is shared. This exists so a large Journal can be
-    /// built for measurement without spending one fsync per row, which at a million rows is the
-    /// difference between minutes and hours.
-    ///
-    /// It must never be reachable from Event1. Acceptance there is per contribution and has to
-    /// stay that way: batching it would publish acceptance for contributions whose commit had not
-    /// yet returned, which is exactly the durability ordering this writer exists to preserve. The
-    /// batch is atomic, so a refusal anywhere leaves the Journal exactly as it was.
-    ///
-    /// A contribution may cite one earlier in the same batch. It is already inserted by then, so
-    /// the reference resolves against the open transaction like any other.
     ///
     /// # Errors
     ///
@@ -865,563 +639,6 @@ impl JournalWriter {
         transaction.commit().map_err(write_error)?;
         Ok(last)
     }
-}
-
-/// Validate, hash, chain and insert one contribution inside a transaction the caller opened.
-///
-/// Never commits and never rolls back. Both are the caller's, because the difference between one
-/// append and a batch is exactly where the commit goes.
-fn append_within_transaction(
-    transaction: &Connection,
-    envelope: &CanonicalEnvelope,
-) -> Result<Appended, WriteError> {
-    {
-        let resolved = resolve(transaction, envelope)?;
-        admission::check_admission(envelope, &resolved)?;
-
-        let (sequence, previous_hash) = tail(transaction)?;
-        let (_, payload_commitment, commitment) = commitment_v3(envelope);
-        let hash = sha256(&canonical_journal_row_v3(
-            sequence,
-            &previous_hash,
-            &commitment,
-        ));
-
-        // SQLite has no unsigned integer type, and the predecessor binds these as signed 64-bit
-        // values. A count past `i64::MAX` cannot be stored without changing what was stored, so it
-        // is refused rather than wrapped.
-        let signed = |value: u64, what: &'static str| {
-            i64::try_from(value).map_err(|_| WriteError::Malformed(what))
-        };
-
-        transaction
-            .execute(
-                "INSERT INTO contribution (seq, message_id, correlation_id, causation_id, \
-                 origin_organ, origin_node, kind, wall_time, monotonic_time, logical_clock, \
-                 confidence, evidence, payload, privacy, capability, schema_version, \
-                 hash_version, prev_hash, hash, commitment, payload_commitment, sealed, \
-                 key_domain, key_epoch, retention_class, retention_policy, retain_until, \
-                 sensitivity) \
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,\
-                 ?21,?22,?23,?24,?25,?26,?27,?28)",
-                params![
-                    signed(sequence, "sequence is out of range")?,
-                    hyphenated(envelope.message_id),
-                    hyphenated(envelope.correlation_id),
-                    optional_uuid(envelope.causation_id),
-                    envelope.origin_organ,
-                    envelope.origin_node,
-                    i64::from(envelope.kind),
-                    qt_instant(envelope.wall_time_ms)
-                        .ok_or(WriteError::Malformed("wall time is out of range"))?,
-                    signed(envelope.monotonic_time, "monotonic time is out of range")?,
-                    signed(envelope.logical_clock, "logical clock is out of range")?,
-                    envelope.confidence,
-                    // The evidence column is inherited and always null: evidence lives in
-                    // `contribution_evidence`, where its order is a column rather than a
-                    // convention about how a string was joined.
-                    None::<String>,
-                    envelope.payload,
-                    i64::from(envelope.privacy),
-                    // Absent, not empty. The predecessor binds a null `QString` here and the
-                    // SQLite driver turns that into NULL; it converts `originNode` to an empty
-                    // string with an explicit ternary and does not do the same for this column,
-                    // so the difference is a decision rather than an accident. The canonical
-                    // envelope represents an absent capability scope as an empty string, so that
-                    // is the value that has to become NULL.
-                    absent_if_empty(&envelope.capability_scope),
-                    i64::from(envelope.schema_version),
-                    JOURNAL_HASH_V3,
-                    // The first row chains onto nothing, and the predecessor stores that as NULL
-                    // rather than a zero-length blob. Verification treats the two alike, so this
-                    // would never have failed a check — it would only have made every Journal
-                    // written by Rust distinguishable from every Journal written by Qt.
-                    previous_hash_column(&previous_hash),
-                    hash.as_slice(),
-                    commitment.as_slice(),
-                    payload_commitment.as_slice(),
-                    0_i64,
-                    optional_uuid(envelope.key_domain_id),
-                    envelope.key_epoch,
-                    i64::from(envelope.retention_class),
-                    i64::from(envelope.retention_policy_version),
-                    optional_instant(envelope.retain_until_ms)
-                        .transpose()
-                        .map_err(|()| WriteError::Malformed("retention time is out of range"))?,
-                    i64::from(envelope.sensitivity),
-                ],
-            )
-            .map_err(WriteError::Query)?;
-
-        for (ordinal, evidence_id) in envelope.evidence.iter().enumerate() {
-            transaction
-                .execute(
-                    "INSERT INTO contribution_evidence (contribution_id, evidence_id, ordinal) \
-                     VALUES (?1, ?2, ?3)",
-                    params![
-                        hyphenated(envelope.message_id),
-                        hyphenated(*evidence_id),
-                        i64::try_from(ordinal).map_err(|_| WriteError::Malformed(
-                            "evidence ordinal is out of range"
-                        ))?
-                    ],
-                )
-                .map_err(WriteError::Query)?;
-        }
-
-        Ok(Appended { sequence, hash })
-    }
-}
-
-/// Migrate a v1 Journal to schema v2, or refuse and leave it untouched.
-///
-/// Explicit rather than automatic. The predecessor performs this while opening a connection, and
-/// that is the one part of its behavior not reproduced here: a migration carries a backup, a
-/// verification of the entire legacy chain, and a rollback, and running it as a side effect of
-/// opening a database means running it wherever a connection happens to be made — including in
-/// processes that are only reading, and at moments when nothing is watching for it to fail.
-///
-/// The order is the predecessor's and matters: the backup is taken before the transaction opens,
-/// because a `VACUUM INTO` cannot run inside one, and because a backup taken after the first
-/// irreversible step is not a backup. Everything after it is one transaction, so an interruption
-/// leaves either a v1 database with a spare backup beside it or a complete v2 — never a
-/// half-migrated one.
-///
-/// The legacy chain is verified *before* the commit, not after. A migration that committed a broken
-/// chain and then reported it would have already made the corruption the new baseline.
-///
-/// # Errors
-///
-/// Returns [`WriteError::Migration`] when the database is not a migratable v1, when legacy evidence
-/// is malformed or dangling, when a cause carries more than one terminal `Outcome`, or when the
-/// legacy hash chain does not verify. In every case the database is left unchanged.
-pub fn migrate_v1_to_v2(path: &Path) -> Result<(), WriteError> {
-    let connection = open_for_write(path)?;
-    ensure_durability(&connection)?;
-
-    let version: i64 = connection
-        .query_row("PRAGMA user_version", [], |row| row.get(0))
-        .map_err(write_error)?;
-    if version != 0 && version != 1 {
-        return Err(WriteError::Migration(format!(
-            "schema {version} is not a migratable v1 journal"
-        )));
-    }
-    if !table_exists(&connection, "contribution")? {
-        return Err(WriteError::Migration(
-            "journal has no contribution table to migrate".into(),
-        ));
-    }
-    // A journal already carrying half the v2 columns was interrupted by something this migration
-    // did not do, and repairing it blind would decide what the missing half should have been.
-    for column in ["schema_version", "hash_version"] {
-        if column_exists(&connection, "contribution", column)? {
-            return Err(WriteError::Migration(
-                "journal has a partially versioned schema; refusing repair".into(),
-            ));
-        }
-    }
-
-    create_migration_backup(&connection, path)?;
-
-    let mut statements = String::from("BEGIN IMMEDIATE;\n");
-    for column in [
-        "schema_version INTEGER NOT NULL DEFAULT 1",
-        "hash_version INTEGER NOT NULL DEFAULT 1",
-        "commitment BLOB",
-        "payload_commitment BLOB",
-        "erased_at TEXT",
-        "sealed INTEGER NOT NULL DEFAULT 0",
-        "key_domain TEXT",
-        "key_epoch INTEGER NOT NULL DEFAULT 0",
-        "retention_class INTEGER NOT NULL DEFAULT 2",
-        "retention_policy INTEGER NOT NULL DEFAULT 0",
-        "retain_until TEXT",
-        "sensitivity INTEGER NOT NULL DEFAULT 1",
-    ] {
-        writeln!(statements, "ALTER TABLE contribution ADD COLUMN {column};")
-            .map_err(|_| WriteError::Malformed("cannot build the migration statement"))?;
-    }
-    statements.push_str(EVIDENCE_TABLE_DDL);
-    connection.execute_batch(&statements).map_err(write_error)?;
-
-    match migrate_within_transaction(&connection) {
-        Ok(()) => connection.execute_batch("COMMIT;").map_err(write_error),
-        Err(error) => {
-            // Best effort: the transaction is already doomed, and a failing rollback must not
-            // replace the reason the migration refused.
-            drop(connection.execute_batch("ROLLBACK;"));
-            Err(error)
-        }
-    }
-}
-
-fn migrate_within_transaction(connection: &Connection) -> Result<(), WriteError> {
-    move_legacy_evidence(connection)?;
-
-    let duplicate: Option<String> = connection
-        .query_row(
-            "SELECT causation_id FROM contribution \
-             WHERE kind = ?1 AND causation_id IS NOT NULL \
-             GROUP BY causation_id HAVING COUNT(*) > 1 LIMIT 1",
-            params![Kind::Outcome as u16],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(write_error)?;
-    if duplicate.is_some() {
-        return Err(WriteError::Migration(
-            "legacy journal contains multiple terminal Outcomes for one cause".into(),
-        ));
-    }
-
-    connection
-        .execute_batch(&format!(
-            "UPDATE contribution SET schema_version = 1, hash_version = 1;
-             {indexes}
-             PRAGMA user_version = {version};",
-            indexes = v2_indexes_ddl(),
-            version = JOURNAL_SCHEMA_V2,
-        ))
-        .map_err(write_error)?;
-
-    crate::inspect_chain(connection, None, None)
-        .map_err(|error| WriteError::Migration(format!("legacy hash chain is broken: {error}")))?;
-
-    Ok(())
-}
-
-/// Turn the legacy comma-joined `evidence` column into ordered join-table rows.
-///
-/// Every identity is parsed, deduplicated, and required to exist. A dangling reference is refused
-/// rather than dropped: an evidence link that silently disappeared during a migration would leave a
-/// conclusion in the Journal with nothing recorded under it.
-fn move_legacy_evidence(connection: &Connection) -> Result<(), WriteError> {
-    let mut legacy = connection
-        .prepare("SELECT message_id, evidence FROM contribution ORDER BY seq")
-        .map_err(write_error)?;
-    let rows: Vec<(String, Option<String>)> = legacy
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-        .map_err(write_error)?
-        .collect::<Result<_, _>>()
-        .map_err(write_error)?;
-
-    let malformed = || WriteError::Migration("legacy evidence contains an invalid UUID".into());
-
-    for (contribution_id, evidence) in rows {
-        let Some(evidence) = evidence else { continue };
-        let mut seen: Vec<String> = Vec::new();
-        for (ordinal, raw) in evidence
-            .split(',')
-            .filter(|part| !part.is_empty())
-            .enumerate()
-        {
-            let parsed = Uuid::parse_str(raw.trim()).map_err(|_| malformed())?;
-            if parsed.is_nil() {
-                return Err(malformed());
-            }
-            let evidence_id = hyphenated(parsed);
-            if seen.contains(&evidence_id) {
-                return Err(WriteError::Migration(
-                    "legacy evidence contains a duplicate UUID".into(),
-                ));
-            }
-            seen.push(evidence_id.clone());
-
-            if !message_id_present(connection, &evidence_id)? {
-                return Err(WriteError::Migration(
-                    "legacy evidence references a missing contribution".into(),
-                ));
-            }
-
-            let ordinal = i64::try_from(ordinal)
-                .map_err(|_| WriteError::Malformed("evidence ordinal is out of range"))?;
-            connection
-                .execute(
-                    "INSERT INTO contribution_evidence (contribution_id, evidence_id, ordinal) \
-                     VALUES (?1, ?2, ?3)",
-                    params![contribution_id, evidence_id, ordinal],
-                )
-                .map_err(write_error)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn message_id_present(connection: &Connection, message_id: &str) -> Result<bool, WriteError> {
-    connection
-        .query_row(
-            "SELECT 1 FROM contribution WHERE message_id = ?1 LIMIT 1",
-            params![message_id],
-            |_| Ok(()),
-        )
-        .optional()
-        .map(|found| found.is_some())
-        .map_err(write_error)
-}
-
-/// A copy of the database as it was, before the first irreversible step.
-///
-/// `VACUUM INTO` rather than a file copy: it runs through `SQLite` and therefore accounts for the
-/// write-ahead log, which copying the main file alone would silently leave behind.
-fn create_migration_backup(connection: &Connection, path: &Path) -> Result<(), WriteError> {
-    connection
-        .query_row("PRAGMA wal_checkpoint(FULL)", [], |_| Ok(()))
-        .optional()
-        .map_err(write_error)?;
-
-    let mut backup = path.as_os_str().to_os_string();
-    backup.push(".v1.bak");
-    let backup = std::path::PathBuf::from(backup);
-    if backup.exists() {
-        std::fs::remove_file(&backup).map_err(|error| {
-            WriteError::Migration(format!("cannot replace migration backup: {error}"))
-        })?;
-    }
-    let literal = backup
-        .to_str()
-        .ok_or(WriteError::Malformed("backup path is not valid UTF-8"))?
-        .replace('\'', "''");
-    connection
-        .execute_batch(&format!("VACUUM INTO '{literal}'"))
-        .map_err(write_error)
-}
-
-fn open_for_write(path: &Path) -> Result<Connection, WriteError> {
-    let connection = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE
-            | OpenFlags::SQLITE_OPEN_CREATE
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(WriteError::Open)?;
-    connection
-        .busy_timeout(std::time::Duration::from_secs(5))
-        .map_err(write_error)?;
-    for pragma in [
-        "PRAGMA foreign_keys=ON",
-        "PRAGMA journal_mode=WAL",
-        "PRAGMA synchronous=FULL",
-    ] {
-        // `journal_mode` answers with a row, so it cannot go through `execute_batch`.
-        connection
-            .query_row(pragma, [], |_| Ok(()))
-            .or_else(|error| match error {
-                rusqlite::Error::QueryReturnedNoRows => Ok(()),
-                other => Err(write_error(other)),
-            })?;
-    }
-    Ok(connection)
-}
-
-fn ensure_durability(connection: &Connection) -> Result<(), WriteError> {
-    let mode: String = connection
-        .query_row("PRAGMA journal_mode", [], |row| row.get(0))
-        .map_err(write_error)?;
-    if !mode.eq_ignore_ascii_case("wal") {
-        return Err(WriteError::Durability(format!(
-            "commit mode is {mode}, not the required write-ahead log"
-        )));
-    }
-
-    let synchronous: i64 = connection
-        .query_row("PRAGMA synchronous", [], |row| row.get(0))
-        .map_err(write_error)?;
-    if synchronous < REQUIRED_SYNCHRONOUS_LEVEL {
-        return Err(WriteError::Durability(format!(
-            "synchronisation level {synchronous} does not survive power loss; \
-             acceptance cannot be published as durable"
-        )));
-    }
-
-    Ok(())
-}
-
-fn table_exists(connection: &Connection, table: &str) -> Result<bool, WriteError> {
-    connection
-        .query_row(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1 LIMIT 1",
-            params![table],
-            |_| Ok(()),
-        )
-        .optional()
-        .map(|found| found.is_some())
-        .map_err(write_error)
-}
-
-fn column_exists(connection: &Connection, table: &str, column: &str) -> Result<bool, WriteError> {
-    let mut statement = connection
-        .prepare(&format!("PRAGMA table_info({table})"))
-        .map_err(write_error)?;
-    let mut rows = statement.query([]).map_err(write_error)?;
-    while let Some(row) = rows.next().map_err(write_error)? {
-        let name: String = row.get(1).map_err(write_error)?;
-        if name == column {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-/// Sequence to assign and the hash it chains onto.
-fn tail(connection: &Connection) -> Result<(u64, Vec<u8>), WriteError> {
-    let row: Option<(i64, Vec<u8>)> = connection
-        .query_row(
-            "SELECT seq, hash FROM contribution ORDER BY seq DESC LIMIT 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
-        .map_err(WriteError::Query)?;
-
-    match row {
-        None => Ok((1, Vec::new())),
-        Some((sequence, hash)) => {
-            let sequence = u64::try_from(sequence)
-                .map_err(|_| WriteError::Malformed("sequence is negative"))?;
-            Ok((sequence + 1, hash))
-        }
-    }
-}
-
-/// Read back exactly what admission needs about everything this contribution names.
-fn resolve(connection: &Connection, envelope: &CanonicalEnvelope) -> Result<Resolved, WriteError> {
-    let message_id_exists = reference_facts(connection, envelope.message_id)?.is_some();
-
-    let causation = if envelope.causation_id.is_nil() {
-        None
-    } else {
-        Some(reference_facts(connection, envelope.causation_id)?)
-    };
-
-    let mut evidence = Vec::with_capacity(envelope.evidence.len());
-    for id in &envelope.evidence {
-        evidence.push(reference_facts(connection, *id)?);
-    }
-
-    // Asked only when it can matter. A cause that already concluded is a fact about the cause, and
-    // a contribution that declares none cannot collide with one.
-    let causation_has_outcome = if envelope.causation_id.is_nil() {
-        false
-    } else {
-        connection
-            .query_row(
-                "SELECT 1 FROM contribution WHERE causation_id = ?1 AND kind = ?2 LIMIT 1",
-                params![hyphenated(envelope.causation_id), Kind::Outcome as u16],
-                |_| Ok(()),
-            )
-            .optional()
-            .map_err(WriteError::Query)?
-            .is_some()
-    };
-
-    Ok(Resolved {
-        causation,
-        evidence,
-        causation_has_outcome,
-        message_id_exists,
-    })
-}
-
-fn reference_facts(
-    connection: &Connection,
-    id: Uuid,
-) -> Result<Option<ReferenceFacts>, WriteError> {
-    let row: Option<(i64, Option<String>, i64)> = connection
-        .query_row(
-            "SELECT privacy, retain_until, sensitivity FROM contribution WHERE message_id = ?1",
-            params![hyphenated(id)],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(WriteError::Query)?;
-
-    let Some((privacy, retain_until, sensitivity)) = row else {
-        return Ok(None);
-    };
-
-    let privacy = u8::try_from(privacy)
-        .ok()
-        .and_then(Privacy::from_u8)
-        .ok_or(WriteError::Malformed("stored privacy class is unknown"))?;
-    let sensitivity = u8::try_from(sensitivity)
-        .ok()
-        .and_then(Sensitivity::from_u8)
-        .ok_or(WriteError::Malformed("stored sensitivity class is unknown"))?;
-    let retain_until_ms = match retain_until.filter(|value| !value.is_empty()) {
-        None => 0,
-        Some(value) => parse_instant(&value)
-            .ok_or(WriteError::Malformed("stored retention time is malformed"))?,
-    };
-
-    Ok(Some(ReferenceFacts {
-        privacy,
-        retain_until_ms,
-        sensitivity,
-    }))
-}
-
-/// An absent text column, spelled the way the predecessor's driver spells one.
-fn absent_if_empty(value: &str) -> Option<&str> {
-    if value.is_empty() { None } else { Some(value) }
-}
-
-/// The `prev_hash` column: NULL at the head of the chain, the stored hash after it.
-fn previous_hash_column(previous: &[u8]) -> Option<&[u8]> {
-    if previous.is_empty() {
-        None
-    } else {
-        Some(previous)
-    }
-}
-
-fn hyphenated(id: Uuid) -> String {
-    id.hyphenated().to_string()
-}
-
-fn optional_uuid(id: Uuid) -> Option<String> {
-    if id.is_nil() {
-        None
-    } else {
-        Some(hyphenated(id))
-    }
-}
-
-fn optional_instant(millis: u64) -> Option<Result<String, ()>> {
-    if millis == 0 {
-        return None;
-    }
-    Some(i64::try_from(millis).ok().and_then(qt_instant).ok_or(()))
-}
-
-/// The predecessor's `Qt::ISODateWithMs` spelling of a UTC instant.
-///
-/// Written by hand rather than through a general RFC3339 formatter because the predecessor always
-/// emits exactly three subsecond digits, and a formatter that trims trailing zeros would produce a
-/// different string for the same instant. That string is stored, and for a legacy v1 row it is
-/// hashed, so its exact shape is part of the format rather than a presentation choice.
-fn qt_instant(millis: i64) -> Option<String> {
-    let instant = OffsetDateTime::from_unix_timestamp_nanos(i128::from(millis) * 1_000_000).ok()?;
-    let year = instant.year();
-    if !(0..=9999).contains(&year) {
-        return None;
-    }
-    Some(format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{milli:03}Z",
-        month = u8::from(instant.month()),
-        day = instant.day(),
-        hour = instant.hour(),
-        minute = instant.minute(),
-        second = instant.second(),
-        milli = instant.millisecond(),
-    ))
-}
-
-fn parse_instant(value: &str) -> Option<u64> {
-    let instant =
-        OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339).ok()?;
-    u64::try_from(instant.unix_timestamp_nanos() / 1_000_000).ok()
 }
 
 #[cfg(test)]
@@ -1495,9 +712,6 @@ mod tests {
             .expect("prev_hash");
         assert_eq!(stored, first.hash.to_vec());
 
-        // The head of the chain links onto nothing, and the predecessor spells that as NULL rather
-        // than a zero-length blob. Verification treats the two alike, so only a differential
-        // comparison would ever have noticed the difference.
         let head: Option<Vec<u8>> = writer
             .connection
             .query_row(
@@ -1639,15 +853,11 @@ mod tests {
             qt_instant(1_760_000_000_123).as_deref(),
             Some("2025-10-09T08:53:20.123Z")
         );
-        // A whole second still spells its milliseconds; a formatter that trimmed them would
-        // produce a different stored string for the same instant.
         assert_eq!(
             qt_instant(1_760_000_000_000).as_deref(),
             Some("2025-10-09T08:53:20.000Z")
         );
     }
-
-    // --- W4: concurrency and rollback -------------------------------------------------------
 
     #[test]
     fn a_second_writer_is_refused_rather_than_admitted() {
@@ -1656,7 +866,6 @@ mod tests {
         let holder = JournalWriter::open(&path).expect("holder");
         let mut contender = JournalWriter::open(&path).expect("contender");
 
-        // Hold the write lock exactly as `append` does, then let the other writer try.
         holder
             .connection
             .execute_batch("BEGIN IMMEDIATE")
@@ -1700,9 +909,6 @@ mod tests {
         );
     }
 
-    // --- W5: the v1 migration ----------------------------------------------------------------
-
-    /// A legacy v1 journal: no versioning columns, evidence as a comma-joined string, hash v1.
     fn legacy_journal(path: &std::path::Path) {
         let connection = rusqlite::Connection::open(path).expect("create");
         connection
@@ -1738,7 +944,6 @@ mod tests {
             .expect("legacy schema");
     }
 
-    /// Append a legacy row, chaining hash v1 the way the predecessor did.
     fn legacy_row(
         connection: &rusqlite::Connection,
         sequence: i64,
@@ -1761,8 +966,6 @@ mod tests {
             envelope.correlation_id,
             envelope.causation_id,
         ] {
-            // Hash v1 spells identities with braces, which is the whole reason it is frozen
-            // rather than reconstructed from the current spelling.
             input.extend_from_slice(format!("{{{id}}}").as_bytes());
         }
         input.extend_from_slice(envelope.origin_organ.as_bytes());

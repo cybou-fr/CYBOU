@@ -3,25 +3,14 @@
 
 //! Bounded, read-only HTTP boundary between Living Canvas and Presence.
 
-use std::{convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc};
 
-use async_trait::async_trait;
 use axum::{
-    Json, Router,
-    extract::State,
-    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
-    response::{
-        IntoResponse, Response,
-        sse::{Event, KeepAlive, Sse},
-    },
+    Router,
+    http::{HeaderName, HeaderValue},
     routing::{any, get, post},
 };
-use cybou_web_contracts::{
-    MindProjection, SessionMode, SessionProjection, ShellExecRequest, ShellExecResponse,
-    SnapshotProjection, WEB_SCHEMA_V1,
-};
-use serde::Serialize;
-use thiserror::Error;
+use cybou_web_contracts::{SessionProjection, WEB_SCHEMA_V1};
 use time::{Duration as TimeDuration, OffsetDateTime, format_description::well_known::Rfc3339};
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -36,276 +25,30 @@ pub mod disclose;
 pub mod fixture;
 #[cfg(target_os = "linux")]
 pub mod presence_zbus;
+pub mod routes;
+pub mod state;
 
 pub use access::{CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions};
 pub use disclose::Disclosures;
-
-use cybou_protocol::{
-    canonical::CanonicalEnvelope,
-    disclosure::{ConsumerTrust, Destination},
+pub use state::{
+    Delivered, DisclosureSink, EVENT_POLL_INTERVAL, GatewayError, PresenceSource,
+    SNAPSHOT_BUDGET, SessionContext,
 };
 
-/// Maximum time the gateway permits one Presence projection request to occupy.
-pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(1_500);
-
-/// Interval used until Presence exposes a native changed-event subscription.
-pub const EVENT_POLL_INTERVAL: Duration = Duration::from_secs(2);
-
-const MAX_CURSOR_BYTES: usize = 256;
-
-/// Typed read-only source behind the HTTP boundary.
-/// What one projection supplied, and what it held back.
-///
-/// Read after a projection is built, by whoever is going to record the delivery. It is separate
-/// from the projection itself because a consumer must not be told what was withheld from it: that
-/// a concept exists is frequently the sensitive part of it.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Delivered {
-    /// The contributions the supplied items were derived from.
-    pub items: Vec<Uuid>,
-    /// How many items were supplied, whether or not their provenance was known.
-    pub item_count: u32,
-    /// What was held back, and why.
-    pub withheld: Vec<cybou_protocol::disclosure::Withheld>,
-}
-
-/// Where a disclosure record goes.
-///
-/// A trait so the gateway's own tests can watch what it would have recorded without a Journal, and
-/// so a fixture-backed gateway can have none at all rather than pretend.
-#[async_trait]
-pub trait DisclosureSink: Send + Sync + 'static {
-    /// Record one disclosure, answering whether it was accepted.
-    ///
-    /// `false` is a fact worth acting on rather than an error to swallow: the reader is still
-    /// entitled to what they asked for, and the operator is entitled to know the audit trail has a
-    /// hole in it.
-    async fn record(&self, envelope: &CanonicalEnvelope) -> bool;
-}
-
-/// Where the gateway reads Mind from.
-#[async_trait]
-pub trait PresenceSource: Send + Sync + 'static {
-    /// Return one atomic, presentation-ready snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`GatewayError`] when transport, decoding, or owner availability prevents a typed
-    /// projection. It must never turn those failures into an empty successful snapshot.
-    async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError>;
-
-    /// What the last projection this source built supplied, and what it left out.
-    ///
-    /// Defaulting to nothing is safe rather than convenient: a source that does not filter has
-    /// nothing to report, and a source that does must say so or the withholding is invisible —
-    /// which is the exact failure ADR-0030's B6 exists to prevent.
-    fn last_delivery(&self) -> Delivered {
-        Delivered::default()
-    }
-
-    /// Wait until the source may have a newer projection.
-    ///
-    /// Sources with a native change signal override this method. Deterministic fixtures retain a
-    /// bounded polling fallback so the same gateway contract remains testable without D-Bus.
-    async fn wait_for_change(&self) -> Result<(), GatewayError> {
-        tokio::time::sleep(EVENT_POLL_INTERVAL).await;
-        Ok(())
-    }
-
-    /// Return what the owners behind Mind actually hold right now.
-    ///
-    /// Defaulting to unavailable is deliberate: a source that cannot reach the owners must say so
-    /// rather than answer with a projection full of absent sections, which a reader could mistake
-    /// for a Mind that holds nothing.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`GatewayError`] when the source cannot produce the projection at all.
-    async fn mind(&self) -> Result<MindProjection, GatewayError> {
-        Err(GatewayError::Unavailable)
-    }
-}
-
-/// Failure response safe to expose at the browser boundary.
-#[derive(Clone, Debug, Error)]
-pub enum GatewayError {
-    /// Presence did not answer within the gateway's outer budget.
-    #[error("presence snapshot exceeded the gateway budget")]
-    Timeout,
-    /// Presence transport is unavailable.
-    #[error("presence transport is unavailable")]
-    Unavailable,
-    /// Presence returned data that cannot satisfy the web contract.
-    #[error("presence projection is incompatible with the web contract")]
-    InvalidProjection,
-    /// A resume cursor is malformed or exceeds the bounded header budget.
-    #[error("event resume cursor is invalid")]
-    InvalidCursor,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ErrorBody {
-    schema_version: cybou_protocol::SchemaVersion,
-    error: &'static str,
-    retryable: bool,
-}
-
-impl IntoResponse for GatewayError {
-    fn into_response(self) -> Response {
-        let (status, error, retryable) = match self {
-            Self::Timeout => (StatusCode::GATEWAY_TIMEOUT, "presenceTimeout", true),
-            Self::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, "presenceUnavailable", true),
-            Self::InvalidProjection => {
-                (StatusCode::BAD_GATEWAY, "invalidPresenceProjection", false)
-            }
-            Self::InvalidCursor => (StatusCode::BAD_REQUEST, "invalidEventCursor", false),
-        };
-        (
-            status,
-            Json(ErrorBody {
-                schema_version: WEB_SCHEMA_V1,
-                error,
-                retryable,
-            }),
-        )
-            .into_response()
-    }
-}
-
-#[derive(Clone)]
-struct GatewayState {
-    presence: Arc<dyn PresenceSource>,
-    /// The unfiltered source, for a reader who has signed in.
-    ///
-    /// `None` when this deployment cannot authenticate anybody, which is a valid way to run a
-    /// public demo: every reader is then served the filtered source and there is no way in.
-    privileged: Option<Arc<dyn PresenceSource>>,
-    /// Who can say whether an account accepts a secret, if anything can.
-    verifier: Option<Arc<dyn CredentialVerifier>>,
-    /// The sessions this process is honouring.
-    sessions: Arc<Sessions>,
-    /// What has already been recorded as supplied to each consumer.
-    disclosures: Arc<Disclosures>,
-    /// Where a disclosure record is written, when there is one to write.
-    ///
-    /// `None` leaves deliveries unrecorded, which is what a fixture-backed gateway does: there is
-    /// no Journal behind it to record into. A deployment without this is a deployment that cannot
-    /// say who read what, and that is a fact about the deployment rather than a silent default.
-    journal: Option<Arc<dyn DisclosureSink>>,
-    session: SessionProjection,
-    shell: Arc<tokio::sync::Mutex<cybou_shelld::ShellEngine>>,
-}
-
-impl GatewayState {
-    /// Who this request is, as a consumer.
-    ///
-    /// The identity is the one the gateway established, never the one the caller offers: a
-    /// consumer that could name itself could also name somebody else, and the record would say so.
-    fn destination_for(session: Option<&Session>) -> Destination {
-        session.map_or_else(
-            || Destination {
-                id: "living-canvas:public".to_owned(),
-                trust: ConsumerTrust::Public,
-                // A browser renders and forgets; what makes this recordable is the boundary it
-                // crossed on the way out, which no later decision can call back.
-                retains: false,
-                external_boundary: true,
-            },
-            |session| Destination {
-                id: format!("living-canvas:{}", session.username),
-                trust: ConsumerTrust::Owner,
-                retains: false,
-                external_boundary: true,
-            },
-        )
-    }
-
-    /// Record that this consumer was supplied what the source just built, if that is new.
-    async fn record_delivery(&self, destination: &Destination, delivered: &Delivered) {
-        let Some(journal) = &self.journal else {
-            return;
-        };
-        let Some(record) =
-            self.disclosures
-                .record_for(destination, delivered, OffsetDateTime::now_utc())
-        else {
-            return;
-        };
-        // A delivery that could not be recorded is not a reason to withhold the answer: the reader
-        // is entitled to it either way, and refusing would trade an incomplete record for an
-        // outage. It is said out loud instead, because an audit trail with silent holes is worse
-        // than one with known ones.
-        if !journal.record(&record).await {
-            eprintln!(
-                "a delivery to {} could not be recorded; the audit trail is incomplete",
-                destination.id
-            );
-        }
-    }
-
-    /// The session this request carries, if it carries a live one.
-    fn session_for(&self, headers: &HeaderMap) -> Option<Session> {
-        let token = headers
-            .get(axum::http::header::COOKIE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(access::token_in)?;
-        self.sessions.resolve(token, OffsetDateTime::now_utc())
-    }
-
-    /// The source this request is entitled to.
-    ///
-    /// Defaulting to the filtered source is what makes a missing, expired or invented session
-    /// harmless: none of them is an entitlement, and they do not need to be told apart to be
-    /// refused. Nothing is rejected outright, because a public surface that answered 401 to
-    /// strangers would stop being a public surface.
-    fn source_for(&self, headers: &HeaderMap) -> &Arc<dyn PresenceSource> {
-        let Some(privileged) = &self.privileged else {
-            return &self.presence;
-        };
-        if self.session_for(headers).is_some() {
-            privileged
-        } else {
-            &self.presence
-        }
-    }
-}
-
-/// Server-established browser trust context.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SessionContext {
-    /// Trust mode presented to the frontend.
-    pub mode: SessionMode,
-    /// Stable named consumer used by projection policy.
-    pub consumer_id: String,
-}
-
-impl SessionContext {
-    /// Device-bound context used by the desktop shell.
-    #[must_use]
-    pub fn local_desktop() -> Self {
-        Self {
-            mode: SessionMode::LocalDesktop,
-            consumer_id: "cybou-desktop".into(),
-        }
-    }
-
-    /// Read-only public preview context.
-    #[must_use]
-    pub fn public_preview() -> Self {
-        Self {
-            mode: SessionMode::PublicPreview,
-            consumer_id: "public-preview".into(),
-        }
-    }
-}
+use routes::{
+    api_not_found, events_handler, login_handler, logout_handler, mind_handler,
+    session_handler, shell_exec_handler, snapshot_handler,
+};
+use state::GatewayState;
 
 /// Build the v1 router around a single source.
+#[must_use]
 pub fn router(presence: Arc<dyn PresenceSource>) -> Router {
     router_with_verifier_and_access(presence, None, None, None, SessionContext::local_desktop())
 }
 
 /// Build the v1 router serving static assets when configured.
+#[must_use]
 pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<PathBuf>) -> Router {
     router_with_verifier_and_access(
         presence,
@@ -317,6 +60,7 @@ pub fn router_with_assets(presence: Arc<dyn PresenceSource>, web_root: Option<Pa
 }
 
 /// Build the v1 router with an explicit server-established trust context.
+#[must_use]
 pub fn router_with_assets_and_session(
     presence: Arc<dyn PresenceSource>,
     web_root: Option<PathBuf>,
@@ -328,17 +72,10 @@ pub fn router_with_assets_and_session(
 /// Build the v1 router with a filtered source for everyone and a full source for a signed-in
 /// reader.
 ///
-/// The two sources are separate objects rather than one source and a flag, so a route cannot
-/// ask the wrong question and get the privileged answer: what a request is entitled to is
-/// decided once, where the session is read.
-///
-/// # Panics
-///
-/// If the sandbox the shell surface runs in cannot be created.
-///
 /// # Panics
 ///
 /// If the sandbox jail the shell surface runs in cannot be created.
+#[must_use]
 pub fn router_with_verifier_and_access(
     presence: Arc<dyn PresenceSource>,
     privileged: Option<Arc<dyn PresenceSource>>,
@@ -358,12 +95,10 @@ pub fn router_with_verifier_and_access(
 
 /// Build the v1 router that records what it supplies to whom.
 ///
-/// The sink is where a disclosure record goes. Without one, deliveries are not recorded — which is
-/// what a fixture-backed gateway does, because there is no Journal behind it to record into.
-///
 /// # Panics
 ///
 /// If the sandbox the shell surface runs in cannot be created.
+#[must_use]
 pub fn router_recording_disclosures(
     presence: Arc<dyn PresenceSource>,
     privileged: Option<Arc<dyn PresenceSource>>,
@@ -407,13 +142,13 @@ pub fn router_recording_disclosures(
     };
 
     let app = Router::new()
-        .route("/api/v1/session", get(session))
-        .route("/api/v1/login", post(login))
-        .route("/api/v1/logout", post(logout))
-        .route("/api/v1/snapshot", get(snapshot))
-        .route("/api/v1/mind", get(mind))
-        .route("/api/v1/events", get(events))
-        .route("/api/v1/shell/exec", post(shell_exec))
+        .route("/api/v1/session", get(session_handler))
+        .route("/api/v1/login", post(login_handler))
+        .route("/api/v1/logout", post(logout_handler))
+        .route("/api/v1/snapshot", get(snapshot_handler))
+        .route("/api/v1/mind", get(mind_handler))
+        .route("/api/v1/events", get(events_handler))
+        .route("/api/v1/shell/exec", post(shell_exec_handler))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -441,228 +176,6 @@ pub fn router_recording_disclosures(
         ),
         None => app,
     }
-}
-
-async fn api_not_found() -> StatusCode {
-    StatusCode::NOT_FOUND
-}
-
-async fn session(State(state): State<GatewayState>, headers: HeaderMap) -> Json<SessionProjection> {
-    let mut projection = state.session.clone();
-    // A signed-in reader is a different trust context, and the contract already has a name for it.
-    // Leaving it at `publicPreview` would make the page unable to tell that anyone had signed in,
-    // and would state a trust level that is no longer the one that was established.
-    if let Some(session) = state.session_for(&headers) {
-        projection.mode = SessionMode::RemoteBrowser;
-        projection.consumer_id.clone_from(&session.username);
-        projection.expires_at = session
-            .expires_at
-            .format(&Rfc3339)
-            .unwrap_or_else(|_| projection.expires_at.clone());
-    }
-    Json(projection)
-}
-
-/// Establish a session for a Linux account.
-///
-/// The gateway never learns whether the account exists: it asks the privileged helper and receives
-/// one bit. A deployment with no helper answers the same as a wrong password, because in both
-/// cases nothing was established.
-async fn login(
-    State(state): State<GatewayState>,
-    Json(request): Json<LoginRequest>,
-) -> impl IntoResponse {
-    let authenticated = match &state.verifier {
-        Some(verifier) => verifier.verify(&request.username, &request.password).await,
-        None => false,
-    };
-    let username = request.username.clone();
-    // Dropped here rather than at the end of the function: the secret is gone from this process
-    // before the response is built.
-    drop(request);
-
-    if !authenticated {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(LoginOutcome {
-                authenticated: false,
-            }),
-        )
-            .into_response();
-    }
-
-    let token = state.sessions.begin(&username, OffsetDateTime::now_utc());
-    (
-        StatusCode::OK,
-        [(
-            axum::http::header::SET_COOKIE,
-            access::session_cookie(&token),
-        )],
-        Json(LoginOutcome {
-            authenticated: true,
-        }),
-    )
-        .into_response()
-}
-
-/// End the session this request carries, if it carries one.
-///
-/// Answers the same either way. Whether a token named a live session is not something a caller
-/// needs told, and saying so would make this a way to test tokens.
-async fn logout(State(state): State<GatewayState>, headers: HeaderMap) -> impl IntoResponse {
-    if let Some(token) = headers
-        .get(axum::http::header::COOKIE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(access::token_in)
-    {
-        state.sessions.end(token);
-    }
-    (
-        StatusCode::OK,
-        [(axum::http::header::SET_COOKIE, access::cleared_cookie())],
-    )
-}
-
-async fn snapshot(
-    State(state): State<GatewayState>,
-    headers: HeaderMap,
-) -> Result<Json<SnapshotProjection>, GatewayError> {
-    tokio::time::timeout(SNAPSHOT_BUDGET, state.source_for(&headers).snapshot())
-        .await
-        .map_err(|_| GatewayError::Timeout)?
-        .map(Json)
-}
-
-async fn mind(
-    State(state): State<GatewayState>,
-    headers: HeaderMap,
-) -> Result<Json<MindProjection>, GatewayError> {
-    let session = state.session_for(&headers);
-    let source = state.source_for(&headers);
-    let projection = tokio::time::timeout(SNAPSHOT_BUDGET, source.mind())
-        .await
-        .map_err(|_| GatewayError::Timeout)??;
-
-    // Recorded after the projection is built and before it is answered, so what the record says
-    // was supplied is what this reader is about to receive.
-    state
-        .record_delivery(
-            &GatewayState::destination_for(session.as_ref()),
-            &source.last_delivery(),
-        )
-        .await;
-    Ok(Json(projection))
-}
-
-async fn shell_exec(
-    State(state): State<GatewayState>,
-    headers: HeaderMap,
-    Json(payload): Json<ShellExecRequest>,
-) -> Result<Json<ShellExecResponse>, (StatusCode, Json<ErrorBody>)> {
-    let is_authenticated =
-        state.session_for(&headers).is_some() || state.session.mode == SessionMode::LocalDesktop;
-    if !is_authenticated {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(ErrorBody {
-                schema_version: WEB_SCHEMA_V1,
-                error: "shellExecutionForbiddenInPublicPreview",
-                retryable: false,
-            }),
-        ));
-    }
-
-    let mut engine = state.shell.lock().await;
-    let output = engine.execute(&payload.command);
-
-    Ok(Json(ShellExecResponse {
-        schema_version: WEB_SCHEMA_V1,
-        exit_code: output.exit_code,
-        stdout: output.stdout,
-        stderr: output.stderr,
-        cwd: output.cwd,
-    }))
-}
-
-fn resume_cursor(headers: &HeaderMap) -> Result<Option<String>, GatewayError> {
-    let Some(value) = headers.get("last-event-id") else {
-        return Ok(None);
-    };
-    let value = value.to_str().map_err(|_| GatewayError::InvalidCursor)?;
-    if value.is_empty() || value.len() > MAX_CURSOR_BYTES || value.chars().any(char::is_control) {
-        return Err(GatewayError::InvalidCursor);
-    }
-    Ok(Some(value.to_owned()))
-}
-
-async fn events(
-    State(state): State<GatewayState>,
-    headers: HeaderMap,
-) -> Result<Sse<impl futures_core::Stream<Item = Result<Event, Infallible>>>, GatewayError> {
-    let initial_cursor = resume_cursor(&headers)?;
-    let stream = futures_util::stream::unfold(
-        (state, initial_cursor),
-        |(state, mut last_cursor)| async move {
-            loop {
-                let result = tokio::time::timeout(SNAPSHOT_BUDGET, state.presence.snapshot()).await;
-                match result {
-                    Ok(Ok(snapshot))
-                        if last_cursor.as_deref() != Some(snapshot.cursor.as_str()) =>
-                    {
-                        let cursor = snapshot.cursor.clone();
-                        if let Ok(data) = serde_json::to_string(&snapshot) {
-                            let event = Event::default()
-                                .event("snapshot")
-                                .id(cursor.clone())
-                                .data(data);
-                            last_cursor = Some(cursor);
-                            return Some((Ok::<_, Infallible>(event), (state, last_cursor)));
-                        }
-                        let data = serde_json::json!({
-                            "schemaVersion": WEB_SCHEMA_V1,
-                            "error": "invalidPresenceProjection",
-                            "retryable": false
-                        });
-                        let event = Event::default()
-                            .event("projection-error")
-                            .data(data.to_string());
-                        return Some((Ok(event), (state, last_cursor)));
-                    }
-                    Ok(Ok(_)) => {}
-                    Ok(Err(error)) => {
-                        let data = serde_json::json!({
-                            "schemaVersion": WEB_SCHEMA_V1,
-                            "error": error.to_string(),
-                            "retryable": !matches!(error, GatewayError::InvalidProjection | GatewayError::InvalidCursor)
-                        });
-                        let event = Event::default()
-                            .event("projection-error")
-                            .data(data.to_string());
-                        return Some((Ok(event), (state, last_cursor)));
-                    }
-                    Err(_) => {
-                        let data = serde_json::json!({
-                            "schemaVersion": WEB_SCHEMA_V1,
-                            "error": "presenceTimeout",
-                            "retryable": true
-                        });
-                        let event = Event::default()
-                            .event("projection-error")
-                            .data(data.to_string());
-                        return Some((Ok(event), (state, last_cursor)));
-                    }
-                }
-                if state.presence.wait_for_change().await.is_err() {
-                    tokio::time::sleep(EVENT_POLL_INTERVAL).await;
-                }
-            }
-        },
-    );
-    Ok(Sse::new(stream).keep_alive(
-        KeepAlive::new()
-            .interval(Duration::from_secs(15))
-            .text("presence-stream"),
-    ))
 }
 
 #[cfg(test)]
@@ -695,7 +208,6 @@ mod tests {
     };
     use crate::fixture::FixturePresenceSource;
 
-    /// A source that reports whether it was the one asked.
     struct NamedSource {
         name: &'static str,
     }
@@ -712,7 +224,6 @@ mod tests {
         }
     }
 
-    /// A verifier that accepts exactly one account with exactly one secret.
     struct OneAccount;
 
     #[async_trait]
@@ -739,7 +250,6 @@ mod tests {
         projection.cursor
     }
 
-    /// Sign in and return the cookie the browser would send back, if it worked.
     async fn sign_in(app: &Router, username: &str, password: &str) -> Option<String> {
         let body = format!(r#"{{"username":"{username}","password":"{password}"}}"#);
         let response = app
@@ -786,8 +296,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_session_nobody_issued_is_served_the_public_source_rather_than_refused() {
-        // Refusing would stop this being a public surface. A stranger gets what a stranger gets,
-        // and an invented cookie is a stranger.
         let app = guarded_router();
         assert_eq!(
             cursor_for(&app, Some("cybou_session=invented")).await,
@@ -810,8 +318,6 @@ mod tests {
     async fn a_wrong_secret_establishes_nothing() {
         let app = guarded_router();
         assert!(sign_in(&app, "alice", "not-hunter2").await.is_none());
-        // And the account that does not exist is answered exactly the same way, so a caller cannot
-        // learn from the reply which accounts are real.
         assert!(sign_in(&app, "mallory", "hunter2").await.is_none());
         assert!(sign_in(&app, "alice", "").await.is_none());
     }
@@ -853,8 +359,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_signed_in_session_says_which_account_it_belongs_to() {
-        // The page has to be able to tell that somebody signed in, and as whom. Leaving the mode at
-        // publicPreview would state a trust level that is no longer the one established.
         let app = guarded_router();
         let cookie = sign_in(&app, "alice", "hunter2").await.expect("signed in");
         let response = app

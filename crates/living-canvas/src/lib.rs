@@ -14,6 +14,13 @@ pub mod deck;
 pub mod layout;
 
 #[cfg(target_arch = "wasm32")]
+pub mod components;
+#[cfg(target_arch = "wasm32")]
+pub mod interaction;
+#[cfg(target_arch = "wasm32")]
+pub mod state;
+
+#[cfg(target_arch = "wasm32")]
 mod gateway_client;
 pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
 pub use deck::DeckInstance;
