@@ -263,6 +263,16 @@ fn IconZoomOut(#[prop(default = 13)] size: u32) -> impl IntoView {
 }
 
 #[component]
+fn IconCopy(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+        </svg>
+    }
+}
+
+#[component]
 fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
@@ -420,7 +430,10 @@ fn DeckResizeHandle(
     }
 }
 
-const SHELL_AUTOCOMPLETE: &[&str] = &["help", "pwd", "ls", "cd", "cat", "clear"];
+const SHELL_AUTOCOMPLETE: &[&str] = &[
+    "cat", "cd", "clear", "echo", "grep", "head", "help", "ls", "pwd", "stat", "tail", "uname",
+    "whoami",
+];
 
 #[component]
 fn ShellCard(
@@ -913,8 +926,21 @@ fn FileManagerCard(
                                         <header class="fm-preview-header">
                                             <span><IconFile size=12 /> " " {move || selected_file.get().unwrap_or_default()}</span>
                                             <div class="fm-preview-actions">
+                                                <button
+                                                    class="fm-btn"
+                                                    title="Copy file text to clipboard"
+                                                    on:click=move |_| {
+                                                        let text = file_content.get();
+                                                        if let Some(window) = web_sys::window() {
+                                                            let _ = window.navigator().clipboard().write_text(&text);
+                                                        }
+                                                    }
+                                                >
+                                                    <IconCopy size=12 />
+                                                    <span>"Copy"</span>
+                                                </button>
                                                 <small class="fm-readonly-pill">"Read-only"</small>
-                                                <button class="fm-btn" on:click=move |_| set_selected_file.set(None)>"×"</button>
+                                                <button class="fm-btn" title="Close preview" on:click=move |_| set_selected_file.set(None)>"×"</button>
                                             </div>
                                         </header>
                                         <pre class="fm-preview-text">{move || file_content.get()}</pre>
@@ -3271,6 +3297,41 @@ pub fn App() -> impl IntoView {
                                     history.update(|h| h.push(layout.get_untracked()));
                                     layout.set(DesktopLayout::default());
                                     layout.get_untracked().save();
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                } else if command_matches(&q, "fit") || command_matches(&q, "fit all") {
+                                    event.prevent_default();
+                                    if let Some(bbox) = layout.get_untracked().bounding_rect() {
+                                        let (w, h) = (
+                                            web_sys::window().and_then(|w| w.inner_width().ok()).and_then(|v| v.as_f64()).unwrap_or(1440.0),
+                                            web_sys::window().and_then(|w| w.inner_height().ok()).and_then(|v| v.as_f64()).unwrap_or(900.0),
+                                        );
+                                        let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
+                                        set_zoom.set(z);
+                                        set_pan.set((px, py));
+                                    } else {
+                                        set_zoom.set(1.0);
+                                        set_pan.set((0.0, 0.0));
+                                    }
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                } else if command_matches(&q, "files") || command_matches(&q, "file manager") {
+                                    event.prevent_default();
+                                    layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("files");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                } else if command_matches(&q, "feed") || command_matches(&q, "event stream") {
+                                    event.prevent_default();
+                                    layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
+                                    layout.get_untracked().save();
+                                    set_selected.set("journal-feed");
+                                    set_command_open.set(false);
+                                    set_command_query.set(String::new());
+                                } else if command_matches(&q, "auth") || command_matches(&q, "login") || command_matches(&q, "sign in") {
+                                    event.prevent_default();
+                                    auth_modal_open.set(true);
                                     set_command_open.set(false);
                                     set_command_query.set(String::new());
                                 } else if command_matches(&q, "shell") {
