@@ -291,6 +291,40 @@ mod tests {
     }
 
     #[test]
+    fn a_layout_saved_with_the_old_maximized_flag_still_loads() {
+        // The flag was removed on 2026-08-22 because nothing set it and nothing read it. A desktop
+        // saved while it existed must still open: dropping a field is only safe if the field's
+        // absence and its presence both parse, and a person's saved layout is not something to
+        // discard over a value that never meant anything.
+        let saved = r#"{
+            "schema_version": 9,
+            "cards": [{
+                "id": "identity",
+                "geometry": {"x": 70.0, "y": 70.0, "width": 220.0, "height": 188.0, "z": 1},
+                "presentation": {"collapsed": true, "pinned": false, "maximized": true}
+            }],
+            "decks": []
+        }"#;
+
+        let layout = DesktopLayout::parse_json(saved).expect("an old v9 layout still parses");
+        assert!(layout.contains_card(CardId::Identity));
+        assert!(layout.presentation(CardId::Identity).collapsed);
+        assert!(!layout.presentation(CardId::Identity).pinned);
+    }
+
+    #[test]
+    fn a_presentation_written_now_does_not_mention_focus() {
+        // Focus lives in DesktopViewMode and nowhere else. A persisted flag claiming to answer the
+        // same question would be a second truth about it, and the persisted one was the one that
+        // never knew.
+        let written =
+            serde_json::to_string(&CardPresentation::default()).expect("serialize presentation");
+        assert!(!written.contains("maximized"), "{written}");
+        assert!(written.contains("collapsed"));
+        assert!(written.contains("pinned"));
+    }
+
+    #[test]
     fn parse_json_supports_both_schemas() {
         let v8_json = serde_json::to_string(&CanvasLayoutV8::default()).unwrap();
         let layout_v8 = DesktopLayout::parse_json(&v8_json).expect("parses v8");

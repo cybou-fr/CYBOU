@@ -334,6 +334,17 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Focus is recorded in one place (2026-08-22)
+
+`CardPresentation` persisted a `maximized` flag. Nothing set it and nothing read it: focus is
+`DesktopViewMode::Focus`, which fills the viewport without touching the geometry underneath and
+restores the desktop on `Escape`. Two fields that could each answer "is this card filling the
+screen?" is one too many, and the one being written to disk was the one that never knew.
+
+It is removed. A layout saved while the flag existed still loads, because unknown fields are ignored
+on the way in — dropping a field is only safe when its absence and its presence both parse, and a
+person's saved desktop is not something to discard over a value that never meant anything.
+
 ## The minimap shows the desktop it is on, and where you are in it (2026-08-22)
 
 It drew `layout.cards`, which is not the set of things on the desktop. A card docked into a deck

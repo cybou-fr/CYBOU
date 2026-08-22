@@ -153,6 +153,10 @@ pub enum ArrangementMode {
 pub enum DesktopViewMode {
     /// Full infinite 2D spatial canvas.
     Spatial,
-    /// Single-item maximized focus mode.
+    /// One item filling the viewport.
+    ///
+    /// Non-destructive: the persisted geometry underneath is untouched, and `Escape` restores the
+    /// desktop as it was. This is the only place focus is recorded — `CardPresentation` used to
+    /// carry a `maximized` flag as well, which nothing set and nothing read.
     Focus(DesktopItemId),
 }

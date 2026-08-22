@@ -399,14 +399,21 @@ impl CardGeometry {
 }
 
 /// Presentation mode of a Card instance.
+///
+/// There was a `maximized` flag here until 2026-08-22. Nothing ever set it and nothing ever read
+/// it: focus is [`DesktopViewMode::Focus`](crate::DesktopViewMode), which fills the viewport
+/// without touching the geometry underneath and restores it on `Escape`. Two fields that could
+/// each answer "is this card filling the screen?" is one field too many, and the one that was
+/// persisted was the one that never knew.
+///
+/// Unknown fields are ignored on the way in, so a layout saved while the flag existed still loads.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default)]
 pub struct CardPresentation {
     /// Whether the card is collapsed into a single-line summary pill.
     pub collapsed: bool,
     /// Whether the card is pinned (locked against automatic arrangement).
     pub pinned: bool,
-    /// Whether the card is maximized to fill the viewport canvas.
-    pub maximized: bool,
 }
 
 /// Static capabilities and bounds of a Card type.
@@ -457,7 +464,6 @@ impl CardInstance {
             presentation: CardPresentation {
                 collapsed: false,
                 pinned: false,
-                maximized: false,
             },
         }
     }
