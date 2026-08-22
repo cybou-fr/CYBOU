@@ -34,6 +34,37 @@ What the workspace gate genuinely could not see was behaviour: a daemon compiles
 pass without any of them ever having spoken to another daemon. That is what the job below now
 covers.
 
+## What proves the desktop
+
+```bash
+cargo test -p living-canvas --target wasm32-unknown-unknown
+```
+
+Everything under `crates/living-canvas/src/components` is `cfg(target_arch = "wasm32")`, so
+`cargo test --workspace` compiles none of it. That gap is not small: three separate faults found on
+2026-08-22 lived entirely inside it and no existing test could see any of them. Clicking one Shell
+card selected every Shell card. Collapsing a card destroyed the terminal session inside it. The
+minimap drew cards that were docked inside decks, and the stylesheet rules for its own elements did
+not exist at all.
+
+`src/interaction_gate.rs` mounts real components against real signals in a headless Chromium and
+asserts on the DOM a person would have seen. It needs `wasm-bindgen-cli` at exactly the version in
+`Cargo.lock` — the runner and the generated bindings must agree — and a WebDriver:
+
+```bash
+cargo install wasm-bindgen-cli --version 0.2.126 --locked
+sudo apt-get install chromium chromium-driver
+CHROMEDRIVER=/usr/bin/chromedriver cargo test -p living-canvas --target wasm32-unknown-unknown
+```
+
+`.cargo/config.toml` names `wasm-bindgen-test-runner` for that target, which is what makes `cargo
+test` start a browser rather than fail to execute a `.wasm` file. The `desktop` job runs it on every
+push.
+
+The rule this gate exists to enforce is cheaper than the gate: **arithmetic over the layout belongs
+in `layout/`, where it is tested natively, and components should only draw.** `layout::selection`
+and `layout::minimap` were moved there for exactly that reason after their bugs were found.
+
 ## Checking the Linux half without a Linux machine
 
 ```bash

@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# The desktop's interaction logic exists only on wasm32, so the only place it can be run is a
+# browser. This is what makes `cargo test --target wasm32-unknown-unknown -p living-canvas` start
+# one instead of failing to execute a `.wasm` file.
+#
+# It needs `wasm-bindgen-cli` at exactly the version in Cargo.lock, and a WebDriver — see
+# docs/TESTING.md.
+
+[target.wasm32-unknown-unknown]
+runner = "wasm-bindgen-test-runner"

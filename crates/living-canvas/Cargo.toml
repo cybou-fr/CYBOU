@@ -19,8 +19,16 @@ serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 
-[dev-dependencies]
+# Native-only: the workspace tokio carries `net`, and mio refuses to build for wasm32. The browser
+# tests below need none of it.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
+
+# The desktop's interaction logic only exists on wasm32, so the only place it can be exercised is a
+# browser. Pinned to the same wasm-bindgen the frontend builds against: the runner and the bindings
+# must agree exactly or the harness refuses to start.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "=0.3.76"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
@@ -44,6 +52,8 @@ web-sys = { version = "=0.3.103", features = [
     "KeyboardEvent",
     "MessageEvent",
     "Navigator",
+    # For the browser interaction gate, which counts the cards a mount actually drew.
+    "NodeList",
     "PointerEvent",
     "Storage",
     "Window",

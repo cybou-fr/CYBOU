@@ -6,6 +6,7 @@
 # There is one product and one toolchain now, so there is one story here:
 #
 #   code        -> the Rust workspace and the WASM frontend compile, test and lint
+#   desktop     -> the desktop's interaction logic, run in a browser because that is where it lives
 #   integration -> the twelve daemons start on a session bus and answer as a system
 #   compliance  -> licence headers and the documents this repository declares authoritative
 #
@@ -54,6 +55,33 @@ jobs:
           cargo install trunk --version 0.21.14 --locked
           cd crates/living-canvas
           trunk build --release
+
+  desktop:
+    name: the desktop in a browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --target wasm32-unknown-unknown
+          rustup default 1.95.0
+
+      # Everything under `components` is cfg(target_arch = "wasm32"), so the workspace job compiles
+      # none of it. Three separate faults found on 2026-08-22 lived entirely in that half and were
+      # invisible to every test that existed. This job is the half that was missing.
+      - name: Install a browser and the wasm test harness
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends chromium-browser chromium-chromedriver ||             sudo apt-get install --yes --no-install-recommends chromium chromium-driver
+          # Exactly the wasm-bindgen in Cargo.lock. The runner and the generated bindings must
+          # agree or the harness refuses to start.
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+
+      - name: Run the desktop interaction gate
+        env:
+          CHROMEDRIVER: /usr/bin/chromedriver
+        run: cargo test -p living-canvas --target wasm32-unknown-unknown --locked
 
   integration:
     name: the Mind as a system

@@ -334,6 +334,29 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The half of the desktop no test could see (2026-08-22)
+
+Everything under `components` is `cfg(target_arch = "wasm32")`. `cargo test --workspace` compiles
+none of it, and that is where three of the day's faults lived: selection comparing a kind key,
+collapse destroying a terminal session, and a minimap drawing docked cards through stylesheet rules
+that did not exist. Each was found by looking, and each could have gone on indefinitely.
+
+`src/interaction_gate.rs` runs under `wasm-bindgen-test` in a headless Chromium. It mounts real
+components against real signals and asserts on the DOM a person would have seen: that clicking one
+Shell card selects that card and no other, that collapsing a card and expanding it returns the
+history that was in it, that two Tool cards of one kind keep separate state, that closing one
+releases it, and that a card docked into a deck stops being drawn standing on its own.
+
+The gate was checked against the fault it was written for. Restoring the key comparison in
+`CardFrame` makes `clicking_one_shell_card_does_not_select_the_others` report `[true, true]` where
+`[false, true]` is expected — the original bug, named exactly. A test that has never failed for the
+right reason is a test nobody has checked.
+
+It runs in CI on every push as the `desktop` job, alongside the workspace and the multi-daemon
+gates. The rule it exists to enforce is cheaper than the gate itself: arithmetic over the layout
+belongs in `layout/`, where it is tested natively, and components should only draw.
+`layout::selection` and `layout::minimap` moved there for that reason.
+
 ## Selection names an item, not a kind (2026-08-22)
 
 The desktop learned to hold several Shell cards and several File Managers, and one place did not

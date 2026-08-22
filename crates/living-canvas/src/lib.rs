@@ -25,6 +25,8 @@ pub mod tool_state;
 
 #[cfg(target_arch = "wasm32")]
 mod gateway_client;
+#[cfg(all(test, target_arch = "wasm32"))]
+mod interaction_gate;
 pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
 pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
@@ -252,7 +254,9 @@ impl MindClient for MockMindClient {
     }
 }
 
-#[cfg(test)]
+// Native only: the browser gate in `interaction_gate` covers what lives on wasm32, and this
+// module's async tests need a tokio that cannot build for that target.
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use cybou_protocol::{CapabilityState, KnowledgeState, SchemaVersion};
     use cybou_web_contracts::{
