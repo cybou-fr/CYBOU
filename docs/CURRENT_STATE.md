@@ -334,6 +334,21 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The bottom of the screen has an order (2026-08-22)
+
+The command bar floated in the middle of the canvas, over the cards. It and the palette were both
+`position: absolute` with no positioned ancestor, so they resolved against the document rather than
+the window — and because the palette section is itself a containing block once fixed, the bar's
+`bottom` was measured from the palette instead of the screen.
+
+One anchored container now, two children: the section is fixed to the window, the menu is a box that
+appears above the bar, and the bar sits in normal flow inside the section. The three bottom surfaces
+have a stated order — dock, command bar above it, menu above that — and the viewport controls sit
+clear of all of them.
+
+Measured rather than eyeballed, at 1440x900 and at 760x700: no pair of them overlaps, and nothing
+crosses the edge of the window at either size.
+
 ## Instants are shown the way a person reads them (2026-08-22)
 
 The owners record time as RFC 3339 with whatever precision they had —
