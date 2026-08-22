@@ -28,8 +28,7 @@ use leptos::reactive::owner::{Owner, StoredValue};
 use crate::CardId;
 
 /// The greeting a Shell card shows before anyone has typed anything.
-const SHELL_BANNER: &str =
-    "CYBOU Bounded Body Shell (ADR-0040 DemoReadOnly)\nType 'help' for available capabilities.\n";
+const SHELL_BANNER: &str = "Bounded, read-only. Type 'help' to see what this shell can do.\n";
 
 /// One Shell card's interactive state.
 ///

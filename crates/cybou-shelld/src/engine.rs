@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 
 use cybou_jailfs::{JailError, JailFs};
 
-use crate::types::{MAX_FILE_PAYLOAD_BYTES, ShellOutput};
+use crate::types::{MAX_FILE_PAYLOAD_BYTES, MAX_WALK_DEPTH, MAX_WALK_ENTRIES, ShellOutput};
 
 /// Interactive Shell state with virtual working directory and sandboxed filesystem.
 #[derive(Clone, Debug)]
@@ -68,12 +68,17 @@ impl ShellEngine {
             "head" => self.exec_head(args),
             "tail" => self.exec_tail(args),
             "grep" => self.exec_grep(args),
+            "wc" => self.exec_wc(args),
+            "du" => self.exec_du(args),
+            "file" => self.exec_file(args),
+            "find" => self.exec_find(args),
+            "date" => self.exec_date(),
             "help" => self.exec_help(args),
             "clear" => ShellOutput::success("\x1b[2J\x1b[H", self.cwd()),
             unknown => ShellOutput::error(
                 127,
                 format!(
-                    "cybou: command not found: '{unknown}'. Type 'help' for available capabilities.\n"
+                    "command not found: '{unknown}'. Type 'help' to see what this shell can do.\n"
                 ),
                 self.cwd(),
             ),
@@ -412,6 +417,229 @@ impl ShellEngine {
         }
     }
 
+    /// Count what a file actually contains.
+    fn exec_wc(&self, args: &[String]) -> ShellOutput {
+        let Some(target) = args.iter().find(|arg| !arg.starts_with('-')) else {
+            return ShellOutput::error(
+                1,
+                "wc: missing file operand
+",
+                self.cwd(),
+            );
+        };
+        let full_path = self.resolve_path(target);
+        match self.jail.read_to_string(&full_path, MAX_FILE_PAYLOAD_BYTES) {
+            Ok(content) => {
+                let lines = content.lines().count();
+                let words = content.split_whitespace().count();
+                let bytes = content.len();
+                ShellOutput::success(
+                    format!(
+                        "{lines} {words} {bytes} {target}
+"
+                    ),
+                    self.cwd(),
+                )
+            }
+            Err(JailError::NotFound(p)) => ShellOutput::error(
+                1,
+                format!(
+                    "wc: {p}: No such file or directory
+"
+                ),
+                self.cwd(),
+            ),
+            Err(e) => ShellOutput::error(
+                1,
+                format!(
+                    "wc: {e}
+"
+                ),
+                self.cwd(),
+            ),
+        }
+    }
+
+    /// Add up the sizes the sandbox reported, and say when it stopped adding.
+    fn exec_du(&self, args: &[String]) -> ShellOutput {
+        let target = args
+            .iter()
+            .find(|arg| !arg.starts_with('-'))
+            .map_or_else(|| self.cwd().to_owned(), |arg| self.resolve_path(arg));
+
+        if self.jail.is_file(&target) {
+            return match self.jail.read_bytes(&target, MAX_FILE_PAYLOAD_BYTES) {
+                Ok(bytes) => ShellOutput::success(
+                    format!(
+                        "{} {target}
+",
+                        bytes.len()
+                    ),
+                    self.cwd(),
+                ),
+                Err(e) => ShellOutput::error(
+                    1,
+                    format!(
+                        "du: {e}
+"
+                    ),
+                    self.cwd(),
+                ),
+            };
+        }
+
+        let mut total: u64 = 0;
+        let mut visited = 0usize;
+        let complete = self.walk(&target, 0, &mut visited, &mut |_, entry, _| {
+            total = total.saturating_add(entry.size_bytes);
+        });
+
+        let mut out = format!(
+            "{total} {target}
+"
+        );
+        if !complete {
+            // Partial is not a smaller directory. A total that stopped early says so.
+            let _ = writeln!(
+                out,
+                "du: stopped after {visited} entries or {MAX_WALK_DEPTH} levels; this total is partial"
+            );
+        }
+        ShellOutput::success(out, self.cwd())
+    }
+
+    /// Say what kind of thing a path is, and nothing about what it means.
+    ///
+    /// A directory, or a file that is valid UTF-8 text, or a file that is not. No guess at a format
+    /// from an extension or a magic number: this reports what was checked, which is exactly two
+    /// things.
+    fn exec_file(&self, args: &[String]) -> ShellOutput {
+        let Some(target) = args.iter().find(|arg| !arg.starts_with('-')) else {
+            return ShellOutput::error(
+                1,
+                "file: missing operand
+",
+                self.cwd(),
+            );
+        };
+        let full_path = self.resolve_path(target);
+        if !self.jail.exists(&full_path) {
+            return ShellOutput::error(
+                1,
+                format!(
+                    "file: {target}: No such file or directory
+"
+                ),
+                self.cwd(),
+            );
+        }
+        if !self.jail.is_file(&full_path) {
+            return ShellOutput::success(
+                format!(
+                    "{target}: directory
+"
+                ),
+                self.cwd(),
+            );
+        }
+        let kind = match self.jail.read_bytes(&full_path, MAX_FILE_PAYLOAD_BYTES) {
+            Ok(bytes) if std::str::from_utf8(&bytes).is_ok() => "UTF-8 text",
+            Ok(_) => "data (not UTF-8 text)",
+            Err(JailError::SizeLimitExceeded { .. }) => "file too large to inspect",
+            Err(e) => {
+                return ShellOutput::error(
+                    1,
+                    format!(
+                        "file: {e}
+"
+                    ),
+                    self.cwd(),
+                );
+            }
+        };
+        ShellOutput::success(
+            format!(
+                "{target}: {kind}
+"
+            ),
+            self.cwd(),
+        )
+    }
+
+    /// List what is under a directory, to a bounded depth.
+    fn exec_find(&self, args: &[String]) -> ShellOutput {
+        let target = args
+            .iter()
+            .find(|arg| !arg.starts_with('-'))
+            .map_or_else(|| self.cwd().to_owned(), |arg| self.resolve_path(arg));
+
+        let mut out = String::new();
+        let mut visited = 0usize;
+        let complete = self.walk(&target, 0, &mut visited, &mut |path, entry, is_dir| {
+            let suffix = if is_dir { "/" } else { "" };
+            let _ = writeln!(out, "{path}/{}{suffix}", entry.name);
+        });
+        if !complete {
+            let _ = writeln!(
+                out,
+                "find: stopped after {visited} entries or {MAX_WALK_DEPTH} levels; this listing is partial"
+            );
+        }
+        ShellOutput::success(out, self.cwd())
+    }
+
+    /// The current instant, in UTC, from the host clock.
+    ///
+    /// A real reading, not a constant. `uname` was withdrawn for answering with something compiled
+    /// in; a clock that did the same would be the same fault wearing a different name.
+    fn exec_date(&self) -> ShellOutput {
+        let now = time::OffsetDateTime::now_utc();
+        let rendered = now
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_else(|_| "unavailable".to_owned());
+        ShellOutput::success(
+            format!(
+                "{rendered}
+"
+            ),
+            self.cwd(),
+        )
+    }
+
+    /// Walk a directory, calling `visit` for each entry, within the declared bounds.
+    ///
+    /// Returns whether the walk finished. A caller that ignored this would report a partial answer
+    /// as a complete one, which for a listing means a smaller directory and for a total means a
+    /// smaller number.
+    fn walk(
+        &self,
+        path: &str,
+        depth: usize,
+        visited: &mut usize,
+        visit: &mut impl FnMut(&str, &cybou_jailfs::DirEntry, bool),
+    ) -> bool {
+        if depth >= MAX_WALK_DEPTH {
+            return false;
+        }
+        let Ok(entries) = self.jail.list_dir(path) else {
+            return true;
+        };
+        let mut complete = true;
+        for entry in entries {
+            if *visited >= MAX_WALK_ENTRIES {
+                return false;
+            }
+            *visited += 1;
+            let is_dir = entry.is_dir;
+            let child = format!("{}/{}", path.trim_end_matches('/'), entry.name);
+            visit(path.trim_end_matches('/'), &entry, is_dir);
+            if is_dir && !self.walk(&child, depth + 1, visited, visit) {
+                complete = false;
+            }
+        }
+        complete
+    }
+
     fn exec_help(&self, args: &[String]) -> ShellOutput {
         if let Some(cmd) = args.first() {
             let desc = match cmd.as_str() {
@@ -424,6 +652,15 @@ impl ShellEngine {
                 "head" => "head [-n N] <file> - output the first part of files",
                 "tail" => "tail [-n N] <file> - output the last part of files",
                 "grep" => "grep [-i] <pattern> <file> - print lines matching a pattern",
+                "wc" => "wc <file> - count lines, words and bytes",
+                "du" => {
+                    "du [path] - add up the sizes the sandbox reports, and say if it stopped early"
+                }
+                "file" => {
+                    "file <path> - directory, UTF-8 text, or data; nothing guessed from the name"
+                }
+                "find" => "find [path] - list what is underneath, to a bounded depth",
+                "date" => "date - the current instant in UTC, read from the host clock",
                 "clear" => "clear - clear terminal screen buffer",
                 "help" => "help [command] - display information about builtin capabilities",
                 _ => "Unknown command. Type 'help' to list available capabilities.",
@@ -443,6 +680,11 @@ A bounded, read-only view of one directory. Available commands:
   head [-n N] <file>    Output the first N lines (default 10)
   tail [-n N] <file>    Output the last N lines (default 10)
   grep [-i] <pat> <file> Search for pattern in file
+  wc <file>             Count lines, words and bytes
+  du [path]             Total size, and whether the total is partial
+  file <path>           Directory, UTF-8 text, or data
+  find [path]           List what is underneath, to a bounded depth
+  date                  The current instant, UTC, from the host clock
   clear                 Clear screen
   help [cmd]            Display command help
 ";

@@ -193,7 +193,7 @@ Two more were printing invented fields and now print fewer, truthful ones:
 - `stat` reported `Access: (0644/-rw-r--r--)` for everything, including directories. The line is
   gone. File, size and type remain because those come from a real `metadata` call.
 
-**The accepted set is therefore eleven, all read-only:**
+**The accepted set was therefore eleven, all read-only** — see Amendment 4, which extends it:
 
 ```text
 help  pwd  ls  cd  cat  echo  stat  head  tail  grep  clear
@@ -224,3 +224,35 @@ thing made a non-destructive view look like a destructive rearrangement.
 `Disclosure` was added as a twelfth canonical system card, and is the one card that is not a
 projection of an organ: it shows what the reader in front of it was supplied and what was kept from
 them (ADR-0030 B1, B6).
+
+## Amendment 4 (2026-08-22): five more read-only capabilities, and a prompt that stopped pretending
+
+The accepted set grows to sixteen. Each addition was checked against the same question Amendment 1
+withdrew two commands for — *can this answer with something nobody established?* — and each answers
+only from what `cybou-jailfs` read or what the host clock says:
+
+| Added | What it answers from | Why it cannot invent |
+|---|---|---|
+| `wc` | the bytes of one file | counts of what was read |
+| `du` | the sizes the sandbox reported | a sum, and a statement when the sum is partial |
+| `file` | whether it is a directory, and whether the bytes are UTF-8 | two checks, two answers, no format guessed from a name or a magic number |
+| `find` | the directory listing, to a bounded depth | paths that exist, and a statement when the walk stopped early |
+| `date` | the host clock, in UTC | a real reading; a compiled-in instant would be the fault `uname` was withdrawn for |
+
+`du` and `find` walk, so they are bounded — eight levels, two thousand entries. **A bounded answer
+always says it is bounded.** A total that stopped adding is not a smaller directory and a listing
+that stopped is not a shorter one, and a surface that presented either as complete would be stating
+what it had not established.
+
+The prompt also changed. It read `cybou:/path ›`, which has the shape of `user@host:path` and named
+neither: there is no account called `cybou` being reported and no host being named. It is the path
+alone now. Removing `whoami` while leaving a prompt that implied the same answer would have been
+half a decision.
+
+**The accepted set is sixteen:**
+
+```text
+help  pwd  ls  cd  cat  echo  stat  head  tail  grep  wc  du  file  find  date  clear
+```
+
+Extending it still requires amending this document in the same commit as the code.

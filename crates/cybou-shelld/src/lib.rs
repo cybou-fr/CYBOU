@@ -89,6 +89,76 @@ mod tests {
     }
 
     #[test]
+    fn counting_reports_what_the_file_holds() {
+        let (mut engine, dir) = test_engine();
+        let out = engine.execute("wc welcome.txt");
+        assert_eq!(out.exit_code, 0);
+        // "Welcome to CYBOU Bounded Shell" — one line, five words, thirty bytes.
+        let fields: Vec<&str> = out.stdout.split_whitespace().collect();
+        assert_eq!(fields[0], "1");
+        assert_eq!(fields[1], "5");
+        assert_eq!(fields[2], "30");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn file_says_what_it_checked_and_nothing_more() {
+        // Two answers, because two things were checked: whether it is a directory, and whether the
+        // bytes are UTF-8. No format guessed from a name or a magic number.
+        let (mut engine, dir) = test_engine();
+        assert!(
+            engine
+                .execute("file welcome.txt")
+                .stdout
+                .contains("UTF-8 text")
+        );
+        assert!(engine.execute("file /").stdout.contains("directory"));
+        assert_eq!(engine.execute("file nothing-here").exit_code, 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_walk_that_stopped_early_says_so() {
+        // Partial is not a smaller directory. `find` and `du` are bounded, and a bounded answer
+        // that read like a complete one would be the surface stating something it did not
+        // establish.
+        let (mut engine, dir) = test_engine();
+        let deep = (0..crate::types::MAX_WALK_DEPTH + 2)
+            .map(|level| format!("level{level}"))
+            .collect::<Vec<_>>()
+            .join("/");
+        std::fs::create_dir_all(dir.join(&deep)).expect("a deep tree");
+
+        let out = engine.execute("find /");
+        assert_eq!(out.exit_code, 0);
+        assert!(
+            out.stdout.contains("partial"),
+            "a truncated walk did not say so: {}",
+            out.stdout
+        );
+
+        let total = engine.execute("du /");
+        assert!(total.stdout.contains("partial"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_clock_is_read_rather_than_recited() {
+        // `uname` was withdrawn for answering with something compiled in. A date that did the same
+        // would be the same fault under another name.
+        let (mut engine, dir) = test_engine();
+        let first = engine.execute("date");
+        assert_eq!(first.exit_code, 0);
+        let year = time::OffsetDateTime::now_utc().year().to_string();
+        assert!(
+            first.stdout.starts_with(&year),
+            "date did not report the current year: {}",
+            first.stdout
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn a_builtin_that_could_only_lie_is_not_offered_at_all() {
         // `whoami` answered "cybou" and `uname -a` answered a fixed kernel string, on every host,
         // regardless of who was asking or what the machine was. In a terminal those read as

@@ -12,6 +12,16 @@ pub const MAX_OUTPUT_BYTES: usize = 65_536;
 /// Maximum file read/write payload size in single command (1 MB).
 pub const MAX_FILE_PAYLOAD_BYTES: usize = 1_048_576;
 
+/// How deep a recursive walk may go below where it started.
+///
+/// A bound, because the sandbox root is a directory somebody else can fill and a walk without one
+/// is a way to make the surface work indefinitely on a request that costs nothing to send. What is
+/// cut is always reported as cut.
+pub const MAX_WALK_DEPTH: usize = 8;
+
+/// How many entries a recursive walk may visit.
+pub const MAX_WALK_ENTRIES: usize = 2_000;
+
 /// Error returned by Shell capability execution.
 #[derive(Clone, Debug, Eq, Error, PartialEq, Serialize, Deserialize)]
 pub enum ShellError {
@@ -19,7 +29,7 @@ pub enum ShellError {
     #[error("command error: {0}")]
     InvalidCommand(String),
     /// Command is unrecognized or forbidden.
-    #[error("command not found: '{0}'. Type 'help' for available commands.")]
+    #[error("command not found: '{0}'. Type 'help' to see what this shell can do.")]
     CommandNotFound(String),
     /// Sandboxed filesystem violation.
     #[error("filesystem sandbox violation: {0}")]

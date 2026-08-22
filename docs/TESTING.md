@@ -224,7 +224,7 @@ This gate runs 5 sequential verification stages covering the frontend and capabi
 
 1. **Desktop and Living Canvas unit tests**: Verifies `DesktopLayout` v8-to-v9 migration, spatial geometry clamping, layout undo/redo history, and automatic self-healing normalization (`validate_and_normalize`) that recovers missing system cards and dissolves corrupt decks.
 2. **Invariant-safe Deck model**: Verifies `DeckError` enforcement, preventing single-card decks, duplicate cards, and multi-deck conflicts.
-3. **CYBOU Shelld confinement**: Verifies that `cybou-shelld` strictly executes only the ADR-0040 DemoReadOnly builtins — `help`, `pwd`, `ls`, `cd`, `cat`, `echo`, `stat`, `head`, `tail`, `grep`, `clear`, as accepted in that ADR's Amendment 1 — and rejects everything else, including mutating and arbitrary commands, with code 127. This line said six until 2026-08-22, while the engine recognised thirteen; the set is now enumerated in one place and this document points at it rather than restating it from memory.
+3. **CYBOU Shelld confinement**: Verifies that `cybou-shelld` strictly executes only the ADR-0040 DemoReadOnly builtins — the set accepted in that ADR's Amendments 1 and 4 — and rejects everything else, including mutating and arbitrary commands, with code 127. This line said six until 2026-08-22, while the engine recognised thirteen; the set is enumerated in the ADR and this document points at it rather than restating it from memory.
 4. **Web Gateway security boundaries**: Verifies that Public Preview mode strictly forbids shell access (HTTP 403) and serves only safe read-only projections.
 5. **WASM32 target compilation and workspace Clippy**: Proves clean, zero-warning compilation for the browser runtime.
 

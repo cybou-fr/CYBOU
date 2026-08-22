@@ -21,7 +21,8 @@ use crate::{
 };
 
 const SHELL_AUTOCOMPLETE: &[&str] = &[
-    "cat", "cd", "clear", "echo", "grep", "head", "help", "ls", "pwd", "stat", "tail",
+    "cat", "cd", "clear", "date", "du", "echo", "file", "find", "grep", "head", "help", "ls",
+    "pwd", "stat", "tail", "wc",
 ];
 
 /// Interactive Shell domain content presentation.
@@ -148,7 +149,7 @@ pub fn ShellContent(
                     />
                 </div>
                 <div class="shell-input-line" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
-                    <span class="shell-prompt">{move || format!("cybou:{} ›", cwd.get())}</span>
+                    <span class="shell-prompt">{move || format!("{} ›", cwd.get())}</span>
                     <input
                         node_ref=input_ref
                         type="text"
