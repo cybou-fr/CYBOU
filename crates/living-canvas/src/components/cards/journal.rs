@@ -19,7 +19,7 @@ use crate::{
 pub fn JournalContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let journal_count = move || {
@@ -87,7 +87,7 @@ pub fn JournalCard(
 ) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let journal_count = move || {

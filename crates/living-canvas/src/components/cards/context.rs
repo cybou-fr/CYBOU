@@ -20,7 +20,7 @@ use crate::{
 pub fn ContextContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let concepts = move || mind().map_or_else(Vec::new, |m| m.context.concepts);
@@ -69,7 +69,7 @@ pub fn ContextCard(
 ) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let context_label = move || match mind() {

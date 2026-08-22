@@ -19,7 +19,7 @@ use crate::{
 pub fn LifecycleContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let lifecycle_activity = move || {
@@ -56,7 +56,7 @@ pub fn LifecycleCard(
 ) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let lifecycle_mode = move || mind().and_then(|m| m.lifecycle.mode).unwrap_or_else(unread);

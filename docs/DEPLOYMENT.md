@@ -34,8 +34,11 @@ gateway on loopback and exposes it through public HTTPS:
 bash scripts/deploy-vps.sh
 ```
 
-The public URLs are `https://vps-d0669a91.vps.ovh.net` and `https://51.255.46.58`; neither requires
-a login. The IP endpoint uses a renewable Let's Encrypt `shortlived` certificate.
+The public URLs are `https://vps-d0669a91.vps.ovh.net` and `https://51.255.46.58`. Both require a
+login: the gateway runs with `CYBOU_SESSION_MODE=sign-in-required`, refuses every projection route
+with `401` until a session exists, and the page shows nothing but the way in. This was
+`public-preview` until 2026-08-22 — a filtered projection of a live Mind, served to anyone with the
+address. The IP endpoint uses a renewable Let's Encrypt `shortlived` certificate.
 
 What a stranger receives is filtered rather than all-or-nothing. Beliefs and concepts carry the
 sensitivity of the contributions they were derived from, obligations are withheld entirely because a

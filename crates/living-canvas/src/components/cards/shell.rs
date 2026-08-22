@@ -241,7 +241,7 @@ pub fn ShellCard(
         view! {
             <div class="card-collapsed-summary">
                 <b>"Shell"</b>
-                <span>"Zone 3 Body"</span>
+                <span>"Bounded, read-only"</span>
             </div>
         }
         .into_any()
@@ -255,7 +255,7 @@ pub fn ShellCard(
             set_selected=set_selected
             dragging=dragging
             resizing=resizing
-            kicker_title="CYBOU Shell · Zone 3 Body"
+            kicker_title="CYBOU Shell"
             kicker_icon=Arc::new(|| view! { <IconTerminal size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >

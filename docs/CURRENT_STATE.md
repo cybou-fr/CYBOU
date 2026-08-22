@@ -334,6 +334,41 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A stranger is served nothing, and the page says less (2026-08-22)
+
+The deployed surface ran in `PublicPreview`: a filtered projection of a live Mind, served to anyone
+who had the address. Filtering is not the same as not showing, and the person the projection is
+about had agreed to neither. `SessionMode::SignInRequired` is now the default whenever a deployment
+can authenticate anybody, and it is what the deployed unit sets. `PublicPreview` still means what it
+meant — a surface deliberately opened — but it has to be asked for rather than being what happens
+when nobody chooses.
+
+The refusal is at the gateway. `/api/v1/snapshot`, `/mind`, `/events` and `/disclosure` answer `401`
+without a session; only the routes that establish one stay open, because a gate that refused those
+would be a locked door with no handle. Hiding the cards in the page would not have been a boundary:
+every one of those routes is reachable with `curl`.
+
+Reading the session is now the first and separate thing the frontend does. Asking for a snapshot
+anyway turned a closed door into a connection error, and the page then drew a whole desktop of
+em-dashes — telling a stranger the machine was broken while showing them the entire structure of the
+Mind. `RuntimeState::SignInRequired` is its own state for that reason: nothing is wrong, nothing is
+being shown, and those are different.
+
+Separately, the page stopped saying things only its authors could read. The brand said
+`Mind · Body · Living Canvas`; the header printed `Projection v42 · Cursor fixture:presence:42 ·
+Expires 2026-08-22T23:06:59.51365708Z` across the top of the screen, which told everybody who opened
+it that it was not for them. The mode a person is in stays visible in words; the plumbing moved to a
+tooltip, because removing it from sight is not the same as removing it. The menu is labelled `Menu`
+rather than `Mind`, sign-in is `Sign in` rather than `Authenticate`, and `Zone 3 Body` and
+`Zone 3 Storage` are gone from every card that showed them. The organ names in card headers stayed:
+`Identity1` on the Identity card is the claim that the page composed nothing.
+
+The viewport chrome was not anchored to anything. `.canvas-controls`, `.zoom-controls` and
+`.canvas-btn` had no stylesheet rules at all — the same fault the minimap had — so the zoom controls
+sat wherever document flow left them. They are fixed to the window now. And the floating action
+beside a card was positioned from `Capabilities`'s geometry whatever a person had actually selected,
+so it sat under a card nobody had chosen and acted on one they had; it follows the selection.
+
 ## A Debian-native desktop session exists, and what is proven about it is narrow (2026-08-22)
 
 `scripts/cybou-desktop-session.sh` and `systemd/user/cybou-desktop.service` are the smallest thing

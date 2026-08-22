@@ -28,20 +28,40 @@ pub fn Topbar(
 ) -> impl IntoView {
     let runtime_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting".to_owned(),
+        RuntimeState::SignInRequired => "Not signed in".to_owned(),
         RuntimeState::Ready { mode, .. } => match mode {
-            SessionMode::LocalDesktop => "Local desktop".to_owned(),
-            SessionMode::PublicPreview => "Public surface".to_owned(),
-            SessionMode::RemoteBrowser => "Remote browser".to_owned(),
+            SessionMode::LocalDesktop => "This machine".to_owned(),
+            SessionMode::PublicPreview => "Open".to_owned(),
+            SessionMode::RemoteBrowser => "Signed in".to_owned(),
+            SessionMode::SignInRequired => "Not signed in".to_owned(),
         },
         RuntimeState::Error(_) => "Unavailable".to_owned(),
     };
 
-    let projection_label = move || match runtime.get() {
-        RuntimeState::Loading => "Awaiting server-established session…".to_owned(),
+    // What a person needs to see, and nothing else. The projection version, the stream cursor and
+    // an RFC 3339 instant with nanoseconds are facts about the plumbing; printing them across the
+    // top of the screen told everybody who opened this page that it was not for them.
+    let status_detail = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting to this machine…".to_owned(),
+        RuntimeState::SignInRequired => "Nothing is shown until you sign in".to_owned(),
+        RuntimeState::Ready { mode, .. } => match mode {
+            SessionMode::LocalDesktop => "The surface is on this machine".to_owned(),
+            SessionMode::PublicPreview => "Anyone with the address can see this".to_owned(),
+            SessionMode::RemoteBrowser => "With an account on this machine".to_owned(),
+            SessionMode::SignInRequired => "Nothing is shown until you sign in".to_owned(),
+        },
+        RuntimeState::Error(_) => "Cannot reach this machine".to_owned(),
+    };
+
+    // The plumbing is still reachable, on hover, by whoever wants it. Removing it from sight is not
+    // the same as removing it.
+    let status_tooltip = move || match runtime.get() {
+        RuntimeState::Loading => "Awaiting server-established session".to_owned(),
+        RuntimeState::SignInRequired => "No session has been established".to_owned(),
         RuntimeState::Ready {
             snapshot, session, ..
         } => format!(
-            "Projection v{} · Cursor {} · Expires {}",
+            "Projection v{} · Cursor {} · Session expires {}",
             snapshot.projection_version, snapshot.cursor, session.expires_at
         ),
         RuntimeState::Error(message) => message,
@@ -58,15 +78,18 @@ pub fn Topbar(
                 <img class="brand-mark" src="/cybou-mark.svg" alt="" />
                 <span class="brand-text">
                     <span class="brand-title">"CYBOU"</span>
-                    <span class="brand-sub">"Mind · Body · Living Canvas"</span>
                 </span>
             </a>
 
             <div class="topbar-center">
-                <span class="status-pill" class:online=move || matches!(runtime.get(), RuntimeState::Ready { .. })>
+                <span
+                    class="status-pill"
+                    class:online=move || matches!(runtime.get(), RuntimeState::Ready { .. })
+                    title=status_tooltip
+                >
                     <span class="status-dot"></span>
                     <span class="status-mode">{runtime_label}</span>
-                    <span class="status-meta">{projection_label}</span>
+                    <span class="status-meta">{status_detail}</span>
                 </span>
             </div>
 
@@ -103,63 +126,63 @@ pub fn Topbar(
                         on:click=move |_| set_runtime_menu_open.update(|open| *open = !*open)
                     >
                         <Ellipsis size=16 />
-                        <span>"Mind"</span>
+                        <span>"Menu"</span>
                     </button>
                     <Show when=move || runtime_menu_open.get()>
                         <div class="runtime-popover" role="menu">
-                            <span class="popover-heading">"Registered Organs"</span>
+                            <span class="popover-heading">"Open"</span>
                             <button
                                 class:active=move || selected.get() == "capabilities"
                                 on:click=move |_| navigate_from_menu("capabilities")
-                            ><Sparkles size=14 /><span>"Capabilities"</span><small>"Health1"</small></button>
+                             title="Composed by Health1"><Sparkles size=14 /><span>"Capabilities"</span></button>
                             <button
                                 class:active=move || selected.get() == "identity"
                                 on:click=move |_| navigate_from_menu("identity")
-                            ><IconPin size=14 /><span>"Identity"</span><small>"Identity1"</small></button>
+                             title="Composed by Identity1"><IconPin size=14 /><span>"Identity"</span></button>
                             <button
                                 class:active=move || selected.get() == "session"
                                 on:click=move |_| navigate_from_menu("session")
-                            ><IconPin size=14 /><span>"Session"</span><small>"Trust"</small></button>
+                             title="Composed by Trust"><IconPin size=14 /><span>"Session"</span></button>
                             <button
                                 class:active=move || selected.get() == "journal"
                                 on:click=move |_| navigate_from_menu("journal")
-                            ><Link size=14 /><span>"Journal"</span><small>"Event1"</small></button>
+                             title="Composed by Event1"><Link size=14 /><span>"Journal"</span></button>
                             <button
                                 class:active=move || selected.get() == "lifecycle"
                                 on:click=move |_| navigate_from_menu("lifecycle")
-                            ><Sparkles size=14 /><span>"Lifecycle"</span><small>"Lifecycle1"</small></button>
+                             title="Composed by Lifecycle1"><Sparkles size=14 /><span>"Lifecycle"</span></button>
                             <button
                                 class:active=move || selected.get() == "commitments"
                                 on:click=move |_| navigate_from_menu("commitments")
-                            ><ListChecks size=14 /><span>"Commitments"</span><small>"Intention1"</small></button>
+                             title="Composed by Intention1"><ListChecks size=14 /><span>"Commitments"</span></button>
                             <button
                                 class:active=move || selected.get() == "self"
                                 on:click=move |_| navigate_from_menu("self")
-                            ><Sparkles size=14 /><span>"Self-Model"</span><small>"Self1"</small></button>
+                             title="Composed by Self1"><Sparkles size=14 /><span>"Self-Model"</span></button>
                             <button
                                 class:active=move || selected.get() == "attention"
                                 on:click=move |_| navigate_from_menu("attention")
-                            ><Sparkles size=14 /><span>"Attention"</span><small>"Workspace1"</small></button>
+                             title="Composed by Workspace1"><Sparkles size=14 /><span>"Attention"</span></button>
                             <button
                                 class:active=move || selected.get() == "beliefs"
                                 on:click=move |_| navigate_from_menu("beliefs")
-                            ><Sparkles size=14 /><span>"Beliefs"</span><small>"Epistemic1"</small></button>
+                             title="Composed by Epistemic1"><Sparkles size=14 /><span>"Beliefs"</span></button>
                             <button
                                 class:active=move || selected.get() == "perception"
                                 on:click=move |_| navigate_from_menu("perception")
-                            ><Link size=14 /><span>"Perception"</span><small>"Perception1"</small></button>
+                             title="Composed by Perception1"><Link size=14 /><span>"Perception"</span></button>
                             <button
                                 class:active=move || selected.get() == "context"
                                 on:click=move |_| navigate_from_menu("context")
-                            ><Link size=14 /><span>"Context"</span><small>"Context1"</small></button>
+                             title="Composed by Context1"><Link size=14 /><span>"Context"</span></button>
                             <div class="popover-divider"></div>
-                            <span class="popover-heading">"Workspace Actions"</span>
+                            <span class="popover-heading">"Desktop"</span>
                             <button on:click=move |_| {
                                 history.update(|h| h.push(layout.get_untracked()));
                                 layout.update(|l| l.reset_desktop(None));
                                 layout.get_untracked().save();
                                 set_runtime_menu_open.set(false);
-                            }><IconRefresh size=14 /><span>"Reset Desktop (Home)"</span></button>
+                            }><IconRefresh size=14 /><span>"Reset layout"</span></button>
                             <button on:click=move |_| {
                                 history.update(|h| h.push(layout.get_untracked()));
                                 layout.update(|l| {
@@ -167,19 +190,19 @@ pub fn Topbar(
                                 });
                                 layout.get_untracked().save();
                                 set_runtime_menu_open.set(false);
-                            }><IconLayers size=14 /><span>"Group Mind Core Deck"</span></button>
+                            }><IconLayers size=14 /><span>"Group Identity and Session"</span></button>
                         </div>
                     </Show>
                 </div>
 
                 <button
                     class="auth-trigger-btn"
-                    title="Sign in with Linux PAM credentials"
+                    title="Sign in with an account on this machine"
                     aria-label="Sign in"
                     on:click=move |_| auth_modal_open.set(true)
                 >
                     <FolderOpen size=14 />
-                    <span>"Authenticate"</span>
+                    <span>"Sign in"</span>
                 </button>
             </div>
         </header>

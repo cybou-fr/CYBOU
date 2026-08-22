@@ -20,11 +20,12 @@ use crate::{
 pub fn CapabilitiesContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let capabilities = move || match runtime.get() {
         RuntimeState::Ready { snapshot, .. } => snapshot.capabilities,
-        RuntimeState::Loading | RuntimeState::Error(_) => Vec::new(),
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => Vec::new(),
     };
 
     let system_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting…".into(),
+        RuntimeState::SignInRequired => "Not signed in".into(),
         RuntimeState::Ready { snapshot, .. } => {
             let available = snapshot
                 .capabilities
@@ -39,6 +40,7 @@ pub fn CapabilitiesContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let observed_label = move || match runtime.get() {
         RuntimeState::Ready { snapshot, .. } => format!("Observed {}", snapshot.observed_at),
         RuntimeState::Loading => "Waiting for snapshot".into(),
+        RuntimeState::SignInRequired => "Not signed in".into(),
         RuntimeState::Error(_) => "No snapshot".into(),
     };
 
@@ -85,6 +87,7 @@ pub fn CapabilitiesCard(
 ) -> impl IntoView {
     let system_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting…".into(),
+        RuntimeState::SignInRequired => "Not signed in".into(),
         RuntimeState::Ready { snapshot, .. } => {
             let available = snapshot
                 .capabilities

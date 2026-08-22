@@ -20,7 +20,7 @@ use crate::{
 pub fn CommitmentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
@@ -70,7 +70,7 @@ pub fn CommitmentsCard(
 ) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let commitments_label = move || match mind() {

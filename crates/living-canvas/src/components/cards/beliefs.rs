@@ -20,7 +20,7 @@ use crate::{
 pub fn BeliefsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let beliefs = move || mind().map_or_else(Vec::new, |m| m.beliefs.beliefs);
@@ -70,7 +70,7 @@ pub fn BeliefsCard(
 ) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
 
     let beliefs_label = move || match mind() {

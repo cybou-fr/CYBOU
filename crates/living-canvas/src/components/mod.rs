@@ -16,7 +16,7 @@ pub mod relations;
 pub mod topbar;
 pub mod viewport;
 
-pub use auth_modal::AuthModal;
+pub use auth_modal::{AuthModal, SignInView};
 pub use card_controls::{CardControls, CardResizeHandle, DeckResizeHandle};
 pub use card_frame::CardFrame;
 pub use cards::*;

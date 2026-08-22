@@ -93,7 +93,7 @@ pub fn CommandPalette(
                             layout.get_untracked().save();
                             select_from_command("shell");
                         }
-                    ><IconExternalLink size=15 /><span><b>"Launch CYBOU Shell"</b><i>"Bounded Zone 3 Body capability"</i></span></button>
+                    ><IconExternalLink size=15 /><span><b>"Launch CYBOU Shell"</b><i>"A bounded, read-only shell"</i></span></button>
                     <button
                         class:hidden=move || !command_matches(&command_query.get(), "files file manager storage browse read-only")
                         on:click=move |_| {
@@ -101,7 +101,7 @@ pub fn CommandPalette(
                             layout.get_untracked().save();
                             select_from_command("files");
                         }
-                    ><IconExternalLink size=15 /><span><b>"Launch File Manager"</b><i>"Bounded Zone 3 read-only browser"</i></span></button>
+                    ><IconExternalLink size=15 /><span><b>"Launch File Manager"</b><i>"Browse files, read-only"</i></span></button>
                     <button
                         class:hidden=move || !command_matches(&command_query.get(), "events feed live stream sse journal")
                         on:click=move |_| {

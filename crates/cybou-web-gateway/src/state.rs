@@ -256,6 +256,37 @@ impl GatewayState {
         None
     }
 
+    /// Whether this deployment serves nothing at all until somebody signs in.
+    ///
+    /// `PublicPreview` is a surface deliberately opened to strangers and `LocalDesktop` is a
+    /// device-bound seat on the machine itself. `SignInRequired` is neither, and it is what a
+    /// deployment reachable from a network should be.
+    #[must_use]
+    pub const fn requires_sign_in(&self) -> bool {
+        matches!(self.session.mode, SessionMode::SignInRequired)
+    }
+
+    /// Whether this request may be served a projection of the person's Mind.
+    ///
+    /// Asked here, at the gateway, and not in the page. A frontend that merely hid the cards would
+    /// leave every projection reachable with `curl` — a boundary drawn where nobody is standing.
+    #[must_use]
+    pub fn may_read_mind(&self, headers: &HeaderMap) -> bool {
+        !self.requires_sign_in() || self.session_for(headers).is_some()
+    }
+
+    /// The refusal a reader who has not signed in receives.
+    pub fn sign_in_required() -> (StatusCode, Json<ErrorBody>) {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorBody {
+                schema_version: WEB_SCHEMA_V1,
+                error: "signInRequired",
+                retryable: false,
+            }),
+        )
+    }
+
     /// The seat this request belongs to, whatever instance it named.
     #[must_use]
     pub fn shell_seat(&self, headers: &HeaderMap) -> Option<ShellOwner> {
@@ -292,6 +323,15 @@ impl SessionContext {
         Self {
             mode: SessionMode::LocalDesktop,
             consumer_id: "cybou-desktop".into(),
+        }
+    }
+
+    /// A surface that serves nothing until somebody signs in.
+    #[must_use]
+    pub fn sign_in_required_context() -> Self {
+        Self {
+            mode: SessionMode::SignInRequired,
+            consumer_id: "sign-in-required".into(),
         }
     }
 

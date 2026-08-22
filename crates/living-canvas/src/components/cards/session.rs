@@ -20,35 +20,39 @@ use crate::{
 pub fn SessionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let runtime_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting".to_owned(),
+        RuntimeState::SignInRequired => "Not signed in".to_owned(),
         RuntimeState::Ready { mode, .. } => match mode {
-            SessionMode::LocalDesktop => "Local desktop (Zone 2)".to_owned(),
-            SessionMode::PublicPreview => "Public surface (Zone 1)".to_owned(),
-            SessionMode::RemoteBrowser => "Remote browser (Zone 2)".to_owned(),
+            SessionMode::LocalDesktop => "This machine".to_owned(),
+            SessionMode::PublicPreview => "Open to anyone".to_owned(),
+            SessionMode::RemoteBrowser => "Signed in, over the network".to_owned(),
+            SessionMode::SignInRequired => "Not signed in".to_owned(),
         },
         RuntimeState::Error(_) => "Unavailable".to_owned(),
     };
 
     let session_consumer = move || match runtime.get() {
         RuntimeState::Ready { session, .. } => session.consumer_id,
-        RuntimeState::Loading | RuntimeState::Error(_) => unread(),
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => unread(),
     };
 
     let session_auth = move || match runtime.get() {
         RuntimeState::Ready { mode, .. } => match mode {
-            SessionMode::RemoteBrowser => "Yes (Host token)".to_owned(),
-            SessionMode::LocalDesktop => "Device loopback".to_owned(),
-            SessionMode::PublicPreview => "No (Public)".to_owned(),
+            SessionMode::RemoteBrowser => "Yes, with an account on this machine".to_owned(),
+            SessionMode::LocalDesktop => "No, but the surface is on this machine".to_owned(),
+            SessionMode::PublicPreview => "No".to_owned(),
+            SessionMode::SignInRequired => "No".to_owned(),
         },
-        RuntimeState::Loading | RuntimeState::Error(_) => unread(),
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => unread(),
     };
 
     let session_device = move || match runtime.get() {
         RuntimeState::Ready { mode, .. } => match mode {
-            SessionMode::LocalDesktop => "Yes (Local Unix Socket)".to_owned(),
-            SessionMode::RemoteBrowser => "No (Network Session)".to_owned(),
-            SessionMode::PublicPreview => "No (Public Surface)".to_owned(),
+            SessionMode::LocalDesktop => "Yes, this machine".to_owned(),
+            SessionMode::RemoteBrowser => "No, over the network".to_owned(),
+            SessionMode::PublicPreview => "No".to_owned(),
+            SessionMode::SignInRequired => "No".to_owned(),
         },
-        RuntimeState::Loading | RuntimeState::Error(_) => unread(),
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => unread(),
     };
 
     let session_id_short = move || match runtime.get() {
@@ -58,7 +62,7 @@ pub fn SessionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
             .chars()
             .take(8)
             .collect::<String>(),
-        RuntimeState::Loading | RuntimeState::Error(_) => unread(),
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => unread(),
     };
 
     let session_expires = move || match runtime.get() {
@@ -69,7 +73,7 @@ pub fn SessionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                 session.expires_at
             }
         }
-        RuntimeState::Loading | RuntimeState::Error(_) => unread(),
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => unread(),
     };
 
     view! {
@@ -94,10 +98,12 @@ pub fn SessionCard(
 ) -> impl IntoView {
     let runtime_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting".to_owned(),
+        RuntimeState::SignInRequired => "Not signed in".to_owned(),
         RuntimeState::Ready { mode, .. } => match mode {
-            SessionMode::LocalDesktop => "Local desktop (Zone 2)".to_owned(),
-            SessionMode::PublicPreview => "Public surface (Zone 1)".to_owned(),
-            SessionMode::RemoteBrowser => "Remote browser (Zone 2)".to_owned(),
+            SessionMode::LocalDesktop => "This machine".to_owned(),
+            SessionMode::PublicPreview => "Open to anyone".to_owned(),
+            SessionMode::RemoteBrowser => "Signed in, over the network".to_owned(),
+            SessionMode::SignInRequired => "Not signed in".to_owned(),
         },
         RuntimeState::Error(_) => "Unavailable".to_owned(),
     };

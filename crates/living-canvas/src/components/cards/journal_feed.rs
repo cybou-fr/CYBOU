@@ -244,7 +244,7 @@ pub fn JournalFeedCard(
             set_selected=set_selected
             dragging=dragging
             resizing=resizing
-            kicker_title="Event Stream · Live SSE"
+            kicker_title="Event Stream"
             kicker_icon=Arc::new(|| view! { <IconFile size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >

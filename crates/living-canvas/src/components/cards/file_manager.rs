@@ -268,7 +268,7 @@ pub fn FileManagerCard(
         view! {
             <div class="card-collapsed-summary">
                 <b>"File Manager"</b>
-                <span>"Zone 3 Storage"</span>
+                <span>"Read-only"</span>
             </div>
         }
         .into_any()
@@ -282,7 +282,7 @@ pub fn FileManagerCard(
             set_selected=set_selected
             dragging=dragging
             resizing=resizing
-            kicker_title="File Manager · Zone 3 Storage"
+            kicker_title="File Manager"
             kicker_icon=Arc::new(|| view! { <IconFolder size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >

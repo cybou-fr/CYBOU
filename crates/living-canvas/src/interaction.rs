@@ -7,9 +7,7 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlElement, KeyboardEvent, PointerEvent};
 
-use crate::{
-    CardGeometry, CardId, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, SnapGuide,
-};
+use crate::{CardId, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, SnapGuide};
 
 /// Target item for a pointer drag operation.
 #[derive(Clone, Debug, PartialEq)]
@@ -87,8 +85,17 @@ pub fn card_style(layout: DesktopLayout, card: CardId) -> String {
 
 /// Inline style for the release quick-action bar attached to Capabilities card.
 #[must_use]
-pub fn selection_actions_style(layout: DesktopLayout) -> String {
-    let geom = layout.geometry(CardId::Capabilities);
+pub fn selection_actions_style(layout: &DesktopLayout, selected: &str) -> String {
+    // The selected card, not `Capabilities`. It was pinned to that one card's geometry whatever a
+    // person had actually selected, so the button sat under a card nobody had chosen and acted on
+    // one they had.
+    let Some(card) = CardId::from_key(selected) else {
+        return "display:none".to_owned();
+    };
+    if !layout.contains_card(card) || layout.is_in_deck(card) {
+        return "display:none".to_owned();
+    }
+    let geom = layout.geometry(card);
     format!(
         "left:{:.1}px;top:{:.1}px;z-index:{}",
         geom.x + 18.0,

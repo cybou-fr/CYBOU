@@ -19,7 +19,7 @@
 //! context does this bookkeeping internally. What none of them do is let the person it is about
 //! read it.
 
-use axum::{Json, extract::State, http::HeaderMap};
+use axum::{Json, extract::State, http::HeaderMap, http::StatusCode};
 use cybou_protocol::disclosure::{ConsumerTrust, WithheldBecause};
 use cybou_web_contracts::{
     DISCLOSURE_ITEM_SAMPLE, DisclosureProjection, WEB_SCHEMA_V1, WithheldProjection,
@@ -44,10 +44,17 @@ const fn reason(because: WithheldBecause) -> &'static str {
 /// Answers for the caller and nobody else. The record is keyed by consumer, so a reader sees their
 /// own deliveries: this is a window onto what was done to you, not a log of what was done to
 /// everyone.
+///
+/// # Errors
+///
+/// Refuses with `401` when this deployment serves nothing until somebody signs in and nobody has.
 pub async fn disclosure_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Json<DisclosureProjection> {
+) -> Result<Json<DisclosureProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
+    if !state.may_read_mind(&headers) {
+        return Err(GatewayState::sign_in_required());
+    }
     let session = state.session_for(&headers);
     let destination = GatewayState::destination_for(session.as_ref());
     let last = state.disclosures.last_for(&destination.id);
@@ -63,7 +70,7 @@ pub async fn disclosure_handler(
     // must not be a way around it.
     let subjects_visible = destination.trust == ConsumerTrust::Owner;
 
-    Json(DisclosureProjection {
+    Ok(Json(DisclosureProjection {
         schema_version: WEB_SCHEMA_V1,
         consumer_id: destination.id,
         external_boundary: destination.external_boundary,
@@ -93,5 +100,5 @@ pub async fn disclosure_handler(
             .collect(),
         subjects_visible,
         delivered,
-    })
+    }))
 }

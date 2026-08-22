@@ -28,7 +28,7 @@ use crate::{
 fn disclosure_of(runtime: RwSignal<RuntimeState>) -> Option<DisclosureProjection> {
     match runtime.get() {
         RuntimeState::Ready { disclosure, .. } => disclosure,
-        RuntimeState::Loading | RuntimeState::Error(_) => None,
+        RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     }
 }
 

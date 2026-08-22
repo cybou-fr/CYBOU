@@ -12,6 +12,8 @@ use axum::{
 };
 use cybou_web_contracts::WEB_SCHEMA_V1;
 
+use axum::response::IntoResponse;
+
 use crate::state::{
     EVENT_POLL_INTERVAL, GatewayError, GatewayState, MAX_CURSOR_BYTES, SNAPSHOT_BUDGET,
 };
@@ -40,8 +42,14 @@ pub fn resume_cursor(headers: &HeaderMap) -> Result<Option<String>, GatewayError
 pub async fn events_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Result<Sse<impl futures_core::Stream<Item = Result<Event, Infallible>>>, GatewayError> {
-    let initial_cursor = resume_cursor(&headers)?;
+) -> Result<
+    Sse<impl futures_core::Stream<Item = Result<Event, Infallible>>>,
+    axum::response::Response,
+> {
+    if !state.may_read_mind(&headers) {
+        return Err(GatewayState::sign_in_required().into_response());
+    }
+    let initial_cursor = resume_cursor(&headers).map_err(IntoResponse::into_response)?;
     let stream = futures_util::stream::unfold(
         (state, initial_cursor),
         |(state, mut last_cursor)| async move {

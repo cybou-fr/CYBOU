@@ -30,6 +30,13 @@ pub enum SessionMode {
     PublicPreview,
     /// Authenticated browser session crossing the external network boundary.
     RemoteBrowser,
+    /// Nothing is served until somebody signs in.
+    ///
+    /// The default, and what a deployment that can authenticate anybody should be. `PublicPreview`
+    /// says a surface is deliberately open; this says the opposite, and says it before a reader has
+    /// been shown anything rather than after. A visitor in this mode is served the sign-in surface
+    /// and the routes that establish a session, and no projection of the person's Mind at all.
+    SignInRequired,
 }
 
 /// Freshness carried with every owner projection.

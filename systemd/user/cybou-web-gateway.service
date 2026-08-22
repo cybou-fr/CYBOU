@@ -14,7 +14,10 @@ PartOf=cybou-mind.target
 [Service]
 Type=simple
 Environment=CYBOU_WEB_ROOT=/usr/share/cybou/web
-Environment=CYBOU_SESSION_MODE=public-preview
+# Nothing is served until somebody signs in. This was public-preview, which served a filtered
+# projection of a live Mind to anyone who had the address; filtering is not the same as not
+# showing, and the person it was about had not agreed to either.
+Environment=CYBOU_SESSION_MODE=sign-in-required
 
 # Everyone is served a projection with nothing above ordinary in it. A reader who signs in with a
 # Linux account is served the unfiltered one instead. The gateway never checks the password itself:

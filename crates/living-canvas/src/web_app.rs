@@ -3,6 +3,7 @@
 
 //! High-level Living Canvas desktop workspace application coordinator.
 
+use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use wasm_bindgen::{JsCast, closure::Closure};
@@ -13,7 +14,7 @@ use living_canvas::{
     SnapGuide,
     components::{
         AuthModal, CanvasViewport, CommandPalette, DesktopDock, IconGrid, IconMaximize, Minimap,
-        Topbar,
+        SignInView, Topbar,
     },
     interaction::{DragState, ResizeState, apply_redo, apply_undo, selection_actions_style},
     state::{DesktopRuntimeSubscription, RuntimeState},
@@ -54,8 +55,21 @@ pub fn App() -> impl IntoView {
     // Initial gateway bootstrap
     spawn_local(async move {
         let client = GatewayMindClient;
+        // The session is read first and on its own. On a surface that serves nothing until somebody
+        // signs in, every other route refuses, and asking anyway turned a closed door into a
+        // connection error.
+        let session = match client.session().await {
+            Ok(session) => session,
+            Err(error) => {
+                runtime.set(RuntimeState::Error(error.to_string()));
+                return;
+            }
+        };
+        if session.mode == SessionMode::SignInRequired {
+            runtime.set(RuntimeState::SignInRequired);
+            return;
+        }
         let result = async {
-            let session = client.session().await?;
             let snapshot = client.snapshot().await?;
             Ok::<_, ClientError>((session, snapshot))
         }
@@ -143,7 +157,17 @@ pub fn App() -> impl IntoView {
         on_shortcut.forget();
     }
 
+    // Nothing but the way in, until there is a way in. The gateway refuses every projection in this
+    // mode, so a desktop drawn here would be a frame around empty cards claiming a system is
+    // unavailable when it is simply not being shown to a stranger.
+    let must_sign_in = move || matches!(runtime.get(), RuntimeState::SignInRequired);
+
     view! {
+        <Show when=must_sign_in>
+            <SignInView />
+        </Show>
+
+        <Show when=move || !must_sign_in()>
         <main class="app-shell">
             <Topbar
                 runtime=runtime
@@ -182,7 +206,7 @@ pub fn App() -> impl IntoView {
                 runtime=runtime
             />
 
-            <div class="selection-actions" style=move || selection_actions_style(layout.get())>
+            <div class="selection-actions" style=move || selection_actions_style(&layout.get(), selected.get())>
                 <button
                     class="action-btn"
                     title="Bring forward in Z-order"
@@ -270,5 +294,6 @@ pub fn App() -> impl IntoView {
 
             <AuthModal open=auth_modal_open />
         </main>
+        </Show>
     }
 }

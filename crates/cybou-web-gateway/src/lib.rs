@@ -1103,6 +1103,98 @@ mod tests {
             .expect("a response")
     }
 
+    /// A router that serves nothing until somebody signs in.
+    fn closed_router() -> Router {
+        router_with_verifier_and_access(
+            Arc::new(FixturePresenceSource::nominal()),
+            Some(Arc::new(FixturePresenceSource::nominal())),
+            Some(Arc::new(OneAccount)),
+            None,
+            SessionContext::sign_in_required_context(),
+        )
+    }
+
+    /// Ask one route, with a cookie or without one.
+    async fn get_route(app: &Router, uri: &str, cookie: Option<&str>) -> StatusCode {
+        let mut request = Request::builder().uri(uri);
+        if let Some(cookie) = cookie {
+            request = request.header("cookie", cookie);
+        }
+        app.clone()
+            .oneshot(request.body(Body::empty()).expect("a request"))
+            .await
+            .expect("a response")
+            .status()
+    }
+
+    #[tokio::test]
+    async fn a_stranger_is_served_no_projection_at_all() {
+        // Not a filtered one. Filtering is not the same as not showing, and the person the
+        // projection is about had agreed to neither. This is asked at the gateway, so hiding the
+        // cards in the page would not have been enough: every one of these is reachable with curl.
+        let app = closed_router();
+        for route in [
+            "/api/v1/snapshot",
+            "/api/v1/mind",
+            "/api/v1/events",
+            "/api/v1/disclosure",
+        ] {
+            assert_eq!(
+                get_route(&app, route, None).await,
+                StatusCode::UNAUTHORIZED,
+                "{route} answered a stranger"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_way_in_is_still_open() {
+        // A gate that refused the routes needed to pass it would be a locked door with no handle.
+        let app = closed_router();
+        assert_eq!(
+            get_route(&app, "/api/v1/session", None).await,
+            StatusCode::OK
+        );
+        assert!(sign_in(&app, "alice", "hunter2").await.is_some());
+    }
+
+    #[tokio::test]
+    async fn signing_in_is_what_opens_it() {
+        let app = closed_router();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+        for route in ["/api/v1/snapshot", "/api/v1/mind", "/api/v1/disclosure"] {
+            assert_eq!(
+                get_route(&app, route, Some(&cookie)).await,
+                StatusCode::OK,
+                "{route} refused someone who had signed in"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_session_nobody_issued_does_not_open_it() {
+        let app = closed_router();
+        assert_eq!(
+            get_route(&app, "/api/v1/mind", Some("cybou_session=invented")).await,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    #[tokio::test]
+    async fn a_surface_deliberately_opened_still_serves() {
+        // PublicPreview did not stop meaning what it means; it stopped being what happens when
+        // nobody chooses anything.
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::public_preview(),
+        );
+        assert_eq!(
+            get_route(&app, "/api/v1/snapshot", None).await,
+            StatusCode::OK
+        );
+    }
+
     #[tokio::test]
     async fn a_directory_is_read_as_structure_rather_than_as_terminal_output() {
         // The File Manager used to parse `ls -la`. Its parser wanted nine whitespace fields, the

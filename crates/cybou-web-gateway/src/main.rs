@@ -37,10 +37,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let listener = tokio::net::TcpListener::bind(address).await?;
     let web_root = std::env::var_os("CYBOU_WEB_ROOT").map(std::path::PathBuf::from);
+    // A deployment that can authenticate somebody serves nothing until somebody does. Opening a
+    // surface to strangers is a decision, and it is taken here, in the unit that starts the
+    // process, rather than being what happens when nobody says anything.
     let session_context = match std::env::var("CYBOU_SESSION_MODE") {
         Ok(value) if value == "public-preview" => SessionContext::public_preview(),
         Ok(value) if value == "local-desktop" => SessionContext::local_desktop(),
-        Err(std::env::VarError::NotPresent) => SessionContext::local_desktop(),
+        Ok(value) if value == "sign-in-required" => SessionContext::sign_in_required_context(),
+        Err(std::env::VarError::NotPresent) => {
+            if verifier.is_some() {
+                SessionContext::sign_in_required_context()
+            } else {
+                // Nothing here can check a password, so requiring one would make the surface
+                // unreachable by anybody rather than protecting it from anybody.
+                SessionContext::local_desktop()
+            }
+        }
         Ok(value) => return Err(format!("unsupported CYBOU_SESSION_MODE: {value}").into()),
         Err(error) => return Err(error.into()),
     };

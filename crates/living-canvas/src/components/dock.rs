@@ -57,9 +57,11 @@ pub fn DesktopDock(
     };
 
     let user_label = move || match runtime.get() {
+        RuntimeState::SignInRequired => "Not signed in".to_string(),
         RuntimeState::Ready { mode, mind, .. } => match mode {
-            SessionMode::PublicPreview => "Public Preview 🔒".to_string(),
-            SessionMode::LocalDesktop => "local · authenticated ●".to_string(),
+            SessionMode::PublicPreview => "Open to anyone".to_string(),
+            SessionMode::SignInRequired => "Not signed in".to_string(),
+            SessionMode::LocalDesktop => "This machine".to_string(),
             SessionMode::RemoteBrowser => {
                 if let Some(m) = mind {
                     if let Some(origin) = m.identity.origin {

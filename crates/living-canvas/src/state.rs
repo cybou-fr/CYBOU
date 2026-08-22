@@ -33,6 +33,13 @@ pub enum RuntimeState {
     },
     /// Connection or protocol error.
     Error(String),
+    /// This deployment serves nothing until somebody signs in, and nobody has.
+    ///
+    /// Its own state rather than an `Error`, because it is not one. Reading the session, finding
+    /// the surface closed and reporting "unavailable" drew a whole desktop of em-dashes: it told a
+    /// stranger the machine was broken, and showed them the entire structure of the Mind while
+    /// doing it. Nothing is wrong here. Nothing is being shown, which is different.
+    SignInRequired,
 }
 
 /// Managed subscription to gateway runtime state and SSE live event stream.
