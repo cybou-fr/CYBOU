@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Session card component representing established trust and gateway session mode.
+//! Session card and content component representing established trust and gateway session mode.
 
 use std::sync::Arc;
 use cybou_web_contracts::SessionMode;
@@ -15,16 +15,9 @@ use crate::{
     state::{RuntimeState, unread},
 };
 
-/// Session established trust card component.
+/// Session domain content presentation.
 #[component]
-pub fn SessionCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-    runtime: RwSignal<RuntimeState>,
-) -> impl IntoView {
+pub fn SessionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let runtime_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting".to_owned(),
         RuntimeState::Ready { mode, .. } => match mode {
@@ -76,6 +69,36 @@ pub fn SessionCard(
         RuntimeState::Loading | RuntimeState::Error(_) => unread(),
     };
 
+    view! {
+        <div class="session-card-body">
+            <strong>{runtime_label}</strong>
+            <span class="session-consumer">{session_consumer}</span>
+            <span class="session-badges"><i>"Auth "{session_auth}</i><i>"Device "{session_device}</i></span>
+            <span class="session-meta">"Session "{session_id_short}" · Expires "{session_expires}</span>
+        </div>
+    }
+}
+
+/// Session established trust card component.
+#[component]
+pub fn SessionCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+    runtime: RwSignal<RuntimeState>,
+) -> impl IntoView {
+    let runtime_label = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting".to_owned(),
+        RuntimeState::Ready { mode, .. } => match mode {
+            SessionMode::LocalDesktop => "Local desktop (Zone 2)".to_owned(),
+            SessionMode::PublicPreview => "Public surface (Zone 1)".to_owned(),
+            SessionMode::RemoteBrowser => "Remote browser (Zone 2)".to_owned(),
+        },
+        RuntimeState::Error(_) => "Unavailable".to_owned(),
+    };
+
     let collapsed = move || {
         let label = runtime_label();
         view! {
@@ -99,14 +122,7 @@ pub fn SessionCard(
             kicker_icon=Arc::new(|| view! { <UsersRound size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <strong>"Established trust"</strong>
-            <span class="row"><b>"Mode"</b><i>{runtime_label}</i></span>
-            <span class="row"><b>"Consumer"</b><i>{session_consumer}</i></span>
-            <span class="row"><b>"Authenticated"</b><i>{session_auth}</i></span>
-            <span class="row"><b>"Device bound"</b><i>{session_device}</i></span>
-            <span class="row"><b>"Session ID"</b><i>{session_id_short}</i></span>
-            <span class="row"><b>"Expires"</b><i>{session_expires}</i></span>
-            <span class="panel-link">"Established by the gateway, never by this page"</span>
+            <SessionContent runtime=runtime />
         </CardFrame>
     }
 }

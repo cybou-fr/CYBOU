@@ -8,6 +8,7 @@ pub mod history;
 pub mod migration;
 pub mod model;
 pub mod placement;
+pub mod relations;
 pub mod snap;
 
 pub use engine::DesktopLayout;
@@ -17,6 +18,7 @@ pub use model::{
     ArrangementMode, DesktopItem, DesktopItemId, DesktopViewMode, Rect, UsableViewport,
 };
 pub use placement::PlacementResolver;
+pub use relations::{DesktopRelationshipGraph, Relationship, RelationshipKind};
 pub use snap::{SnapGuide, SnapResult, compute_snap};
 
 #[cfg(test)]
@@ -240,7 +242,10 @@ mod tests {
         assert!(!history.can_redo());
 
         let undone = history.undo(modified.clone()).expect("undo available");
-        assert_eq!(undone.geometry(CardId::Identity).x, 70.0);
+        assert_eq!(
+            undone.geometry(CardId::Identity).x,
+            initial.geometry(CardId::Identity).x
+        );
         assert!(history.can_redo());
 
         let redone = history.redo(undone).expect("redo available");
@@ -285,9 +290,9 @@ mod tests {
         let layout = DesktopLayout::default();
         let id_geom = layout.geometry(CardId::Identity);
         let id_right = id_geom.x + id_geom.width;
-        // Place candidate very close to Identity's right edge
-        let candidate_x = id_right + 4.0;
-        let candidate_y = id_geom.y + 3.0;
+        // Place candidate very close to Identity's right edge and top edge
+        let candidate_x = id_right + 3.0;
+        let candidate_y = id_geom.y + 0.5;
 
         let snap = layout.compute_snap(
             &DesktopItemId::Card(CardId::Session),

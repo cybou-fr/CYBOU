@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Capabilities card component representing Health1 capability graph and organ availability.
+//! Capabilities card and content component representing Health1 capability graph and organ availability.
 
 use std::sync::Arc;
 use cybou_protocol::CapabilityState;
@@ -15,16 +15,9 @@ use crate::{
     state::{RuntimeState, capability_state_label},
 };
 
-/// Capabilities cognitive card component.
+/// Capabilities domain content presentation.
 #[component]
-pub fn CapabilitiesCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-    runtime: RwSignal<RuntimeState>,
-) -> impl IntoView {
+pub fn CapabilitiesContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let capabilities = move || match runtime.get() {
         RuntimeState::Ready { snapshot, .. } => snapshot.capabilities,
         RuntimeState::Loading | RuntimeState::Error(_) => Vec::new(),
@@ -49,29 +42,8 @@ pub fn CapabilitiesCard(
         RuntimeState::Error(_) => "No snapshot".into(),
     };
 
-    let collapsed = move || {
-        let label = system_label();
-        view! {
-            <div class="card-collapsed-summary">
-                <b>"Capabilities"</b>
-                <span>{label}</span>
-            </div>
-        }
-        .into_any()
-    };
-
     view! {
-        <CardFrame
-            card=CardId::Capabilities
-            layout=layout
-            selected=selected
-            set_selected=set_selected
-            dragging=dragging
-            resizing=resizing
-            kicker_title="Health1"
-            kicker_icon=Arc::new(|| view! { <Sparkles size=14 /> }.into_any())
-            collapsed_summary=Arc::new(collapsed)
-        >
+        <div class="capabilities-card-body">
             <h1>{system_label}</h1>
             <span class="capabilities-kind">"Capability health"</span>
             <p>"A capability is available only while every organ it depends on answers Health1. Nothing here is composed by this page."</p>
@@ -97,6 +69,57 @@ pub fn CapabilitiesCard(
             <footer class="capabilities-meta">
                 <span><small>"Observed"</small><b>{observed_label}</b></span>
             </footer>
+        </div>
+    }
+}
+
+/// Capabilities cognitive card component.
+#[component]
+pub fn CapabilitiesCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+    runtime: RwSignal<RuntimeState>,
+) -> impl IntoView {
+    let system_label = move || match runtime.get() {
+        RuntimeState::Loading => "Connecting…".into(),
+        RuntimeState::Ready { snapshot, .. } => {
+            let available = snapshot
+                .capabilities
+                .iter()
+                .filter(|c| c.state == CapabilityState::Available)
+                .count();
+            format!("{available}/{} capabilities", snapshot.capabilities.len())
+        }
+        RuntimeState::Error(_) => "Gateway unavailable".into(),
+    };
+
+    let collapsed = move || {
+        let label = system_label();
+        view! {
+            <div class="card-collapsed-summary">
+                <b>"Capabilities"</b>
+                <span>{label}</span>
+            </div>
+        }
+        .into_any()
+    };
+
+    view! {
+        <CardFrame
+            card=CardId::Capabilities
+            layout=layout
+            selected=selected
+            set_selected=set_selected
+            dragging=dragging
+            resizing=resizing
+            kicker_title="Health1"
+            kicker_icon=Arc::new(|| view! { <Sparkles size=14 /> }.into_any())
+            collapsed_summary=Arc::new(collapsed)
+        >
+            <CapabilitiesContent runtime=runtime />
         </CardFrame>
     }
 }

@@ -1,10 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Runtime state and formatting helpers for Living Canvas.
+//! Runtime state, subscription lifecycle, and formatting helpers for Living Canvas.
 
 use cybou_protocol::{CapabilityState, KnowledgeState};
-use cybou_web_contracts::{Freshness, MindProjection, SessionMode, SessionProjection, SnapshotProjection};
+use cybou_web_contracts::{
+    Freshness, MindProjection, SessionMode, SessionProjection, SnapshotProjection,
+};
+use leptos::prelude::RwSignal;
 
 /// High-level runtime connection and projection state.
 #[derive(Clone, Debug)]
@@ -24,6 +27,68 @@ pub enum RuntimeState {
     },
     /// Connection or protocol error.
     Error(String),
+}
+
+/// Managed subscription to gateway runtime state and SSE live event stream.
+pub struct DesktopRuntimeSubscription {
+    #[cfg(target_arch = "wasm32")]
+    es: Option<web_sys::EventSource>,
+}
+
+impl DesktopRuntimeSubscription {
+    /// Subscribe to the SSE event stream, updating the runtime signal on snapshots.
+    #[must_use]
+    pub fn subscribe(runtime: RwSignal<RuntimeState>) -> Self {
+        #[cfg(target_arch = "wasm32")]
+        {
+            use leptos::prelude::*;
+            use wasm_bindgen::{JsCast, closure::Closure};
+            use web_sys::{EventSource, MessageEvent};
+
+            if let Ok(es) = EventSource::new("/api/v1/events") {
+                let on_snap =
+                    Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
+                        let Some(data) = event.data().as_string() else {
+                            return;
+                        };
+                        let Ok(new_snapshot) =
+                            serde_json::from_str::<SnapshotProjection>(&data)
+                        else {
+                            return;
+                        };
+                        runtime.update(|state| {
+                            if let RuntimeState::Ready {
+                                snapshot,
+                                ..
+                            } = state
+                            {
+                                *snapshot = new_snapshot;
+                            }
+                        });
+                    });
+                let _ = es.add_event_listener_with_callback(
+                    "snapshot",
+                    on_snap.as_ref().unchecked_ref(),
+                );
+                on_snap.forget();
+                return Self { es: Some(es) };
+            }
+        }
+        let _ = runtime;
+        Self {
+            #[cfg(target_arch = "wasm32")]
+            es: None,
+        }
+    }
+}
+
+impl Drop for DesktopRuntimeSubscription {
+    fn drop(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        if let Some(es) = &self.es {
+            es.close();
+        }
+    }
 }
 
 /// Placeholder string for unread/withheld data fields.

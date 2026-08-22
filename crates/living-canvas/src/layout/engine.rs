@@ -11,6 +11,7 @@ use crate::layout::{
     migration::{CanvasLayoutV8, from_v8},
     model::{ArrangementMode, DesktopItem, DesktopItemId, Rect, UsableViewport},
     placement::PlacementResolver,
+    relations::DesktopRelationshipGraph,
     snap::{SnapResult, compute_snap},
 };
 
@@ -31,7 +32,7 @@ pub struct DesktopLayout {
 
 impl Default for DesktopLayout {
     fn default() -> Self {
-        from_v8(&CanvasLayoutV8::default())
+        Self::canonical(None)
     }
 }
 
@@ -44,6 +45,48 @@ impl DesktopLayout {
             cards: Vec::new(),
             decks: Vec::new(),
         }
+    }
+
+    /// Construct the canonical Desktop layout containing all 11 system cards in Home arrangement.
+    #[must_use]
+    pub fn canonical(viewport: Option<UsableViewport>) -> Self {
+        let mut layout = Self::new();
+        let canonical_cards = [
+            CardId::Identity,
+            CardId::Session,
+            CardId::Capabilities,
+            CardId::Journal,
+            CardId::Lifecycle,
+            CardId::Commitments,
+            CardId::SelfModel,
+            CardId::Attention,
+            CardId::Beliefs,
+            CardId::Perception,
+            CardId::Context,
+        ];
+        for (idx, card_id) in canonical_cards.iter().enumerate() {
+            let spec = card_id.spec();
+            let z = u32::try_from(idx + 1).unwrap_or(1);
+            layout.cards.push(CardInstance {
+                id: *card_id,
+                geometry: CardGeometry {
+                    x: 0.0,
+                    y: 0.0,
+                    width: spec.default_size.0,
+                    height: spec.default_size.1,
+                    z,
+                },
+                presentation: CardPresentation::default(),
+            });
+        }
+        layout.apply_arrangement(ArrangementMode::Home, viewport);
+        layout
+    }
+
+    /// Reset the desktop to the canonical set of 11 system cards in Home arrangement,
+    /// removing all temporary tool cards and dissolving all decks.
+    pub fn reset_desktop(&mut self, viewport: Option<UsableViewport>) {
+        *self = Self::canonical(viewport);
     }
 
     /// Return all active top-level spatial items on the desktop:
@@ -710,22 +753,7 @@ impl DesktopLayout {
         let start_x = 40.0;
         let start_y = 40.0;
 
-        // Categorize into 5 causal layers
-        let item_layer = |item: &DesktopItem| -> usize {
-            match &item.id {
-                DesktopItemId::Card(id) => match id {
-                    CardId::Identity | CardId::Session | CardId::Perception | CardId::Lifecycle => {
-                        0
-                    }
-                    CardId::Capabilities | CardId::Journal => 1,
-                    CardId::Context | CardId::Beliefs => 2,
-                    CardId::Commitments | CardId::Attention | CardId::SelfModel => 3,
-                    _ => 4, // Tool cards
-                },
-                DesktopItemId::Deck(_) => 1,
-            }
-        };
-
+        // Categorize items into 5 causal layers using DesktopRelationshipGraph
         let mut layer_items: [Vec<DesktopItem>; 5] = [
             Vec::new(),
             Vec::new(),
@@ -736,8 +764,8 @@ impl DesktopLayout {
 
         for item in items {
             if !item.is_pinned() {
-                let l = item_layer(&item);
-                layer_items[l].push(item);
+                let l = DesktopRelationshipGraph::layer_for_item(&item, self);
+                layer_items[l.min(4)].push(item);
             }
         }
 

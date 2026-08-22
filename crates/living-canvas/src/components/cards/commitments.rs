@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Commitments card component representing Intention1 open obligations.
+//! Commitments card and content component representing Intention1 open obligations.
 
 use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
@@ -14,6 +14,49 @@ use crate::{
     interaction::{DragState, ResizeState},
     state::RuntimeState,
 };
+
+/// Commitments domain content presentation.
+#[component]
+pub fn CommitmentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+
+    let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
+    let commitments_label = move || match mind() {
+        None => "Intention1 not read".to_owned(),
+        Some(m) if m.commitments.knowledge != KnowledgeState::Known => {
+            "Intention1 not read".to_owned()
+        }
+        Some(m) => match m.commitments.open_count.unwrap_or_default() {
+            0 => "No open commitments".to_owned(),
+            1 => "1 open commitment".to_owned(),
+            count => format!("{count} open commitments"),
+        },
+    };
+
+    view! {
+        <div class="commitments-card-body">
+            <div class="commitments-meta-label">
+                <strong>{commitments_label}</strong>
+            </div>
+            <For
+                each=commitments
+                key=|commitment| commitment.id.clone()
+                children=move |commitment| {
+                    view! {
+                        <span class="check-row">
+                            <b>{commitment.description}</b>
+                            <i>{commitment.trigger}</i>
+                        </span>
+                    }
+                }
+            />
+            <span class="panel-link">"Intention1 holds these until they are closed"</span>
+        </div>
+    }
+}
 
 /// Commitments cognitive card component.
 #[component]
@@ -30,7 +73,6 @@ pub fn CommitmentsCard(
         RuntimeState::Loading | RuntimeState::Error(_) => None,
     };
 
-    let commitments = move || mind().map_or_else(Vec::new, |m| m.commitments.open);
     let commitments_label = move || match mind() {
         None => "Intention1 not read".to_owned(),
         Some(m) if m.commitments.knowledge != KnowledgeState::Known => {
@@ -66,22 +108,7 @@ pub fn CommitmentsCard(
             kicker_icon=Arc::new(|| view! { <ListChecks size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <div class="commitments-meta-label">
-                <strong>{commitments_label}</strong>
-            </div>
-            <For
-                each=commitments
-                key=|commitment| commitment.id.clone()
-                children=move |commitment| {
-                    view! {
-                        <span class="check-row">
-                            <b>{commitment.description}</b>
-                            <i>{commitment.trigger}</i>
-                        </span>
-                    }
-                }
-            />
-            <span class="panel-link">"Intention1 holds these until they are closed"</span>
+            <CommitmentsContent runtime=runtime />
         </CardFrame>
     }
 }

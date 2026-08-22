@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Attention card component representing Workspace1 Global Workspace Theory attention focus.
+//! Attention card and content component representing Workspace1 Global Workspace Theory attention focus.
 
 use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
@@ -15,16 +15,9 @@ use crate::{
     state::{RuntimeState, unread},
 };
 
-/// Attention cognitive card component.
+/// Attention domain content presentation.
 #[component]
-pub fn AttentionCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-    runtime: RwSignal<RuntimeState>,
-) -> impl IntoView {
+pub fn AttentionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
         RuntimeState::Loading | RuntimeState::Error(_) => None,
@@ -56,6 +49,42 @@ pub fn AttentionCard(
         }
     };
 
+    view! {
+        <div class="attention-card-body">
+            <strong>"Attention"</strong>
+            <span class="attention-focus">{attention_focus}</span>
+            <span class="row"><b>"Salience"</b><i>{attention_salience}</i></span>
+            <span class="row"><b>"Organs"</b><i>{attention_organs}</i></span>
+        </div>
+    }
+}
+
+/// Attention cognitive card component.
+#[component]
+pub fn AttentionCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+    runtime: RwSignal<RuntimeState>,
+) -> impl IntoView {
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+
+    let attention_focus = move || match mind() {
+        None => "Workspace1 not read".to_owned(),
+        Some(m) if m.attention.knowledge != KnowledgeState::Known => {
+            "Workspace1 not read".to_owned()
+        }
+        Some(m) => m
+            .attention
+            .focus
+            .unwrap_or_else(|| "Nothing holds focus".to_owned()),
+    };
+
     let collapsed = move || {
         let focus = attention_focus();
         view! {
@@ -79,10 +108,7 @@ pub fn AttentionCard(
             kicker_icon=Arc::new(|| view! { <Map size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <strong>"Attention"</strong>
-            <span class="attention-focus">{attention_focus}</span>
-            <span class="row"><b>"Salience"</b><i>{attention_salience}</i></span>
-            <span class="row"><b>"Organs"</b><i>{attention_organs}</i></span>
+            <AttentionContent runtime=runtime />
         </CardFrame>
     }
 }

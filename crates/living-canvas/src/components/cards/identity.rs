@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Identity1 card component representing subject continuity and provenance.
+//! Identity1 card and content component representing subject continuity and provenance.
 
 use std::sync::Arc;
 use leptos::prelude::*;
@@ -14,16 +14,9 @@ use crate::{
     state::{RuntimeState, unread},
 };
 
-/// Identity1 cognitive card component.
+/// Identity1 domain content presentation.
 #[component]
-pub fn IdentityCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-    runtime: RwSignal<RuntimeState>,
-) -> impl IntoView {
+pub fn IdentityContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
         RuntimeState::Loading | RuntimeState::Error(_) => None,
@@ -54,6 +47,36 @@ pub fn IdentityCard(
             .unwrap_or_else(unread)
     };
 
+    view! {
+        <div class="identity-card-body">
+            <strong>"Subject continuity"</strong>
+            <span class="identity-digest">{identity_id}</span>
+            <span class="identity-badges"><i>{identity_sessions}" sessions"</i><i>{identity_age}</i></span>
+            <span class="identity-meta">"Origin "{identity_origin}" · "{identity_architecture}</span>
+        </div>
+    }
+}
+
+/// Identity1 cognitive card component.
+#[component]
+pub fn IdentityCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+    runtime: RwSignal<RuntimeState>,
+) -> impl IntoView {
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+    let identity_id = move || {
+        mind()
+            .and_then(|m| m.identity.identity_id)
+            .unwrap_or_else(unread)
+    };
+
     let collapsed = move || {
         let id = identity_id();
         view! {
@@ -77,10 +100,7 @@ pub fn IdentityCard(
             kicker_icon=Arc::new(|| view! { <FileCheck size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <strong>"Subject continuity"</strong>
-            <span class="identity-digest">{identity_id}</span>
-            <span class="identity-badges"><i>{identity_sessions}" sessions"</i><i>{identity_age}</i></span>
-            <span class="identity-meta">"Origin "{identity_origin}" · "{identity_architecture}</span>
+            <IdentityContent runtime=runtime />
         </CardFrame>
     }
 }

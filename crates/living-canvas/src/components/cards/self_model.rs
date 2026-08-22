@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Self-model card component representing Self1 autobiographical assessment and narration.
+//! Self-model card and content component representing Self1 autobiographical assessment and narration.
 
 use std::sync::Arc;
 use leptos::prelude::*;
@@ -14,16 +14,9 @@ use crate::{
     state::{RuntimeState, unread},
 };
 
-/// Self-model cognitive card component.
+/// SelfModel domain content presentation.
 #[component]
-pub fn SelfModelCard(
-    layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
-    dragging: RwSignal<Option<DragState>>,
-    resizing: RwSignal<Option<ResizeState>>,
-    runtime: RwSignal<RuntimeState>,
-) -> impl IntoView {
+pub fn SelfModelContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let mind = move || match runtime.get() {
         RuntimeState::Ready { mind, .. } => mind,
         RuntimeState::Loading | RuntimeState::Error(_) => None,
@@ -42,6 +35,38 @@ pub fn SelfModelCard(
     let self_settled = move || {
         mind()
             .and_then(|m| m.self_model.settled_predictions)
+            .map_or_else(unread, |value| value.to_string())
+    };
+
+    view! {
+        <div class="self-model-card-body">
+            <strong>"Self-assessment"</strong>
+            <p class="self-narration">{self_narration}</p>
+            <span class="row"><b>"Open obligations"</b><i>{self_open_intentions}</i></span>
+            <span class="row"><b>"Settled predictions"</b><i>{self_settled}</i></span>
+            <span class="panel-link">"Composed by Self1, not by this page"</span>
+        </div>
+    }
+}
+
+/// Self-model cognitive card component.
+#[component]
+pub fn SelfModelCard(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+    set_selected: WriteSignal<&'static str>,
+    dragging: RwSignal<Option<DragState>>,
+    resizing: RwSignal<Option<ResizeState>>,
+    runtime: RwSignal<RuntimeState>,
+) -> impl IntoView {
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+
+    let self_open_intentions = move || {
+        mind()
+            .and_then(|m| m.self_model.open_intentions)
             .map_or_else(unread, |value| value.to_string())
     };
 
@@ -68,11 +93,7 @@ pub fn SelfModelCard(
             kicker_icon=Arc::new(|| view! { <Sparkles size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <strong>"Self-assessment"</strong>
-            <p class="self-narration">{self_narration}</p>
-            <span class="row"><b>"Open obligations"</b><i>{self_open_intentions}</i></span>
-            <span class="row"><b>"Settled predictions"</b><i>{self_settled}</i></span>
-            <span class="panel-link">"Composed by Self1, not by this page"</span>
+            <SelfModelContent runtime=runtime />
         </CardFrame>
     }
 }

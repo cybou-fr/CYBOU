@@ -1,13 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! SVG relationship connection line between dependent cognitive cards.
+//! SVG relationship connection line and graph layer between dependent cognitive cards.
 
 use leptos::prelude::*;
 
-use crate::{CardId, DesktopLayout, interaction::relationship_points};
+use crate::{
+    CardId, DesktopLayout,
+    interaction::relationship_points,
+    layout::relations::{DesktopRelationshipGraph, Relationship},
+};
 
-/// SVG relationship edge component.
+/// SVG relationship edge component connecting two cards.
 #[component]
 pub fn RelationshipEdge(
     layout: RwSignal<DesktopLayout>,
@@ -36,5 +40,30 @@ pub fn RelationshipEdge(
                 text-anchor="middle"
             >{label}</text>
         </g>
+    }
+}
+
+/// Full SVG layer rendering all canonical semantic relationship connections.
+#[component]
+pub fn RelationshipsLayer(
+    layout: RwSignal<DesktopLayout>,
+    selected: ReadSignal<&'static str>,
+) -> impl IntoView {
+    let relationships = DesktopRelationshipGraph::canonical();
+    view! {
+        <svg class="relationships" aria-hidden="true">
+            {relationships.iter().map(|rel: &Relationship| {
+                view! {
+                    <RelationshipEdge
+                        layout=layout
+                        selected=selected
+                        from=rel.from
+                        to=rel.to
+                        label=rel.label
+                        amber=rel.amber
+                    />
+                }
+            }).collect_view()}
+        </svg>
     }
 }

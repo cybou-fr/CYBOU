@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Beliefs card component representing Epistemic1 derived beliefs and validity.
+//! Beliefs card and content component representing Epistemic1 derived beliefs and validity.
 
 use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
@@ -14,6 +14,49 @@ use crate::{
     interaction::{DragState, ResizeState},
     state::RuntimeState,
 };
+
+/// Beliefs domain content presentation.
+#[component]
+pub fn BeliefsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
+    let mind = move || match runtime.get() {
+        RuntimeState::Ready { mind, .. } => mind,
+        RuntimeState::Loading | RuntimeState::Error(_) => None,
+    };
+
+    let beliefs = move || mind().map_or_else(Vec::new, |m| m.beliefs.beliefs);
+    let beliefs_label = move || match mind() {
+        None => "Epistemic1 not read".to_owned(),
+        Some(m) if m.beliefs.knowledge != KnowledgeState::Known => "Epistemic1 not read".to_owned(),
+        Some(m) => match m.beliefs.beliefs.len() {
+            0 => "Believes nothing yet".to_owned(),
+            1 => "1 belief".to_owned(),
+            count => format!("{count} beliefs"),
+        },
+    };
+
+    view! {
+        <div class="beliefs-card-body">
+            <strong>{beliefs_label}</strong>
+            <div class="belief-list">
+                <For
+                    each=beliefs
+                    key=|belief| belief.subject.clone()
+                    children=move |belief| {
+                        let observed = belief.status == "observed";
+                        view! {
+                            <span class:observed=observed class="belief-line">
+                                <b>{belief.subject}</b>
+                                <span class="belief-value">{belief.value}</span>
+                                <i>{belief.status}</i>
+                            </span>
+                        }
+                    }
+                />
+            </div>
+            <span class="panel-link">"A belief and its validity are separate facts"</span>
+        </div>
+    }
+}
 
 /// Beliefs cognitive card component.
 #[component]
@@ -30,7 +73,6 @@ pub fn BeliefsCard(
         RuntimeState::Loading | RuntimeState::Error(_) => None,
     };
 
-    let beliefs = move || mind().map_or_else(Vec::new, |m| m.beliefs.beliefs);
     let beliefs_label = move || match mind() {
         None => "Epistemic1 not read".to_owned(),
         Some(m) if m.beliefs.knowledge != KnowledgeState::Known => "Epistemic1 not read".to_owned(),
@@ -64,24 +106,7 @@ pub fn BeliefsCard(
             kicker_icon=Arc::new(|| view! { <Sparkles size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <strong>{beliefs_label}</strong>
-            <div class="belief-list">
-                <For
-                    each=beliefs
-                    key=|belief| belief.subject.clone()
-                    children=move |belief| {
-                        let observed = belief.status == "observed";
-                        view! {
-                            <span class:observed=observed class="belief-line">
-                                <b>{belief.subject}</b>
-                                <span class="belief-value">{belief.value}</span>
-                                <i>{belief.status}</i>
-                            </span>
-                        }
-                    }
-                />
-            </div>
-            <span class="panel-link">"A belief and its validity are separate facts"</span>
+            <BeliefsContent runtime=runtime />
         </CardFrame>
     }
 }
