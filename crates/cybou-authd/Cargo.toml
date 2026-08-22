@@ -13,7 +13,7 @@ repository.workspace = true
 [dependencies]
 ciborium.workspace = true
 serde.workspace = true
-tokio = { workspace = true, features = ["io-util"] }
+tokio = { workspace = true, features = ["io-util", "sync"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 pam = "0.8.0"

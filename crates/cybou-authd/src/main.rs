@@ -21,16 +21,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(unix)]
 mod unix {
-    use std::{os::unix::fs::PermissionsExt, path::Path};
+    use std::{os::unix::fs::PermissionsExt, path::Path, sync::Arc, time::Instant};
 
-    use cybou_authd::{ACCESS_GROUP, Answer, MAX_REQUEST_BYTES, Request};
-    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use cybou_authd::{
+        ACCESS_GROUP, Answer, MAX_CONCURRENT_ATTEMPTS, MAX_REQUEST_BYTES, MAX_USERNAME_BYTES,
+        Request, Throttle,
+    };
+    use tokio::{
+        io::{AsyncReadExt as _, AsyncWriteExt as _},
+        sync::Semaphore,
+    };
 
     /// Where the gateway looks for the helper.
     const SOCKET_PATH: &str = "/run/cybou/auth.sock";
 
-    /// How long a failed attempt is held before answering.
-    const FAILURE_DELAY: std::time::Duration = std::time::Duration::from_millis(750);
+    /// How long the helper will wait for a caller to finish sending its request.
+    ///
+    /// A connection that opens and then says nothing would otherwise hold a task forever, and
+    /// enough of them would be a way to exhaust the helper without ever guessing a password.
+    const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
     pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!("[cybou-authd] Starting the credential helper");
@@ -47,20 +56,35 @@ mod unix {
         println!("[cybou-authd] Listening on {}", path.display());
         println!("[cybou-authd] Only members of {ACCESS_GROUP} may authenticate");
 
+        // One throttle and one gate for the whole process. Both are shared deliberately: backoff
+        // that a caller could reset by reconnecting would measure nothing, and a limit that were
+        // per-connection would be no limit at all.
+        let throttle = Arc::new(Throttle::new());
+        let attempts = Arc::new(Semaphore::new(MAX_CONCURRENT_ATTEMPTS));
+
         loop {
             let Ok((mut stream, _)) = listener.accept().await else {
                 continue;
             };
+            let throttle = Arc::clone(&throttle);
+            let attempts = Arc::clone(&attempts);
             tokio::spawn(async move {
                 let mut buffer = Vec::new();
                 let mut limited = (&mut stream).take(MAX_REQUEST_BYTES as u64);
-                if limited.read_to_end(&mut buffer).await.is_err() {
+                let read = tokio::time::timeout(READ_TIMEOUT, limited.read_to_end(&mut buffer));
+                if !matches!(read.await, Ok(Ok(_))) {
                     return;
                 }
                 let Ok(request) = ciborium::from_reader::<Request, _>(buffer.as_slice()) else {
                     return;
                 };
-                let authenticated = decide(request).await;
+                // The permit is taken here rather than at accept, and held across the delay below.
+                // Reading is cheap and already bounded; deciding is what must queue, because a
+                // delay that runs in parallel with every other delay costs an attacker nothing.
+                let Ok(_permit) = attempts.acquire().await else {
+                    return;
+                };
+                let authenticated = decide(request, &throttle).await;
 
                 let mut encoded = Vec::new();
                 if ciborium::into_writer(&Answer { authenticated }, &mut encoded).is_ok() {
@@ -71,22 +95,28 @@ mod unix {
         }
     }
 
-    async fn decide(request: Request) -> bool {
-        if request.username.is_empty() || request.password.is_empty() {
-            tokio::time::sleep(FAILURE_DELAY).await;
-            return false;
-        }
-
-        if !in_access_group(&request.username) {
-            tokio::time::sleep(FAILURE_DELAY).await;
-            return false;
-        }
-
+    /// Whether this attempt is accepted, and what it costs if it is not.
+    ///
+    /// Every path that answers `false` leaves through the same delay, so the reason for a refusal
+    /// — no name, an account outside the group, a wrong password — is not readable from how long
+    /// the answer took.
+    async fn decide(request: Request, throttle: &Throttle) -> bool {
         let username = request.username.clone();
+
+        if username.is_empty()
+            || username.len() > MAX_USERNAME_BYTES
+            || request.password.is_empty()
+            || !in_access_group(&username)
+        {
+            refuse(throttle, &username).await;
+            return false;
+        }
+
         let password = request.password.clone();
+        let for_pam = username.clone();
         drop(request);
         let authenticated = tokio::task::spawn_blocking(move || {
-            let decision = authenticate(&username, &password);
+            let decision = authenticate(&for_pam, &password);
             let mut bytes = password.into_bytes();
             bytes.fill(0);
             decision
@@ -95,11 +125,23 @@ mod unix {
         .unwrap_or(false);
 
         if authenticated {
+            throttle.record_success(&username);
             true
         } else {
-            tokio::time::sleep(FAILURE_DELAY).await;
+            refuse(throttle, &username).await;
             false
         }
+    }
+
+    /// Hold a failed attempt for what this account currently owes, then count it.
+    ///
+    /// The penalty is read before the failure is recorded so that the first wrong password costs
+    /// the floor rather than double it: the delay is what the attempt earned on arrival.
+    async fn refuse(throttle: &Throttle, username: &str) {
+        let now = Instant::now();
+        let penalty = throttle.penalty(username, now);
+        throttle.record_failure(username, now);
+        tokio::time::sleep(penalty).await;
     }
 
     #[cfg(target_os = "linux")]
