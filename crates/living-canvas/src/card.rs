@@ -35,6 +35,8 @@ pub enum CardId {
     Perception,
     /// Context1 associative context graph.
     Context,
+    /// What this reader was supplied, and what was kept from them (ADR-0030 B1, B6).
+    Disclosure,
     /// Dynamic bounded CYBOU Shell instance (Zone 3 `DemoReadOnly` capability).
     Shell(u32),
     /// Dynamic bounded File Manager instance (Zone 3 Read-Only storage).
@@ -44,8 +46,8 @@ pub enum CardId {
 }
 
 impl CardId {
-    /// All 11 canonical System cards.
-    pub const ALL_SYSTEM_CARDS: [Self; 11] = [
+    /// All 12 canonical System cards.
+    pub const ALL_SYSTEM_CARDS: [Self; 12] = [
         Self::Identity,
         Self::Session,
         Self::Capabilities,
@@ -57,6 +59,7 @@ impl CardId {
         Self::Beliefs,
         Self::Perception,
         Self::Context,
+        Self::Disclosure,
     ];
 
     /// Canonical string key for selection, routing, and legacy mapping.
@@ -74,6 +77,7 @@ impl CardId {
             Self::Beliefs => "beliefs",
             Self::Perception => "perception",
             Self::Context => "context",
+            Self::Disclosure => "disclosure",
             Self::Shell(_) => "shell",
             Self::FileManager(_) => "files",
             Self::JournalFeed(_) => "journal-feed",
@@ -95,6 +99,7 @@ impl CardId {
             Self::Beliefs => "Beliefs",
             Self::Perception => "Perception",
             Self::Context => "Context",
+            Self::Disclosure => "Disclosure",
             Self::Shell(_) => "CYBOU Shell",
             Self::FileManager(_) => "File Manager",
             Self::JournalFeed(_) => "Event Stream",
@@ -116,6 +121,7 @@ impl CardId {
             "beliefs" => Some(Self::Beliefs),
             "perception" => Some(Self::Perception),
             "context" => Some(Self::Context),
+            "disclosure" => Some(Self::Disclosure),
             "shell" => Some(Self::Shell(0)),
             "files" => Some(Self::FileManager(0)),
             "journal-feed" => Some(Self::JournalFeed(0)),
@@ -139,6 +145,7 @@ impl CardId {
                 | Self::Beliefs
                 | Self::Perception
                 | Self::Context
+                | Self::Disclosure
         )
     }
 
@@ -278,6 +285,21 @@ impl CardId {
                 default_size: (330.0, 200.0),
                 min_size: (260.0, 160.0),
                 max_size: (550.0, 500.0),
+            },
+            // Wider than the other system cards, and not closable. What was withheld is a list of
+            // subjects and reasons that has to stay readable as a list, and a surface a person can
+            // dismiss is one they can be encouraged to dismiss.
+            Self::Disclosure => CardSpec {
+                kind: CardKind::System,
+                singleton: true,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: false,
+                deckable: true,
+                default_size: (360.0, 260.0),
+                min_size: (280.0, 180.0),
+                max_size: (620.0, 620.0),
             },
             Self::Shell(_) => CardSpec {
                 kind: CardKind::Tool,
@@ -444,6 +466,37 @@ impl CardInstance {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_system_card_survives_a_round_trip_through_its_key() {
+        // The key is what a saved layout and a command palette both name a card by. A card whose
+        // key does not resolve back is a card that silently disappears from a restored desktop.
+        for card_id in CardId::ALL_SYSTEM_CARDS {
+            assert_eq!(
+                CardId::from_key(card_id.key()),
+                Some(card_id),
+                "{} did not survive its key",
+                card_id.title()
+            );
+            assert!(
+                card_id.is_system(),
+                "{} is not a system card",
+                card_id.key()
+            );
+        }
+    }
+
+    #[test]
+    fn a_layout_saved_before_a_card_existed_gains_it_rather_than_losing_the_card() {
+        // The disclosure card was added after layouts had already been saved. A desktop restored
+        // from one of those must end up with it, or the surface exists and nobody sees it.
+        let mut older = crate::DesktopLayout::canonical(None);
+        older.cards.retain(|card| card.id != CardId::Disclosure);
+        assert!(!older.cards.iter().any(|card| card.id == CardId::Disclosure));
+
+        older.validate_and_normalize();
+        assert!(older.cards.iter().any(|card| card.id == CardId::Disclosure));
+    }
 
     #[test]
     #[allow(clippy::float_cmp)]

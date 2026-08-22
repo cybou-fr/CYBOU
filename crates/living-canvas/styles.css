@@ -169,6 +169,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .concept-line b { color: #dfe8ed; font-weight: 500; }
 .concept-line i { color: var(--accent); font-style: normal; font-size: 10px; }
 .concept-line small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+/* Disclosure: what was supplied to this reader, and what was kept from them. */
+.disclosure-card-body { display: grid; gap: 5px; }
+.disclosure-provenance { color: var(--muted); font-size: 11px; }
+.disclosure-consumer { color: var(--muted); font-size: 10px; word-break: break-all; }
+.disclosure-withheld-label { margin-top: 4px; font-size: 12px; }
+.disclosure-subject-notice { color: var(--muted); font-size: 10px; }
+.withheld-list { display: grid; gap: 6px; max-height: 120px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
+.withheld-line { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 11px; }
+.withheld-line b { color: #dfe8ed; font-weight: 500; }
+/* A refusal whose subject could not be named is still a row, and reads as one. */
+.withheld-line b.withheld-unnamed { color: var(--muted); font-style: italic; font-weight: 400; }
+.withheld-line small { color: #b08a3a; font-size: 10px; white-space: nowrap; }
 .attention-focus { padding: 8px 10px; border: 1px solid rgba(112,225,200,.28); border-radius: 8px; color: var(--accent); font-size: 11px; word-break: break-all; }
 .row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
 .row b, .check-row b { color: #dfe8ed; font-weight: 500; }

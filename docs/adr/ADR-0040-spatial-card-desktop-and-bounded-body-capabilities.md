@@ -69,7 +69,7 @@ pub struct CardPresentation {
 ```
 
 Cards are classified into three architectural categories (`CardKind`):
-- **System Cards** (11 canonical singleton projections: `Identity`, `Session`, `Capabilities`, `Journal`, `Lifecycle`, `Commitments`, `SelfModel`, `Attention`, `Beliefs`, `Perception`, `Context`). System cards are singleton, movable, resizable, collapsible, deckable, and cannot be destroyed.
+- **System Cards** (12 canonical singleton projections: `Identity`, `Session`, `Capabilities`, `Journal`, `Lifecycle`, `Commitments`, `SelfModel`, `Attention`, `Beliefs`, `Perception`, `Context`, `Disclosure`). System cards are singleton, movable, resizable, collapsible, deckable, and cannot be destroyed. `Disclosure` was added on 2026-08-22 and is the one card that is not a projection of an organ: it shows what the reader in front of it was supplied and what was kept from them (ADR-0030 B1, B6).
 - **Tool Cards** (e.g. `CYBOU Shell`, Inspector, Debugger). Ephemeral or multi-instance, closable, resizable, bounded to specific capability profiles.
 - **Ephemeral Cards** (e.g. search previews, temporary diffs, inspection overlays). Transient life-cycle, closable, discardable.
 

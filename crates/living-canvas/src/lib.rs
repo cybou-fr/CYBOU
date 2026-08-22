@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
-    MindProjection, SessionProjection, ShellExecResponse, SnapshotProjection,
+    DisclosureProjection, MindProjection, SessionProjection, ShellExecResponse, SnapshotProjection,
 };
 use thiserror::Error;
 
@@ -72,6 +72,16 @@ pub trait MindClient {
     /// Returns [`ClientError`] when the gateway cannot produce the projection.
     async fn mind(&self) -> Result<MindProjection, ClientError>;
 
+    /// Return what this reader was supplied, and what was kept from them.
+    ///
+    /// Read after the projection it describes, never before: a delivery is recorded when it
+    /// happens, so asking first would report the previous one as if it were this one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the gateway cannot produce the projection.
+    async fn disclosure(&self) -> Result<DisclosureProjection, ClientError>;
+
     /// Execute a bounded Shell capability inside the Body host sandbox.
     ///
     /// # Errors
@@ -86,6 +96,7 @@ pub struct MockMindClient {
     session: SessionProjection,
     snapshot: SnapshotProjection,
     mind: Option<MindProjection>,
+    disclosure: Option<DisclosureProjection>,
 }
 
 impl MockMindClient {
@@ -96,6 +107,7 @@ impl MockMindClient {
             session,
             snapshot,
             mind: None,
+            disclosure: None,
         }
     }
 
@@ -103,6 +115,16 @@ impl MockMindClient {
     #[must_use]
     pub fn with_mind(mut self, mind: MindProjection) -> Self {
         self.mind = Some(mind);
+        self
+    }
+
+    /// Attach a disclosure record to a mock that would otherwise report none.
+    ///
+    /// A mock without one reports that nothing has been supplied, which is the correct answer for
+    /// a client that has never read a projection.
+    #[must_use]
+    pub fn with_disclosure(mut self, disclosure: DisclosureProjection) -> Self {
+        self.disclosure = Some(disclosure);
         self
     }
 
@@ -140,6 +162,27 @@ impl MindClient for MockMindClient {
         self.mind.clone().ok_or_else(|| {
             ClientError::GatewayRequest("mock client holds no owner projection".into())
         })
+    }
+
+    async fn disclosure(&self) -> Result<DisclosureProjection, ClientError> {
+        // A mock that was given none reports a delivery that has not happened, rather than
+        // inventing an empty one — the two are different facts to the surface that shows them.
+        Ok(self
+            .disclosure
+            .clone()
+            .unwrap_or_else(|| DisclosureProjection {
+                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                consumer_id: self.session.consumer_id.clone(),
+                external_boundary: true,
+                retains: false,
+                supplied: 0,
+                accounted_for: 0,
+                provenance_count: 0,
+                items: Vec::new(),
+                withheld: Vec::new(),
+                subjects_visible: false,
+                delivered: false,
+            }))
     }
 
     async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError> {

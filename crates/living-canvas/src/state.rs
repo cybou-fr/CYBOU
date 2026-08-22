@@ -5,7 +5,8 @@
 
 use cybou_protocol::{CapabilityState, KnowledgeState};
 use cybou_web_contracts::{
-    Freshness, MindProjection, SessionMode, SessionProjection, SnapshotProjection,
+    DisclosureProjection, Freshness, MindProjection, SessionMode, SessionProjection,
+    SnapshotProjection,
 };
 use leptos::prelude::RwSignal;
 
@@ -24,6 +25,11 @@ pub enum RuntimeState {
         snapshot: SnapshotProjection,
         /// Full Mind owner projection if available.
         mind: Option<MindProjection>,
+        /// What this reader was last supplied, and what was kept from them.
+        ///
+        /// `None` means the gateway could not be asked, which is a different fact from a delivery
+        /// that has not happened — the projection carries that one itself.
+        disclosure: Option<DisclosureProjection>,
     },
     /// Connection or protocol error.
     Error(String),
@@ -51,25 +57,18 @@ impl DesktopRuntimeSubscription {
                         let Some(data) = event.data().as_string() else {
                             return;
                         };
-                        let Ok(new_snapshot) =
-                            serde_json::from_str::<SnapshotProjection>(&data)
+                        let Ok(new_snapshot) = serde_json::from_str::<SnapshotProjection>(&data)
                         else {
                             return;
                         };
                         runtime.update(|state| {
-                            if let RuntimeState::Ready {
-                                snapshot,
-                                ..
-                            } = state
-                            {
+                            if let RuntimeState::Ready { snapshot, .. } = state {
                                 *snapshot = new_snapshot;
                             }
                         });
                     });
-                let _ = es.add_event_listener_with_callback(
-                    "snapshot",
-                    on_snap.as_ref().unchecked_ref(),
-                );
+                let _ = es
+                    .add_event_listener_with_callback("snapshot", on_snap.as_ref().unchecked_ref());
                 on_snap.forget();
                 return Self { es: Some(es) };
             }

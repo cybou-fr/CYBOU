@@ -5,7 +5,8 @@
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
-    MindProjection, SessionProjection, ShellExecRequest, ShellExecResponse, SnapshotProjection,
+    DisclosureProjection, MindProjection, SessionProjection, ShellExecRequest, ShellExecResponse,
+    SnapshotProjection,
 };
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
@@ -47,6 +48,10 @@ impl MindClient for GatewayMindClient {
 
     async fn mind(&self) -> Result<MindProjection, ClientError> {
         Self::get("/api/v1/mind").await
+    }
+
+    async fn disclosure(&self) -> Result<DisclosureProjection, ClientError> {
+        Self::get("/api/v1/disclosure").await
     }
 
     async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError> {

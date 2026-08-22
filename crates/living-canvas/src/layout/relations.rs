@@ -101,7 +101,9 @@ impl DesktopRelationshipGraph {
             CardId::Capabilities | CardId::Journal => 1,
             CardId::Context | CardId::Beliefs => 2,
             CardId::Commitments | CardId::Attention | CardId::SelfModel => 3,
-            _ => 4, // Tool cards (Shell, Files, Feed, etc.)
+            // Tool cards (Shell, Files, Feed), and Disclosure, which is a system card but not an
+            // organ: it describes what leaves, so it sits after everything that produces it.
+            _ => 4,
         }
     }
 

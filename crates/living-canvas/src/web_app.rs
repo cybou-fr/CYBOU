@@ -56,12 +56,16 @@ pub fn App() -> impl IntoView {
         }
         .await;
         let mind = client.mind().await.ok();
+        // Asked after the projection it describes. A delivery is recorded when it happens, so
+        // reading this first would report the previous delivery as though it were this one.
+        let disclosure = client.disclosure().await.ok();
         runtime.set(match result {
             Ok((session, snapshot)) => RuntimeState::Ready {
                 mode: session.mode,
                 session,
                 snapshot,
                 mind,
+                disclosure,
             },
             Err(error) => RuntimeState::Error(error.to_string()),
         });
@@ -101,8 +105,14 @@ pub fn App() -> impl IntoView {
                 event.prevent_default();
                 if let Some(bbox) = layout.get_untracked().bounding_rect() {
                     let (w, h) = (
-                        web_sys::window().and_then(|w| w.inner_width().ok()).and_then(|v| v.as_f64()).unwrap_or(1440.0),
-                        web_sys::window().and_then(|w| w.inner_height().ok()).and_then(|v| v.as_f64()).unwrap_or(900.0),
+                        web_sys::window()
+                            .and_then(|w| w.inner_width().ok())
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(1440.0),
+                        web_sys::window()
+                            .and_then(|w| w.inner_height().ok())
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(900.0),
                     );
                     let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
                     set_zoom.set(z);
@@ -111,18 +121,20 @@ pub fn App() -> impl IntoView {
                     set_zoom.set(1.0);
                     set_pan.set((0.0, 0.0));
                 }
-            } else if (event.ctrl_key() || event.meta_key()) && (event.key() == "=" || event.key() == "+") {
+            } else if (event.ctrl_key() || event.meta_key())
+                && (event.key() == "=" || event.key() == "+")
+            {
                 event.prevent_default();
                 set_zoom.update(|z| *z = (*z + 0.1).min(2.0));
-            } else if (event.ctrl_key() || event.meta_key()) && (event.key() == "-" || event.key() == "_") {
+            } else if (event.ctrl_key() || event.meta_key())
+                && (event.key() == "-" || event.key() == "_")
+            {
                 event.prevent_default();
                 set_zoom.update(|z| *z = (*z - 0.1).max(0.4));
             }
         });
-        let _ = window.add_event_listener_with_callback(
-            "keydown",
-            on_shortcut.as_ref().unchecked_ref(),
-        );
+        let _ = window
+            .add_event_listener_with_callback("keydown", on_shortcut.as_ref().unchecked_ref());
         on_shortcut.forget();
     }
 
