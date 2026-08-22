@@ -3,11 +3,7 @@
 
 //! Snapshot and Mind atomic projection route handlers.
 
-use axum::{
-    Json,
-    extract::State,
-    http::HeaderMap,
-};
+use axum::{Json, extract::State, http::HeaderMap};
 use cybou_web_contracts::{MindProjection, SnapshotProjection};
 
 use crate::state::{GatewayError, GatewayState, SNAPSHOT_BUDGET};

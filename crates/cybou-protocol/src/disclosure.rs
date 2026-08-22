@@ -96,16 +96,22 @@ pub struct Withheld {
 pub struct ContextDisclosedV1 {
     /// Who received it.
     pub destination: Destination,
-    /// The contributions the supplied items were derived from.
+    /// The distinct contributions the supplied items were derived from.
     ///
     /// Provenance rather than content: what was disclosed can be reconstructed from the Journal by
     /// anyone entitled to read it, and cannot be read out of this record by anyone who is not.
+    ///
+    /// A set of sources, and not on the same scale as `item_count`: one supplied belief can cite
+    /// hundreds of contributions, so this is routinely far the longer of the two. Until 2026-08-22
+    /// the paragraph below claimed the opposite relationship, and a surface built on that reading
+    /// reported ten items supplied and three thousand accounted for on a live deployment.
     pub items: Vec<Uuid>,
     /// How many items were supplied, including any whose provenance could not be established.
     ///
-    /// Separate from the length of `items` on purpose. A projection that lost track of where one of
-    /// its rows came from should say it supplied five things and can account for four, rather than
-    /// quietly claim it supplied four.
+    /// Neither bounds the other, and the length of `items` is not the count this should be read
+    /// against. What answers "supplied five, can account for four" is a count of items that named
+    /// at least one contribution, which this record does not carry; the gateway keeps it for the
+    /// surface that shows it.
     pub item_count: u32,
     /// What was held back, and why.
     pub withheld: Vec<Withheld>,

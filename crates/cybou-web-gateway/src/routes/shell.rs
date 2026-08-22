@@ -8,13 +8,16 @@ use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
 };
-use cybou_web_contracts::{
-    SessionMode, ShellExecRequest, ShellExecResponse, WEB_SCHEMA_V1,
-};
+use cybou_web_contracts::{ShellExecRequest, ShellExecResponse, WEB_SCHEMA_V1};
+use time::OffsetDateTime;
 
 use crate::state::{ErrorBody, GatewayState};
 
-/// Execute a sandboxed shell command.
+/// Execute a sandboxed shell command in the caller's own shell.
+///
+/// The shell a request drives is the one belonging to whoever sent it — a live session, or the
+/// desktop seat. Entitlement and identity are the same question here, so it is asked once: a
+/// caller who owns no shell is refused rather than falling back onto someone else's.
 ///
 /// # Errors
 ///
@@ -24,9 +27,7 @@ pub async fn shell_exec_handler(
     headers: HeaderMap,
     Json(payload): Json<ShellExecRequest>,
 ) -> Result<Json<ShellExecResponse>, (StatusCode, Json<ErrorBody>)> {
-    let is_authenticated =
-        state.session_for(&headers).is_some() || state.session.mode == SessionMode::LocalDesktop;
-    if !is_authenticated {
+    let Some(owner) = state.shell_owner(&headers) else {
         return Err((
             StatusCode::FORBIDDEN,
             Json(ErrorBody {
@@ -35,9 +36,10 @@ pub async fn shell_exec_handler(
                 retryable: false,
             }),
         ));
-    }
+    };
 
-    let mut engine = state.shell.lock().await;
+    let shell = state.shells.for_owner(&owner, OffsetDateTime::now_utc());
+    let mut engine = shell.lock().await;
     let output = engine.execute(&payload.command);
 
     Ok(Json(ShellExecResponse {

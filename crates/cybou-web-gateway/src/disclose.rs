@@ -50,6 +50,19 @@ impl Disclosures {
         }
     }
 
+    /// What this consumer was last recorded as being supplied, if anything ever was.
+    ///
+    /// `None` and an empty delivery are different answers and the caller must be able to tell them
+    /// apart: one says nothing has been supplied to this consumer, the other says something was
+    /// supplied and it was empty.
+    #[must_use]
+    pub fn last_for(&self, destination_id: &str) -> Option<Delivered> {
+        let last = self.last.lock().ok()?;
+        last.iter()
+            .find(|(id, _)| id == destination_id)
+            .map(|(_, delivered)| delivered.clone())
+    }
+
     /// The contribution to record for this delivery, or `None` when there is nothing new to say.
     ///
     /// `None` covers two cases that are the same fact: a consumer that keeps nothing and stays on
@@ -140,6 +153,7 @@ mod tests {
         Delivered {
             items: vec![Uuid::from_u128(1)],
             item_count: count,
+            accounted_for: count,
             withheld: vec![Withheld {
                 subject: Some("utterance".into()),
                 because: WithheldBecause::AboveConsumerTrust,

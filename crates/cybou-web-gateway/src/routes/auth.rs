@@ -9,11 +9,12 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use cybou_web_contracts::{SessionMode, SessionProjection};
+use cybou_web_contracts::{SessionMode, SessionProjection, WEB_SCHEMA_V1};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 use crate::access::{self, LoginOutcome, LoginRequest};
-use crate::state::GatewayState;
+use crate::shells::ShellOwner;
+use crate::state::{ErrorBody, GatewayState};
 
 /// Read back active session projection.
 pub async fn session_handler(
@@ -54,7 +55,19 @@ pub async fn login_handler(
             .into_response();
     }
 
-    let token = state.sessions.begin(&username, OffsetDateTime::now_utc());
+    let Some(token) = state.sessions.begin(&username, OffsetDateTime::now_utc()) else {
+        // Authentication succeeded and the session did not. Saying so plainly, and retryably, is
+        // the only honest answer: the alternative was a token that was not unpredictable.
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorBody {
+                schema_version: WEB_SCHEMA_V1,
+                error: "sessionCouldNotBeIssued",
+                retryable: true,
+            }),
+        )
+            .into_response();
+    };
     (
         StatusCode::OK,
         [(
@@ -79,6 +92,11 @@ pub async fn logout_handler(
         .and_then(access::token_in)
     {
         state.sessions.end(token);
+        // The shell goes with the session. Leaving it behind would keep a working directory for a
+        // token nobody holds, and hand it back if that token were ever issued again.
+        state
+            .shells
+            .end(&ShellOwner::Session(access::digest(token)));
     }
     (
         StatusCode::OK,

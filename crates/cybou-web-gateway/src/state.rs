@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::access::{self, CredentialVerifier, Session, Sessions};
 use crate::disclose::Disclosures;
+use crate::shells::{ShellOwner, Shells};
 
 /// Maximum time the gateway permits one Presence projection request to occupy.
 pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(1_500);
@@ -38,10 +39,22 @@ pub const MAX_CURSOR_BYTES: usize = 256;
 /// What one projection supplied, and what it held back.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Delivered {
-    /// The contributions the supplied items were derived from.
+    /// The distinct contributions the supplied items were derived from.
+    ///
+    /// A set of sources, not a count of items: one supplied belief can cite hundreds of
+    /// contributions, so this is routinely far longer than `item_count` and the two are not
+    /// comparable. Reading its length as "how many items are accounted for" is wrong, and was
+    /// wrong on a live deployment before the inspector made it visible: ten items supplied,
+    /// three thousand contributions cited.
     pub items: Vec<Uuid>,
     /// How many items were supplied, whether or not their provenance was known.
     pub item_count: u32,
+    /// How many of those items named at least one contribution they came from.
+    ///
+    /// This is the number `item_count` is meant to be read against. Where it is smaller,
+    /// something crossed the boundary that cannot say where it came from — a concept, today,
+    /// because a concept does not carry its evidence.
+    pub accounted_for: u32,
     /// What was held back, and why.
     pub withheld: Vec<cybou_protocol::disclosure::Withheld>,
 }
@@ -152,8 +165,8 @@ pub struct GatewayState {
     pub journal: Option<Arc<dyn DisclosureSink>>,
     /// Baseline session projection.
     pub session: SessionProjection,
-    /// Sandboxed shell engine instance.
-    pub shell: Arc<tokio::sync::Mutex<cybou_shelld::ShellEngine>>,
+    /// One sandboxed shell per session, rather than one for the whole process.
+    pub shells: Arc<Shells>,
 }
 
 impl GatewayState {
@@ -177,14 +190,21 @@ impl GatewayState {
     }
 
     /// Record that this consumer was supplied what the source just built, if that is new.
+    ///
+    /// What was supplied is remembered first and written second. Until 2026-08-22 the order was
+    /// the other way around and the write was a precondition: a deployment with no Journal sink
+    /// skipped the bookkeeping entirely, so the disclosure surface told the person nothing had
+    /// been supplied to them while it was supplying things. Having nowhere durable to write a
+    /// delivery is a reason to say the audit trail is incomplete, never a reason to answer as
+    /// though the delivery did not happen.
     pub async fn record_delivery(&self, destination: &Destination, delivered: &Delivered) {
-        let Some(journal) = &self.journal else {
-            return;
-        };
         let Some(record) =
             self.disclosures
                 .record_for(destination, delivered, OffsetDateTime::now_utc())
         else {
+            return;
+        };
+        let Some(journal) = &self.journal else {
             return;
         };
         if !journal.record(&record).await {
@@ -198,11 +218,37 @@ impl GatewayState {
     /// The session this request carries, if it carries a live one.
     #[must_use]
     pub fn session_for(&self, headers: &HeaderMap) -> Option<Session> {
-        let token = headers
+        let token = Self::token_in(headers)?;
+        self.sessions.resolve(token, OffsetDateTime::now_utc())
+    }
+
+    /// The session token this request carries, whether or not it names a live session.
+    fn token_in(headers: &HeaderMap) -> Option<&str> {
+        headers
             .get(axum::http::header::COOKIE)
             .and_then(|value| value.to_str().ok())
-            .and_then(access::token_in)?;
-        self.sessions.resolve(token, OffsetDateTime::now_utc())
+            .and_then(access::token_in)
+    }
+
+    /// Whose shell this request is entitled to drive, if it is entitled to one at all.
+    ///
+    /// A live session owns the shell named by its token. The desktop owns one shell because it is
+    /// one seat. Everything else owns nothing, which is what makes the refusal in the shell route
+    /// a refusal rather than a fallback onto somebody else's.
+    #[must_use]
+    pub fn shell_owner(&self, headers: &HeaderMap) -> Option<ShellOwner> {
+        if let Some(token) = Self::token_in(headers)
+            && self
+                .sessions
+                .resolve(token, OffsetDateTime::now_utc())
+                .is_some()
+        {
+            return Some(ShellOwner::Session(access::digest(token)));
+        }
+        if self.session.mode == SessionMode::LocalDesktop {
+            return Some(ShellOwner::LocalDesktop);
+        }
+        None
     }
 
     /// The source this request is entitled to.

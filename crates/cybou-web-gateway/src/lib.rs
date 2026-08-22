@@ -26,17 +26,19 @@ pub mod fixture;
 #[cfg(target_os = "linux")]
 pub mod presence_zbus;
 pub mod routes;
+pub mod shells;
 pub mod state;
 
 pub use access::{CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions};
 pub use disclose::Disclosures;
+pub use shells::{SHELL_IDLE_LIFETIME, ShellOwner, Shells, sandbox_root};
 pub use state::{
-    Delivered, DisclosureSink, EVENT_POLL_INTERVAL, GatewayError, PresenceSource,
-    SNAPSHOT_BUDGET, SessionContext,
+    Delivered, DisclosureSink, EVENT_POLL_INTERVAL, GatewayError, PresenceSource, SNAPSHOT_BUDGET,
+    SessionContext,
 };
 
 use routes::{
-    api_not_found, events_handler, login_handler, logout_handler, mind_handler,
+    api_not_found, disclosure_handler, events_handler, login_handler, logout_handler, mind_handler,
     session_handler, shell_exec_handler, snapshot_handler,
 };
 use state::GatewayState;
@@ -102,22 +104,43 @@ pub fn router_recording_disclosures(
     web_root: Option<PathBuf>,
     session_context: SessionContext,
 ) -> Router {
+    router_in_sandbox(
+        presence,
+        privileged,
+        verifier,
+        journal,
+        web_root,
+        session_context,
+        &shells::sandbox_root(),
+    )
+}
+
+/// Build the v1 router around a named sandbox root.
+///
+/// The public builders resolve the root from the deployment. This one is told, because a test must
+/// not reach into whatever sandbox the host happens to have: the deployed host has a real
+/// `/home/demo` that the build user cannot write to, and a test that wrote there passed on a
+/// developer machine and failed on the one that matters.
+///
+/// # Panics
+///
+/// If the sandbox the shell surface runs in cannot be created.
+pub(crate) fn router_in_sandbox(
+    presence: Arc<dyn PresenceSource>,
+    privileged: Option<Arc<dyn PresenceSource>>,
+    verifier: Option<Arc<dyn CredentialVerifier>>,
+    journal: Option<Arc<dyn DisclosureSink>>,
+    web_root: Option<PathBuf>,
+    session_context: SessionContext,
+    sandbox_path: &std::path::Path,
+) -> Router {
     let now = OffsetDateTime::now_utc();
     let expires_at = (now + TimeDuration::hours(8))
         .format(&Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into());
 
-    let default_jail = if std::path::Path::new("/home/demo").exists() {
-        std::path::PathBuf::from("/home/demo")
-    } else {
-        std::env::temp_dir().join(format!("cybou_sandbox_{}", std::process::id()))
-    };
-    let sandbox_path =
-        std::env::var("CYBOU_SHELL_JAIL").map_or(default_jail, std::path::PathBuf::from);
-    let jail = cybou_jailfs::JailFs::new(&sandbox_path).expect("initialize gateway sandbox jail");
-    let shell = Arc::new(tokio::sync::Mutex::new(cybou_shelld::ShellEngine::new(
-        jail,
-    )));
+    let jail = cybou_jailfs::JailFs::new(sandbox_path).expect("initialize gateway sandbox jail");
+    let shells = Arc::new(shells::Shells::new(jail));
 
     let state = GatewayState {
         presence,
@@ -133,7 +156,7 @@ pub fn router_recording_disclosures(
             consumer_id: session_context.consumer_id,
             expires_at,
         },
-        shell,
+        shells,
     };
 
     let app = Router::new()
@@ -143,6 +166,7 @@ pub fn router_recording_disclosures(
         .route("/api/v1/snapshot", get(snapshot_handler))
         .route("/api/v1/mind", get(mind_handler))
         .route("/api/v1/events", get(events_handler))
+        .route("/api/v1/disclosure", get(disclosure_handler))
         .route("/api/v1/shell/exec", post(shell_exec_handler))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
@@ -191,11 +215,12 @@ mod tests {
     };
     use cybou_protocol::KnowledgeState;
     use cybou_web_contracts::{
-        MindProjection, SessionMode, SessionProjection, ShellExecRequest, ShellExecResponse,
-        SnapshotProjection,
+        DisclosureProjection, MindProjection, SessionMode, SessionProjection, ShellExecRequest,
+        ShellExecResponse, SnapshotProjection,
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
+    use uuid::Uuid;
 
     use super::{
         CredentialVerifier, GatewayError, PresenceSource, SessionContext, router,
@@ -217,6 +242,285 @@ mod tests {
             snapshot.cursor = self.name.to_owned();
             Ok(snapshot)
         }
+    }
+
+    /// A source that reports a delivery with a gap in it.
+    ///
+    /// The fixture source supplies nothing and withholds nothing, which is the one case where the
+    /// disclosure surface has no work to do. This one supplies more than it can account for and
+    /// refuses two items for two different reasons, because those are the facts the surface exists
+    /// to show.
+    struct PartlyAccountedSource;
+
+    #[async_trait]
+    impl PresenceSource for PartlyAccountedSource {
+        async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError> {
+            FixturePresenceSource::nominal().snapshot().await
+        }
+
+        async fn mind(&self) -> Result<MindProjection, GatewayError> {
+            FixturePresenceSource::nominal().mind().await
+        }
+
+        fn last_delivery(&self) -> crate::Delivered {
+            crate::Delivered {
+                // Two source contributions, cited between them by the two items that could say
+                // where they came from. A set of sources, not a count of items.
+                items: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+                // Three supplied, two of which named their provenance. The third is the case the
+                // two numbers exist for.
+                item_count: 3,
+                accounted_for: 2,
+                withheld: vec![
+                    cybou_protocol::disclosure::Withheld {
+                        subject: Some("disk-pressure".to_owned()),
+                        because: cybou_protocol::disclosure::WithheldBecause::AboveConsumerTrust,
+                    },
+                    cybou_protocol::disclosure::Withheld {
+                        subject: None,
+                        because: cybou_protocol::disclosure::WithheldBecause::BelongsToThePerson,
+                    },
+                ],
+            }
+        }
+    }
+
+    /// A guarded router whose shell sandbox is a directory this test owns.
+    ///
+    /// The `TempDir` is returned rather than dropped: dropping it removes the sandbox out from
+    /// under the router. Tests bind it to `_sandbox` so it lives to the end of the test.
+    fn shell_router_over_a_temporary_sandbox() -> (Router, tempfile::TempDir) {
+        let sandbox = tempfile::tempdir().expect("a sandbox root");
+        std::fs::create_dir(sandbox.path().join("somewhere")).expect("a directory to enter");
+        let app = crate::router_in_sandbox(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            Some(Arc::new(OneAccount)),
+            None,
+            None,
+            SessionContext::public_preview(),
+            sandbox.path(),
+        );
+        (app, sandbox)
+    }
+
+    /// Read the disclosure surface as whoever holds this cookie, if any.
+    async fn disclosure_for(app: &Router, cookie: Option<&str>) -> DisclosureProjection {
+        let mut request = Request::builder().uri("/api/v1/disclosure");
+        if let Some(cookie) = cookie {
+            request = request.header("cookie", cookie);
+        }
+        let response = app
+            .clone()
+            .oneshot(request.body(Body::empty()).expect("a request"))
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        serde_json::from_slice(&body).expect("a disclosure projection")
+    }
+
+    /// Fetch the Mind projection, which is what records a delivery.
+    async fn read_mind(app: &Router, cookie: Option<&str>) {
+        let mut request = Request::builder().uri("/api/v1/mind");
+        if let Some(cookie) = cookie {
+            request = request.header("cookie", cookie);
+        }
+        let response = app
+            .clone()
+            .oneshot(request.body(Body::empty()).expect("a request"))
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn nothing_supplied_yet_is_not_the_same_as_an_empty_delivery() {
+        // A surface that answered "you were supplied nothing" before anything had been supplied
+        // would be making a claim about a delivery that never happened.
+        let app = router(Arc::new(PartlyAccountedSource));
+        let disclosure = disclosure_for(&app, None).await;
+        assert!(!disclosure.delivered);
+        assert_eq!(disclosure.supplied, 0);
+        assert!(disclosure.withheld.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_reader_is_shown_that_something_was_kept_from_them_and_why() {
+        // This router has no Journal sink, which is deliberate: what was supplied must be
+        // remembered whether or not there is anywhere durable to write it down.
+        //
+        // It also carries no session, so the reader is the public consumer even though the
+        // deployment is a local desktop — which is correct, because a reader without a session is
+        // served the filtered source. They are told what was refused and why; the subjects are the
+        // business of the separate test below.
+        let app = router(Arc::new(PartlyAccountedSource));
+        read_mind(&app, None).await;
+
+        let disclosure = disclosure_for(&app, None).await;
+        assert!(disclosure.delivered);
+        assert_eq!(disclosure.withheld.len(), 2);
+        assert!(
+            disclosure
+                .withheld
+                .iter()
+                .any(|item| item.because == "aboveConsumerTrust")
+        );
+        assert!(
+            disclosure
+                .withheld
+                .iter()
+                .any(|item| item.because == "belongsToThePerson")
+        );
+    }
+
+    /// A source whose items cite far more contributions than there are items.
+    ///
+    /// The realistic shape: one belief can name hundreds of contributions. This is what made the
+    /// provenance set unusable as a count, and what made the response a hundred kilobytes.
+    struct WidelyDerivedSource;
+
+    #[async_trait]
+    impl PresenceSource for WidelyDerivedSource {
+        async fn snapshot(&self) -> Result<SnapshotProjection, GatewayError> {
+            FixturePresenceSource::nominal().snapshot().await
+        }
+
+        async fn mind(&self) -> Result<MindProjection, GatewayError> {
+            FixturePresenceSource::nominal().mind().await
+        }
+
+        fn last_delivery(&self) -> crate::Delivered {
+            crate::Delivered {
+                items: (0..500).map(Uuid::from_u128).collect(),
+                item_count: 10,
+                accounted_for: 10,
+                withheld: Vec::new(),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_wide_provenance_set_is_sampled_and_its_true_size_reported() {
+        let app = router(Arc::new(WidelyDerivedSource));
+        read_mind(&app, None).await;
+
+        let disclosure = disclosure_for(&app, None).await;
+        assert_eq!(disclosure.supplied, 10);
+        assert_eq!(disclosure.accounted_for, 10);
+        // The total is never truncated, only the sample is.
+        assert_eq!(disclosure.provenance_count, 500);
+        assert_eq!(
+            disclosure.items.len(),
+            cybou_web_contracts::DISCLOSURE_ITEM_SAMPLE
+        );
+    }
+
+    #[tokio::test]
+    async fn a_stranger_is_told_how_much_was_refused_and_never_what_it_was_about() {
+        // The subject of a refused concept is that concept's label. Publishing it to explain the
+        // refusal would perform the disclosure the refusal prevented, so the surface that reports
+        // a filter must not be a way around it.
+        let app = router_with_assets_and_session(
+            Arc::new(PartlyAccountedSource),
+            None,
+            SessionContext::public_preview(),
+        );
+        read_mind(&app, None).await;
+
+        let disclosure = disclosure_for(&app, None).await;
+        assert!(!disclosure.subjects_visible);
+        assert_eq!(
+            disclosure.withheld.len(),
+            2,
+            "the count of refusals is a fact about the system and is still given"
+        );
+        assert!(
+            disclosure
+                .withheld
+                .iter()
+                .all(|item| item.subject.is_none()),
+            "a public reader was named a withheld subject"
+        );
+        // The grounds are still stated: how much was refused and why are not the person's secrets.
+        assert!(
+            disclosure
+                .withheld
+                .iter()
+                .any(|item| item.because == "aboveConsumerTrust")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_person_the_record_is_about_is_named_the_subjects() {
+        let app = router_with_verifier_and_access(
+            Arc::new(PartlyAccountedSource),
+            Some(Arc::new(PartlyAccountedSource)),
+            Some(Arc::new(OneAccount)),
+            None,
+            SessionContext::public_preview(),
+        );
+
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+        read_mind(&app, Some(&cookie)).await;
+
+        let disclosure = disclosure_for(&app, Some(&cookie)).await;
+        assert!(disclosure.subjects_visible);
+        assert!(
+            disclosure
+                .withheld
+                .iter()
+                .any(|item| item.subject.as_deref() == Some("disk-pressure")),
+            "the owner could not see what was held back from them"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delivery_says_what_it_cannot_account_for() {
+        // The whole reason two numbers are carried: three items crossed the boundary and only two
+        // of them can name where they came from. A surface reporting "two" would be claiming
+        // provenance it does not have.
+        let app = router(Arc::new(PartlyAccountedSource));
+        read_mind(&app, None).await;
+
+        let disclosure = disclosure_for(&app, None).await;
+        assert_eq!(disclosure.supplied, 3);
+        assert_eq!(disclosure.accounted_for, 2);
+        // Never more accounted for than supplied. The first live deployment of this surface
+        // reported ten supplied and three thousand accounted for, because the length of the
+        // provenance set was being read as a count of items. It is its own number now.
+        assert!(disclosure.accounted_for <= disclosure.supplied);
+        assert_eq!(disclosure.provenance_count, 2);
+        assert_eq!(disclosure.items.len(), 2);
+        assert!(disclosure.external_boundary);
+        assert!(!disclosure.retains);
+    }
+
+    #[tokio::test]
+    async fn a_reader_is_shown_their_own_deliveries_and_not_someone_elses() {
+        // The record is keyed by consumer. A surface that answered for whoever read last would be
+        // a log of what was done to everyone, which is a different and much worse thing.
+        let app = router_with_verifier_and_access(
+            Arc::new(PartlyAccountedSource),
+            None,
+            Some(Arc::new(OneAccount)),
+            None,
+            SessionContext::public_preview(),
+        );
+
+        // A stranger reads, and is recorded as the public consumer.
+        read_mind(&app, None).await;
+        let stranger = disclosure_for(&app, None).await;
+        assert!(stranger.delivered);
+        assert_eq!(stranger.consumer_id, "living-canvas:public");
+
+        // Someone who signs in is a different consumer, and has been supplied nothing yet.
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+        let owner = disclosure_for(&app, Some(&cookie)).await;
+        assert_eq!(owner.consumer_id, "living-canvas:alice");
+        assert!(!owner.delivered);
     }
 
     struct OneAccount;
@@ -702,6 +1006,104 @@ mod tests {
             serde_json::from_slice(&body_bytes).expect("deserialize shell response");
         assert_eq!(parsed.exit_code, 0);
         assert_eq!(parsed.stdout.trim(), "/");
+    }
+
+    /// Run one command as the holder of this cookie, and return what the shell said.
+    async fn shell_exec_as(app: &Router, cookie: &str, command: &str) -> ShellExecResponse {
+        let payload = serde_json::to_vec(&ShellExecRequest {
+            command: command.into(),
+        })
+        .expect("serialize request");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/shell/exec")
+                    .header("content-type", "application/json")
+                    .header("cookie", cookie)
+                    .body(Body::from(payload))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("a body")
+            .to_bytes();
+        serde_json::from_slice(&body).expect("a shell response")
+    }
+
+    #[tokio::test]
+    async fn one_session_does_not_move_another_sessions_shell() {
+        // Two sign-ins are two seats even when they are the same account, because a shell is where
+        // one person is standing. Before shells were split per session, the `cd` below moved the
+        // second caller too, and its `pwd` answered for somebody else.
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+
+        let first = sign_in(&app, "alice", "hunter2").await.expect("a session");
+        let second = sign_in(&app, "alice", "hunter2").await.expect("a session");
+        assert_ne!(first, second, "two sign-ins must be two sessions");
+
+        let moved = shell_exec_as(&app, &first, "cd somewhere").await;
+        assert_eq!(moved.exit_code, 0);
+        assert_eq!(moved.cwd, "/somewhere");
+
+        let untouched = shell_exec_as(&app, &second, "pwd").await;
+        assert_eq!(untouched.stdout.trim(), "/");
+        assert_eq!(untouched.cwd, "/");
+
+        // And the session that moved is still where it put itself.
+        let still_there = shell_exec_as(&app, &first, "pwd").await;
+        assert_eq!(still_there.stdout.trim(), "/somewhere");
+    }
+
+    #[tokio::test]
+    async fn signing_out_forgets_where_the_session_was_standing() {
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+        assert_eq!(
+            shell_exec_as(&app, &cookie, "cd somewhere").await.cwd,
+            "/somewhere"
+        );
+
+        let signed_out = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/logout")
+                    .header("cookie", cookie.clone())
+                    .body(Body::empty())
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(signed_out.status(), StatusCode::OK);
+
+        // The cookie no longer names a session, so the shell surface refuses rather than handing
+        // the caller whatever shell that token used to own.
+        let payload = serde_json::to_vec(&ShellExecRequest {
+            command: "pwd".into(),
+        })
+        .expect("serialize request");
+        let refused = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/shell/exec")
+                    .header("content-type", "application/json")
+                    .header("cookie", cookie)
+                    .body(Body::from(payload))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

@@ -10,6 +10,12 @@ use uuid::Uuid;
 /// First web contract version. It is independent of internal D-Bus encoding versions.
 pub const WEB_SCHEMA_V1: SchemaVersion = SchemaVersion(1);
 
+/// How many provenance identifiers a disclosure projection carries.
+///
+/// Enough for someone cross-checking a delivery by hand, few enough that the surface stays a page
+/// rather than a dump. The count it is a sample of is reported separately and is never truncated.
+pub const DISCLOSURE_ITEM_SAMPLE: usize = 64;
+
 /// Trust context established by the gateway, never by a frontend toggle.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,6 +58,88 @@ pub struct SessionProjection {
     pub consumer_id: String,
     /// RFC 3339 expiry timestamp supplied by the gateway.
     pub expires_at: String,
+}
+
+/// One thing that was not supplied, as the person is shown it.
+///
+/// A subject and a reason, never a value. Restating what was withheld in order to explain that it
+/// was withheld would defeat the withholding, so this says what the item was *about* and why, and
+/// stops there. Where even the subject would say too much, the subject is absent and the item is
+/// still counted — an unnamed refusal is a smaller loss than a silent one.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithheldProjection {
+    /// What the item was about.
+    pub subject: Option<String>,
+    /// Why it was held back, in the frozen vocabulary of `WithheldBecause`.
+    pub because: String,
+}
+
+/// What this consumer was last supplied, and what was kept from them.
+///
+/// The point of the surface is the difference between the two. Every system that assembles context
+/// silently is doing this much bookkeeping internally; what it does not do is let the person it is
+/// about read it (ADR-0030 B1, B6).
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+// Four flags, and each answers a question the others cannot. Whether the delivery crossed a
+// boundary, whether the consumer keeps it, whether the subjects are named to them, and whether a
+// delivery happened at all are independent facts; folding any pair into one value would report
+// them as the same fact and lose exactly the distinction this surface exists to make.
+#[allow(clippy::struct_excessive_bools)]
+pub struct DisclosureProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// The consumer this delivery went to.
+    pub consumer_id: String,
+    /// Whether the delivery crossed a boundary this system does not control.
+    pub external_boundary: bool,
+    /// Whether the consumer keeps what it was given.
+    ///
+    /// False for every consumer today, because no consumer learns from what it is shown. It is
+    /// reported rather than assumed so that the first consumer which does retain something is
+    /// visible here on the day it appears, instead of being discovered later.
+    pub retains: bool,
+    /// How many items were supplied.
+    pub supplied: u32,
+    /// How many of those named at least one contribution they were derived from.
+    ///
+    /// Deliberately separate from `supplied`. A projection that lost track of where one of its rows
+    /// came from must say it supplied five things and can account for four — a delivery that
+    /// silently reported four would be claiming provenance it does not have.
+    pub accounted_for: u32,
+    /// How many distinct contributions those items were derived from in total.
+    ///
+    /// A different scale from `supplied`, and routinely much larger: one belief can cite hundreds
+    /// of contributions. It is carried as its own number because the length of `items` is a sample
+    /// and answers a different question.
+    pub provenance_count: u32,
+    /// A bounded sample of the contributions those items were derived from.
+    ///
+    /// At most [`DISCLOSURE_ITEM_SAMPLE`] entries. The full set reached three thousand on the
+    /// first live deployment of this surface, which is a hundred kilobytes served to anyone who
+    /// asks and unreadable by the person it is for. `provenance_count` carries the true total, so
+    /// the sample is never mistaken for it.
+    pub items: Vec<Uuid>,
+    /// What was held back, and why.
+    pub withheld: Vec<WithheldProjection>,
+    /// Whether the subjects of the withheld items are named to this consumer.
+    ///
+    /// False for a consumer whose trust is `Public`. The subject of a withheld item is the least
+    /// that still lets a person ask "why was that held back?" — but to a stranger it is the thing
+    /// that was held back. A concept refused for exposure is refused by its label, and a surface
+    /// that published the label to explain the refusal would perform the disclosure it exists to
+    /// report.
+    ///
+    /// The count and the reason are still given, because how much was refused and on what grounds
+    /// are facts about the system rather than about the person. The flag exists so a reader can
+    /// tell "no subject could be named" from "you are not the person this record is about".
+    pub subjects_visible: bool,
+    /// Whether this consumer has been supplied anything at all yet.
+    ///
+    /// An empty delivery and no delivery are different facts, and the first reading of this route
+    /// on a fresh gateway is the second one.
+    pub delivered: bool,
 }
 
 /// Minimal capability row used by deterministic frontend fixtures.

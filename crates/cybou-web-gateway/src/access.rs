@@ -16,8 +16,8 @@ use std::{
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 use time::{Duration, OffsetDateTime};
-use uuid::Uuid;
 
 /// How long a session lasts before the person authenticates again.
 ///
@@ -28,6 +28,31 @@ pub const SESSION_LIFETIME: Duration = Duration::hours(8);
 
 /// What the browser sends back to prove it already authenticated.
 pub const SESSION_COOKIE: &str = "cybou_session";
+
+/// How much unpredictability a session token carries.
+///
+/// The token is a bearer credential: whoever holds it is the session. Thirty-two bytes from the
+/// operating system's generator is far past what could be searched, and it is deliberately not a
+/// UUID — a UUID is an identifier, it spends six of its bits saying which kind of UUID it is, and
+/// nothing about the type says it must come from a generator suitable for secrets. Reading a token
+/// as a name for something is how a name ends up somewhere a secret should not be.
+pub const SESSION_TOKEN_BYTES: usize = 32;
+
+/// What a token is called once it is stored: the SHA-256 of what the browser holds.
+pub type SessionDigest = [u8; 32];
+
+/// The name a token is filed under.
+///
+/// Sessions are keyed by this rather than by the token, so the value that grants access is not
+/// also sitting in the process's memory as a map key, and so the time a lookup takes says nothing
+/// about the token — an attacker cannot walk backwards from a digest to the secret that produced
+/// it, whatever the lookup leaks.
+#[must_use]
+pub fn digest(token: &str) -> SessionDigest {
+    let mut hasher = Sha256::new();
+    hasher.update(token.as_bytes());
+    hasher.finalize().into()
+}
 
 /// A login attempt, as it arrives from a browser.
 #[derive(Deserialize)]
@@ -74,31 +99,46 @@ pub struct Session {
 /// would be a second place holding something about a person.
 #[derive(Default)]
 pub struct Sessions {
-    live: Mutex<HashMap<String, Session>>,
+    live: Mutex<HashMap<SessionDigest, Session>>,
 }
 
 impl Sessions {
     /// Begin a session for an authenticated account, and return the token the browser will send.
-    pub fn begin(&self, username: &str, now: OffsetDateTime) -> String {
-        let token = Uuid::new_v4().to_string();
+    ///
+    /// Returns `None` when the operating system will not supply randomness. That is close enough
+    /// to impossible that the temptation is to unwrap it, which is exactly why it is returned: the
+    /// alternative to refusing here is issuing a predictable token, and a session nobody can get
+    /// is a far smaller failure than a session anybody can guess.
+    pub fn begin(&self, username: &str, now: OffsetDateTime) -> Option<String> {
+        let mut bytes = [0_u8; SESSION_TOKEN_BYTES];
+        getrandom::getrandom(&mut bytes).ok()?;
+        let token = bytes.iter().fold(
+            String::with_capacity(SESSION_TOKEN_BYTES * 2),
+            |mut token, byte| {
+                use std::fmt::Write as _;
+                let _ = write!(token, "{byte:02x}");
+                token
+            },
+        );
+
         let mut live = self.live.lock().unwrap_or_else(PoisonError::into_inner);
         // Expired entries are cleared whenever anything is written, so a long-running gateway does
         // not accumulate sessions nobody can use.
         live.retain(|_, session| session.expires_at > now);
         live.insert(
-            token.clone(),
+            digest(&token),
             Session {
                 username: username.to_owned(),
                 expires_at: now + SESSION_LIFETIME,
             },
         );
-        token
+        Some(token)
     }
 
     /// The session a token names, if it names one that has not expired.
     pub fn resolve(&self, token: &str, now: OffsetDateTime) -> Option<Session> {
         let live = self.live.lock().unwrap_or_else(PoisonError::into_inner);
-        live.get(token)
+        live.get(&digest(token))
             .filter(|session| session.expires_at > now)
             .cloned()
     }
@@ -106,7 +146,7 @@ impl Sessions {
     /// End a session, if the token names one.
     pub fn end(&self, token: &str) {
         let mut live = self.live.lock().unwrap_or_else(PoisonError::into_inner);
-        live.remove(token);
+        live.remove(&digest(token));
     }
 }
 
@@ -159,7 +199,7 @@ mod tests {
     #[test]
     fn a_session_stops_being_honoured_when_it_expires() {
         let sessions = Sessions::default();
-        let token = sessions.begin("alice", at(0));
+        let token = sessions.begin("alice", at(0)).expect("a token");
 
         assert_eq!(
             sessions.resolve(&token, at(1)).map(|s| s.username),
@@ -172,7 +212,7 @@ mod tests {
     #[test]
     fn ending_a_session_ends_it() {
         let sessions = Sessions::default();
-        let token = sessions.begin("alice", at(0));
+        let token = sessions.begin("alice", at(0)).expect("a token");
         sessions.end(&token);
         assert!(sessions.resolve(&token, at(1)).is_none());
     }
@@ -180,9 +220,42 @@ mod tests {
     #[test]
     fn a_token_nobody_issued_names_no_session() {
         let sessions = Sessions::default();
-        sessions.begin("alice", at(0));
+        sessions.begin("alice", at(0)).expect("a token");
         assert!(sessions.resolve("not-a-token", at(1)).is_none());
         assert!(sessions.resolve("", at(1)).is_none());
+    }
+
+    #[test]
+    fn two_sessions_are_never_handed_the_same_token() {
+        // The token is the whole credential. Two of them colliding, or being derivable from one
+        // another, is the failure this replaces a UUID to avoid.
+        let sessions = Sessions::default();
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..256 {
+            assert!(seen.insert(sessions.begin("alice", at(0)).expect("a token")));
+        }
+    }
+
+    #[test]
+    fn a_token_carries_the_unpredictability_it_claims_to() {
+        let sessions = Sessions::default();
+        let token = sessions.begin("alice", at(0)).expect("a token");
+        assert_eq!(token.len(), SESSION_TOKEN_BYTES * 2);
+        assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn a_session_is_filed_under_a_digest_rather_than_the_token() {
+        // What grants access must not also be a key sitting in the process. The digest is what a
+        // lookup touches; the token itself is only ever in the request that carried it.
+        let sessions = Sessions::default();
+        let token = sessions.begin("alice", at(0)).expect("a token");
+        let key = digest(&token);
+        assert_ne!(key.as_slice(), token.as_bytes());
+
+        let live = sessions.live.lock().expect("the store");
+        assert!(live.contains_key(&key));
+        assert_eq!(live.len(), 1);
     }
 
     #[test]
