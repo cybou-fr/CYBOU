@@ -5,7 +5,8 @@
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
-    DisclosureProjection, MindProjection, SessionProjection, ShellExecResponse, SnapshotProjection,
+    DirectoryListingProjection, DisclosureProjection, FileContentProjection, MindProjection,
+    SessionProjection, ShellExecResponse, SnapshotProjection,
 };
 use thiserror::Error;
 
@@ -19,6 +20,8 @@ pub mod components;
 pub mod interaction;
 #[cfg(target_arch = "wasm32")]
 pub mod state;
+#[cfg(target_arch = "wasm32")]
+pub mod tool_state;
 
 #[cfg(target_arch = "wasm32")]
 mod gateway_client;
@@ -87,7 +90,36 @@ pub trait MindClient {
     /// # Errors
     ///
     /// Returns [`ClientError`] on gateway transport failure or if forbidden in public preview.
-    async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError>;
+    /// List one directory inside the sandbox, as structure rather than as terminal output.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the path names nothing readable, or the gateway refuses.
+    async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError>;
+
+    /// Read one text file inside the sandbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the path names nothing readable, or the gateway refuses.
+    async fn read_text_file(&self, path: &str) -> Result<FileContentProjection, ClientError>;
+
+    /// End one of the caller's shells, because the card standing in it was closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the gateway refuses or cannot be reached.
+    async fn close_shell(&self, instance: u32) -> Result<(), ClientError>;
+
+    /// Execute a bounded Shell capability in one of the caller's shells.
+    ///
+    /// `instance` names which Shell card the command came from. Two cards are two places a person
+    /// is standing, and passing a constant here would make them one.
+    async fn execute_shell(
+        &self,
+        command: &str,
+        instance: u32,
+    ) -> Result<ShellExecResponse, ClientError>;
 }
 
 /// Deterministic client for component, visual, and state-vocabulary tests.
@@ -185,7 +217,29 @@ impl MindClient for MockMindClient {
             }))
     }
 
-    async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError> {
+    async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
+        // A mock holds no sandbox. Answering with an empty directory would be the failure the
+        // typed routes exist to remove: nothing there, and nothing saying why.
+        Err(ClientError::GatewayRequest(format!(
+            "mock client holds no sandbox to list {path} in"
+        )))
+    }
+
+    async fn read_text_file(&self, path: &str) -> Result<FileContentProjection, ClientError> {
+        Err(ClientError::GatewayRequest(format!(
+            "mock client holds no sandbox to read {path} from"
+        )))
+    }
+
+    async fn close_shell(&self, _instance: u32) -> Result<(), ClientError> {
+        Ok(())
+    }
+
+    async fn execute_shell(
+        &self,
+        command: &str,
+        _instance: u32,
+    ) -> Result<ShellExecResponse, ClientError> {
         Ok(ShellExecResponse {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             exit_code: 0,

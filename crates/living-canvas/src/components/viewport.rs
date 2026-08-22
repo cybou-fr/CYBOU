@@ -8,7 +8,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{PointerEvent, WheelEvent};
 
 use crate::{
-    DesktopLayout, LayoutHistory, SnapGuide,
+    CardId, DesktopLayout, LayoutHistory, SnapGuide,
     components::{
         cards::{
             AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
@@ -135,9 +135,30 @@ pub fn CanvasViewport(
             <ContextCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
             <DisclosureCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
 
-            <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />
-            <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />
-            <JournalFeedCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing />
+            // One card per instance the layout holds, not one card per kind. `CardSpec` says these
+            // are not singletons; rendering exactly one of each made that a promise the desktop
+            // could not keep, so a second Shell could be opened into the model and never appear.
+            <For
+                each=move || shell_instances(&layout.get())
+                key=|instance| *instance
+                children=move |instance| view! {
+                    <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
+                }
+            />
+            <For
+                each=move || file_manager_instances(&layout.get())
+                key=|instance| *instance
+                children=move |instance| view! {
+                    <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
+                }
+            />
+            <For
+                each=move || journal_feed_instances(&layout.get())
+                key=|instance| *instance
+                children=move |instance| view! {
+                    <JournalFeedCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing instance=instance />
+                }
+            />
 
             <For
                 each=move || layout.get().decks
@@ -158,4 +179,40 @@ pub fn CanvasViewport(
             />
         </section>
     }
+}
+
+/// The Shell cards this layout holds, by instance.
+fn shell_instances(layout: &DesktopLayout) -> Vec<u32> {
+    layout
+        .cards
+        .iter()
+        .filter_map(|card| match card.id {
+            CardId::Shell(instance) => Some(instance),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The File Manager cards this layout holds, by instance.
+fn file_manager_instances(layout: &DesktopLayout) -> Vec<u32> {
+    layout
+        .cards
+        .iter()
+        .filter_map(|card| match card.id {
+            CardId::FileManager(instance) => Some(instance),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The event-stream cards this layout holds, by instance.
+fn journal_feed_instances(layout: &DesktopLayout) -> Vec<u32> {
+    layout
+        .cards
+        .iter()
+        .filter_map(|card| match card.id {
+            CardId::JournalFeed(instance) => Some(instance),
+            _ => None,
+        })
+        .collect()
 }

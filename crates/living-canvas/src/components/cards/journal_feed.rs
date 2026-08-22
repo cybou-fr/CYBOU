@@ -220,8 +220,11 @@ pub fn JournalFeedCard(
     set_selected: WriteSignal<&'static str>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
+    /// Which instance of this tool card this is.
+    #[prop(optional)]
+    instance: u32,
 ) -> impl IntoView {
-    let card_id = CardId::JournalFeed(0);
+    let card_id = CardId::JournalFeed(instance);
 
     let collapsed = move || {
         view! {

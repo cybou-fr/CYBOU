@@ -6,17 +6,21 @@
 use leptos::prelude::*;
 use web_sys::PointerEvent;
 
+use leptos::task::spawn_local;
+
 use crate::{
-    CardId, DesktopItemId, DesktopLayout, DesktopViewMode,
+    CardId, DesktopItemId, DesktopLayout, DesktopViewMode, GatewayMindClient, MindClient,
     components::icons::{
         IconClose, IconExternalLink, IconMaximize, IconMinimize, IconPin, IconResizeGrip,
     },
     interaction::{ResizeState, start_deck_resize, start_resize},
+    tool_state::ToolCardStates,
 };
 
 /// Card header window management controls (Pin, Focus, Collapse/Expand, Close/Detach).
 #[component]
 pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
+    let tool_states = expect_context::<ToolCardStates>();
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
@@ -84,6 +88,18 @@ pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoV
                             layout.update(|current| {
                                 current.close_card(card);
                             });
+                            // Closing is the one action that really is a person finished with the
+                            // card. Everything else that unmounts it — collapsing, switching a deck
+                            // tab, docking — deliberately does not reach here.
+                            tool_states.forget(card);
+                            // The shell behind it goes too. Left standing, it would still be in the
+                            // directory this card was in, and the next card opened at the same
+                            // number would show `/` and then jump there on the first command.
+                            if let CardId::Shell(instance) = card {
+                                spawn_local(async move {
+                                    let _ = GatewayMindClient.close_shell(instance).await;
+                                });
+                            }
                             layout.get_untracked().save();
                         }
                     >

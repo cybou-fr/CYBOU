@@ -17,6 +17,7 @@ use living_canvas::{
     },
     interaction::{DragState, ResizeState, apply_redo, apply_undo, selection_actions_style},
     state::{DesktopRuntimeSubscription, RuntimeState},
+    tool_state::ToolCardStates,
 };
 
 fn load_layout() -> DesktopLayout {
@@ -39,6 +40,10 @@ pub fn App() -> impl IntoView {
     let command_input = NodeRef::<leptos::html::Input>::new();
     let view_mode = RwSignal::new(DesktopViewMode::Spatial);
     provide_context(view_mode);
+    // Built here so every tool card's state is owned by the root rather than by whichever mount
+    // happens to be showing it. Collapsing a card, switching a deck tab, or docking a card all
+    // unmount its content; none of them are a person discarding what they had done.
+    provide_context(ToolCardStates::new());
     let layout = RwSignal::new(load_layout());
     let history = RwSignal::new(LayoutHistory::new());
     let dragging = RwSignal::new(None::<DragState>);

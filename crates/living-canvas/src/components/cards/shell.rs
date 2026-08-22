@@ -17,11 +17,11 @@ use crate::{
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
+    tool_state::ToolCardStates,
 };
 
 const SHELL_AUTOCOMPLETE: &[&str] = &[
-    "cat", "cd", "clear", "echo", "grep", "head", "help", "ls", "pwd", "stat", "tail", "uname",
-    "whoami",
+    "cat", "cd", "clear", "echo", "grep", "head", "help", "ls", "pwd", "stat", "tail",
 ];
 
 /// Interactive Shell domain content presentation.
@@ -29,25 +29,30 @@ const SHELL_AUTOCOMPLETE: &[&str] = &[
 pub fn ShellContent(
     runtime: RwSignal<RuntimeState>,
     auth_modal_open: RwSignal<bool>,
+    /// Which Shell card this is, taken from `CardId::Shell(n)`.
+    ///
+    /// Sent with every command so the gateway drives this card's shell and not another card's.
+    #[prop(optional)]
+    instance: u32,
 ) -> impl IntoView {
     let is_public_preview = move || match runtime.get() {
         RuntimeState::Ready { mode, .. } => mode == SessionMode::PublicPreview,
         _ => false,
     };
 
-    let (history, set_history) = signal(vec![(
-        String::new(),
-        "CYBOU Bounded Body Shell (ADR-0040 DemoReadOnly)\nType 'help' for available capabilities.\n"
-            .to_string(),
-        0,
-    )]);
-    let (cmd_history, set_cmd_history) = signal(Vec::<String>::new());
-    let (history_idx, set_history_idx) = signal(Option::<usize>::None);
-    let (temp_draft, set_temp_draft) = signal(String::new());
+    // Looked up, not created. These signals are owned by the root, so collapsing this card,
+    // switching away from its deck tab, or docking it does not destroy what was typed into it.
+    let state = expect_context::<ToolCardStates>().shell(CardId::Shell(instance));
+    let (history, set_history) = (state.history, state.history);
+    let (cmd_history, set_cmd_history) = (state.cmd_history, state.cmd_history);
+    let (history_idx, set_history_idx) = (state.history_idx, state.history_idx);
+    let (temp_draft, set_temp_draft) = (state.temp_draft, state.temp_draft);
+    let (input_val, set_input_val) = (state.input, state.input);
+    let (cwd, set_cwd) = (state.cwd, state.cwd);
+    let (running, set_running) = (state.running, state.running);
 
-    let (input_val, set_input_val) = signal(String::new());
-    let (cwd, set_cwd) = signal("/".to_string());
-    let (running, set_running) = signal(false);
+    // These stay component-local on purpose: they point at DOM nodes, which really do belong to
+    // one mount.
     let output_ref = NodeRef::<leptos::html::Div>::new();
     let input_ref = NodeRef::<leptos::html::Input>::new();
 
@@ -82,7 +87,7 @@ pub fn ShellContent(
         set_input_val.set(String::new());
         spawn_local(async move {
             let client = GatewayMindClient;
-            match client.execute_shell(&cmd_str).await {
+            match client.execute_shell(&cmd_str, instance).await {
                 Ok(resp) => {
                     let text = if !resp.stdout.is_empty() {
                         resp.stdout
@@ -226,8 +231,11 @@ pub fn ShellCard(
     resizing: RwSignal<Option<ResizeState>>,
     auth_modal_open: RwSignal<bool>,
     runtime: RwSignal<RuntimeState>,
+    /// Which Shell card this is.
+    #[prop(optional)]
+    instance: u32,
 ) -> impl IntoView {
-    let card_id = CardId::Shell(0);
+    let card_id = CardId::Shell(instance);
 
     let collapsed = move || {
         view! {
@@ -251,7 +259,7 @@ pub fn ShellCard(
             kicker_icon=Arc::new(|| view! { <IconTerminal size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <ShellContent runtime=runtime auth_modal_open=auth_modal_open />
+            <ShellContent runtime=runtime auth_modal_open=auth_modal_open instance=instance />
         </CardFrame>
     }
 }

@@ -415,6 +415,91 @@ pub struct MindProjection {
 pub struct ShellExecRequest {
     /// Full command line string.
     pub command: String,
+    /// Which of the caller's shells this command is for.
+    ///
+    /// A Shell card is not a singleton — two of them are two places a person is standing, and a
+    /// `cd` in one must not move the other. The card carries the instance it belongs to and sends
+    /// it here, because the gateway cannot otherwise tell two cards in one session apart.
+    ///
+    /// Defaults to zero so a request written before this field existed still names a shell rather
+    /// than being refused.
+    #[serde(default)]
+    pub instance: u32,
+}
+
+/// How many directory entries one listing carries.
+///
+/// A bound, because the sandbox root is a directory somebody else can fill. What is cut is always
+/// reported as cut — a listing that quietly stopped would be a smaller directory, not a partial
+/// answer.
+pub const FILE_LISTING_MAX_ENTRIES: usize = 512;
+
+/// How many bytes of a file one read carries.
+pub const FILE_READ_MAX_BYTES: usize = 256 * 1024;
+
+/// Which path in the sandbox a request is about.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePathRequest {
+    /// The path, interpreted inside the sandbox root and never outside it.
+    pub path: String,
+}
+
+/// One entry in a directory, as the sandbox established it.
+///
+/// Name, kind and size, and nothing else. There is deliberately no mode and no owner: the sandbox
+/// does not read them, and a surface that showed them would be showing a constant.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryEntryProjection {
+    /// Entry name, without any path.
+    pub name: String,
+    /// Whether the entry is a directory.
+    pub is_dir: bool,
+    /// Size in bytes for files. Zero for directories, whose size the sandbox does not establish.
+    pub size_bytes: u64,
+}
+
+/// What a directory held when it was read.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryListingProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// The directory that was read, as the sandbox resolved it.
+    pub path: String,
+    /// Its entries, directories first, then by name.
+    pub entries: Vec<DirectoryEntryProjection>,
+    /// How many entries the directory actually held.
+    ///
+    /// Separate from the length of `entries` so a listing that hit
+    /// [`FILE_LISTING_MAX_ENTRIES`] says so rather than presenting a bounded answer as a complete
+    /// one. Partial is not empty truth.
+    pub total_entries: u32,
+    /// Whether entries were left out to stay inside the bound.
+    pub truncated: bool,
+}
+
+/// What a file held when it was read.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileContentProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// The file that was read.
+    pub path: String,
+    /// Its text.
+    pub text: String,
+    /// How large the file is on disk.
+    pub size_bytes: u64,
+}
+
+/// Request to end one of the caller's shells.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShellCloseRequest {
+    /// Which of the caller's shells to end.
+    pub instance: u32,
 }
 
 /// Typed response from executing a bounded Shell capability.

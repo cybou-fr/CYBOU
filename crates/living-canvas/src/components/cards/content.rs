@@ -44,11 +44,13 @@ pub fn CardContent(
         CardId::Perception => view! { <PerceptionContent runtime=runtime /> }.into_any(),
         CardId::Context => view! { <ContextContent runtime=runtime /> }.into_any(),
         CardId::Disclosure => view! { <DisclosureContent runtime=runtime /> }.into_any(),
-        CardId::Shell(_) => {
-            view! { <ShellContent runtime=runtime auth_modal_open=auth /> }.into_any()
+        CardId::Shell(instance) => {
+            view! { <ShellContent runtime=runtime auth_modal_open=auth instance=instance /> }
+                .into_any()
         }
-        CardId::FileManager(_) => {
-            view! { <FileManagerContent runtime=runtime auth_modal_open=auth /> }.into_any()
+        CardId::FileManager(instance) => {
+            view! { <FileManagerContent runtime=runtime auth_modal_open=auth instance=instance /> }
+                .into_any()
         }
         CardId::JournalFeed(_) => view! { <JournalFeedContent /> }.into_any(),
     }

@@ -51,7 +51,7 @@ The repository builds all Mind services from one locked workspace:
 - `cybou-lifecycled`: Sleep/wake lifecycle and consolidation scheduler (`org.cybou.Mind.Lifecycle1`).
 - `cybou-presenced`: Unified Mind presentation and command gateway (`org.cybou.Mind.Presence1`).
 - `cybou-jailfs`: Sandboxed filesystem containment library with canonical root validation, symlink traversal prevention, and bounded quota enforcement.
-- `cybou-shelld`: Bounded Body capability engine strictly confined to ADR-0040 DemoReadOnly builtins (`help`, `pwd`, `ls`, `cd`, `cat`, `echo`, `whoami`, `uname`, `stat`, `head`, `tail`, `grep`, `clear`).
+- `cybou-shelld`: Bounded Body capability engine strictly confined to the ADR-0040 DemoReadOnly builtins accepted in that ADR's Amendment 1 (`help`, `pwd`, `ls`, `cd`, `cat`, `echo`, `stat`, `head`, `tail`, `grep`, `clear`). `whoami` and `uname` were withdrawn on 2026-08-22: both answered with a compiled-in constant on every host, which in a terminal reads as an observation of the Body and was an observation of nothing.
 - `cybou-web-gateway`: Loopback-bound HTTP & SSE server providing read-only projections (`/api/v1/snapshot`, `/api/v1/mind`, `/api/v1/events`, `/api/v1/session`), and sandboxed execution endpoint (`POST /api/v1/shell/exec`) with strict refusal for a caller who owns no shell (HTTP 403) and execution for a live session or the local desktop seat. Shells are held per owner, not per process (`shells::Shells`).
 - `living-canvas`: Unified browser and desktop frontend (**CYBOU Desktop**), implementing the generic Card model over twelve canonical system cards, Layout schema v9 with transparent v8 migration and startup self-healing normalization (`validate_and_normalize`), Spatial Compositor Invariants L1–L15, invariant-safe Deck composition with `DeckError`, interactive resize, magnetic snap guidelines (`compute_snap`), auto-scaling viewport fit ("Fit All" `Ctrl+0`), interactive minimap navigation, card pinning & collapsing, non-destructive Viewport Focus mode, accessible keyboard navigation (`Alt+Arrow` move, `Alt+Shift+Arrow` resize, WAI-ARIA tablist), automated multi-mode Arrangement Engine (`Grid`, `Compact`, `Relations`, `Focus`, and `Ctrl+K` command palette actions), live UTC desktop clock, clean SSE lifecycle teardown, and strictly truthful session/capability representations (Phases 0, 1, 2, 3, and OS-Grade Grounding completed; see [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md)).
 
@@ -309,6 +309,105 @@ error rather than issued a predictable token.
 Sessions are also filed under the SHA-256 of the token rather than the token, so the value that
 grants access is not sitting in the process as a map key, and the time a lookup takes says nothing
 about the secret. The shell registry keys on the same digest for the same reason.
+
+## The Shell says less, and means it (2026-08-22)
+
+Four of the Shell's builtins were answering with values nobody had established, in the one place a
+person reads output as observation. `whoami` printed `cybou` and `uname -a` printed a fixed kernel
+string — on every host, for every caller, compiled in. `ls -l` printed `-rwxr-xr-x 1 cybou cybou`
+for every entry and `4096` for every directory. `stat` printed `Access: (0644/-rw-r--r--)` for
+everything, including directories.
+
+None of this was a sandbox weakness: there is still no `exec`, no pipeline, no redirection, and
+every path goes through `cybou-jailfs`. It was a truthfulness failure, which for a surface whose
+whole claim is that a projection may not state what nobody established is the more serious kind.
+
+`whoami` and `uname` are withdrawn; both exit 127 like any other unknown command, and neither
+appears in `help` or in the frontend's completion list. A command that can only answer with a
+constant is not a small capability, it is a false one. `ls -l` now reports type, size and name, with
+a dash where a directory's size would be, because the sandbox does not establish it. `stat` reports
+the file, size and type it actually read and no access mode at all.
+
+The accepted set is eleven and is enumerated in
+[ADR-0040 Amendment 1](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md). Before
+that amendment the ADR said six, this document said thirteen, `TESTING.md` said six and the engine
+recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
+had changed. Extending the set again requires amending that ADR in the same commit as the code.
+
+## The File Manager reads the sandbox instead of reading a terminal (2026-08-22)
+
+The File Manager asked the Shell for `ls -la` and parsed the columns back into names, kinds and
+sizes. A typed filesystem turned into text and then guessed at — and it failed the way such loops
+fail. The parser wanted nine whitespace-separated fields; the engine's long format produced six; so
+every entry fell through both branches, and the panel reported an empty directory. Nothing raised an
+error, because from the parser's point of view there was nothing there. The bug was invisible
+precisely because both halves were working as written.
+
+`POST /api/v1/files/list` and `POST /api/v1/files/read` hand back what `cybou-jailfs` already
+established: name, kind, size, contents. There is deliberately no mode and no owner, because the
+sandbox does not read them and a surface that showed them would be showing a constant. A listing
+that hit its bound reports the total it was cut from, so a bounded answer is never mistaken for a
+small directory. A path that left the sandbox is answered exactly as a path that does not exist:
+distinguishing them would let a caller entitled to read inside the sandbox map its edge by watching
+which refusals differ.
+
+Both routes share the Shell's entitlement boundary and refuse a public reader, and neither goes
+through the Shell. The stopgap shell number the File Manager was borrowing is gone with the parser.
+
+Two things surfaced while replacing it. The panel opened on the words "Empty directory" before it
+had asked anything — an assertion about a directory it had never read, and a person had to press
+Refresh to find out whether the first screen had been true. It now reads on first mount, and while
+it has not read, it says so. And an empty list is no longer the answer to a failed read: a directory
+nobody could open reports why, rather than reporting that it is empty.
+
+## A card's identity survived composition; what it had done did not (2026-08-22)
+
+Invariant L8 says a Card keeps its identity through grouping, and the layout model always held that.
+What did not survive was everything the card had *done*: a Shell's history, the command someone was
+halfway through recalling, the directory the File Manager was looking at. All of it was created with
+`signal(...)` inside the component, owned by that component's reactive owner, and destroyed the
+moment the component unmounted.
+
+Three ordinary actions unmounted it, and the smallest one is the worst. Docking a card into a deck
+or pulling it out, because standalone and docked are different subtrees. Switching a deck tab,
+because the deck body renders the active card and nothing else. And simply **collapsing the card**,
+because `CardFrame` wraps its body in a `Show` — so a person tidying their desktop was silently
+erasing a terminal session, with no warning and nothing to undo.
+
+Tool card state now lives in `tool_state::ToolCardStates`, created under the root owner and looked
+up by `CardId`. A component that mounts finds what its card already had; a component that unmounts
+takes nothing with it. Node references stay component-local, because those really do belong to one
+mount.
+
+Closing the card is the one action that is a person saying they are finished, and it releases the
+state. That exposed a second gap: the frontend forgot, and the gateway did not. A reopened Shell
+showed `cybou:/ ›` while the engine behind it was still standing in `/somewhere`, so the first
+command jumped the prompt somewhere the surface had already said it was not. `POST
+/api/v1/shell/close` ends that shell, and closing the card calls it.
+
+Verified in a browser against a local gateway rather than only by reading: after two commands the
+prompt reads `/somewhere` with three entries; collapsing unmounts the body entirely; expanding
+restores the same three entries and the same prompt; closing and reopening gives one entry and `/`,
+and `pwd` agrees.
+
+## A Tool card is an instance, not a kind (2026-08-22)
+
+`CardSpec` has said `singleton: false` for Shell, File Manager and the event stream since ADR-0040.
+Nothing else in the system agreed. The gateway kept one shell per seat, so two Shell cards in one
+session were two views of one working directory. The frontend sent no card identity at all with a
+command, so the gateway could not have told them apart if it wanted to. And the viewport rendered
+exactly one `<ShellCard>`, so a second Shell opened into the layout model would never have appeared
+on the desktop. Three layers, one unkept promise each.
+
+`ShellExecRequest` now carries the instance the card belongs to, `ShellOwner` names a seat *and* an
+instance, and the viewport renders one card per instance the layout holds rather than one per kind.
+Signing out ends every shell the session opened, not the one numbered zero — a person who opened
+three and signed out was leaving two working directories behind.
+
+The File Manager reads through a shell number no card uses, so browsing files no longer moves the
+working directory of a shell somebody is typing in. That is a stopgap and is written down as one:
+it should be reading a typed filesystem capability rather than parsing `ls -la` out of a terminal,
+and until it does, the least it can do is not stand in someone else's shell.
 
 ## The disclosure inspector (2026-08-22)
 

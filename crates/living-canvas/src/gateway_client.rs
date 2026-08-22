@@ -5,7 +5,8 @@
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
-    DisclosureProjection, MindProjection, SessionProjection, ShellExecRequest, ShellExecResponse,
+    DirectoryListingProjection, DisclosureProjection, FileContentProjection, FilePathRequest,
+    MindProjection, SessionProjection, ShellCloseRequest, ShellExecRequest, ShellExecResponse,
     SnapshotProjection,
 };
 use gloo_net::http::Request;
@@ -18,6 +19,28 @@ use crate::{ClientError, MindClient};
 pub struct GatewayMindClient;
 
 impl GatewayMindClient {
+    /// Ask one route about one sandbox path, and decode its typed answer.
+    async fn post_path<T: DeserializeOwned>(route: &str, path: &str) -> Result<T, ClientError> {
+        let response = Request::post(route)
+            .json(&FilePathRequest {
+                path: path.to_owned(),
+            })
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "{route} returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
     async fn get<T: DeserializeOwned>(path: &str) -> Result<T, ClientError> {
         let response = Request::get(path)
             .send()
@@ -54,10 +77,40 @@ impl MindClient for GatewayMindClient {
         Self::get("/api/v1/disclosure").await
     }
 
-    async fn execute_shell(&self, command: &str) -> Result<ShellExecResponse, ClientError> {
+    async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
+        Self::post_path("/api/v1/files/list", path).await
+    }
+
+    async fn read_text_file(&self, path: &str) -> Result<FileContentProjection, ClientError> {
+        Self::post_path("/api/v1/files/read", path).await
+    }
+
+    async fn close_shell(&self, instance: u32) -> Result<(), ClientError> {
+        let response = Request::post("/api/v1/shell/close")
+            .json(&ShellCloseRequest { instance })
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if response.ok() {
+            Ok(())
+        } else {
+            Err(ClientError::GatewayRequest(format!(
+                "/api/v1/shell/close returned HTTP {}",
+                response.status()
+            )))
+        }
+    }
+
+    async fn execute_shell(
+        &self,
+        command: &str,
+        instance: u32,
+    ) -> Result<ShellExecResponse, ClientError> {
         let response = Request::post("/api/v1/shell/exec")
             .json(&ShellExecRequest {
                 command: command.to_owned(),
+                instance,
             })
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
             .send()

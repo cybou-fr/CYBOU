@@ -57,10 +57,32 @@ pub fn sandbox_root() -> std::path::PathBuf {
 /// so it gets a name of its own rather than sharing whatever session happened to be first.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ShellOwner {
-    /// A browser session, named by the digest of its token.
-    Session(SessionDigest),
-    /// The local desktop, which is one seat and carries no session token.
-    LocalDesktop,
+    /// One shell belonging to a browser session, named by the digest of its token.
+    Session {
+        /// Which session holds it.
+        session: SessionDigest,
+        /// Which of that session's shells it is.
+        instance: u32,
+    },
+    /// One shell belonging to the local desktop seat, which carries no session token.
+    LocalDesktop {
+        /// Which of the seat's shells it is.
+        instance: u32,
+    },
+}
+
+impl ShellOwner {
+    /// Whether this owner belongs to the same seat as another, whatever instance either names.
+    ///
+    /// Ending a session ends every shell it opened, not the one that happened to be numbered zero.
+    #[must_use]
+    pub fn same_seat_as(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Session { session: a, .. }, Self::Session { session: b, .. }) => a == b,
+            (Self::LocalDesktop { .. }, Self::LocalDesktop { .. }) => true,
+            _ => false,
+        }
+    }
 }
 
 /// One owner's shell, and when it was last used.
@@ -116,10 +138,24 @@ impl Shells {
         engine
     }
 
-    /// Forget this owner's shell, because the session that owned it has ended.
-    pub fn end(&self, owner: &ShellOwner) {
+    /// Forget one shell, because the card that was standing in it was closed.
+    ///
+    /// Closing a Tool card is a person saying they are finished with it. A shell left behind would
+    /// still be standing where they left it, so the next card opened at the same number would show
+    /// `/` and then jump somewhere else on the first command — a working directory the surface had
+    /// already stated was somewhere it was not.
+    pub fn end_one(&self, owner: &ShellOwner) {
         let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
         held.remove(owner);
+    }
+
+    /// Forget every shell belonging to this owner's seat, because that session has ended.
+    ///
+    /// All of them, not the one instance named: a person who signed out and opened three shells
+    /// left three working directories behind, and only one of them would have been forgotten.
+    pub fn end_seat(&self, owner: &ShellOwner) {
+        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        held.retain(|held_owner, _| !held_owner.same_seat_as(owner));
     }
 
     /// How many shells are currently held.
@@ -143,7 +179,17 @@ mod tests {
     }
 
     fn session(token: &str) -> ShellOwner {
-        ShellOwner::Session(crate::access::digest(token))
+        ShellOwner::Session {
+            session: crate::access::digest(token),
+            instance: 0,
+        }
+    }
+
+    fn session_instance(token: &str, instance: u32) -> ShellOwner {
+        ShellOwner::Session {
+            session: crate::access::digest(token),
+            instance,
+        }
     }
 
     #[tokio::test]
@@ -181,6 +227,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn two_shells_of_one_session_stand_in_different_places() {
+        // A seat can hold more than one shell. Keying only on the session made every Shell card a
+        // second view of the same working directory.
+        let (shells, root) = registry();
+        std::fs::create_dir(root.path().join("somewhere")).expect("a directory to enter");
+        let now = OffsetDateTime::now_utc();
+
+        let first = shells.for_owner(&session_instance("alice-token", 0), now);
+        drop(first.lock().await.execute("cd somewhere"));
+        assert_eq!(first.lock().await.cwd(), "/somewhere");
+
+        let second = shells.for_owner(&session_instance("alice-token", 1), now);
+        assert_eq!(second.lock().await.cwd(), "/");
+    }
+
+    #[tokio::test]
+    async fn ending_one_shell_leaves_the_others_standing() {
+        let (shells, _root) = registry();
+        let now = OffsetDateTime::now_utc();
+        shells.for_owner(&session_instance("alice-token", 0), now);
+        shells.for_owner(&session_instance("alice-token", 1), now);
+
+        shells.end_one(&session_instance("alice-token", 0));
+        assert_eq!(shells.held_shells(), 1);
+    }
+
+    #[tokio::test]
+    async fn ending_a_seat_ends_every_shell_it_opened() {
+        let (shells, _root) = registry();
+        let now = OffsetDateTime::now_utc();
+        for instance in 0..3 {
+            shells.for_owner(&session_instance("alice-token", instance), now);
+        }
+        shells.for_owner(&session_instance("bob-token", 0), now);
+        assert_eq!(shells.held_shells(), 4);
+
+        shells.end_seat(&session("alice-token"));
+        assert_eq!(
+            shells.held_shells(),
+            1,
+            "a signed-out seat left shells behind"
+        );
+    }
+
+    #[tokio::test]
     async fn the_desktop_is_not_whichever_session_arrived_first() {
         let (shells, root) = registry();
         std::fs::create_dir(root.path().join("somewhere")).expect("a directory to enter");
@@ -194,7 +285,7 @@ mod tests {
                 .await
                 .execute("cd somewhere"),
         );
-        let desktop = shells.for_owner(&ShellOwner::LocalDesktop, now);
+        let desktop = shells.for_owner(&ShellOwner::LocalDesktop { instance: 0 }, now);
         assert_eq!(desktop.lock().await.cwd(), "/");
     }
 
@@ -214,7 +305,7 @@ mod tests {
                 .await
                 .execute("cd somewhere"),
         );
-        shells.end(&session("alice-token"));
+        shells.end_seat(&session("alice-token"));
 
         let fresh = shells.for_owner(&session("alice-token"), now);
         assert_eq!(fresh.lock().await.cwd(), "/");

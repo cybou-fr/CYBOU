@@ -92,11 +92,13 @@ pub async fn logout_handler(
         .and_then(access::token_in)
     {
         state.sessions.end(token);
-        // The shell goes with the session. Leaving it behind would keep a working directory for a
-        // token nobody holds, and hand it back if that token were ever issued again.
-        state
-            .shells
-            .end(&ShellOwner::Session(access::digest(token)));
+        // Every shell the session opened goes with it, not the one that happens to be numbered
+        // zero. Leaving them behind would keep working directories for a token nobody holds, and
+        // hand them back if that token were ever issued again.
+        state.shells.end_seat(&ShellOwner::Session {
+            session: access::digest(token),
+            instance: 0,
+        });
     }
     (
         StatusCode::OK,

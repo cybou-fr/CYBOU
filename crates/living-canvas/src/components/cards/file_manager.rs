@@ -17,6 +17,7 @@ use crate::{
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
+    tool_state::ToolCardStates,
 };
 
 /// File Manager domain content presentation.
@@ -24,18 +25,25 @@ use crate::{
 pub fn FileManagerContent(
     runtime: RwSignal<RuntimeState>,
     auth_modal_open: RwSignal<bool>,
+    /// Which File Manager card this is, taken from `CardId::FileManager(n)`.
+    #[prop(optional)]
+    instance: u32,
 ) -> impl IntoView {
     let is_public_preview = move || match runtime.get() {
         RuntimeState::Ready { mode, .. } => mode == SessionMode::PublicPreview,
         _ => false,
     };
 
-    let (current_path, set_current_path) = signal("/".to_string());
-    let (entries, set_entries) = signal(Vec::<(String, bool, u64)>::new());
-    let (selected_file, set_selected_file) = signal(Option::<String>::None);
-    let (file_content, set_file_content) = signal(String::new());
-    let (loading, set_loading) = signal(false);
-    let (error_msg, set_error_msg) = signal(Option::<String>::None);
+    // Looked up, not created. The directory a person navigated to is something they did, and
+    // collapsing the card or switching a deck tab is not them undoing it.
+    let state = expect_context::<ToolCardStates>().file_manager(CardId::FileManager(instance));
+    let (current_path, set_current_path) = (state.current_path, state.current_path);
+    let (entries, set_entries) = (state.entries, state.entries);
+    let (selected_file, set_selected_file) = (state.selected_file, state.selected_file);
+    let (file_content, set_file_content) = (state.file_content, state.file_content);
+    let (loading, set_loading) = (state.loading, state.loading);
+    let (error_msg, set_error_msg) = (state.error_msg, state.error_msg);
+    let (was_read, set_was_read) = (state.read, state.read);
 
     let load_dir = move |path: String| {
         set_loading.set(true);
@@ -44,55 +52,46 @@ pub fn FileManagerContent(
         let target_p = path.clone();
         set_current_path.set(path);
         spawn_local(async move {
-            let client = GatewayMindClient;
-            let cmd = if target_p == "/" || target_p.is_empty() {
-                "ls -la".to_string()
-            } else {
-                format!("ls -la {target_p}")
-            };
-            match client.execute_shell(&cmd).await {
-                Ok(resp) => {
+            match GatewayMindClient.list_directory(&target_p).await {
+                Ok(listing) => {
                     set_loading.set(false);
-                    if resp.exit_code == 0 {
-                        let mut list = Vec::new();
-                        for line in resp.stdout.lines() {
-                            let trimmed = line.trim();
-                            if trimmed.is_empty() || trimmed.starts_with("total") {
-                                continue;
-                            }
-                            let parts: Vec<&str> = trimmed.split_whitespace().collect();
-                            if parts.len() >= 9 {
-                                let is_dir = parts[0].starts_with('d');
-                                let size: u64 = parts[4].parse().unwrap_or(0);
-                                let name = parts[8..].join(" ");
-                                if name != "." && name != ".." {
-                                    list.push((name, is_dir, size));
-                                }
-                            } else if parts.len() == 1 {
-                                let is_dir = parts[0].ends_with('/');
-                                let name = parts[0].trim_end_matches('/').to_string();
-                                if name != "." && name != ".." {
-                                    list.push((name, is_dir, 0));
-                                }
-                            }
-                        }
-                        list.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        set_entries.set(list);
-                    } else {
-                        set_error_msg.set(Some(if !resp.stderr.is_empty() {
-                            resp.stderr
-                        } else {
-                            "Directory read error".to_string()
-                        }));
+                    set_was_read.set(true);
+                    if listing.truncated {
+                        // A bounded listing says so. Showing the first five hundred entries as if
+                        // they were all of them would be a smaller directory, not a partial answer.
+                        set_error_msg.set(Some(format!(
+                            "Showing {} of {} entries",
+                            listing.entries.len(),
+                            listing.total_entries
+                        )));
                     }
+                    set_entries.set(
+                        listing
+                            .entries
+                            .into_iter()
+                            .map(|entry| (entry.name, entry.is_dir, entry.size_bytes))
+                            .collect(),
+                    );
                 }
                 Err(err) => {
                     set_loading.set(false);
-                    set_error_msg.set(Some(format!("Network error: {err}")));
+                    // Not read, so the panel keeps saying it has not read rather than reporting an
+                    // empty directory it never saw.
+                    set_entries.set(Vec::new());
+                    set_error_msg.set(Some(err.to_string()));
                 }
             }
         });
     };
+
+    // Read once, the first time this card is shown. Without it the panel opened on an assertion
+    // about a directory it had never asked about, and a person had to press Refresh to find out
+    // whether the first screen had been true.
+    Effect::new(move |_| {
+        if !was_read.get_untracked() && !loading.get_untracked() {
+            load_dir(current_path.get_untracked());
+        }
+    });
 
     let view_file = move |name: String| {
         set_selected_file.set(Some(name.clone()));
@@ -103,23 +102,14 @@ pub fn FileManagerContent(
             format!("{}/{name}", current_path.get())
         };
         spawn_local(async move {
-            let client = GatewayMindClient;
-            match client.execute_shell(&format!("cat {p}")).await {
-                Ok(resp) => {
+            match GatewayMindClient.read_text_file(&p).await {
+                Ok(content) => {
                     set_loading.set(false);
-                    if resp.exit_code == 0 {
-                        set_file_content.set(resp.stdout);
-                    } else {
-                        set_file_content.set(if !resp.stderr.is_empty() {
-                            resp.stderr
-                        } else {
-                            "Could not read file".to_string()
-                        });
-                    }
+                    set_file_content.set(content.text);
                 }
                 Err(err) => {
                     set_loading.set(false);
-                    set_file_content.set(format!("Error: {err}"));
+                    set_file_content.set(err.to_string());
                 }
             }
         });
@@ -183,8 +173,11 @@ pub fn FileManagerContent(
                         <Show when=move || loading.get()>
                             <div class="fm-empty">"Loading directory…"</div>
                         </Show>
-                        <Show when=move || !loading.get() && entries.get().is_empty() && error_msg.get().is_none()>
+                        <Show when=move || !loading.get() && entries.get().is_empty() && error_msg.get().is_none() && was_read.get()>
                             <div class="fm-empty">"Empty directory"</div>
+                        </Show>
+                        <Show when=move || !loading.get() && !was_read.get() && error_msg.get().is_none()>
+                            <div class="fm-empty">"Not read yet"</div>
                         </Show>
                         <For
                             each=move || entries.get()
@@ -265,8 +258,11 @@ pub fn FileManagerCard(
     resizing: RwSignal<Option<ResizeState>>,
     auth_modal_open: RwSignal<bool>,
     runtime: RwSignal<RuntimeState>,
+    /// Which instance of this tool card this is.
+    #[prop(optional)]
+    instance: u32,
 ) -> impl IntoView {
-    let card_id = CardId::FileManager(0);
+    let card_id = CardId::FileManager(instance);
 
     let collapsed = move || {
         view! {
@@ -290,7 +286,7 @@ pub fn FileManagerCard(
             kicker_icon=Arc::new(|| view! { <IconFolder size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
-            <FileManagerContent runtime=runtime auth_modal_open=auth_modal_open />
+            <FileManagerContent runtime=runtime auth_modal_open=auth_modal_open instance=instance />
         </CardFrame>
     }
 }

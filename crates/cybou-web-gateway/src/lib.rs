@@ -38,8 +38,9 @@ pub use state::{
 };
 
 use routes::{
-    api_not_found, disclosure_handler, events_handler, login_handler, logout_handler, mind_handler,
-    session_handler, shell_exec_handler, snapshot_handler,
+    api_not_found, disclosure_handler, events_handler, list_directory_handler, login_handler,
+    logout_handler, mind_handler, read_file_handler, session_handler, shell_close_handler,
+    shell_exec_handler, snapshot_handler,
 };
 use state::GatewayState;
 
@@ -140,7 +141,7 @@ pub(crate) fn router_in_sandbox(
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into());
 
     let jail = cybou_jailfs::JailFs::new(sandbox_path).expect("initialize gateway sandbox jail");
-    let shells = Arc::new(shells::Shells::new(jail));
+    let shells = Arc::new(shells::Shells::new(jail.clone()));
 
     let state = GatewayState {
         presence,
@@ -157,6 +158,7 @@ pub(crate) fn router_in_sandbox(
             expires_at,
         },
         shells,
+        files: jail,
     };
 
     let app = Router::new()
@@ -168,6 +170,9 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/events", get(events_handler))
         .route("/api/v1/disclosure", get(disclosure_handler))
         .route("/api/v1/shell/exec", post(shell_exec_handler))
+        .route("/api/v1/shell/close", post(shell_close_handler))
+        .route("/api/v1/files/list", post(list_directory_handler))
+        .route("/api/v1/files/read", post(read_file_handler))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -980,6 +985,7 @@ mod tests {
         let app = router(Arc::new(FixturePresenceSource::nominal()));
         let payload = serde_json::to_vec(&ShellExecRequest {
             command: "pwd".into(),
+            instance: 0,
         })
         .expect("serialize request");
 
@@ -1010,8 +1016,19 @@ mod tests {
 
     /// Run one command as the holder of this cookie, and return what the shell said.
     async fn shell_exec_as(app: &Router, cookie: &str, command: &str) -> ShellExecResponse {
+        shell_exec_instance(app, cookie, command, 0).await
+    }
+
+    /// Run one command in a named shell of the seat this cookie holds.
+    async fn shell_exec_instance(
+        app: &Router,
+        cookie: &str,
+        command: &str,
+        instance: u32,
+    ) -> ShellExecResponse {
         let payload = serde_json::to_vec(&ShellExecRequest {
             command: command.into(),
+            instance,
         })
         .expect("serialize request");
         let response = app
@@ -1061,6 +1078,207 @@ mod tests {
         assert_eq!(still_there.stdout.trim(), "/somewhere");
     }
 
+    /// Ask a typed filesystem route as whoever holds this cookie.
+    async fn files_post(
+        app: &Router,
+        route: &str,
+        cookie: &str,
+        path: &str,
+    ) -> axum::http::Response<Body> {
+        let payload = serde_json::to_vec(&cybou_web_contracts::FilePathRequest {
+            path: path.to_owned(),
+        })
+        .expect("serialize request");
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(route)
+                    .header("content-type", "application/json")
+                    .header("cookie", cookie)
+                    .body(Body::from(payload))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response")
+    }
+
+    #[tokio::test]
+    async fn a_directory_is_read_as_structure_rather_than_as_terminal_output() {
+        // The File Manager used to parse `ls -la`. Its parser wanted nine whitespace fields, the
+        // engine produced six, and every entry fell through both branches — so the panel showed an
+        // empty directory and reported no error, because from the parser's view there was nothing
+        // there. This route hands back what the sandbox established.
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        std::fs::write(sandbox.path().join("welcome.txt"), "hello").expect("a file");
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let response = files_post(&app, "/api/v1/files/list", &cookie, "/").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let listing: cybou_web_contracts::DirectoryListingProjection =
+            serde_json::from_slice(&body).expect("a listing");
+
+        assert!(!listing.truncated);
+        assert_eq!(listing.total_entries, 2);
+        // Directories first, then by name — the order the sandbox sorted them in.
+        assert!(listing.entries[0].is_dir);
+        assert_eq!(listing.entries[0].name, "somewhere");
+        let file = listing
+            .entries
+            .iter()
+            .find(|entry| entry.name == "welcome.txt")
+            .expect("the file");
+        assert!(!file.is_dir);
+        assert_eq!(file.size_bytes, 5);
+    }
+
+    #[tokio::test]
+    async fn a_file_is_read_with_the_size_it_actually_has() {
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        std::fs::write(sandbox.path().join("welcome.txt"), "hello").expect("a file");
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let response = files_post(&app, "/api/v1/files/read", &cookie, "/welcome.txt").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let content: cybou_web_contracts::FileContentProjection =
+            serde_json::from_slice(&body).expect("file content");
+        assert_eq!(content.text, "hello");
+        assert_eq!(content.size_bytes, 5);
+    }
+
+    #[tokio::test]
+    async fn leaving_the_sandbox_is_answered_exactly_as_not_existing() {
+        // Distinguishing the two would let a caller entitled to read inside the sandbox map its
+        // edge by watching which refusals differ.
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let escaped = files_post(&app, "/api/v1/files/read", &cookie, "/../../etc/passwd").await;
+        let absent = files_post(&app, "/api/v1/files/read", &cookie, "/no-such-file").await;
+        assert_eq!(escaped.status(), StatusCode::NOT_FOUND);
+        assert_eq!(absent.status(), escaped.status());
+
+        let escaped_body = axum::body::to_bytes(escaped.into_body(), 16 * 1024)
+            .await
+            .expect("a body");
+        let absent_body = axum::body::to_bytes(absent.into_body(), 16 * 1024)
+            .await
+            .expect("a body");
+        assert_eq!(
+            escaped_body, absent_body,
+            "the two refusals are distinguishable"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_public_reader_cannot_read_the_sandbox_at_all() {
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::public_preview(),
+        );
+        let payload = serde_json::to_vec(&cybou_web_contracts::FilePathRequest {
+            path: "/".to_owned(),
+        })
+        .expect("serialize request");
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/files/list")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn two_shells_in_one_session_are_two_places_to_stand() {
+        // `CardSpec` says a Shell card is not a singleton. Until the instance reached the gateway
+        // that was a promise the backend could not keep: every card in a session drove one engine,
+        // so opening a second Shell gave you a second view of the first one's working directory.
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let moved = shell_exec_instance(&app, &cookie, "cd somewhere", 0).await;
+        assert_eq!(moved.cwd, "/somewhere");
+
+        let other = shell_exec_instance(&app, &cookie, "pwd", 1).await;
+        assert_eq!(
+            other.cwd, "/",
+            "a second Shell card inherited the first one's cwd"
+        );
+        assert_eq!(other.stdout.trim(), "/");
+
+        // And the first is still where it put itself.
+        assert_eq!(
+            shell_exec_instance(&app, &cookie, "pwd", 0).await.cwd,
+            "/somewhere"
+        );
+    }
+
+    #[tokio::test]
+    async fn signing_out_ends_every_shell_the_session_opened() {
+        // Not just the one numbered zero: a person who opened three shells and signed out left
+        // three working directories behind, and only one of them was being forgotten.
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        for instance in 0..3 {
+            assert_eq!(
+                shell_exec_instance(&app, &cookie, "cd somewhere", instance)
+                    .await
+                    .cwd,
+                "/somewhere"
+            );
+        }
+
+        let signed_out = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/logout")
+                    .header("cookie", cookie.clone())
+                    .body(Body::empty())
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(signed_out.status(), StatusCode::OK);
+
+        for instance in 0..3 {
+            let payload = serde_json::to_vec(&ShellExecRequest {
+                command: "pwd".into(),
+                instance,
+            })
+            .expect("serialize request");
+            let refused = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/v1/shell/exec")
+                        .header("content-type", "application/json")
+                        .header("cookie", cookie.clone())
+                        .body(Body::from(payload))
+                        .expect("a request"),
+                )
+                .await
+                .expect("a response");
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+        }
+    }
+
     #[tokio::test]
     async fn signing_out_forgets_where_the_session_was_standing() {
         let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
@@ -1089,6 +1307,7 @@ mod tests {
         // the caller whatever shell that token used to own.
         let payload = serde_json::to_vec(&ShellExecRequest {
             command: "pwd".into(),
+            instance: 0,
         })
         .expect("serialize request");
         let refused = app
@@ -1115,6 +1334,7 @@ mod tests {
         );
         let payload = serde_json::to_vec(&ShellExecRequest {
             command: "pwd".into(),
+            instance: 0,
         })
         .expect("serialize request");
 

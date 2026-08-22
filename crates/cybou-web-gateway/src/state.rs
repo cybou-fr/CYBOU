@@ -167,6 +167,8 @@ pub struct GatewayState {
     pub session: SessionProjection,
     /// One sandboxed shell per session, rather than one for the whole process.
     pub shells: Arc<Shells>,
+    /// The sandbox itself, for surfaces that read it as structure rather than through a shell.
+    pub files: cybou_jailfs::JailFs,
 }
 
 impl GatewayState {
@@ -236,19 +238,28 @@ impl GatewayState {
     /// one seat. Everything else owns nothing, which is what makes the refusal in the shell route
     /// a refusal rather than a fallback onto somebody else's.
     #[must_use]
-    pub fn shell_owner(&self, headers: &HeaderMap) -> Option<ShellOwner> {
+    pub fn shell_owner(&self, headers: &HeaderMap, instance: u32) -> Option<ShellOwner> {
         if let Some(token) = Self::token_in(headers)
             && self
                 .sessions
                 .resolve(token, OffsetDateTime::now_utc())
                 .is_some()
         {
-            return Some(ShellOwner::Session(access::digest(token)));
+            return Some(ShellOwner::Session {
+                session: access::digest(token),
+                instance,
+            });
         }
         if self.session.mode == SessionMode::LocalDesktop {
-            return Some(ShellOwner::LocalDesktop);
+            return Some(ShellOwner::LocalDesktop { instance });
         }
         None
+    }
+
+    /// The seat this request belongs to, whatever instance it named.
+    #[must_use]
+    pub fn shell_seat(&self, headers: &HeaderMap) -> Option<ShellOwner> {
+        self.shell_owner(headers, 0)
     }
 
     /// The source this request is entitled to.
