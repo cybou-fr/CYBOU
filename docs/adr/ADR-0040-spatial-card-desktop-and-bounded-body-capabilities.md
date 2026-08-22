@@ -69,7 +69,7 @@ pub struct CardPresentation {
 ```
 
 Cards are classified into three architectural categories (`CardKind`):
-- **System Cards** (12 canonical singleton projections: `Identity`, `Session`, `Capabilities`, `Journal`, `Lifecycle`, `Commitments`, `SelfModel`, `Attention`, `Beliefs`, `Perception`, `Context`, `Disclosure`). System cards are singleton, movable, resizable, collapsible, deckable, and cannot be destroyed. `Disclosure` was added on 2026-08-22 and is the one card that is not a projection of an organ: it shows what the reader in front of it was supplied and what was kept from them (ADR-0030 B1, B6).
+- **System Cards** (12 canonical singleton projections: `Identity`, `Session`, `Capabilities`, `Journal`, `Lifecycle`, `Commitments`, `SelfModel`, `Attention`, `Beliefs`, `Perception`, `Context`, `Disclosure`). System cards are singleton, movable, resizable, collapsible, deckable, and cannot be destroyed.
 - **Tool Cards** (e.g. `CYBOU Shell`, Inspector, Debugger). Ephemeral or multi-instance, closable, resizable, bounded to specific capability profiles.
 - **Ephemeral Cards** (e.g. search previews, temporary diffs, inspection overlays). Transient life-cycle, closable, discardable.
 
@@ -93,7 +93,7 @@ CYBOU Desktop provides spatial freedom combined with deterministic structure:
 - **Collapse / Expand**: Cards can collapse into single-line summary pills to save canvas real estate while preserving presence.
 - **Pinning**: Pinned cards (`pinned: true`) are locked against auto-arrangement algorithms.
 - **Non-Destructive Focus Mode**: Focus expands cards to fill the active viewport without mutating underlying persisted spatial coordinates; `Escape` cleanly restores the previous desktop state.
-- **Arrangement Modes**: Pure, deterministic function `arrange(mode, cards, relationships, bounds)` supporting `Free`, `Compact`, `Grid`, `Relations`, and `Focus`.
+- **Arrangement Modes**: Pure, deterministic function `arrange(mode, cards, relationships, bounds)` supporting `Free`, `Compact`, `Grid`, `Relations`, and `Home`. Focus is not an arrangement — see **Amendment 2**.
 - **Invariant-Safe Decks**: Tabbed grouping governed by typed `DeckError` invariants, ensuring minimum 2 cards per deck, no duplicate cards, and WAI-ARIA `role="tablist"` keyboard traversal (`ArrowLeft`/`ArrowRight`/`Home`/`End`).
 
 ### 4. Bounded Body Capability: CYBOU Shell
@@ -118,12 +118,12 @@ CYBOU Shell is **not** an unrestricted terminal emulator, shell launcher, or `/b
 │       Dedicated unprivileged daemon (NoNewPrivileges=yes)   │
 │              cybou-jailfs (RESOLVE_BENEATH)                 │
 │                 DemoReadOnly -> /home/demo                  │
-│       Builtins only: help, pwd, ls, cd, cat, clear          │
+│  Builtins only; the accepted set is in Amendment 1 below.   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 #### Shell Invariants:
-1. **Builtins only**: Only `help`, `pwd`, `ls`, `cd`, `cat`, `clear` are recognized. No fork/exec of `/usr/bin/*`, no pipelines (`|`), no shell expansions, no redirection (`>`, `<`), no subshells.
+1. **Builtins only**: Only the set named in **Amendment 1** is recognized; anything else exits 127. No fork/exec of `/usr/bin/*`, no pipelines (`|`), no shell expansions, no redirection (`>`, `<`), no subshells. The invariant is that the set is closed and enumerated here, not that it has any particular size.
 2. **Filesystem Jail (`cybou-jailfs`)**: All filesystem operations use fd-relative lookup (`openat2` with `RESOLVE_BENEATH` on Linux), strict path canonicalization, no traversal beyond jail root, and bounded read budgets (max file size, max directory entries).
 3. **Session Profile**: Default profile is `DemoReadOnly` rooted at `/home/demo`.
 4. **No Public Preview Exposure**: `cybou-web-gateway` strictly omits and refuses shell capability endpoints when running under `PublicPreview` mode. Shell capabilities are available exclusively to authenticated `LocalDesktop` sessions.
@@ -160,3 +160,67 @@ Cross-zone rules:
 ### Negative / Trade-offs
 - Additional daemon (`cybou-shelld`) and crate (`cybou-jailfs`) to maintain.
 - Bounded shell syntax requires explicit documentation for users expecting full bash/zsh capabilities.
+
+---
+
+## Amendment 1 (2026-08-22): the accepted builtin set, and two capabilities withdrawn
+
+This decision named six builtins and said only those were recognized. The implementation had grown
+to thirteen, `CURRENT_STATE.md` described thirteen, and `TESTING.md` still described six. Three
+documents and one program held three different answers, and the Accepted decision was the one
+nobody had changed.
+
+The growth did not weaken the sandbox — there is still no `exec`, no pipeline, no redirection, and
+every path goes through `cybou-jailfs`. It happened without amending the decision, which is its own
+failure and is what this amendment closes.
+
+Two of the thirteen are withdrawn rather than accepted, because they could only answer with
+something nobody established:
+
+| Withdrawn | What it did | Why |
+|---|---|---|
+| `whoami` | printed `cybou` | A constant. It named no account, and there was no account it was naming. |
+| `uname` | printed a fixed kernel string | A constant. It reported a kernel version, architecture and hostname that were compiled in, on every host. |
+
+In a terminal both read as observations of the Body. They were not observations of anything. A
+bounded surface may be small; nothing it prints may be invented.
+
+Two more were printing invented fields and now print fewer, truthful ones:
+
+- `ls -l` reported `-rwxr-xr-x 1 cybou cybou` for every entry — a mode nobody read and an owner
+  nobody looked up — and `4096` for every directory. It now reports type, size and name, and a
+  directory's size is a dash because the sandbox does not establish it.
+- `stat` reported `Access: (0644/-rw-r--r--)` for everything, including directories. The line is
+  gone. File, size and type remain because those come from a real `metadata` call.
+
+**The accepted set is therefore eleven, all read-only:**
+
+```text
+help  pwd  ls  cd  cat  echo  stat  head  tail  grep  clear
+```
+
+Each earns its place the same way: it reads bytes or paths that `cybou-jailfs` already resolved
+inside the sandbox root, or it manipulates only text the caller supplied. None of them observes the
+host, names a principal, or reports a property of the machine.
+
+Extending this set again requires amending this document in the same commit as the code.
+
+## Amendment 2 (2026-08-22): Focus is a view mode, not an arrangement
+
+This decision listed `Focus` among the arrangement modes. The implementation separates the two, and
+the separation is better than the original text:
+
+```text
+ArrangementMode :: Free | Grid | Compact | Relations | Home
+DesktopViewMode :: Spatial | Focus
+```
+
+An arrangement computes persisted geometry. Focus does not: it fills the viewport without mutating
+the coordinates underneath, and `Escape` restores what was there. Calling both "modes" of the same
+thing made a non-destructive view look like a destructive rearrangement.
+
+## Amendment 3 (2026-08-22): twelve system cards
+
+`Disclosure` was added as a twelfth canonical system card, and is the one card that is not a
+projection of an organ: it shows what the reader in front of it was supplied and what was kept from
+them (ADR-0030 B1, B6).

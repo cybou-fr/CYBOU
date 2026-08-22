@@ -64,8 +64,6 @@ impl ShellEngine {
             "ls" => self.exec_ls(args),
             "cat" => self.exec_cat(args),
             "echo" => self.exec_echo(args),
-            "whoami" => self.exec_whoami(),
-            "uname" => self.exec_uname(args),
             "stat" => self.exec_stat(args),
             "head" => self.exec_head(args),
             "tail" => self.exec_tail(args),
@@ -167,13 +165,18 @@ impl ShellEngine {
                 let mut out = String::new();
                 for entry in entries {
                     if show_long {
-                        let kind = if entry.is_dir { "d" } else { "-" };
-                        let size = if entry.is_dir { 4096 } else { entry.size_bytes };
-                        let _ = writeln!(
-                            out,
-                            "{kind}rwxr-xr-x 1 cybou cybou {size:>8} {}",
-                            entry.name
-                        );
+                        // Type, size and name, because those are what the sandbox established.
+                        // This column used to read `-rwxr-xr-x 1 cybou cybou` for every entry on
+                        // every host: a mode nobody read and an owner nobody looked up, printed in
+                        // the format a person trusts to be a fact. A directory's size is not
+                        // established either, so it is a dash rather than a plausible 4096.
+                        let kind = if entry.is_dir { "dir " } else { "file" };
+                        let size = if entry.is_dir {
+                            "-".to_owned()
+                        } else {
+                            entry.size_bytes.to_string()
+                        };
+                        let _ = writeln!(out, "{kind} {size:>10} {}", entry.name);
                     } else {
                         let suffix = if entry.is_dir { "/" } else { "" };
                         let _ = write!(out, "{}{suffix}  ", entry.name);
@@ -228,20 +231,6 @@ impl ShellEngine {
         ShellOutput::success(out, self.cwd())
     }
 
-    fn exec_whoami(&self) -> ShellOutput {
-        ShellOutput::success("cybou\n", self.cwd())
-    }
-
-    fn exec_uname(&self, args: &[String]) -> ShellOutput {
-        let show_all = args.iter().any(|a| a == "-a" || a == "--all");
-        let out = if show_all {
-            "Linux cybou-node 6.1.0-cybou #1 SMP Debian 13 (Trixie) x86_64 GNU/Linux\n"
-        } else {
-            "Linux\n"
-        };
-        ShellOutput::success(out, self.cwd())
-    }
-
     fn exec_stat(&self, args: &[String]) -> ShellOutput {
         if args.is_empty() {
             return ShellOutput::error(1, "stat: missing operand\n", self.cwd());
@@ -256,8 +245,13 @@ impl ShellEngine {
                         "regular file"
                     };
                     let size = meta.len();
+                    // No access line. It read `(0644/-rw-r--r--)` for everything,
+                    // including directories and files whose mode was something else
+                    // entirely. Permissions inside the sandbox are not something this
+                    // surface establishes, and a constant printed in the position of a
+                    // fact is worse than a gap.
                     let out = format!(
-                        "  File: {}\n  Size: {}\t\tType: {}\n  Access: (0644/-rw-r--r--)\n",
+                        "  File: {}\n  Size: {}\t\tType: {}\n",
                         args[0], size, file_type
                     );
                     ShellOutput::success(out, self.cwd())
@@ -426,9 +420,7 @@ impl ShellEngine {
                 "ls" => "ls [-l] [dir] - list directory contents",
                 "cat" => "cat <file> - concatenate and display file content",
                 "echo" => "echo [-n] [text...] - display a line of text",
-                "whoami" => "whoami - print effective user name",
-                "uname" => "uname [-a] - print operating system information",
-                "stat" => "stat <file> - display file or directory status",
+                "stat" => "stat <file> - display the file type and size the sandbox established",
                 "head" => "head [-n N] <file> - output the first part of files",
                 "tail" => "tail [-n N] <file> - output the last part of files",
                 "grep" => "grep [-i] <pattern> <file> - print lines matching a pattern",
@@ -445,12 +437,10 @@ Available builtin capabilities:
 
   pwd                   Print working directory
   cd <dir>              Change directory inside sandbox
-  ls [-l] [dir]         List directory contents
+  ls [-l] [dir]         List directory contents; -l adds type and size
   cat <file>            Display file contents
   echo [-n] [text...]   Display text
-  whoami                Print current user name
-  uname [-a]            Print system information
-  stat <file>           Display file or directory metadata
+  stat <file>           Display the file type and size
   head [-n N] <file>    Output the first N lines (default 10)
   tail [-n N] <file>    Output the last N lines (default 10)
   grep [-i] <pat> <file> Search for pattern in file
