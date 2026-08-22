@@ -10,6 +10,7 @@ pub mod minimap;
 pub mod model;
 pub mod placement;
 pub mod relations;
+pub mod selection;
 pub mod snap;
 
 pub use engine::DesktopLayout;
@@ -24,6 +25,7 @@ pub use model::{
 };
 pub use placement::PlacementResolver;
 pub use relations::{DesktopRelationshipGraph, Relationship, RelationshipKind};
+pub use selection::{selected_rect, selected_z};
 pub use snap::{SnapGuide, SnapResult, compute_snap};
 
 #[cfg(test)]
@@ -288,6 +290,61 @@ mod tests {
         for item in &items {
             assert!(!item.effective_rect().intersects(&candidate));
         }
+    }
+
+    #[test]
+    fn a_merged_deck_stands_where_the_target_stood_and_is_its_size() {
+        // Dropping one card onto another used to replace both with a deck starting at a constant
+        // 420x480 that only ever grew, so a merge could double the footprint of what a person had
+        // just arranged.
+        let mut layout = DesktopLayout::canonical(None);
+        layout.set_size(CardId::Context, 330.0, 200.0);
+        let target = layout.geometry(CardId::Context);
+
+        let deck_id = layout
+            .create_deck_over(
+                "Context + Beliefs",
+                vec![CardId::Context, CardId::Beliefs],
+                target.x,
+                target.y,
+                Some((target.width, target.height)),
+            )
+            .expect("a deck");
+        let deck = layout.deck(&deck_id).expect("the deck");
+
+        assert_eq!(deck.geometry.x, target.x);
+        assert_eq!(deck.geometry.y, target.y);
+        // No larger than the place it took, except where a member's own minimum requires it.
+        let floor_w = CardId::Context
+            .spec()
+            .min_size
+            .0
+            .max(CardId::Beliefs.spec().min_size.0)
+            .max(340.0);
+        assert_eq!(deck.geometry.width, target.width.max(floor_w));
+        assert!(
+            deck.geometry.width < 420.0 || floor_w >= 420.0,
+            "the deck grew to the old constant"
+        );
+    }
+
+    #[test]
+    fn a_merged_deck_still_grows_to_fit_what_it_holds() {
+        // The footprint is a wish, not an override: a deck smaller than one of its own cards would
+        // be a container that cannot show its contents.
+        let mut layout = DesktopLayout::canonical(None);
+        let deck_id = layout
+            .create_deck_over(
+                "Tiny",
+                vec![CardId::Capabilities, CardId::Journal],
+                10.0,
+                10.0,
+                Some((100.0, 80.0)),
+            )
+            .expect("a deck");
+        let deck = layout.deck(&deck_id).expect("the deck");
+        assert!(deck.geometry.width >= CardId::Capabilities.spec().min_size.0);
+        assert!(deck.geometry.height >= CardId::Capabilities.spec().min_size.1);
     }
 
     #[test]

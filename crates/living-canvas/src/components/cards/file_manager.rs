@@ -10,7 +10,7 @@ use std::sync::Arc;
 use web_sys::PointerEvent;
 
 use crate::{
-    CardId, DesktopLayout, GatewayMindClient, MindClient,
+    CardId, DesktopItemId, DesktopLayout, GatewayMindClient, MindClient,
     components::{
         card_frame::CardFrame,
         icons::{IconArrowLeft, IconCopy, IconFile, IconFolder, IconHome, IconRefresh, IconShield},
@@ -252,8 +252,8 @@ pub fn FileManagerContent(
 #[component]
 pub fn FileManagerCard(
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
     auth_modal_open: RwSignal<bool>,

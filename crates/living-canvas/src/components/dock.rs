@@ -8,7 +8,7 @@ use leptos::prelude::*;
 use wasm_bindgen::{JsCast, closure::Closure};
 
 use crate::{
-    CardId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout,
     components::icons::{IconFile, IconFolder, IconShield, IconTerminal},
     state::RuntimeState,
 };
@@ -17,8 +17,8 @@ use crate::{
 #[component]
 pub fn DesktopDock(
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     auth_modal_open: RwSignal<bool>,
     runtime: RwSignal<RuntimeState>,
 ) -> impl IntoView {
@@ -78,29 +78,29 @@ pub fn DesktopDock(
         RuntimeState::Error(_) => "offline ✕".to_string(),
     };
 
-    let open_or_focus = move |card_id: CardId, key: &'static str, def_w: f64, def_h: f64| {
+    let open_or_focus = move |card_id: CardId, def_w: f64, def_h: f64| {
         if !layout.get().contains_card(card_id) {
             layout.update(|l| l.open_card(card_id, def_w, def_h));
         } else if layout.get().presentation(card_id).collapsed {
             layout.update(|l| l.set_collapsed(card_id, false));
         }
         layout.update(|l| l.bring_forward(card_id));
-        set_selected.set(key);
+        set_selected.set(Some(DesktopItemId::Card(card_id)));
         layout.get_untracked().save();
     };
 
     view! {
         <footer class="desktop-dock" aria-label="Desktop Card Shelf and Taskbar">
             <div class="dock-apps">
-                <button class="dock-item" class:active=move || selected.get() == "shell" title="CYBOU Shell" on:click=move |_| open_or_focus(CardId::Shell(0), "shell", 400.0, 160.0)>
+                <button class="dock-item" class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "shell")) title="CYBOU Shell" on:click=move |_| open_or_focus(CardId::Shell(0), 400.0, 160.0)>
                     <IconTerminal size=18 />
                     <span class="dock-tooltip">"Shell"</span>
                 </button>
-                <button class="dock-item" class:active=move || selected.get() == "files" title="File Manager" on:click=move |_| open_or_focus(CardId::FileManager(0), "files", 380.0, 120.0)>
+                <button class="dock-item" class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "files")) title="File Manager" on:click=move |_| open_or_focus(CardId::FileManager(0), 380.0, 120.0)>
                     <IconFolder size=18 />
                     <span class="dock-tooltip">"Files"</span>
                 </button>
-                <button class="dock-item" class:active=move || selected.get() == "journal-feed" title="Event Stream" on:click=move |_| open_or_focus(CardId::JournalFeed(0), "journal-feed", 420.0, 150.0)>
+                <button class="dock-item" class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "journal-feed")) title="Event Stream" on:click=move |_| open_or_focus(CardId::JournalFeed(0), 420.0, 150.0)>
                     <IconFile size=18 />
                     <span class="dock-tooltip">"Events"</span>
                 </button>
@@ -114,9 +114,8 @@ pub fn DesktopDock(
                     key=|c| format!("{:?}", c.id)
                     children=move |c| {
                         let id_click = c.id;
-                        let k = c.id.key();
                         let title = c.id.title();
-                        let is_active = move || selected.get() == k;
+                        let is_active = move || selected.get() == Some(DesktopItemId::Card(id_click));
                         let is_min = c.presentation.collapsed;
                         view! {
                             <button
@@ -129,7 +128,7 @@ pub fn DesktopDock(
                                         layout.update(|l| l.set_collapsed(id_click, false));
                                     }
                                     layout.update(|l| l.bring_forward(id_click));
-                                    set_selected.set(k);
+                                    set_selected.set(Some(DesktopItemId::Card(id_click)));
                                 }
                             >
                                 <span class="dock-win-dot"></span>

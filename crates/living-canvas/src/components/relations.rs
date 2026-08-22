@@ -6,7 +6,7 @@
 use leptos::prelude::*;
 
 use crate::{
-    CardId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout,
     interaction::relationship_points,
     layout::relations::{DesktopRelationshipGraph, Relationship},
 };
@@ -15,7 +15,7 @@ use crate::{
 #[component]
 pub fn RelationshipEdge(
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
     from: CardId,
     to: CardId,
     label: &'static str,
@@ -25,7 +25,10 @@ pub fn RelationshipEdge(
     view! {
         <g
             class:amber=amber
-            class:active=move || selected.get() == from.key() || selected.get() == to.key()
+            class:active=move || {
+                let selected = selected.get();
+                selected == Some(DesktopItemId::Card(from)) || selected == Some(DesktopItemId::Card(to))
+            }
             class="relationship-edge"
         >
             <line
@@ -47,7 +50,7 @@ pub fn RelationshipEdge(
 #[component]
 pub fn RelationshipsLayer(
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
 ) -> impl IntoView {
     let relationships = DesktopRelationshipGraph::canonical();
     view! {

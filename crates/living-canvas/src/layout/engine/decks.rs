@@ -29,8 +29,31 @@ impl DesktopLayout {
         x: f64,
         y: f64,
     ) -> Result<String, DeckError> {
+        self.create_deck_over(title, cards, x, y, None)
+    }
+
+    /// Group cards into a deck standing where an existing item stood.
+    ///
+    /// `footprint` is the size the deck should take if its members allow it — the geometry of the
+    /// card that was dropped onto. Without it a merge started from a constant `420 x 480` and only
+    /// ever grew, so dropping a 330x200 card onto another one replaced them with something half the
+    /// desktop wide. A deck put in the place of a card should be the size of that place.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DeckError` if cards cannot be grouped into a valid deck.
+    pub fn create_deck_over(
+        &mut self,
+        title: impl Into<String>,
+        cards: Vec<CardId>,
+        x: f64,
+        y: f64,
+        footprint: Option<(f64, f64)>,
+    ) -> Result<String, DeckError> {
         let id = format!("deck-{}", uuid::Uuid::new_v4());
 
+        // What the deck cannot be smaller than: every member has to fit, and the tab strip needs
+        // its own room. This is a floor, never a target.
         let mut min_w: f64 = 340.0;
         let mut min_h: f64 = 240.0;
         for c in &cards {
@@ -40,8 +63,9 @@ impl DesktopLayout {
         }
 
         let mut deck = DeckInstance::try_new(&id, title, cards, x, y)?;
-        deck.geometry.width = deck.geometry.width.max(min_w);
-        deck.geometry.height = deck.geometry.height.max(min_h);
+        let (wanted_w, wanted_h) = footprint.unwrap_or((deck.geometry.width, deck.geometry.height));
+        deck.geometry.width = wanted_w.max(min_w);
+        deck.geometry.height = wanted_h.max(min_h);
         self.decks.push(deck);
         self.bring_item_forward(&DesktopItemId::Deck(id.clone()));
         Ok(id)

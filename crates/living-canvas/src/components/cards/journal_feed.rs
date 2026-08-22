@@ -10,7 +10,7 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, MessageEvent, PointerEvent};
 
 use crate::{
-    CardId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout,
     components::{card_frame::CardFrame, icons::IconFile},
     interaction::{DragState, ResizeState},
 };
@@ -216,8 +216,8 @@ pub fn JournalFeedContent() -> impl IntoView {
 #[component]
 pub fn JournalFeedCard(
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
     /// Which instance of this tool card this is.

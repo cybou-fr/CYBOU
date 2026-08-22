@@ -8,7 +8,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{PointerEvent, WheelEvent};
 
 use crate::{
-    CardId, DesktopLayout, LayoutHistory, SnapGuide,
+    CardId, DesktopItemId, DesktopLayout, LayoutHistory, SnapGuide,
     components::{
         cards::{
             AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
@@ -27,8 +27,8 @@ use crate::{
 pub fn CanvasViewport(
     layout: RwSignal<DesktopLayout>,
     history: RwSignal<LayoutHistory>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
     snap_guides: RwSignal<Vec<SnapGuide>>,

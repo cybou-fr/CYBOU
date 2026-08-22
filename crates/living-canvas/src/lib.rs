@@ -32,7 +32,8 @@ pub use gateway_client::GatewayMindClient;
 pub use layout::{
     ArrangementMode, DesktopItem, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory,
     MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, PlacementResolver, Rect,
-    SnapGuide, SnapResult, UsableViewport, pan_centring, visible_desktop_rect,
+    SnapGuide, SnapResult, UsableViewport, pan_centring, selected_rect, selected_z,
+    visible_desktop_rect,
 };
 
 /// Error returned by a typed Mind client operation.

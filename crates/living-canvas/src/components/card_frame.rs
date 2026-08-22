@@ -8,7 +8,7 @@ use std::sync::Arc;
 use web_sys::{KeyboardEvent, PointerEvent};
 
 use crate::{
-    CardId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout,
     components::card_controls::{CardControls, CardResizeHandle},
     interaction::{DragState, ResizeState, card_style, keyboard_move, start_drag},
 };
@@ -18,8 +18,8 @@ use crate::{
 pub fn CardFrame(
     card: CardId,
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
     kicker_title: &'static str,
@@ -27,9 +27,12 @@ pub fn CardFrame(
     collapsed_summary: Arc<dyn Fn() -> AnyView + Send + Sync>,
     children: ChildrenFn,
 ) -> impl IntoView {
+    // The kind, for CSS. Not the identity: `Shell(0)` and `Shell(2)` share this string, and
+    // comparing it selected every Shell card at once while the action bar acted on the first.
     let key = card.key();
+    let item = move || DesktopItemId::Card(card);
     let is_open = move || layout.get().contains_card(card) && !layout.get().is_in_deck(card);
-    let is_selected = move || selected.get() == key;
+    let is_selected = move || selected.get() == Some(item());
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
     let is_magnet_target = move || dragging.get().and_then(|d| d.drop_target) == Some(card);
@@ -57,7 +60,7 @@ pub fn CardFrame(
                 aria-label=aria_label.clone()
                 on:pointerdown=move |event: PointerEvent| start_drag(event, card, layout, dragging)
                 on:keydown=move |event: KeyboardEvent| keyboard_move(event, card, layout)
-                on:click=move |_| set_selected.set(key)
+                on:click=move |_| set_selected.set(Some(item()))
             >
                 <header class="card-header">
                     <small class="panel-kicker">

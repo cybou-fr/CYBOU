@@ -8,7 +8,7 @@ use leptos::prelude::*;
 use lucide_leptos::{Ellipsis, FolderOpen, Link, ListChecks, Sparkles};
 
 use crate::{
-    DesktopLayout, LayoutHistory,
+    CardId, DesktopItemId, DesktopLayout, LayoutHistory,
     components::icons::{IconLayers, IconPin, IconRedo, IconRefresh, IconUndo},
     interaction::{apply_redo, apply_undo},
     state::RuntimeState,
@@ -19,8 +19,8 @@ use crate::{
 pub fn Topbar(
     runtime: RwSignal<RuntimeState>,
     auth_modal_open: RwSignal<bool>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     runtime_menu_open: ReadSignal<bool>,
     set_runtime_menu_open: WriteSignal<bool>,
     layout: RwSignal<DesktopLayout>,
@@ -68,7 +68,9 @@ pub fn Topbar(
     };
 
     let navigate_from_menu = move |panel: &'static str| {
-        set_selected.set(panel);
+        // A named panel is always a system card, and a system card is a singleton, so its key
+        // does identify it. Tool cards are never reached this way.
+        set_selected.set(CardId::from_key(panel).map(DesktopItemId::Card));
         set_runtime_menu_open.set(false);
     };
 
@@ -132,47 +134,47 @@ pub fn Topbar(
                         <div class="runtime-popover" role="menu">
                             <span class="popover-heading">"Open"</span>
                             <button
-                                class:active=move || selected.get() == "capabilities"
+                                class:active=move || selected.get() == CardId::from_key("capabilities").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("capabilities")
                              title="Composed by Health1"><Sparkles size=14 /><span>"Capabilities"</span></button>
                             <button
-                                class:active=move || selected.get() == "identity"
+                                class:active=move || selected.get() == CardId::from_key("identity").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("identity")
                              title="Composed by Identity1"><IconPin size=14 /><span>"Identity"</span></button>
                             <button
-                                class:active=move || selected.get() == "session"
+                                class:active=move || selected.get() == CardId::from_key("session").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("session")
                              title="Composed by Trust"><IconPin size=14 /><span>"Session"</span></button>
                             <button
-                                class:active=move || selected.get() == "journal"
+                                class:active=move || selected.get() == CardId::from_key("journal").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("journal")
                              title="Composed by Event1"><Link size=14 /><span>"Journal"</span></button>
                             <button
-                                class:active=move || selected.get() == "lifecycle"
+                                class:active=move || selected.get() == CardId::from_key("lifecycle").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("lifecycle")
                              title="Composed by Lifecycle1"><Sparkles size=14 /><span>"Lifecycle"</span></button>
                             <button
-                                class:active=move || selected.get() == "commitments"
+                                class:active=move || selected.get() == CardId::from_key("commitments").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("commitments")
                              title="Composed by Intention1"><ListChecks size=14 /><span>"Commitments"</span></button>
                             <button
-                                class:active=move || selected.get() == "self"
+                                class:active=move || selected.get() == CardId::from_key("self").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("self")
                              title="Composed by Self1"><Sparkles size=14 /><span>"Self-Model"</span></button>
                             <button
-                                class:active=move || selected.get() == "attention"
+                                class:active=move || selected.get() == CardId::from_key("attention").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("attention")
                              title="Composed by Workspace1"><Sparkles size=14 /><span>"Attention"</span></button>
                             <button
-                                class:active=move || selected.get() == "beliefs"
+                                class:active=move || selected.get() == CardId::from_key("beliefs").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("beliefs")
                              title="Composed by Epistemic1"><Sparkles size=14 /><span>"Beliefs"</span></button>
                             <button
-                                class:active=move || selected.get() == "perception"
+                                class:active=move || selected.get() == CardId::from_key("perception").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("perception")
                              title="Composed by Perception1"><Link size=14 /><span>"Perception"</span></button>
                             <button
-                                class:active=move || selected.get() == "context"
+                                class:active=move || selected.get() == CardId::from_key("context").map(DesktopItemId::Card)
                                 on:click=move |_| navigate_from_menu("context")
                              title="Composed by Context1"><Link size=14 /><span>"Context"</span></button>
                             <div class="popover-divider"></div>

@@ -8,7 +8,7 @@ use lucide_leptos::Files;
 use std::sync::Arc;
 
 use crate::{
-    CardId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
     interaction::{DragState, ResizeState},
     state::{RuntimeState, knowledge_label, unread},
@@ -79,8 +79,8 @@ pub fn JournalContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
 #[component]
 pub fn JournalCard(
     layout: RwSignal<DesktopLayout>,
-    selected: ReadSignal<&'static str>,
-    set_selected: WriteSignal<&'static str>,
+    selected: ReadSignal<Option<DesktopItemId>>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     dragging: RwSignal<Option<DragState>>,
     resizing: RwSignal<Option<ResizeState>>,
     runtime: RwSignal<RuntimeState>,

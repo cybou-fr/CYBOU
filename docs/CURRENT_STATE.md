@@ -334,6 +334,30 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Selection names an item, not a kind (2026-08-22)
+
+The desktop learned to hold several Shell cards and several File Managers, and one place did not
+learn with it. Selection was a `&'static str` holding a card's key — and a key names a *kind*:
+`Shell(0)`, `Shell(1)` and `Shell(2)` all answer `"shell"`. So clicking one Shell card marked every
+Shell card selected, and the action attached to the selection resolved that key back through
+`CardId::from_key`, which answers `Shell(0)`: clicking the third Shell brought the first one
+forward.
+
+Selection is a `DesktopItemId` now — what the layout has always used to tell one thing on the
+desktop from another, decks included, so a deck can be selected in its own right. `key()` stays what
+it always was: a name for a kind, good for CSS and routing, never an identity.
+
+The arithmetic moved to `layout::selection`, where it can be tested without a browser. Six tests
+hold it, including the one that would have caught this: two Shell cards at different coordinates
+must not resolve to the same place. It was invisible to every existing test because the whole of it
+lived in wasm-only component code.
+
+Two smaller things went with it. A deck created by dropping one card onto another started from a
+constant `420 x 480` and only ever grew, so a merge could double the footprint of what a person had
+just arranged; it takes the place of the card it replaced, expanded only where a member's own
+minimum requires. And the global keyboard listener was installed with `forget()`; it is removed on
+cleanup now. A listener nobody can take off keeps answering after whatever installed it is gone.
+
 ## A stranger is served nothing, and the page says less (2026-08-22)
 
 The deployed surface ran in `PublicPreview`: a filtered projection of a live Mind, served to anyone

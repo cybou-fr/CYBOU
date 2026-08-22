@@ -8,7 +8,7 @@ use lucide_leptos::{Link, ListChecks, Search, Sparkles};
 use web_sys::KeyboardEvent;
 
 use crate::{
-    ArrangementMode, CardId, DesktopLayout, LayoutHistory,
+    ArrangementMode, CardId, DesktopItemId, DesktopLayout, LayoutHistory,
     components::icons::{
         IconExternalLink, IconGrid, IconLayers, IconMaximize, IconMinimize, IconPin, IconRedo,
         IconRefresh, IconUndo,
@@ -22,7 +22,7 @@ use crate::{
 pub fn CommandPalette(
     layout: RwSignal<DesktopLayout>,
     history: RwSignal<LayoutHistory>,
-    set_selected: WriteSignal<&'static str>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
     auth_modal_open: RwSignal<bool>,
     command_open: ReadSignal<bool>,
     set_command_open: WriteSignal<bool>,
@@ -33,7 +33,9 @@ pub fn CommandPalette(
     set_pan: WriteSignal<(f64, f64)>,
 ) -> impl IntoView {
     let select_from_command = move |panel: &'static str| {
-        set_selected.set(panel);
+        // A named panel is always a system card, and a system card is a singleton, so its key
+        // does identify it. Tool cards are never reached this way.
+        set_selected.set(CardId::from_key(panel).map(DesktopItemId::Card));
         set_command_open.set(false);
         set_command_query.set(String::new());
     };

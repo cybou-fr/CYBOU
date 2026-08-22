@@ -83,24 +83,21 @@ pub fn card_style(layout: DesktopLayout, card: CardId) -> String {
     }
 }
 
-/// Inline style for the release quick-action bar attached to Capabilities card.
+/// Absolute placement for the action attached to the current selection.
+///
+/// The arithmetic is in [`crate::layout::selection`], where it can be tested without a browser —
+/// this used to resolve the selection through a kind key, so clicking the third Shell card acted on
+/// the first, and nothing native could see it.
 #[must_use]
-pub fn selection_actions_style(layout: &DesktopLayout, selected: &str) -> String {
-    // The selected card, not `Capabilities`. It was pinned to that one card's geometry whatever a
-    // person had actually selected, so the button sat under a card nobody had chosen and acted on
-    // one they had.
-    let Some(card) = CardId::from_key(selected) else {
+pub fn selection_actions_style(layout: &DesktopLayout, selected: Option<&DesktopItemId>) -> String {
+    let Some(rect) = crate::selected_rect(layout, selected) else {
         return "display:none".to_owned();
     };
-    if !layout.contains_card(card) || layout.is_in_deck(card) {
-        return "display:none".to_owned();
-    }
-    let geom = layout.geometry(card);
     format!(
         "left:{:.1}px;top:{:.1}px;z-index:{}",
-        geom.x + 18.0,
-        geom.y + geom.height,
-        geom.z + 1
+        rect.x + 18.0,
+        rect.y + rect.height,
+        crate::selected_z(layout, selected) + 1
     )
 }
 
@@ -352,11 +349,15 @@ pub fn finish_drag(
             } else {
                 let target_geom = current.geometry(target_card);
                 let title = format!("{} + {}", target_card.title(), dragged_card.title());
-                let _ = current.create_deck(
+                // The deck takes the place of the card it was dropped onto, size included. It used
+                // to start from a constant and only grow, so a merge could double the footprint of
+                // what a person had just arranged.
+                let _ = current.create_deck_over(
                     title,
                     vec![target_card, dragged_card],
                     target_geom.x,
                     target_geom.y,
+                    Some((target_geom.width, target_geom.height)),
                 );
             }
         });
