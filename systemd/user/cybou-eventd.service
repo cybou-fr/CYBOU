@@ -8,6 +8,18 @@ After=dbus.socket
 PartOf=cybou-mind.target
 
 [Service]
+# What this deployment keeps outside the live database.
+#
+# Erasure destroys a key and redacts a payload, which reaches the live database and every future
+# backup. It cannot reach a copy already taken: that copy plus a recovery root that still unwraps
+# the key defeats the erasure for that record (ADR-0028, E11 and E12). So an erasure reports a state
+# rather than a boolean, and the state depends on what this host actually keeps.
+#
+# 0 means no backups are kept, so nothing survives an erasure. A positive number is how many days a
+# copy stays in rotation. Leaving this unset is not neutral: the erasure then reports `unknown`,
+# because silence about backups is not evidence that none exist.
+Environment=CYBOU_BACKUP_ROTATION_DAYS=0
+
 Type=dbus
 BusName=org.cybou.Mind.Event1
 ExecStart=/usr/libexec/cybou/cybou-eventd

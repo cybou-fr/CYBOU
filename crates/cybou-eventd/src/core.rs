@@ -26,6 +26,7 @@ use crate::offsets::{PersistedOffsets, is_valid_consumer_id};
 use crate::verification::{
     FullSweepStep, PersistedCheckpoint, VerificationState, decode_hex, encode_hex, format_instant,
 };
+use cybou_protocol::admission::BackupState;
 
 /// Pure core domain logic for Event1 service, wrapping `JournalWriter`, `KeyStore`, and offsets.
 pub struct EventCore {
@@ -308,6 +309,18 @@ impl EventCore {
         writer.apply_erasure(target).map_err(EventError::Storage)
     }
 
+    /// What this deployment declared about the backups it keeps.
+    ///
+    /// `CYBOU_BACKUP_ROTATION_DAYS=0` means it keeps none. A positive number is how long a copy
+    /// stays in rotation. Unset means nothing was declared, which is not the same as none: silence
+    /// about backups is not evidence that none exist, and an erasure reporting completeness on the
+    /// strength of nobody having mentioned a copy would be stating what nobody established.
+    fn declared_backup_rotation() -> Option<u32> {
+        std::env::var("CYBOU_BACKUP_ROTATION_DAYS")
+            .ok()
+            .and_then(|value| value.trim().parse().ok())
+    }
+
     pub(crate) fn record_erasure_step(
         &self,
         kind: Kind,
@@ -319,8 +332,8 @@ impl EventCore {
             .find_by_message_id(target)
             .map_or((1, 1), |envelope| (envelope.privacy, envelope.sensitivity));
 
-        let mut payload = Vec::new();
-        let record = ciborium::Value::Map(vec![
+        let now_ms = cybou_protocol::unix_millis(OffsetDateTime::now_utc());
+        let mut record = vec![
             (
                 ciborium::Value::Text("target".into()),
                 ciborium::Value::Text(target.to_string()),
@@ -329,7 +342,28 @@ impl EventCore {
                 ciborium::Value::Text("reason".into()),
                 ciborium::Value::Text(reason.name().into()),
             ),
-        ]);
+        ];
+
+        // Only the terminal step carries a completion state. A request that has not been carried
+        // out has achieved nothing yet, and saying anything about backups there would be a claim
+        // about work not done.
+        if kind == Kind::ErasureApplied {
+            let backups =
+                BackupState::from_rotation(Self::declared_backup_rotation(), now_ms, now_ms);
+            record.push((
+                ciborium::Value::Text("backupState".into()),
+                ciborium::Value::Text(backups.name().into()),
+            ));
+            if let BackupState::PendingRotation { complete_after_ms } = backups {
+                record.push((
+                    ciborium::Value::Text("backupsCompleteAfterMs".into()),
+                    ciborium::Value::Integer(complete_after_ms.into()),
+                ));
+            }
+        }
+
+        let mut payload = Vec::new();
+        let record = ciborium::Value::Map(record);
         ciborium::into_writer(&record, &mut payload)
             .map_err(|error| EventError::Decode(error.to_string()))?;
 

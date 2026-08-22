@@ -483,12 +483,79 @@ pub fn check_admission(
 #[cfg(test)]
 mod tests {
     use super::{
-        Admitted, ENVELOPE_SCHEMA_CLASSIFIED, ENVELOPE_SCHEMA_PROTECTED, Kind, Privacy,
-        ReferenceFacts, Rejection, Resolved, Sensitivity, check_admission, check_structure,
-        derived_retain_until_ms,
+        Admitted, BackupState, ENVELOPE_SCHEMA_CLASSIFIED, ENVELOPE_SCHEMA_PROTECTED, Kind,
+        Privacy, ReferenceFacts, Rejection, Resolved, Sensitivity, check_admission,
+        check_structure, derived_retain_until_ms,
     };
     use crate::canonical::CanonicalEnvelope;
     use uuid::Uuid;
+
+    #[test]
+    fn silence_about_backups_is_not_a_declaration_that_there_are_none() {
+        // The whole point. A deployment that has said nothing cannot be reported as having
+        // forgotten completely, because nobody established that no copy exists.
+        let state = BackupState::from_rotation(None, 1_000, 2_000);
+        assert_eq!(state, BackupState::Unknown);
+        assert!(!state.reached_every_copy());
+    }
+
+    #[test]
+    fn a_deployment_that_keeps_no_backups_says_so() {
+        let state = BackupState::from_rotation(Some(0), 1_000, 1_000);
+        assert_eq!(state, BackupState::NoneDeclared);
+        assert!(state.reached_every_copy());
+    }
+
+    #[test]
+    fn an_erasure_is_incomplete_while_an_older_copy_could_still_exist() {
+        // Seven days of rotation, erased now: for the next seven days a backup taken before the
+        // erasure may still hold the key that was destroyed.
+        let erased_at = 1_000_000_000_000;
+        let state = BackupState::from_rotation(Some(7), erased_at, erased_at);
+        match state {
+            BackupState::PendingRotation { complete_after_ms } => {
+                assert_eq!(complete_after_ms, erased_at + 7 * 86_400_000);
+            }
+            other => panic!("expected a pending rotation, got {other:?}"),
+        }
+        assert!(!state.reached_every_copy());
+    }
+
+    #[test]
+    fn it_becomes_complete_only_once_the_rotation_has_actually_passed() {
+        let erased_at = 1_000_000_000_000;
+        let window = 7 * 86_400_000;
+        assert!(
+            !BackupState::from_rotation(Some(7), erased_at, erased_at + window - 1)
+                .reached_every_copy()
+        );
+        assert_eq!(
+            BackupState::from_rotation(Some(7), erased_at, erased_at + window),
+            BackupState::Complete
+        );
+    }
+
+    #[test]
+    fn a_rotation_long_enough_to_overflow_does_not_wrap_into_completeness() {
+        // A deployment declaring an absurd rotation must not come out the other side reported as
+        // having forgotten everything.
+        let state = BackupState::from_rotation(Some(u32::MAX), i64::MAX - 1, i64::MAX);
+        assert!(!state.reached_every_copy(), "{state:?}");
+    }
+
+    #[test]
+    fn every_state_has_a_frozen_spelling() {
+        for state in [
+            BackupState::NoneDeclared,
+            BackupState::PendingRotation {
+                complete_after_ms: 0,
+            },
+            BackupState::Complete,
+            BackupState::Unknown,
+        ] {
+            assert!(!state.name().is_empty());
+        }
+    }
 
     fn uuid(byte: u8) -> Uuid {
         Uuid::from_bytes([byte; 16])
@@ -790,6 +857,94 @@ mod tests {
         assert!(!Sensitivity::Credential.may_be_training_target());
         assert!(!Sensitivity::Secret.may_be_training_target());
         assert!(Sensitivity::Sensitive.may_be_training_target());
+    }
+}
+
+/// How far an erasure reached, on the axis erasure cannot reach by itself.
+///
+/// Destroying a key and redacting a payload reaches the live database and every future backup. It
+/// does not reach a backup already taken: a copy made before the erasure, together with a recovery
+/// root that still unwraps the key captured in it, defeats the erasure for that record. Backup
+/// rotation is therefore part of the retention guarantee rather than an operational detail, and a
+/// deployment keeping backups indefinitely has weakened erasure to the age of its oldest one
+/// (ADR-0028, E11 and E12).
+///
+/// This is a state and not a boolean because "erased" is too binary to be honest. A person asking
+/// whether something was forgotten must not be told "yes, completely" while a copy that can still
+/// be recovered is in rotation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackupState {
+    /// Nothing outside the live database holds a copy, because this deployment declares no backups.
+    ///
+    /// A declaration, not an observation: the system cannot see what somebody copied elsewhere. It
+    /// says what the deployment stated about itself, which is the most it can honestly say.
+    NoneDeclared,
+    /// A backup taken before this erasure may still be in rotation, and may still hold the key.
+    ///
+    /// `complete_after_ms` is the instant at which the declared rotation will have discarded every
+    /// copy that predates the erasure. Until then the erasure is real for the live database and
+    /// incomplete for the deployment as a whole.
+    PendingRotation {
+        /// Unix milliseconds after which no pre-erasure copy remains inside the declared rotation.
+        complete_after_ms: i64,
+    },
+    /// Every copy that predated the erasure has left the declared rotation.
+    Complete,
+    /// This deployment has not said whether it keeps backups, so nothing can be claimed.
+    ///
+    /// The default, and deliberately the unreassuring one. Silence about backups is not evidence
+    /// that none exist, and an erasure that reported completeness on the strength of nobody having
+    /// mentioned a copy would be stating what nobody established.
+    Unknown,
+}
+
+impl BackupState {
+    /// The state a declared rotation implies for an erasure at this instant.
+    ///
+    /// `rotation_days` is what the deployment declared it keeps. `None` means it declared nothing,
+    /// which is not the same as declaring none.
+    #[must_use]
+    pub const fn from_rotation(rotation_days: Option<u32>, erased_at_ms: i64, now_ms: i64) -> Self {
+        let Some(days) = rotation_days else {
+            return Self::Unknown;
+        };
+        if days == 0 {
+            return Self::NoneDeclared;
+        }
+        let window_ms = (days as i64).saturating_mul(86_400_000);
+        // A sum that did not fit is a calculation that could not be made, not a window that has
+        // passed. Saturating here and then comparing would turn "we cannot say" into "it is done",
+        // which is the one direction this type exists to prevent.
+        let Some(complete_after_ms) = erased_at_ms.checked_add(window_ms) else {
+            return Self::PendingRotation {
+                complete_after_ms: i64::MAX,
+            };
+        };
+        if now_ms >= complete_after_ms {
+            Self::Complete
+        } else {
+            Self::PendingRotation { complete_after_ms }
+        }
+    }
+
+    /// The frozen spelling this state is recorded and reported under.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::NoneDeclared => "no-backups-declared",
+            Self::PendingRotation { .. } => "pending-rotation",
+            Self::Complete => "complete",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    /// Whether the erasure can be said to have reached every copy this deployment knows of.
+    ///
+    /// Only one state answers yes on its own, and one more answers yes because the rotation has
+    /// since passed. `Unknown` never does.
+    #[must_use]
+    pub const fn reached_every_copy(self) -> bool {
+        matches!(self, Self::NoneDeclared | Self::Complete)
     }
 }
 

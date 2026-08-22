@@ -59,7 +59,14 @@ true while the chain underneath it was broken.
    A temporary permission that survives its reason is the same failure as a claim that survives its
    evidence.
 
-2. **Erasure beyond the live database.** The executor exists: `Event1.RequestErasure` records a
+2. **Erasure beyond the live database.** *Partly done 2026-08-23.* An erasure now reports a typed
+   `BackupState` rather than implying completeness: a deployment declares its rotation in the unit
+   and the terminal `ErasureApplied` record carries what the erasure actually reached, with
+   `unknown` as the default because silence about backups is not evidence that none exist. What
+   remains is the part that needs software rather than a declaration — nothing in this tree takes a
+   backup, so no rotation is being enforced by anything but a statement. The original text follows.
+
+   **Erasure beyond the live database.** The executor exists: `Event1.RequestErasure` records a
    durable request, destroys the keys, redacts the payload of the target and everything derived
    from it, advances the epoch, and records that it happened. An interrupted erasure finishes on
    the next start, because the request is on record precisely so nobody has to remember. What is

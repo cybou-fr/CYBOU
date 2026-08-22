@@ -334,6 +334,42 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## An erasure says what it reached, not that it is finished (2026-08-23)
+
+`Event1.RequestErasure` destroys the key, redacts the payload of the target and everything derived
+from it, advances the epoch and records that it happened. All of that reaches the live database and
+every future backup. None of it reaches a copy already taken: a backup made before the erasure, plus
+a recovery root that still unwraps the key captured in it, defeats the erasure for that record.
+ADR-0028 says so plainly (E11, E12) and the code said nothing at all — so the surface reported the
+reassuring reading without justifying it.
+
+`BackupState` is the typed answer the ADR asks for, and the terminal `ErasureApplied` record now
+carries it:
+
+| state | means |
+|---|---|
+| `no-backups-declared` | this deployment states it keeps none, so nothing outside the database holds a copy |
+| `pending-rotation` | a copy predating the erasure may still be in rotation; the record names the instant that ends |
+| `complete` | every copy that predated the erasure has left the declared rotation |
+| `unknown` | this deployment has not said, so nothing can be claimed |
+
+`unknown` is the default and deliberately the unreassuring one. Silence about backups is not
+evidence that none exist, and an erasure reporting completeness because nobody mentioned a copy
+would be stating what nobody established. A deployment declares its rotation in the unit —
+`CYBOU_BACKUP_ROTATION_DAYS`, where `0` means none — and this one declares zero.
+
+Only the terminal step carries a state. A request that has not been carried out has achieved
+nothing, and saying anything about backups there would be a claim about work not done.
+
+One thing the tests caught rather than the design: a rotation long enough to overflow the instant
+arithmetic came out the other side as `complete`. A sum that did not fit is a calculation that could
+not be made, not a window that has passed, and turning "we cannot say" into "it is done" is the one
+direction this type exists to prevent. Six tests hold the states, including that one.
+
+What this is still not: backup software. Nothing in this tree takes a backup. What changed is that
+the erasure no longer implies it reached copies nobody has described — the deployment states what it
+keeps, and the erasure reports the consequence.
+
 ## The bottom of the screen has an order (2026-08-22)
 
 The command bar floated in the middle of the canvas, over the cards. It and the palette were both
