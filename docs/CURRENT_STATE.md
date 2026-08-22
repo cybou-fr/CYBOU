@@ -52,8 +52,8 @@ The repository builds all Mind services from one locked workspace:
 - `cybou-presenced`: Unified Mind presentation and command gateway (`org.cybou.Mind.Presence1`).
 - `cybou-jailfs`: Sandboxed filesystem containment library with canonical root validation, symlink traversal prevention, and bounded quota enforcement.
 - `cybou-shelld`: Bounded Body capability engine strictly confined to ADR-0040 DemoReadOnly builtins (`help`, `pwd`, `ls`, `cd`, `cat`, `echo`, `whoami`, `uname`, `stat`, `head`, `tail`, `grep`, `clear`).
-- `cybou-web-gateway`: Loopback-bound HTTP & SSE server providing read-only projections (`/api/v1/snapshot`, `/api/v1/mind`, `/api/v1/events`, `/api/v1/session`), and sandboxed execution endpoint (`POST /api/v1/shell/exec`) with strict refusal in `SessionMode::PublicPreview` (HTTP 403) and execution in `SessionMode::LocalDesktop`.
-- `living-canvas`: Unified browser and desktop frontend (**CYBOU Desktop**), implementing the generic Card model, Layout schema v9 with transparent v8 migration and startup self-healing normalization (`validate_and_normalize`), Spatial Compositor Invariants L1–L15, invariant-safe Deck composition with `DeckError`, interactive resize, magnetic snap guidelines (`compute_snap`), auto-scaling viewport fit ("Fit All" `Ctrl+0`), interactive minimap navigation, card pinning & collapsing, non-destructive Viewport Focus mode, accessible keyboard navigation (`Alt+Arrow` move, `Alt+Shift+Arrow` resize, WAI-ARIA tablist), automated multi-mode Arrangement Engine (`Grid`, `Compact`, `Relations`, `Focus`, and `Ctrl+K` command palette actions), live UTC desktop clock, clean SSE lifecycle teardown, and strictly truthful session/capability representations (Phases 0, 1, 2, 3, and OS-Grade Grounding completed; see [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md)).
+- `cybou-web-gateway`: Loopback-bound HTTP & SSE server providing read-only projections (`/api/v1/snapshot`, `/api/v1/mind`, `/api/v1/events`, `/api/v1/session`), and sandboxed execution endpoint (`POST /api/v1/shell/exec`) with strict refusal for a caller who owns no shell (HTTP 403) and execution for a live session or the local desktop seat. Shells are held per owner, not per process (`shells::Shells`).
+- `living-canvas`: Unified browser and desktop frontend (**CYBOU Desktop**), implementing the generic Card model over twelve canonical system cards, Layout schema v9 with transparent v8 migration and startup self-healing normalization (`validate_and_normalize`), Spatial Compositor Invariants L1–L15, invariant-safe Deck composition with `DeckError`, interactive resize, magnetic snap guidelines (`compute_snap`), auto-scaling viewport fit ("Fit All" `Ctrl+0`), interactive minimap navigation, card pinning & collapsing, non-destructive Viewport Focus mode, accessible keyboard navigation (`Alt+Arrow` move, `Alt+Shift+Arrow` resize, WAI-ARIA tablist), automated multi-mode Arrangement Engine (`Grid`, `Compact`, `Relations`, `Focus`, and `Ctrl+K` command palette actions), live UTC desktop clock, clean SSE lifecycle teardown, and strictly truthful session/capability representations (Phases 0, 1, 2, 3, and OS-Grade Grounding completed; see [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md)).
 
 ## What is wired to what (2026-08-20)
 
@@ -260,6 +260,109 @@ default session; Plasma remains the fallback, and lock screen, multi-display, in
 accessibility, renderer recovery, and navigation-policy gates are still open.
 
 Status date: 2026-08-20.
+
+## The shell surface, and the helper that guards the way in (2026-08-22)
+
+Two things were true of the surfaces a person actually touches, and neither was visible from the
+code that implemented them.
+
+`/api/v1/shell/exec` locked one `ShellEngine` held for the whole gateway process. A shell has state
+— where it is standing — so that state was shared: two people signed in to two accounts issued `cd`
+into the same variable and each of them moved the other. No file crossed a boundary the sandbox
+would not have opened anyway, because the jail root is the same either way. What was wrong is
+narrower and worse to leave standing: a working directory that answers to somebody else is a claim
+about who is at the keyboard, and it was false.
+
+Shells are now held per owner in `shells::Shells` — a live session named by its token, or the
+desktop seat, which is one seat and carries none. A caller who owns neither is refused rather than
+handed whichever shell was first, so entitlement and identity are the same question and it is asked
+once. Signing out ends the shell with the session, because a token can be reissued and a shell that
+outlived its session would hand the next holder of that name a place somebody else chose. Idle
+shells expire on the session lifetime. The sandbox root is still shared deliberately: ADR-0040
+bounds the Body to read-only builtins over one demonstration root, and a private root per session
+would be a different capability rather than a fix to this one.
+
+`cybou-authd` held every failed attempt for 750 ms and then answered. The delay was there so that a
+wrong password and an account that does not exist take the same visible time, and it does that. It
+was not a limit on guessing, and it read like one: the helper spawns a task per connection, so a
+caller opening a hundred connections paid the 750 ms a hundred times in parallel, which is the same
+as paying it once.
+
+It now costs what it claims to. `Throttle` doubles an account's delay per consecutive failure from
+750 ms to a cap of thirty seconds, forgets a run of failures after fifteen quiet minutes, and
+forgets them immediately on success. It is deliberately not a lockout: a lockout turns knowledge of
+a username into the power to deny that account, so the failure mode of the defence would be the
+attack. Because backoff is per account and a caller can invent account names, a semaphore of four
+permits is held across the delay, which bounds the whole socket to roughly five attempts a second
+regardless of how many names or connections are used. The table of tracked accounts is bounded and
+evicts the least recently failed, since its keys come from the caller. All of it is portable code
+with tests that run on every push, which is the point: the property is checked where the check runs.
+
+A third thing was smaller and of the same kind. A session token is a bearer credential — whoever
+holds it is the session — and it was a v4 UUID used as one. The randomness underneath was
+adequate; what was wrong is that nothing about the type said it had to be, a UUID spends six of its
+bits saying which kind of UUID it is, and reading a secret as an identifier is how an identifier
+ends up somewhere a secret should not be. Tokens are now thirty-two bytes from the operating
+system's generator, and if that generator will not answer, the login is refused with a retryable
+error rather than issued a predictable token.
+
+Sessions are also filed under the SHA-256 of the token rather than the token, so the value that
+grants access is not sitting in the process as a map key, and the time a lookup takes says nothing
+about the secret. The shell registry keys on the same digest for the same reason.
+
+## The disclosure inspector (2026-08-22)
+
+Every supply of a projection across a boundary already wrote a `ContextDisclosed` naming the
+consumer, the contributions the supplied items came from, and what was held back and why. The
+records existed and the person they were about could not read them: they were in the Journal, and
+reaching them meant `busctl`. Transparency legible only to a developer is transparency for the
+wrong person.
+
+`GET /api/v1/disclosure` and the `Disclosure` system card close that. Both answer for the caller and
+nobody else — the record is keyed by consumer, so a reader sees their own deliveries rather than a
+log of what was done to everyone. What they show is the gap rather than the total: how much was
+supplied against how much of it names the contribution it came from, and every refusal with its
+reason in the frozen vocabulary. Where a withheld item could not even be named without saying too
+much, it is still listed and still counted, because an unnamed refusal is a smaller loss than a
+silent one.
+
+One hazard was designed out before the surface shipped, because building it created it. The subject
+of a withheld item is what makes the refusal answerable — but a concept is refused *by its label*,
+so serving that label to a stranger to explain the refusal would have published exactly what the
+refusal withheld. Subjects are named only to a consumer whose trust is `Owner`. A public reader is
+told how much was refused and on what grounds, which are facts about the system rather than about
+the person, and the projection carries `subjectsVisible` so the card can say why the subjects are
+absent instead of leaving a reader to infer it from blanks. A surface that reports a filter must not
+be a way around it.
+
+Three states are kept apart that a summary would collapse: the record could not be read, nothing has
+been supplied yet, and something was supplied. The middle one is the honest answer on a gateway
+nobody has read from, and reporting it as an empty delivery would be a claim about a delivery that
+never happened.
+
+Building it found the failure it was built to expose. The gateway remembered a delivery only if it
+could also write it to the Journal — the durable write was a precondition for the bookkeeping — so a
+deployment with no sink answered that nothing had been supplied while it was supplying things.
+Remembering and recording are now separate operations in that order. Having nowhere durable to write
+a delivery is a reason to say the audit trail is incomplete; it is never a reason to answer as
+though the delivery did not happen.
+
+Deploying it found a second thing, which is the point of building surfaces rather than reasoning
+about records. The first live read answered `supplied: 10, accountedFor: 3011` — more accounted for
+than were supplied, which is not a number, it is a category error. `ContextDisclosed.items` is the
+set of *distinct contributions* the supplied items were derived from, and one belief cites hundreds
+of them; its length was never a count of items, though the field's own documentation had claimed
+that relationship since the record was defined. The count of items that can name where they came
+from is now kept separately and is the number `supplied` is read against, the total size of the
+provenance set is reported as its own figure, and the identifiers themselves are a bounded sample —
+the full set was a hundred kilobytes served to anyone who asked and unreadable by the person it was
+for.
+
+What this is not: a history. The surface shows the last delivery to this consumer, not the sequence
+of them. A person can see what they were supplied; they cannot yet see what they were supplied last
+week.
+
+Status date: 2026-08-22.
 
 This document is intentionally limited to implemented behavior and current limitations.
 
@@ -514,7 +617,7 @@ component records. A real process test suspends selfd while it remains registere
 bounded partial snapshot, resumes it, and leaves subsequent recovery tests clean. All compound
 Presence reads and mutations are now protected from sequential timeout multiplication.
 
-P6.8 closes the substrate findings recorded in the [Implementation Audit](CODE_AUDIT_2026-08-10.md).
+P6.8 closes the substrate findings recorded in the [Implementation Audit](history/CODE_AUDIT_2026-08-10.md).
 The Journal commits at `synchronous=FULL` and verifies both commit pragmas at open, refusing to
 start rather than let a silent fallback leave durable-before-visible stated more strongly than
 storage supports; an in-memory Journal remains exempt because it makes no durability claim.

@@ -14,7 +14,7 @@ with [Current State](CURRENT_STATE.md).
 ### Product and status
 
 - [Repository overview](../README.md)
-- [Implementation Audit — 2026-08-10](CODE_AUDIT_2026-08-10.md) — source-level findings on implementation maturity
+- [Implementation Audit — 2026-08-10](history/CODE_AUDIT_2026-08-10.md) — source-level findings on the C++/Qt tree, which no longer exists
 - [Current State](CURRENT_STATE.md) — authoritative implementation boundary
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates

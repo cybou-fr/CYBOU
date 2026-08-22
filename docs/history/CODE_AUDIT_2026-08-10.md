@@ -5,13 +5,19 @@ SPDX-License-Identifier: MIT
 
 # Implementation Audit — 2026-08-10
 
+> **Historical.** This audit read the C++/Qt Mind tree, the Nix modules and the CI workflow of
+> 2026-08-10. That tree was removed on 2026-08-20 and every file path below points at something
+> that no longer exists. It is kept because the findings name properties, not files, and a property
+> that was once broken is worth checking again in whatever implements it now. It is not evidence
+> about the current code: [Current State](../CURRENT_STATE.md) is.
+
 ## Audit identity
 
 | Field | Value |
 |---|---|
 | Audited commit | `108f0304` |
 | Method | source reading of the Mind C++ tree, Nix modules, and CI workflow |
-| Relationship to the checkpoint | complements the 2026-08-10 project checkpoint (retired; see [Current State](CURRENT_STATE.md)) |
+| Relationship to the checkpoint | complements the 2026-08-10 project checkpoint (retired; see [Current State](../CURRENT_STATE.md)) |
 | Scope | implementation evidence only; no new capability was assessed |
 
 The checkpoint records what the architecture claims and how mature each area is. This document
@@ -262,7 +268,7 @@ All four KVM gates pass with the hardening applied, including both split-commit 
 
 ## A7 — No fault evidence runs in hosted CI
 
-**Where:** [`checks.yml`](../.github/workflows/checks.yml) and the four gates in `tests/`.
+**Where:** [`checks.yml`](../../.github/workflows/checks.yml) and the four gates in `tests/`.
 
 The fast workflow runs the static validators, both packages, and — through the `cybou-mind` package
 build — the CTest suites. None of `vm-smoke`, `p4-plasma-lifecycle`, `lifecycle-continuity`, or

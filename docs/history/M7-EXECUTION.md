@@ -81,7 +81,7 @@ Presence remains read-only; lifecycle mode remains orthogonal to capability heal
 
 ## P6.8 — Close the substrate audit findings
 
-**Status: complete.** The [Implementation Audit — 2026-08-10](../CODE_AUDIT_2026-08-10.md) found
+**Status: complete.** The [Implementation Audit — 2026-08-10](CODE_AUDIT_2026-08-10.md) found
 four places where the shipped implementation does not support a stated invariant, plus two hygiene
 items. This package closes them before M7 raises event volume and adds a second projection, because
 each finding becomes more expensive to fix once a perception adapter depends on it.

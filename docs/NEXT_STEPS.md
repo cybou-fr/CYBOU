@@ -25,26 +25,39 @@ true while the chain underneath it was broken.
 
 ## In order
 
-1. **An inspector, so the record is readable by the person it is about.** Deliveries are recorded
-   now: every supply of a projection across a boundary writes a `ContextDisclosed` naming the
-   consumer, the contributions the supplied items came from, and what was held back and why. What
-   does not exist is the surface ADR-0030 asks for — the person cannot see the gap between what was
-   available and what was delivered, which is the interesting part and the one invisible in every
-   system that assembles context silently (B1, B6). The records are in the Journal and only a
-   developer with `busctl` can read them.
+1. **An inspector, so the record is readable by the person it is about.** *Done 2026-08-22, and
+   read the limits below before treating it as finished.* `GET /api/v1/disclosure` answers for the
+   caller and nobody else, and the `Disclosure` system card shows it: how much was supplied against
+   how much of it can be accounted for, and every refusal with its reason. That is the gap ADR-0030
+   asks for (B1, B6) — the part invisible in every system that assembles context silently. Before
+   this the records were in the Journal and only a developer with `busctl` could read them.
 
-   Two smaller gaps behind it. A concept does not carry what it was derived from, so a delivery
-   that supplied one says it supplied something it cannot account for; the count and the provenance
-   are deliberately separate so that shows rather than hides. And `retains` is false for every
-   consumer today because there are no learning consumers yet — when there are, ADR-0033's A6 needs
-   these records to find what an erased payload influenced.
+   One thing was found while building it and is worth keeping in mind, because it is the shape this
+   whole document is about: the gateway remembered a delivery only if it could also write it to the
+   Journal, so a deployment without a sink told the person nothing had been supplied while it was
+   supplying things. Remembering and recording are now separate. Having nowhere durable to write a
+   delivery is a reason to say the audit trail is incomplete, never a reason to answer as though the
+   delivery did not happen.
+
+   Two smaller gaps remain, and the surface shows both rather than hiding them. A concept does not
+   carry what it was derived from, so a delivery that supplied one says it supplied something it
+   cannot account for; the count and the provenance are deliberately separate, and the card names
+   the difference in words. And `retains` is false for every consumer today because there are no
+   learning consumers yet — the field is reported rather than assumed so that the first consumer
+   which does retain something is visible on the day it appears; when there is one, ADR-0033's A6
+   needs these records to find what an erased payload influenced.
+
+   Still missing: the record shown is the *last* delivery to this consumer, not their history. A
+   person can see what they were supplied; they cannot yet see what they were supplied last week.
 
    Do not reach for `CYBOU_PUBLISHABLE_SENSITIVITY` to solve anything. It was raised on 2026-08-20
    for one stated reason — 1252 rows in the first Journal carried a constant sensitivity their
    content did not justify — with a comment saying to remove it once those rows were gone. The rows
    were discarded that same day and the raise outlived them, so the next thing above ordinary was
-   published without anyone deciding to. A temporary permission that survives its reason is the same
-   failure as a claim that survives its evidence.
+   published without anyone deciding to. It was taken back the same day in `4fa5788`, and the
+   default is `Ordinary` again; this paragraph is kept as the reason not to raise it a second time.
+   A temporary permission that survives its reason is the same failure as a claim that survives its
+   evidence.
 
 2. **Erasure beyond the live database.** The executor exists: `Event1.RequestErasure` records a
    durable request, destroys the keys, redacts the payload of the target and everything derived
