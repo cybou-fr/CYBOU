@@ -7,6 +7,7 @@ use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use wasm_bindgen::{JsCast, closure::Closure};
 
+use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::icons::{IconFile, IconFolder, IconShield, IconTerminal},
@@ -65,7 +66,9 @@ pub fn DesktopDock(
             SessionMode::RemoteBrowser => {
                 if let Some(m) = mind {
                     if let Some(origin) = m.identity.origin {
-                        format!("{origin} · authenticated ●")
+                        // The subject's origin instant, which is what Identity1 holds. Shown as a
+                        // date rather than a nanosecond string; the exact value is on the card.
+                        format!("Since {} ●", instant_label(&origin))
                     } else {
                         "authenticated ●".to_string()
                     }

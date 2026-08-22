@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use lucide_leptos::Files;
 use std::sync::Arc;
 
+use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
@@ -35,7 +36,7 @@ pub fn PerceptionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let perception_at = move || {
         mind()
             .and_then(|m| m.perception.acquired_at)
-            .unwrap_or_else(unread)
+            .map_or_else(unread, |at| instant_label(&at))
     };
 
     view! {

@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use lucide_leptos::FileCheck;
 use std::sync::Arc;
 
+use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
@@ -29,6 +30,7 @@ pub fn IdentityContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let identity_origin = move || {
         mind()
             .and_then(|m| m.identity.origin)
+            .map(|origin| instant_label(&origin))
             .unwrap_or_else(unread)
     };
     let identity_sessions = move || {

@@ -334,6 +334,22 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Instants are shown the way a person reads them (2026-08-22)
+
+The owners record time as RFC 3339 with whatever precision they had —
+`2026-08-22T16:33:54.409963793Z`. That is the right thing to store and the wrong thing to put on a
+card. The topbar stopped printing them earlier the same day; the cards did not, so the desktop was
+still covered in nine subsecond digits and a pair of format characters, which is what a surface
+built for whoever wrote it looks like.
+
+`instant::instant_label` renders `2026-08-22 16:33:54 UTC`, and the exact string stays reachable
+beside every display. Nothing is rounded away: what is dropped is the part nobody was reading. An
+input the formatter does not understand is returned untouched rather than reshaped — a formatter
+that invented a value for something it could not parse would be the failure it exists to stop.
+
+It lives outside `components`, so it is tested natively: five tests, including that a non-UTC offset
+is not labelled UTC and that an unparseable string comes back as it went in.
+
 ## The desktop was drawing what nobody had styled (2026-08-22)
 
 Sixty-five classes the components render had no rule in the stylesheet at all, including every

@@ -12,6 +12,7 @@ use thiserror::Error;
 
 pub mod card;
 pub mod deck;
+pub mod instant;
 pub mod layout;
 
 #[cfg(target_arch = "wasm32")]
@@ -31,6 +32,7 @@ pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, C
 pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
+pub use instant::{instant_label, time_label};
 pub use layout::{
     ArrangementMode, DesktopItem, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory,
     MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, PlacementResolver, Rect,

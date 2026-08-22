@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use lucide_leptos::Files;
 use std::sync::Arc;
 
+use crate::time_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
@@ -64,7 +65,7 @@ pub fn JournalContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                             <span class="journal-line">
                                 <b>{contribution.kind}</b>
                                 <i>{contribution.origin_organ}</i>
-                                <small>{contribution.recorded_at}</small>
+                                <small title=contribution.recorded_at.clone()>{time_label(&contribution.recorded_at)}</small>
                             </span>
                         }
                     }

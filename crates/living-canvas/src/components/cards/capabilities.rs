@@ -8,6 +8,7 @@ use leptos::prelude::*;
 use lucide_leptos::Sparkles;
 use std::sync::Arc;
 
+use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
@@ -38,7 +39,7 @@ pub fn CapabilitiesContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     };
 
     let observed_label = move || match runtime.get() {
-        RuntimeState::Ready { snapshot, .. } => format!("Observed {}", snapshot.observed_at),
+        RuntimeState::Ready { snapshot, .. } => instant_label(&snapshot.observed_at),
         RuntimeState::Loading => "Waiting for snapshot".into(),
         RuntimeState::SignInRequired => "Not signed in".into(),
         RuntimeState::Error(_) => "No snapshot".into(),

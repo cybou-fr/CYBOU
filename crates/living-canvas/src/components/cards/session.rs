@@ -8,6 +8,7 @@ use leptos::prelude::*;
 use lucide_leptos::UsersRound;
 use std::sync::Arc;
 
+use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
@@ -70,7 +71,7 @@ pub fn SessionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
             if session.expires_at.is_empty() {
                 "Never (Local)".to_owned()
             } else {
-                session.expires_at
+                instant_label(&session.expires_at)
             }
         }
         RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => unread(),

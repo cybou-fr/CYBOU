@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use lucide_leptos::Sparkles;
 use std::sync::Arc;
 
+use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
@@ -25,12 +26,12 @@ pub fn LifecycleContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let lifecycle_activity = move || {
         mind()
             .and_then(|m| m.lifecycle.last_user_activity_at)
-            .unwrap_or_else(unread)
+            .map_or_else(unread, |at| instant_label(&at))
     };
     let mind_observed = move || {
         mind().map_or_else(
             || "owners not read".to_owned(),
-            |m| format!("Owners read {}", m.observed_at),
+            |m| format!("Owners read {}", instant_label(&m.observed_at)),
         )
     };
 
