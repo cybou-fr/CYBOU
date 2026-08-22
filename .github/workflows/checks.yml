@@ -5,8 +5,9 @@
 #
 # There is one product and one toolchain now, so there is one story here:
 #
-#   code       -> the Rust workspace and the WASM frontend compile, test and lint
-#   compliance -> licence headers and the documents this repository declares authoritative
+#   code        -> the Rust workspace and the WASM frontend compile, test and lint
+#   integration -> the twelve daemons start on a session bus and answer as a system
+#   compliance  -> licence headers and the documents this repository declares authoritative
 #
 # What used to be here and is gone with the code it checked: Nix builds of the C++/QML Plasma
 # packages, the NixOS VM, and the Qt compatibility oracles. Nothing installs those packages, and
@@ -14,9 +15,13 @@
 # that has no data in it. The canonical byte fixtures they produced stay in fixtures/, and the
 # Rust tests still verify against them.
 #
-# Deployment is proved separately by scripts/vps-checks.sh on the Debian builder, which also runs
-# the multi-daemon integration gate: that needs a session bus and twelve running daemons. It is
-# the authority on the deployed system; this workflow is the authority on the code.
+# The integration gate used to run only on the Debian builder, which meant the one place the Mind
+# is exercised as a system was also the one place nobody ran on a push. It needs a session bus and
+# twelve running daemons, and an Ubuntu runner has both dbus-run-session and busctl, so it runs
+# here too. This does not make the builder redundant: systemd units, unit ordering and a real
+# reboot are still only provable on a deployed host, and scripts/vps-checks.sh remains the
+# authority on the deployed system. What changed is that a daemon broken on a push is now found on
+# that push.
 
 name: checks
 
@@ -49,6 +54,27 @@ jobs:
           cargo install trunk --version 0.21.14 --locked
           cd crates/living-canvas
           trunk build --release
+
+  integration:
+    name: the Mind as a system
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+
+      # dbus-run-session is what the gate re-executes itself under; busctl is how it talks to the
+      # daemons; libpam0g-dev is what cybou-authd links against.
+      - name: Install the session bus and PAM headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends dbus libpam0g-dev systemd
+
+      - name: Run the multi-daemon integration gate
+        run: bash scripts/test-multi-daemon-integration.sh
 
   compliance:
     name: licensing and declared documents

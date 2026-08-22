@@ -23,9 +23,48 @@ It also builds the frontend with `trunk`, lints licence headers with `reuse`, an
 `scripts/validate-cognitive-docs.py`, which checks that the documents this repository declares
 authoritative still say what they claim and that their links resolve.
 
-This gate cannot see most of the Mind. Everything behind `cfg(target_os = "linux")` — the twelve
-daemons and every D-Bus surface — is not compiled there, so a green run says the portable half is
-sound and nothing about the daemons.
+Until 2026-08-22 this section said the gate could not see most of the Mind, because everything
+behind `cfg(target_os = "linux")` was "not compiled there". That was wrong, and wrong in the
+direction that matters: the runner is Ubuntu, so `target_os = "linux"` holds, and the twelve
+daemons and every D-Bus surface have been compiling and running their unit tests on every push all
+along. The document understated its own evidence — which is the same failure as overstating it,
+because a gate nobody believes in is a gate nobody reads.
+
+What the workspace gate genuinely could not see was behaviour: a daemon compiles and its unit tests
+pass without any of them ever having spoken to another daemon. That is what the job below now
+covers.
+
+## Checking the Linux half without a Linux machine
+
+```bash
+rustup target add x86_64-unknown-linux-gnu
+cargo check -p cybou-web-gateway --all-targets --target x86_64-unknown-linux-gnu
+cargo clippy -p cybou-web-gateway --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
+```
+
+`cargo check` does not link, so the `cfg(target_os = "linux")` half — the zbus surfaces, the
+daemons' service code — type-checks from any host with that target's standard library installed.
+This is worth knowing before editing it: without it, a change to `presence_zbus` or a daemon is
+written blind and found out on a push.
+
+Two limits. `--workspace` does not work this way, because the crates that pull `rusqlite` build a
+bundled SQLite and need a cross compiler; check those crates individually or leave them to CI. And
+it type-checks only — the tests cannot run, because running them would mean running a Linux binary.
+That is what the gates below are for.
+
+## What proves the Mind as a system, on every push
+
+```bash
+bash scripts/test-multi-daemon-integration.sh
+```
+
+The `integration` job runs the same script the Debian builder runs. It re-executes itself under
+`dbus-run-session`, starts all twelve owners, and asserts the properties listed under
+[What proves the system](#what-proves-the-system) below. It needs `dbus-run-session`, `busctl` and
+the PAM headers, all of which an Ubuntu runner has.
+
+This is not a substitute for the builder. The script starts the owners by hand: no systemd units,
+no unit ordering, no reboot. Those remain provable only on a deployed host.
 
 ## What proves the system
 
@@ -34,11 +73,13 @@ scripts/vps-checks.sh fast
 scripts/vps-checks.sh release
 ```
 
-This runs on the Debian 13 builder, compiles the whole workspace including the Linux-only half, and
-then runs the multi-daemon integration gate. `release` additionally builds the release binaries and
-the frontend artifact that a deployment installs.
+This runs on the Debian 13 builder, compiles the whole workspace, and then runs the multi-daemon
+integration gate against the distribution the system actually targets. `release` additionally
+builds the release binaries and the frontend artifact that a deployment installs.
 
-The integration gate is the only place the Mind is exercised as a system. It re-executes itself
+The integration gate is the only place the Mind is exercised as a system. Since 2026-08-22 it also
+runs in CI on every push; the builder remains the authority on Debian 13 specifically, and on
+everything a real `systemd` and a real reboot are needed to falsify. It re-executes itself
 under `dbus-run-session` so the daemons, the PID list and the cleanup trap share one process, starts
 all twelve owners, and then asserts:
 
