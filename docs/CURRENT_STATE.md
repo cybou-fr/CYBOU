@@ -334,6 +334,35 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The relationship graph decides the arrangement, and one edge ran backwards (2026-08-22)
+
+`DesktopRelationshipGraph::canonical()` was already the single source for the lines drawn between
+cards. It was not the source for where the cards went: the causal layers were a hand-kept table, and
+it had drifted away from the edges it was meant to summarise. `Identity` proved `Session` while both
+sat in layer 0. `Capabilities` audited `Journal` from inside layer 1. `Beliefs` reached `Perception`
+backwards through two layers. The graph drew one story and the arrangement laid out another.
+
+A card's layer is now the longest path into it, computed from the edges. Every edge therefore points
+forward by at least one column, and the arrangement can be read as the causality it came from. The
+number of columns comes from the graph too, rather than a constant five that silently folded
+anything deeper into the last one. Tool cards are not in the graph and sit after every organ,
+because they consume what the organs produce and feed none of it back.
+
+One edge was reversed. `Beliefs -> Perception` was labelled "empirical observation updating
+propositions", which describes the opposite direction, and the wiring this repository documents runs
+that way: `perceptiond` observes the host and submits to Event1, and `epistemicd` forms beliefs
+keyed by the subject of each observation. Nothing flows back. It is `Perception -> Beliefs` now.
+While these edges only drew a line the error was cosmetic; the moment they decide placement, a
+reversed edge is a reversed desktop.
+
+`Disclosure` gained the three edges it actually has — `Intention1`, `Epistemic1` and `Context1` are
+the organs the gateway's disclosure bookkeeping counts, and no others contribute to a
+`ContextDisclosed`. It is placed after them rather than by an exception in a table.
+
+Seven tests hold the properties rather than the numbers: the graph is acyclic, every edge advances
+at least one layer, an organ nothing feeds starts at the beginning, what leaves is placed after
+everything that produced it, and a tool card sits last.
+
 ## The File Manager reads the sandbox instead of reading a terminal (2026-08-22)
 
 The File Manager asked the Shell for `ls -la` and parsed the columns back into names, kinds and

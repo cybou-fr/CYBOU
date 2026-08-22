@@ -207,14 +207,15 @@ impl DesktopLayout {
         let start_x = 40.0;
         let start_y = 40.0;
 
-        // Categorize items into 5 causal layers using DesktopRelationshipGraph
-        let mut layer_items: [Vec<DesktopItem>; 5] =
-            [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        // As many columns as the graph produces, rather than a constant that has to be found again
+        // whenever an edge is added. A fixed five silently folded anything deeper into the last one.
+        let layers = DesktopRelationshipGraph::layer_count();
+        let mut layer_items: Vec<Vec<DesktopItem>> = vec![Vec::new(); layers];
 
         for item in items {
             if !item.is_pinned() {
                 let l = DesktopRelationshipGraph::layer_for_item(&item, self);
-                layer_items[l.min(4)].push(item);
+                layer_items[l.min(layers - 1)].push(item);
             }
         }
 
