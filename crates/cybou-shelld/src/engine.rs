@@ -432,8 +432,7 @@ impl ShellEngine {
         }
 
         let help = "\
-CYBOU Bounded Body Shell (Zone 3 capability exploration · ADR-0040 DemoReadOnly)
-Available builtin capabilities:
+A bounded, read-only view of one directory. Available commands:
 
   pwd                   Print working directory
   cd <dir>              Change directory inside sandbox

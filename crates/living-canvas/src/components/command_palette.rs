@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use lucide_leptos::{Link, ListChecks, Search, Sparkles};
 use web_sys::KeyboardEvent;
 
+use crate::interaction::usable_viewport;
 use crate::{
     ArrangementMode, CardId, DesktopItemId, DesktopLayout, LayoutHistory,
     components::icons::{
@@ -95,7 +96,7 @@ pub fn CommandPalette(
                             layout.get_untracked().save();
                             select_from_command("shell");
                         }
-                    ><IconExternalLink size=15 /><span><b>"Launch CYBOU Shell"</b><i>"A bounded, read-only shell"</i></span></button>
+                    ><IconExternalLink size=15 /><span><b>"Open Shell"</b><i>"A bounded, read-only shell"</i></span></button>
                     <button
                         class:hidden=move || !command_matches(&command_query.get(), "files file manager storage browse read-only")
                         on:click=move |_| {
@@ -103,7 +104,7 @@ pub fn CommandPalette(
                             layout.get_untracked().save();
                             select_from_command("files");
                         }
-                    ><IconExternalLink size=15 /><span><b>"Launch File Manager"</b><i>"Browse files, read-only"</i></span></button>
+                    ><IconExternalLink size=15 /><span><b>"Open File Manager"</b><i>"Browse files, read-only"</i></span></button>
                     <button
                         class:hidden=move || !command_matches(&command_query.get(), "events feed live stream sse journal")
                         on:click=move |_| {
@@ -152,7 +153,7 @@ pub fn CommandPalette(
                         class:hidden=move || !command_matches(&command_query.get(), "arrange home canonical default")
                         on:click=move |_| {
                             history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Home, None));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
                             layout.get_untracked().save();
                             set_command_open.set(false);
                             set_command_query.set(String::new());
@@ -162,7 +163,7 @@ pub fn CommandPalette(
                         class:hidden=move || !command_matches(&command_query.get(), "arrange grid structured columns")
                         on:click=move |_| {
                             history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, None));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
                             layout.get_untracked().save();
                             set_command_open.set(false);
                             set_command_query.set(String::new());
@@ -172,7 +173,7 @@ pub fn CommandPalette(
                         class:hidden=move || !command_matches(&command_query.get(), "arrange compact packing fit")
                         on:click=move |_| {
                             history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, None));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
                             layout.get_untracked().save();
                             set_command_open.set(false);
                             set_command_query.set(String::new());
@@ -182,7 +183,7 @@ pub fn CommandPalette(
                         class:hidden=move || !command_matches(&command_query.get(), "arrange relations causal")
                         on:click=move |_| {
                             history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, None));
+                            layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport())));
                             layout.get_untracked().save();
                             set_command_open.set(false);
                             set_command_query.set(String::new());
@@ -245,28 +246,28 @@ pub fn CommandPalette(
                             } else if command_matches(&q, "arrange home") {
                                 event.prevent_default();
                                 history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Home, None));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
                                 layout.get_untracked().save();
                                 set_command_open.set(false);
                                 set_command_query.set(String::new());
                             } else if command_matches(&q, "arrange grid") {
                                 event.prevent_default();
                                 history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, None));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
                                 layout.get_untracked().save();
                                 set_command_open.set(false);
                                 set_command_query.set(String::new());
                             } else if command_matches(&q, "arrange compact") {
                                 event.prevent_default();
                                 history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, None));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
                                 layout.get_untracked().save();
                                 set_command_open.set(false);
                                 set_command_query.set(String::new());
                             } else if command_matches(&q, "arrange relations") {
                                 event.prevent_default();
                                 history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, None));
+                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport())));
                                 layout.get_untracked().save();
                                 set_command_open.set(false);
                                 set_command_query.set(String::new());

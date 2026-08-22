@@ -7,7 +7,9 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlElement, KeyboardEvent, PointerEvent};
 
-use crate::{CardId, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, SnapGuide};
+use crate::{
+    CardId, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, SnapGuide, UsableViewport,
+};
 
 /// Target item for a pointer drag operation.
 #[derive(Clone, Debug, PartialEq)]
@@ -57,6 +59,44 @@ pub struct ResizeState {
     pub start_width: f64,
     /// Initial target height.
     pub start_height: f64,
+}
+
+/// How much room the desktop actually has, in CSS pixels.
+///
+/// Every arrangement used to be called with `None`, which meant a hardcoded 1440x900 whatever the
+/// window was. On a maximised screen the cards were laid out for a smaller desktop than the one
+/// they were on, and "Fit All" then had to shrink the result to something like 61% — which is what
+/// a person saw as the arrangement changing the zoom by itself.
+///
+/// The topbar and the dock are subtracted because a card placed under either is a card the person
+/// cannot reach.
+#[must_use]
+pub fn usable_viewport() -> UsableViewport {
+    const TOPBAR: f64 = 64.0;
+    const DOCK: f64 = 72.0;
+    let window = web_sys::window();
+    let measure = |value: Option<f64>, fallback: f64| match value {
+        Some(size) if size.is_finite() && size > 0.0 => size,
+        _ => fallback,
+    };
+    let width = measure(
+        window
+            .as_ref()
+            .and_then(|w| w.inner_width().ok())
+            .and_then(|value| value.as_f64()),
+        1440.0,
+    );
+    let height = measure(
+        window
+            .as_ref()
+            .and_then(|w| w.inner_height().ok())
+            .and_then(|value| value.as_f64()),
+        900.0,
+    );
+    UsableViewport {
+        width: (width - 48.0).max(640.0),
+        height: (height - TOPBAR - DOCK).max(480.0),
+    }
 }
 
 /// Generate CSS inline style for a card item given current layout and focus mode.

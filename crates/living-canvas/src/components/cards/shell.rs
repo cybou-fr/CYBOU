@@ -114,7 +114,7 @@ pub fn ShellContent(
             fallback=move || view! {
                 <div class="card-auth-gate">
                     <IconShield size=26 />
-                    <strong>"CYBOU Shell Locked"</strong>
+                    <strong>"Shell locked"</strong>
                     <p>"Public preview does not permit Body capabilities execution. Sign in with Linux PAM credentials to unlock."</p>
                     <button class="primary-btn" on:click=move |_| auth_modal_open.set(true)>"Sign in"</button>
                 </div>
@@ -255,7 +255,7 @@ pub fn ShellCard(
             set_selected=set_selected
             dragging=dragging
             resizing=resizing
-            kicker_title="CYBOU Shell"
+            kicker_title="Shell"
             kicker_icon=Arc::new(|| view! { <IconTerminal size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >

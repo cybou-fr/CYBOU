@@ -8,7 +8,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{PointerEvent, WheelEvent};
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout, LayoutHistory, SnapGuide,
+    CardId, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, SnapGuide,
     components::{
         cards::{
             AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
@@ -41,14 +41,28 @@ pub fn CanvasViewport(
     panning: ReadSignal<Option<(f64, f64, f64, f64)>>,
     set_panning: WriteSignal<Option<(f64, f64, f64, f64)>>,
 ) -> impl IntoView {
+    let view_mode = use_context::<RwSignal<DesktopViewMode>>()
+        .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
+
     view! {
         <section
             class="canvas"
             id="canvas"
-            style=move || format!(
-                "transform: translate3d({:.1}px, {:.1}px, 0) scale({:.3}); transform-origin: 0 0;",
-                pan.get().0, pan.get().1, zoom.get()
-            )
+            // No transform while something is focused. A `position: fixed` element inside a
+            // transformed ancestor is positioned against that ancestor and scaled with it, so a
+            // focused card meant to fill the window was drawn at the canvas zoom and offset by the
+            // pan — a large empty frame with its contents small in one corner. Focus means the same
+            // thing at every zoom, which it cannot while the canvas is still scaling it.
+            style=move || {
+                if matches!(view_mode.get(), DesktopViewMode::Focus(_)) {
+                    "transform: none;".to_owned()
+                } else {
+                    format!(
+                        "transform: translate3d({:.1}px, {:.1}px, 0) scale({:.3}); transform-origin: 0 0;",
+                        pan.get().0, pan.get().1, zoom.get()
+                    )
+                }
+            }
             on:wheel=move |event: WheelEvent| {
                 if event.ctrl_key() || event.meta_key() {
                     event.prevent_default();

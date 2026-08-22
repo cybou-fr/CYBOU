@@ -66,6 +66,12 @@ cybou_ssh "
 
   # Create shell jail root
   sudo install -d -m 0755 -o cybou -g cybou /var/lib/cybou/shell-jail
+  # Something to look at. An empty sandbox and a broken one are indistinguishable from the outside,
+  # which is how a misconfigured jail went unnoticed.
+  sudo install -d -m 0755 -o cybou -g cybou /var/lib/cybou/shell-jail/notes
+  printf '%s
+'     'This is the bounded filesystem the Shell and the File Manager can read.'     'It is not the host filesystem: nothing outside this directory is reachable,'     'and nothing here can be written from the desktop.'     | sudo tee /var/lib/cybou/shell-jail/README.txt >/dev/null
+  sudo chown cybou:cybou /var/lib/cybou/shell-jail/README.txt
 
   # The gateway used to be a system service, which is why it could only serve fixtures: a system
   # service has no session bus and therefore no way to reach Presence1. It is a user unit now,

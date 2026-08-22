@@ -51,6 +51,31 @@ impl DesktopLayout {
         }
     }
 
+    /// Where each column starts, given what is actually in the ones before it.
+    ///
+    /// Both column arrangements used to step by a constant — 360 in one, 380 in the other — while
+    /// cards range from 220 to 560 wide. A wide card therefore ran into the next column, and the
+    /// last column could start at a coordinate that put its contents past the edge of the window
+    /// with nothing saying so. A column is as wide as its widest member.
+    fn column_offsets(
+        columns: &[Vec<DesktopItem>],
+        start_x: f64,
+        gap: f64,
+        minimum: f64,
+    ) -> Vec<f64> {
+        let mut offsets = Vec::with_capacity(columns.len());
+        let mut x = start_x;
+        for column in columns {
+            offsets.push(x);
+            let widest = column
+                .iter()
+                .map(|item| item.geometry.width)
+                .fold(minimum, f64::max);
+            x += widest + gap;
+        }
+        offsets
+    }
+
     /// Arrange top-level items in an adaptive multi-track Grid layout.
     #[allow(clippy::cast_precision_loss)]
     fn arrange_grid(&mut self, viewport: UsableViewport) {
@@ -219,8 +244,10 @@ impl DesktopLayout {
             }
         }
 
+        let offsets = Self::column_offsets(&layer_items, start_x, col_gap, col_width);
+
         for (l_idx, layer) in layer_items.into_iter().enumerate() {
-            let col_x = start_x + (l_idx as f64) * (col_width + col_gap);
+            let col_x = offsets[l_idx];
             let mut cur_y = start_y;
 
             for item in layer {
@@ -305,8 +332,10 @@ impl DesktopLayout {
             }
         }
 
+        let offsets = Self::column_offsets(&cols, start_x, col_gap, col_width);
+
         for (c_idx, col) in cols.into_iter().enumerate() {
-            let col_x = start_x + (c_idx as f64) * (col_width + col_gap);
+            let col_x = offsets[c_idx];
             let mut cur_y = start_y;
 
             for item in col {

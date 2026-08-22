@@ -100,7 +100,7 @@ impl CardId {
             Self::Perception => "Perception",
             Self::Context => "Context",
             Self::Disclosure => "Disclosure",
-            Self::Shell(_) => "CYBOU Shell",
+            Self::Shell(_) => "Shell",
             Self::FileManager(_) => "File Manager",
             Self::JournalFeed(_) => "Event Stream",
         }

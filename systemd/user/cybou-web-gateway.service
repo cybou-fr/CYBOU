@@ -26,6 +26,11 @@ Environment=CYBOU_SESSION_MODE=sign-in-required
 # public demo.
 Environment=CYBOU_AUTH_SOCKET=/run/cybou/auth.sock
 
+# Where the bounded Body reads. Named here because nothing named it before: the gateway fell back to
+# whichever candidate path happened to exist, which on this host was /home/demo — a directory this
+# service cannot read. Every `ls` answered with an I/O error and every file listing was a 502.
+Environment=CYBOU_SHELL_JAIL=/var/lib/cybou/shell-jail
+
 ExecStart=/usr/libexec/cybou/cybou-web-gateway
 Restart=on-failure
 RestartSec=1

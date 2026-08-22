@@ -34,12 +34,105 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   height: 64px;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* Three children: brand, status, actions. Two columns put the third on a second row, which is
+     how the controls ended up stacked under the logo and drawn over the canvas. */
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
   align-items: center;
   border-bottom: 1px solid rgba(154, 167, 184, 0.13);
   background: rgba(8, 12, 17, 0.82);
   backdrop-filter: blur(22px);
 }
+
+/* --- Topbar ------------------------------------------------------------------------------- */
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-title { font-size: 15px; letter-spacing: .18em; color: #dce6eb; }
+
+.topbar-center { min-width: 0; display: flex; justify-content: center; }
+/* One pill, one line, and gaps between the parts. Without them "Signed in" and the sentence after
+   it ran together into a single word. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 12px;
+  border: 1px solid rgba(154,167,184,.22);
+  border-radius: 999px;
+  background: rgba(12,18,26,.72);
+  font-size: 12px;
+}
+.status-pill .status-dot { background: #7c8792; box-shadow: none; }
+.status-pill.online .status-dot { background: var(--accent); box-shadow: 0 0 12px rgba(112,225,200,.8); }
+.status-mode { color: #dce6eb; white-space: nowrap; }
+.status-meta { min-width: 0; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.history-controls { display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid rgba(154,167,184,.22); border-radius: 10px; }
+
+/* One shape for every text-and-icon control in the chrome. */
+.history-btn,
+.runtime-trigger,
+.auth-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #dce6eb;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.history-btn:hover:not(:disabled),
+.runtime-trigger:hover,
+.auth-trigger-btn:hover { border-color: rgba(154,167,184,.32); background: rgba(154,167,184,.12); }
+.history-btn:disabled { opacity: .4; cursor: default; }
+.runtime-trigger.active { border-color: var(--accent); color: var(--accent); }
+.auth-trigger-btn { border-color: rgba(112,225,200,.45); color: var(--accent); }
+.auth-trigger-btn:hover { background: rgba(112,225,200,.14); }
+
+.runtime-menu-anchor { position: relative; }
+.runtime-popover {
+  position: absolute;
+  z-index: 3000;
+  top: 38px;
+  right: 0;
+  width: 250px;
+  max-height: 70vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid rgba(154,167,184,.28);
+  border-radius: 12px;
+  background: rgba(14,20,28,.98);
+  box-shadow: 0 24px 70px rgba(0,0,0,.55);
+}
+.popover-heading { padding: 8px 8px 4px; color: var(--muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.popover-divider { margin: 6px 0; border-top: 1px solid rgba(154,167,184,.16); }
+.runtime-popover button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #c9d3dc;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.runtime-popover button:hover { background: rgba(255,255,255,.06); }
+.runtime-popover button.active { color: var(--accent); background: rgba(112,225,200,.1); }
+.runtime-popover button svg { flex: 0 0 auto; color: #91a5b4; }
 
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; }
 .brand-mark { display: block; width: 28px; height: 28px; object-fit: contain; }
@@ -106,13 +199,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .panel-kicker { display: flex; align-items: center; gap: 7px; }
 .panel-kicker svg { flex: 0 0 auto; stroke-width: 1.7; }
 .object span, .object p { color: var(--muted); }
-.identity { padding: 19px; }
 .identity-digest { font-size: 11px; }
 .identity-badges { display: flex; gap: 7px; margin-top: 2px; }
 .identity-badges i { padding: 5px 8px; border: 1px solid rgba(112,225,200,.34); border-radius: 12px; color: var(--accent); font-size: 10px; font-style: normal; }
 .identity-meta { margin-top: 4px; padding-top: 11px; border-top: 1px solid rgba(154,167,184,.14); font-size: 10px; }
-.session { padding: 20px; }
-.capabilities { padding: 24px; }
 .capabilities h1 { margin: 5px 0 0; font-size: 30px; font-weight: 560; }
 .capabilities-kind { padding-left: 10px; border-left: 2px solid #5d9df5; font-size: 11px; }
 .capabilities p { margin: 0; line-height: 1.55; }
@@ -132,7 +222,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .object-actions { position: absolute; display: flex; gap: 4px; padding: 7px; border: 1px solid var(--border); border-radius: 15px; background: rgba(17,24,33,.96); box-shadow: 0 18px 45px rgba(0,0,0,.42); }
 .object-actions button { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; color: #cbd5dd; font-size: 12px; cursor: pointer; }
 .object-actions button:hover, .object-actions button.active { background: rgba(255,255,255,.07); color: white; }
-.lifecycle { padding: 22px; border-color: rgba(225,174,55,.64); box-shadow: 0 22px 65px rgba(0,0,0,.42), 0 0 24px rgba(225,174,55,.08); }
+.lifecycle { border-color: rgba(225,174,55,.64); box-shadow: 0 22px 65px rgba(0,0,0,.42), 0 0 24px rgba(225,174,55,.08); }
 .lifecycle.selected { border-color: #e0ad37; box-shadow: 0 0 0 1px rgba(224,173,55,.12), 0 0 32px rgba(224,173,55,.14), 0 24px 70px rgba(0,0,0,.44); }
 .lifecycle-heading { display: flex; align-items: center; justify-content: space-between; }
 .lifecycle-heading small { color: #f3bd3e; }
@@ -142,7 +232,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .lifecycle-actions button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: #e3e9ed; cursor: pointer; }
 .lifecycle-actions .primary { border-color: #efc45a; background: linear-gradient(#f8d36c,#e9af31); color: #17130a; font-weight: 650; }
 .lifecycle-source { padding-top: 10px; border-top: 1px solid rgba(154,167,184,.14); font-size: 10px; }
-.journal { padding: 20px; }
 .journal-feed { display: grid; gap: 5px; max-height: 150px; overflow-y: auto; margin-top: 4px; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .journal-line { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; font-size: 11px; }
 .journal-line b { color: #dfe8ed; font-weight: 500; }
@@ -151,19 +240,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .journal-footer { display: flex; justify-content: space-between; margin-top: 3px; padding-top: 11px; border-top: 1px solid rgba(154,167,184,.14); font-size: 11px; }
 .journal-footer i { color: var(--muted); font-style: normal; }
 .journal-footer b { color: #70a8f7; font-weight: 500; }
-.commitments { padding: 22px; }
-.self-model { padding: 22px; }
 .self-narration { margin: 0; line-height: 1.5; color: #cfd8de; font-size: 12px; }
-.attention { padding: 20px; }
-.beliefs { padding: 20px; }
 .belief-list { display: grid; gap: 6px; max-height: 150px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .belief-line { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; font-size: 11px; }
 .belief-line b { color: #dfe8ed; font-weight: 500; }
 .belief-line i { color: #b08a3a; font-style: normal; font-size: 10px; }
 .belief-line.observed i { color: var(--accent); }
 .belief-value { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
-.perception { padding: 20px; }
-.context { padding: 20px; }
 .concept-list { display: grid; gap: 6px; max-height: 110px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .concept-line { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 11px; }
 .concept-line b { color: #dfe8ed; font-weight: 500; }
@@ -280,7 +363,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 /* CYBOU Shell Card & Terminal Styles */
 .shell-card { padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-.shell-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; margin-top: 6px; }
+.shell-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; margin-top: 6px; padding: 0 16px 14px; }
 .shell-output { flex: 1; min-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 11px; line-height: 1.4; color: #a9b8c5; }
 .shell-entry { display: flex; flex-direction: column; gap: 2px; }
 .shell-cmd-echo { color: var(--accent); font-weight: 550; display: flex; gap: 6px; }
@@ -333,13 +416,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 }
 
 @media (max-width: 760px) {
-  .topbar { grid-template-columns: 1fr auto; padding: 0 14px; }
-  .runtime-switch { display: none; }
+  /* Still three children, so still three columns. Two put the actions on a second row and drew
+     them over the canvas — the same fault the desktop rule had. What gives way on a narrow screen
+     is the status detail, which is the one part a person can do without; the controls do not move.
+  */
+  .topbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; padding: 0 14px; }
+  .status-meta { display: none; }
+  .history-btn span, .runtime-trigger span, .auth-trigger-btn span { display: none; }
+  .history-btn, .runtime-trigger, .auth-trigger-btn { padding: 0 8px; }
+
   .canvas { min-height: 900px; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; }
-  .ambient, .relationship-layer, .system-state, .object-actions, .minimap { display: none; }
-  .object, .capabilities, .capabilities:hover { position: static; width: 100%; transform: none; }
+  .relationships, .snap-guides-layer, .desktop-minimap { display: none; }
+  .object { position: static; width: 100%; transform: none; }
   .capabilities { order: -1; }
-  .command-bar { position: fixed; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -481,7 +570,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 /* File Manager Card Styles */
 .file-manager-card { padding: 14px; display: flex; flex-direction: column; }
-.fm-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; }
+.fm-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; padding: 0 16px 14px; }
 .fm-path-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(4, 9, 14, 0.5); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(154, 167, 184, 0.15); }
 .fm-crumbs { display: flex; align-items: center; gap: 4px; font-size: 11px; font-family: ui-monospace, SFMono-Regular, monospace; color: var(--accent); overflow-x: auto; white-space: nowrap; }
 .fm-toolbar { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -633,7 +722,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 /* Journal Event Stream Card Styles */
 .journal-feed-card { padding: 14px; display: flex; flex-direction: column; }
-.jf-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; }
+.jf-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; padding: 0 16px 14px; }
 .jf-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .jf-filter-group { display: flex; align-items: center; gap: 4px; }
 .jf-filter-btn {
@@ -1296,3 +1385,125 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   background: rgba(112, 225, 200, 0.75);
   box-shadow: 0 0 6px rgba(112, 225, 200, 0.6);
 }
+
+/* --- One card shape ----------------------------------------------------------------------- */
+/* Cards used to carry a padding each — 19px, 20px, 22px, 24px — with nothing recording why. On a
+   desktop where every card is the same kind of object, twelve arbitrary geometries is twelve small
+   surprises. The frame sets the shape; the header and the body below set their own spacing.
+
+   The per-kind class stays on the element, and does nothing to how it looks. It is there so a card
+   can be *found* — by a test, by a script, by a person reading the DOM — not so it can be
+   different. Cards look alike on purpose. */
+
+/* --- Card bodies -------------------------------------------------------------------------- */
+/* Every card lays its content out the same way: a vertical stack with room between the parts.
+   Without this the label and the value of each row ran together into one word, which is how the
+   session card came to read "Signed in, over the networkdemoAuth Yes". */
+.attention-card-body,
+.beliefs-card-body,
+.capabilities-card-body,
+.commitments-card-body,
+.context-card-body,
+.disclosure-card-body,
+.identity-card-body,
+.journal-card-body,
+.lifecycle-card-body,
+.perception-card-body,
+.self-model-card-body,
+.session-card-body { display: grid; gap: 6px; align-content: start; padding: 0 20px 18px; font-size: 12px; }
+
+.session-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.session-consumer { color: #dce6eb; }
+.session-meta,
+.commitments-meta-label { color: var(--muted); font-size: 11px; }
+.muted { color: var(--muted); }
+
+/* --- Card controls ------------------------------------------------------------------------ */
+.pin-btn,
+.focus-btn,
+.collapse-btn,
+.close-btn,
+.detach-btn,
+.control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #91a5b4;
+  cursor: pointer;
+}
+.pin-btn:hover,
+.focus-btn:hover,
+.collapse-btn:hover,
+.detach-btn:hover,
+.control-btn:hover { border-color: rgba(154,167,184,.3); background: rgba(154,167,184,.12); color: #dce6eb; }
+.close-btn:hover { border-color: rgba(200,90,80,.5); background: rgba(200,90,80,.16); color: #e5a09a; }
+.pin-btn.active { color: var(--accent); }
+
+/* --- Decks -------------------------------------------------------------------------------- */
+.deck-tabs-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid rgba(154,167,184,.14); }
+.deck-brand { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.deck-title { color: #dce6eb; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-tab-bar { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; }
+.deck-detach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #91a5b4;
+  cursor: pointer;
+}
+.deck-detach-btn:hover { background: rgba(154,167,184,.16); color: #dce6eb; }
+.object-header { display: flex; align-items: center; gap: 8px; }
+
+/* --- Event stream inspector --------------------------------------------------------------- */
+.jf-empty { padding: 14px 0; color: var(--muted); font-size: 11px; text-align: center; }
+.jf-inspector { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(154,167,184,.2); border-radius: 10px; background: rgba(6,11,17,.8); }
+.jf-insp-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.jf-insp-title { color: #dce6eb; font-size: 12px; }
+.jf-insp-actions { display: flex; align-items: center; gap: 4px; }
+.jf-json-view { max-height: 190px; overflow: auto; margin: 0; color: #c9d3dc; font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; }
+.unverified { color: #d9a62f; }
+
+/* --- File manager and shell gates --------------------------------------------------------- */
+.card-auth-gate { display: grid; justify-items: center; gap: 8px; padding: 22px 20px; text-align: center; }
+.card-auth-gate svg { color: var(--accent); }
+.card-auth-gate p { color: var(--muted); font-size: 11px; }
+.fm-readonly-pill { padding: 2px 7px; border: 1px solid rgba(154,167,184,.28); border-radius: 999px; color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.primary-btn {
+  padding: 7px 14px;
+  border: 1px solid rgba(112,225,200,.5);
+  border-radius: 9px;
+  background: rgba(112,225,200,.14);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.primary-btn:hover { background: rgba(112,225,200,.22); }
+
+/* --- Dock --------------------------------------------------------------------------------- */
+.dock-win-title { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.public-preview { color: #d9a62f; }
+
+/* --- Command palette ---------------------------------------------------------------------- */
+.command-menu { display: grid; gap: 2px; max-height: 320px; overflow-y: auto; padding: 6px; }
+.shortcut { margin-left: auto; padding: 2px 6px; border: 1px solid rgba(154,167,184,.24); border-radius: 5px; color: var(--muted); font-size: 10px; }
+
+/* --- Canvas layers ------------------------------------------------------------------------ */
+/* Decoration only: behind everything, and never in the way of a pointer. */
+.ambient-primary,
+.ambient-secondary { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.relationships { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
+.snap-guides-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; }
+.snap-guide-line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 4; opacity: .8; }
+.snap-guide-line.vertical,
+.snap-guide-line.horizontal { shape-rendering: crispEdges; }

@@ -8,7 +8,8 @@
 #   code        -> the Rust workspace and the WASM frontend compile, test and lint
 #   desktop     -> the desktop's interaction logic, run in a browser because that is where it lives
 #   integration -> the twelve daemons start on a session bus and answer as a system
-#   compliance  -> licence headers and the documents this repository declares authoritative
+#   compliance  -> licence headers, the documents this repository declares authoritative, and
+#                  that every class the desktop renders has a rule to be drawn by
 #
 # What used to be here and is gone with the code it checked: Nix builds of the C++/QML Plasma
 # packages, the NixOS VM, and the Qt compatibility oracles. Nothing installs those packages, and
@@ -119,3 +120,4 @@ jobs:
         run: |
           reuse lint
           python3 scripts/validate-cognitive-docs.py .
+          python3 scripts/validate-desktop-styles.py

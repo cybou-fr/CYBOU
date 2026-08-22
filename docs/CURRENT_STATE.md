@@ -334,6 +334,50 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The desktop was drawing what nobody had styled (2026-08-22)
+
+Sixty-five classes the components render had no rule in the stylesheet at all, including every
+element of the topbar. An unstyled element does not look wrong in an obvious way — it falls into the
+document flow — so the controls stacked vertically under the logo and drew themselves over the
+canvas, and the status text ran together into one word. Meanwhile the stylesheet still carried rules
+for a previous generation of components that nothing renders: a telemetry card, a web browser card,
+an intent launcher. Neither half was visible to the compiler, to `cargo test`, or to the browser
+gate, because CSS is not code to any of them.
+
+`scripts/validate-desktop-styles.py` now fails if a class a component renders has no rule, and runs
+in CI. One direction only: "rendered but unstyled" is exact, while "a rule nothing renders" is not
+decidable from source, and a check that guesses gets ignored.
+
+Four faults behind the same wall were fixed with it:
+
+- The topbar is a grid of **three** columns, because it has three children. Two put the actions on a
+  second row. The narrow-screen rule had the same fault; what gives way there is the status detail,
+  not the controls.
+- Cards carried a padding each — 19, 20, 22, 24 pixels — with nothing recording why. On a desktop
+  where every card is the same kind of object, twelve arbitrary geometries is twelve small
+  surprises. One shape now; the per-kind class stays as an identity hook and does nothing to how a
+  card looks.
+- Arrangements were called with `None` for the viewport, which meant a hardcoded 1440x900 whatever
+  the window was. On a maximised screen the cards were laid out for a smaller desktop than the one
+  they were on, and "Fit All" then shrank the result to around 61% — which a person saw as the
+  arrangement changing the zoom by itself. Every arrangement is told the real size now.
+- Columns stepped by a constant while cards range from 220 to 560 wide, so wide cards ran into the
+  next column and the last column could start past the edge of the window. A column is as wide as
+  its widest member.
+
+Focus was scaled by the canvas. A `position: fixed` element inside a transformed ancestor is
+positioned against that ancestor and scaled with it, so a focused card meant to fill the window was
+drawn at the canvas zoom and offset by the pan — a large empty frame with its contents small in one
+corner. The canvas drops its transform while anything is focused, so focus means the same thing at
+every zoom.
+
+And the Shell and the File Manager could not read anything on the deployed host. Nothing ever set
+`CYBOU_SHELL_JAIL`, so the gateway chose its sandbox from a list of candidate paths and picked
+`/home/demo` because that directory happens to exist there — owned by somebody else and unreadable
+by the service. Every `ls` answered with an I/O error and every listing was a 502. The unit names the
+sandbox now, and the gateway guesses nothing: a sandbox chosen by what happens to be on disk is a
+sandbox nobody chose.
+
 ## The half of the desktop no test could see (2026-08-22)
 
 Everything under `components` is `cfg(target_arch = "wasm32")`. `cargo test --workspace` compiles

@@ -34,6 +34,24 @@ What the workspace gate genuinely could not see was behaviour: a daemon compiles
 pass without any of them ever having spoken to another daemon. That is what the job below now
 covers.
 
+## What proves the desktop is styled at all
+
+```bash
+python3 scripts/validate-desktop-styles.py
+```
+
+Living Canvas draws its own window chrome. There is no browser furniture behind it and no
+user-agent stylesheet that makes an unstyled element look deliberate: a `div` whose class nobody
+styled falls into the document flow, and the person sees controls stacked in a corner rather than a
+toolbar. Neither the compiler, nor `cargo test`, nor the browser gate can see this, because CSS is
+not code to any of them.
+
+On 2026-08-22 sixty-five rendered classes had no rule at all — the entire topbar among them — while
+the stylesheet still carried rules for a previous generation of components that nothing renders.
+This check fails if a class a component renders has no rule. It is one direction only, deliberately:
+"rendered but unstyled" is exact, while "a rule nothing renders" is not decidable from source, and a
+check that guesses gets ignored.
+
 ## What proves the desktop
 
 ```bash

@@ -40,12 +40,13 @@ pub fn sandbox_root() -> std::path::PathBuf {
     if let Ok(configured) = std::env::var("CYBOU_SHELL_JAIL") {
         return std::path::PathBuf::from(configured);
     }
-    let demo = std::path::Path::new("/home/demo");
-    if demo.exists() {
-        return demo.to_path_buf();
-    }
-    // Named by process rather than at random: a gateway restarted in place should find the
-    // sandbox it was using, and a second gateway on the same host must not land in it.
+    // Nothing else is guessed. This used to prefer `/home/demo` whenever that directory existed,
+    // which on the deployed host it does — owned by somebody else, unreadable by this service. The
+    // Shell answered every `ls` with an I/O error and the File Manager returned 502, because the
+    // sandbox had been chosen by what happened to be on disk rather than by anyone.
+    //
+    // Named by process rather than at random: a gateway restarted in place should find the sandbox
+    // it was using, and a second gateway on the same host must not land in it.
     std::env::temp_dir().join(format!("cybou_sandbox_{}", std::process::id()))
 }
 
