@@ -19,9 +19,10 @@ Debian 13 · Rust/WebAssembly · one frontend for web and, as a target, desktop 
 
 Cybou is an experimental agent-native environment targeting Debian 13. The architecture builds one
 Rust/WebAssembly frontend (Living Canvas) shared by ordinary browsers and, as a target, a lightweight
-Chromium/Wayland desktop shell. The shell has no implementation in this tree: the Plasma packaging
-that once stood in for it was removed with the rest of the C++/Nix legacy, and a Debian-native
-launcher has not replaced it yet. Its long-term target is an **agent-native computing environment** in which a persistent
+Chromium/Wayland desktop shell. A Debian-native launcher now exists — Cage showing one Chromium
+window over the loopback gateway, installed by a deployment and left disabled — but it has never
+been run on a machine with a seat, so the desktop remains a target rather than something this tree
+demonstrates. Cybou writes no compositor and no shell. Its long-term target is an **agent-native computing environment** in which a persistent
 **Mind** remembers and governs the system while models, agents, workers, tools, and user interfaces
 remain replaceable.
 

@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# The Debian-native CYBOU Desktop session.
+#
+# Deliberately not part of cybou-mind.target and deliberately not enabled by a deployment. Mind runs
+# on hosts with no display at all — the one this project deploys to is one of them — and a target
+# that dragged a compositor along would make a headless install fail at something it does not need.
+# A person who wants the session enables this unit on a machine that has a seat.
+
+[Unit]
+Description=Cybou Desktop session (Cage + Chromium over the loopback gateway)
+Documentation=https://github.com/cybou-fr/CYBOU
+# The session shows the gateway, so it is worth starting after it. Not Requires: the launcher waits
+# for the gateway to answer and refuses rather than showing a browser error page as a desktop.
+After=cybou-web-gateway.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/cybou/cybou-desktop-session.sh
+
+# Restart, because a compositor that dies takes the whole visible system with it and there is
+# nothing else on the screen to start it again from.
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=default.target

@@ -54,6 +54,12 @@ cybou_ssh "
   # Install systemd user units and target
   sudo install -m 0644 systemd/user/*.service systemd/user/*.target /usr/lib/systemd/user/
 
+  # The desktop session launcher is installed and left disabled. This host has no seat and no
+  # display; a target that started a compositor here would fail at something it does not need, and
+  # a unit that is present but not enabled is the honest way to ship a session for machines that do
+  # have one.
+  sudo install -m 0755 scripts/cybou-desktop-session.sh /usr/libexec/cybou/cybou-desktop-session.sh
+
   sudo getent group cybou >/dev/null || sudo groupadd --system cybou
   sudo id cybou >/dev/null 2>&1 || sudo useradd --system --gid cybou \
     --home-dir /var/lib/cybou --create-home --shell /usr/sbin/nologin cybou

@@ -72,9 +72,15 @@ true while the chain underneath it was broken.
    activation session this version does not have — depth, time and token budgets, and seeds that
    are not only words. Until it exists the capability is partial and is described that way.
 
-4. **A Debian-native desktop launcher, or an honest absence.** The Plasma packaging that stood in
-   for the shell is gone. Either a small Cage/Chromium launcher lands in this tree, or the README
-   keeps calling the desktop a target.
+4. **A Debian-native desktop launcher, or an honest absence.** *Partly done 2026-08-22.* The
+   launcher landed: `scripts/cybou-desktop-session.sh` with `systemd/user/cybou-desktop.service`,
+   installed by a deployment and left disabled, with a durable Chromium profile under
+   `$XDG_STATE_HOME/cybou/desktop`. What is proven is narrow and listed in
+   [Current State](CURRENT_STATE.md): the launcher refuses a silent gateway, refuses a missing
+   browser, creates its profile directory, and can print what it would run. What is not proven is
+   the part that matters — that Cage acquires a seat and shows the window on real hardware — because
+   no machine with a seat was available. The README therefore still calls the desktop a target, and
+   should keep doing so until someone runs the unit on one.
 
 5. **The rest of M8.** `cybou-meaningd` owns the boundary and is gated: an utterance becomes a
    typed act or none, a reference stays unresolved rather than being guessed, corrections append,

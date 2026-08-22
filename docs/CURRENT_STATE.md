@@ -334,6 +334,36 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A Debian-native desktop session exists, and what is proven about it is narrow (2026-08-22)
+
+`scripts/cybou-desktop-session.sh` and `systemd/user/cybou-desktop.service` are the smallest thing
+that can be called a session: Cage owns the display and shows one window, Chromium draws Living
+Canvas from the loopback gateway. There is no panel, no launcher and no second application, because
+the desktop is inside the surface rather than around it. Cybou wrote no compositor and no shell.
+
+The unit is installed by a deployment and **not enabled**. This project's deployed host has no seat
+and no display; a target that dragged a compositor onto it would fail at something it does not
+need. A person who wants the session enables it on a machine that has one.
+
+The Chromium profile is durable, under `$XDG_STATE_HOME/cybou/desktop/chromium`. The layout lives in
+that profile's `localStorage`, so an ephemeral profile — which is what the removed Plasma-era
+preview used — meant a desktop that forgot where every card was put, on every start. It is state and
+not biography: where a person likes their windows belongs under `XDG_STATE_HOME` and never in the
+Journal.
+
+**What is proven.** The launcher refuses rather than starting a browser when the gateway does not
+answer, so a late gateway does not become a desktop showing a browser error page; it exits non-zero
+when no Chromium binary can be found, including when one is named explicitly and is not there; it
+creates the profile directory under `XDG_STATE_HOME`; and the argument vector it would run is
+printable without running it, so it can be checked without a compositor. Those four were exercised
+on Debian 13.
+
+**What is not proven.** That Cage acquires a seat, opens a display and shows that Chromium window on
+real hardware. It could not be exercised here: the only Linux machine available is WSL, whose
+compositor mounts `/tmp/.X11-unix` read-only, and Cage 0.2.0 always starts XWayland and has no
+option to decline. Nothing about the desktop session should be read as evidence until it has run on
+a machine with a seat. `README.md` continues to call the desktop a target.
+
 ## Focus is recorded in one place (2026-08-22)
 
 `CardPresentation` persisted a `maximized` flag. Nothing set it and nothing read it: focus is
