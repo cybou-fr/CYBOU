@@ -111,6 +111,44 @@ pub struct MeaningInterpretation {
     pub derived_at: OffsetDateTime,
 }
 
+/// Something a plan carries that the prose must not be allowed to drop.
+///
+/// A closed set, never free text. These are the qualifications ADR-0031 C5 requires a plan to
+/// express *before* language realization, and they are exactly the parts a fluent sentence tends to
+/// lose: "mostly fine", "as far as I know", "roughly". A renderer that omitted one would turn a
+/// hedged answer into a confident one, which is the failure the plan boundary exists to prevent.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Qualification {
+    /// An owner this answer depends on was never read.
+    ///
+    /// Not the same as an owner that answered with nothing. Silence and emptiness are different
+    /// facts, and only one of them is evidence.
+    NotRead,
+    /// The state this answer rests on is outside the freshness its owner declared.
+    Stale,
+    /// The answer was cut short by a bound rather than by running out of things to say.
+    Partial,
+    /// Something was withheld from the reader this answer is for.
+    Withheld,
+    /// The Journal behind this answer has not been verified through its head.
+    Unverified,
+}
+
+impl Qualification {
+    /// The frozen spelling this qualification is recorded and rendered under.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::NotRead => "not-read",
+            Self::Stale => "stale",
+            Self::Partial => "partial",
+            Self::Withheld => "withheld",
+            Self::Unverified => "unverified",
+        }
+    }
+}
+
 /// Abstract response plan formulated by Mind before language realization.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,6 +161,12 @@ pub struct ResponsePlan {
     pub key_points: Vec<String>,
     /// Factual epistemic propositions referenced.
     pub referenced_evidence: Vec<Uuid>,
+    /// What the reader must be told alongside the points, whatever wording is chosen.
+    ///
+    /// Carried in the plan rather than left to the realizer because a qualification is a claim
+    /// about the answer's standing, and the realizer is not allowed to make claims (C5, C6).
+    #[serde(default)]
+    pub qualifications: Vec<Qualification>,
 }
 
 #[cfg(test)]

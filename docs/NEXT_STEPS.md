@@ -89,7 +89,12 @@ true while the chain underneath it was broken.
    no machine with a seat was available. The README therefore still calls the desktop a target, and
    should keep doing so until someone runs the unit on one.
 
-5. **The rest of M8.** `cybou-meaningd` owns the boundary and is gated: an utterance becomes a
+5. **The rest of M8.** *Partly done 2026-08-23.* `meaning::plan_status` builds a `ResponsePlan`
+   from typed capability facts, and `ResponsePlan` gained a closed set of qualifications, so C5 has
+   assertions behind it and `Realize` is reachable and used. What remains is what the original text
+   below names: composition operators and dialogue state across turns.
+
+   **The rest of M8.** `cybou-meaningd` owns the boundary and is gated: an utterance becomes a
    typed act or none, a reference stays unresolved rather than being guessed, corrections append,
    and prose comes from a `ResponsePlan` and nothing else. What is missing is the middle. Nothing
    builds a `ResponsePlan` from Mind state, so `Realize` is reachable and unused and ADR-0031's C5

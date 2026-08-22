@@ -334,6 +334,38 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A plan now exists to be realized from (2026-08-23)
+
+ADR-0031 puts a `ResponsePlan` between typed state and anything a person reads, and the realizer has
+been honouring that boundary for some time: it is handed a plan and nothing else, so a fluent
+sentence cannot quietly acquire a claim Mind never made. What was missing was the other side.
+Nothing built a plan. `Realize` was reachable and unused, and C5 — *a plan expresses claims,
+evidence references and qualifications before language realization* — had no assertion behind it,
+because there was no plan for an assertion to be about.
+
+Two things changed. `ResponsePlan` gained `qualifications`, a closed set: `not-read`, `stale`,
+`partial`, `withheld`, `unverified`. And `meaning::plan_status` builds a plan from typed capability
+facts.
+
+The point is not the wording. It is that **the hedges are decided in the typed layer**. A capability
+nobody could read, a projection outside its freshness, a listing cut short by a bound — each becomes
+a qualification on the plan, where the realizer cannot lose it. Left to whoever writes the sentence,
+"eleven of eleven capabilities are available" and "eleven of eleven, as far as I could read" would
+be the same function of the same state, chosen by tone.
+
+The planner reaches nothing, which is the realizer's discipline one layer earlier: it is a function
+of the facts it is handed, down to the plan's identity being supplied rather than generated. A test
+asserts that the same facts produce the same plan, so anything it reached for would fail rather than
+be described as absent in a comment.
+
+Two properties now have assertions. A projection that was never read does not become "0 of 0
+capabilities available" — it becomes a `not-read` qualification and a sentence saying so. And a
+qualification carried by a plan reaches the reader in both languages, because a plan that hedged
+beside prose that did not would put the confident reading in front of the person while the honest
+one stayed in a struct.
+
+Still missing from M8, unchanged: composition operators, and dialogue state across turns.
+
 ## An erasure says what it reached, not that it is finished (2026-08-23)
 
 `Event1.RequestErasure` destroys the key, redacts the payload of the target and everything derived

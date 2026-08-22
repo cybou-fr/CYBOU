@@ -8,7 +8,7 @@
 //! it has no access to anything except the plan it was handed, so a fluent sentence cannot quietly
 //! acquire a claim Mind never made.
 
-use cybou_protocol::meaning::ResponsePlan;
+use cybou_protocol::meaning::{Qualification, ResponsePlan};
 
 /// A surface language a plan can be rendered in.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,6 +37,16 @@ pub fn realize(plan: &ResponsePlan, language: Language) -> String {
         lines.push(format!("- {point}"));
     }
 
+    // Every qualification the plan carries reaches the reader. This is the half of C5 that only
+    // matters if the renderer honours it: a plan that hedged and prose that did not would put the
+    // confident reading in front of the person while the honest one stayed in a struct.
+    for qualification in &plan.qualifications {
+        lines.push(match language {
+            Language::English => qualification_en(*qualification),
+            Language::Russian => qualification_ru(*qualification),
+        });
+    }
+
     // What the plan rests on is said out loud rather than left implicit. A reader who wants to
     // check an answer has the contributions to check it against.
     if !plan.referenced_evidence.is_empty() {
@@ -52,7 +62,7 @@ pub fn realize(plan: &ResponsePlan, language: Language) -> String {
         });
     }
 
-    if plan.key_points.is_empty() {
+    if plan.key_points.is_empty() && plan.qualifications.is_empty() {
         lines.push(match language {
             Language::English => "There is nothing established to report.".to_owned(),
             Language::Russian => "Установленного, о чём сообщить, нет.".to_owned(),
@@ -60,6 +70,38 @@ pub fn realize(plan: &ResponsePlan, language: Language) -> String {
     }
 
     lines.join("\n")
+}
+
+/// How a qualification reads in English.
+///
+/// Each says what is missing rather than softening the answer. "Some information may be missing" is
+/// the phrasing this deliberately avoids: it hedges everything and names nothing, which leaves a
+/// reader no better off than an unhedged claim would.
+fn qualification_en(qualification: Qualification) -> String {
+    match qualification {
+        Qualification::NotRead => "Something this rests on was never read.".to_owned(),
+        Qualification::Stale => {
+            "This is older than its owner declared it stays good for.".to_owned()
+        }
+        Qualification::Partial => {
+            "This was cut short by a limit, so it is not the whole of it.".to_owned()
+        }
+        Qualification::Withheld => "Something was held back from you.".to_owned(),
+        Qualification::Unverified => {
+            "The record behind this has not been verified to its end.".to_owned()
+        }
+    }
+}
+
+/// How a qualification reads in Russian.
+fn qualification_ru(qualification: Qualification) -> String {
+    match qualification {
+        Qualification::NotRead => "Что-то, на чём это держится, не было прочитано.".to_owned(),
+        Qualification::Stale => "Это старше срока, который назначил его владелец.".to_owned(),
+        Qualification::Partial => "Ответ обрезан ограничением, это не всё.".to_owned(),
+        Qualification::Withheld => "Часть была от вас удержана.".to_owned(),
+        Qualification::Unverified => "Запись за этим не проверена до конца.".to_owned(),
+    }
 }
 
 /// The English opening for a communicative intent.
@@ -94,6 +136,39 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn a_hedge_in_the_plan_reaches_the_reader_in_both_languages() {
+        // The renderer may choose wording, order and language. It may not choose to leave out that
+        // the answer is qualified — that would put the confident reading in front of the person
+        // while the honest one stayed in a struct.
+        let mut hedged = plan();
+        hedged.qualifications = vec![Qualification::Stale, Qualification::Withheld];
+
+        let english = realize(&hedged, Language::English);
+        let russian = realize(&hedged, Language::Russian);
+
+        assert!(english.contains("older than"), "{english}");
+        assert!(english.contains("held back"), "{english}");
+        assert!(russian.contains("старше"), "{russian}");
+        assert!(russian.contains("удержана"), "{russian}");
+    }
+
+    #[test]
+    fn a_qualification_alone_is_not_nothing_to_report() {
+        // "There is nothing established to report" beside a plan that says something was never read
+        // would be the renderer contradicting the plan it was handed.
+        let only_hedge = ResponsePlan {
+            plan_id: Uuid::from_u128(3),
+            intent: "inform_status".into(),
+            key_points: Vec::new(),
+            referenced_evidence: Vec::new(),
+            qualifications: vec![Qualification::NotRead],
+        };
+        let rendered = realize(&only_hedge, Language::English);
+        assert!(rendered.contains("never read"), "{rendered}");
+        assert!(!rendered.contains("nothing established"), "{rendered}");
+    }
+
     fn plan() -> ResponsePlan {
         ResponsePlan {
             plan_id: Uuid::from_u128(1),
@@ -103,6 +178,7 @@ mod tests {
                 "one obligation is open".into(),
             ],
             referenced_evidence: vec![Uuid::from_u128(42)],
+            qualifications: Vec::new(),
         }
     }
 
@@ -148,6 +224,7 @@ mod tests {
             intent: "inform_status".into(),
             key_points: Vec::new(),
             referenced_evidence: Vec::new(),
+            qualifications: Vec::new(),
         };
         let rendered = realize(&empty, Language::English);
         assert!(rendered.contains("nothing established"));
@@ -160,6 +237,7 @@ mod tests {
             intent: "propose_consolidation".into(),
             key_points: vec!["the chain has not been swept in nine hours".into()],
             referenced_evidence: Vec::new(),
+            qualifications: Vec::new(),
         };
         let rendered = realize(&unusual, Language::English);
         assert!(rendered.starts_with("propose_consolidation:"));
