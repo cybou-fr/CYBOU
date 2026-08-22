@@ -97,14 +97,6 @@ pub fn selection_actions_style(layout: DesktopLayout) -> String {
     )
 }
 
-/// Calculate minimap marker position for a card.
-#[must_use]
-pub fn minimap_style(geom: CardGeometry) -> String {
-    let x = 10.0 + geom.x / 1_280.0 * 180.0;
-    let y = 8.0 + geom.y / 650.0 * 92.0;
-    format!("left:{x:.1}px;top:{y:.1}px")
-}
-
 /// Compute start, end, and label center coordinates for a relationship edge between two cards.
 #[must_use]
 pub fn relationship_points(

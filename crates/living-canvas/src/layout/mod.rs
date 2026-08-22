@@ -6,6 +6,7 @@
 pub mod engine;
 pub mod history;
 pub mod migration;
+pub mod minimap;
 pub mod model;
 pub mod placement;
 pub mod relations;
@@ -14,6 +15,10 @@ pub mod snap;
 pub use engine::DesktopLayout;
 pub use history::LayoutHistory;
 pub use migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, PointV8, from_v8};
+pub use minimap::{
+    MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, pan_centring,
+    visible_desktop_rect,
+};
 pub use model::{
     ArrangementMode, DesktopItem, DesktopItemId, DesktopViewMode, Rect, UsableViewport,
 };

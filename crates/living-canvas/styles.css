@@ -518,6 +518,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 /* Canvas Panning & Minimap Viewport */
 .canvas.panning { cursor: grabbing !important; user-select: none; }
 .minimap-field { position: relative; }
+/* Minimap: one item per top-level desktop item, drawn at its real projected size. */
+.desktop-minimap { position: absolute; z-index: 900; left: 24px; bottom: 24px; padding: 12px; border: 1px solid rgba(154,167,184,.32); border-radius: 14px; background: rgba(8,13,20,.88); box-shadow: 0 18px 55px rgba(0,0,0,.36); backdrop-filter: blur(22px); }
+.minimap-surface { position: relative; overflow: hidden; border: 1px solid rgba(154,167,184,.12); border-radius: 10px; background: radial-gradient(circle at 50% 48%, rgba(61,181,161,.12), transparent 45%), rgba(4,9,14,.72); }
+.minimap-item { position: absolute; padding: 0; border: 1px solid rgba(154,167,184,.45); border-radius: 2px; background: rgba(154,167,184,.22); cursor: pointer; }
+.minimap-item:hover { border-color: var(--accent); background: rgba(112,225,200,.3); }
+/* A deck is one item, and reads as one. Drawing its cards separately was the old map's mistake. */
+.minimap-item.deck { border-color: rgba(112,225,200,.55); background: rgba(112,225,200,.18); border-radius: 4px; }
+.minimap-item.collapsed { background: rgba(154,167,184,.1); }
+.minimap-item.pinned { border-style: dashed; }
 .minimap-viewport {
   position: absolute;
   border: 1.5px solid var(--accent);

@@ -334,6 +334,29 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The minimap shows the desktop it is on, and where you are in it (2026-08-22)
+
+It drew `layout.cards`, which is not the set of things on the desktop. A card docked into a deck
+stays in `cards`, so the map drew it standing alone at coordinates it had left, and never drew the
+deck it was actually inside. `desktop_items()` is the set Invariant L8 defines, and it is what the
+map draws now: one item per top-level thing, a deck as one item rather than as its contents
+scattered.
+
+Every coordinate was divided by a constant `1280 x 650`. That is a projection of one particular
+desktop: a card dragged past those numbers was drawn outside the surface and disappeared. The
+transform is derived from `bounding_rect()` now, so whatever the layout is, it fits — with one scale
+for both axes, because a map that stretched one of them would draw a wide desktop as a square one.
+
+There was no viewport rectangle at all. The map showed where the cards were and never where the
+person was, which is the one thing an overview is for. The rectangle is derived from the canvas
+transform — `translate(pan) scale(zoom)` inverted — and moves as the desktop is panned or zoomed.
+
+The projection is ordinary geometry over `Rect`, so it lives in `layout::minimap` and is tested
+natively rather than only by looking: nine tests hold that a desktop of any size and origin lands
+inside the surface, that shape survives, that nothing is drawn too small to see, and that centring a
+card puts it in the middle of the screen. The classes the old component used had no stylesheet rules
+at all, which is its own answer to how much of this was working.
+
 ## The relationship graph decides the arrangement, and one edge ran backwards (2026-08-22)
 
 `DesktopRelationshipGraph::canonical()` was already the single source for the lines drawn between

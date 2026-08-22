@@ -31,7 +31,8 @@ pub use deck::DeckInstance;
 pub use gateway_client::GatewayMindClient;
 pub use layout::{
     ArrangementMode, DesktopItem, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory,
-    PlacementResolver, Rect, SnapGuide, SnapResult, UsableViewport,
+    MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, PlacementResolver, Rect,
+    SnapGuide, SnapResult, UsableViewport, pan_centring, visible_desktop_rect,
 };
 
 /// Error returned by a typed Mind client operation.

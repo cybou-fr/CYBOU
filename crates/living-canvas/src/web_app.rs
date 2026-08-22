@@ -200,7 +200,7 @@ pub fn App() -> impl IntoView {
 
             <section class="canvas-controls" aria-label="Canvas viewport navigation">
                 <Show when=move || minimap_visible.get()>
-                    <Minimap layout=layout zoom=zoom set_pan=set_pan />
+                    <Minimap layout=layout zoom=zoom pan=pan set_pan=set_pan />
                 </Show>
 
                 <div class="zoom-controls">
