@@ -34,6 +34,9 @@ mod tests {
         let v9 = DesktopLayout::from_v8(&v8);
 
         assert_eq!(v9.schema_version, 9);
+        // Eleven, because that is how many panels v8 had. Migration carries what the old layout
+        // held and invents nothing; a card added after v8 is the business of normalization, which
+        // this test deliberately does not run.
         assert_eq!(v9.cards.len(), 11);
 
         let id_geom = v9.geometry(CardId::Identity);
@@ -49,7 +52,7 @@ mod tests {
     fn default_layout_has_all_system_cards() {
         let layout = DesktopLayout::default();
         assert_eq!(layout.schema_version, 9);
-        assert_eq!(layout.cards.len(), 11);
+        assert_eq!(layout.cards.len(), CardId::ALL_SYSTEM_CARDS.len());
 
         for sys_id in CardId::ALL_SYSTEM_CARDS {
             assert!(layout.contains_card(sys_id));
@@ -90,14 +93,23 @@ mod tests {
 
         // L8: Desktop items exclude cards docked in decks
         let items = layout.desktop_items();
-        assert_eq!(items.len(), 10); // 9 standalone cards + 1 deck
-        assert!(!items.iter().any(|it| it.id == DesktopItemId::Card(CardId::Identity)));
-        assert!(items.iter().any(|it| it.id == DesktopItemId::Deck(d_id.clone())));
+        // Two cards went into the deck, so they are one item between them.
+        assert_eq!(items.len(), CardId::ALL_SYSTEM_CARDS.len() - 1);
+        assert!(
+            !items
+                .iter()
+                .any(|it| it.id == DesktopItemId::Card(CardId::Identity))
+        );
+        assert!(
+            items
+                .iter()
+                .any(|it| it.id == DesktopItemId::Deck(d_id.clone()))
+        );
 
         // Detach card and dissolve
         layout.detach_from_deck(&d_id, CardId::Identity, None);
         assert_eq!(layout.decks.len(), 0); // dissolved
-        assert_eq!(layout.desktop_items().len(), 11);
+        assert_eq!(layout.desktop_items().len(), CardId::ALL_SYSTEM_CARDS.len());
     }
 
     #[test]
@@ -220,7 +232,7 @@ mod tests {
 
         corrupt.validate_and_normalize();
 
-        assert_eq!(corrupt.cards.len(), 11);
+        assert_eq!(corrupt.cards.len(), CardId::ALL_SYSTEM_CARDS.len());
         assert_eq!(corrupt.decks.len(), 0); // dissolved
         for c in corrupt.cards {
             assert!(c.geometry.x >= 0.0);
@@ -278,6 +290,7 @@ mod tests {
         let v8_json = serde_json::to_string(&CanvasLayoutV8::default()).unwrap();
         let layout_v8 = DesktopLayout::parse_json(&v8_json).expect("parses v8");
         assert_eq!(layout_v8.schema_version, 9);
+        // Eleven for the same reason as above: this is what v8 carried, not what v9 requires.
         assert_eq!(layout_v8.cards.len(), 11);
 
         let v9_json = serde_json::to_string(&DesktopLayout::default()).unwrap();
