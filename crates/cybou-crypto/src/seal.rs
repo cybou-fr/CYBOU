@@ -6,9 +6,7 @@
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce, aead::Aead};
 use sha2::{Digest, Sha256};
 
-use crate::types::{
-    CryptoError, KeyDomain, SEAL_KEY_BYTES, SEAL_NONCE_BYTES, SealedPayload,
-};
+use crate::types::{CryptoError, KeyDomain, SEAL_KEY_BYTES, SEAL_NONCE_BYTES, SealedPayload};
 
 /// Sealing and key wrapping primitives using XChaCha20-Poly1305.
 pub struct Seal;

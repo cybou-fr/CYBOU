@@ -8,7 +8,9 @@ use web_sys::PointerEvent;
 
 use crate::{
     CardId, DesktopItemId, DesktopLayout, DesktopViewMode,
-    components::icons::{IconClose, IconExternalLink, IconMaximize, IconMinimize, IconPin, IconResizeGrip},
+    components::icons::{
+        IconClose, IconExternalLink, IconMaximize, IconMinimize, IconPin, IconResizeGrip,
+    },
     interaction::{ResizeState, start_deck_resize, start_resize},
 };
 

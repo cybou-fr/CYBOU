@@ -3,8 +3,8 @@
 
 //! Consumer offsets tracking and validation.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Consumer offsets persisted schema.
 #[derive(Clone, Debug, Deserialize, Serialize)]

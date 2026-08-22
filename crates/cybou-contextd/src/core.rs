@@ -15,7 +15,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::types::{
-    Association, AssociationOrigin, ConceptNode, ContextBundle, ContextBudget,
+    Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
     most_restrictive_privacy, shortest_retention,
 };
 

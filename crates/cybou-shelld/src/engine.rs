@@ -383,11 +383,7 @@ impl ShellEngine {
         }
 
         let (Some(pat), Some(file_name)) = (pattern, file_arg) else {
-            return ShellOutput::error(
-                1,
-                "grep: usage: grep [-i] <pattern> <file>\n",
-                self.cwd(),
-            );
+            return ShellOutput::error(1, "grep: usage: grep [-i] <pattern> <file>\n", self.cwd());
         };
 
         let full_path = self.resolve_path(file_name);

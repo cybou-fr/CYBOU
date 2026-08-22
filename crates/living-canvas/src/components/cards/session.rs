@@ -3,10 +3,10 @@
 
 //! Session card and content component representing established trust and gateway session mode.
 
-use std::sync::Arc;
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use lucide_leptos::UsersRound;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,
@@ -52,9 +52,12 @@ pub fn SessionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     };
 
     let session_id_short = move || match runtime.get() {
-        RuntimeState::Ready { session, .. } => {
-            session.session_id.to_string().chars().take(8).collect::<String>()
-        }
+        RuntimeState::Ready { session, .. } => session
+            .session_id
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>(),
         RuntimeState::Loading | RuntimeState::Error(_) => unread(),
     };
 

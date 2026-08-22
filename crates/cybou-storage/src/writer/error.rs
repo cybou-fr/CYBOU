@@ -3,8 +3,8 @@
 
 //! Write errors and `SQLite` error classification.
 
-use cybou_protocol::admission::Rejection;
 use crate::StorageError;
+use cybou_protocol::admission::Rejection;
 
 /// Journal hash version written by this build.
 pub const JOURNAL_HASH_V3: i64 = 3;

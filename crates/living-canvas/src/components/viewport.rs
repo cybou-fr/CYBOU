@@ -12,8 +12,8 @@ use crate::{
     components::{
         cards::{
             AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
-            FileManagerCard, IdentityCard, JournalCard, JournalFeedCard, LifecycleCard,
-            PerceptionCard, SelfModelCard, SessionCard, ShellCard,
+            DisclosureCard, FileManagerCard, IdentityCard, JournalCard, JournalFeedCard,
+            LifecycleCard, PerceptionCard, SelfModelCard, SessionCard, ShellCard,
         },
         deck::DeckContainerView,
         relations::RelationshipsLayer,
@@ -133,6 +133,7 @@ pub fn CanvasViewport(
             <BeliefsCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
             <PerceptionCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
             <ContextCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
+            <DisclosureCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
 
             <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />
             <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />

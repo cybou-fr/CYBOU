@@ -17,8 +17,8 @@ pub use types::{ComponentHealth, ComponentHealthRecord, HealthError};
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use cybou_protocol::{CapabilityState, KnowledgeState, capability::CapabilityRegistry};
+    use std::collections::HashMap;
     use time::OffsetDateTime;
 
     use super::*;

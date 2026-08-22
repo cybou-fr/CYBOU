@@ -3,10 +3,10 @@
 
 //! File Manager tool card and content component for sandboxed filesystem exploration.
 
-use std::sync::Arc;
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use std::sync::Arc;
 use web_sys::PointerEvent;
 
 use crate::{

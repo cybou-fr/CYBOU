@@ -3,9 +3,9 @@
 
 //! Real-time Journal SSE stream tool card and content component.
 
-use std::sync::Arc;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use std::sync::Arc;
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, MessageEvent, PointerEvent};
 
@@ -69,10 +69,8 @@ pub fn JournalFeedContent() -> impl IntoView {
                             });
                         }
                     });
-                let _ = es.add_event_listener_with_callback(
-                    "snapshot",
-                    on_snap.as_ref().unchecked_ref(),
-                );
+                let _ = es
+                    .add_event_listener_with_callback("snapshot", on_snap.as_ref().unchecked_ref());
                 on_snap.forget();
                 es_handle.set_value(Some(es));
             }

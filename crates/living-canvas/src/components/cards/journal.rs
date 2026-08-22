@@ -3,9 +3,9 @@
 
 //! Journal card and content component representing Event1 canonical event store and integrity.
 
-use std::sync::Arc;
 use leptos::prelude::*;
 use lucide_leptos::Files;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

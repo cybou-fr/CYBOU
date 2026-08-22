@@ -3,10 +3,10 @@
 
 //! Commitments card and content component representing Intention1 open obligations.
 
-use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
 use leptos::prelude::*;
 use lucide_leptos::ListChecks;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

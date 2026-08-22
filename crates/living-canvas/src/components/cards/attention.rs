@@ -3,10 +3,10 @@
 
 //! Attention card and content component representing Workspace1 Global Workspace Theory attention focus.
 
-use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
 use leptos::prelude::*;
 use lucide_leptos::Map;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

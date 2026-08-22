@@ -7,10 +7,10 @@ pub mod append;
 pub mod error;
 pub mod schema;
 
-use std::path::Path;
 use cybou_protocol::admission::Kind;
 use cybou_protocol::canonical::CanonicalEnvelope;
 use rusqlite::{Connection, OptionalExtension};
+use std::path::Path;
 use time::OffsetDateTime;
 use uuid::Uuid;
 

@@ -15,7 +15,7 @@ pub mod service;
 
 pub use core::{ContextCore, enforce_edge_budget, enforce_node_budget};
 pub use types::{
-    Association, AssociationOrigin, ConceptNode, ContextBundle, ContextBudget,
+    Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
     most_restrictive_privacy, shortest_retention,
 };
 

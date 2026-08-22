@@ -3,9 +3,9 @@
 
 //! Self-model card and content component representing Self1 autobiographical assessment and narration.
 
-use std::sync::Arc;
 use leptos::prelude::*;
 use lucide_leptos::Sparkles;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

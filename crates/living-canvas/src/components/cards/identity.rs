@@ -3,9 +3,9 @@
 
 //! Identity1 card and content component representing subject continuity and provenance.
 
-use std::sync::Arc;
 use leptos::prelude::*;
 use lucide_leptos::FileCheck;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

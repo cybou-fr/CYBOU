@@ -75,7 +75,12 @@ pub fn compute_snap(
             (cand_left, other_right, other_right, other_right),
             (cand_right, other_left, other_left - width, other_left),
             (cand_right, other_right, other_right - width, other_right),
-            (cand_mid_x, other_mid_x, other_mid_x - width / 2.0, other_mid_x),
+            (
+                cand_mid_x,
+                other_mid_x,
+                other_mid_x - width / 2.0,
+                other_mid_x,
+            ),
         ];
 
         for (c_val, o_val, target_x, guide_x) in x_pairs {
@@ -91,8 +96,18 @@ pub fn compute_snap(
             (cand_top, other_top, other_top, other_top),
             (cand_top, other_bottom, other_bottom, other_bottom),
             (cand_bottom, other_top, other_top - height, other_top),
-            (cand_bottom, other_bottom, other_bottom - height, other_bottom),
-            (cand_mid_y, other_mid_y, other_mid_y - height / 2.0, other_mid_y),
+            (
+                cand_bottom,
+                other_bottom,
+                other_bottom - height,
+                other_bottom,
+            ),
+            (
+                cand_mid_y,
+                other_mid_y,
+                other_mid_y - height / 2.0,
+                other_mid_y,
+            ),
         ];
 
         for (c_val, o_val, target_y, guide_y) in y_pairs {

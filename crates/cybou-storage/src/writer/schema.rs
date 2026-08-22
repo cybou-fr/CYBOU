@@ -121,7 +121,11 @@ pub fn table_exists(connection: &Connection, table: &str) -> Result<bool, WriteE
 /// # Errors
 ///
 /// Returns [`WriteError`] on database query failure.
-pub fn column_exists(connection: &Connection, table: &str, column: &str) -> Result<bool, WriteError> {
+pub fn column_exists(
+    connection: &Connection,
+    table: &str,
+    column: &str,
+) -> Result<bool, WriteError> {
     let mut statement = connection
         .prepare(&format!("PRAGMA table_info({table})"))
         .map_err(write_error)?;

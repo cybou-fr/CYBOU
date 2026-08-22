@@ -10,8 +10,7 @@ pub mod sources;
 pub mod types;
 
 pub use sources::{
-    LinuxHostSource, LinuxSystemSource, NixosSystemSource, SystemGenerationSource,
-    parse_os_release,
+    LinuxHostSource, LinuxSystemSource, NixosSystemSource, SystemGenerationSource, parse_os_release,
 };
 pub use types::{
     AcquisitionResult, AcquisitionStatus, DEFAULT_FRESHNESS_SECONDS, LINUX_SYSTEM_SOURCE_ID,

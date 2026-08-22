@@ -3,10 +3,10 @@
 
 //! Context card and content component representing Context1 associative concepts graph.
 
-use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
 use leptos::prelude::*;
 use lucide_leptos::Link;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

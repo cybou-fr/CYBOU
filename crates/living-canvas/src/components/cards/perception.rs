@@ -3,9 +3,9 @@
 
 //! Perception card and content component representing Perception1 host observations.
 
-use std::sync::Arc;
 use leptos::prelude::*;
 use lucide_leptos::Files;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

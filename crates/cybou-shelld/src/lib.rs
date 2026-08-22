@@ -15,8 +15,8 @@ pub use types::{MAX_FILE_PAYLOAD_BYTES, MAX_OUTPUT_BYTES, ShellError, ShellOutpu
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use cybou_jailfs::JailFs;
+    use std::path::PathBuf;
 
     use super::*;
 

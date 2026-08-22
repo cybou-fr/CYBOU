@@ -3,10 +3,10 @@
 
 //! CYBOU Shell tool card and content component for bounded execution in the Body sandbox.
 
-use std::sync::Arc;
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use std::sync::Arc;
 use web_sys::{KeyboardEvent, PointerEvent};
 
 use crate::{

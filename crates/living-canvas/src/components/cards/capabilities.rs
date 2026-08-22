@@ -3,10 +3,10 @@
 
 //! Capabilities card and content component representing Health1 capability graph and organ availability.
 
-use std::sync::Arc;
 use cybou_protocol::CapabilityState;
 use leptos::prelude::*;
 use lucide_leptos::Sparkles;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

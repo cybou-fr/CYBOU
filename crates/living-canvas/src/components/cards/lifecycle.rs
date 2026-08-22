@@ -3,9 +3,9 @@
 
 //! Lifecycle1 card and content component representing sleep/wake states and background consolidation.
 
-use std::sync::Arc;
 use leptos::prelude::*;
 use lucide_leptos::Sparkles;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

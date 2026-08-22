@@ -3,10 +3,10 @@
 
 //! Beliefs card and content component representing Epistemic1 derived beliefs and validity.
 
-use std::sync::Arc;
 use cybou_protocol::KnowledgeState;
 use leptos::prelude::*;
 use lucide_leptos::Sparkles;
+use std::sync::Arc;
 
 use crate::{
     CardId, DesktopLayout,

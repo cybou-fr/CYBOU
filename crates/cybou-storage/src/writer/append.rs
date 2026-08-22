@@ -3,9 +3,7 @@
 
 //! Contribution appending, hashing, admission resolution, and database insertion pipeline.
 
-use cybou_protocol::admission::{
-    self, Kind, Privacy, ReferenceFacts, Resolved, Sensitivity,
-};
+use cybou_protocol::admission::{self, Kind, Privacy, ReferenceFacts, Resolved, Sensitivity};
 use cybou_protocol::canonical::{
     CanonicalEnvelope, canonical_journal_row_v3, commitment_v3, sha256,
 };
@@ -113,9 +111,8 @@ pub fn append_within_transaction(
                 params![
                     hyphenated(envelope.message_id),
                     hyphenated(*evidence_id),
-                    i64::try_from(ordinal).map_err(|_| WriteError::Malformed(
-                        "evidence ordinal is out of range"
-                    ))?
+                    i64::try_from(ordinal)
+                        .map_err(|_| WriteError::Malformed("evidence ordinal is out of range"))?
                 ],
             )
             .map_err(WriteError::Query)?;
@@ -129,7 +126,10 @@ pub fn append_within_transaction(
 /// # Errors
 ///
 /// Returns [`WriteError`] on database query failure.
-pub fn resolve(connection: &Connection, envelope: &CanonicalEnvelope) -> Result<Resolved, WriteError> {
+pub fn resolve(
+    connection: &Connection,
+    envelope: &CanonicalEnvelope,
+) -> Result<Resolved, WriteError> {
     let message_id_exists = reference_facts(connection, envelope.message_id)?.is_some();
 
     let causation = if envelope.causation_id.is_nil() {

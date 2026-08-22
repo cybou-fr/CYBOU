@@ -66,8 +66,8 @@ pub struct ResizeState {
 pub fn card_style(layout: DesktopLayout, card: CardId) -> String {
     let geom = layout.geometry(card);
     let pres = layout.presentation(card);
-    let view_mode = use_context::<RwSignal<DesktopViewMode>>()
-        .map_or(DesktopViewMode::Spatial, |vm| vm.get());
+    let view_mode =
+        use_context::<RwSignal<DesktopViewMode>>().map_or(DesktopViewMode::Spatial, |vm| vm.get());
 
     if view_mode == DesktopViewMode::Focus(DesktopItemId::Card(card)) {
         "position:fixed;left:20px;top:20px;width:calc(100vw - 40px);height:calc(100vh - 100px);z-index:9999;box-shadow:0 0 0 9999px rgba(0,0,0,0.65);"
@@ -277,9 +277,10 @@ pub fn move_drag(
         DragTarget::Deck(deck_id) => DesktopItemId::Deck(deck_id.clone()),
     };
 
-    let snap = layout
-        .get_untracked()
-        .compute_snap(&target_id, raw_x, raw_y, drag.width, drag.height, 8.0);
+    let snap =
+        layout
+            .get_untracked()
+            .compute_snap(&target_id, raw_x, raw_y, drag.width, drag.height, 8.0);
 
     let x = snap.snapped_x.max(12.0);
     let y = snap.snapped_y.max(12.0);
