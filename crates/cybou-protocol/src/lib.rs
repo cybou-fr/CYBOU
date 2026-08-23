@@ -23,6 +23,7 @@ pub mod observation;
 // that the corresponding behaviour exists.
 pub mod action;
 pub mod disclosure;
+pub mod epistemic;
 pub mod governance;
 pub mod learning;
 pub mod meaning;

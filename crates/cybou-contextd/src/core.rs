@@ -11,6 +11,7 @@ use std::{
     },
 };
 
+use cybou_protocol::epistemic::EpistemicStatus;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -123,6 +124,34 @@ impl ContextCore {
         now: OffsetDateTime,
         sensitivity: u8,
     ) {
+        self.activate_with_standing(
+            label,
+            salience,
+            reason,
+            now,
+            sensitivity,
+            EpistemicStatus::Unknown,
+        );
+    }
+
+    /// Activate a concept, carrying how the epistemic owner stood on what produced it.
+    ///
+    /// A stated standing replaces whatever was held; `Unknown` never does. A caller that did not
+    /// know is not evidence that a dispute went away, and letting silence overwrite `Disputed`
+    /// would lose a dispute at the one boundary A4 exists to hold.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "each argument is a distinct fact about one activation"
+    )]
+    pub fn activate_with_standing(
+        &self,
+        label: impl Into<String>,
+        salience: f64,
+        reason: impl Into<String>,
+        now: OffsetDateTime,
+        sensitivity: u8,
+        epistemic_status: EpistemicStatus,
+    ) {
         let label_str = label.into();
         let reason_str = reason.into();
 
@@ -141,12 +170,16 @@ impl ContextCore {
                 activation_reason: reason_str.clone(),
                 last_activated_at: now,
                 sensitivity,
+                epistemic_status,
             });
 
         node.salience = (node.salience * 0.5 + salience * 0.5).clamp(0.0, 1.0);
         node.activation_reason = reason_str;
         node.last_activated_at = now;
         node.sensitivity = node.sensitivity.max(sensitivity);
+        if epistemic_status != EpistemicStatus::Unknown {
+            node.epistemic_status = epistemic_status;
+        }
 
         let dropped = enforce_node_budget(&mut candidate_nodes, self.budget.nodes);
         let assocs = if dropped.is_empty() {

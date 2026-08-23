@@ -334,6 +334,40 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A dispute that does not survive retrieval was never held (2026-08-23)
+
+ADR-0029 A4 asks that a disputed epistemic state still be disputed after retrieval. It held, in the
+way the last two gates held: retrieval did not touch epistemic standing at all, so nothing could
+drop it. A retrieval with no word for "disputed" cannot carry one — it hands back the value, and the
+loss looks exactly like there having been nothing to lose.
+
+`EpistemicStatus` moved into the protocol for that reason. A standing only the organ that derived it
+can name is a standing that gets dropped at the first boundary it crosses. Naming it in the shared
+vocabulary moves no authority: `epistemicd` remains the only thing that decides what a subject's
+status is, and everyone else may only carry what it decided, unchanged. `Unknown` is the default,
+deliberately — something arriving without a standing has not been established to be settled, and
+treating silence as corroboration is how an unread projection comes to read as a healthy one.
+
+A concept now carries its standing into activation, and out of activation into attention. Both
+boundaries have a test, and the retrieval one was checked by breaking it: dropping the standing on
+the walk fails three tests rather than none.
+
+### The half an instinct gets wrong
+
+A concept reached *through* a disputed one is **not** thereby disputed, and this is the opposite of
+what `compose` does two layers away.
+
+The rule there is that a qualification on any part qualifies the whole, because the parts were
+claims about one answer and a reader cannot tell which half a hedge applied to. Here the walk is
+association, not inference. `lemon` being contested says nothing about whether honey exists, and
+propagating the dispute along the edge would be association conferring epistemic force — the precise
+thing A5 forbids. So each concept carries its own standing and only its own, and the session can say
+that *something* in it is qualified without pretending to know that everything is.
+
+`Unknown` never overwrites a stated standing either: a caller that did not know is not evidence a
+dispute went away. A stated standing does replace a stated standing, so the rule is not "disputes
+are permanent" — the epistemic owner settling one is carried through the same way.
+
 ## A gate nothing evaluates is a comment (2026-08-23)
 
 ADR-0032 defines a `PromotionGate` with three criteria — independent episodes, success rate, replay

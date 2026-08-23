@@ -14,21 +14,7 @@ use uuid::Uuid;
 /// The rule this build derives beliefs with.
 pub const BELIEF_RULE_VERSION: u32 = 3;
 
-/// Epistemic validity status of a proposition.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum EpistemicStatus {
-    /// Actively corroborated by recent observations.
-    Observed,
-    /// Previously observed but beyond freshness horizon without corroboration.
-    Stale,
-    /// Contradicted by competing observations with conflicting values.
-    Disputed,
-    /// Explicitly superseded by a newer belief revision.
-    Superseded,
-    /// Not yet observed or unresolvable.
-    Unknown,
-}
+pub use cybou_protocol::epistemic::EpistemicStatus;
 
 /// A validated epistemic proposition.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -31,6 +31,7 @@
 
 use std::collections::HashSet;
 
+use cybou_protocol::epistemic::EpistemicStatus;
 use serde::{Deserialize, Serialize};
 
 /// A concept asking to be noticed.
@@ -47,6 +48,13 @@ pub struct AttentionProposal {
     pub relevance: f64,
     /// Why it was proposed, carried through from the retrieval that found it.
     pub reason: String,
+    /// How the epistemic owner stood on it, carried through from the same retrieval.
+    ///
+    /// ADR-0029 A4 does not stop at the retrieval boundary. A disputed concept that reached
+    /// attention with its standing stripped would be presented as settled by whatever draws the
+    /// moment, and nothing downstream would have any way to know it had been contested.
+    #[serde(default)]
+    pub epistemic_status: EpistemicStatus,
 }
 
 /// The outcome of offering proposals to a moment.
@@ -156,6 +164,14 @@ mod tests {
             label: label.to_owned(),
             relevance,
             reason: format!("lemon → {label} (episodic, strength {relevance:.2}) at depth 1"),
+            epistemic_status: EpistemicStatus::Observed,
+        }
+    }
+
+    fn disputed(label: &str, relevance: f64) -> AttentionProposal {
+        AttentionProposal {
+            epistemic_status: EpistemicStatus::Disputed,
+            ..proposal(label, relevance)
         }
     }
 
@@ -170,6 +186,18 @@ mod tests {
                 proposal(&format!("concept-{index:04}"), relevance)
             })
             .collect()
+    }
+
+    #[test]
+    fn a_disputed_proposal_reaches_attention_still_disputed() {
+        // A4 one layer on. Admission decides whether something is attended to; it has no business
+        // deciding how sure Mind is of it, and stripping the standing would decide exactly that.
+        let admission = admit(&[disputed("honey", 0.9)], 32, 0);
+        assert_eq!(admission.admitted.len(), 1);
+        assert_eq!(
+            admission.admitted[0].epistemic_status,
+            EpistemicStatus::Disputed
+        );
     }
 
     #[test]

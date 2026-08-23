@@ -347,6 +347,7 @@ mod tests {
                 label: format!("concept-{index:04}"),
                 relevance: 0.9,
                 reason: "lemon → something".to_owned(),
+                epistemic_status: cybou_protocol::epistemic::EpistemicStatus::Observed,
             })
             .collect();
         let admission = core.consider(&proposals);

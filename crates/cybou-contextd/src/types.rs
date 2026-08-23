@@ -3,7 +3,7 @@
 
 //! Associative and situational context types, nodes, bundles, and budgets.
 
-use cybou_protocol::admission::Privacy;
+use cybou_protocol::{admission::Privacy, epistemic::EpistemicStatus};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -65,6 +65,13 @@ pub struct ConceptNode {
     /// The highest sensitivity among the contributions that activated this concept.
     #[serde(default)]
     pub sensitivity: u8,
+    /// How `epistemicd` stood on what this concept was derived from.
+    ///
+    /// ADR-0029 A4: a disputed state is still disputed after retrieval. Carried rather than
+    /// recomputed — `contextd` may read the layer above it and may not overrule it, so this field
+    /// only ever holds what the epistemic owner decided.
+    #[serde(default)]
+    pub epistemic_status: EpistemicStatus,
 }
 
 /// Bounded context bundle returned for cognitive queries.

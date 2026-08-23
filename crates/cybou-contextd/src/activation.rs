@@ -40,6 +40,7 @@ use std::{
     time::Duration,
 };
 
+use cybou_protocol::epistemic::EpistemicStatus;
 use serde::{Deserialize, Serialize};
 
 use crate::types::{Association, ConceptNode};
@@ -120,6 +121,28 @@ pub struct ActivatedConcept {
     pub reason: String,
     /// What returning it is estimated to cost.
     pub estimated_tokens: usize,
+    /// How the epistemic owner stood on what this concept was derived from.
+    ///
+    /// ADR-0029 A4. Its own standing, and never the path's: a concept reached *through* a disputed
+    /// one is not thereby disputed. Propagating along the walk would be association conferring
+    /// epistemic force, which is the thing A5 forbids — `lemon` being contested says nothing about
+    /// whether honey exists.
+    #[serde(default)]
+    pub epistemic_status: EpistemicStatus,
+}
+
+impl ActivationSession {
+    /// Whether anything reached carries a standing a reader has to be told about.
+    ///
+    /// Offered so a consumer cannot present a bundle as settled without having looked. It is a
+    /// summary of the items and never a substitute for them: which concept is disputed is the part
+    /// a person needs, and that stays on the concept.
+    #[must_use]
+    pub fn carries_qualified(&self) -> bool {
+        self.items
+            .iter()
+            .any(|item| item.epistemic_status.qualifies())
+    }
 }
 
 /// One bounded walk, and everything needed to argue with it.
@@ -240,6 +263,8 @@ pub fn activate_from<S: BuildHasher>(
             next_path.push(neighbour.clone());
             frontier.push(ActivatedConcept {
                 estimated_tokens: estimated_tokens(neighbour, &reason),
+                // The neighbour's own standing. Not the one it was reached from: see the field.
+                epistemic_status: standing_of(nodes, neighbour),
                 label: neighbour.clone(),
                 relevance: relevance * link.strength,
                 depth: depth + 1,
@@ -267,6 +292,16 @@ pub fn activate_from<S: BuildHasher>(
     }
 }
 
+/// How the epistemic owner stood on one concept, or `Unknown` if the graph does not hold it.
+fn standing_of<S: BuildHasher>(
+    nodes: &HashMap<String, ConceptNode, S>,
+    label: &str,
+) -> EpistemicStatus {
+    nodes
+        .get(label)
+        .map_or(EpistemicStatus::Unknown, |node| node.epistemic_status)
+}
+
 /// The starting frontier: one entry per distinct seed the graph actually holds.
 ///
 /// A seed the graph does not hold is recorded as an exhaustion rather than skipped. A caller that
@@ -289,6 +324,7 @@ fn seed_frontier<S: BuildHasher>(
         let reason = "named as a seed".to_owned();
         frontier.push(ActivatedConcept {
             estimated_tokens: estimated_tokens(seed, &reason),
+            epistemic_status: standing_of(nodes, seed),
             label: seed.clone(),
             relevance: 1.0,
             depth: 0,
@@ -365,8 +401,19 @@ mod tests {
                 activation_reason: "observed".to_owned(),
                 last_activated_at: at(),
                 sensitivity: 0,
+                epistemic_status: EpistemicStatus::Observed,
             },
         )
+    }
+
+    /// The same graph, with one concept the epistemic owner is contesting.
+    fn kitchen_with_a_dispute() -> (HashMap<String, ConceptNode>, Vec<Association>) {
+        let (mut nodes, links) = kitchen();
+        nodes
+            .get_mut("honey")
+            .expect("honey is in the kitchen")
+            .epistemic_status = EpistemicStatus::Disputed;
+        (nodes, links)
     }
 
     fn link(source: &str, target: &str, strength: f64) -> Association {
@@ -402,6 +449,81 @@ mod tests {
 
     fn seeds(labels: &[&str]) -> Vec<String> {
         labels.iter().map(|label| (*label).to_owned()).collect()
+    }
+
+    #[test]
+    fn a_disputed_state_is_still_disputed_after_retrieval() {
+        // A4. A retrieval that handed back the value and dropped the standing would lose the
+        // dispute at exactly the boundary where losing it looks like there having been nothing.
+        let (nodes, links) = kitchen_with_a_dispute();
+        let session = activate_from(
+            &nodes,
+            &links,
+            &seeds(&["lemon"]),
+            &ActivationBudget::default(),
+            patient(),
+        );
+        let honey = session
+            .items
+            .iter()
+            .find(|item| item.label == "honey")
+            .expect("honey was reached");
+        assert_eq!(honey.epistemic_status, EpistemicStatus::Disputed);
+        assert!(session.carries_qualified());
+    }
+
+    #[test]
+    fn a_concept_reached_through_a_disputed_one_is_not_thereby_disputed() {
+        // The other half, and the one an instinct gets wrong. In `compose` a hedge on any part
+        // qualifies the whole, because the parts were claims about one answer. Here the walk is
+        // association, not inference: lemon being contested says nothing about whether honey
+        // exists, and propagating would be association conferring epistemic force.
+        let (nodes, links) = kitchen_with_a_dispute();
+        let session = activate_from(
+            &nodes,
+            &links,
+            &seeds(&["lemon"]),
+            &ActivationBudget::default(),
+            patient(),
+        );
+        let tea = session
+            .items
+            .iter()
+            .find(|item| item.label == "tea")
+            .expect("tea was reached through honey");
+        assert_eq!(tea.path, vec!["lemon", "honey", "tea"]);
+        assert_eq!(
+            tea.epistemic_status,
+            EpistemicStatus::Observed,
+            "the dispute travelled along the path"
+        );
+    }
+
+    #[test]
+    fn a_bundle_with_nothing_contested_does_not_claim_to_be_qualified() {
+        let (nodes, links) = kitchen();
+        let session = activate_from(
+            &nodes,
+            &links,
+            &seeds(&["lemon"]),
+            &ActivationBudget::default(),
+            patient(),
+        );
+        assert!(!session.carries_qualified());
+    }
+
+    #[test]
+    fn a_disputed_seed_carries_its_own_standing() {
+        let (nodes, links) = kitchen_with_a_dispute();
+        let session = activate_from(
+            &nodes,
+            &links,
+            &seeds(&["honey"]),
+            &ActivationBudget::default(),
+            patient(),
+        );
+        assert_eq!(session.items[0].label, "honey");
+        assert_eq!(session.items[0].epistemic_status, EpistemicStatus::Disputed);
     }
 
     #[test]

@@ -25,11 +25,62 @@ pub use types::{
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::admission::Privacy;
+    use cybou_protocol::{admission::Privacy, epistemic::EpistemicStatus};
     use time::OffsetDateTime;
     use uuid::Uuid;
 
     use super::*;
+
+    #[test]
+    fn a_later_activation_that_knew_nothing_does_not_erase_a_dispute() {
+        // A caller that did not know is not evidence that a dispute went away. Letting silence
+        // overwrite `Disputed` would lose it at the one boundary A4 exists to hold — and the loss
+        // would look exactly like there having been nothing to lose.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate_with_standing(
+            "kernel-version",
+            1.0,
+            "observed",
+            now,
+            0,
+            EpistemicStatus::Disputed,
+        );
+        context_engine.activate("kernel-version", 1.0, "observed again", now);
+
+        let session = context_engine
+            .bring_to_mind(&["kernel-version".to_owned()], &ActivationBudget::default());
+        assert_eq!(session.items[0].epistemic_status, EpistemicStatus::Disputed);
+    }
+
+    #[test]
+    fn the_epistemic_owner_settling_a_dispute_is_carried_through() {
+        // The other direction, so the rule is not "disputes are permanent". A stated standing
+        // replaces a stated standing; only silence does not.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate_with_standing(
+            "kernel-version",
+            1.0,
+            "observed",
+            now,
+            0,
+            EpistemicStatus::Disputed,
+        );
+        context_engine.activate_with_standing(
+            "kernel-version",
+            1.0,
+            "corroborated",
+            now,
+            0,
+            EpistemicStatus::Observed,
+        );
+
+        let session = context_engine
+            .bring_to_mind(&["kernel-version".to_owned()], &ActivationBudget::default());
+        assert_eq!(session.items[0].epistemic_status, EpistemicStatus::Observed);
+        assert!(!session.carries_qualified());
+    }
 
     #[test]
     fn the_organ_can_be_asked_what_a_word_brings_to_mind() {
