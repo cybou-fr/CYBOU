@@ -40,6 +40,7 @@ use std::{
     time::Duration,
 };
 
+use cybou_protocol::attention::AttentionProposal;
 use cybou_protocol::epistemic::EpistemicStatus;
 use serde::{Deserialize, Serialize};
 
@@ -132,6 +133,25 @@ pub struct ActivatedConcept {
 }
 
 impl ActivationSession {
+    /// What this walk offers attention, and nothing more.
+    ///
+    /// ADR-0014's amendment permits exactly this and no more: `contextd` may produce proposals;
+    /// activation itself never enters the Workspace. The conversion is a named function rather
+    /// than a shared struct so that the moment association becomes a proposal is a line somebody
+    /// can point at — and so that `workspaced` still decides what becomes of them.
+    #[must_use]
+    pub fn proposals(&self) -> Vec<AttentionProposal> {
+        self.items
+            .iter()
+            .map(|item| AttentionProposal {
+                label: item.label.clone(),
+                relevance: item.relevance,
+                reason: item.reason.clone(),
+                epistemic_status: item.epistemic_status,
+            })
+            .collect()
+    }
+
     /// Whether anything reached carries a standing a reader has to be told about.
     ///
     /// Offered so a consumer cannot present a bundle as settled without having looked. It is a

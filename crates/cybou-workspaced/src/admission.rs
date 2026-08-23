@@ -31,52 +31,7 @@
 
 use std::collections::HashSet;
 
-use cybou_protocol::epistemic::EpistemicStatus;
-use serde::{Deserialize, Serialize};
-
-/// A concept asking to be noticed.
-///
-/// Deliberately not a `ConceptNode` or an `ActivatedConcept`: `workspaced` does not read
-/// `contextd`'s types, so association cannot acquire the standing of attention by being the same
-/// struct. Whoever holds both organs does the conversion, in the open.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AttentionProposal {
-    /// The concept being proposed.
-    pub label: String,
-    /// How strongly whatever proposed it reached it, in [0.0, 1.0].
-    pub relevance: f64,
-    /// Why it was proposed, carried through from the retrieval that found it.
-    pub reason: String,
-    /// How the epistemic owner stood on it, carried through from the same retrieval.
-    ///
-    /// ADR-0029 A4 does not stop at the retrieval boundary. A disputed concept that reached
-    /// attention with its standing stripped would be presented as settled by whatever draws the
-    /// moment, and nothing downstream would have any way to know it had been contested.
-    #[serde(default)]
-    pub epistemic_status: EpistemicStatus,
-}
-
-/// The outcome of offering proposals to a moment.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Admission {
-    /// What got in, strongest first.
-    pub admitted: Vec<AttentionProposal>,
-    /// How many were offered.
-    pub considered: usize,
-    /// How many were turned away because the quota was full.
-    pub refused_for_quota: usize,
-    /// How many were turned away because nothing actually reached them.
-    pub refused_unreached: usize,
-    /// How many named a concept another proposal had already named.
-    pub refused_duplicate: usize,
-    /// Whether every proposal offered was admitted.
-    ///
-    /// False is the ordinary case for a large activation, and saying so is the point: a caller
-    /// reading a short list as the whole list is the failure this field exists to prevent.
-    pub complete: bool,
-}
+pub use cybou_protocol::attention::{Admission, AttentionProposal};
 
 /// The share of a workspace that proposals may occupy at once.
 ///
@@ -105,8 +60,18 @@ pub fn proposal_quota(capacity: usize) -> usize {
 ///
 /// Nothing here can remove a resident. The worst a flood of proposals can do is fill the quota and
 /// be counted; the moment it arrived into is the moment it leaves behind.
+///
+/// `offered_everything` is what the caller knows and admission cannot: whether the retrieval that
+/// produced these proposals finished. A truncated activation offering one concept is
+/// indistinguishable here from a graph that holds one concept, so the fact has to be carried in
+/// rather than inferred.
 #[must_use]
-pub fn admit(proposals: &[AttentionProposal], capacity: usize, occupied: usize) -> Admission {
+pub fn admit(
+    proposals: &[AttentionProposal],
+    capacity: usize,
+    occupied: usize,
+    offered_everything: bool,
+) -> Admission {
     let considered = proposals.len();
 
     let mut ranked: Vec<&AttentionProposal> = proposals
@@ -151,12 +116,15 @@ pub fn admit(proposals: &[AttentionProposal], capacity: usize, occupied: usize) 
         // A duplicate is not a refusal a caller needs to act on — it asked for one thing twice and
         // got it once — so it does not make an admission incomplete.
         complete: refused_for_quota == 0 && refused_unreached == 0,
+        upstream_complete: offered_everything,
         admitted,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use cybou_protocol::epistemic::EpistemicStatus;
+
     use super::*;
 
     fn proposal(label: &str, relevance: f64) -> AttentionProposal {
@@ -189,10 +157,25 @@ mod tests {
     }
 
     #[test]
+    fn an_offer_that_was_already_short_does_not_become_a_whole_answer() {
+        // The defect the end-to-end walkthrough found. A budget cut the retrieval to one concept;
+        // that one concept fits the quota comfortably, so admission had nothing to refuse and said
+        // it was complete. From inside `workspaced` a truncated activation offering one concept is
+        // indistinguishable from a graph holding one concept, and the truncation died here.
+        let admission = admit(&[proposal("honey", 0.9)], 32, 0, false);
+        assert_eq!(admission.refused_for_quota, 0, "nothing needed refusing");
+        assert!(admission.complete, "admission itself admitted everything");
+        assert!(
+            !admission.upstream_complete,
+            "and the answer is still not the whole of it"
+        );
+    }
+
+    #[test]
     fn a_disputed_proposal_reaches_attention_still_disputed() {
         // A4 one layer on. Admission decides whether something is attended to; it has no business
         // deciding how sure Mind is of it, and stripping the standing would decide exactly that.
-        let admission = admit(&[disputed("honey", 0.9)], 32, 0);
+        let admission = admit(&[disputed("honey", 0.9)], 32, 0, true);
         assert_eq!(admission.admitted.len(), 1);
         assert_eq!(
             admission.admitted[0].epistemic_status,
@@ -204,7 +187,7 @@ mod tests {
     fn thousands_of_associations_cannot_take_over_the_moment() {
         // A11, and the amendment to ADR-0014. The word lemon activating fifty related things must
         // not become fifty things Mind is now paying attention to.
-        let admission = admit(&flood(5000), 32, 0);
+        let admission = admit(&flood(5000), 32, 0, true);
         assert_eq!(admission.admitted.len(), proposal_quota(32));
         assert_eq!(admission.considered, 5000);
         assert!(!admission.complete);
@@ -215,11 +198,16 @@ mod tests {
     fn a_proposal_never_takes_a_slot_something_that_happened_is_in() {
         // The rule stated structurally rather than as a threshold: no relevance is high enough,
         // because relevance is not the currency being spent.
-        let full = admit(&[proposal("honey", 1.0)], 32, 32);
+        let full = admit(&[proposal("honey", 1.0)], 32, 32, true);
         assert!(full.admitted.is_empty());
         assert!(!full.complete);
 
-        let nearly_full = admit(&[proposal("honey", 1.0), proposal("tea", 0.9)], 32, 31);
+        let nearly_full = admit(
+            &[proposal("honey", 1.0), proposal("tea", 0.9)],
+            32,
+            31,
+            true,
+        );
         assert_eq!(nearly_full.admitted.len(), 1, "one free slot, one admitted");
         assert_eq!(nearly_full.admitted[0].label, "honey");
     }
@@ -237,7 +225,7 @@ mod tests {
                     "capacity {capacity} could be made entirely of reminders"
                 );
             }
-            let admission = admit(&flood(1000), capacity, 0);
+            let admission = admit(&flood(1000), capacity, 0, true);
             assert!(admission.admitted.len() <= quota);
         }
     }
@@ -246,7 +234,7 @@ mod tests {
     fn what_was_turned_away_is_counted_rather_than_dropped_quietly() {
         // Three admitted out of two thousand and three admitted out of three look identical unless
         // the difference is reported.
-        let admission = admit(&flood(2000), 12, 0);
+        let admission = admit(&flood(2000), 12, 0, true);
         assert_eq!(
             admission.considered,
             admission.admitted.len()
@@ -260,7 +248,7 @@ mod tests {
 
     #[test]
     fn a_small_activation_that_fits_is_complete() {
-        let admission = admit(&[proposal("honey", 0.8)], 32, 0);
+        let admission = admit(&[proposal("honey", 0.8)], 32, 0, true);
         assert_eq!(admission.admitted.len(), 1);
         assert!(admission.complete);
         assert_eq!(admission.refused_for_quota, 0);
@@ -268,7 +256,12 @@ mod tests {
 
     #[test]
     fn a_concept_nothing_reached_is_not_admitted_for_being_in_the_list() {
-        let admission = admit(&[proposal("honey", 0.8), proposal("unreached", 0.0)], 32, 0);
+        let admission = admit(
+            &[proposal("honey", 0.8), proposal("unreached", 0.0)],
+            32,
+            0,
+            true,
+        );
         assert_eq!(admission.admitted.len(), 1);
         assert_eq!(admission.refused_unreached, 1);
         assert!(!admission.complete);
@@ -284,6 +277,7 @@ mod tests {
             ],
             8,
             6,
+            true,
         );
         assert_eq!(admission.admitted.len(), 2, "two free slots");
         assert_eq!(admission.admitted[0].label, "yellow");
@@ -298,16 +292,21 @@ mod tests {
             proposal("apple", 0.7),
             proposal("mango", 0.7),
         ];
-        let first = admit(&tied, 8, 6);
+        let first = admit(&tied, 8, 6, true);
         for _ in 0..8 {
-            assert_eq!(admit(&tied, 8, 6), first);
+            assert_eq!(admit(&tied, 8, 6, true), first);
         }
         assert_eq!(first.admitted[0].label, "apple");
     }
 
     #[test]
     fn one_concept_proposed_twice_takes_one_slot() {
-        let admission = admit(&[proposal("honey", 0.8), proposal("honey", 0.8)], 32, 0);
+        let admission = admit(
+            &[proposal("honey", 0.8), proposal("honey", 0.8)],
+            32,
+            0,
+            true,
+        );
         assert_eq!(admission.admitted.len(), 1);
         assert_eq!(admission.refused_duplicate, 1);
         // Asking for one thing twice and getting it once is not a partial answer.
@@ -316,7 +315,7 @@ mod tests {
 
     #[test]
     fn admitting_nothing_into_an_empty_moment_is_complete() {
-        let admission = admit(&[], 32, 0);
+        let admission = admit(&[], 32, 0, true);
         assert!(admission.admitted.is_empty());
         assert!(admission.complete, "nothing was asked and nothing refused");
     }

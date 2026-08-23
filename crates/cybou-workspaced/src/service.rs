@@ -81,10 +81,14 @@ impl Workspace1Service {
     /// already holding, however relevant whatever found it thought it was — ADR-0014's amendment
     /// exists so that a word activating fifty things cannot become fifty things Mind attends to.
     /// The reply says how many were refused, so a caller cannot read a short list as a whole one.
-    async fn consider(&self, proposals: Vec<u8>) -> Vec<u8> {
+    ///
+    /// `offered_everything` is what the caller knows and this organ cannot: whether the retrieval
+    /// that produced these proposals finished. A truncated activation offering one concept is
+    /// indistinguishable here from a graph that holds one concept.
+    async fn consider(&self, proposals: Vec<u8>, offered_everything: bool) -> Vec<u8> {
         let offered: Vec<AttentionProposal> =
             ciborium::from_reader(proposals.as_slice()).unwrap_or_default();
-        let admission = self.core.consider(&offered);
+        let admission = self.core.consider(&offered, offered_everything);
         let mut buf = Vec::new();
         let _ = ciborium::into_writer(&admission, &mut buf);
         buf

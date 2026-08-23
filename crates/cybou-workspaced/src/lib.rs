@@ -171,12 +171,12 @@ impl WorkspaceCore {
     /// bound and leave the moment holding nothing but associations. What comes back is a decision
     /// the caller can act on, count, or show.
     #[must_use]
-    pub fn consider(&self, proposals: &[AttentionProposal]) -> Admission {
+    pub fn consider(&self, proposals: &[AttentionProposal], offered_everything: bool) -> Admission {
         let occupied = self
             .moment
             .read()
             .map_or(self.capacity, |moment| moment.len());
-        admit(proposals, self.capacity, occupied)
+        admit(proposals, self.capacity, occupied, offered_everything)
     }
 
     /// Calculate dynamic salience for a coalition at a given moment.
@@ -350,7 +350,7 @@ mod tests {
                 epistemic_status: cybou_protocol::epistemic::EpistemicStatus::Observed,
             })
             .collect();
-        let admission = core.consider(&proposals);
+        let admission = core.consider(&proposals, true);
 
         assert!(admission.admitted.len() <= proposal_quota(32));
         assert!(

@@ -133,6 +133,14 @@ pub enum Qualification {
     Withheld,
     /// The Journal behind this answer has not been verified through its head.
     Unverified,
+    /// Competing observations disagree about something here, and nothing has settled which is right.
+    ///
+    /// Added rather than folded into `Unverified`, which means something else: unverified is a
+    /// check that has not finished, disputed is a check that finished and came back contradictory.
+    /// A reader told the weaker of the two would not know to go and look.
+    Disputed,
+    /// Something newer has replaced part of what this rests on.
+    Superseded,
 }
 
 impl Qualification {
@@ -145,6 +153,8 @@ impl Qualification {
             Self::Partial => "partial",
             Self::Withheld => "withheld",
             Self::Unverified => "unverified",
+            Self::Disputed => "disputed",
+            Self::Superseded => "superseded",
         }
     }
 }

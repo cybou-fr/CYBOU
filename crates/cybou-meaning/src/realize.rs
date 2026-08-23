@@ -90,6 +90,10 @@ fn qualification_en(qualification: Qualification) -> String {
         Qualification::Unverified => {
             "The record behind this has not been verified to its end.".to_owned()
         }
+        Qualification::Disputed => {
+            "Something here is contested, and nothing has settled it.".to_owned()
+        }
+        Qualification::Superseded => "Something newer has replaced part of this.".to_owned(),
     }
 }
 
@@ -101,6 +105,8 @@ fn qualification_ru(qualification: Qualification) -> String {
         Qualification::Partial => "Ответ обрезан ограничением, это не всё.".to_owned(),
         Qualification::Withheld => "Часть была от вас удержана.".to_owned(),
         Qualification::Unverified => "Запись за этим не проверена до конца.".to_owned(),
+        Qualification::Disputed => "Что-то здесь оспорено, и это не улажено.".to_owned(),
+        Qualification::Superseded => "Часть этого заменена более новым.".to_owned(),
     }
 }
 

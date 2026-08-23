@@ -334,6 +334,51 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Walking the whole path found something no layer could see (2026-08-23)
+
+```
+utterance → act → activation → proposals → attention → plan → prose
+```
+
+Every joint of this existed and was tested on its own. That is exactly the condition under which
+things get lost: each layer holds its own invariant, nobody holds the composition, and a hedge that
+survives five boundaries and dies at the sixth looks — from the only place a person stands —
+identical to a hedge that was never raised.
+
+Walking it end to end found one immediately.
+
+A budget cut the retrieval to a single concept. That one concept fits the attention quota
+comfortably, so admission had nothing to refuse and reported itself complete — correctly, on its own
+terms. The plan asked the admission whether the answer was whole, the admission said yes, and the
+prose presented one concept as everything the word brings to mind. **From inside `workspaced` a
+truncated activation offering one concept is indistinguishable from a graph that holds one concept.**
+No test of any layer could have caught it, because no layer was wrong.
+
+The fix is a second flag rather than a stronger one: `upstream_complete` beside `complete`. Kept
+apart because they are different facts with different remedies — a quota turning proposals away is
+attention being busy, a budget cutting a walk short is retrieval never having finished — and one
+flag would report "there is more" without saying where the more is. The plan hedges on either, since
+a reader acts on the same thing; which one it was stays on the admission for anyone who needs it.
+
+Three things now provably travel the whole way, asserted at the far end rather than at the joint
+that produced them: a dispute the epistemic owner set, the fact that a budget or a quota cut the
+answer short, and why each concept came back at all. Plus a control that unhedged answers stay
+unhedged — without it, a renderer that hedged everything would pass, and a hedge that is always
+there is the same as no hedge.
+
+Two more the walk makes checkable for the first time: an erasure reaches the sentence as *"nothing
+is associated with lemon"* rather than as a sentence still naming an erased concept, and asking Mind
+a question does not change what Mind was already attending to.
+
+The vocabulary gained `Disputed` and `Superseded` as qualifications on the way. Folding disputed
+into `Unverified` would have been the same class of loss: unverified is a check that has not
+finished, disputed is a check that finished and came back contradictory, and a reader told the
+weaker of the two would not know to go and look.
+
+Held as a dev-dependency test rather than an organ. The daemons are separate processes over D-Bus;
+this composes the libraries the way a caller composes the interfaces, and its subject is the loss,
+not the transport.
+
 ## A dispute that does not survive retrieval was never held (2026-08-23)
 
 ADR-0029 A4 asks that a disputed epistemic state still be disputed after retrieval. It held, in the

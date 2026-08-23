@@ -15,5 +15,12 @@ cybou-protocol = { path = "../cybou-protocol" }
 time.workspace = true
 uuid.workspace = true
 
+[dev-dependencies]
+# The walkthrough test composes the layers a word travels through. Development-only on purpose:
+# nothing in the meaning boundary may depend on an organ at run time, and this file exists to hold
+# the composition that no single organ owns.
+cybou-contextd = { path = "../cybou-contextd" }
+cybou-workspaced = { path = "../cybou-workspaced" }
+
 [lints]
 workspace = true
