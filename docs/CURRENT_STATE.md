@@ -334,6 +334,29 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Plans compose, and a hedge on one part holds for the whole (2026-08-23)
+
+One question often needs two answers, built by different parts of Mind. The tempting way to join
+them is to concatenate the prose, and that is exactly where the loss happens: two sentences run
+together keep the claims and quietly shed the hedges, because a hedge reads as belonging to the
+sentence beside it rather than to the answer.
+
+`meaning::compose` joins plans instead, where the hedges are typed. The rule is one line:
+**a qualification on any part qualifies the whole.** Joining an answer read from a stale projection
+with one that was not produces an answer that is stale, because a reader cannot tell which half a
+hedge applied to and should not have to.
+
+Two compositions are refused rather than fudged. Plans built for different intents are not one plan
+— picking one intent would present half the claims under a purpose their author did not have. And an
+empty composition is refused, because the absence of an answer is not an answer that says nothing,
+and returning an empty plan would let a caller present "no parts" as "nothing to report".
+
+Everything else is a union that states each thing once: a contribution cited by two parts is one
+contribution, identical claim text is one claim, and the order a plan put its claims in survives.
+Eight tests hold it.
+
+Still missing from M8: dialogue state across turns.
+
 ## A plan now exists to be realized from (2026-08-23)
 
 ADR-0031 puts a `ResponsePlan` between typed state and anything a person reads, and the realizer has

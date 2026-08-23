@@ -12,6 +12,7 @@
 //! What crosses into Mind is a [`CognitiveAct`]: typed, inspectable, and readable long after
 //! whatever produced it has been stopped or replaced.
 
+pub mod compose;
 pub mod plan;
 pub mod realize;
 pub mod resolve;
@@ -20,6 +21,7 @@ use cybou_protocol::meaning::{CognitiveAct, CognitiveActKind, MeaningInterpretat
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+pub use compose::{CompositionRefused, compose};
 pub use plan::{CapabilityFact, INTENT_STATUS, StatusFacts, plan_status};
 pub use realize::{Language, realize};
 pub use resolve::{Candidate, resolve_reference};

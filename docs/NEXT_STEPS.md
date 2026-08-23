@@ -91,8 +91,9 @@ true while the chain underneath it was broken.
 
 5. **The rest of M8.** *Partly done 2026-08-23.* `meaning::plan_status` builds a `ResponsePlan`
    from typed capability facts, and `ResponsePlan` gained a closed set of qualifications, so C5 has
-   assertions behind it and `Realize` is reachable and used. What remains is what the original text
-   below names: composition operators and dialogue state across turns.
+   assertions behind it and `Realize` is reachable and used. `meaning::compose` joins plans that
+   share an intent, carrying every qualification from every part, and refuses the joins that cannot
+   be made honestly. What remains of the original text below is dialogue state across turns.
 
    **The rest of M8.** `cybou-meaningd` owns the boundary and is gated: an utterance becomes a
    typed act or none, a reference stays unresolved rather than being guessed, corrections append,
