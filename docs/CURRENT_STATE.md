@@ -334,6 +334,56 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The host can be asked what is going on with it (2026-08-23)
+
+```text
+/proc text → reading → bounded window → baseline → finding → plan → prose
+```
+
+The detector concluded and the conclusion stopped at a struct. `meaning::plan_system_state` closes
+the *explain* stage, and an end-to-end walkthrough runs the whole path from what a kernel writes to
+what a person reads — with no network, no model, and no `/proc`: the kernel output is a string
+literal, which is what makes it a test rather than an observation about whichever machine ran it.
+
+Three things are decided in the typed layer rather than by whoever writes the sentence, and each is
+a way this answer is normally lost.
+
+**A finding is a hypothesis, and the words say so.** *The cause is memory pressure* and *this is
+consistent with what I observed* are the same struct and different claims. The first is what a
+fluent renderer produces when nobody decided; the second is what the evidence supports. A test at
+the far end asserts the prose never says "the cause".
+
+**An all-clear is qualified by what was never looked at.** A host whose kernel was built without
+pressure accounting can honestly say nothing needs attention *among the things it watches*. Saying
+it plainly would report an absence of evidence as evidence of absence, on the one surface a person
+consults to decide whether to go back to sleep. So the unwatched subjects are named and the answer
+carries `NotRead` — as a typed qualification and not only as a sentence, because a hedge living only
+in prose is one that `compose` will drop a layer over.
+
+**Not having watched long enough is its own answer.** For the first minutes after a restart there is
+no notion yet of what is ordinary here, and *I have not been watching long enough* is a different
+answer from *nothing is wrong*. A confident all-clear built on four readings is worse than silence,
+because it will be believed.
+
+Both honesty rules were checked by breaking them: disabling the two of them fails three tests rather
+than none.
+
+Eight walkthrough tests, including the control that a fully-observed calm host does not hedge —
+without it, a planner that hedged unconditionally would pass everything, and a hedge that is always
+there is the same as no hedge.
+
+### Where S0 stands
+
+```text
+observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome
+   ✅          ✅           ✅          ✅         ✅         ❌          ❌       ❌         ❌
+```
+
+*Explain* closed today. **S0 is not passed**, and the walkthrough says so in its own header rather
+than implying otherwise: the gate asks for typed action proposals as well, and nothing proposes an
+action yet. What is true is that a host with no network and no model now observes itself, notices
+what is wrong, and can say why it thinks so, in two languages, from evidence it gathered.
+
 ## Something finally watches the Body (2026-08-23)
 
 `cybou-telemetryd` is the fourteenth Mind owner, and the first thing in this tree that observes the

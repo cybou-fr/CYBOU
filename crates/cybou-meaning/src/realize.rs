@@ -121,6 +121,7 @@ fn opening_en(intent: &str) -> String {
         "clarify_ambiguity" => "This is ambiguous, and needs one word from you:".to_owned(),
         "confirm_action" => "Confirm before this happens:".to_owned(),
         "explain_cause" => "What led to this:".to_owned(),
+        "inform_system_state" => "This host:".to_owned(),
         other => format!("{other}:"),
     }
 }
@@ -132,6 +133,7 @@ fn opening_ru(intent: &str) -> String {
         "clarify_ambiguity" => "Здесь неоднозначность, нужно одно слово от вас:".to_owned(),
         "confirm_action" => "Подтвердите, прежде чем это произойдёт:".to_owned(),
         "explain_cause" => "Что к этому привело:".to_owned(),
+        "inform_system_state" => "Этот хост:".to_owned(),
         other => format!("{other}:"),
     }
 }

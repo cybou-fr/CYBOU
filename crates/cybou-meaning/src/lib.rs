@@ -15,6 +15,7 @@
 pub mod attention_plan;
 pub mod compose;
 pub mod dialogue;
+pub mod insight_plan;
 pub mod plan;
 pub mod realize;
 pub mod resolve;
@@ -26,6 +27,7 @@ use uuid::Uuid;
 pub use attention_plan::{INTENT_ASSOCIATION, plan_attention};
 pub use compose::{CompositionRefused, compose};
 pub use dialogue::Dialogue;
+pub use insight_plan::{INTENT_SYSTEM_STATE, plan_system_state};
 pub use plan::{CapabilityFact, INTENT_STATUS, StatusFacts, plan_status};
 pub use realize::{Language, realize};
 pub use resolve::{Candidate, resolve_reference};

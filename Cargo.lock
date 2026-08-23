@@ -694,6 +694,7 @@ version = "0.1.0"
 dependencies = [
  "cybou-contextd",
  "cybou-protocol",
+ "cybou-telemetryd",
  "cybou-workspaced",
  "time",
  "uuid",

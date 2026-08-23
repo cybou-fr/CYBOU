@@ -20,6 +20,7 @@ uuid.workspace = true
 # nothing in the meaning boundary may depend on an organ at run time, and this file exists to hold
 # the composition that no single organ owns.
 cybou-contextd = { path = "../cybou-contextd" }
+cybou-telemetryd = { path = "../cybou-telemetryd" }
 cybou-workspaced = { path = "../cybou-workspaced" }
 
 [lints]
