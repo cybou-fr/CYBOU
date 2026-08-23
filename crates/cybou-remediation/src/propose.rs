@@ -36,7 +36,12 @@ pub fn remedies_for(finding: Finding) -> Vec<Operation> {
             Operation::ReloadService,
             Operation::RestartService,
         ],
-        Finding::MemoryPressure => vec![Operation::InspectServiceStatus],
+        // Looking, and nothing else, for both. Something is holding memory or descriptors it is not
+        // releasing, and this build cannot say which — a restart proposal would name a placeholder
+        // unit, which is a proposal to restart whatever came to mind.
+        Finding::MemoryPressure | Finding::FileDescriptorExhaustion => {
+            vec![Operation::InspectServiceStatus]
+        }
         // Nothing here is a remedy for waiting on a disk or a CPU. Offering a restart would be
         // offering to do something in order to be seen doing something, which is how an operator
         // learns to stop reading what the system suggests.

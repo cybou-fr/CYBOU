@@ -124,6 +124,9 @@ const fn describe(finding: Finding) -> &'static str {
         Finding::IoSaturation => "the machine is spending time waiting for disk",
         Finding::CpuSaturation => "the machine is spending time waiting for CPU",
         Finding::ServiceFailure => "one or more services are in a failed state",
+        Finding::FileDescriptorExhaustion => {
+            "the machine is running out of file descriptors and cannot open more"
+        }
         Finding::UnexplainedDeviation => {
             "something is out of its ordinary range and I cannot say why"
         }

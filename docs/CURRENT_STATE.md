@@ -84,7 +84,18 @@ One writer. Append-only, hash-chained, schema v3, with v2 still readable.
 there.
 
 `Telemetry1` watches what a host is doing: load, memory and swap use, memory/IO/CPU pressure, root
-filesystem use, failed units. Windows are bounded twice, by span and by count.
+filesystem bytes **and inodes**, open file descriptors against the system limit, failed units.
+Windows are bounded twice, by span and by count.
+
+Every subject is readable on any Linux host with no configuration. That is deliberate and it is why
+certificate expiry, per-service availability and backup age are not among them: each needs to be told
+*which* certificate, service or backup, and a configured subject is a different kind of thing from
+one that is universally true.
+
+Two of them exist because an existing measure reads healthy while the machine is broken. A filesystem
+out of inodes has free bytes, so every byte-based reading says forty percent used while nothing can be
+created. A host at its file-descriptor limit has memory, disk and load all fine, and cannot open a
+socket. Both are found and both are their own finding, because deleting things frees no descriptors.
 
 **Telemetry is not biography.** A `Reading` has no path into the Journal anywhere in this tree — no
 kind, no conversion. It is transient by construction rather than by policy. A `SystemInsight` may

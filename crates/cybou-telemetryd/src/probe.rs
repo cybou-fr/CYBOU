@@ -95,6 +95,43 @@ pub fn filesystem_used(total_blocks: u64, available_blocks: u64) -> Option<f64> 
     Some(share.clamp(0.0, 1.0))
 }
 
+/// The share of a filesystem's inodes in use, from `df -i` output.
+///
+/// Parsed from the same shape as the byte figures rather than from the percentage column, because
+/// `df` rounds that to whole percent — a host at 99.6% and one at 99.0% would be the same number,
+/// and the difference between them is hours.
+#[must_use]
+pub fn inodes_used(total: u64, free: u64) -> Option<f64> {
+    if total == 0 {
+        // A filesystem that reports no inodes is one that does not have them — btrfs and some
+        // network mounts. No reading is the honest answer; zero would say there is unlimited room.
+        return None;
+    }
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "a share is compared against a threshold, not counted with"
+    )]
+    let share = 1.0 - (free as f64 / total as f64);
+    Some(share.clamp(0.0, 1.0))
+}
+
+/// The share of the system-wide open file limit in use, from `/proc/sys/fs/file-nr`.
+///
+/// Three numbers: allocated, free-but-allocated, and the maximum. The second has been zero on every
+/// kernel since 2.6 and is ignored rather than subtracted, because subtracting a field the kernel no
+/// longer maintains would make the answer depend on a historical accident.
+#[must_use]
+pub fn open_files(contents: &str) -> Option<f64> {
+    let mut fields = contents.split_whitespace();
+    let allocated: f64 = fields.next()?.parse().ok()?;
+    let _unused: f64 = fields.next()?.parse().ok()?;
+    let limit: f64 = fields.next()?.parse().ok()?;
+    if limit <= 0.0 {
+        return None;
+    }
+    Some((allocated / limit).clamp(0.0, 1.0))
+}
+
 /// How many units `systemctl list-units --failed` reported.
 ///
 /// Counts the lines that look like a unit rather than trusting the summary line, which is absent
@@ -193,6 +230,42 @@ mod tests {
         // The reserved portion is not usable by the services that will fail when it runs out.
         let used = filesystem_used(1000, 50).expect("a real filesystem");
         assert!((used - 0.95).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn a_filesystem_can_be_out_of_inodes_while_every_byte_measure_reads_healthy() {
+        // The blind spot this subject exists for. Forty percent of the bytes are used and nothing
+        // can be created, and no other reading on this host would notice.
+        let bytes = filesystem_used(1000, 600).expect("a real filesystem");
+        let inodes = inodes_used(67_108_864, 200_000).expect("a real filesystem");
+
+        assert!((bytes - 0.40).abs() < f64::EPSILON, "{bytes}");
+        assert!(inodes > 0.99, "{inodes}");
+    }
+
+    #[test]
+    fn a_filesystem_with_no_inodes_has_no_reading_rather_than_unlimited_room() {
+        // btrfs and some network mounts report none. Zero would say there is unlimited room, which
+        // is the most reassuring possible answer from the least informative data.
+        assert_eq!(inodes_used(0, 0), None);
+    }
+
+    #[test]
+    fn the_open_file_share_ignores_the_field_the_kernel_stopped_maintaining() {
+        // The middle number has been zero since 2.6. Subtracting it would make the answer depend on
+        // a historical accident rather than on the machine.
+        let quiet = open_files("669\t0\t9223372036854775807\n").expect("a well-formed file-nr");
+        assert!(quiet < 0.000_001, "{quiet}");
+
+        let strained = open_files("970000\t0\t1000000\n").expect("a well-formed file-nr");
+        assert!((strained - 0.97).abs() < 1e-9, "{strained}");
+    }
+
+    #[test]
+    fn a_file_limit_of_zero_produces_no_reading() {
+        assert_eq!(open_files("100\t0\t0\n"), None);
+        assert_eq!(open_files("garbage"), None);
+        assert_eq!(open_files(""), None);
     }
 
     #[test]

@@ -58,6 +58,18 @@ pub enum Subject {
     CpuPressure,
     /// Share of the root filesystem in use, in [0.0, 1.0].
     RootFilesystemUsed,
+    /// Share of the root filesystem's inodes in use, in [0.0, 1.0].
+    ///
+    /// Its own subject because it is its own failure. A filesystem out of inodes cannot create a
+    /// file and has free bytes; every byte-based measure reads healthy while nothing can be written,
+    /// which is the shape of failure this whole layer exists to catch. A host that logs many small
+    /// files, or runs a mail spool, reaches this first.
+    RootFilesystemInodesUsed,
+    /// Share of the system-wide open file descriptor limit in use, in [0.0, 1.0].
+    ///
+    /// The other way a machine stops accepting work while looking well: memory is fine, the disk is
+    /// fine, load is fine, and nothing can open a socket. Nothing else here would notice.
+    OpenFileDescriptors,
     /// How many systemd units are in a failed state.
     FailedUnits,
 }
@@ -74,6 +86,8 @@ impl Subject {
             Self::IoPressure => "io.pressure",
             Self::CpuPressure => "cpu.pressure",
             Self::RootFilesystemUsed => "filesystem.root.used",
+            Self::RootFilesystemInodesUsed => "filesystem.root.inodes.used",
+            Self::OpenFileDescriptors => "files.open",
             Self::FailedUnits => "systemd.units.failed",
         }
     }
@@ -90,8 +104,14 @@ impl Subject {
     pub const fn alarming(self) -> Option<f64> {
         match self {
             Self::RootFilesystemUsed | Self::MemoryUsed => Some(0.95),
+            // Lower than the byte threshold on purpose, and the same number for both by coincidence
+            // rather than by kinship: each is a resource whose exhaustion is not gradual in effect.
+            // A filesystem works and then cannot create a file; swap absorbs pressure and then the
+            // next allocation stalls. Neither gives the warning a slowly filling disk does, so the
+            // useful warning has to come earlier.
+            Self::RootFilesystemInodesUsed | Self::SwapUsed => Some(0.90),
+            Self::OpenFileDescriptors => Some(0.85),
             Self::MemoryPressure | Self::IoPressure | Self::CpuPressure => Some(40.0),
-            Self::SwapUsed => Some(0.90),
             Self::FailedUnits => Some(1.0),
             Self::LoadAverage => None,
         }
@@ -118,6 +138,8 @@ pub const ALL_SUBJECTS: &[Subject] = &[
     Subject::IoPressure,
     Subject::CpuPressure,
     Subject::RootFilesystemUsed,
+    Subject::RootFilesystemInodesUsed,
+    Subject::OpenFileDescriptors,
     Subject::FailedUnits,
 ];
 
@@ -218,6 +240,11 @@ pub enum Finding {
     CpuSaturation,
     /// One or more services are in a failed state.
     ServiceFailure,
+    /// The machine is running out of file descriptors.
+    ///
+    /// Its own finding rather than folded into storage, because the remedy is different: nothing is
+    /// full and deleting things frees nothing. Something is holding descriptors it is not closing.
+    FileDescriptorExhaustion,
     /// Something is out of its ordinary range and nothing here explains it.
     ///
     /// Kept as a finding rather than dropped. A detector that only reported what it had a name for
@@ -236,6 +263,7 @@ impl Finding {
             Self::IoSaturation => "io-saturation",
             Self::CpuSaturation => "cpu-saturation",
             Self::ServiceFailure => "service-failure",
+            Self::FileDescriptorExhaustion => "file-descriptor-exhaustion",
             Self::UnexplainedDeviation => "unexplained-deviation",
         }
     }

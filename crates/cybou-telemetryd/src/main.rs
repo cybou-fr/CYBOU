@@ -106,6 +106,10 @@ mod linux {
             }
         }
         note(Subject::RootFilesystemUsed, root_filesystem_used());
+        note(Subject::RootFilesystemInodesUsed, root_filesystem_inodes());
+        if let Some(file_nr) = read("/proc/sys/fs/file-nr") {
+            note(Subject::OpenFileDescriptors, probe::open_files(&file_nr));
+        }
         note(Subject::FailedUnits, failed_units());
         readings
     }
@@ -126,6 +130,24 @@ mod linux {
         let total: u64 = fields.next()?.parse().ok()?;
         let available: u64 = fields.next()?.parse().ok()?;
         probe::filesystem_used(total, available)
+    }
+
+    /// How many of the root filesystem's inodes are in use.
+    ///
+    /// Its own call rather than a second column on the byte query, because a filesystem can report
+    /// bytes and no inodes, and one `df` invocation that failed for either reason would take both
+    /// readings with it.
+    fn root_filesystem_inodes() -> Option<f64> {
+        let output = std::process::Command::new("df")
+            .args(["--output=itotal,iavail", "/"])
+            .output()
+            .ok()?;
+        let text = String::from_utf8(output.stdout).ok()?;
+        let figures = text.lines().nth(1)?;
+        let mut fields = figures.split_whitespace();
+        let total: u64 = fields.next()?.parse().ok()?;
+        let available: u64 = fields.next()?.parse().ok()?;
+        probe::inodes_used(total, available)
     }
 
     /// How many units are in a failed state.

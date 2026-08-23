@@ -190,19 +190,46 @@ fn categorical(
     // Categorical first. Some things do not need a baseline: a filesystem at 95% is a problem on
     // a host where it has been at 95% for a month, and a purely statistical detector would say
     // nothing precisely because it is normal here.
-    if let Some(series) = windows.get(&Subject::RootFilesystemUsed)
+    // Both ways a filesystem stops working, and they are one finding because they have one family
+    // of remedies. A host out of inodes has free bytes: every byte-based measure reads healthy while
+    // nothing can be created, which is why the inode share is watched at all.
+    for subject in [
+        Subject::RootFilesystemUsed,
+        Subject::RootFilesystemInodesUsed,
+    ] {
+        if let Some(series) = windows.get(&subject)
+            && let Some(latest) = series.latest()
+            && latest.value >= alarming_for(subject)
+        {
+            explained.push(subject);
+            found.push(SystemInsight {
+                insight_id: id(Finding::StorageExhaustion),
+                finding: Finding::StorageExhaustion,
+                because: evidence(deviations, &[subject]),
+                strength: EvidenceStrength::Strong,
+                concluded_at: now,
+                since: series
+                    .continuously_since(alarming_for(subject))
+                    .unwrap_or(latest.at),
+            });
+        }
+    }
+
+    if let Some(series) = windows.get(&Subject::OpenFileDescriptors)
         && let Some(latest) = series.latest()
-        && latest.value >= alarming_for(Subject::RootFilesystemUsed)
+        && latest.value >= alarming_for(Subject::OpenFileDescriptors)
     {
-        explained.push(Subject::RootFilesystemUsed);
+        // The other way a machine stops accepting work while looking well: memory fine, disk fine,
+        // load fine, and nothing can open a socket.
+        explained.push(Subject::OpenFileDescriptors);
         found.push(SystemInsight {
-            insight_id: id(Finding::StorageExhaustion),
-            finding: Finding::StorageExhaustion,
-            because: evidence(deviations, &[Subject::RootFilesystemUsed]),
+            insight_id: id(Finding::FileDescriptorExhaustion),
+            finding: Finding::FileDescriptorExhaustion,
+            because: evidence(deviations, &[Subject::OpenFileDescriptors]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
             since: series
-                .continuously_since(alarming_for(Subject::RootFilesystemUsed))
+                .continuously_since(alarming_for(Subject::OpenFileDescriptors))
                 .unwrap_or(latest.at),
         });
     }
@@ -397,6 +424,39 @@ mod tests {
             .expect("a full disk is a finding regardless of statistics");
         assert_eq!(storage.strength, EvidenceStrength::Strong);
         assert!(!storage.because.is_empty(), "the finding cites nothing");
+    }
+
+    #[test]
+    fn a_filesystem_out_of_inodes_is_found_while_every_byte_measure_reads_healthy() {
+        // The blind spot the subject exists for. Forty percent of the bytes are used and nothing can
+        // be created; without this the host would report that storage is fine.
+        let core = core();
+        history(&core, Subject::RootFilesystemUsed, 0.40, &[]);
+        history(&core, Subject::RootFilesystemInodesUsed, 0.995, &[]);
+
+        let insights = core.insights(at(300), ids());
+        assert!(
+            insights
+                .iter()
+                .any(|insight| insight.finding == Finding::StorageExhaustion),
+            "a full inode table produced no finding: {insights:?}"
+        );
+    }
+
+    #[test]
+    fn a_machine_out_of_file_descriptors_is_its_own_finding() {
+        // Nothing is full and deleting things frees nothing, so folding it into storage would offer
+        // the wrong remedy.
+        let core = core();
+        history(&core, Subject::OpenFileDescriptors, 0.97, &[]);
+
+        let insights = core.insights(at(300), ids());
+        assert!(
+            insights
+                .iter()
+                .any(|insight| insight.finding == Finding::FileDescriptorExhaustion),
+            "{insights:?}"
+        );
     }
 
     #[test]
