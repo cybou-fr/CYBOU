@@ -98,10 +98,20 @@ they hear of it is an expired certificate. A refused file is announced with ever
 number, and the universal subjects keep running — a mistake in an optional file must not remove
 watching that was never in question.
 
-`certificate.days.remaining` is the first declared subject, one window per declared path, one finding
-per expiring certificate. Nothing is offered to remedy it: renewal is a deadline met outside this
-machine's control, and an offer would be doing something in order to be seen doing something.
-Per-service availability and backup age are still not watched.
+Three subjects are declared rather than universal: `certificate.days.remaining`, `service.active`
+and `backup.age.days`. One window per declared thing, one finding per thing rather than one naming a
+count — an operator with four certificates needs to know which.
+
+**Backup age has no universal threshold, and this build does not invent one.** How stale a backup may
+get is a policy the operator holds, and two backups on one host can honestly disagree, so the number
+comes from the declaration and the subject table supplies none. A backup declared without one is
+refused rather than defaulted; a backup watched with no threshold at all is watched and never judged,
+which is the honest state rather than a number nobody chose.
+
+Nothing is offered to remedy an expiring certificate or a stale backup. Renewal is a deadline met
+outside this machine's control, and what would relieve a stale backup is the backup succeeding —
+there is no operation here that could make it. An inactive service is offered the same three things
+as a failed one, because which it is affects what the host says rather than what it could do.
 
 Two of them exist because an existing measure reads healthy while the machine is broken. A filesystem
 out of inodes has free bytes, so every byte-based reading says forty percent used while nothing can be

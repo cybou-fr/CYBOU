@@ -35,10 +35,24 @@
 use std::path::PathBuf;
 
 /// Something named that this host was told to watch.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Watched {
     /// A TLS certificate, watched for how long it has left.
     Certificate(PathBuf),
+    /// A systemd unit, watched for whether it is running.
+    Service(String),
+    /// A file whose modification time marks the last successful backup, and how many days it may
+    /// reach before that is a problem.
+    ///
+    /// The threshold is declared because there is no universal one. Two backups on one host can
+    /// honestly disagree about how stale is too stale, and a number chosen here would be this
+    /// system deciding an operator's policy for them.
+    Backup {
+        /// The marker file.
+        marker: PathBuf,
+        /// How many days old it may get.
+        stale_after_days: f64,
+    },
 }
 
 /// Why a declaration file was refused.
@@ -60,6 +74,13 @@ pub enum Because {
     UnknownKind(String),
     /// The kind was recognised and nothing was named.
     NothingNamed(String),
+    /// A number was expected and something else was written.
+    NotANumber(String),
+    /// A backup was declared without saying how stale is too stale.
+    ///
+    /// Refused rather than defaulted. A default would be this build choosing a backup policy, and
+    /// the operator would not know which one until it was wrong.
+    NoThresholdGiven,
     /// The path is not absolute.
     ///
     /// Refused rather than resolved. A relative path in a daemon's declaration resolves against
@@ -75,6 +96,11 @@ impl core::fmt::Display for Because {
                 write!(formatter, "'{word}' is not something this build can watch")
             }
             Self::NothingNamed(kind) => write!(formatter, "'{kind}' names nothing"),
+            Self::NotANumber(word) => write!(formatter, "'{word}' is not a number"),
+            Self::NoThresholdGiven => write!(
+                formatter,
+                "a backup must say how many days old it may get; there is no default"
+            ),
             Self::NotAbsolute(path) => {
                 write!(formatter, "'{path}' is not an absolute path")
             }
@@ -114,26 +140,50 @@ pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
         };
         let named = words.next().unwrap_or_default();
 
+        let mut refuse = |because| {
+            refused.push(Refused {
+                line: number,
+                because,
+            });
+        };
+
         match kind {
             "certificate" => {
                 if named.is_empty() {
-                    refused.push(Refused {
-                        line: number,
-                        because: Because::NothingNamed(kind.to_owned()),
-                    });
+                    refuse(Because::NothingNamed(kind.to_owned()));
                 } else if !named.starts_with('/') {
-                    refused.push(Refused {
-                        line: number,
-                        because: Because::NotAbsolute(named.to_owned()),
-                    });
+                    refuse(Because::NotAbsolute(named.to_owned()));
                 } else {
                     watched.push(Watched::Certificate(PathBuf::from(named)));
                 }
             }
-            other => refused.push(Refused {
-                line: number,
-                because: Because::UnknownKind(other.to_owned()),
-            }),
+            "service" => {
+                if named.is_empty() {
+                    refuse(Because::NothingNamed(kind.to_owned()));
+                } else {
+                    // Taken as written. A unit name is systemd's to validate, and a build that
+                    // second-guessed it would refuse names that work.
+                    watched.push(Watched::Service(named.to_owned()));
+                }
+            }
+            "backup" => {
+                let threshold = words.next().unwrap_or_default();
+                if named.is_empty() {
+                    refuse(Because::NothingNamed(kind.to_owned()));
+                } else if !named.starts_with('/') {
+                    refuse(Because::NotAbsolute(named.to_owned()));
+                } else if threshold.is_empty() {
+                    refuse(Because::NoThresholdGiven);
+                } else if let Ok(days) = threshold.parse::<f64>() {
+                    watched.push(Watched::Backup {
+                        marker: PathBuf::from(named),
+                        stale_after_days: days,
+                    });
+                } else {
+                    refuse(Because::NotANumber(threshold.to_owned()));
+                }
+            }
+            other => refuse(Because::UnknownKind(other.to_owned())),
         }
     }
 
@@ -166,7 +216,7 @@ mod tests {
     #[test]
     fn every_bad_line_is_reported_rather_than_the_first() {
         // Reporting one error per run makes correcting three typos three restarts.
-        let messy = "certficate /a\nservice nginx\ncertificate relative/path\n";
+        let messy = "certficate /a\nnonsense here\ncertificate relative/path\n";
         let refused = parse(messy).expect_err("refusals");
         assert_eq!(refused.len(), 3);
         assert_eq!(
@@ -195,6 +245,46 @@ mod tests {
             refused[0].because,
             Because::NothingNamed("certificate".to_owned())
         );
+    }
+
+    #[test]
+    fn a_backup_without_a_staleness_threshold_is_refused_rather_than_defaulted() {
+        // A default would be this build choosing a backup policy, and the operator would not learn
+        // which one until it was wrong.
+        let bare = "backup /var/backups/.last-success\n";
+        let refused = parse(bare).expect_err("a refusal");
+        assert_eq!(refused[0].because, Because::NoThresholdGiven);
+    }
+
+    #[test]
+    fn a_backup_threshold_that_is_not_a_number_is_refused() {
+        let wordy = "backup /var/backups/.stamp daily\n";
+        let refused = parse(wordy).expect_err("a refusal");
+        assert_eq!(refused[0].because, Because::NotANumber("daily".to_owned()));
+    }
+
+    #[test]
+    fn a_backup_and_a_service_are_read_as_written() {
+        let declared = "service postgresql.service\nbackup /var/backups/.stamp 2\n";
+        let watched = parse(declared).expect("a readable file");
+        assert_eq!(
+            watched,
+            vec![
+                Watched::Service("postgresql.service".to_owned()),
+                Watched::Backup {
+                    marker: "/var/backups/.stamp".into(),
+                    stale_after_days: 2.0,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_unit_name_is_taken_as_written() {
+        // A unit name is systemd's to validate, and a build that second-guessed it would refuse
+        // names that work — templates, escapes, slices.
+        let unusual = "service getty@tty1.service\nservice system-postgresql.slice\n";
+        assert_eq!(parse(unusual).expect("readable").len(), 2);
     }
 
     #[test]

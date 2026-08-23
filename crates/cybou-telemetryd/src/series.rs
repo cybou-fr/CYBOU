@@ -24,6 +24,14 @@ pub struct Series {
     subject: Subject,
     /// Which one, for a subject about a named thing.
     instance: Option<String>,
+    /// The threshold this window is judged against.
+    ///
+    /// Held here rather than derived from the subject every time it is needed, because some
+    /// thresholds are not properties of the subject at all. How full a filesystem may get is a fact
+    /// about filesystems; how old a backup may get before it is a problem is a policy the operator
+    /// holds, and differs between two backups on one host. The subject supplies the default and a
+    /// declaration may replace it — one effective number, in one place, whichever decided it.
+    alarming: Option<Alarming>,
     span: Duration,
     capacity: usize,
     readings: VecDeque<Reading>,
@@ -44,13 +52,32 @@ impl Series {
         span: Duration,
         capacity: usize,
     ) -> Self {
+        Self::judged(subject, instance, subject.alarming(), span, capacity)
+    }
+
+    /// A window over one named thing, judged against a threshold the declaration chose.
+    #[must_use]
+    pub fn judged(
+        subject: Subject,
+        instance: Option<String>,
+        alarming: Option<Alarming>,
+        span: Duration,
+        capacity: usize,
+    ) -> Self {
         Self {
             subject,
             instance,
+            alarming,
             span,
             capacity: capacity.max(1),
             readings: VecDeque::new(),
         }
+    }
+
+    /// The threshold this window is judged against, if it has one.
+    #[must_use]
+    pub const fn alarming(&self) -> Option<Alarming> {
+        self.alarming
     }
 
     /// Which one this window is about, for a named subject.
@@ -234,6 +261,27 @@ mod tests {
         assert!(series.observe(reading(Subject::MemoryPressure, 1.0, 0)));
         assert!(!series.observe(reading(Subject::IoPressure, 90.0, 1)));
         assert_eq!(series.len(), 1);
+    }
+
+    #[test]
+    fn a_window_falls_back_to_its_subject_threshold_and_a_declaration_may_replace_it() {
+        // Some thresholds are properties of the subject and some are policies the operator holds.
+        // Two backups on one host can honestly disagree about how old is too old.
+        let ordinary = Series::new(Subject::RootFilesystemUsed, Duration::minutes(10), 8);
+        assert_eq!(
+            ordinary.alarming(),
+            Some(Alarming::AtOrAbove(0.95)),
+            "the subject supplies the default"
+        );
+
+        let chosen = Series::judged(
+            Subject::RootFilesystemUsed,
+            None,
+            Some(Alarming::AtOrAbove(0.70)),
+            Duration::minutes(10),
+            8,
+        );
+        assert_eq!(chosen.alarming(), Some(Alarming::AtOrAbove(0.70)));
     }
 
     #[test]

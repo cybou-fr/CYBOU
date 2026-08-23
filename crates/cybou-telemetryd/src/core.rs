@@ -83,12 +83,21 @@ impl TelemetryCore {
     ///
     /// Called for each declaration. A window that already exists is left alone, so re-reading the
     /// declarations does not discard the history of everything still declared.
-    pub fn watch(&self, subject: Subject, instance: String) {
+    pub fn watch(&self, subject: Subject, instance: String, alarming: Option<Alarming>) {
         if let Ok(mut windows) = self.windows.write() {
             windows
                 .entry((subject, Some(instance.clone())))
                 .or_insert_with(|| {
-                    Series::named(subject, Some(instance), self.span, self.capacity)
+                    Series::judged(
+                        subject,
+                        Some(instance),
+                        // What the declaration chose, or what the subject says by default. A named
+                        // subject with neither is watched and never judged categorically, which is
+                        // the honest state for something nobody has set a limit on.
+                        alarming.or_else(|| subject.alarming()),
+                        self.span,
+                        self.capacity,
+                    )
                 });
         }
     }
@@ -166,7 +175,7 @@ impl TelemetryCore {
         windows
             .values()
             .filter_map(|series| {
-                let alarming = series.subject().alarming()?;
+                let alarming = series.alarming()?;
                 Some((
                     series.subject(),
                     // Which one, or a page of rows all called the same thing.
@@ -248,24 +257,32 @@ fn categorical(
         }
     }
 
-    // One per declared certificate rather than one for all of them: an operator with four needs to
-    // know which, and a single finding naming a count would send them looking.
+    // One finding per declared thing rather than one naming a count: an operator with four
+    // certificates needs to know which. Written once over every named subject, because three copies
+    // of this loop is three places for the next named subject to be forgotten.
     for series in windows.values() {
-        if series.subject() != Subject::CertificateDaysRemaining {
+        if !series.subject().needs_naming() {
             continue;
         }
         let Some(latest) = series.latest() else {
             continue;
         };
-        let alarming = alarming_for(Subject::CertificateDaysRemaining);
+        // A named subject may have no threshold at all — a backup nobody set a staleness policy for
+        // is watched and never judged, which is the honest state rather than a default nobody chose.
+        let Some(alarming) = series.alarming() else {
+            continue;
+        };
         if !alarming.reached_by(latest.value) {
             continue;
         }
-        explained.push(Subject::CertificateDaysRemaining);
+        let Some(finding) = named_finding(series.subject()) else {
+            continue;
+        };
+        explained.push(series.subject());
         found.push(SystemInsight {
-            insight_id: id(Finding::CertificateExpiring),
-            finding: Finding::CertificateExpiring,
-            because: evidence(deviations, &[Subject::CertificateDaysRemaining]),
+            insight_id: id(finding),
+            finding,
+            because: evidence(deviations, &[series.subject()]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
             since: series.continuously_since(alarming).unwrap_or(latest.at),
@@ -405,6 +422,20 @@ fn unexplained(
     }
 }
 
+/// What a named subject reaching its threshold means.
+///
+/// `None` for a named subject this build watches and has no finding for, which is a gap rather than
+/// a decision — the compiler cannot force this the way it forces a match arm, so the loop above
+/// skips what it cannot name rather than inventing a finding for it.
+const fn named_finding(subject: Subject) -> Option<Finding> {
+    match subject {
+        Subject::CertificateDaysRemaining => Some(Finding::CertificateExpiring),
+        Subject::ServiceActive => Some(Finding::ServiceInactive),
+        Subject::BackupAgeDays => Some(Finding::BackupStale),
+        _ => None,
+    }
+}
+
 /// The deviations behind a finding, in the order the finding cited them.
 fn evidence(
     deviations: &BTreeMap<Subject, Deviation>,
@@ -496,6 +527,7 @@ mod tests {
         core.watch(
             Subject::CertificateDaysRemaining,
             "/etc/ssl/example.pem".to_owned(),
+            None,
         );
         for tick in 0..40 {
             core.observe(Reading {
@@ -537,7 +569,7 @@ mod tests {
         // would send them looking through the four themselves.
         let core = core();
         for name in ["/etc/ssl/a.pem", "/etc/ssl/b.pem"] {
-            core.watch(Subject::CertificateDaysRemaining, name.to_owned());
+            core.watch(Subject::CertificateDaysRemaining, name.to_owned(), None);
             for tick in 0..20 {
                 core.observe(Reading {
                     subject: Subject::CertificateDaysRemaining,
@@ -557,6 +589,97 @@ mod tests {
     }
 
     #[test]
+    fn a_declared_service_that_is_not_running_is_found() {
+        // Distinct from the count of failed units, which says something is wrong and not what. A
+        // service can be inactive without having failed.
+        let core = core();
+        core.watch(
+            Subject::ServiceActive,
+            "postgresql.service".to_owned(),
+            None,
+        );
+        for tick in 0..20 {
+            core.observe(Reading {
+                subject: Subject::ServiceActive,
+                instance: Some("postgresql.service".to_owned()),
+                value: 0.0,
+                at: at(tick * 60),
+            });
+        }
+        assert!(
+            core.insights(at(2000), ids())
+                .iter()
+                .any(|insight| insight.finding == Finding::ServiceInactive)
+        );
+    }
+
+    #[test]
+    fn a_backup_is_judged_against_the_operators_number_and_not_one_of_ours() {
+        // Two backups on one host can honestly disagree about how stale is too stale. The same age
+        // is a finding under one declaration and not under the other.
+        let core = core();
+        core.watch(
+            Subject::BackupAgeDays,
+            "/var/backups/strict".to_owned(),
+            Some(Alarming::AtOrAbove(1.0)),
+        );
+        core.watch(
+            Subject::BackupAgeDays,
+            "/var/backups/relaxed".to_owned(),
+            Some(Alarming::AtOrAbove(30.0)),
+        );
+        for name in ["/var/backups/strict", "/var/backups/relaxed"] {
+            for tick in 0..20 {
+                core.observe(Reading {
+                    subject: Subject::BackupAgeDays,
+                    instance: Some(name.to_owned()),
+                    value: 3.0,
+                    at: at(tick * 60),
+                });
+            }
+        }
+
+        let stale = core
+            .insights(at(2000), ids())
+            .into_iter()
+            .filter(|insight| insight.finding == Finding::BackupStale)
+            .count();
+        assert_eq!(stale, 1, "both were judged against one number");
+    }
+
+    #[test]
+    fn a_backup_nobody_set_a_policy_for_is_watched_and_never_judged() {
+        // The honest state for something with no universal threshold and no declared one: watched,
+        // and not reported against a number nobody chose.
+        let core = core();
+        core.watch(
+            Subject::BackupAgeDays,
+            "/var/backups/quiet".to_owned(),
+            None,
+        );
+        for tick in 0..20 {
+            core.observe(Reading {
+                subject: Subject::BackupAgeDays,
+                instance: Some("/var/backups/quiet".to_owned()),
+                value: 400.0,
+                at: at(tick * 60),
+            });
+        }
+        assert!(
+            !core
+                .insights(at(2000), ids())
+                .iter()
+                .any(|insight| insight.finding == Finding::BackupStale)
+        );
+        assert!(
+            core.latest()
+                .iter()
+                .any(|reading| reading.subject == Subject::BackupAgeDays),
+            "and it is still watched"
+        );
+    }
+
+    #[test]
     fn a_certificate_with_months_left_is_not_a_finding() {
         // The control. Every assertion above passes on a detector that reports every watched
         // certificate.
@@ -564,6 +687,7 @@ mod tests {
         core.watch(
             Subject::CertificateDaysRemaining,
             "/etc/ssl/a.pem".to_owned(),
+            None,
         );
         for tick in 0..20 {
             core.observe(Reading {

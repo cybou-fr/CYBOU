@@ -27,13 +27,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     for watched in &declared {
+        use cybou_protocol::telemetry::{Alarming, Subject};
+        use cybou_telemetryd::watchlist::Watched;
+
         match watched {
-            cybou_telemetryd::watchlist::Watched::Certificate(path) => {
-                core.watch(
-                    cybou_protocol::telemetry::Subject::CertificateDaysRemaining,
-                    path.to_string_lossy().into_owned(),
-                );
+            Watched::Certificate(path) => core.watch(
+                Subject::CertificateDaysRemaining,
+                path.to_string_lossy().into_owned(),
+                None,
+            ),
+            Watched::Service(unit) => {
+                core.watch(Subject::ServiceActive, unit.clone(), None);
             }
+            Watched::Backup {
+                marker,
+                stale_after_days,
+            } => core.watch(
+                Subject::BackupAgeDays,
+                marker.to_string_lossy().into_owned(),
+                // The one threshold that comes from the declaration, because there is no universal
+                // answer to how stale a backup may get.
+                Some(Alarming::AtOrAbove(*stale_after_days)),
+            ),
         }
     }
 
@@ -88,6 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod linux {
     use cybou_protocol::telemetry::{Reading, Subject};
     use cybou_telemetryd::probe;
+    use cybou_telemetryd::watchlist::Watched;
     use time::OffsetDateTime;
 
     /// Take one reading of everything this host will say something about.
@@ -189,21 +205,67 @@ mod linux {
     ) -> Vec<Reading> {
         let mut readings = Vec::new();
         for watched in declared {
-            let cybou_telemetryd::watchlist::Watched::Certificate(path) = watched;
-            // A certificate that cannot be read produces no reading rather than a zero. Zero days
-            // remaining is the most alarming possible answer, and an unreadable file is not that —
-            // it is a file this process cannot open, which is a different problem.
-            let Some(days) = certificate_days(path) else {
+            // Every one of these produces no reading rather than a substitute when it cannot be
+            // read. Zero days remaining, an inactive service and a backup of age zero are the three
+            // most alarming answers available, and none of them is what "this process could not
+            // look" means.
+            let (subject, instance, value) = match watched {
+                Watched::Certificate(path) => (
+                    Subject::CertificateDaysRemaining,
+                    path.to_string_lossy().into_owned(),
+                    certificate_days(path),
+                ),
+                Watched::Service(unit) => {
+                    (Subject::ServiceActive, unit.clone(), service_active(unit))
+                }
+                Watched::Backup { marker, .. } => (
+                    Subject::BackupAgeDays,
+                    marker.to_string_lossy().into_owned(),
+                    backup_age_days(marker, now),
+                ),
+            };
+            let Some(value) = value else {
                 continue;
             };
             readings.push(Reading {
-                subject: Subject::CertificateDaysRemaining,
-                instance: Some(path.to_string_lossy().into_owned()),
-                value: days,
+                subject,
+                instance: Some(instance),
+                value,
                 at: now,
             });
         }
         readings
+    }
+
+    /// Whether one declared unit is active.
+    ///
+    /// `None` when systemd cannot be asked at all, which is different from a unit that is not
+    /// running: a host where nothing can be enumerated has not established that anything is down.
+    fn service_active(unit: &str) -> Option<f64> {
+        let output = std::process::Command::new("systemctl")
+            .args(["is-active", unit])
+            .output()
+            .ok()?;
+        let state = String::from_utf8(output.stdout).ok()?;
+        // `is-active` exits non-zero for an inactive unit, so the status is not a failure to ask —
+        // it is the answer. What would be a failure to ask is an unreadable or empty reply.
+        let state = state.trim();
+        if state.is_empty() {
+            return None;
+        }
+        Some(if state == "active" { 1.0 } else { 0.0 })
+    }
+
+    /// How many days since a backup marker was last written.
+    ///
+    /// `None` when the marker is absent. A missing marker and a very old one are different facts:
+    /// one is a backup that has not run since the file was last removed, the other is a backup
+    /// nobody has ever configured, and reporting a large age for the second would raise an alarm
+    /// about a thing that does not exist.
+    fn backup_age_days(marker: &std::path::Path, now: OffsetDateTime) -> Option<f64> {
+        let modified = std::fs::metadata(marker).ok()?.modified().ok()?;
+        let stamped = OffsetDateTime::from(modified);
+        Some((now - stamped).as_seconds_f64() / 86_400.0)
     }
 
     /// How long one certificate has left.

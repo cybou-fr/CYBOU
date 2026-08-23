@@ -31,7 +31,10 @@ pub fn remedies_for(finding: Finding) -> Vec<Operation> {
             Operation::RotateLogs,
             Operation::TrimTemporaryFiles,
         ],
-        Finding::ServiceFailure => vec![
+        // A declared service that is not running is the same situation as one that failed, and the
+        // same three things are worth offering. Which one it is affects what the host says, not
+        // what it could do about it.
+        Finding::ServiceFailure | Finding::ServiceInactive => vec![
             Operation::InspectServiceStatus,
             Operation::ReloadService,
             Operation::RestartService,
@@ -46,7 +49,10 @@ pub fn remedies_for(finding: Finding) -> Vec<Operation> {
         // certificate. Renewal is a deadline met outside this machine's control — by an ACME client,
         // a registrar, a person — and an offer would be offering to do something in order to be seen
         // doing something, which is how an operator learns to stop reading what a system suggests.
-        Finding::CertificateExpiring
+        // Nothing here runs a backup either. What would relieve a stale backup is the backup
+        // succeeding, and this build has no operation that could make it.
+        Finding::BackupStale
+        | Finding::CertificateExpiring
         | Finding::IoSaturation
         | Finding::CpuSaturation
         | Finding::UnexplainedDeviation => Vec::new(),

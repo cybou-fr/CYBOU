@@ -107,6 +107,18 @@ pub enum Subject {
     /// discovered — a subject that went looking for certificates would decide for the operator what
     /// is worth watching, which is the guess this whole layer refuses everywhere else.
     CertificateDaysRemaining,
+    /// Whether one declared service is active: 1.0 or 0.0.
+    ///
+    /// Distinct from the count of failed units, which says *something* is wrong and not *what*. A
+    /// service can be inactive without having failed — stopped, never started, masked — and an
+    /// operator who declared it wants to know it is not running, whatever the reason.
+    ServiceActive,
+    /// How long since a declared backup last succeeded, in days.
+    ///
+    /// The one subject with no universal threshold. How stale a backup may get before it is a
+    /// problem is a policy the operator holds, and two backups on one host can honestly disagree, so
+    /// the number comes from the declaration and this table supplies none.
+    BackupAgeDays,
     /// Share of the root filesystem in use, in [0.0, 1.0].
     RootFilesystemUsed,
     /// Share of the root filesystem's inodes in use, in [0.0, 1.0].
@@ -137,6 +149,8 @@ impl Subject {
             Self::IoPressure => "io.pressure",
             Self::CpuPressure => "cpu.pressure",
             Self::CertificateDaysRemaining => "certificate.days.remaining",
+            Self::ServiceActive => "service.active",
+            Self::BackupAgeDays => "backup.age.days",
             Self::RootFilesystemUsed => "filesystem.root.used",
             Self::RootFilesystemInodesUsed => "filesystem.root.inodes.used",
             Self::OpenFileDescriptors => "files.open",
@@ -178,7 +192,13 @@ impl Subject {
             // travel with the number. Fourteen days is what an automated renewal has already had
             // several chances to do and has not.
             Self::CertificateDaysRemaining => Some(Alarming::AtOrBelow(14.0)),
-            Self::LoadAverage => None,
+            // Inactive is the problem, and a service is active or it is not: any threshold between
+            // the two values means the same thing.
+            Self::ServiceActive => Some(Alarming::AtOrBelow(0.5)),
+            // No universal answer, deliberately. A number here would be this system deciding an
+            // operator's backup policy for them, and a wrong one is worse than none: it would report
+            // a healthy backup as stale, or a stale one as fine, on every host that disagreed.
+            Self::LoadAverage | Self::BackupAgeDays => None,
         }
     }
 }
@@ -196,6 +216,8 @@ pub const ALL_SUBJECTS: &[Subject] = &[
     Subject::OpenFileDescriptors,
     Subject::FailedUnits,
     Subject::CertificateDaysRemaining,
+    Subject::ServiceActive,
+    Subject::BackupAgeDays,
 ];
 
 impl Subject {
@@ -207,7 +229,10 @@ impl Subject {
     /// particular.
     #[must_use]
     pub const fn needs_naming(self) -> bool {
-        matches!(self, Self::CertificateDaysRemaining)
+        matches!(
+            self,
+            Self::CertificateDaysRemaining | Self::ServiceActive | Self::BackupAgeDays
+        )
     }
 }
 
@@ -336,6 +361,10 @@ pub enum Finding {
     CpuSaturation,
     /// One or more services are in a failed state.
     ServiceFailure,
+    /// A declared service is not running.
+    ServiceInactive,
+    /// A declared backup is older than the operator said it should get.
+    BackupStale,
     /// A watched certificate is close to expiry, or past it.
     ///
     /// Its own finding because nothing else here is about a deadline. Every other failure is a
@@ -367,6 +396,8 @@ impl Finding {
             Self::ServiceFailure => "service-failure",
             Self::FileDescriptorExhaustion => "file-descriptor-exhaustion",
             Self::CertificateExpiring => "certificate-expiring",
+            Self::ServiceInactive => "service-inactive",
+            Self::BackupStale => "backup-stale",
             Self::UnexplainedDeviation => "unexplained-deviation",
         }
     }
@@ -386,6 +417,21 @@ mod tests {
         for name in &names {
             assert!(name.contains('.'), "{name} is not a dotted subject name");
         }
+    }
+
+    #[test]
+    fn the_one_subject_with_no_universal_threshold_says_so() {
+        // A number here would be this system deciding an operator's backup policy for them, and a
+        // wrong one is worse than none: it reports a healthy backup as stale, or a stale one as
+        // fine, on every host that disagrees.
+        assert_eq!(Subject::BackupAgeDays.alarming(), None);
+        assert!(Subject::BackupAgeDays.needs_naming());
+
+        // And the ones that do have a universal answer still have it.
+        assert_eq!(
+            Subject::ServiceActive.alarming(),
+            Some(Alarming::AtOrBelow(0.5))
+        );
     }
 
     #[test]
@@ -417,7 +463,12 @@ mod tests {
         for subject in ALL_SUBJECTS {
             assert_eq!(
                 subject.needs_naming(),
-                *subject == Subject::CertificateDaysRemaining,
+                matches!(
+                    subject,
+                    Subject::CertificateDaysRemaining
+                        | Subject::ServiceActive
+                        | Subject::BackupAgeDays
+                ),
                 "{subject:?}"
             );
         }

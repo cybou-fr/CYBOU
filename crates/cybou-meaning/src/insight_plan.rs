@@ -125,6 +125,8 @@ const fn describe(finding: Finding) -> &'static str {
         Finding::CpuSaturation => "the machine is spending time waiting for CPU",
         Finding::ServiceFailure => "one or more services are in a failed state",
         Finding::CertificateExpiring => "a watched certificate is close to expiry, or past it",
+        Finding::ServiceInactive => "a service this host was told to watch is not running",
+        Finding::BackupStale => "a backup is older than this host was told to allow",
         Finding::FileDescriptorExhaustion => {
             "the machine is running out of file descriptors and cannot open more"
         }
