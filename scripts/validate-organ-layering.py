@@ -47,6 +47,9 @@ CRATES = Path("crates")
 #: A crate in a layer may depend on crates in layers above it. Depending on one below is the
 #: failure this file exists to name.
 LAYERS: list[tuple[str, set[str]]] = [
+    # Above the Journal, because what a host is doing right now is upstream of what happened to it:
+    # telemetry proposes findings that may become contributions, and never reads one.
+    ("telemetry", {"cybou-telemetryd"}),
     ("journal", {"cybou-storage", "cybou-eventd"}),
     ("epistemic", {"cybou-epistemicd"}),
     ("associative", {"cybou-contextd"}),
@@ -70,6 +73,7 @@ FACULTIES = {"cybou-model-brokerd"}
 #: What each layer owns, for the error message. An operator reading a failure should not have to
 #: open the ADR to know what was crossed.
 OWNS = {
+    "telemetry": "what the Body is doing right now",
     "journal": "what happened",
     "epistemic": "what is known, and with what epistemic force",
     "associative": "what is related, and what is relevant now",

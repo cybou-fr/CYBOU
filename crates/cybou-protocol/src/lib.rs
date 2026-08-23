@@ -31,6 +31,7 @@ pub mod meaning;
 pub mod model;
 pub mod promotion;
 pub mod security;
+pub mod telemetry;
 
 pub use admission::Kind;
 

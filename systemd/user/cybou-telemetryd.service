@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=Cybou Telemetry1 Bounded Body Observation Service
+Documentation=https://github.com/cybou-fr/CYBOU
+PartOf=cybou-mind.target
+
+[Service]
+Type=dbus
+BusName=org.cybou.Mind.Telemetry1
+ExecStart=/usr/libexec/cybou/cybou-telemetryd
+Restart=on-failure
+RestartSec=1
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# Everything it holds is in memory and bounded. There is nothing to persist, because a reading that
+# survived a restart would be the beginning of the telemetry database this organ exists not to be.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# /proc and /sys stay readable: they are what it watches. ProtectSystem=strict does not cover them,
+# and hiding them would leave the organ observing nothing while reporting itself healthy.
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=default.target

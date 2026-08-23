@@ -26,6 +26,7 @@ members = [
     "crates/cybou-selfd",
     "crates/cybou-shelld",
     "crates/cybou-storage",
+    "crates/cybou-telemetryd",
     "crates/cybou-web-contracts",
     "crates/cybou-web-gateway",
     "crates/cybou-workspaced",

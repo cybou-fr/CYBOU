@@ -334,6 +334,76 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Something finally watches the Body (2026-08-23)
+
+`cybou-telemetryd` is the fourteenth Mind owner, and the first thing in this tree that observes the
+machine between one restart and the next. Until now perception recorded what was stable — kernel,
+hostname, memory size — and nothing looked again, so Cybou could say what it knew and not what was
+happening. ADR-0041 S0 was unreachable for one reason: **a system cannot detect a problem it never
+saw**, and every stage after *detect* had nothing to work on.
+
+The whole design is one line, and it is a line rather than a caveat: **telemetry is not biography.**
+A `Reading` has no path into the Journal anywhere in this tree — no `Kind`, no conversion, nothing.
+It is transient by construction rather than by policy. A `SystemInsight` does have one, and it is a
+`Hypothesis` with its readings attached, because *the machine is under memory pressure* is an
+inference and an inference recorded as an observation is a claim the host cannot support.
+
+### Bounded twice, for two different failures
+
+The window holds at most a span and at most a count, the same discipline the dialogue memory needed.
+A duration alone lets a burst hold everything it produced; a count alone lets a slow sampler remember
+a week while a fast one remembers four minutes, so the detector silently sees a different amount of
+history depending on a setting nobody thought of as history. Both are tested against the failure they
+prevent.
+
+### Median and MAD, and why not mean and sigma
+
+The thing being detected contaminates the thing detecting it. A host that has been swapping for ten
+minutes has a mean pulled toward the fault and a standard deviation widened by it, so the fault makes
+itself look ordinary — which is exactly why naive sigma monitors go quiet as a problem settles in. A
+median moves only when half the window has moved, and a median absolute deviation is not widened by a
+tail at all.
+
+That is not an assertion here. A test builds a window that is one third fault and shows a sigma
+detector already considers it unremarkable (under two sigma) while the robust one still puts it fifty
+spreads out.
+
+Four more properties the tests hold: a window too short to have an opinion says nothing rather than
+being confident on four readings; a perfectly flat host does not report its first flicker as infinite
+deviation; an ordinary reading on a quiet host is not called unusual; and the same observation is
+unremarkable on a host that idles at 45% and extreme on one that idles at 4% — which is the property a
+model trained on somebody else's corpus cannot have.
+
+### What it concludes, and what it refuses to conclude
+
+Categorical evidence and statistical deviation are kept apart and both are used. A filesystem at 96%
+is a finding on a host where it has been at 96% for a month — a purely statistical detector says
+nothing there, precisely because it is normal. Corroboration is what separates moderate from weak:
+memory pressure alone is weak, memory pressure with swap growing is the same story told twice.
+
+Six spreads before anything is said, deliberately far. A monitor that speaks at three is a monitor
+people mute, and the failure mode of an alerting system is almost never that it missed something.
+
+And `UnexplainedDeviation` is a finding rather than a dropped case. A detector that only reported what
+it had a name for would be silent exactly when a host is doing something nobody anticipated, which is
+the case an operator most wants to hear about.
+
+### Everything that decides is testable without a kernel
+
+`probe` parses text and returns a number or nothing; the only thing that touches `/proc` is
+`read_to_string`, in the daemon. That is the same lesson as pulling arithmetic out of components, CSS
+out of the compiler's blind spot, and the disclosure rule out of the D-Bus adapter — four times now,
+and each time the code that could not be tested was where the defect was.
+
+Every parser returns `Option` and none guesses. A missing `/proc/pressure` on a kernel built without
+pressure accounting produces *one fewer subject*, not a zero that reads as a perfectly calm machine.
+Memory is measured against `MemAvailable` rather than `MemFree`, because a healthy Linux host keeps
+almost nothing free and a detector watching free memory would report every warm cache as an
+emergency — a test asserts the two measures disagree sharply, so it cannot pass by accident.
+
+Thirty-one tests. Nothing here needs an accelerator, a model, or a network, which is the point: the
+detector has to work on a small instance with the network as the thing under investigation.
+
 ## Where this runs, decided (2026-08-23)
 
 Nothing in the tree said where Cybou runs, so every decision that needed an answer supplied one
@@ -1281,7 +1351,7 @@ Debian-to-NixOS conversion remains permanently forbidden.
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs thirty-seven CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and multi-process integration across the thirteen Mind owners. Both counts
+Lifecycle1 process restart, and multi-process integration across the fourteen Mind owners. Both counts
 are checked against the build rather than trusted: the documentation validator derives them from the
 package's daemon list and the tests CMakeLists, so a document that falls behind the code fails the
 build instead of quietly misdescribing it. The process suite also proves a
@@ -1696,7 +1766,7 @@ milestone is partial rather than complete.
 
 ## Process topology
 
-Mind has thirteen real user-session processes:
+Mind has fourteen real user-session processes:
 
 ```text
 cybou-eventd
@@ -1712,6 +1782,7 @@ cybou-perceptiond
 cybou-epistemicd
 cybou-contextd
 cybou-meaningd
+cybou-telemetryd
 ```
 
 `cybou-shelld` was counted here until 2026-08-23 and should not have been: it is a library with no

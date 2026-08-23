@@ -54,6 +54,7 @@ endpoint!(WORKSPACE, "Workspace", "cybou-workspaced.service");
 endpoint!(PRESENCE, "Presence", "cybou-presenced.service");
 endpoint!(LIFECYCLE, "Lifecycle", "cybou-lifecycled.service");
 endpoint!(MEANING, "Meaning", "cybou-meaningd.service");
+endpoint!(TELEMETRY, "Telemetry", "cybou-telemetryd.service");
 
 /// Stable endpoint for `ModelBroker1`.
 ///

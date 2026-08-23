@@ -861,6 +861,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-telemetryd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-web-contracts"
 version = "0.1.0"
 dependencies = [

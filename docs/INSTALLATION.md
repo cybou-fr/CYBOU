@@ -21,7 +21,7 @@ nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-lo
 ./result/bin/run-cybou-vm
 ```
 
-This evaluates the Plasma surface, the thirteen-process Mind package, D-Bus/systemd activation, and
+This evaluates the Plasma surface, the fourteen-process Mind package, D-Bus/systemd activation, and
 persistent state without installing to a physical disk. Individual VM gates activate the service
 subgraph required by their scenario; see [Testing](TESTING.md) for exact coverage. Development
 login details are defined in `systems/vm.nix` and intentionally not duplicated here.
