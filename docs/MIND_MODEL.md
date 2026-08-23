@@ -38,8 +38,8 @@ Terms such as **Mind**, **identity**, **self**, **attention**, and **cognitive**
 architecture and state ownership in this project. They are not claims that Cybou is conscious,
 sentient, or biologically equivalent to a human mind.
 
-- **Current substrate** — demonstrated M1–M7 behavior.
-- **Future target** — capabilities planned by M8–M13 and Proposed ADRs.
+- **Current substrate** — behaviour that exists and is gated.
+- **Future target** — capabilities described by Proposed ADRs and not yet built.
 
 `CURRENT_STATE.md` remains authoritative for what is implemented today.
 
@@ -193,7 +193,7 @@ observed consequence
         └──────────► Observation / Outcome
 ```
 
-M10 owns the general authorization/execution boundary. Command dispatch is not outcome evidence.
+The authorization boundary owns general authorization and execution. Command dispatch is not outcome evidence.
 
 ### 7. Consolidation derives; it does not rewrite
 
@@ -235,14 +235,14 @@ successful history ≠ standing authorization
 ## The current substrate
 
 The repository already demonstrates the process/ownership/lifecycle/capability substrate and
-advancing M7 perception, epistemic, erasure, sensitivity, context, and delivery work described by
+advancing the perception, epistemic, erasure, sensitivity, context, and delivery work described by
 `CURRENT_STATE.md`.
 
 It does **not** yet provide the full future control plane:
 
-- no M8 structured language/meaning runtime;
-- no M9 general lifelong-learning runtime;
-- no M10 general authorized external executor;
+- no language runtime behind the meaning boundary;
+- no general lifelong-learning runtime;
+- no authorized external executor;
 - no first-class agent/worker runtime;
 - no local/remote model broker;
 - no general MCP/tool broker;
@@ -269,22 +269,22 @@ compete for attention without becoming one semantic domain.
 
 Presence remains an outward projection. UI does not reimplement cognitive/security ownership.
 
-## Lifecycle and consolidation — M5 evaluated
+## Lifecycle and consolidation
 
 Lifecycle orchestrates bounded maintenance/recovery. It does not become owner of learned state,
 security policy, firewall state, agents, or credentials.
 
-## Degraded cognition — M6 implemented
+## Degraded cognition
 
 Missing optional facilities become capability deficits rather than automatic Mind death. The same
 pattern should govern future provider/agent/tool failures.
 
-## Future grounded and distributed cognition — M7
+## Grounded and distributed cognition
 
-M7 grounds world state in provenance/epistemics and governs retention, sensitivity, context, erasure,
+This grounds world state in provenance/epistemics and governs retention, sensitivity, context, erasure,
 and the distributed prototype.
 
-## Future language and meaning — M8
+## Language and meaning
 
 ```text
 human language
@@ -298,11 +298,11 @@ Mind
 → language realization
 ```
 
-## Future lifelong learning — M9
+## Lifelong learning
 
 ADR-0032/0033 define layered learning and learned-artifact governance.
 
-## Future authorized agency — M10
+## Authorized agency
 
 ```text
 proposal
@@ -317,14 +317,14 @@ proposal
 
 It is explicitly not `LLM → privileged shell` or `agent → root`.
 
-## Future agent-native runtime — M11
+## Agent-native runtime
 
 Agents/workers/models/tools become governed subjects. Managed MCP/tool use and local/remote model use
 go through explicit brokers and grants.
 
 See ADR-0034 and ADR-0035.
 
-## Future autonomous security and operations — M12
+## Autonomous security and operations
 
 ```text
 Observe → Assess → Predict → Decide → Authorize → Act → Verify → Learn
@@ -335,9 +335,9 @@ SSH/access, credentials, agents/workers, model usage, MCP/tool usage, and self-h
 
 See ADR-0036.
 
-## Future distributed perimeter governance — M13
+## Distributed perimeter governance
 
-M13 extends governance across nodes/perimeter after M7 has exposed distributed continuity semantics.
+Governance extends across nodes and perimeter once distributed continuity semantics exist.
 
 ## Example future loop
 
@@ -363,21 +363,21 @@ Low-risk reversible containment is pre-authorized.
 
 ## Milestone meaning
 
-| Milestone | System meaning |
+| Capability | System meaning |
 |---|---|
-| M1 | accepted durable contributions become visibly live |
-| M2 | biography gains stricter causal/hash semantics |
-| M3 | Journal has one canonical writer |
-| M4 | cognitive responsibilities gain process ownership |
-| M5 | continuity gains lifecycle/consolidation/recovery |
-| M6 | failure/pressure become explicit capability state |
-| M7 | perception/epistemics/retention/sensitivity/context/distribution become governed |
-| M8 | language crosses explicit meaning boundaries |
-| M9 | experience becomes governed learned behavior/skills/artifacts |
-| M10 | external action crosses authorization/observation |
-| M11 | agents/workers/models/tools become governed runtime subjects |
-| M12 | security/operations become autonomous under standing policy |
-| M13 | governance extends across nodes/perimeter |
+| Durable memory | accepted contributions become visibly live |
+| Causal integrity | biography gains stricter causal and hash semantics |
+| Single writer | the Journal has one canonical writer |
+| Process ownership | cognitive responsibilities gain isolated owners |
+| Lifecycle and consolidation | continuity gains sleep, wake and recovery |
+| Degraded cognition | failure and pressure become explicit capability state |
+| Grounded cognition | perception, epistemics, retention, sensitivity and context become governed |
+| Meaning | language crosses an explicit typed boundary |
+| Lifelong learning | experience becomes governed learned behaviour and artifacts |
+| Authorized agency | external action crosses authorization and observation |
+| Agent-native runtime | agents, workers, models and tools become governed subjects |
+| Autonomous operations | security and operations act under standing policy |
+| Distributed governance | governance extends across nodes and perimeter |
 
 ## Design test for future features
 

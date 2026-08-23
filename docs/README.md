@@ -92,12 +92,12 @@ Read the [Mind index](mind/README.md), or open a specific contract:
 - [Presence API](mind/PRESENCE_API.md)
 - [Continuity](mind/CONTINUITY.md)
 - [Failure Modes](mind/FAILURE_MODES.md)
-- [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — implemented M5/M6 lifecycle contract
-- [Capability and Health Contract](mind/HEALTH.md) — P6.1/P6.2 protocol, owner, graph, and recovery
-- [RPC Resilience](mind/RPC_RESILIENCE.md) — P6.3 outcomes, retry safety, backoff, and circuit breaker
-- [Homeostatic Measurements](mind/HOMEOSTASIS.md) — typed signals and policy-scoped M6 scheduling authority
+- [Cognitive Lifecycle and Consolidation](mind/LIFECYCLE.md) — the implemented lifecycle contract
+- [Capability and Health Contract](mind/HEALTH.md) — protocol, owner, graph, and recovery
+- [RPC Resilience](mind/RPC_RESILIENCE.md) — outcomes, retry safety, backoff, and circuit breaker
+- [Homeostatic Measurements](mind/HOMEOSTASIS.md) — typed signals and policy-scoped scheduling authority
 - [Journal Scale Baseline and Budgets](mind/SCALE_BUDGETS.md) — measured growth costs and the thresholds they imply
-- [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — future M7 contract
+- [Grounding, Epistemics, and Cognitive Governance](mind/EPISTEMIC_GOVERNANCE.md) — a contract for behaviour not yet built
 
 ## Security
 
@@ -124,8 +124,11 @@ when repository gates and focused acceptance tests demonstrate it.
 - Update `CURRENT_STATE.md` in the same change that alters implemented capability.
 - Update the relevant contract before or with protocol/schema changes.
 - Record cross-owner or security-boundary changes in an ADR.
-- Label examples as current or future; do not present unfinished M7–M13 behavior as implemented.
-- Replace milestone-relative phrases such as “current M5” when a later milestone implements the
+- Label examples as current or future; do not present unbuilt behaviour as implemented.
+- Name capabilities, not milestones. Milestone numbers belong in [Roadmap](ROADMAP.md); a document
+  that says “current M5” goes stale the moment the milestone does, and the phrase it replaces —
+  Identity Continuity, Operational Telemetry, Model Brokerage — does not. Replace such phrases when
+  a later milestone implements the
   behavior; prefer capability names and explicit implementation boundaries.
 - Add new canonical documents to `scripts/validate-cognitive-docs.py`.
 - Keep relative Markdown links valid and SPDX metadata present.

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Organ Contracts
 
-M4 makes the source-level organ boundaries real process boundaries.
+Source-level organ boundaries are real process boundaries.
 
 ## eventd
 

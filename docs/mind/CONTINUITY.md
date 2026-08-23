@@ -20,7 +20,7 @@ validate → backup → migrate → verify Journal → restore intentions
 
 If verification or reconstruction fails, Cybou reports degraded continuity instead of silently claiming success.
 
-## Lifecycle integration — implemented M5 boundary
+## Lifecycle integration
 
 Continuity is not only persistence of files. It includes the ability to explain a transition and
 reconcile partial work:

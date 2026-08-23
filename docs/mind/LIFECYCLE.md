@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 ## Scope
 
-This document records the implemented M5 lifecycle contract and future extensions from ADR-0024
+This document records the implemented lifecycle contract and future extensions from ADR-0024
 and ADR-0026. `CURRENT_STATE.md` remains authoritative for the demonstrated implementation boundary.
 
 ## Modes
@@ -146,9 +146,9 @@ Summaries inherit the most restrictive privacy of their causes/evidence. A summa
 source deletion unless policy defines how derived material is erased, redacted, or recomputed.
 Consolidation logs must not duplicate sensitive payloads unnecessarily.
 
-## M5 acceptance evidence
+## Acceptance evidence
 
-M5 evaluation proves:
+Evaluation proves:
 
 - restart during every transition produces one reconcilable result;
 - concurrent runs cannot mutate one owner projection without explicit serialization;

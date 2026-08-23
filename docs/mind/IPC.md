@@ -21,7 +21,7 @@ org.cybou.Mind.Presence1
 
 ## Encoding
 
-Event1 keeps the M3 versioned CognitiveEnvelope CBOR.
+Event1 keeps the versioned CognitiveEnvelope CBOR.
 
 Other organ projections use fabric CBOR version 1:
 

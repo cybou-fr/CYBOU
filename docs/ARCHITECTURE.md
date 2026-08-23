@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 `MIND_MODEL.md` describes what the cognitive architecture means. This document describes the
 current process topology, ownership boundaries, failure domains, and ordering.
 
-## Current M6 process topology
+## Current process topology
 
 ```text
                           ┌───────────────────────┐
@@ -93,7 +93,7 @@ or authorization state.
 - restarting identityd in the same login resumes the current identity through its runtime marker;
 - restarting workspaced reconstructs bounded attention from Event1 history.
 
-M6 is implemented through P6.6, with P6.7 latency hardening complete. Health1 owns capability
+Capability health, resilient transport and latency hardening are implemented. Health1 owns capability
 deficits and typed homeostasis; Presence1 projects them, gates commands by actual dependencies, and
 uses one monotonic deadline for each compound read or mutation. Lifecycle1 owns evidence-bound
 automatic scheduling, durable user-activity cooldown arbitration, recovery, and terminal state.
@@ -214,7 +214,7 @@ replacement of native owners without changing their architectural ownership.
 
 ## Future faculty boundary
 
-M8 adds an explicit meaning boundary without moving identity or memory authority into a model. No
+The meaning boundary is explicit and moves neither identity nor memory authority into a model. No
 generative model is required to cross it.
 
 Target relationship:
@@ -266,7 +266,7 @@ expiry decisions remain derived records with evidence.
 
 Lifecycle1, persistent run state, recovery, owner dispatch, durable owner results, accepted
 terminal outcomes, Presence projection, and process/Plasma/reboot fault-injection gates form the
-implemented M5 evaluation boundary. M6 adds capability-aware scheduling, degraded operation, and
+implemented lifecycle boundary. Capability-aware scheduling, degraded operation and
 recovery without moving state ownership into Lifecycle1. ADR-0024 and ADR-0026 are normative.
 
 ## Future grounding and cognitive-governance boundary
@@ -299,8 +299,8 @@ failure, and privacy contracts are precise.
 
 ## Future action boundary
 
-M10 is intentionally outside the current M1–M6 organ topology, as are the M11 agent, worker and
-model runtime and the M12 security control plane.
+The authorized executor is intentionally outside the current organ topology, as are the agent,
+worker and model runtime and the security control plane.
 
 No language model or UI component should become a privileged executor.
 
@@ -373,15 +373,15 @@ CYBOU Desktop establishes:
 
 ## Next
 
-M1–M6 and P6.7 provide the current accepted substrate: typed memory, isolated owners, lifecycle,
+The current accepted substrate provides typed memory, isolated owners, lifecycle,
 continuity, degraded operation, recovery, evidence-bound scheduling, and bounded compound IPC.
 
-M7 is next: add one local grounded-perception slice with provenance, epistemic/retention
+Next: one local grounded-perception slice with provenance, epistemic/retention
 governance, and fault evidence before attempting inter-node transport.
 
-M8 adds a typed meaning boundary with replaceable language implementations.
+The meaning boundary is typed and its language implementations are replaceable.
 
-M10 adds policy-controlled external agency; M11 governs the agents, workers, models and tools that
-propose it, and M12 makes bounded operation continuous under standing policy.
+Authorized agency adds policy-controlled external action; the agent runtime governs the agents,
+workers, models and tools that propose it, and standing policy makes bounded operation continuous.
 
 See `MIND_MODEL.md` for the conceptual model and `ROADMAP.md` for milestone semantics.

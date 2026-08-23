@@ -135,25 +135,25 @@ gateway that cannot become a second cognitive owner.
 | Journal v2 causal, privacy, hashing, and migration semantics | Implemented — M2 |
 | Single canonical Journal writer (`cybou-eventd`) | Implemented — M3 |
 | Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
-| Restart continuity and lifecycle/consolidation core | Implemented — M5 |
+| Restart continuity and lifecycle/consolidation core | Implemented |
 | Continuity across a real reboot | Implemented — gated on the deployed Debian host |
-| Capability health, RPC resilience, typed homeostatic observation | Implemented — M6 |
+| Capability health, RPC resilience, typed homeostatic observation | Implemented |
 | Contribution origin bound to the calling executable | Implemented — P7.0 |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
 | Grounded local perception and epistemic projection (`cybou-epistemicd`) | Implemented — ADR-0027 |
 | Associative context live integration (`cybou-contextd`) | Partial — ADR-0029 |
-| Journal v3 commitments and crash-safe transitive erasure | Implemented — M7 slices |
+| Journal v3 commitments and crash-safe transitive erasure | Implemented |
 | Erasure a person can ask for, reaching what was derived | Implemented — ADR-0028, live-bus gated |
 | A record of what was supplied to whom, and withheld | Implemented — ADR-0030 B4, no inspector yet |
-| Sensitivity as a durable schema axis | Implemented — M7 slices |
-| Distributed Mind prototype | Planned — M7 |
+| Sensitivity as a durable schema axis | Implemented |
+| Distributed Mind prototype | Planned |
 | Structured language and meaning boundary | Partial — ADR-0031, no generative model |
 | Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
-| Lifelong learning and learned-artifact governance | Planned — M9 |
-| Governed action and remediation boundary | Planned — M10 |
-| Agent/worker runtime, model broker, and governed tool/MCP use | Planned — M11 |
-| Continuous autonomous security and system operations | Planned — M12 |
-| Distributed perimeter and multi-node governance | Planned — M13 |
+| Lifelong learning and learned-artifact governance | Planned |
+| Governed action and remediation boundary | Proposals and authorization implemented; no executor |
+| Agent/worker runtime, model broker, and governed tool/MCP use | Broker implemented; no worker |
+| Continuous autonomous security and system operations | Planned |
+| Distributed perimeter and multi-node governance | Planned |
 
 The milestone labels describe engineering capability, not consciousness or biological equivalence.
 
@@ -324,7 +324,7 @@ Choose a route:
 
 ## Project maturity
 
-Cybou is pre-release research and engineering software. Do not treat planned M8–M13 behavior as
+Cybou is pre-release research and engineering software. Do not treat planned behaviour as
 implemented. The current tree does not yet contain the general agent/worker runtime, model broker,
 MCP governance layer, privileged security control plane, or unattended remediation engine described
 by the future ADRs.

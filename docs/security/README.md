@@ -12,7 +12,7 @@ SPDX-License-Identifier: MIT
 
 ## Current boundary
 
-The M4 runtime has a single Journal writer, causal/privacy validation, and separate user-session
+The runtime has a single Journal writer, causal/privacy validation, and separate user-session
 processes. Same-user D-Bus is not yet a capability-security boundary. Distributed trust,
 retention/erasure propagation, a language faculty, and privileged action execution are not current
 features.

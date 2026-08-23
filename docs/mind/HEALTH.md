@@ -7,9 +7,9 @@ SPDX-License-Identifier: MIT
 
 ## Scope
 
-P6.1 defines a versioned wire contract for component observations and capability deficits. P6.2
+A versioned wire contract carries component observations and capability deficits. It
 implements the initial dependency graph, `cybou-healthd`, persistent snapshot ownership, and
-`Health1`. P6.4.1 migrates Health1 probing to bounded async transport. Schema v2 preserves every
+`Health1`. Health1 probing uses bounded async transport. Schema v2 preserves every
 unhealthy dependency of a capability. Presence1 now projects the snapshot, UI-ready capability
 details, command availability, and recovery progress without becoming a second health owner.
 

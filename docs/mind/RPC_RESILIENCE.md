@@ -7,8 +7,8 @@ SPDX-License-Identifier: MIT
 
 ## Scope
 
-P6.3 introduces one bounded asynchronous D-Bus transport policy. It is the required path for shell
-or owner operations that must not block their event loop. P6.7 moves both RpcClient and EventClient
+There is one bounded asynchronous D-Bus transport policy. It is the required path for shell
+or owner operations that must not block their event loop. Both RpcClient and EventClient move
 synchronous APIs onto explicitly timed asynchronous pending calls. Their public helpers retain a
 five-second default and accept a shorter remaining budget from compound command coordinators.
 
@@ -100,5 +100,5 @@ validation and terminal mutation; exhaustion before `FinishRun` prevents that mu
 sent. Its shell transport remains asynchronous and non-idempotent, so a lost reply is still
 `UnknownOutcome`. Read-only `Snapshot`, `Activity`, and `DetailedObligations` also own one monotonic
 budget. Snapshot preserves its stable projection schema with typed empty/default values when the
-budget expires and never starts another owner call afterward. This completes the P6.7 compound
+budget expires and never starts another owner call afterward. This completes the compound
 Presence rollout.

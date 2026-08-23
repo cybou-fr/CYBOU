@@ -146,7 +146,7 @@ axes: for example, Mind may be `Awake + Limited` or `Recovering + Limited`.
 
 **Node** — one device/runtime participating in a future distributed continuity topology.
 
-**Language faculty** — planned M8 capability for interpretation, proposal and explanation. It may
+**Language faculty** — a capability for interpretation, proposal and explanation. It may
 be a grammar, a parser, a classifier, a local or governed remote model, or a hybrid; no generative
 model is required.
 
@@ -165,7 +165,7 @@ authorization, so nothing becomes reachable merely by existing.
 approval, high confidence and a successful history are none of them standing authorization.
 It must not directly own Journal, identity, authorization, or privileged execution.
 
-**Authorized Action Boundary** — planned M10 policy boundary between uncertain cognition/planning and
+**Authorized Action Boundary** — the policy boundary between uncertain cognition/planning and
 typed external mutation.
 
 Terms such as **Mind**, **identity**, **self**, **attention**, and **cognitive** are software

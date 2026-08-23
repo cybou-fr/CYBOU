@@ -485,7 +485,7 @@ an executable-level test because unsupported user-service directives must not be
 
 ## Migration plan
 
-### Phase W0 — contracts and fixtures
+### Contracts and fixtures
 
 - accept or revise ADR-0037;
 - freeze session, snapshot, capability, error, cursor, and operation schemas;
@@ -496,7 +496,7 @@ an executable-level test because unsupported user-service directives must not be
 Exit: generated frontend types and gateway validation agree; unknown/empty/stale sabotage tests fail
 when distinctions are removed.
 
-### Phase W1 — read-only gateway beside Plasma
+### The read-only gateway
 
 - package `cybou-web-ui` and `cybou-web-gateway`;
 - expose session, snapshot, capabilities, and SSE events on loopback;
@@ -509,7 +509,7 @@ Implementation status: the read-only Rust gateway binary, fixture adapter, Linux
 live `GatewayMindClient`, immutable frontend derivation, and disabled-by-default NixOS user module
 exist. Cursor-aware SSE snapshot delivery now provides reconnect and duplicate suppression through
 `Last-Event-ID`. The Linux source retains a native `Presence1.Changed` zbus stream; deterministic
-fixtures use a bounded two-second polling fallback. Authenticated bootstrap remains before the W1
+fixtures use a bounded two-second polling fallback. Authenticated bootstrap remains before the read-only
 exit gate
 can pass.
 
@@ -554,7 +554,7 @@ pass; remote remains off by default.
 
 ### Phase W5 — governed remote actions
 
-This phase waits for ADR-0022/M10 implementation. Add proposal, preview, confirmation challenge,
+This waits for an ADR-0022 executor to exist. Add proposal, preview, confirmation challenge,
 typed execution, observation, outcome, and rollback surfaces. Remote policy may be narrower than
 local policy.
 
@@ -641,7 +641,7 @@ The remaining explicit choices are:
 
 ## Immediate engineering package
 
-The active safe package is **W0 — contracts and fixtures**, not desktop replacement.
+The active safe package is **contracts and fixtures**, not desktop replacement.
 
 Deliverables:
 
@@ -653,7 +653,7 @@ Deliverables:
 - Nix package skeletons without enabling the new session by default.
 
 The initial Rust types, fixtures, mock client, and browser shell now create that reviewable seam.
-W0 is not complete until current `Presence1` projections and canonical cross-language values are
+It is not complete until current `Presence1` projections and canonical cross-language values are
 captured and checked against the Rust representation.
 The wider native migration and component cutover rules are defined in
 [ADR-0038](adr/ADR-0038-rust-first-codebase.md).

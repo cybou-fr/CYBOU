@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 ## Scope
 
-This document refines the M7 target from ADR-0025. It does not claim that the current M1–M6
+This document refines the target from ADR-0025. It does not claim that the current
 substrate implements perception adapters, an epistemic owner, retention propagation, or a value
 model.
 
@@ -77,10 +77,10 @@ Workspace evolves into bounded interruption, deferral, return, and competition p
 are criticized against user authority, safety, privacy, reversibility, cost, urgency, evidence
 quality, and resource budget.
 
-Value constraints can reject or defer a proposal. They cannot grant execution permission; M10
+Value constraints can reject or defer a proposal. They cannot grant execution permission; the authorization boundary
 authorization remains separate.
 
-## M7 minimal vertical slice
+## Minimal vertical slice
 
 1. One system-state perception adapter.
 2. Provenance-bearing Observation acceptance.

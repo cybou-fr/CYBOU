@@ -18,9 +18,9 @@ backups, and future inter-node messages.
 - organ owner to lifecycle coordinator;
 - Journal history to derived epistemic projection;
 - local node to future trusted peer;
-- cognition/planning to M10 authorization and executor;
-- actors, models and tools to the M11 grant and broker boundaries;
-- unattended response to M12 standing policy, which must hold with models unavailable.
+- cognition/planning to the authorization boundary and executor;
+- actors, models and tools to the grant and broker boundaries;
+- unattended response to standing security policy, which must hold with models unavailable.
 - proposed browser session to `cybou-web-gateway`, over local loopback or remote TLS;
 - proposed `cybou-web-gateway` to the typed Presence and Mind service interfaces.
 
@@ -93,7 +93,7 @@ not claims about the currently shipped Plasma surface:
 - Journal hashing detects inconsistency but is not an external signature/trust anchor;
 - retention and replica erasure are design targets, not implemented controls;
 - lifecycle ownership, recovery, scheduling, and bounded transport are active enforcement paths;
-  epistemic governance and the M10 authorized-action boundary remain proposed;
+  epistemic governance and the authorized-action boundary remain proposed;
 - user-service hardening does not yet define a least-privilege filesystem/network sandbox for
   every daemon;
 - the web gateway, Chromium desktop session, remote authentication, cache/erasure enforcement, and

@@ -31,7 +31,7 @@ No accepted signal is emitted on rollback.
 
 ## Journal v2
 
-Journal v2 behavior from M2 is unchanged: schema/hash versions, v1 migration and backup, canonical
+Journal v2 behaviour is unchanged: schema/hash versions, v1 migration and backup, canonical
 hashing, normalized evidence, reference/privacy validation, writer serialization, and terminal
 Outcome uniqueness remain inside the low-level Journal implementation.
 

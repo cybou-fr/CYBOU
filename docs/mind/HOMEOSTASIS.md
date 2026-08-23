@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 ## Boundary
 
-P6.4 introduced observation before autonomous policy. `cybou-healthd` owns an immutable in-memory
+Observation comes before autonomous policy. `cybou-healthd` owns an immutable in-memory
 `HomeostasisSnapshot` refreshed together with its capability snapshot. It reads public D-Bus
 contracts and never opens Journal or another organ's storage. Schema v2 can authorize a named,
 reviewed scheduling policy but still cannot request or interrupt a lifecycle run itself.

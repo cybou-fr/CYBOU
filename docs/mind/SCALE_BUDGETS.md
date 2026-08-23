@@ -88,7 +88,7 @@ cold organ reconstruction end to end — the last of which has no Rust owner to 
 
 **Append is dominated by fsync, not by work.** At ~1.2 ms per contribution the cost is one disk
 sync; the validation, hashing and insert are noise beside it. This is the price of the durability
-guarantee raised in P6.8, and it is the right price — but it caps sustained write throughput at
+guarantee, and it is the right price — but it caps sustained write throughput at
 roughly 800 contributions per second, which is a real ceiling for any future perception adapter that
 wants to observe continuously.
 

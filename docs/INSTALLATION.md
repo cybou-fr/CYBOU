@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 ## Maturity warning
 
 Cybou images are development artifacts unless a release explicitly states otherwise. Do not use a
-development image as the only copy of important data. M5 continuity and the documented v0/v1
+development image as the only copy of important data. Continuity and the documented v0/v1
 lifecycle-state migration are implemented and tested, but general in-place system-upgrade,
 rollback, installer-migration, and stable-release compatibility guarantees are not.
 

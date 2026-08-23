@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 Workspace owns bounded active context, not biography.
 
-## Current M1–M6 process
+## Current process
 
 The authoritative live Workspace now runs in `cybou-workspaced`.
 
@@ -51,7 +51,7 @@ durable
 No Workspace copy is owned by presenced or the QML proxy. Tests may still construct a local
 Workspace against a temporary EventStore as a unit-test seam.
 
-## M5–M7 direction
+## Direction
 
 During consolidation, workspaced may rebuild a bounded moment, decay salience, or close an episode,
 but only from an accepted input high-water mark and without becoming biography owner.

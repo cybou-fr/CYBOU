@@ -232,12 +232,16 @@ def main(argv: list[str]) -> int:
         "### 7. Consolidation derives; it does not rewrite",
         "### 8. Perception is not truth",
         "### 9. Forgetting and values are governed",
-        "## Lifecycle and consolidation — M5 evaluated",
-        "## Degraded cognition — M6 implemented",
-        "## Future grounded and distributed cognition — M7",
-        "## Future language and meaning — M8",
-        "## Future lifelong learning — M9",
-        "## Future authorized agency — M10",
+        # Capability names rather than milestone numbers. These titles used to carry M5 through M10,
+        # which pinned the document to a roadmap: a milestone landing renamed a section, and renaming
+        # it failed this check. A capability name survives a roadmap restructuring, which is the
+        # whole reason milestone numbers now live only in ROADMAP.md.
+        "## Lifecycle and consolidation",
+        "## Degraded cognition",
+        "## Grounded and distributed cognition",
+        "## Language and meaning",
+        "## Lifelong learning",
+        "## Authorized agency",
         "## Design test for future features",
     ):
         require(paths["mind_model"], label, label)
@@ -363,8 +367,8 @@ def main(argv: list[str]) -> int:
     )
     require(
         paths["installation"],
-        "continuity maturity boundary",
-        "M5 continuity",
+        "continuity boundary",
+        "Continuity and the documented",
     )
 
     for milestone in ("M5", "M6", "M7", "M8", "M9"):
@@ -481,7 +485,7 @@ def main(argv: list[str]) -> int:
         ("lifecycle modes", "## Modes"),
         ("run contract", "## Run contract"),
         ("owner-specific work", "## Owner-specific work"),
-        ("M5 acceptance", "## M5 acceptance evidence"),
+        ("lifecycle acceptance evidence", "## Acceptance evidence"),
     ):
         require(paths["lifecycle"], label, needle)
 
@@ -526,14 +530,14 @@ def main(argv: list[str]) -> int:
         require(paths["process_model"], label, needle)
 
     for label, needle in (
-        ("current M6 boundary", "Current M1–M6"),
+        ("current isolation boundary", "## Current isolation, continuity, and degradation guarantees"),
         ("required-owner failure", "required eventd unavailable"),
         ("bounded timeout behavior", "one shared deadline"),
     ):
         require(paths["failure_modes"], label, needle)
 
     for label, needle in (
-        ("current ownership boundary", "## Current M1–M6 owners"),
+        ("current ownership boundary", "## Current owners"),
         ("health ownership", "`cybou-healthd`"),
         ("lifecycle ownership", "`cybou-lifecycled`"),
     ):
@@ -543,7 +547,7 @@ def main(argv: list[str]) -> int:
         ("epistemic statuses", "## Epistemic projection"),
         ("contradiction handling", "## Contradiction and reconciliation"),
         ("retention lifecycle", "## Retention and forgetting"),
-        ("M7 vertical slice", "## M7 minimal vertical slice"),
+        ("epistemic vertical slice", "## Minimal vertical slice"),
     ):
         require(paths["epistemic"], label, needle)
 
@@ -577,6 +581,33 @@ def main(argv: list[str]) -> int:
             # it is. Every one of these proves something narrower than the sentence above it, and
             # the reader who most needs to know that is the one deciding whether to rely on it.
             error(evidence, "does not say what it fails to prove")
+
+    # Milestone numbers belong in the roadmap and nowhere else.
+    #
+    # A document that says "current M5" goes stale the moment a later milestone lands, and the
+    # capability it was describing — Identity Continuity, Operational Telemetry, Model Brokerage —
+    # does not. This repository has already paid for that twice: two validator checks pinned
+    # milestone-relative sentences, and when the milestones landed, correcting the documents would
+    # have failed the build.
+    #
+    # Two files are exempt and both for the same reason: the roadmap is where sequencing lives, and
+    # the documentation index is where this rule is written down, which requires quoting the phrases
+    # it forbids.
+    milestone = re.compile(r"\b(M[1-9]|M1[0-3]|P[0-9]\.[0-9]|W[01])\b")
+    exempt = {repo / "docs/ROADMAP.md", repo / "docs/README.md"}
+    for document in sorted((repo / "docs").rglob("*.md")):
+        if document in exempt or "adr" in document.parts:
+            continue
+        for number, line in enumerate(
+            document.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            found = milestone.search(line)
+            if found:
+                error(
+                    document,
+                    f"line {number} names the milestone {found.group(0)}; "
+                    f"name the capability instead (milestone numbers live in ROADMAP.md)",
+                )
 
     # The ADR index is checked against the directory rather than maintained beside it. Deleting an
     # ADR is now routine — the rule is that a decision which no longer constrains the design goes —

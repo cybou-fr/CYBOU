@@ -30,7 +30,7 @@ Consolidation does not weaken privacy. Summaries, calibrations, reconciliations,
 language context inherit the most restrictive applicable source classification. Logs should refer
 to identifiers rather than duplicate sensitive payloads.
 
-## Retention and erasure — M7 target
+## Retention and erasure
 
 Classification answers who may access data; retention answers how long and in which forms it may
 exist. Policy must cover source history, active projections, summaries, caches, backups, and
