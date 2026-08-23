@@ -334,6 +334,40 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Bounded in size is not bounded in attention (2026-08-23)
+
+Activation can now return what a word brings to mind. The next question is what happens when it
+returns two thousand of them, and that seam had nothing holding it.
+
+The failure is easy to miss, because a naive workspace still looks correct while suffering it.
+`accept` keeps the moment at capacity by dropping the oldest, so a flood of proposals leaves the
+buffer exactly as bounded as it promised — and empty of everything that mattered. A workspace that
+was answering a `NeedSignal` a moment ago and now holds thirty-two associations of the word *lemon*
+has stayed inside every limit it declared and lost the only thing it was for.
+
+ADR-0014's amendment already said the rule: *relevance discovered by associative retrieval is not
+permission to displace the current focus.* `workspaced::admission` now enforces it.
+
+**A proposal never evicts a resident.** Something that happened outranks something that came to
+mind, whatever their scores. Structural rather than a threshold: no relevance is high enough,
+because relevance is not the currency being spent.
+
+**Proposals share a quota, not the capacity.** A quarter of the slots, at least one and never all.
+Even an empty workspace does not become entirely associative, because a moment made only of what a
+word suggested has nothing left to notice an interruption with.
+
+**What was refused is counted.** Three admitted out of two thousand and three admitted out of three
+look identical unless the difference is reported, and every proposal offered is accounted for
+exactly once — admitted, over quota, unreached, or a duplicate of something already named.
+
+`Workspace1.Consider` exposes it, and considering is deliberately not accepting: proposals reach the
+workspace by a different door than contributions, and only one of those doors makes room.
+
+Two tests at the seam. One offers five thousand associations to a workspace answering a `NeedSignal`
+and holds that it is still answering it. The other is kept as an executable statement of why the two
+paths must differ: the same flood through `accept` leaves the workspace bounded, as promised, and
+the thing worth attending to gone.
+
 ## Asking a word what it brings to mind (2026-08-23)
 
 `contextd` could say what was active and what was associated with what. It could not say what one

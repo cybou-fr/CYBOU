@@ -12,7 +12,7 @@ use std::sync::Arc;
 use time::OffsetDateTime;
 use zbus::{interface, object_server::SignalEmitter};
 
-use crate::WorkspaceCore;
+use crate::{AttentionProposal, WorkspaceCore};
 
 /// D-Bus Service exporting `org.cybou.Mind.Workspace1`.
 pub struct Workspace1Service {
@@ -75,6 +75,21 @@ impl Workspace1Service {
     }
 
     /// Signal emitted when winning focus changes.
+    /// Offer attention proposals to the moment, returning the admission as CBOR.
+    ///
+    /// Considering is not accepting. Nothing offered here can displace what the workspace is
+    /// already holding, however relevant whatever found it thought it was — ADR-0014's amendment
+    /// exists so that a word activating fifty things cannot become fifty things Mind attends to.
+    /// The reply says how many were refused, so a caller cannot read a short list as a whole one.
+    async fn consider(&self, proposals: Vec<u8>) -> Vec<u8> {
+        let offered: Vec<AttentionProposal> =
+            ciborium::from_reader(proposals.as_slice()).unwrap_or_default();
+        let admission = self.core.consider(&offered);
+        let mut buf = Vec::new();
+        let _ = ciborium::into_writer(&admission, &mut buf);
+        buf
+    }
+
     #[zbus(signal)]
     async fn focus_changed(ctxt: &SignalEmitter<'_>, correlation_id: String) -> zbus::Result<()>;
 }

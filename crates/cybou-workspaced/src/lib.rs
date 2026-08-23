@@ -18,8 +18,12 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+pub mod admission;
+
 #[cfg(target_os = "linux")]
 pub mod service;
+
+pub use admission::{Admission, AttentionProposal, admit, proposal_quota};
 
 const HALF_LIFE_SECONDS: f64 = 120.0;
 
@@ -157,6 +161,22 @@ impl WorkspaceCore {
                 moment.truncate(self.capacity);
             }
         }
+    }
+
+    /// Offer proposals to the moment, admitting only what may enter it.
+    ///
+    /// Nothing here calls [`Self::accept`]. That is the whole point: `accept` takes something that
+    /// happened and makes room for it by dropping the oldest, which is right for a contribution and
+    /// catastrophic for a proposal — a thousand associations would stay within every declared
+    /// bound and leave the moment holding nothing but associations. What comes back is a decision
+    /// the caller can act on, count, or show.
+    #[must_use]
+    pub fn consider(&self, proposals: &[AttentionProposal]) -> Admission {
+        let occupied = self
+            .moment
+            .read()
+            .map_or(self.capacity, |moment| moment.len());
+        admit(proposals, self.capacity, occupied)
     }
 
     /// Calculate dynamic salience for a coalition at a given moment.
@@ -303,6 +323,84 @@ mod tests {
             retain_until_ms: 0,
             sensitivity: 1,
         }
+    }
+
+    #[test]
+    fn a_flood_of_associations_does_not_cost_the_workspace_its_focus() {
+        // ADR-0029 A11, at the seam where it actually lives. The workspace was answering a
+        // NeedSignal; five thousand things came to mind; it is still answering the NeedSignal.
+        let core = WorkspaceCore::new(32);
+        let now = OffsetDateTime::now_utc();
+        let now_ms = unix_millis(now);
+        let urgent = Uuid::new_v4();
+        core.accept(make_envelope(
+            Uuid::new_v4(),
+            urgent,
+            "healthd",
+            5,
+            1.0,
+            now_ms,
+        ));
+
+        let proposals: Vec<AttentionProposal> = (0..5000)
+            .map(|index| AttentionProposal {
+                label: format!("concept-{index:04}"),
+                relevance: 0.9,
+                reason: "lemon → something".to_owned(),
+            })
+            .collect();
+        let admission = core.consider(&proposals);
+
+        assert!(admission.admitted.len() <= proposal_quota(32));
+        assert!(
+            !admission.complete,
+            "five thousand did not all fit, and it says so"
+        );
+        // The moment is untouched: considering is not accepting, and this is the whole distinction.
+        assert_eq!(
+            core.focus(now).expect("focus survives").correlation_id,
+            urgent
+        );
+        assert_eq!(core.coalitions(now).len(), 1);
+    }
+
+    #[test]
+    fn what_the_same_flood_would_have_done_through_the_contribution_path() {
+        // Kept as an executable statement of why the two paths must differ. `accept` is right for
+        // something that happened: it makes room by dropping the oldest. Run a flood through it and
+        // the workspace is exactly as bounded as it promised and has lost the NeedSignal entirely.
+        let core = WorkspaceCore::new(32);
+        let now = OffsetDateTime::now_utc();
+        let now_ms = unix_millis(now);
+        let urgent = Uuid::new_v4();
+        core.accept(make_envelope(
+            Uuid::new_v4(),
+            urgent,
+            "healthd",
+            5,
+            1.0,
+            now_ms,
+        ));
+
+        for _ in 0..5000 {
+            core.accept(make_envelope(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                "contextd",
+                1,
+                0.9,
+                now_ms,
+            ));
+        }
+
+        assert_eq!(core.coalitions(now).len(), 32, "bounded, as promised");
+        assert_ne!(
+            core.focus(now)
+                .expect("something is in focus")
+                .correlation_id,
+            urgent,
+            "and the thing worth attending to is gone — which is why proposals do not come this way"
+        );
     }
 
     #[test]
