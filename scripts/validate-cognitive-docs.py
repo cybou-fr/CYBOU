@@ -300,11 +300,6 @@ def main(argv: list[str]) -> int:
         "cargo build --workspace --release --locked",
     )
     require(
-        paths["current"],
-        "read-only Rust gateway status",
-        "The additive W1 gateway seam is also present.",
-    )
-    require(
         paths["presence_api"],
         "initial zbus web mapping",
         "The initial read-only implementation uses zbus on Linux",
@@ -325,10 +320,23 @@ def main(argv: list[str]) -> int:
         "### Proposed web-first presentation boundary",
     )
 
-    require_regex(
+    # This used to pin a sentence listing M8 through M12 as unbuilt. Two of them were built while the
+    # check still demanded the sentence, so correcting the document would have failed the build —
+    # the exact failure the comment below already describes about process counts, in a check written
+    # by whoever had just read it.
+    #
+    # What the old check was reaching for is worth keeping and does not need a milestone number: a
+    # capability nobody built and a capability nobody mentioned look identical to a reader, so the
+    # absences have to be stated. That is a section, and a section survives a roadmap restructuring.
+    require(
         paths["current"],
-        "current/future boundary",
-        r"tree does not yet contain the planned M8 meaning boundary,\s+the M9 learning runtime,\s+the M10 authorized executor,\s+the M11 agent, worker and model runtime,\s+or\s+the M12 security control plane",
+        "stated absences",
+        "## What is not built",
+    )
+    require(
+        paths["current"],
+        "stated limitations of what is built",
+        "## Known limitations of what is built",
     )
     require(
         paths["current"],
