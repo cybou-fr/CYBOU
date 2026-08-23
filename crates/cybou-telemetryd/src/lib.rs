@@ -27,6 +27,7 @@ pub mod core;
 pub mod probe;
 pub mod series;
 pub mod trend;
+pub mod watchlist;
 
 #[cfg(target_os = "linux")]
 pub mod service;
