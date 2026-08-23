@@ -334,6 +334,31 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A conversation remembers what was named, never what it was about (2026-08-23)
+
+With no memory between turns, "it" in the second sentence points at nothing and a person restates
+the subject every time — which is not a conversation, it is a series of unrelated commands. The
+obvious repair is to remember what was being talked about and let the next pronoun mean that. The
+obvious repair is also a machine for guessing, and ADR-0031 C2 exists to stop exactly that guess.
+
+`meaning::Dialogue` remembers **referents, not a topic**. What was named in the recent past is
+offered to the resolver as one more candidate beside whatever the caller already had. Memory can
+therefore make an ambiguity visible — two things were named, so now "it" could be either — and it
+has no way to make one disappear. There is deliberately no accessor for "the current subject",
+because a type that could answer that question would be asked it, and answering it is the guess.
+A bare pronoun still resolves to nothing; what memory changed is that the clarifying question can
+now name the choices.
+
+Three bounds, each for a different failure. Turns, because a referent from twenty exchanges ago is
+not what "it" means and offering it makes every pronoun ambiguous forever. Time, because a
+conversation resumed the next morning is a new conversation whatever the turn counter says. And
+erasure: what ADR-0028 erased leaves here in the same act, since a referent left behind would let
+the system offer, by name, a thing a person had already had removed — and offering it by name is
+the disclosure the erasure was for. A single turn that names two hundred files does not become a
+two-hundred-item candidate list either; a list that long is not a clarification anyone can answer.
+
+Ten tests. M8 is complete.
+
 ## Plans compose, and a hedge on one part holds for the whole (2026-08-23)
 
 One question often needs two answers, built by different parts of Mind. The tempting way to join

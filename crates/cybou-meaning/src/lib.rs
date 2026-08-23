@@ -13,6 +13,7 @@
 //! whatever produced it has been stopped or replaced.
 
 pub mod compose;
+pub mod dialogue;
 pub mod plan;
 pub mod realize;
 pub mod resolve;
@@ -22,6 +23,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub use compose::{CompositionRefused, compose};
+pub use dialogue::Dialogue;
 pub use plan::{CapabilityFact, INTENT_STATUS, StatusFacts, plan_status};
 pub use realize::{Language, realize};
 pub use resolve::{Candidate, resolve_reference};

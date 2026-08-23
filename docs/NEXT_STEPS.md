@@ -93,7 +93,8 @@ true while the chain underneath it was broken.
    from typed capability facts, and `ResponsePlan` gained a closed set of qualifications, so C5 has
    assertions behind it and `Realize` is reachable and used. `meaning::compose` joins plans that
    share an intent, carrying every qualification from every part, and refuses the joins that cannot
-   be made honestly. What remains of the original text below is dialogue state across turns.
+   be made honestly. `meaning::Dialogue` carries state across turns by remembering referents rather
+   than a topic, bounded by turns, by time, and by erasure. **M8 is complete.**
 
    **The rest of M8.** `cybou-meaningd` owns the boundary and is gated: an utterance becomes a
    typed act or none, a reference stays unresolved rather than being guessed, corrections append,
