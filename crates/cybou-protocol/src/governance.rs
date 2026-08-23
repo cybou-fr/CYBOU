@@ -80,38 +80,12 @@ pub enum ToolCallVerdict {
     },
 }
 
-/// Policy specification for model inference routing per ADR-0035.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InferenceRoute {
-    /// Provider name (e.g. "local.llama", "remote.anthropic").
-    pub provider: String,
-    /// Model identifier.
-    pub model_name: String,
-    /// Whether the model operates across an external network boundary.
-    pub is_remote: bool,
-    /// Maximum permitted data sensitivity category allowed to reach this model.
-    pub sensitivity_ceiling: String,
-    /// Maximum allowable cost per request in millicents (1/1000th USD cent).
-    pub cost_budget_millicents: u64,
-}
-
-/// Attributable model inference request crossing the named-consumer boundary.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModelInferenceRequest {
-    /// Unique request identifier.
-    pub request_id: Uuid,
-    /// Selected routing configuration.
-    pub route: InferenceRoute,
-    /// Consumer/requester component name.
-    pub consumer_name: String,
-    /// Context delivery evidence IDs attached to this request.
-    pub context_evidence: Vec<Uuid>,
-    /// Request submission timestamp.
-    #[serde(with = "time::serde::rfc3339")]
-    pub requested_at: OffsetDateTime,
-}
+// `InferenceRoute` and `ModelInferenceRequest` lived here until 2026-08-23. They named a provider
+// and a model as strings, carried a sensitivity ceiling as prose, and had no way to say what was
+// being asked, what came back, or which artifact answered. `crate::model` replaces them: the task
+// is a closed set, the ceiling is comparable, the answer is typed, and the attribution is a digest
+// rather than a name. Nothing consumed the old pair — no runtime existed to consume them — so this
+// is a removal rather than a migration.
 
 #[cfg(test)]
 mod tests {

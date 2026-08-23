@@ -69,6 +69,39 @@ boundary, and cost/resource policy without duplicating raw prompt content into J
 
 Cybou can exploit remote inference without becoming cloud-dependent.
 
+### Amendment: the request vocabulary is typed, and `NoModel` is answered per task (2026-08-23)
+
+The first version of these types named a provider and a model as strings, carried a sensitivity
+ceiling as prose, and had no way to say what was being asked, what came back, or which artifact
+answered. Nothing consumed them, because no runtime existed to consume them. They are replaced by
+`protocol::model` rather than migrated.
+
+Four decisions are worth naming, because each closes a way this boundary is usually lost:
+
+**A task is a closed set, versioned in its name.** An open `String` task would be a way to add an
+input shape, an output shape and a `NoModel` answer all at once, without anybody reviewing any of
+them.
+
+**Every task answers for its own absence.** `ModelTask::without_a_model` is total, and returns one
+of exactly two things: something deterministic already does this, or the feature is *absent*. Absent
+is not degraded and not a stub returning something plausible — a semantic search that quietly falls
+back to matching filenames answers a different question than the one asked. ADR-0021 says `NoModel`
+is a configuration; this is where that stops being an intention.
+
+**No output can assert or command.** There is no `ModelOutput` variant carrying a truth value, a
+permission, a path, or a command to run. MB5 says model output cannot directly authorize mutation;
+making the field absent is stronger than checking for it, because a check can be forgotten at one
+call site and a missing field cannot.
+
+**Attribution is by digest, not by name.** A family and a revision record what somebody intended to
+install; only `artifact_sha256` — with the template version beside it, since the same weights under
+a different template are a different thing to have asked — says what actually answered. MB4 is
+otherwise satisfiable by a worker that loaded a different file than the manifest named.
+
+A request also names the disclosure its input was drawn from, and the field is not optional. A model
+is a named consumer under ADR-0030; a request that could omit this would be a way to hand a model
+context nobody recorded handing it, which is MB1 defeated by an ergonomic default.
+
 ## Acceptance gates
 
 | | Gate |

@@ -28,6 +28,7 @@ pub mod epistemic;
 pub mod governance;
 pub mod learning;
 pub mod meaning;
+pub mod model;
 pub mod promotion;
 pub mod security;
 

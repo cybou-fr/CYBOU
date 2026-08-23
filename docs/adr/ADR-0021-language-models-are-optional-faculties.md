@@ -7,10 +7,20 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted (2026-08-23)
 
-This revision replaces the earlier Proposed wording of ADR-0021. No Accepted decision is being
-silently rewritten: the prior ADR was deliberately Proposed because M8 had not been implemented.
+Proposed until 2026-08-23, deliberately: the acceptance direction below asked M8 to demonstrate the
+decision, and M8 was not implemented. It is now, so the reason for holding this Proposed is gone.
+
+What M8 demonstrated is listed against the acceptance direction below. The part worth stating here
+is the one that could only ever be shown and not argued: **the entire meaning path — interpretation,
+reference resolution, planning, composition, dialogue state, realization — is deterministic, runs
+with no network and no model, and is held by tests that would fail if any of it started depending on
+one.** Accepting this ADR does not commit to never having a model. It commits to a substrate that
+does not stop meaning anything when there isn't one.
+
+Being Accepted, this outranks [Current State](../CURRENT_STATE.md): where an implementation and this
+document disagree, the implementation is wrong.
 
 ## Context
 
@@ -195,17 +205,26 @@ language/model implementation → privileged mutation
 
 ## Acceptance direction
 
-M8 should demonstrate at least:
+M8 was asked to demonstrate the following before this ADR could be Accepted. Each is now met, and
+each is named with the thing that holds it rather than with an assurance:
 
-- Mind starts and remains cognitively usable with no generative model installed;
-- a natural-language implementation can be removed without changing identity, biography, or open
-  commitments;
-- a language/model implementation cannot directly own or write canonical Journal storage;
-- a language/model implementation receives explicit delivered context rather than unrestricted
-  retrieval access;
-- model-derived durable contributions use typed protocols and preserve provenance;
-- model output does not bypass epistemic or authorization boundaries;
-- the core meaning path is testable with network access disabled.
+| | Asked | Held by |
+|---|---|---|
+| Mind is cognitively usable with no generative model | ✅ | no crate depends on an inference runtime; `ModelTask::without_a_model` makes every task answer for its absence |
+| A language implementation can be removed without changing identity, biography or commitments | ✅ | `cybou-meaning` is a leaf: the layering validator fails if any organ depends downward on it |
+| A language implementation cannot own or write canonical Journal storage | ✅ | `meaningd` submits `Observation` and `Hypothesis` through Event1 like any organ, and owns no writer |
+| It receives delivered context rather than unrestricted retrieval | ✅ | `ModelRequest::delivery` is not optional; activation is bounded and its budgets are enforced |
+| Model-derived durable contributions are typed and keep provenance | ✅ | interpretation is recorded as a `Hypothesis` caused by the utterance it interpreted |
+| Model output does not bypass epistemic or authorization boundaries | ✅ | no `ModelOutput` variant asserts a fact or names an action; `PromotionGate` refuses association as durable knowledge |
+| The core meaning path is testable with network access disabled | ✅ | every meaning test is a pure function of its inputs; the end-to-end walkthrough runs offline |
+
+### What acceptance does not settle
+
+`NoModel` being a valid configuration is now a property of the vocabulary, not of anybody's
+intention. What is still only a design is the *runtime*: no model has been loaded, no answer has
+been attributed, and no `ModelOutput` has ever been produced by anything but a test. The gates above
+are about what a model would be permitted to do. Whether the permission is correctly enforced is a
+question for ADR-0035's runtime, and cannot be claimed until one exists.
 
 ## Alternatives Considered
 

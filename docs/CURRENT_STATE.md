@@ -334,6 +334,58 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Somewhere for a model to land, before there is one (2026-08-23)
+
+No inference runtime exists, and that is exactly why the vocabulary for asking a model something is
+worth writing now. A runtime that arrives before the shape of the request does gets whatever shape
+is convenient at the call site, and every constraint this substrate spent its life establishing then
+has to be re-imposed afterwards, against a working system, by whoever notices.
+
+ADR-0021 moves to **Accepted**. It was Proposed for one stated reason — its acceptance direction
+asked M8 to demonstrate the decision, and M8 was not implemented. It is now. The part that could
+only be shown rather than argued: the whole meaning path — interpretation, reference resolution,
+planning, composition, dialogue state, realization — is deterministic, runs with no network and no
+model, and is held by tests that would fail if any of it started depending on one. Accepting it does
+not commit to never having a model; it commits to a substrate that does not stop meaning anything
+when there isn't one.
+
+`protocol::model` replaces the earlier `InferenceRoute` / `ModelInferenceRequest`, which named a
+provider as a string, carried a sensitivity ceiling as prose, and could not say what was asked, what
+came back, or which artifact answered. Nothing consumed them, so this is a removal rather than a
+migration.
+
+**A task is a closed set, versioned in its name**, because an open `String` task would be a way to
+add an input shape, an output shape and a no-model answer all at once without anybody reviewing any
+of them.
+
+**Every task answers for its own absence.** `ModelTask::without_a_model` is total and returns one of
+two things: something deterministic already does this, or the feature is *absent*. Absent is not
+degraded and not a stub returning something plausible — a semantic search that quietly falls back to
+matching filenames answers a different question than the one asked. Interpretation and realization
+are the two that answer `Deterministic`, and a test holds that they stay that way: if either became
+`Unavailable`, installing a model would have quietly become a prerequisite for Mind speaking at all.
+
+**No output can assert or command.** There is no variant of `ModelOutput` carrying a truth value, a
+permission, a path, or a command to run. The strongest thing a model can return is a candidate
+something else has to accept. A model cannot say "the disk is failing" through this interface
+because there is no field to say it in — which is stronger than checking for it, since a check can
+be forgotten at one call site and a missing field cannot.
+
+**Attribution is by digest.** A family and a revision record what somebody intended to install; only
+the artifact's SHA-256 says what answered — with the template version beside it, since the same
+weights under a different template are a different thing to have asked. A worker that loaded a
+different file than the manifest named would otherwise produce answers attributed to a model that
+never ran, and the surface a person uses to ask *which model told me this* would confidently give
+the wrong answer.
+
+And a request names the disclosure its input came from, in a field that is not optional. A model is
+a named consumer under ADR-0030; a request that could omit it would be a way to hand a model context
+nobody recorded handing it.
+
+Twelve tests. What none of them can claim: no model has been loaded, no answer has been attributed,
+and no `ModelOutput` has been produced by anything but a test. This is what a model would be
+permitted to do. Whether the permission is enforced is a question for a runtime that does not exist.
+
 ## The rule that decides what a stranger sees was the one rule no test could run (2026-08-23)
 
 ```
