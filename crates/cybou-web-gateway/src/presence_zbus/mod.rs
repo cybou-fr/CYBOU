@@ -17,10 +17,7 @@ use cybou_fabric::{
     rpc::{OperationSemantics, RetryPolicy, RpcOutcome},
     zbus_rpc::ResilientZbusClient,
 };
-use cybou_protocol::{
-    CapabilityState, KnowledgeState,
-    disclosure::{Withheld, WithheldBecause},
-};
+use cybou_protocol::{CapabilityState, KnowledgeState, disclosure::WithheldBecause};
 use cybou_web_contracts::{
     CapabilityProjection, Freshness, MindProjection, SnapshotProjection, WEB_SCHEMA_V1,
 };
@@ -30,7 +27,7 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 use zbus::{Connection, Proxy, proxy::SignalStream};
 
-use crate::{Delivered, GatewayError, PresenceSource};
+use crate::{Delivered, GatewayError, PresenceSource, redact::Ledger};
 
 mod organs;
 mod wire;
@@ -50,18 +47,13 @@ pub struct ZbusPresenceSource {
     /// the same answer, so a new route cannot forget to filter and publish what the last one did
     /// not.
     permitted_sensitivity: u8,
-    /// What the last projection this source built left out, and why.
+    /// What the last projection this source built passed on, left out, and why.
     ///
     /// ADR-0030 B6: an item quietly dropped for policy reasons and an item that was never relevant
     /// look identical unless something insists on the difference. The filter is the only place that
-    /// knows, so it is the place that records it.
-    withheld: Mutex<Vec<Withheld>>,
-    /// The contributions the last projection's items were derived from.
-    provenance: Mutex<Vec<Uuid>>,
-    /// How many items the last projection carried, whether or not their provenance was known.
-    supplied: AtomicU64,
-    /// How many of those items named at least one contribution they were derived from.
-    accounted_for: AtomicU64,
+    /// knows, so it is the place that records it — and the rule it applies lives in
+    /// [`crate::redact`], where a test can run it without a session bus.
+    ledger: Ledger,
 }
 
 impl ZbusPresenceSource {
@@ -100,48 +92,31 @@ impl ZbusPresenceSource {
             changed: Mutex::new(changed),
             projection_version: AtomicU64::new(0),
             permitted_sensitivity,
-            withheld: Mutex::new(Vec::new()),
-            provenance: Mutex::new(Vec::new()),
-            supplied: AtomicU64::new(0),
-            accounted_for: AtomicU64::new(0),
+            ledger: Ledger::new(),
         })
     }
 
-    /// Note that something was supplied, and what it came from.
-    fn note_supplied(&self, evidence: &[Uuid]) {
-        self.supplied.fetch_add(1, Ordering::Relaxed);
-        if evidence.is_empty() {
-            // Supplied and unaccountable. Counted in `supplied` and not here, which is the whole
-            // difference the disclosure surface exists to show.
-            return;
-        }
-        self.accounted_for.fetch_add(1, Ordering::Relaxed);
-        if let Ok(mut provenance) = self.provenance.try_lock() {
-            for id in evidence {
-                if !provenance.contains(id) {
-                    provenance.push(*id);
-                }
-            }
-        }
+    /// Decide one item for this source's reader, and record what was decided.
+    ///
+    /// The only place `permitted_sensitivity` is read. A per-organ filter that compared for itself
+    /// could be written slightly differently in one organ than another, and the difference would be
+    /// a policy nobody wrote down.
+    fn decide<F>(&self, sensitivity: u8, subject: F, evidence: &[Uuid]) -> bool
+    where
+        F: FnOnce() -> Option<String>,
+    {
+        self.ledger
+            .decide(sensitivity, self.permitted_sensitivity, subject, evidence)
     }
 
     /// Note that something was held back, and why.
     fn note_withheld(&self, subject: Option<String>, because: WithheldBecause) {
-        if let Ok(mut withheld) = self.withheld.try_lock() {
-            withheld.push(Withheld { subject, because });
-        }
+        self.ledger.withhold(subject, because);
     }
 
     /// Start a fresh delivery, discarding what the last one recorded.
     fn begin_delivery(&self) {
-        self.supplied.store(0, Ordering::Relaxed);
-        self.accounted_for.store(0, Ordering::Relaxed);
-        if let Ok(mut withheld) = self.withheld.try_lock() {
-            withheld.clear();
-        }
-        if let Ok(mut provenance) = self.provenance.try_lock() {
-            provenance.clear();
-        }
+        self.ledger.begin();
     }
 
     async fn encoded_snapshot(&self) -> Result<Vec<u8>, GatewayError> {
@@ -304,21 +279,7 @@ impl PresenceSource for ZbusPresenceSource {
     }
 
     fn last_delivery(&self) -> Delivered {
-        Delivered {
-            items: self
-                .provenance
-                .try_lock()
-                .map(|held| held.clone())
-                .unwrap_or_default(),
-            item_count: u32::try_from(self.supplied.load(Ordering::Relaxed)).unwrap_or(u32::MAX),
-            accounted_for: u32::try_from(self.accounted_for.load(Ordering::Relaxed))
-                .unwrap_or(u32::MAX),
-            withheld: self
-                .withheld
-                .try_lock()
-                .map(|held| held.clone())
-                .unwrap_or_default(),
-        }
+        self.ledger.delivered()
     }
 
     async fn wait_for_change(&self) -> Result<(), GatewayError> {

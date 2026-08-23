@@ -35,6 +35,11 @@ uuid = { workspace = true, features = ["v4"] }
 zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
 
 [dev-dependencies]
+# The disclosure walkthrough follows one observation from perception to the bytes a reader
+# receives. Development-only: the gateway must not depend on the organs it reads over D-Bus, and
+# this test exists to hold the composition none of them owns.
+cybou-epistemicd = { path = "../cybou-epistemicd" }
+cybou-perception = { path = "../cybou-perception" }
 http-body-util.workspace = true
 tempfile = "3.23.0"
 tower.workspace = true

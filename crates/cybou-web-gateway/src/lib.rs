@@ -25,6 +25,7 @@ pub mod disclose;
 pub mod fixture;
 #[cfg(target_os = "linux")]
 pub mod presence_zbus;
+pub mod redact;
 pub mod routes;
 pub mod shells;
 pub mod state;

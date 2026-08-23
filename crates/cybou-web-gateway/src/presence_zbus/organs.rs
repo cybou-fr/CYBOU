@@ -257,20 +257,15 @@ impl ZbusPresenceSource {
                     // A belief above what this reader is permitted is left out rather than
                     // blanked: an entry saying a subject exists but its value is withheld still
                     // tells a stranger the person said something about it.
+                    // The subject is named to the record and the value is not. A person asking
+                    // "why did it not tell me that?" needs the subject; anyone else must not learn
+                    // the value from a record that outlives the erasure of the value.
                     .filter(|belief| {
-                        let permitted = belief.sensitivity <= self.permitted_sensitivity;
-                        if permitted {
-                            self.note_supplied(&belief.evidence);
-                        } else {
-                            // The subject is named and the value is not. A person asking "why did
-                            // it not tell me that?" needs the subject; anyone else must not learn
-                            // the value from a record that outlives the erasure of the value.
-                            self.note_withheld(
-                                Some(belief.subject.clone()),
-                                WithheldBecause::AboveConsumerTrust,
-                            );
-                        }
-                        permitted
+                        self.decide(
+                            belief.sensitivity,
+                            || Some(belief.subject.clone()),
+                            &belief.evidence,
+                        )
                     })
                     .map(|belief| BeliefProjection {
                         subject: belief.subject,
@@ -321,19 +316,10 @@ impl ZbusPresenceSource {
                 knowledge: KnowledgeState::Known,
                 concepts: concepts
                     .into_iter()
+                    // A concept does not carry what it was derived from, so it is counted as
+                    // supplied and cannot be accounted for. The record says both.
                     .filter(|concept| {
-                        let permitted = concept.sensitivity <= self.permitted_sensitivity;
-                        if permitted {
-                            // A concept does not carry what it was derived from, so it is counted
-                            // as supplied and cannot be accounted for. The record says both.
-                            self.note_supplied(&[]);
-                        } else {
-                            self.note_withheld(
-                                Some(concept.label.clone()),
-                                WithheldBecause::AboveConsumerTrust,
-                            );
-                        }
-                        permitted
+                        self.decide(concept.sensitivity, || Some(concept.label.clone()), &[])
                     })
                     .map(|concept| ConceptProjection {
                         label: concept.label,

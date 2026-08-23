@@ -334,6 +334,56 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The rule that decides what a stranger sees was the one rule no test could run (2026-08-23)
+
+```
+perception → contribution → epistemic belief → redaction → what a reader receives
+```
+
+The second sweep, on the path that matters more. What can be lost here is not a hedge: it is a value
+the person did not agree to publish. A sensitivity that survives perception, survives the Journal
+envelope, survives belief derivation and is dropped at the redaction step produces a page that looks
+exactly like a page with nothing to hide.
+
+The decision lived inline inside the D-Bus adapter, so it could only run with a session bus and a
+live Mind behind it — the same shape as every defect this codebase has actually shipped: arithmetic
+welded to a component, a stylesheet nothing compiles, a daemon behind a `cfg`. And it is where the
+one live disclosure bug came from: three thousand contributions reported as accounted for against
+ten items supplied.
+
+`gateway::redact` is that rule, extracted. The policy is one comparison of two numbers, deliberately
+a free function rather than a method, so it cannot come to depend on the state of whoever applies
+it. The `Ledger` beside it keeps the account: what crossed, what did not, what it came from, and the
+two counts whose *difference* is the point — a concept carries no evidence, so it is supplied and
+unaccountable, and a surface reporting one number could never show that. Seven unit tests, none of
+which needs a bus.
+
+### What the walkthrough asserts
+
+Not that the filter returned the right count. That the **withheld value appears nowhere in the bytes
+a stranger receives** — serialised whole, searched as text. A projection that leaked the value into a
+field nobody thought to check passes a length assertion and fails this one.
+
+Around it, the controls that keep the strong assertion honest: something *did* cross for the
+stranger (otherwise proving a leak-free empty page proves nothing), and the person is told what
+belongs to them (otherwise a redactor that dropped everything would satisfy every test and the
+surface would be private and useless). Plus: a contradicting observation makes a private belief
+disputed without downgrading its class, and an empty Mind does not produce the same account as a
+fully redacted one — one supplied nothing because there was nothing, the other because everything
+was kept.
+
+Seven tests, all passing on the first run — which is only worth stating alongside the check that
+they bite: with the comparison forced open, six of the seven fail.
+
+### Left undone, deliberately
+
+The provenance set a delivery accumulates is unbounded, and `contains` on it is linear, so a wide
+delivery is quadratic in the number of contributions cited and the resulting Journal record grows
+with the biography. Bounding it means the record would under-report what a delivery rested on, and a
+permanent record that silently omits is worse than a large one. Fixing it properly means carrying a
+true count beside a bounded sample into `ContextDisclosedV1`, which is a frozen payload — so it is
+named here rather than done quietly.
+
 ## Walking the whole path found something no layer could see (2026-08-23)
 
 ```
