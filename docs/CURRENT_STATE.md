@@ -334,6 +334,47 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The System Insight card: seeing what it would do, before it can do anything (2026-08-23)
+
+The vertical reached the desktop. `GET /api/v1/insight` and a fourteenth system card show what this
+host makes of itself — and it is the one card whose entire content is produced with no model and no
+network, which is why it still works at the moment it is most wanted.
+
+Four things are drawn that a monitoring dashboard leaves out.
+
+**The readings behind each finding**, beside what is ordinary for this host. A number without its
+baseline is a number a reader has to take on faith, and the whole reason this path is deterministic
+is so it does not have to be.
+
+**What was never looked at.** An all-clear on a kernel without pressure accounting is an all-clear
+about a subset, and the card says which subjects have no readings rather than leaving it to be
+inferred from an absence.
+
+**Four states where a dashboard has two.** The gateway could not be asked; the organ did not answer;
+it has not watched long enough to have a notion of ordinary; and it has an answer. Collapsing any
+pair of the first three would let *nobody looked* read as *nothing is wrong*.
+
+**What the host would offer to do, and what the gate says about it.** None of it can be carried out —
+there is no executor — and showing the verdict now is the point: a person should see what the system
+would ask permission for while the answer is still theoretical. The verdict is deliberately never
+styled as a button; a control that looked pressable would be offering something that does not exist.
+
+The join lives in the gateway rather than in any organ. Telemetry concluded, meaning worded it, and
+the gate decided — and none of the three reads the others, which an organ assembling the whole answer
+would have had to. Both the structure and the prose cross the wire: sending only the structure would
+put the wording in the browser, one refactor from a fluent sentence nobody planned; sending only the
+prose would make the readings undrawable. A test asserts the phrase on a card is the phrase in the
+sentence, because they come from the same planner and must not drift into two descriptions of one
+thing.
+
+The style validator earned its place again: sixteen new classes, all of them caught before anything
+was rendered.
+
+And one test got better on the way. The migration check that a restored desktop regains a card it
+was saved without named `Disclosure`, the card that prompted it. It now runs over every system card,
+because the next card added is the next one that could go missing — and a test naming one card would
+have passed while it did.
+
 ## The host can offer to fix it, and cannot (2026-08-23)
 
 `cybou-remediation` is *propose* and *authorize*, and it deliberately stops there: **nothing in it

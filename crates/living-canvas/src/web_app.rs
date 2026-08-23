@@ -82,6 +82,7 @@ pub fn App() -> impl IntoView {
         // Asked after the projection it describes. A delivery is recorded when it happens, so
         // reading this first would report the previous delivery as though it were this one.
         let disclosure = client.disclosure().await.ok();
+        let insight = client.insight().await.ok();
         runtime.set(match result {
             Ok((session, snapshot)) => RuntimeState::Ready {
                 mode: session.mode,
@@ -89,6 +90,7 @@ pub fn App() -> impl IntoView {
                 snapshot,
                 mind,
                 disclosure,
+                insight,
             },
             Err(error) => RuntimeState::Error(error.to_string()),
         });

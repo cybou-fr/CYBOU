@@ -69,6 +69,102 @@ pub struct SessionProjection {
 
 /// One thing that was not supplied, as the person is shown it.
 ///
+/// One thing the host concluded about itself, as a reader sees it.
+///
+/// Carries the readings behind it. A finding without them is indistinguishable from one a model
+/// invented, and the whole reason this path is deterministic is so a person can check it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingProjection {
+    /// The finding, in the frozen vocabulary.
+    pub finding: String,
+    /// What it means, in the words a person would use.
+    pub means: String,
+    /// How well the evidence supports it: `weak`, `moderate` or `strong`.
+    ///
+    /// Named rather than numeric. A diagnosis reported as `0.81` invites comparison with another
+    /// `0.79` as though the difference meant something; these three are distinguishable by what is
+    /// actually behind them.
+    pub strength: String,
+    /// When the behaviour started, as far as the window can tell.
+    pub since: String,
+    /// The readings that led to it.
+    pub readings: Vec<ReadingProjection>,
+    /// What the host could offer to do about it, and what it decided about each.
+    ///
+    /// Empty is a real answer and a common one: a finding with no remedy produces no offer rather
+    /// than a gesture.
+    pub offers: Vec<OfferProjection>,
+}
+
+/// One reading behind a finding.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadingProjection {
+    /// The subject, in its frozen dotted name.
+    pub subject: String,
+    /// What was observed.
+    pub observed: f64,
+    /// What is ordinary for this host.
+    pub ordinary: f64,
+    /// How much this host ordinarily varies.
+    pub spread: f64,
+}
+
+/// Something the host could do, and what it decided about doing it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferProjection {
+    /// The operation, in its frozen verb.
+    pub operation: String,
+    /// What it would act on.
+    pub target: String,
+    /// What being wrong about it costs: `low`, `medium`, `high` or `critical`.
+    pub risk: String,
+    /// Whether the system can undo it.
+    ///
+    /// Not whether it is safe. Restarting a service can be undone and still drops every connection
+    /// it was holding; a package cache cannot be un-deleted and is among the safest things offered.
+    pub reversible: bool,
+    /// What the authorization gate decided: `granted`, `requires-confirmation` or `denied`.
+    ///
+    /// Nothing is `granted` on an installation nobody has configured, and nothing is carried out at
+    /// all: there is no executor. The verdict is shown so a person can see what the gate would say
+    /// before anything can act on it.
+    pub verdict: String,
+    /// Why, when the gate refused or wants asking.
+    pub reason: String,
+}
+
+/// What the host currently makes of itself.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightProjection {
+    /// Contract version.
+    pub schema_version: SchemaVersion,
+    /// Whether the telemetry organ could be read at all.
+    pub knowledge: KnowledgeState,
+    /// Whether it has watched long enough to have a notion of what is ordinary here.
+    ///
+    /// False for the first minutes after a restart. Its own field because *I have not watched long
+    /// enough* and *nothing is wrong* are different answers, and a surface that could not tell them
+    /// apart would show a confident all-clear built on four readings.
+    pub watched_enough: bool,
+    /// What needs attention.
+    pub findings: Vec<FindingProjection>,
+    /// The subjects that have no readings at all on this host.
+    ///
+    /// A kernel without pressure accounting, a host without swap. Named so an all-clear can be read
+    /// against what was actually looked at, rather than as a statement about everything.
+    pub unobserved: Vec<String>,
+    /// The answer in prose, from the deterministic layer.
+    ///
+    /// Carried beside the structure rather than instead of it. The structure is what a surface
+    /// draws; this is what the host would say if asked, and having both means the two can be
+    /// compared.
+    pub said: String,
+}
+
 /// A subject and a reason, never a value. Restating what was withheld in order to explain that it
 /// was withheld would defeat the withholding, so this says what the item was *about* and why, and
 /// stops there. Where even the subject would say too much, the subject is absent and the item is

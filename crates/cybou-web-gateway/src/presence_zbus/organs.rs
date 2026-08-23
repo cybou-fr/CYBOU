@@ -15,7 +15,8 @@ use super::wire::{
     kind_name, millis_to_rfc3339,
 };
 use cybou_fabric::{
-    CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, SELF, WORKSPACE,
+    CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, SELF, TELEMETRY,
+    WORKSPACE,
 };
 use cybou_protocol::{KnowledgeState, canonical::CanonicalEnvelope, disclosure::WithheldBecause};
 use cybou_web_contracts::{
@@ -26,6 +27,56 @@ use cybou_web_contracts::{
 };
 
 impl ZbusPresenceSource {
+    /// What the host currently makes of itself.
+    ///
+    /// Not filtered by sensitivity, and that is a decision rather than an oversight. A reading is
+    /// about the machine, not about the person: that memory pressure is high is a fact about a
+    /// server in the same way its kernel version is. What keeps it from a stranger is the route,
+    /// which is gated with the rest of Mind — and the route is the right place, because the whole
+    /// answer is either for this reader or not.
+    pub(super) async fn insight(&self) -> cybou_web_contracts::InsightProjection {
+        let Some(encoded) = self.read::<Vec<u8>>(TELEMETRY, "Insights").await else {
+            // The organ did not answer. Distinct from a host with nothing to report, and the
+            // projection carries that distinction itself.
+            return crate::insight::unread();
+        };
+        let Ok(insights) = ciborium::from_reader::<Vec<cybou_protocol::telemetry::SystemInsight>, _>(
+            encoded.as_slice(),
+        ) else {
+            return crate::insight::unread();
+        };
+
+        let observed = self
+            .read::<Vec<u8>>(TELEMETRY, "Latest")
+            .await
+            .and_then(|encoded| {
+                ciborium::from_reader::<Vec<cybou_protocol::telemetry::Reading>, _>(
+                    encoded.as_slice(),
+                )
+                .ok()
+            })
+            .map(|readings| {
+                readings
+                    .into_iter()
+                    .map(|reading| reading.subject)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        // Readiness is what the organ says about whether it has a notion of ordinary yet, and it is
+        // asked separately rather than inferred from the absence of findings. A quiet host and a
+        // host that has not watched long enough both report no findings, and only one of them is
+        // entitled to an all-clear.
+        let watched_enough = self.read::<bool>(TELEMETRY, "Ready").await.unwrap_or(false);
+
+        crate::insight::project(
+            &insights,
+            &observed,
+            watched_enough,
+            time::OffsetDateTime::now_utc(),
+        )
+    }
+
     pub(super) async fn identity(&self) -> IdentityProjection {
         let identity_id: Option<String> = self.read(IDENTITY, "IdentityId").await;
         let Some(identity_id) = identity_id.filter(|value| !value.is_empty()) else {

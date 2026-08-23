@@ -5,8 +5,8 @@
 
 use cybou_protocol::{CapabilityState, KnowledgeState};
 use cybou_web_contracts::{
-    DisclosureProjection, Freshness, MindProjection, SessionMode, SessionProjection,
-    SnapshotProjection,
+    DisclosureProjection, Freshness, InsightProjection, MindProjection, SessionMode,
+    SessionProjection, SnapshotProjection,
 };
 use leptos::prelude::RwSignal;
 
@@ -30,6 +30,13 @@ pub enum RuntimeState {
         /// `None` means the gateway could not be asked, which is a different fact from a delivery
         /// that has not happened — the projection carries that one itself.
         disclosure: Option<DisclosureProjection>,
+        /// What this host makes of itself, if the telemetry organ could be asked.
+        ///
+        /// `None` means the gateway could not be asked at all. The projection carries the two finer
+        /// distinctions itself — the organ not answering, and the organ not having watched long
+        /// enough — because a surface that showed one thing for all three would let "nobody looked"
+        /// read as "nothing is wrong".
+        insight: Option<InsightProjection>,
     },
     /// Connection or protocol error.
     Error(String),

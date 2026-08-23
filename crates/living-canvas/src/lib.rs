@@ -91,6 +91,13 @@ pub trait MindClient {
     /// Returns [`ClientError`] when the gateway cannot produce the projection.
     async fn disclosure(&self) -> Result<DisclosureProjection, ClientError>;
 
+    /// Return what this host currently makes of itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the gateway cannot produce the projection.
+    async fn insight(&self) -> Result<cybou_web_contracts::InsightProjection, ClientError>;
+
     /// Execute a bounded Shell capability inside the Body host sandbox.
     ///
     /// # Errors
@@ -135,6 +142,7 @@ pub struct MockMindClient {
     snapshot: SnapshotProjection,
     mind: Option<MindProjection>,
     disclosure: Option<DisclosureProjection>,
+    insight: Option<cybou_web_contracts::InsightProjection>,
 }
 
 impl MockMindClient {
@@ -146,6 +154,7 @@ impl MockMindClient {
             snapshot,
             mind: None,
             disclosure: None,
+            insight: None,
         }
     }
 
@@ -163,6 +172,16 @@ impl MockMindClient {
     #[must_use]
     pub fn with_disclosure(mut self, disclosure: DisclosureProjection) -> Self {
         self.disclosure = Some(disclosure);
+        self
+    }
+
+    /// Attach a system insight to a mock that would otherwise report none.
+    ///
+    /// A mock without one reports that telemetry did not answer, which is the correct answer for a
+    /// client with nothing behind it — and not the same as a host with nothing to report.
+    #[must_use]
+    pub fn with_insight(mut self, insight: cybou_web_contracts::InsightProjection) -> Self {
+        self.insight = Some(insight);
         self
     }
 
@@ -200,6 +219,22 @@ impl MindClient for MockMindClient {
         self.mind.clone().ok_or_else(|| {
             ClientError::GatewayRequest("mock client holds no owner projection".into())
         })
+    }
+
+    async fn insight(&self) -> Result<cybou_web_contracts::InsightProjection, ClientError> {
+        // Not read, rather than nothing to report. A mock that answered "all clear" would put an
+        // all-clear on every test surface that never configured one.
+        Ok(self
+            .insight
+            .clone()
+            .unwrap_or_else(|| cybou_web_contracts::InsightProjection {
+                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                knowledge: cybou_protocol::KnowledgeState::Unknown,
+                watched_enough: false,
+                findings: Vec::new(),
+                unobserved: Vec::new(),
+                said: String::new(),
+            }))
     }
 
     async fn disclosure(&self) -> Result<DisclosureProjection, ClientError> {

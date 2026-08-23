@@ -99,6 +99,15 @@ pub trait PresenceSource: Send + Sync + 'static {
     async fn mind(&self) -> Result<MindProjection, GatewayError> {
         Err(GatewayError::Unavailable)
     }
+
+    /// Return what the host currently makes of itself.
+    ///
+    /// The default is *not read*, not *nothing to report*. A source that has no telemetry behind it
+    /// has not established that the machine is well, and a default that said so would put an
+    /// all-clear on a surface nobody looked at.
+    async fn insight(&self) -> cybou_web_contracts::InsightProjection {
+        crate::insight::unread()
+    }
 }
 
 /// Failure response safe to expose at the browser boundary.

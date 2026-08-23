@@ -69,6 +69,7 @@ impl DesktopLayout {
             CardId::Perception,
             CardId::Context,
             CardId::Disclosure,
+            CardId::Insight,
         ];
         for (idx, card_id) in canonical_cards.iter().enumerate() {
             let spec = card_id.spec();

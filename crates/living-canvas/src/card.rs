@@ -37,6 +37,8 @@ pub enum CardId {
     Context,
     /// What this reader was supplied, and what was kept from them (ADR-0030 B1, B6).
     Disclosure,
+    /// Telemetry1: what this host makes of itself, and what it would offer to do (ADR-0041 S0).
+    Insight,
     /// Dynamic bounded CYBOU Shell instance (Zone 3 `DemoReadOnly` capability).
     Shell(u32),
     /// Dynamic bounded File Manager instance (Zone 3 Read-Only storage).
@@ -46,8 +48,8 @@ pub enum CardId {
 }
 
 impl CardId {
-    /// All 12 canonical System cards.
-    pub const ALL_SYSTEM_CARDS: [Self; 12] = [
+    /// All 13 canonical System cards.
+    pub const ALL_SYSTEM_CARDS: [Self; 13] = [
         Self::Identity,
         Self::Session,
         Self::Capabilities,
@@ -60,6 +62,7 @@ impl CardId {
         Self::Perception,
         Self::Context,
         Self::Disclosure,
+        Self::Insight,
     ];
 
     /// Canonical string key for selection, routing, and legacy mapping.
@@ -78,6 +81,7 @@ impl CardId {
             Self::Perception => "perception",
             Self::Context => "context",
             Self::Disclosure => "disclosure",
+            Self::Insight => "insight",
             Self::Shell(_) => "shell",
             Self::FileManager(_) => "files",
             Self::JournalFeed(_) => "journal-feed",
@@ -100,6 +104,7 @@ impl CardId {
             Self::Perception => "Perception",
             Self::Context => "Context",
             Self::Disclosure => "Disclosure",
+            Self::Insight => "System Insight",
             Self::Shell(_) => "Shell",
             Self::FileManager(_) => "File Manager",
             Self::JournalFeed(_) => "Event Stream",
@@ -122,6 +127,7 @@ impl CardId {
             "perception" => Some(Self::Perception),
             "context" => Some(Self::Context),
             "disclosure" => Some(Self::Disclosure),
+            "insight" => Some(Self::Insight),
             "shell" => Some(Self::Shell(0)),
             "files" => Some(Self::FileManager(0)),
             "journal-feed" => Some(Self::JournalFeed(0)),
@@ -146,6 +152,7 @@ impl CardId {
                 | Self::Perception
                 | Self::Context
                 | Self::Disclosure
+                | Self::Insight
         )
     }
 
@@ -300,6 +307,21 @@ impl CardId {
                 default_size: (360.0, 260.0),
                 min_size: (280.0, 180.0),
                 max_size: (620.0, 620.0),
+            },
+            Self::Insight => CardSpec {
+                kind: CardKind::System,
+                singleton: true,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: false,
+                deckable: true,
+                // Larger than the rest by default. A finding carries its readings and its offers,
+                // and a card that showed the headline with everything behind a scrollbar would be
+                // a card whose whole reason for existing is one scroll away.
+                default_size: (420.0, 340.0),
+                min_size: (300.0, 200.0),
+                max_size: (720.0, 720.0),
             },
             Self::Shell(_) => CardSpec {
                 kind: CardKind::Tool,
@@ -494,14 +516,25 @@ mod tests {
 
     #[test]
     fn a_layout_saved_before_a_card_existed_gains_it_rather_than_losing_the_card() {
-        // The disclosure card was added after layouts had already been saved. A desktop restored
-        // from one of those must end up with it, or the surface exists and nobody sees it.
-        let mut older = crate::DesktopLayout::canonical(None);
-        older.cards.retain(|card| card.id != CardId::Disclosure);
-        assert!(!older.cards.iter().any(|card| card.id == CardId::Disclosure));
+        // Disclosure was added after layouts had already been saved, and Insight after that. A
+        // desktop restored from an older one must end up with the card, or the surface exists and
+        // nobody sees it.
+        //
+        // Written over every system card rather than the one that prompted it: the next card added
+        // will be the next one that could go missing, and a test naming a single card would pass
+        // while it did.
+        for card_id in CardId::ALL_SYSTEM_CARDS {
+            let mut older = crate::DesktopLayout::canonical(None);
+            older.cards.retain(|card| card.id != card_id);
+            assert!(!older.cards.iter().any(|card| card.id == card_id));
 
-        older.validate_and_normalize();
-        assert!(older.cards.iter().any(|card| card.id == CardId::Disclosure));
+            older.validate_and_normalize();
+            assert!(
+                older.cards.iter().any(|card| card.id == card_id),
+                "a desktop restored without {} never got it back",
+                card_id.title()
+            );
+        }
     }
 
     #[test]

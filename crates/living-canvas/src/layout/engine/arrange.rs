@@ -309,9 +309,12 @@ impl DesktopLayout {
             match &item.id {
                 DesktopItemId::Card(id) => match id {
                     // Disclosure sits beside Session, the other card about who is being answered.
+                    // Insight sits beside Perception: both are about the machine rather than about
+                    // Mind, and a reader looking at one usually wants the other.
                     CardId::Session
                     | CardId::Identity
                     | CardId::Perception
+                    | CardId::Insight
                     | CardId::Lifecycle
                     | CardId::Disclosure => 0,
                     CardId::Capabilities | CardId::Journal | CardId::Attention => 1 % num_cols,

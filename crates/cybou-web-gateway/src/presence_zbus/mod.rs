@@ -282,6 +282,10 @@ impl PresenceSource for ZbusPresenceSource {
         self.ledger.delivered()
     }
 
+    async fn insight(&self) -> cybou_web_contracts::InsightProjection {
+        Self::insight(self).await
+    }
+
     async fn wait_for_change(&self) -> Result<(), GatewayError> {
         self.changed
             .lock()

@@ -264,6 +264,38 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 /* A refusal whose subject could not be named is still a row, and reads as one. */
 .withheld-line b.withheld-unnamed { color: var(--muted); font-style: italic; font-weight: 400; }
 .withheld-line small { color: #b08a3a; font-size: 10px; white-space: nowrap; }
+/* System Insight. The one card whose content is about the machine rather than about Mind, and the
+   one whose whole point is the small print: a finding is not worth much without the reading behind
+   it, so the readings are laid out as a table rather than buried in a tooltip. */
+.insight-card-body { display: grid; gap: 6px; }
+.insight-unobserved { color: var(--muted); font-size: 10px; }
+.finding-list { display: grid; gap: 10px; max-height: 190px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
+.finding-line { display: grid; gap: 3px; }
+.finding-head { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: 12px; }
+.finding-head b { color: #dfe8ed; font-weight: 500; }
+/* How sure, in a word rather than a number. A diagnosis shown as 0.81 invites comparison with a
+   0.79 as though the difference meant something. */
+.finding-strength { color: #b08a3a; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.finding-since { color: var(--muted); font-size: 10px; }
+.reading-list { display: grid; gap: 2px; margin: 3px 0 0 8px; }
+/* The observation next to what is ordinary for this host. A number without its baseline is a number
+   a reader has to take on faith, which is the opposite of what this path is for. */
+.reading-line { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 10px; }
+.reading-line code { color: var(--muted); font-size: 10px; }
+.reading-line b { color: var(--accent); font-weight: 500; }
+.reading-line small { color: var(--muted); white-space: nowrap; }
+.offer-label { margin-top: 5px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.offer-list { display: grid; gap: 2px; margin-left: 8px; }
+.offer-line { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: baseline; font-size: 10px; }
+.offer-line code { color: #dfe8ed; font-size: 10px; }
+.offer-risk { color: #b08a3a; white-space: nowrap; }
+.offer-undo { color: var(--muted); white-space: nowrap; }
+/* What the gate would say. Never styled as a button: nothing on this card can be carried out, and a
+   verdict that looked pressable would be offering something that does not exist. */
+.offer-verdict { color: var(--muted); font-style: italic; white-space: nowrap; }
+.insight-said { margin-top: 4px; font-size: 10px; }
+.insight-said summary { color: var(--accent); cursor: pointer; }
+.insight-said pre { margin: 6px 0 0; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.22); color: var(--muted); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .attention-focus { padding: 8px 10px; border: 1px solid rgba(112,225,200,.28); border-radius: 8px; color: var(--accent); font-size: 11px; word-break: break-all; }
 .row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
 .row b, .check-row b { color: #dfe8ed; font-weight: 500; }
@@ -1421,6 +1453,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .commitments-card-body,
 .context-card-body,
 .disclosure-card-body,
+.insight-card-body,
 .identity-card-body,
 .journal-card-body,
 .lifecycle-card-body,

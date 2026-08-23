@@ -77,6 +77,10 @@ impl MindClient for GatewayMindClient {
         Self::get("/api/v1/disclosure").await
     }
 
+    async fn insight(&self) -> Result<cybou_web_contracts::InsightProjection, ClientError> {
+        Self::get("/api/v1/insight").await
+    }
+
     async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
         Self::post_path("/api/v1/files/list", path).await
     }

@@ -7,6 +7,7 @@ pub mod auth;
 pub mod disclosure;
 pub mod events;
 pub mod files;
+pub mod insight;
 pub mod shell;
 pub mod snapshot;
 
@@ -16,6 +17,7 @@ pub use auth::{login_handler, logout_handler, session_handler};
 pub use disclosure::disclosure_handler;
 pub use events::events_handler;
 pub use files::{list_directory_handler, read_file_handler};
+pub use insight::insight_handler;
 pub use shell::{shell_close_handler, shell_exec_handler};
 pub use snapshot::{mind_handler, snapshot_handler};
 
