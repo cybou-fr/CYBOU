@@ -94,6 +94,18 @@ impl Telemetry1Service {
         buf
     }
 
+    /// Where each watched subject is heading, and when it becomes a problem, as CBOR.
+    ///
+    /// Only the subjects that have a threshold at all. A load average has none — 4 is a crisis on
+    /// one machine and a Tuesday on another — so projecting it against a number would be inventing
+    /// the number.
+    async fn projections(&self) -> Vec<u8> {
+        let projections = self.core.projections(OffsetDateTime::now_utc());
+        let mut buf = Vec::new();
+        let _ = ciborium::into_writer(&projections, &mut buf);
+        buf
+    }
+
     /// Signal emitted when what the host concludes about itself changes.
     #[zbus(signal)]
     async fn insights_changed(ctxt: &SignalEmitter<'_>) -> zbus::Result<()>;

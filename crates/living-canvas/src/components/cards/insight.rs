@@ -29,6 +29,7 @@ use std::sync::Arc;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
+    heading::heading_line,
     instant::instant_label,
     interaction::{DragState, ResizeState},
     state::RuntimeState,
@@ -95,10 +96,32 @@ pub fn InsightContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
 
     let said = move || state().map(|state| state.said).unwrap_or_default();
 
+    let headings = move || {
+        state().map_or_else(Vec::new, |state| {
+            state
+                .projections
+                .iter()
+                .filter_map(heading_line)
+                .enumerate()
+                .collect::<Vec<_>>()
+        })
+    };
+
     view! {
         <div class="insight-card-body">
             <strong>{label}</strong>
             <span class="insight-unobserved">{unobserved}</span>
+
+            <Show when=move || !headings().is_empty()>
+                <span class="heading-label">"Where things are going"</span>
+            </Show>
+            <div class="heading-list">
+                <For
+                    each=headings
+                    key=|(index, line)| format!("{index}:{line}")
+                    children=move |(_, line)| view! { <span class="heading-line">{line}</span> }
+                />
+            </div>
 
             <div class="finding-list">
                 <For

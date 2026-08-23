@@ -78,6 +78,25 @@ impl Subject {
         }
     }
 
+    /// The value at which this subject is a problem regardless of what is ordinary here.
+    ///
+    /// `None` for the subjects where there is no such number: a load average of 4 is a crisis on one
+    /// machine and a Tuesday on another, and only the baseline can say which.
+    ///
+    /// One number, read by both the detector and the projection. They used to hold their own copies,
+    /// which is how a system comes to report that a disk is fine and that it reaches trouble in three
+    /// days — two true statements about two different thresholds.
+    #[must_use]
+    pub const fn alarming(self) -> Option<f64> {
+        match self {
+            Self::RootFilesystemUsed | Self::MemoryUsed => Some(0.95),
+            Self::MemoryPressure | Self::IoPressure | Self::CpuPressure => Some(40.0),
+            Self::SwapUsed => Some(0.90),
+            Self::FailedUnits => Some(1.0),
+            Self::LoadAverage => None,
+        }
+    }
+
     /// Whether a rising value is the direction worth worrying about.
     ///
     /// Every subject here is one where more is worse, and that is a fact about this list rather

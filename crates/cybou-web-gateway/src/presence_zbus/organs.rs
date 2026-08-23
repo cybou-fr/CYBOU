@@ -69,10 +69,26 @@ impl ZbusPresenceSource {
         // entitled to an all-clear.
         let watched_enough = self.read::<bool>(TELEMETRY, "Ready").await.unwrap_or(false);
 
+        let projections = self
+            .read::<Vec<u8>>(TELEMETRY, "Projections")
+            .await
+            .and_then(|encoded| {
+                ciborium::from_reader::<
+                    Vec<(
+                        cybou_protocol::telemetry::Subject,
+                        cybou_telemetryd::trend::Projection,
+                    )>,
+                    _,
+                >(encoded.as_slice())
+                .ok()
+            })
+            .unwrap_or_default();
+
         crate::insight::project(
             &insights,
             &observed,
             watched_enough,
+            &projections,
             time::OffsetDateTime::now_utc(),
         )
     }

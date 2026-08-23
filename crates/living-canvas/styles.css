@@ -293,6 +293,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 /* What the gate would say. Never styled as a button: nothing on this card can be carried out, and a
    verdict that looked pressable would be offering something that does not exist. */
 .offer-verdict { color: var(--muted); font-style: italic; white-space: nowrap; }
+/* Where things are going. Above the findings on purpose: a disk at 71% produces no finding and can
+   still be the most important thing on the page. */
+.heading-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.heading-list { display: grid; gap: 3px; margin-left: 8px; }
+.heading-line { color: #dfe8ed; font-size: 11px; }
 .insight-said { margin-top: 4px; font-size: 10px; }
 .insight-said summary { color: var(--accent); cursor: pointer; }
 .insight-said pre { margin: 6px 0 0; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.22); color: var(--muted); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }

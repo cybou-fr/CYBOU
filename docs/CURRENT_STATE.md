@@ -97,6 +97,15 @@ at 95%, a failed unit) are evidence in their own right and do not need a baselin
 
 A window too short to have an opinion says so. That is a different answer from *nothing is wrong*.
 
+**Where things are heading** is a separate question from what is wrong now, and a disk at 71% that
+produces no finding can be the most important thing on the page. The slope is a Theil–Sen estimate —
+the median of every pairwise slope — so one spike does not move the date, and the yardstick it is
+called flat against is a median absolute deviation for the same reason. A subject that is flat or
+moving away does not arrive: *not at this rate* is an answer, and a very large number would be read
+as a date. A projection is measured from now rather than from the last reading, and it says when it
+is looking further ahead than the window has watched — the most useful projection is usually the
+least certain, and a reader deciding whether to act tonight is entitled to both facts.
+
 ## Meaning
 
 An utterance becomes a typed `CognitiveAct` or none at all; an unrecognised opening produces no
@@ -230,8 +239,10 @@ mentioned look identical to a reader.
   the window again, and the organ says it has not watched long enough rather than answering.
 - **The context projection has no checkpoint.** It replays from the Journal on every start. Correct,
   and slower than it needs to be on a long biography.
-- **`Predictor1` is domain-neutral.** It forecasts subjects rather than the operational ones —
-  filesystem growth, service availability, certificate expiry — that a server operator asks about.
+- **`Predictor1` is domain-neutral.** It forecasts a level — where a subject sits relative to its own
+  history — which is not what an operator asks. The operational projections (filesystem growth,
+  pressure, swap) are computed in `Telemetry1`, where the series lives; certificate expiry and
+  service availability are not projected at all.
 - **Continuity is proven across process restart, not machine reboot.** See
   [reboot continuity](evidence/reboot-continuity.md).
 - **Nothing is proven under load.** The integration gate proves the system comes up and is coherent,

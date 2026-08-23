@@ -90,6 +90,20 @@ impl Series {
         self.readings.iter().map(|reading| reading.value).collect()
     }
 
+    /// Every reading as seconds since `origin` and its value, oldest first.
+    ///
+    /// The shape a slope is estimated from. Seconds rather than instants because the estimator
+    /// divides by elapsed time, and `origin` rather than the epoch because the difference of two
+    /// large timestamps loses precision exactly where the slope is small — which is the case that
+    /// matters, since a fast-moving subject needs no projection to notice.
+    #[must_use]
+    pub fn timed_values(&self, origin: OffsetDateTime) -> Vec<(f64, f64)> {
+        self.readings
+            .iter()
+            .map(|reading| ((reading.at - origin).as_seconds_f64(), reading.value))
+            .collect()
+    }
+
     /// The most recent reading, if there is one.
     #[must_use]
     pub fn latest(&self) -> Option<Reading> {

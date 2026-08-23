@@ -136,6 +136,40 @@ pub struct OfferProjection {
     pub reason: String,
 }
 
+/// Where one watched subject is heading, and when it becomes a problem.
+///
+/// Separate from a finding. A finding is about now; this is about a rate, and the two answer
+/// different questions — a disk at 71% produces no finding and may still be the most important thing
+/// on the page.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionProjection {
+    /// The subject, in its frozen dotted name.
+    pub subject: String,
+    /// Where it is heading: `rising`, `falling` or `flat`.
+    pub trend: String,
+    /// The most recent reading.
+    pub current: f64,
+    /// The value at which it becomes a problem.
+    pub threshold: f64,
+    /// When it arrives: `already`, `at-this-rate`, `not-at-this-rate` or `not-enough-history`.
+    pub reaching: String,
+    /// Seconds until it arrives, when it does.
+    ///
+    /// `None` for every other answer. Zero would be a time, and *not at this rate* is not a time —
+    /// a surface that showed one number for both would render "arrives now" for a disk that is
+    /// emptying.
+    pub after_seconds: Option<i64>,
+    /// Whether the arrival is further ahead than this window has watched.
+    ///
+    /// The most useful projection is usually the least certain: a young window saying a disk fills
+    /// in three days is exactly what an operator needs and is an extrapolation. Both facts are the
+    /// reader's.
+    pub beyond_what_was_watched: bool,
+    /// How long the window has actually watched, in seconds.
+    pub watched_seconds: i64,
+}
+
 /// What the host currently makes of itself.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -157,6 +191,8 @@ pub struct InsightProjection {
     /// A kernel without pressure accounting, a host without swap. Named so an all-clear can be read
     /// against what was actually looked at, rather than as a statement about everything.
     pub unobserved: Vec<String>,
+    /// Where the watched subjects are heading.
+    pub projections: Vec<ProjectionProjection>,
     /// The answer in prose, from the deterministic layer.
     ///
     /// Carried beside the structure rather than instead of it. The structure is what a surface

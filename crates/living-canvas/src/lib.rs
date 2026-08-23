@@ -12,6 +12,7 @@ use thiserror::Error;
 
 pub mod card;
 pub mod deck;
+pub mod heading;
 pub mod instant;
 pub mod layout;
 
@@ -233,6 +234,7 @@ impl MindClient for MockMindClient {
                 watched_enough: false,
                 findings: Vec::new(),
                 unobserved: Vec::new(),
+                projections: Vec::new(),
                 said: String::new(),
             }))
     }

@@ -27,10 +27,13 @@ const NOTEWORTHY_SPREADS: f64 = 6.0;
 /// Some things do not need a baseline. A disk at 95% is a problem on a host where it has been at 95%
 /// for a month, and a purely statistical detector would say nothing precisely because it is normal
 /// here. Categorical facts and statistical deviations are different evidence and both are kept.
-const FILESYSTEM_ALARMING: f64 = 0.95;
-
-/// How much pressure counts as the machine actually stalling.
-const PRESSURE_ALARMING: f64 = 40.0;
+///
+/// Read from the subject rather than held here. The detector and the projection used to keep their
+/// own copies, which is how a system comes to report that a disk is fine and that it reaches trouble
+/// in three days — two true statements about two different numbers.
+fn alarming_for(subject: Subject) -> f64 {
+    subject.alarming().unwrap_or(f64::MAX)
+}
 
 /// What the telemetry organ holds and concludes.
 pub struct TelemetryCore {
@@ -119,6 +122,28 @@ impl TelemetryCore {
         })
     }
 
+    /// Where each watched subject is heading, and when it becomes a problem.
+    ///
+    /// Only the subjects that have a threshold at all. A load average has none — 4 is a crisis on
+    /// one machine and a Tuesday on another — so projecting it against a number would be inventing
+    /// the number.
+    #[must_use]
+    pub fn projections(&self, now: OffsetDateTime) -> Vec<(Subject, crate::trend::Projection)> {
+        let Ok(windows) = self.windows.read() else {
+            return Vec::new();
+        };
+        windows
+            .values()
+            .filter_map(|series| {
+                let threshold = series.subject().alarming()?;
+                Some((
+                    series.subject(),
+                    crate::trend::project(series, threshold, now)?,
+                ))
+            })
+            .collect()
+    }
+
     /// What this host currently concludes about itself.
     ///
     /// Every conclusion carries the readings that produced it and is a hypothesis, never a fact.
@@ -167,7 +192,7 @@ fn categorical(
     // nothing precisely because it is normal here.
     if let Some(series) = windows.get(&Subject::RootFilesystemUsed)
         && let Some(latest) = series.latest()
-        && latest.value >= FILESYSTEM_ALARMING
+        && latest.value >= alarming_for(Subject::RootFilesystemUsed)
     {
         explained.push(Subject::RootFilesystemUsed);
         found.push(SystemInsight {
@@ -177,7 +202,7 @@ fn categorical(
             strength: EvidenceStrength::Strong,
             concluded_at: now,
             since: series
-                .continuously_since(FILESYSTEM_ALARMING)
+                .continuously_since(alarming_for(Subject::RootFilesystemUsed))
                 .unwrap_or(latest.at),
         });
     }
@@ -232,7 +257,7 @@ fn pressures(
         let unusual = deviations
             .get(&subject)
             .is_some_and(|found| found.spreads_away >= NOTEWORTHY_SPREADS);
-        if !unusual && latest.value < PRESSURE_ALARMING {
+        if !unusual && latest.value < alarming_for(subject) {
             continue;
         }
         let corroborated = corroborator.is_some_and(|other| {
@@ -257,7 +282,7 @@ fn pressures(
             },
             concluded_at: now,
             since: series
-                .continuously_since(PRESSURE_ALARMING)
+                .continuously_since(alarming_for(subject))
                 .unwrap_or(latest.at),
         });
     }

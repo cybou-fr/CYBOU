@@ -20,8 +20,10 @@
 use cybou_protocol::action::{AuthorizationVerdict, RiskLevel};
 use cybou_protocol::telemetry::{ALL_SUBJECTS, EvidenceStrength, Subject, SystemInsight};
 use cybou_remediation::{StandingPolicy, authorize, criticise, propose};
+use cybou_telemetryd::trend::{Projection, Reaching, Trend};
 use cybou_web_contracts::{
-    FindingProjection, InsightProjection, OfferProjection, ReadingProjection, WEB_SCHEMA_V1,
+    FindingProjection, InsightProjection, OfferProjection, ProjectionProjection, ReadingProjection,
+    WEB_SCHEMA_V1,
 };
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
@@ -35,6 +37,7 @@ pub fn project(
     insights: &[SystemInsight],
     observed: &[Subject],
     watched_enough: bool,
+    projections: &[(Subject, Projection)],
     now: OffsetDateTime,
 ) -> InsightProjection {
     let plan = cybou_meaning::plan_system_state(
@@ -59,7 +62,44 @@ pub fn project(
             .filter(|subject| !observed.contains(subject))
             .map(|subject| subject.name().to_owned())
             .collect(),
+        projections: projections
+            .iter()
+            .map(|(subject, projection)| heading(*subject, projection))
+            .collect(),
         said: cybou_meaning::realize(&plan, cybou_meaning::Language::English),
+    }
+}
+
+/// One subject's direction, as a reader receives it.
+fn heading(subject: Subject, projection: &Projection) -> ProjectionProjection {
+    let (reaching, after_seconds, beyond) = match projection.reaching {
+        Reaching::Already => ("already", None, false),
+        Reaching::AtThisRate {
+            after,
+            beyond_what_was_watched,
+        } => (
+            "at-this-rate",
+            Some(after.whole_seconds()),
+            beyond_what_was_watched,
+        ),
+        // No number, deliberately. Zero would be a time, and *not at this rate* is not a time.
+        Reaching::NotAtThisRate => ("not-at-this-rate", None, false),
+        Reaching::NotEnoughHistory { .. } => ("not-enough-history", None, false),
+    };
+    ProjectionProjection {
+        subject: subject.name().to_owned(),
+        trend: match projection.trend {
+            Trend::Rising(_) => "rising",
+            Trend::Falling(_) => "falling",
+            Trend::Flat => "flat",
+        }
+        .to_owned(),
+        current: projection.current,
+        threshold: projection.threshold,
+        reaching: reaching.to_owned(),
+        after_seconds,
+        beyond_what_was_watched: beyond,
+        watched_seconds: projection.watched.whole_seconds(),
     }
 }
 
@@ -76,6 +116,7 @@ pub fn unread() -> InsightProjection {
         watched_enough: false,
         findings: Vec::new(),
         unobserved: Vec::new(),
+        projections: Vec::new(),
         said: String::new(),
     }
 }
@@ -205,7 +246,7 @@ mod tests {
         // A surface showing the same thing for both would tell a person their machine is fine when
         // nobody looked.
         let silent = unread();
-        let calm = project(&[], ALL_SUBJECTS, true, at());
+        let calm = project(&[], ALL_SUBJECTS, true, &[], at());
 
         assert_eq!(silent.knowledge, cybou_protocol::KnowledgeState::Unknown);
         assert_eq!(calm.knowledge, cybou_protocol::KnowledgeState::Known);
@@ -225,6 +266,7 @@ mod tests {
             )],
             ALL_SUBJECTS,
             true,
+            &[],
             at(),
         );
         let offers = &projected.findings[0].offers;
@@ -242,6 +284,7 @@ mod tests {
             &[insight(Finding::ServiceFailure, EvidenceStrength::Weak)],
             ALL_SUBJECTS,
             true,
+            &[],
             at(),
         );
         let offers = &projected.findings[0].offers;
@@ -268,6 +311,7 @@ mod tests {
             )],
             ALL_SUBJECTS,
             true,
+            &[],
             at(),
         );
         let reading = &projected.findings[0].readings[0];
@@ -285,14 +329,14 @@ mod tests {
             .filter(|subject| **subject != Subject::MemoryPressure)
             .copied()
             .collect();
-        let projected = project(&[], &partial, true, at());
+        let projected = project(&[], &partial, true, &[], at());
         assert_eq!(projected.unobserved, vec!["memory.pressure".to_owned()]);
         assert!(projected.said.contains("no readings for"));
     }
 
     #[test]
     fn a_host_that_has_not_watched_long_enough_says_so_on_the_wire() {
-        let projected = project(&[], ALL_SUBJECTS, false, at());
+        let projected = project(&[], ALL_SUBJECTS, false, &[], at());
         assert!(!projected.watched_enough);
         assert!(projected.said.contains("not been watching"));
     }
@@ -308,6 +352,7 @@ mod tests {
             )],
             ALL_SUBJECTS,
             true,
+            &[],
             at(),
         );
         let means = &projected.findings[0].means;
@@ -325,9 +370,9 @@ mod tests {
             Finding::StorageExhaustion,
             EvidenceStrength::Strong,
         )];
-        let first = project(&insights, ALL_SUBJECTS, true, at());
+        let first = project(&insights, ALL_SUBJECTS, true, &[], at());
         for _ in 0..8 {
-            assert_eq!(project(&insights, ALL_SUBJECTS, true, at()), first);
+            assert_eq!(project(&insights, ALL_SUBJECTS, true, &[], at()), first);
         }
     }
 }
