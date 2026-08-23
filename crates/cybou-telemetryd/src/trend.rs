@@ -31,6 +31,7 @@
 //! given and the reach is stated: a projection knows whether it is looking further ahead than it has
 //! watched, and says so.
 
+use cybou_protocol::telemetry::Alarming;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
@@ -169,7 +170,7 @@ pub fn theil_sen(points: &[(f64, f64)]) -> Option<f64> {
 /// `now` is the instant the projection is made from, so a stale window does not report a date
 /// measured from a reading taken an hour ago.
 #[must_use]
-pub fn project(series: &Series, threshold: f64, now: OffsetDateTime) -> Option<Projection> {
+pub fn project(series: &Series, alarming: Alarming, now: OffsetDateTime) -> Option<Projection> {
     let latest = series.latest()?;
     let oldest = series.sees_back_to()?;
     let watched = latest.at - oldest;
@@ -181,7 +182,7 @@ pub fn project(series: &Series, threshold: f64, now: OffsetDateTime) -> Option<P
         return Some(Projection {
             trend: Trend::Flat,
             current,
-            threshold,
+            threshold: alarming.threshold(),
             reaching: Reaching::NotEnoughHistory {
                 have: points.len(),
                 need: SMALLEST_TRENDABLE_WINDOW,
@@ -203,42 +204,44 @@ pub fn project(series: &Series, threshold: f64, now: OffsetDateTime) -> Option<P
         Trend::Flat
     };
 
-    let reaching = if current >= threshold {
+    let reaching = if alarming.reached_by(current) {
         Reaching::Already
     } else {
-        match trend {
-            // Flat, or heading away from the threshold. Not "in a very long time": a series moving
-            // downward does not arrive at all, and a large number would be read as a date.
-            Trend::Flat | Trend::Falling(_) => Reaching::NotAtThisRate,
-            Trend::Rising(rate) => {
-                let seconds = (threshold - current) / rate;
-                if seconds.is_finite() && seconds >= 0.0 {
-                    #[allow(
-                        clippy::cast_possible_truncation,
-                        reason = "a projection measured to the second is already more precise than the claim"
-                    )]
-                    let from_the_last_reading = Duration::seconds(seconds as i64);
-                    // Measured from now, not from the reading. A window that stopped being fed ten
-                    // minutes ago would otherwise keep reporting the same three hours, counting down
-                    // from an instant that is receding — and the closer the arrival, the larger the
-                    // error as a share of what is left.
-                    let stale_by = now - latest.at;
-                    let after = (from_the_last_reading - stale_by).max(Duration::ZERO);
-                    Reaching::AtThisRate {
-                        after,
-                        beyond_what_was_watched: after > watched,
-                    }
-                } else {
-                    Reaching::NotAtThisRate
-                }
+        // Whether this is movement *toward* the problem, which depends on which side the problem is
+        // on. A certificate losing a day a day is approaching; a filesystem losing a percent a day
+        // is retreating, and the same slope means opposite things.
+        let rate = match trend {
+            Trend::Rising(rate) | Trend::Falling(rate) => rate,
+            Trend::Flat => 0.0,
+        };
+        let seconds = (alarming.threshold() - current) / rate;
+        // Flat, or heading away: not "in a very long time". A series moving away does not arrive at
+        // all, and a large number would be read as a date.
+        if alarming.approaches(rate) && seconds.is_finite() && seconds >= 0.0 {
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "a projection measured to the second is already more precise than the claim"
+            )]
+            let from_the_last_reading = Duration::seconds(seconds as i64);
+            // Measured from now, not from the reading. A window that stopped being fed ten minutes
+            // ago would otherwise keep reporting the same three hours, counting down from an instant
+            // that is receding — and the closer the arrival, the larger the error as a share of what
+            // is left.
+            let stale_by = now - latest.at;
+            let after = (from_the_last_reading - stale_by).max(Duration::ZERO);
+            Reaching::AtThisRate {
+                after,
+                beyond_what_was_watched: after > watched,
             }
+        } else {
+            Reaching::NotAtThisRate
         }
     };
 
     Some(Projection {
         trend,
         current,
-        threshold,
+        threshold: alarming.threshold(),
         reaching,
         watched,
     })
@@ -290,8 +293,9 @@ mod tests {
             if tick == 30 { base + 0.30 } else { base }
         });
 
-        let clean = project(&steady, 0.95, at(3600)).expect("a projection");
-        let disturbed = project(&spiked, 0.95, at(3600)).expect("a projection");
+        let clean = project(&steady, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
+        let disturbed =
+            project(&spiked, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
 
         let (Reaching::AtThisRate { after: a, .. }, Reaching::AtThisRate { after: b, .. }) =
             (clean.reaching, disturbed.reaching)
@@ -314,15 +318,56 @@ mod tests {
             let tick = tick as f64;
             0.80 - tick * 0.0005
         });
-        let projected = project(&shrinking, 0.95, at(3600)).expect("a projection");
+        let projected =
+            project(&shrinking, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
         assert!(matches!(projected.trend, Trend::Falling(_)));
         assert_eq!(projected.reaching, Reaching::NotAtThisRate);
     }
 
     #[test]
+    fn a_subject_whose_problem_is_a_low_value_is_projected_toward_its_floor() {
+        // The case the old code could not express. Days remaining on a certificate falls toward
+        // zero, and a projection that only watched the rising tail would report it as never
+        // arriving — healthy right up to the hour it expires.
+        let expiring = window(60, |tick| {
+            #[allow(clippy::cast_precision_loss, reason = "a test fixture of sixty ticks")]
+            let tick = tick as f64;
+            30.0 - tick * 0.01
+        });
+        let projected = project(&expiring, Alarming::AtOrBelow(7.0), at(3600)).expect("projected");
+
+        assert!(matches!(projected.trend, Trend::Falling(_)));
+        let Reaching::AtThisRate { after, .. } = projected.reaching else {
+            panic!("{projected:?}");
+        };
+        assert!(after > Duration::ZERO);
+    }
+
+    #[test]
+    fn a_low_threshold_subject_moving_upward_does_not_arrive() {
+        // The control for the direction. A certificate that was just renewed is going the right way,
+        // and the same slope on a filling disk would be an arrival.
+        let renewed = window(60, |tick| {
+            #[allow(clippy::cast_precision_loss, reason = "a test fixture of sixty ticks")]
+            let tick = tick as f64;
+            10.0 + tick * 0.5
+        });
+        let projected = project(&renewed, Alarming::AtOrBelow(7.0), at(3600)).expect("projected");
+        assert_eq!(projected.reaching, Reaching::NotAtThisRate);
+    }
+
+    #[test]
+    fn something_already_below_a_low_threshold_says_so() {
+        let expired = window(60, |_| 2.0);
+        let projected = project(&expired, Alarming::AtOrBelow(7.0), at(3600)).expect("projected");
+        assert_eq!(projected.reaching, Reaching::Already);
+    }
+
+    #[test]
     fn a_flat_series_is_flat_rather_than_very_slowly_rising() {
         let steady = window(60, |_| 0.42);
-        let projected = project(&steady, 0.95, at(3600)).expect("a projection");
+        let projected =
+            project(&steady, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
         assert_eq!(projected.trend, Trend::Flat);
         assert_eq!(projected.reaching, Reaching::NotAtThisRate);
     }
@@ -337,7 +382,7 @@ mod tests {
             let tick = tick as f64;
             0.60 + tick * 0.00002
         });
-        let projected = project(&slow, 0.95, at(3600)).expect("a projection");
+        let projected = project(&slow, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
         let Reaching::AtThisRate {
             after,
             beyond_what_was_watched,
@@ -361,8 +406,9 @@ mod tests {
         });
 
         // Staled by less than the arrival is away, so the countdown is visible rather than clamped.
-        let fresh = project(&filling, 0.95, at(3540)).expect("a projection");
-        let stale = project(&filling, 0.95, at(3540 + 300)).expect("a projection");
+        let fresh = project(&filling, Alarming::AtOrAbove(0.95), at(3540)).expect("a projection");
+        let stale =
+            project(&filling, Alarming::AtOrAbove(0.95), at(3540 + 300)).expect("a projection");
 
         let (Reaching::AtThisRate { after: soon, .. }, Reaching::AtThisRate { after: sooner, .. }) =
             (fresh.reaching, stale.reaching)
@@ -379,7 +425,8 @@ mod tests {
             let tick = tick as f64;
             0.60 + tick * 0.005
         });
-        let forgotten = project(&filling, 0.95, at(3540 + 100_000)).expect("a projection");
+        let forgotten =
+            project(&filling, Alarming::AtOrAbove(0.95), at(3540 + 100_000)).expect("a projection");
         let Reaching::AtThisRate { after, .. } = forgotten.reaching else {
             panic!("{forgotten:?}");
         };
@@ -394,7 +441,7 @@ mod tests {
             let tick = tick as f64;
             0.60 + tick * 0.005
         });
-        let projected = project(&fast, 0.95, at(3600)).expect("a projection");
+        let projected = project(&fast, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
         let Reaching::AtThisRate {
             beyond_what_was_watched,
             ..
@@ -412,7 +459,7 @@ mod tests {
             let tick = tick as f64;
             0.60 + tick * 0.01
         });
-        let projected = project(&barely, 0.95, at(600)).expect("a projection");
+        let projected = project(&barely, Alarming::AtOrAbove(0.95), at(600)).expect("a projection");
         assert!(matches!(
             projected.reaching,
             Reaching::NotEnoughHistory { .. }
@@ -422,7 +469,7 @@ mod tests {
     #[test]
     fn something_already_past_the_threshold_says_so_rather_than_projecting_to_it() {
         let full = window(60, |_| 0.97);
-        let projected = project(&full, 0.95, at(3600)).expect("a projection");
+        let projected = project(&full, Alarming::AtOrAbove(0.95), at(3600)).expect("a projection");
         assert_eq!(projected.reaching, Reaching::Already);
     }
 
@@ -457,6 +504,6 @@ mod tests {
     #[test]
     fn an_empty_window_has_nothing_to_project() {
         let empty = Series::new(Subject::RootFilesystemUsed, Duration::hours(1), 100);
-        assert!(project(&empty, 0.95, at(0)).is_none());
+        assert!(project(&empty, Alarming::AtOrAbove(0.95), at(0)).is_none());
     }
 }

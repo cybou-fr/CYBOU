@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::sync::RwLock;
 
 use cybou_protocol::telemetry::{
-    ALL_SUBJECTS, Deviation, EvidenceStrength, Finding, Reading, Subject, SystemInsight,
+    ALL_SUBJECTS, Alarming, Deviation, EvidenceStrength, Finding, Reading, Subject, SystemInsight,
 };
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -31,8 +31,13 @@ const NOTEWORTHY_SPREADS: f64 = 6.0;
 /// Read from the subject rather than held here. The detector and the projection used to keep their
 /// own copies, which is how a system comes to report that a disk is fine and that it reaches trouble
 /// in three days — two true statements about two different numbers.
-fn alarming_for(subject: Subject) -> f64 {
-    subject.alarming().unwrap_or(f64::MAX)
+fn alarming_for(subject: Subject) -> Alarming {
+    // A subject with no categorical threshold is one no observation can reach, so the statistical
+    // half is the only judge of it. Expressed as an unreachable threshold rather than as an early
+    // return, so every caller reads the same shape.
+    subject
+        .alarming()
+        .unwrap_or(Alarming::AtOrAbove(f64::INFINITY))
 }
 
 /// What the telemetry organ holds and concludes.
@@ -135,10 +140,10 @@ impl TelemetryCore {
         windows
             .values()
             .filter_map(|series| {
-                let threshold = series.subject().alarming()?;
+                let alarming = series.subject().alarming()?;
                 Some((
                     series.subject(),
-                    crate::trend::project(series, threshold, now)?,
+                    crate::trend::project(series, alarming, now)?,
                 ))
             })
             .collect()
@@ -199,7 +204,7 @@ fn categorical(
     ] {
         if let Some(series) = windows.get(&subject)
             && let Some(latest) = series.latest()
-            && latest.value >= alarming_for(subject)
+            && alarming_for(subject).reached_by(latest.value)
         {
             explained.push(subject);
             found.push(SystemInsight {
@@ -217,7 +222,7 @@ fn categorical(
 
     if let Some(series) = windows.get(&Subject::OpenFileDescriptors)
         && let Some(latest) = series.latest()
-        && latest.value >= alarming_for(Subject::OpenFileDescriptors)
+        && alarming_for(Subject::OpenFileDescriptors).reached_by(latest.value)
     {
         // The other way a machine stops accepting work while looking well: memory fine, disk fine,
         // load fine, and nothing can open a socket.
@@ -245,7 +250,9 @@ fn categorical(
             because: evidence(deviations, &[Subject::FailedUnits]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
-            since: series.continuously_since(1.0).unwrap_or(latest.at),
+            since: series
+                .continuously_since(alarming_for(Subject::FailedUnits))
+                .unwrap_or(latest.at),
         });
     }
 }
@@ -284,7 +291,7 @@ fn pressures(
         let unusual = deviations
             .get(&subject)
             .is_some_and(|found| found.spreads_away >= NOTEWORTHY_SPREADS);
-        if !unusual && latest.value < alarming_for(subject) {
+        if !unusual && !alarming_for(subject).reached_by(latest.value) {
             continue;
         }
         let corroborated = corroborator.is_some_and(|other| {

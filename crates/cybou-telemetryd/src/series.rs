@@ -15,7 +15,7 @@
 
 use std::collections::VecDeque;
 
-use cybou_protocol::telemetry::{Reading, Subject};
+use cybou_protocol::telemetry::{Alarming, Reading, Subject};
 use time::{Duration, OffsetDateTime};
 
 /// One subject's recent history.
@@ -126,10 +126,10 @@ impl Series {
     /// backwards from the most recent reading and stops at the first one below the threshold, so an
     /// episode that recovered and started again reports the current episode and not both.
     #[must_use]
-    pub fn continuously_since(&self, threshold: f64) -> Option<OffsetDateTime> {
+    pub fn continuously_since(&self, alarming: Alarming) -> Option<OffsetDateTime> {
         let mut since = None;
         for reading in self.readings.iter().rev() {
-            if reading.value >= threshold {
+            if alarming.reached_by(reading.value) {
                 since = Some(reading.at);
             } else {
                 break;
@@ -214,14 +214,31 @@ mod tests {
         for (offset, value) in [(0, 90.0), (30, 90.0), (60, 2.0), (90, 80.0), (120, 85.0)] {
             series.observe(reading(Subject::MemoryPressure, value, offset));
         }
-        assert_eq!(series.continuously_since(50.0), Some(at(90)));
+        assert_eq!(
+            series.continuously_since(Alarming::AtOrAbove(50.0)),
+            Some(at(90))
+        );
+    }
+
+    #[test]
+    fn a_subject_whose_problem_is_a_low_value_reports_since_from_the_low_side() {
+        // The same episode logic, watching the other tail. A window that only ever compared upward
+        // would report a certificate as never having entered trouble.
+        let mut series = Series::new(Subject::LoadAverage, Duration::minutes(10), 64);
+        for (offset, value) in [(0, 40.0), (30, 30.0), (60, 5.0), (90, 3.0)] {
+            series.observe(reading(Subject::LoadAverage, value, offset));
+        }
+        assert_eq!(
+            series.continuously_since(Alarming::AtOrBelow(7.0)),
+            Some(at(60))
+        );
     }
 
     #[test]
     fn nothing_beyond_the_threshold_has_no_since() {
         let mut series = window();
         series.observe(reading(Subject::MemoryPressure, 1.0, 0));
-        assert_eq!(series.continuously_since(50.0), None);
+        assert_eq!(series.continuously_since(Alarming::AtOrAbove(50.0)), None);
     }
 
     #[test]
@@ -230,6 +247,6 @@ mod tests {
         assert!(series.is_empty());
         assert!(series.latest().is_none());
         assert!(series.values().is_empty());
-        assert_eq!(series.continuously_since(0.0), None);
+        assert_eq!(series.continuously_since(Alarming::AtOrAbove(0.0)), None);
     }
 }

@@ -32,6 +32,50 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+/// A threshold, and which side of it is the problem.
+///
+/// Both directions exist because both kinds of subject do. A filesystem share is a problem when it
+/// is high; days remaining on a certificate, free memory, and time since the last successful backup
+/// are problems when they are low. A single number with an implied direction would make the second
+/// kind unrepresentable, and the way that failure shows up is a detector reporting a certificate as
+/// healthy right up to the hour it expires.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Alarming {
+    /// A problem at or above this value.
+    AtOrAbove(f64),
+    /// A problem at or below this value.
+    AtOrBelow(f64),
+}
+
+impl Alarming {
+    /// The number itself, without its direction.
+    #[must_use]
+    pub const fn threshold(self) -> f64 {
+        match self {
+            Self::AtOrAbove(value) | Self::AtOrBelow(value) => value,
+        }
+    }
+
+    /// Whether an observation has reached the problem side.
+    #[must_use]
+    pub fn reached_by(self, observed: f64) -> bool {
+        match self {
+            Self::AtOrAbove(value) => observed >= value,
+            Self::AtOrBelow(value) => observed <= value,
+        }
+    }
+
+    /// Whether moving in this direction takes a subject toward the problem.
+    #[must_use]
+    pub const fn approaches(self, slope: f64) -> bool {
+        match self {
+            Self::AtOrAbove(_) => slope > 0.0,
+            Self::AtOrBelow(_) => slope < 0.0,
+        }
+    }
+}
+
 /// Something about a host that is worth watching over time.
 ///
 /// A closed set. An open string subject would let any probe invent a series, and a series nobody
@@ -92,7 +136,8 @@ impl Subject {
         }
     }
 
-    /// The value at which this subject is a problem regardless of what is ordinary here.
+    /// The value at which this subject is a problem regardless of what is ordinary here, and which
+    /// side of it is the problem.
     ///
     /// `None` for the subjects where there is no such number: a load average of 4 is a crisis on one
     /// machine and a Tuesday on another, and only the baseline can say which.
@@ -100,32 +145,29 @@ impl Subject {
     /// One number, read by both the detector and the projection. They used to hold their own copies,
     /// which is how a system comes to report that a disk is fine and that it reaches trouble in three
     /// days — two true statements about two different thresholds.
+    ///
+    /// The direction travels with the number rather than beside it. It was a separate predicate
+    /// until 2026-08-24, whose only answer was *rising*, with a comment saying that a subject where
+    /// a fall is the problem would need its own answer. Two functions that can disagree about one
+    /// threshold is the same shape as two copies of one number, and the failure is worse: a detector
+    /// watching the wrong tail reports a certificate as healthy right up to the hour it expires.
     #[must_use]
-    pub const fn alarming(self) -> Option<f64> {
+    pub const fn alarming(self) -> Option<Alarming> {
         match self {
-            Self::RootFilesystemUsed | Self::MemoryUsed => Some(0.95),
+            Self::RootFilesystemUsed | Self::MemoryUsed => Some(Alarming::AtOrAbove(0.95)),
             // Lower than the byte threshold on purpose, and the same number for both by coincidence
             // rather than by kinship: each is a resource whose exhaustion is not gradual in effect.
             // A filesystem works and then cannot create a file; swap absorbs pressure and then the
             // next allocation stalls. Neither gives the warning a slowly filling disk does, so the
             // useful warning has to come earlier.
-            Self::RootFilesystemInodesUsed | Self::SwapUsed => Some(0.90),
-            Self::OpenFileDescriptors => Some(0.85),
-            Self::MemoryPressure | Self::IoPressure | Self::CpuPressure => Some(40.0),
-            Self::FailedUnits => Some(1.0),
+            Self::RootFilesystemInodesUsed | Self::SwapUsed => Some(Alarming::AtOrAbove(0.90)),
+            Self::OpenFileDescriptors => Some(Alarming::AtOrAbove(0.85)),
+            Self::MemoryPressure | Self::IoPressure | Self::CpuPressure => {
+                Some(Alarming::AtOrAbove(40.0))
+            }
+            Self::FailedUnits => Some(Alarming::AtOrAbove(1.0)),
             Self::LoadAverage => None,
         }
-    }
-
-    /// Whether a rising value is the direction worth worrying about.
-    ///
-    /// Every subject here is one where more is worse, and that is a fact about this list rather
-    /// than about telemetry: a subject where a *fall* is the problem — free disk, requests served,
-    /// backup recency — would need its own answer, and adding one without answering this would give
-    /// it a detector that watches the wrong tail.
-    #[must_use]
-    pub const fn rising_is_worse(self) -> bool {
-        true
     }
 }
 
@@ -283,6 +325,35 @@ mod tests {
         for name in &names {
             assert!(name.contains('.'), "{name} is not a dotted subject name");
         }
+    }
+
+    #[test]
+    fn a_threshold_carries_which_side_of_it_is_the_problem() {
+        // The failure this exists to make unrepresentable: a subject where a fall is the problem,
+        // measured by a detector that only watches the rising tail, reads healthy right up to the
+        // hour it expires.
+        let filling = Alarming::AtOrAbove(0.95);
+        assert!(filling.reached_by(0.96));
+        assert!(!filling.reached_by(0.10));
+        assert!(filling.approaches(0.001));
+        assert!(!filling.approaches(-0.001));
+
+        let expiring = Alarming::AtOrBelow(7.0);
+        assert!(expiring.reached_by(3.0));
+        assert!(!expiring.reached_by(90.0));
+        assert!(expiring.approaches(-0.001));
+        assert!(!expiring.approaches(0.001));
+
+        assert!((filling.threshold() - 0.95).abs() < f64::EPSILON);
+        assert!((expiring.threshold() - 7.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn a_flat_subject_approaches_nothing_in_either_direction() {
+        // Zero slope is not movement toward a problem, whichever side the problem is on. A detector
+        // that read it as approaching would find an arrival date for a machine that is not moving.
+        assert!(!Alarming::AtOrAbove(0.95).approaches(0.0));
+        assert!(!Alarming::AtOrBelow(7.0).approaches(0.0));
     }
 
     #[test]

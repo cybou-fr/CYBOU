@@ -113,7 +113,9 @@ produces no finding can be the most important thing on the page. The slope is a 
 the median of every pairwise slope — so one spike does not move the date, and the yardstick it is
 called flat against is a median absolute deviation for the same reason. A subject that is flat or
 moving away does not arrive: *not at this rate* is an answer, and a very large number would be read
-as a date. A projection is measured from now rather than from the last reading, and it says when it
+as a date — and *away* depends on which side of the threshold the problem is on, because a
+certificate losing a day a day is approaching while a filesystem losing a percent a day is
+retreating. A projection is measured from now rather than from the last reading, and it says when it
 is looking further ahead than the window has watched — the most useful projection is usually the
 least certain, and a reader deciding whether to act tonight is entitled to both facts.
 
