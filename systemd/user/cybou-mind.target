@@ -4,7 +4,7 @@
 [Unit]
 Description=Cybou Mind Cognitive Control Plane Target
 Documentation=https://github.com/cybou-fr/CYBOU
-Wants=cybou-eventd.service cybou-identityd.service cybou-healthd.service cybou-intentiond.service cybou-predictord.service cybou-perceptiond.service cybou-epistemicd.service cybou-contextd.service cybou-meaningd.service cybou-workspaced.service cybou-lifecycled.service cybou-selfd.service cybou-presenced.service cybou-web-gateway.service
+Wants=cybou-eventd.service cybou-identityd.service cybou-healthd.service cybou-intentiond.service cybou-predictord.service cybou-perceptiond.service cybou-epistemicd.service cybou-contextd.service cybou-meaningd.service cybou-model-brokerd.service cybou-workspaced.service cybou-lifecycled.service cybou-selfd.service cybou-presenced.service cybou-web-gateway.service
 After=dbus.socket
 
 [Install]

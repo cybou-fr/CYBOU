@@ -54,6 +54,19 @@ LAYERS: list[tuple[str, set[str]]] = [
     ("meaning", {"cybou-meaning"}),
 ]
 
+#: Crates that are faculties rather than organs, and what each of them must not depend on.
+#:
+#: ADR-0035 gives the model broker a different bus namespace — `Faculty`, not `Mind` — and the
+#: namespace is a claim: an organ of Mind owns part of what Mind is, and a faculty owns none of it.
+#: A claim like that survives exactly as long as nothing makes it false by accident, and the way it
+#: becomes false is a dependency added for a good reason. So it is checked rather than asserted.
+#:
+#: The rule is stronger than the layering one below: a faculty may not depend on *any* organ, in
+#: either direction. Reading upward is what organs are allowed to do because they are part of the
+#: same Mind; a faculty is not, and a faculty that could name an organ's types is one refactor away
+#: from holding a piece of what it was built to stay outside of.
+FACULTIES = {"cybou-model-brokerd"}
+
 #: What each layer owns, for the error message. An operator reading a failure should not have to
 #: open the ADR to know what was crossed.
 OWNS = {
@@ -79,12 +92,30 @@ def path_dependencies(manifest: Path) -> set[str]:
     return set(re.findall(r'^\s*([a-z0-9-]+)\s*=\s*\{[^}]*path\s*=\s*"\.\./', text, re.MULTILINE))
 
 
+def organ_names() -> set[str]:
+    """Every crate that is an organ of Mind."""
+    return {crate for _, members in LAYERS for crate in members}
+
+
 def main() -> int:
     violations = 0
     checked = 0
+    organs = organ_names()
 
     for manifest in sorted(CRATES.glob("*/Cargo.toml")):
         crate = manifest.parent.name
+        if crate in FACULTIES:
+            checked += 1
+            for dependency in sorted(path_dependencies(manifest)):
+                if dependency in organs:
+                    print(
+                        f"error: {crate} is a faculty and depends on the organ {dependency}. "
+                        f"ADR-0035: a faculty owns no part of Mind, which is why it is exported "
+                        f"under org.cybou.Faculty and not org.cybou.Mind."
+                    )
+                    violations += 1
+            continue
+
         here = layer_of(crate)
         if here is None:
             continue
@@ -105,10 +136,15 @@ def main() -> int:
                 violations += 1
 
     if violations:
-        print(f"validate-organ-layering: {checked} organ(s), {violations} inverted dependency(ies)")
+        print(
+            f"validate-organ-layering: {checked} checked, {violations} forbidden dependency(ies)"
+        )
         return 1
 
-    print(f"validate-organ-layering: {checked} organ(s), no layer reaches downward")
+    print(
+        f"validate-organ-layering: {checked} organ(s) and faculty(ies), "
+        f"no layer reaches downward and no faculty holds an organ"
+    )
     return 0
 
 

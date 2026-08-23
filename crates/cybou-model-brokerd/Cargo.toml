@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-model-brokerd"
+description = "Model brokerage faculty: selects, budgets and attributes inference without owning cognition"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ciborium.workspace = true
+# The protocol and the fabric, and no organ. A dependency on an organ would make the claim in
+# lib.rs — that this owns no part of Mind — false, and validate-organ-layering.py enforces it.
+cybou-fabric = { path = "../cybou-fabric" }
+cybou-protocol = { path = "../cybou-protocol" }
+tokio.workspace = true
+uuid.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
+
+[lints]
+workspace = true

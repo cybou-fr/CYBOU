@@ -715,6 +715,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-model-brokerd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [

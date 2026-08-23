@@ -78,8 +78,18 @@ def check_relative_markdown_links(repo: Path, path: Path) -> None:
 # This used to count them in the Nix package's install check, and the test suites in the C++
 # CMakeLists. Both are gone with the implementation they described; the discipline is the same, so
 # it moved to the units rather than being dropped with them.
+# A faculty is not an owner. ADR-0035 gives the model broker the `org.cybou.Faculty` namespace
+# precisely because it owns no part of Mind, and counting it among the Mind owners would undo that
+# distinction in the one place a reader goes to find out how many there are. The unit's own
+# `BusName` is what separates them, so the count still comes from what actually starts rather than
+# from a second list somebody has to remember to update.
 def count_installed_daemons(repo):
-    return len(list((repo / "systemd/user").glob("cybou-*d.service")))
+    owners = 0
+    for unit in (repo / "systemd/user").glob("cybou-*d.service"):
+        text = unit.read_text(encoding="utf-8")
+        if "BusName=org.cybou.Mind." in text:
+            owners += 1
+    return owners
 
 
 NUMBER_WORDS = {
@@ -89,6 +99,8 @@ NUMBER_WORDS = {
     12: "twelve",
     13: "thirteen",
     14: "fourteen",
+    15: "fifteen",
+    16: "sixteen",
     26: "twenty-six",
     27: "twenty-seven",
     28: "twenty-eight",

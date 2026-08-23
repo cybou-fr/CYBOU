@@ -55,6 +55,20 @@ endpoint!(PRESENCE, "Presence", "cybou-presenced.service");
 endpoint!(LIFECYCLE, "Lifecycle", "cybou-lifecycled.service");
 endpoint!(MEANING, "Meaning", "cybou-meaningd.service");
 
+/// Stable endpoint for `ModelBroker1`.
+///
+/// `Faculty`, not `Mind`, and written out rather than through the macro because the macro exists to
+/// make every Mind endpoint identical. The namespace is the claim: an organ of Mind owns part of
+/// what Mind is, and the model broker owns none of it. Putting it under `Mind` would have been one
+/// word of convenience and a standing invitation to read whatever a model said as something Mind
+/// holds.
+pub const MODEL_BROKER: BusEndpoint = BusEndpoint {
+    service: "org.cybou.Faculty.ModelBroker1",
+    object_path: "/org/cybou/Faculty/ModelBroker1",
+    interface: "org.cybou.Faculty.ModelBroker1",
+    systemd_unit: "cybou-model-brokerd.service",
+};
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct WireEnvelope<T> {

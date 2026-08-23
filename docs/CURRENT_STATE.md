@@ -334,6 +334,60 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A faculty, and the namespace is the claim (2026-08-23)
+
+`cybou-model-brokerd` exports `org.cybou.Faculty.ModelBroker1` — a different namespace from every
+`Mind1` interface, and the difference is the whole decision. An organ of Mind owns part of what Mind
+is. This owns none of it: no biography, no Journal, no filesystem, no authorization, no execution,
+and nothing about what is true. It does four things — select who answers, hold them to the budget,
+put the request, attribute what comes back.
+
+That claim is checkable rather than promised. The crate depends on the protocol and the fabric and
+on no organ, and the layering validator gained a rule for it: **a faculty may not depend on any
+organ, in either direction.** Organs may read the layer above them because they are part of the same
+Mind; a faculty is not, and one that could name an organ's types is a refactor away from holding a
+piece of what it was built to stay outside of. A dependency was injected to confirm the rule catches
+it.
+
+### What it does when there is no model
+
+Everything, which is the point. `submit` on an installation with no worker returns not "unavailable"
+but **what happens instead** — for interpretation and realization, the deterministic thing that
+already does it; for the rest, the named feature this machine does not have. A faculty that answered
+"no" and stopped would make `NoModel` feel like a fault. It reports `healthy`, because nothing is
+wrong with it, and it reports what it *can* answer through `AnswerableTasks`, so a surface can stop
+offering a feature that cannot work here rather than offering it and failing when somebody uses it.
+
+Four refusals, kept apart because they have four different remedies: nothing here does this task at
+all (install something, or use what does it instead), every route that does it refused (fix the
+request or the routing table — and each route says which of the two it was), the chosen worker
+failed (a capability deficit, per MB6; the faculty still has a model and still answers the next
+request), and what answered was not what was registered.
+
+That last one is refused rather than passed on with a warning. An answer attributed to an artifact
+that did not produce it is worse than no answer: the surface a person uses to ask *which model told
+me this* would confidently name the wrong one, and nothing downstream could tell.
+
+Route selection is by declaration order, not by measured latency. A broker that raced its backends
+would answer differently on a busy machine, and two answers a person cannot compare is a worse
+outcome than a slower one.
+
+What it remembers is that it answered — request id, task, which provider, whether it crossed a
+boundary — bounded to sixty-four attempts and holding no input or output. A broker that kept prompts
+would be a second memory with different rules, which is what ADR-0029 spent a whole decision
+refusing. A test greps the remembered attempts for the text of the request and fails if it is there.
+
+The unit ships with `PrivateNetwork=yes`. No remote route is configured, so the faculty has no reason
+to reach one, and a deployment that adds a remote provider has to remove that line — which is the
+point: a decision somebody makes rather than a default nobody sees.
+
+**No inference runtime is implemented.** A broker whose only backend was written beside it would
+have that backend's assumptions built into it, and the first real one would arrive as a rewrite.
+`llama.cpp`, `mistral.rs` and an ONNX runtime are three different shapes of process; `Worker` is the
+interface they share, and registering one is the whole of what installing a model will mean.
+
+Ten tests.
+
 ## Somewhere for a model to land, before there is one (2026-08-23)
 
 No inference runtime exists, and that is exactly why the vocabulary for asking a model something is
@@ -1179,7 +1233,7 @@ Debian-to-NixOS conversion remains permanently forbidden.
 The P0 baseline is green: formatting, REUSE 3.3, package metadata, cognitive documentation, Mind
 access, QML API, UI polish, `cybou-mind`, and `cybou-presence-applet` pass through pinned Nix checks.
 The Mind package runs thirty-seven CTest suites, including Event1, lifecycle persistence/recovery,
-Lifecycle1 process restart, and multi-process integration across the fourteen Mind owners. Both counts
+Lifecycle1 process restart, and multi-process integration across the thirteen Mind owners. Both counts
 are checked against the build rather than trusted: the documentation validator derives them from the
 package's daemon list and the tests CMakeLists, so a document that falls behind the code fails the
 build instead of quietly misdescribing it. The process suite also proves a
@@ -1594,7 +1648,7 @@ milestone is partial rather than complete.
 
 ## Process topology
 
-Mind now has fourteen real user-session processes:
+Mind has thirteen real user-session processes:
 
 ```text
 cybou-eventd
@@ -1610,7 +1664,23 @@ cybou-perceptiond
 cybou-epistemicd
 cybou-contextd
 cybou-meaningd
-cybou-shelld
+```
+
+`cybou-shelld` was counted here until 2026-08-23 and should not have been: it is a library with no
+binary, its unit says so in its own header, and it is left out of the deploy and out of
+`cybou-mind.target` on purpose. Counting a unit that describes a process which does not exist is the
+same error as a projection stating what nobody established — in the one document a reader consults
+to find out what is running.
+
+It went unnoticed because the count was derived from a glob over unit files, which is the right
+instinct and the wrong measurement: a unit is a description, and what makes something a Mind owner is
+that it owns a `Mind1` interface. The validator now reads `BusName` instead, which is the same
+declaration the bus itself uses, so nothing is trusted twice.
+
+Beside them, and deliberately not among them:
+
+```text
+cybou-model-brokerd    org.cybou.Faculty.ModelBroker1
 ```
 
 `plasmashell` no longer constructs Identity, Intentions, Predictor, SelfModel, Workspace, Journal,
