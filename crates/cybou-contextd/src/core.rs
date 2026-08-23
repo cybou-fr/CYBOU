@@ -14,9 +14,12 @@ use std::{
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::types::{
-    Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
-    most_restrictive_privacy, shortest_retention,
+use crate::{
+    activation::{ActivationBudget, ActivationSession, activate_from},
+    types::{
+        Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
+        most_restrictive_privacy, shortest_retention,
+    },
 };
 
 /// Core domain logic of the associative context organ.
@@ -269,6 +272,23 @@ impl ContextCore {
             associations: relevant_assocs,
             complete: excluded_by_salience == 0,
         }
+    }
+
+    /// Walk the associations from `seeds`, bounded by `budget`.
+    ///
+    /// The clock is wired here rather than inside the walk, because a walk that reaches for a clock
+    /// cannot be tested against one. What it hands over is elapsed time and nothing else: the
+    /// instant is never an input to what gets reached, only to when the reaching stops.
+    #[must_use]
+    pub fn bring_to_mind(&self, seeds: &[String], budget: &ActivationBudget) -> ActivationSession {
+        let nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
+        let associations = self
+            .associations
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        let started = std::time::Instant::now();
+        activate_from(&nodes, &associations, seeds, budget, || started.elapsed())
     }
 
     /// Return active concept nodes ordered by salience descending.

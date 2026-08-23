@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use zbus::{interface, object_server::SignalEmitter};
 
-use crate::ContextCore;
+use crate::{ActivationBudget, ContextCore};
 
 /// D-Bus Service exporting `org.cybou.Mind.Context1`.
 pub struct Context1Service {
@@ -63,6 +63,20 @@ impl Context1Service {
         let list = self.core.active_context();
         let mut buf = Vec::new();
         let _ = ciborium::into_writer(&list, &mut buf);
+        buf
+    }
+
+    /// What the named concepts bring to mind, as a bounded, inspectable walk, encoded as CBOR.
+    ///
+    /// Every returned concept carries the path it was reached by, and the session says what
+    /// stopped it. A caller that wants only the labels can drop the rest; a caller that wants to
+    /// know why a thing came back does not have to ask anything to invent a reason.
+    async fn bring_to_mind(&self, seeds: Vec<String>) -> Vec<u8> {
+        let session = self
+            .core
+            .bring_to_mind(&seeds, &ActivationBudget::default());
+        let mut buf = Vec::new();
+        let _ = ciborium::into_writer(&session, &mut buf);
         buf
     }
 

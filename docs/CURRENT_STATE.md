@@ -334,6 +334,50 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Asking a word what it brings to mind (2026-08-23)
+
+`contextd` could say what was active and what was associated with what. It could not say what one
+word brings to mind. Filtering every concept by salience is not that answer: it reports what is loud
+right now, which is the same answer whatever you asked.
+
+`ActivationSession` walks the associations from named seeds. Three properties make it worth having,
+and each is a refusal.
+
+**Bounded.** Nodes, edges, depth, time and tokens each stop the walk by themselves, and the session
+names which one did. "The budget ran out" would leave an operator unable to tell a graph that is too
+wide from one that is too deep from a machine that is too slow, and those need different responses.
+
+**Inspectable.** Every reached concept carries the path it came along and the links on it — `lemon →
+honey`, episodic, strength 0.84, depth 1. Relevance is the product of those strengths, chosen
+because it is the one number a person reading the path can arrive at themselves. A richer score
+blending freshness and personal relevance would very likely rank better and could not be accounted
+for by what it came from. Nothing is ever asked to compose a reason: a generated explanation of a
+retrieval is not evidence about that retrieval.
+
+**Partial says so.** A walk cut short is not complete and says what cut it. A seed the graph does not
+hold is reported too, because "nothing came back" and "nothing is associated with it" are different
+answers and only one of them is true. And a walk that ended exactly at its depth limit with nothing
+further to reach is *not* called truncated — reporting a complete answer as a cut one is the same
+lie in the other direction.
+
+### Where the clock is allowed to act
+
+A1 wants determinism; A2 wants a wall clock able to stop the walk. Taken naively they contradict —
+a slower machine would return a different bundle.
+
+They reconcile at the point the clock touches. Expansion order is fixed entirely by the graph
+(strongest first, ties by label), so one canonical sequence exists per snapshot and seeds. The time
+budget may only **truncate a prefix** of that sequence; it can never reorder it or admit something a
+patient run would not have reached. A hurried bundle is therefore always a prefix of the unhurried
+one, and it says it was cut. A test holds exactly that.
+
+Reachable, not just correct: `ContextCore::bring_to_mind` walks the graph the organ actually holds
+under a real clock, and `org.cybou.Mind.Context1.BringToMind` exposes it. An erasure invalidates the
+projection, so after one the walk finds the graph gone rather than an erased concept still
+reachable.
+
+Twenty-one tests in the organ.
+
 ## A conversation remembers what was named, never what it was about (2026-08-23)
 
 With no memory between turns, "it" in the second sentence points at nothing and a person restates

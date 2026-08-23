@@ -7,12 +7,16 @@
 //! tracking explicit provenance (`why?`, `origin`, `evidence`) and producing inspectable
 //! bounded `ContextBundle` projections.
 
+pub mod activation;
 pub mod core;
 pub mod types;
 
 #[cfg(target_os = "linux")]
 pub mod service;
 
+pub use activation::{
+    ActivatedConcept, ActivationBudget, ActivationSession, Exhausted, activate_from,
+};
 pub use core::{ContextCore, enforce_edge_budget, enforce_node_budget};
 pub use types::{
     Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
@@ -26,6 +30,58 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
+
+    #[test]
+    fn the_organ_can_be_asked_what_a_word_brings_to_mind() {
+        // The walk is wired to the graph the organ actually holds, and to a real clock. Without
+        // this the module would be correct and unreachable, which is how `Realize` sat unused.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate("lemon", 1.0, "observed", now);
+        context_engine.activate("honey", 1.0, "observed", now);
+        context_engine.associate(
+            "lemon",
+            "honey",
+            0.84,
+            AssociationOrigin::Episodic,
+            vec![Uuid::from_u128(1)],
+        );
+
+        let session =
+            context_engine.bring_to_mind(&["lemon".to_owned()], &ActivationBudget::default());
+        let honey = session
+            .items
+            .iter()
+            .find(|item| item.label == "honey")
+            .expect("honey is one link from lemon");
+        assert!(honey.reason.contains("lemon → honey"), "{}", honey.reason);
+        assert!(session.complete);
+    }
+
+    #[test]
+    fn an_erasure_leaves_nothing_for_a_word_to_bring_to_mind() {
+        // A7 reaching the surface a person actually queries: the projection is invalidated, so the
+        // walk over it finds the graph gone rather than finding an erased concept still reachable.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate("lemon", 1.0, "observed", now);
+        context_engine.activate("honey", 1.0, "observed", now);
+        context_engine.associate(
+            "lemon",
+            "honey",
+            0.84,
+            AssociationOrigin::Episodic,
+            vec![Uuid::from_u128(1)],
+        );
+        assert!(context_engine.invalidate_for_epoch(1));
+
+        let session =
+            context_engine.bring_to_mind(&["lemon".to_owned()], &ActivationBudget::default());
+        assert!(session.items.is_empty());
+        // And it says the seed was not found rather than reporting an empty association set.
+        assert!(session.exhausted.contains(&Exhausted::UnknownSeed));
+        assert!(!session.complete);
+    }
 
     #[test]
     fn an_association_cannot_come_out_looser_than_its_evidence() {
