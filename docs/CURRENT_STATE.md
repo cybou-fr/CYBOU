@@ -375,14 +375,28 @@ was kept.
 Seven tests, all passing on the first run — which is only worth stating alongside the check that
 they bite: with the comparison forced open, six of the seven fail.
 
-### Left undone, deliberately
+### And then the growth it named (2026-08-23)
 
-The provenance set a delivery accumulates is unbounded, and `contains` on it is linear, so a wide
-delivery is quadratic in the number of contributions cited and the resulting Journal record grows
-with the biography. Bounding it means the record would under-report what a delivery rested on, and a
-permanent record that silently omits is worse than a large one. Fixing it properly means carrying a
-true count beside a bounded sample into `ContextDisclosedV1`, which is a frozen payload — so it is
-named here rather than done quietly.
+The provenance set a delivery accumulated was unbounded, and membership was tested by scanning a
+list, so a wide delivery was quadratic in what it cited and wrote a set that grows with the
+biography into a permanent contribution every time. This is the mechanism behind the three-thousand
+figure, and the one unbounded growth anywhere in the system.
+
+Bounding it alone would have been worse than leaving it: **a permanent record that silently omits**.
+So `ContextDisclosedV1` carries `provenance_count` beside a bounded `items`, and a record says which
+kind it is by arithmetic — where the count exceeds the length, it is a sample. No flag, and nothing
+to keep in sync.
+
+The count is `Option<u32>`, not `u32`. Records already in Journals do not have the field, and a zero
+default would have turned every one of them into a record claiming it cited nothing, on the day the
+field shipped. `None` says it cannot say. A test decodes a map built without the field — assembled
+as CBOR rather than by re-encoding the struct, since re-encoding could only ever produce what this
+build writes today — and holds that it reads as `None` and not as zero.
+
+The `Ledger` keeps two structures for the same sources: a set that decides whether a contribution is
+new, and a bounded list of what gets written. They answer different questions, and only one of them
+may grow into a permanent record. The set is discarded when the delivery ends; only its size
+outlives it.
 
 ## Walking the whole path found something no layer could see (2026-08-23)
 

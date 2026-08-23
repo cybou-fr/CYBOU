@@ -80,7 +80,10 @@ pub async fn disclosure_handler(
         // and reading it as a count of accounted-for items reported more accounted for than were
         // supplied on the first live deployment of this surface.
         accounted_for: last.accounted_for,
-        provenance_count: u32::try_from(last.items.len()).unwrap_or(u32::MAX),
+        // The true number of distinct sources, not the length of what the record could carry.
+        // Reading the length would under-report a wide delivery by exactly the amount that made
+        // bounding the record necessary in the first place.
+        provenance_count: last.provenance_count,
         items: last
             .items
             .into_iter()

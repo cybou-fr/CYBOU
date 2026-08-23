@@ -92,6 +92,7 @@ impl Disclosures {
         let record = ContextDisclosedV1 {
             destination: destination.clone(),
             items: delivered.items.clone(),
+            provenance_count: Some(delivered.provenance_count),
             item_count: delivered.item_count,
             withheld: delivered.withheld.clone(),
             disclosed_at: now.format(&Rfc3339).ok()?,
@@ -152,6 +153,7 @@ mod tests {
     fn delivered(count: u32) -> Delivered {
         Delivered {
             items: vec![Uuid::from_u128(1)],
+            provenance_count: 1,
             item_count: count,
             accounted_for: count,
             withheld: vec![Withheld {

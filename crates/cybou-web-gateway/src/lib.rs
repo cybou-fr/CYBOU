@@ -273,6 +273,7 @@ mod tests {
                 // Two source contributions, cited between them by the two items that could say
                 // where they came from. A set of sources, not a count of items.
                 items: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+                provenance_count: 2,
                 // Three supplied, two of which named their provenance. The third is the case the
                 // two numbers exist for.
                 item_count: 3,
@@ -400,7 +401,13 @@ mod tests {
 
         fn last_delivery(&self) -> crate::Delivered {
             crate::Delivered {
-                items: (0..500).map(Uuid::from_u128).collect(),
+                // A delivery whose record could carry every source it cited, and one whose sources
+                // outran the bound: both are exercised, because the surface has to read the count
+                // rather than the length either way.
+                items: (0..cybou_protocol::disclosure::MAX_RECORDED_PROVENANCE as u128)
+                    .map(Uuid::from_u128)
+                    .collect(),
+                provenance_count: 500,
                 item_count: 10,
                 accounted_for: 10,
                 withheld: Vec::new(),

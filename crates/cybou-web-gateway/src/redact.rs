@@ -18,12 +18,13 @@
 //! carries no evidence, so it is supplied and unaccountable — and a surface that reported one
 //! number would be unable to show that, which is the whole thing the disclosure route exists for.
 
+use std::collections::HashSet;
 use std::sync::{
     Mutex,
     atomic::{AtomicU64, Ordering},
 };
 
-use cybou_protocol::disclosure::{Withheld, WithheldBecause};
+use cybou_protocol::disclosure::{MAX_RECORDED_PROVENANCE, Withheld, WithheldBecause};
 use uuid::Uuid;
 
 use crate::Delivered;
@@ -59,18 +60,24 @@ pub const fn verdict(sensitivity: u8, permitted_sensitivity: u8) -> Verdict {
 pub struct Ledger {
     supplied: AtomicU64,
     accounted_for: AtomicU64,
-    provenance: Mutex<Vec<Uuid>>,
+    /// The sources recorded, and every source seen.
+    ///
+    /// Two structures because they answer different questions and only one of them may grow into a
+    /// permanent record. The set decides whether a contribution is new — linear search over a
+    /// thousands-long list made a wide delivery quadratic — and the list is what gets written,
+    /// bounded. The set is discarded when the delivery ends; only its size outlives it.
+    provenance: Mutex<(Vec<Uuid>, HashSet<Uuid>)>,
     withheld: Mutex<Vec<Withheld>>,
 }
 
 impl Ledger {
     /// An account with nothing in it.
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             supplied: AtomicU64::new(0),
             accounted_for: AtomicU64::new(0),
-            provenance: Mutex::new(Vec::new()),
+            provenance: Mutex::new((Vec::new(), HashSet::new())),
             withheld: Mutex::new(Vec::new()),
         }
     }
@@ -83,7 +90,8 @@ impl Ledger {
         self.supplied.store(0, Ordering::Relaxed);
         self.accounted_for.store(0, Ordering::Relaxed);
         if let Ok(mut provenance) = self.provenance.lock() {
-            provenance.clear();
+            provenance.0.clear();
+            provenance.1.clear();
         }
         if let Ok(mut withheld) = self.withheld.lock() {
             withheld.clear();
@@ -101,8 +109,13 @@ impl Ledger {
         self.accounted_for.fetch_add(1, Ordering::Relaxed);
         if let Ok(mut provenance) = self.provenance.lock() {
             for id in evidence {
-                if !provenance.contains(id) {
-                    provenance.push(*id);
+                if !provenance.1.insert(*id) {
+                    continue;
+                }
+                // Counted by the set whether or not it is recorded, so the record can say how many
+                // there were even when it could not carry them.
+                if provenance.0.len() < MAX_RECORDED_PROVENANCE {
+                    provenance.0.push(*id);
                 }
             }
         }
@@ -148,12 +161,18 @@ impl Ledger {
     /// The account as it now stands.
     #[must_use]
     pub fn delivered(&self) -> Delivered {
+        let (items, provenance_count) = self.provenance.lock().map_or_else(
+            |_| (Vec::new(), 0),
+            |held| {
+                (
+                    held.0.clone(),
+                    u32::try_from(held.1.len()).unwrap_or(u32::MAX),
+                )
+            },
+        );
         Delivered {
-            items: self
-                .provenance
-                .lock()
-                .map(|held| held.clone())
-                .unwrap_or_default(),
+            items,
+            provenance_count,
             item_count: u32::try_from(self.supplied.load(Ordering::Relaxed)).unwrap_or(u32::MAX),
             accounted_for: u32::try_from(self.accounted_for.load(Ordering::Relaxed))
                 .unwrap_or(u32::MAX),
@@ -198,6 +217,7 @@ mod tests {
         assert_eq!(delivered.item_count, 2);
         assert_eq!(delivered.accounted_for, 2);
         assert_eq!(delivered.items.len(), 5, "one source, counted once");
+        assert_eq!(delivered.provenance_count, 5);
         assert!(delivered.accounted_for <= delivered.item_count);
     }
 
@@ -280,6 +300,41 @@ mod tests {
                 + delivered.withheld.len(),
             10
         );
+    }
+
+    #[test]
+    fn a_delivery_citing_more_sources_than_it_can_record_says_how_many_there_were() {
+        // Unbounded, this grew with the biography and went into a permanent contribution on every
+        // delivery. Bounded and silent it would be worse: a permanent record that omits without
+        // saying so. The record says so by arithmetic — the count exceeds what it carries.
+        let ledger = Ledger::new();
+        let cited: Vec<Uuid> = (0..(MAX_RECORDED_PROVENANCE as u128 * 3))
+            .map(Uuid::from_u128)
+            .collect();
+        ledger.supply(&cited);
+
+        let delivered = ledger.delivered();
+        assert_eq!(delivered.items.len(), MAX_RECORDED_PROVENANCE);
+        assert_eq!(
+            delivered.provenance_count,
+            u32::try_from(cited.len()).expect("a small count")
+        );
+        assert!(
+            usize::try_from(delivered.provenance_count).expect("a small count")
+                > delivered.items.len(),
+            "a truncated record could not be told from a complete one"
+        );
+    }
+
+    #[test]
+    fn a_delivery_within_the_bound_records_every_source_it_cited() {
+        // The control. A record that always claimed to be truncated would pass the test above.
+        let ledger = Ledger::new();
+        ledger.supply(&[Uuid::from_u128(1), Uuid::from_u128(2)]);
+
+        let delivered = ledger.delivered();
+        assert_eq!(delivered.items.len(), 2);
+        assert_eq!(delivered.provenance_count, 2);
     }
 
     #[test]

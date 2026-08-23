@@ -46,7 +46,11 @@ pub struct Delivered {
     /// comparable. Reading its length as "how many items are accounted for" is wrong, and was
     /// wrong on a live deployment before the inspector made it visible: ten items supplied,
     /// three thousand contributions cited.
+    ///
+    /// Bounded by `MAX_RECORDED_PROVENANCE`; `provenance_count` is the true size.
     pub items: Vec<Uuid>,
+    /// How many distinct contributions there were, whether or not `items` carried them all.
+    pub provenance_count: u32,
     /// How many items were supplied, whether or not their provenance was known.
     pub item_count: u32,
     /// How many of those items named at least one contribution they came from.

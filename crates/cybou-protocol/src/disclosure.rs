@@ -14,6 +14,14 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// The most source contributions one disclosure record carries.
+///
+/// A delivery can cite thousands. Recording all of them put a set that grows with the biography
+/// into a permanent contribution on every delivery, and searching it linearly made a wide delivery
+/// quadratic in what it cited. The bound is generous enough that ordinary deliveries are recorded
+/// whole, and `provenance_count` says when one was not.
+pub const MAX_RECORDED_PROVENANCE: usize = 256;
+
 /// How much of a person's context a consumer may see.
 ///
 /// Locality is not trust. ADR-0030's amendment says so in as many words: once every consequential
@@ -96,7 +104,8 @@ pub struct Withheld {
 pub struct ContextDisclosedV1 {
     /// Who received it.
     pub destination: Destination,
-    /// The distinct contributions the supplied items were derived from.
+    /// The distinct contributions the supplied items were derived from, up to
+    /// [`MAX_RECORDED_PROVENANCE`].
     ///
     /// Provenance rather than content: what was disclosed can be reconstructed from the Journal by
     /// anyone entitled to read it, and cannot be read out of this record by anyone who is not.
@@ -105,7 +114,20 @@ pub struct ContextDisclosedV1 {
     /// hundreds of contributions, so this is routinely far the longer of the two. Until 2026-08-22
     /// the paragraph below claimed the opposite relationship, and a surface built on that reading
     /// reported ten items supplied and three thousand accounted for on a live deployment.
+    ///
+    /// Bounded since 2026-08-23. Unbounded, it grew with the biography and put a set that large
+    /// into a permanent record on every delivery. Where it is a sample rather than the whole set,
+    /// `provenance_count` is larger than its length — the record says so itself rather than
+    /// needing a flag, and a permanent record that silently omitted would be worse than a large
+    /// one.
     pub items: Vec<Uuid>,
+    /// How many distinct contributions there were, whether or not `items` could carry them all.
+    ///
+    /// `None` on a record written before this field existed. Not zero: a record that cannot say
+    /// how many sources there were and a record saying there were none are different facts, and
+    /// defaulting to zero would turn the first into the second everywhere it was read.
+    #[serde(default)]
+    pub provenance_count: Option<u32>,
     /// How many items were supplied, including any whose provenance could not be established.
     ///
     /// Neither bounds the other, and the length of `items` is not the count this should be read
@@ -149,8 +171,99 @@ mod tests {
     }
 
     #[test]
+    fn a_record_written_before_this_field_existed_says_it_cannot_say() {
+        // Records already in Journals do not have `provenanceCount`. Decoding one must not report
+        // that it cited nothing: a record that cannot say how many sources there were and a record
+        // saying there were none are different facts, and a zero default would turn every existing
+        // record into the second one on the day this field shipped.
+        //
+        // The fixture is built as a map without the field rather than by re-encoding the struct,
+        // because re-encoding could only ever produce whatever this build writes today.
+        let mut older = Vec::new();
+        ciborium::into_writer(
+            &ciborium::Value::Map(vec![
+                (
+                    ciborium::Value::Text("destination".into()),
+                    ciborium::Value::Map(vec![
+                        (
+                            ciborium::Value::Text("id".into()),
+                            ciborium::Value::Text("living-canvas:public".into()),
+                        ),
+                        (
+                            ciborium::Value::Text("trust".into()),
+                            ciborium::Value::Text("public".into()),
+                        ),
+                        (
+                            ciborium::Value::Text("retains".into()),
+                            ciborium::Value::Bool(false),
+                        ),
+                        (
+                            ciborium::Value::Text("externalBoundary".into()),
+                            ciborium::Value::Bool(true),
+                        ),
+                    ]),
+                ),
+                (
+                    ciborium::Value::Text("items".into()),
+                    ciborium::Value::Array(Vec::new()),
+                ),
+                (
+                    ciborium::Value::Text("itemCount".into()),
+                    ciborium::Value::Integer(7.into()),
+                ),
+                (
+                    ciborium::Value::Text("withheld".into()),
+                    ciborium::Value::Array(Vec::new()),
+                ),
+                (
+                    ciborium::Value::Text("disclosedAt".into()),
+                    ciborium::Value::Text("2026-08-21T00:00:00Z".into()),
+                ),
+            ]),
+            &mut older,
+        )
+        .expect("the older shape encodes");
+
+        let decoded: ContextDisclosedV1 =
+            ciborium::from_reader(older.as_slice()).expect("an older record still decodes");
+        assert_eq!(decoded.item_count, 7);
+        assert_eq!(
+            decoded.provenance_count, None,
+            "an older record was read as having cited nothing"
+        );
+    }
+
+    #[test]
+    fn a_record_that_carried_every_source_it_cited_says_a_number_matching_its_own_list() {
+        // The two readings a consumer has to be able to tell apart, side by side: a complete record
+        // where the count equals the length, and a sampled one where it exceeds it.
+        let complete = ContextDisclosedV1 {
+            provenance_count: Some(2),
+            destination: destination(false, true),
+            items: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            item_count: 1,
+            withheld: Vec::new(),
+            disclosed_at: "2026-08-23T00:00:00Z".into(),
+        };
+        assert_eq!(complete.provenance_count, Some(2));
+        assert_eq!(complete.items.len(), 2);
+
+        let sampled = ContextDisclosedV1 {
+            provenance_count: Some(3000),
+            items: vec![Uuid::from_u128(1)],
+            ..complete
+        };
+        assert!(
+            sampled.provenance_count.unwrap_or_default()
+                > u32::try_from(sampled.items.len()).unwrap_or(u32::MAX),
+            "a sampled record could not be told from a complete one"
+        );
+    }
+
+    #[test]
     fn a_record_carries_provenance_and_never_content() {
         let record = ContextDisclosedV1 {
+            provenance_count: Some(1),
             destination: destination(false, true),
             items: vec![Uuid::from_u128(1)],
             item_count: 2,
