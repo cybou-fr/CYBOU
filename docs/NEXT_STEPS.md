@@ -8,10 +8,6 @@ SPDX-License-Identifier: MIT
 [Roadmap](ROADMAP.md) defines the milestones. [Current State](CURRENT_STATE.md) is the
 implementation authority. This document is the short list of what to do next, and nothing else.
 
-The plan that carried the Rust cutover is finished and has moved to
-[Historical Execution](history/M5-M6.md) and [M7 execution](history/M7-EXECUTION.md). The C++/Qt
-and NixOS trees it describes were removed on 2026-08-20.
-
 ## The objective
 
 > **Make every claim the system makes about itself traceable to a source, before giving it a

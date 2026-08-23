@@ -122,3 +122,4 @@ jobs:
           python3 scripts/validate-cognitive-docs.py .
           python3 scripts/validate-desktop-styles.py
           python3 scripts/validate-organ-layering.py
+          python3 scripts/validate-doc-links.py

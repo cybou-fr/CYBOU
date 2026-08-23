@@ -219,5 +219,4 @@ every consumer on the machine walks straight through is a boundary in name only.
 - [ADR-0018: Privacy Classification and Replication](ADR-0018-privacy-classification-and-replication.md)
 - [ADR-0021: Language Models Are Optional Faculties](ADR-0021-language-models-are-optional-faculties.md)
 - [ADR-0022: Authorized Action Boundary](ADR-0022-authorized-action-boundary.md)
-- [ADR-0023: Mind Dock Discoverability and Access](ADR-0023-mind-dock-discoverability-and-access.md)
 - [ADR-0029: Associative Context Projection and Semantic Activation](ADR-0029-associative-context-projection.md)

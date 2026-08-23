@@ -50,4 +50,3 @@ Key architecture and operational decisions:
 - [Debian Build and Deployment](../DEPLOYMENT.md)
 - [ADR-0037](ADR-0037-web-first-presence-and-desktop.md)
 - [ADR-0038](ADR-0038-rust-first-codebase.md)
-- [ADR-0006](ADR-0006-state-version-pinning.md) (Superseded)

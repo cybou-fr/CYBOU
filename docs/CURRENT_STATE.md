@@ -1749,7 +1749,7 @@ component records. A real process test suspends selfd while it remains registere
 bounded partial snapshot, resumes it, and leaves subsequent recovery tests clean. All compound
 Presence reads and mutations are now protected from sequential timeout multiplication.
 
-P6.8 closes the substrate findings recorded in the [Implementation Audit](history/CODE_AUDIT_2026-08-10.md).
+
 The Journal commits at `synchronous=FULL` and verifies both commit pragmas at open, refusing to
 start rather than let a silent fallback leave durable-before-visible stated more strongly than
 storage supports; an in-memory Journal remains exempt because it makes no durability claim.

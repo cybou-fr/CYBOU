@@ -118,6 +118,18 @@ hash inputs change only through their own versioned ADR and migration.
 | **R9** | Audit, license, SBOM, clippy, format, unit, integration, fuzz/property, and Debian gates pass |
 | **R10** | C++/Qt/CMake, QML/Plasma, Python/shell tooling, and authored JavaScript are removed only after owning replacements pass their gates |
 
+### Interfaces are versioned and reached through a transport abstraction
+
+Inherited from ADR-0013, which is otherwise about a Qt D-Bus fabric that no longer exists.
+
+Every exported interface carries its version in its name — `org.cybou.Mind.Event1`,
+`org.cybou.Faculty.ModelBroker1` — and extensible payloads cross as versioned CBOR. Domain logic
+depends on a transport abstraction (`cybou-fabric`) rather than on the D-Bus client types, so a
+change of transport is a change in one crate rather than in every organ.
+
+The reason this outlived the ADR that introduced it: the whole Qt tree was replaced and none of the
+organs changed shape, because none of them named a D-Bus class.
+
 ## Consequences
 
 Positive consequences are one primary type system and toolchain, shared end-to-end DTOs, memory-safe
@@ -148,9 +160,7 @@ native wrapper may not introduce a second capability path around the gateway.
 
 ## Related documents
 
-- [Rust Migration Plan](../history/RUST_MIGRATION.md)
 - [Web UI Architecture](../WEB_UI_ARCHITECTURE.md)
 - [ADR-0037](ADR-0037-web-first-presence-and-desktop.md)
 - [ADR-0010](ADR-0010-journal-v2-schema-and-canonical-hashing.md)
 - [ADR-0012](ADR-0012-organ-process-isolation-and-lifecycle.md)
-- [ADR-0013](ADR-0013-local-cognitive-fabric-qt-dbus.md)

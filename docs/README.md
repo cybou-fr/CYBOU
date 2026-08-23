@@ -5,21 +5,34 @@ SPDX-License-Identifier: MIT
 
 # Cybou Documentation
 
-This documentation describes the repository at the M6 + P6.7 boundary. M7–M13 sections are target
-architecture unless a document explicitly says otherwise. For any implementation claim, begin
-with [Current State](CURRENT_STATE.md).
+This documentation carries three kinds of thing and nothing else:
+
+```text
+current truth        what exists now              CURRENT_STATE.md
+normative decisions  what may not be violated     adr/
+current evidence     what the claims rest on      evidence/
+```
+
+The rule behind that: **if the past does not constrain Cybou today, it does not belong here.** A
+record of what was done and when is `git log`, which is better at it than prose is. What survives a
+deletion is never *we once did X* — it is the consequence of X that still binds, and it is written
+where it binds rather than where it happened.
+
+Milestone numbers live in [Roadmap](ROADMAP.md) and nowhere else. Everywhere else, capabilities are
+named: Identity Continuity, Context Activation, Operational Telemetry, Model Brokerage, Governed
+Actions. Those survive a roadmap restructuring; `M6 + P6.7` did not.
+
+For any implementation claim, begin with [Current State](CURRENT_STATE.md).
 
 ## Choose a reading path
 
 ### Product and status
 
 - [Repository overview](../README.md)
-- [Implementation Audit — 2026-08-10](history/CODE_AUDIT_2026-08-10.md) — source-level findings on the C++/Qt tree, which no longer exists
-- [Current State](CURRENT_STATE.md) — authoritative implementation boundary
+- [Current State](CURRENT_STATE.md) — what exists now, and what does not
+- [Evidence](evidence/README.md) — what the current claims rest on, and the command that checks each
 - [Roadmap](ROADMAP.md) — capability progression, not a release promise
 - [Next Engineering Steps](NEXT_STEPS.md) — executable work packages and exit gates
-- [Historical Execution — P0 through P6.7](history/M5-M6.md) — the completed packages, kept out of the plan
-- [M5 Evaluation Evidence](M5_EVALUATION.md) — completed evaluation boundary, artifacts, and limitations
 - [Installation](INSTALLATION.md) — development artifacts and safety constraints
 
 ### Architecture
@@ -28,8 +41,7 @@ with [Current State](CURRENT_STATE.md).
 - [Architecture](ARCHITECTURE.md) — topology, ownership, failure domains, ordering
 - [Glossary](GLOSSARY.md) — normative vocabulary
 - [ADR index](adr/README.md) — decisions and their acceptance status
-- [Living Canvas Web UI Architecture](WEB_UI_ARCHITECTURE.md) — proposed single-frontend local/remote integration and migration plan
-- [Rust Migration Plan](history/RUST_MIGRATION.md) — Rust/WASM frontend and contract-preserving migration of all product code
+- [Living Canvas Web UI Architecture](WEB_UI_ARCHITECTURE.md) — the single frontend served to browser and desktop alike
 
 ### Build, test, and release
 
@@ -48,10 +60,10 @@ with [Current State](CURRENT_STATE.md).
 MIND_MODEL.md     meaning, invariants, and long-term cognitive model
 CURRENT_STATE.md  what the repository actually implements today
 ARCHITECTURE.md   current topology plus explicit future boundaries
-WEB_UI_ARCHITECTURE.md  proposed web-first Presence, gateway, desktop, and migration blueprint
-RUST_MIGRATION.md       proposed Rust-first codebase, sequencing, cutover, and completion gates
+WEB_UI_ARCHITECTURE.md  web-first Presence, gateway, and desktop
 DEPLOYMENT.md     active Debian 13 OVH build and deployment environment
 ROADMAP.md        sequencing and acceptance meaning of milestones
+evidence/*        what a current claim rests on, and how to re-check it
 mind/*            protocol and component contracts
 security/*        threat, privacy, and trust boundaries
 adr/*             normative decisions; status matters

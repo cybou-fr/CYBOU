@@ -63,7 +63,7 @@ nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
 
 Run release commands from the clean tagged tree. Record the flake revision, artifact hashes, test
 environment, known limitations, and whether persistent state can be upgraded or must be reset.
-Use [M5 Evaluation Evidence](M5_EVALUATION.md) as the evidence template for the current candidate;
+Use [Evidence](evidence/README.md) as the template for what a candidate must be able to show;
 its artifact record names the clean source revision, Nix outputs, size, hash, environment, and
 compatibility boundary. Future evidence records must follow the same provenance rule and must not
 use values produced from a dirty tree.

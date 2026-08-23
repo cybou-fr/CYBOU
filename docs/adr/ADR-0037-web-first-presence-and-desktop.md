@@ -348,8 +348,6 @@ processes.
 - [Presence API](../mind/PRESENCE_API.md)
 - [Threat Model](../security/THREAT_MODEL.md)
 - [ADR-0001](ADR-0001-system-architecture.md)
-- [ADR-0008](ADR-0008-mind-dock-with-tabs.md)
 - [ADR-0022](ADR-0022-authorized-action-boundary.md)
-- [ADR-0023](ADR-0023-mind-dock-discoverability-and-access.md)
 - [ADR-0030](ADR-0030-transparent-context-delivery.md)
 - [ADR-0038](ADR-0038-rust-first-codebase.md)

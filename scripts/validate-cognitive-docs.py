@@ -136,7 +136,6 @@ def main(argv: list[str]) -> int:
         "mind_model": repo / "docs/MIND_MODEL.md",
         "architecture": repo / "docs/ARCHITECTURE.md",
         "web_ui_architecture": repo / "docs/WEB_UI_ARCHITECTURE.md",
-        "rust_migration": repo / "docs/history/RUST_MIGRATION.md",
         "current": repo / "docs/CURRENT_STATE.md",
         "building": repo / "docs/BUILDING.md",
         "deployment": repo / "docs/DEPLOYMENT.md",
@@ -164,7 +163,8 @@ def main(argv: list[str]) -> int:
         "security_index": repo / "docs/security/README.md",
         "threat_model": repo / "docs/security/THREAT_MODEL.md",
         "next_steps": repo / "docs/NEXT_STEPS.md",
-        "history": repo / "docs/history/M5-M6.md",
+        "evidence_index": repo / "docs/evidence/README.md",
+        "adr_index": repo / "docs/adr/README.md",
     }
 
     for path in paths.values():
@@ -539,25 +539,65 @@ def main(argv: list[str]) -> int:
     ):
         require(paths["epistemic"], label, needle)
 
-    # The completed packages now live in the history document; Next Steps holds only executable
-    # work. Checking them there keeps the record from being quietly dropped in the move.
-    for label in (
-        "## P0 — Restore a trustworthy green baseline",
-        "## P1 — Freeze the M5 lifecycle contract",
-        "## P2 — Prove continuity before consolidation",
-        "## P3 — Implement the consolidation MVP",
-        "## P4 — Make lifecycle visible without moving ownership into UI",
-        "## P5 — Close M5 and publish evidence",
-        "## P6.1 — Freeze the capability and health contract",
-        "## Historical P6 PR decomposition",
+    # `docs/history/` was removed on 2026-08-23 along with the block that pinned its section
+    # headings. What that block was protecting was a record of completed work packages, which git
+    # holds better than prose does. What replaced it is the rule below: a claim that needs defending
+    # gets an evidence document naming the command that checks it, and the index has to list it.
+    #
+    # The difference is what the check is for. The old one asked "is the diary still complete?"; this
+    # one asks "can each current claim still be re-checked?" — which is the question a reader has,
+    # and the one a stale document fails silently.
+    for claim, document in (
+        ("journal compatibility", "journal-compatibility.md"),
+        ("erasure gate", "erasure-gate.md"),
+        ("reboot continuity", "reboot-continuity.md"),
+        ("desktop and browser gate", "desktop-browser-gate.md"),
+        ("debian integration", "debian-integration.md"),
     ):
-        require(paths["history"], label, label)
+        evidence = repo / "docs/evidence" / document
+        if not evidence.is_file():
+            error(evidence, f"missing evidence for {claim}")
+            continue
+        require(paths["evidence_index"], f"{claim} evidence entry", f"]({document})")
+        # An evidence document that cannot name a command is not evidence, it is an assertion with a
+        # heading. This is the whole difference between the directory and the one it replaced.
+        text = evidence.read_text(encoding="utf-8")
+        if "```bash" not in text:
+            error(evidence, "names no command, so the claim cannot be re-checked")
+        if "## What this does not prove" not in text:
+            # The section that keeps an evidence document from being read as a stronger claim than
+            # it is. Every one of these proves something narrower than the sentence above it, and
+            # the reader who most needs to know that is the one deciding whether to rely on it.
+            error(evidence, "does not say what it fails to prove")
 
-    require(
-        paths["next_steps"],
-        "link to the moved history",
-        "[Historical Execution](history/M5-M6.md)",
-    )
+    # The ADR index is checked against the directory rather than maintained beside it. Deleting an
+    # ADR is now routine — the rule is that a decision which no longer constrains the design goes —
+    # and a routine deletion that leaves the index wrong would make the index the least reliable
+    # document about the most normative material.
+    adr_dir = repo / "docs/adr"
+    index_text = paths["adr_index"].read_text(encoding="utf-8")
+    for adr in sorted(adr_dir.glob("ADR-*.md")):
+        if f"]({adr.name})" not in index_text:
+            error(paths["adr_index"], f"does not list {adr.name}")
+            continue
+        status_block = adr.read_text(encoding="utf-8").split("## Status", 1)
+        if len(status_block) < 2:
+            error(adr, "has no Status section")
+            continue
+        declared = ""
+        for line in status_block[1].split("##", 1)[0].splitlines():
+            if line.strip():
+                declared = line.strip().split("(")[0].strip().rstrip(".")
+                break
+        row = next(
+            (line for line in index_text.splitlines() if f"]({adr.name})" in line),
+            "",
+        )
+        if declared and not row.rstrip().endswith(f"| {declared} |"):
+            error(
+                paths["adr_index"],
+                f"lists {adr.name} with a status that is not its own ({declared})",
+            )
 
     require(
         paths["glossary"],
