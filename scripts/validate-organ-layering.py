@@ -55,6 +55,10 @@ LAYERS: list[tuple[str, set[str]]] = [
     ("associative", {"cybou-contextd"}),
     ("attention", {"cybou-workspaced"}),
     ("meaning", {"cybou-meaning"}),
+    # Last, and below meaning on purpose. What may be done is decided after what is known, what is
+    # related, what has attention and what is being said — and nothing above it may read it, because
+    # a layer that could consult the authorization gate could come to depend on being permitted.
+    ("governance", {"cybou-remediation"}),
 ]
 
 #: Crates that are faculties rather than organs, and what each of them must not depend on.
@@ -79,6 +83,7 @@ OWNS = {
     "associative": "what is related, and what is relevant now",
     "attention": "what gets bounded attention",
     "meaning": "how a selected context is interpreted or expressed",
+    "governance": "what may be done, and by whose permission",
 }
 
 

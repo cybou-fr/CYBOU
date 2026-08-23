@@ -17,11 +17,17 @@
 //! literal, which is what makes it a test rather than an observation about the machine it runs on.
 //! Nothing here imports an inference runtime, and there is none to import.
 //!
-//! What this walks is *observe → detect → explain*. Proposing an action and carrying it out are not
-//! built, and this file does not pretend they are: S0 is not passed until they exist.
+//! What this walks is *observe → detect → explain → propose → authorize*. Carrying an action out is
+//! not built, and this file does not pretend otherwise: there is no executor, and the last two
+//! stages of S0 — *act* and *observe outcome* — do not exist. What is walked is everything up to the
+//! point where a person would have to say yes.
 
 use cybou_meaning::{Language, plan_system_state, realize};
+use cybou_protocol::action::AuthorizationVerdict;
 use cybou_protocol::telemetry::{Finding, Reading, Subject, SystemInsight};
+use cybou_remediation::{
+    Operation, StandingPolicy, authorize, criticise, permits_unattended, propose,
+};
 use cybou_telemetryd::TelemetryCore;
 use cybou_telemetryd::probe;
 use time::{Duration, OffsetDateTime};
@@ -296,4 +302,157 @@ fn the_answer_reads_in_russian_without_changing_what_it_claims() {
         assert!(rendered.contains("memory-pressure"), "{rendered}");
         assert!(rendered.contains("87.40"), "{rendered}");
     }
+}
+
+/// Everything the host would offer to do about one finding, and what it decided about each.
+fn offers(insight: &SystemInsight) -> Vec<(String, AuthorizationVerdict)> {
+    propose(insight, at(0), |operation| {
+        Uuid::from_u128(operation.verb().len() as u128)
+    })
+    .into_iter()
+    .map(|proposal| {
+        let checks = criticise(&proposal, insight);
+        let decision = authorize(
+            &proposal,
+            &checks,
+            insight.strength == cybou_protocol::telemetry::EvidenceStrength::Weak,
+            &StandingPolicy::nothing_pre_authorized(),
+            at(0),
+        );
+        (proposal.operation, decision.verdict)
+    })
+    .collect()
+}
+
+#[test]
+fn a_full_disk_produces_offers_and_not_one_of_them_may_happen_unattended() {
+    // The stage this file gained, walked from the same kernel text as everything above. The host
+    // noticed, explained, and now offers — and on a machine nobody has configured, every offer waits
+    // for a person.
+    let core = core();
+    for tick in 0..40 {
+        sample(
+            &core,
+            CALM_MEMINFO,
+            CALM_PRESSURE,
+            (1_000_000, 38_000),
+            at(tick * 10),
+        );
+    }
+    let insights = core.insights(at(500), |_| Uuid::from_u128(7));
+    let storage = insights
+        .iter()
+        .find(|insight| insight.finding == Finding::StorageExhaustion)
+        .expect("the host noticed the disk");
+
+    let decided = offers(storage);
+    assert!(!decided.is_empty(), "the host offered nothing at all");
+    for (operation, verdict) in &decided {
+        assert!(
+            !matches!(verdict, AuthorizationVerdict::Granted),
+            "{operation} was granted on a machine nobody configured"
+        );
+    }
+    assert!(
+        decided.iter().any(
+            |(operation, verdict)| operation == Operation::CleanPackageCache.verb()
+                && matches!(
+                    verdict,
+                    AuthorizationVerdict::RequiresUserConfirmation { .. }
+                )
+        ),
+        "{decided:?}"
+    );
+}
+
+#[test]
+fn nothing_the_host_offers_is_ever_destructive() {
+    // Walked across every finding the detector can reach, rather than asserted about one. The
+    // example that motivated this — deleting a database's data directory to free space — is not
+    // something the host declines to do. It is something it never offers.
+    for finding in [
+        Finding::StorageExhaustion,
+        Finding::ServiceFailure,
+        Finding::MemoryPressure,
+        Finding::IoSaturation,
+        Finding::CpuSaturation,
+        Finding::UnexplainedDeviation,
+    ] {
+        let insight = SystemInsight {
+            insight_id: Uuid::from_u128(3),
+            finding,
+            because: Vec::new(),
+            strength: cybou_protocol::telemetry::EvidenceStrength::Strong,
+            concluded_at: at(0),
+            since: at(0),
+        };
+        for (operation, _) in offers(&insight) {
+            let known = cybou_remediation::ALL_OPERATIONS
+                .iter()
+                .find(|candidate| candidate.verb() == operation)
+                .expect("a known operation");
+            assert!(!known.forbidden(), "{finding:?} offered {operation}");
+        }
+    }
+}
+
+#[test]
+fn a_host_that_is_only_guessing_offers_to_look_and_refuses_to_change_anything() {
+    // One uncorroborated reading out of range is a reason to investigate, not to act. A system that
+    // acted on its weakest conclusions would spend its credibility on the cases it is least sure of.
+    let guessing = SystemInsight {
+        insight_id: Uuid::from_u128(4),
+        finding: Finding::ServiceFailure,
+        because: Vec::new(),
+        strength: cybou_protocol::telemetry::EvidenceStrength::Weak,
+        concluded_at: at(0),
+        since: at(0),
+    };
+    for (operation, verdict) in offers(&guessing) {
+        if operation == Operation::InspectServiceStatus.verb() {
+            assert!(
+                matches!(
+                    verdict,
+                    AuthorizationVerdict::RequiresUserConfirmation { .. }
+                ),
+                "looking was refused: {verdict:?}"
+            );
+        } else {
+            assert!(
+                matches!(verdict, AuthorizationVerdict::Denied { .. }),
+                "{operation} was offered on one uncorroborated reading"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_configured_operator_can_let_one_ordinary_thing_happen_unattended() {
+    // The control. Every assertion above passes on a gate that refuses everything, and a gate that
+    // refuses everything is not a policy boundary, it is an off switch.
+    let insight = SystemInsight {
+        insight_id: Uuid::from_u128(5),
+        finding: Finding::StorageExhaustion,
+        because: Vec::new(),
+        strength: cybou_protocol::telemetry::EvidenceStrength::Strong,
+        concluded_at: at(0),
+        since: at(0),
+    };
+    let proposal = propose(&insight, at(0), |operation| {
+        Uuid::from_u128(operation.verb().len() as u128)
+    })
+    .into_iter()
+    .find(|proposal| proposal.operation == Operation::CleanPackageCache.verb())
+    .expect("offered");
+
+    let decision = authorize(
+        &proposal,
+        &criticise(&proposal, &insight),
+        false,
+        &StandingPolicy {
+            pre_authorized: vec![Operation::CleanPackageCache],
+        },
+        at(0),
+    );
+    assert!(permits_unattended(&decision));
 }

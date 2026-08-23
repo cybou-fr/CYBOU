@@ -694,7 +694,6 @@ version = "0.1.0"
 dependencies = [
  "cybou-contextd",
  "cybou-protocol",
- "cybou-telemetryd",
  "cybou-workspaced",
  "time",
  "uuid",
@@ -805,6 +804,18 @@ dependencies = [
  "serde",
  "sha2 0.11.0",
  "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "cybou-remediation"
+version = "0.1.0"
+dependencies = [
+ "cybou-meaning",
+ "cybou-protocol",
+ "cybou-telemetryd",
+ "serde",
  "time",
  "uuid",
 ]

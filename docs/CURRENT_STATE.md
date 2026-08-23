@@ -334,6 +334,74 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## The host can offer to fix it, and cannot (2026-08-23)
+
+`cybou-remediation` is *propose* and *authorize*, and it deliberately stops there: **nothing in it
+executes anything, and there is no executor to call.**
+
+That is why it is worth building now. The natural shape of this code — build a proposal, hand it to
+an executor — has no place for the decision to live, so the decision gets made by whoever wires the
+two together, on a working system, under pressure to make it work. Written first, the executor
+arrives to find the gate already closed.
+
+### A proposer cannot choose its own risk
+
+`ActionProposal` carries `risk_level` and `reversible` as ordinary fields, which means whoever
+builds one fills them in — and **something arguing for its own proposal is the wrong party to assess
+it.** A model asked to restart a database and rate the danger will rate it low; not dishonestly,
+because it is arguing.
+
+So `Operation` is a closed set and risk is a function of it. A proposer names the operation; the risk
+follows, and there is no field to override it. A critic catches a hand-built proposal that understates
+itself, which is what makes the field harmless rather than a hole.
+
+Two distinctions kept apart that are usually collapsed. **Reversible is not harmless**: restarting a
+service is reversible and still drops every connection it was holding. **Irreversible is not
+forbidden**: a package cache cannot be un-deleted and is among the safest things on the list, because
+the bytes are re-downloadable. Reversibility is whether the system can undo it; risk is what it costs
+if it was the wrong call.
+
+### Nothing is granted on a machine nobody configured
+
+`Granted` means *carry this out without asking*, and it is reachable only through a standing policy a
+person set. The default policy grants nothing. Not a stub waiting to be relaxed: pre-authorisation is
+something an operator decides about their own machine, and a default that granted anything would be
+this system deciding it for them.
+
+**A policy cannot grant what the operation table forbids** — otherwise the forbidden list is
+advisory, which is the same as absent. And a failed critic stops a pre-authorised operation too:
+objections are not weighed against confidence, because the objection that matters most is usually the
+one nobody weighted highly enough.
+
+### What it will not offer
+
+The example that motivated this — deleting a database's data directory to free space — is not
+something the host declines to do. **It is something it never offers.** The remedy tables do not
+contain it, and the gate refuses it if something else builds one. Both, because the first is the
+design and the second is what survives somebody adding a finding and forgetting.
+
+A finding with no remedy produces no proposal rather than a gesture. Offering a restart for I/O
+saturation would be offering to do something in order to be seen doing something, which is how an
+operator learns to stop reading what a system suggests. And a target only an investigation could
+supply is left as a placeholder: a proposal that guessed a unit name would be a proposal to restart
+whatever came to mind.
+
+One uncorroborated reading is a reason to look and not to change anything — every mutation is denied,
+and inspection is not, because a system where investigation is harder than mutation has it exactly
+backwards.
+
+### Where S0 stands
+
+```text
+observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome
+   ✅          ✅           ✅          ✅         ✅        ✅          ✅        ❌         ❌
+```
+
+Thirty-five tests, twelve of them walking the whole chain from kernel text to a decision. **S0 is
+still not passed**, and the walkthrough says so in its own header: the last two stages do not exist.
+What is true is that a host with no network and no model observes itself, notices what is wrong, says
+why it thinks so, offers what it could do about it, and refuses to do any of it.
+
 ## The host can be asked what is going on with it (2026-08-23)
 
 ```text

@@ -1,0 +1,233 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+//! What may be proposed at all, and what each one costs to be wrong about.
+//!
+//! The whole point of this module is one thing being impossible: **a proposer cannot choose its own
+//! risk.** `ActionProposal` carries a `risk_level` and a `reversible` flag as ordinary fields, which
+//! means whoever builds a proposal fills them in — and something arguing for its own proposal is
+//! exactly the wrong party to assess it. A model asked to restart a database and rate the danger
+//! will rate it low, not dishonestly, but because it is arguing.
+//!
+//! So an operation is a closed set, and risk and reversibility are *functions of the operation*.
+//! A proposer names the operation; the risk follows, and there is no field to override it.
+//!
+//! ## Reversible does not mean harmless, and irreversible does not mean forbidden
+//!
+//! Two distinctions that get collapsed and should not be. Restarting a service is reversible in the
+//! sense that the service comes back, and it still drops every connection it was holding. Deleting a
+//! package cache is irreversible in the sense that the bytes are gone, and it is one of the safest
+//! things on this list because the bytes are re-downloadable. Reversibility is about whether the
+//! system can undo it; risk is about what it costs if it was the wrong call. They are recorded
+//! separately because they answer different questions.
+
+use cybou_protocol::action::RiskLevel;
+use cybou_protocol::telemetry::Finding;
+use serde::{Deserialize, Serialize};
+
+/// Something Cybou may propose doing to its own Body.
+///
+/// Closed, and short. Every entry is something with a distinct effect and a distinct cost; an open
+/// string operation would be a way to add both without anyone deciding either, which is the same
+/// gap that let a model-generated shell command become the architecture everywhere else.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Operation {
+    /// Ask a unit what state it is in.
+    InspectServiceStatus,
+    /// Ask a unit to reload its configuration.
+    ReloadService,
+    /// Restart a unit.
+    RestartService,
+    /// Delete downloaded package archives that can be fetched again.
+    CleanPackageCache,
+    /// Rotate and compress logs that are past their retention.
+    RotateLogs,
+    /// Delete temporary files nothing has opened.
+    TrimTemporaryFiles,
+    /// Delete a service's data directory.
+    DeleteServiceData,
+    /// Reformat a filesystem.
+    FormatFilesystem,
+    /// Power the machine off.
+    PowerOff,
+}
+
+/// Every operation, so a test can hold a property across all of them.
+pub const ALL_OPERATIONS: &[Operation] = &[
+    Operation::InspectServiceStatus,
+    Operation::ReloadService,
+    Operation::RestartService,
+    Operation::CleanPackageCache,
+    Operation::RotateLogs,
+    Operation::TrimTemporaryFiles,
+    Operation::DeleteServiceData,
+    Operation::FormatFilesystem,
+    Operation::PowerOff,
+];
+
+impl Operation {
+    /// The frozen verb this operation is recorded under.
+    #[must_use]
+    pub const fn verb(self) -> &'static str {
+        match self {
+            Self::InspectServiceStatus => "service.status",
+            Self::ReloadService => "service.reload",
+            Self::RestartService => "service.restart",
+            Self::CleanPackageCache => "package.cache.clean",
+            Self::RotateLogs => "log.rotate",
+            Self::TrimTemporaryFiles => "tmp.trim",
+            Self::DeleteServiceData => "service.data.delete",
+            Self::FormatFilesystem => "filesystem.format",
+            Self::PowerOff => "system.poweroff",
+        }
+    }
+
+    /// What being wrong about this costs.
+    ///
+    /// A property of the operation, not of the argument for it. There is no path by which a
+    /// proposer supplies this.
+    #[must_use]
+    pub const fn risk(self) -> RiskLevel {
+        match self {
+            Self::InspectServiceStatus | Self::ReloadService => RiskLevel::Low,
+            // Reversible and not harmless: the service comes back, and every connection it was
+            // holding is gone.
+            Self::RestartService | Self::CleanPackageCache | Self::RotateLogs => RiskLevel::Medium,
+            // Higher than the cache because something may be using a temporary file this cannot see.
+            Self::TrimTemporaryFiles => RiskLevel::High,
+            Self::DeleteServiceData | Self::FormatFilesystem | Self::PowerOff => {
+                RiskLevel::Critical
+            }
+        }
+    }
+
+    /// Whether the system can undo it.
+    ///
+    /// Not whether it is safe. Deleting a package cache cannot be undone and is among the safest
+    /// things here, because the bytes are re-downloadable; restarting a service can be undone and
+    /// still costs every connection it was holding.
+    #[must_use]
+    pub const fn reversible(self) -> bool {
+        matches!(
+            self,
+            Self::InspectServiceStatus | Self::ReloadService | Self::RestartService
+        )
+    }
+
+    /// Whether this is refused whatever the evidence says.
+    ///
+    /// The list ADR-0022 calls *destructive or forbidden regardless of model confidence*. Nothing
+    /// in this build can grant them, and the reason they are here at all rather than simply absent
+    /// is that a proposer that reaches for one should be visibly refused rather than silently
+    /// unable to express it. A refusal is a record; an inexpressible thought is not.
+    #[must_use]
+    pub const fn forbidden(self) -> bool {
+        matches!(self.risk(), RiskLevel::Critical)
+    }
+
+    /// What this operation would relieve, if anything.
+    ///
+    /// An operation that relieves nothing is not a remedy, and a proposal citing a finding this
+    /// does not address is what the critic exists to catch.
+    #[must_use]
+    pub fn relieves(self) -> &'static [Finding] {
+        match self {
+            Self::CleanPackageCache | Self::RotateLogs | Self::TrimTemporaryFiles => {
+                &[Finding::StorageExhaustion]
+            }
+            Self::RestartService => &[Finding::ServiceFailure, Finding::MemoryPressure],
+            Self::ReloadService => &[Finding::ServiceFailure],
+            // Reading a unit's state relieves nothing and is worth proposing anyway: it is how a
+            // person finds out more without changing anything, and a system that could only offer
+            // mutations would push every investigation toward one. The forbidden three relieve
+            // nothing for the opposite reason — advertising a remedy would give a proposer a reason
+            // to reach for one, and the refusal would then read as obstruction.
+            Self::InspectServiceStatus
+            | Self::DeleteServiceData
+            | Self::FormatFilesystem
+            | Self::PowerOff => &[],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn risk_is_a_property_of_the_operation_and_not_of_the_argument_for_it() {
+        // The whole point of the module. There is no path by which a proposer supplies this, which
+        // is what makes it different from the `risk_level` field on the proposal it produces.
+        assert_eq!(Operation::RestartService.risk(), RiskLevel::Medium);
+        assert_eq!(Operation::DeleteServiceData.risk(), RiskLevel::Critical);
+        assert_eq!(Operation::InspectServiceStatus.risk(), RiskLevel::Low);
+    }
+
+    #[test]
+    fn reversible_does_not_mean_harmless_and_irreversible_does_not_mean_dangerous() {
+        // Two distinctions that get collapsed and answer different questions.
+        assert!(
+            Operation::RestartService.reversible(),
+            "the service comes back"
+        );
+        assert_eq!(
+            Operation::RestartService.risk(),
+            RiskLevel::Medium,
+            "and every connection it was holding is gone"
+        );
+
+        assert!(
+            !Operation::CleanPackageCache.reversible(),
+            "the bytes are gone"
+        );
+        assert_eq!(
+            Operation::CleanPackageCache.risk(),
+            RiskLevel::Medium,
+            "and they are re-downloadable, so this is among the safest things here"
+        );
+    }
+
+    #[test]
+    fn everything_critical_is_forbidden_and_nothing_else_is() {
+        for operation in ALL_OPERATIONS {
+            assert_eq!(
+                operation.forbidden(),
+                operation.risk() == RiskLevel::Critical,
+                "{operation:?}"
+            );
+        }
+        assert!(Operation::DeleteServiceData.forbidden());
+        assert!(!Operation::RestartService.forbidden());
+    }
+
+    #[test]
+    fn nothing_forbidden_claims_to_relieve_anything() {
+        // A forbidden operation that advertised a remedy would give a proposer a reason to reach
+        // for it, and the refusal would then read as the system being obstructive rather than as
+        // the operation being off the table.
+        for operation in ALL_OPERATIONS {
+            if operation.forbidden() {
+                assert!(operation.relieves().is_empty(), "{operation:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_operation_has_a_distinct_frozen_verb() {
+        let mut verbs: Vec<&str> = ALL_OPERATIONS.iter().map(|op| op.verb()).collect();
+        verbs.sort_unstable();
+        let distinct = verbs.len();
+        verbs.dedup();
+        assert_eq!(verbs.len(), distinct, "two operations share a verb");
+    }
+
+    #[test]
+    fn something_that_relieves_nothing_is_still_worth_being_able_to_propose() {
+        // Reading a unit's state changes nothing, and a system that could only offer mutations
+        // would push every investigation toward one.
+        assert!(Operation::InspectServiceStatus.relieves().is_empty());
+        assert!(!Operation::InspectServiceStatus.forbidden());
+        assert_eq!(Operation::InspectServiceStatus.risk(), RiskLevel::Low);
+    }
+}
