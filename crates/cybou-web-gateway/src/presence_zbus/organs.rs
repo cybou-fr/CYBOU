@@ -76,6 +76,7 @@ impl ZbusPresenceSource {
                 ciborium::from_reader::<
                     Vec<(
                         cybou_protocol::telemetry::Subject,
+                        Option<String>,
                         cybou_telemetryd::trend::Projection,
                     )>,
                     _,

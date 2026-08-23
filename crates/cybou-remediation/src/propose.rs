@@ -42,12 +42,14 @@ pub fn remedies_for(finding: Finding) -> Vec<Operation> {
         Finding::MemoryPressure | Finding::FileDescriptorExhaustion => {
             vec![Operation::InspectServiceStatus]
         }
-        // Nothing here is a remedy for waiting on a disk or a CPU. Offering a restart would be
-        // offering to do something in order to be seen doing something, which is how an operator
-        // learns to stop reading what the system suggests.
-        Finding::IoSaturation | Finding::CpuSaturation | Finding::UnexplainedDeviation => {
-            Vec::new()
-        }
+        // Nothing here is a remedy for waiting on a disk or a CPU, and nothing here renews a
+        // certificate. Renewal is a deadline met outside this machine's control — by an ACME client,
+        // a registrar, a person — and an offer would be offering to do something in order to be seen
+        // doing something, which is how an operator learns to stop reading what a system suggests.
+        Finding::CertificateExpiring
+        | Finding::IoSaturation
+        | Finding::CpuSaturation
+        | Finding::UnexplainedDeviation => Vec::new(),
     }
 }
 

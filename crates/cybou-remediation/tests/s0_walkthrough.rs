@@ -57,7 +57,12 @@ fn sample(
 ) {
     let note = |subject: Subject, value: Option<f64>| {
         if let Some(value) = value {
-            core.observe(Reading { subject, value, at });
+            core.observe(Reading {
+                subject,
+                instance: None,
+                value,
+                at,
+            });
         }
     };
     note(Subject::MemoryUsed, probe::memory_used(meminfo));

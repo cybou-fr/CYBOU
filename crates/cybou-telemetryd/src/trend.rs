@@ -269,6 +269,7 @@ mod tests {
         for tick in 0..count {
             series.observe(Reading {
                 subject: Subject::RootFilesystemUsed,
+                instance: None,
                 value: value(tick),
                 at: at(tick * 60),
             });

@@ -37,7 +37,7 @@ pub fn project(
     insights: &[SystemInsight],
     observed: &[Subject],
     watched_enough: bool,
-    projections: &[(Subject, Projection)],
+    projections: &[(Subject, Option<String>, Projection)],
     now: OffsetDateTime,
 ) -> InsightProjection {
     let plan = cybou_meaning::plan_system_state(
@@ -64,14 +64,14 @@ pub fn project(
             .collect(),
         projections: projections
             .iter()
-            .map(|(subject, projection)| heading(*subject, projection))
+            .map(|(subject, which, projection)| heading(*subject, which.as_deref(), projection))
             .collect(),
         said: cybou_meaning::realize(&plan, cybou_meaning::Language::English),
     }
 }
 
 /// One subject's direction, as a reader receives it.
-fn heading(subject: Subject, projection: &Projection) -> ProjectionProjection {
+fn heading(subject: Subject, which: Option<&str>, projection: &Projection) -> ProjectionProjection {
     let (reaching, after_seconds, beyond) = match projection.reaching {
         Reaching::Already => ("already", None, false),
         Reaching::AtThisRate {
@@ -87,7 +87,12 @@ fn heading(subject: Subject, projection: &Projection) -> ProjectionProjection {
         Reaching::NotEnoughHistory { .. } => ("not-enough-history", None, false),
     };
     ProjectionProjection {
-        subject: subject.name().to_owned(),
+        // The thing it is about, not just the kind. A page of rows all called
+        // `certificate.days.remaining` is a page nobody can act on.
+        subject: match which {
+            Some(name) => format!("{} ({name})", subject.name()),
+            None => subject.name().to_owned(),
+        },
         trend: match projection.trend {
             Trend::Rising(_) => "rising",
             Trend::Falling(_) => "falling",

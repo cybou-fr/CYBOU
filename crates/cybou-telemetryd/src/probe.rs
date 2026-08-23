@@ -14,6 +14,8 @@
 //! into a baseline, and a baseline is exactly where a fabricated number does the most damage: it
 //! moves what the host believes is ordinary about itself.
 
+use time::{Date, Month, OffsetDateTime};
+
 /// The one-minute load average from `/proc/loadavg`.
 #[must_use]
 pub fn load_average(contents: &str) -> Option<f64> {
@@ -130,6 +132,50 @@ pub fn open_files(contents: &str) -> Option<f64> {
         return None;
     }
     Some((allocated / limit).clamp(0.0, 1.0))
+}
+
+/// Days remaining on a certificate, from `openssl x509 -enddate -noout` output.
+///
+/// The line is `notAfter=Aug 24 12:00:00 2026 GMT`. Parsed here rather than by asking openssl for a
+/// friendlier format, because the friendlier formats vary between versions and this one has not
+/// changed in twenty years.
+///
+/// Fractional days, not whole ones. A certificate with eleven hours left and one with thirty-five
+/// both round to a day and are not the same situation, and the projection needs the slope to be
+/// visible rather than a staircase.
+#[must_use]
+pub fn certificate_days_remaining(enddate: &str, now: OffsetDateTime) -> Option<f64> {
+    let value = enddate.trim().strip_prefix("notAfter=")?.trim();
+    let mut fields = value.split_whitespace();
+    let month = match fields.next()? {
+        "Jan" => Month::January,
+        "Feb" => Month::February,
+        "Mar" => Month::March,
+        "Apr" => Month::April,
+        "May" => Month::May,
+        "Jun" => Month::June,
+        "Jul" => Month::July,
+        "Aug" => Month::August,
+        "Sep" => Month::September,
+        "Oct" => Month::October,
+        "Nov" => Month::November,
+        "Dec" => Month::December,
+        // A month name this build does not know is not a date. Guessing at one would put an expiry
+        // on the page that nothing produced.
+        _ => return None,
+    };
+    let day: u8 = fields.next()?.parse().ok()?;
+    let clock = fields.next()?;
+    let year: i32 = fields.next()?.parse().ok()?;
+
+    let mut parts = clock.split(':');
+    let hour: u8 = parts.next()?.parse().ok()?;
+    let minute: u8 = parts.next()?.parse().ok()?;
+    let second: u8 = parts.next()?.parse().ok()?;
+
+    let date = Date::from_calendar_date(year, month, day).ok()?;
+    let expires = date.with_hms(hour, minute, second).ok()?.assume_utc();
+    Some((expires - now).as_seconds_f64() / 86_400.0)
 }
 
 /// How many units `systemctl list-units --failed` reported.
@@ -266,6 +312,54 @@ mod tests {
         assert_eq!(open_files("100\t0\t0\n"), None);
         assert_eq!(open_files("garbage"), None);
         assert_eq!(open_files(""), None);
+    }
+
+    fn at(offset: i64) -> OffsetDateTime {
+        OffsetDateTime::from_unix_timestamp(1_787_000_000 + offset).expect("a fixed instant")
+    }
+
+    #[test]
+    fn a_certificate_reports_the_days_it_has_left() {
+        // `at(0)` is 2026-08-17 20:53:20 UTC.
+        let a_year_out = certificate_days_remaining("notAfter=Aug 17 20:53:20 2027 GMT", at(0))
+            .expect("a well-formed enddate");
+        assert!((a_year_out - 365.0).abs() < 0.01, "{a_year_out}");
+    }
+
+    #[test]
+    fn an_expired_certificate_reports_a_negative_number_rather_than_zero() {
+        // Zero would say "expires today", which is a different situation from "expired last week"
+        // and the one an operator is far less alarmed by.
+        let gone = certificate_days_remaining("notAfter=Aug 07 20:53:20 2026 GMT", at(0))
+            .expect("a well-formed enddate");
+        assert!((gone + 10.0).abs() < 0.01, "{gone}");
+    }
+
+    #[test]
+    fn fractional_days_survive() {
+        // Eleven hours left and thirty-five hours left both round to a day and are not the same
+        // situation; the projection needs the slope visible rather than a staircase.
+        let hours = certificate_days_remaining("notAfter=Aug 18 08:53:20 2026 GMT", at(0))
+            .expect("a well-formed enddate");
+        assert!((hours - 0.5).abs() < 0.01, "{hours}");
+    }
+
+    #[test]
+    fn anything_that_is_not_an_enddate_produces_no_reading() {
+        for unreadable in [
+            "",
+            "notAfter=",
+            "notBefore=Aug 24 12:00:00 2026 GMT",
+            "notAfter=Smarch 24 12:00:00 2026 GMT",
+            "notAfter=Aug 24 12:00 2026 GMT",
+            "notAfter=Aug 99 12:00:00 2026 GMT",
+        ] {
+            assert_eq!(
+                certificate_days_remaining(unreadable, at(0)),
+                None,
+                "{unreadable:?}"
+            );
+        }
     }
 
     #[test]

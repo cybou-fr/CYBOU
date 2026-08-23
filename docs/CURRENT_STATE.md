@@ -87,10 +87,21 @@ there.
 filesystem bytes **and inodes**, open file descriptors against the system limit, failed units.
 Windows are bounded twice, by span and by count.
 
-Every subject is readable on any Linux host with no configuration. That is deliberate and it is why
-certificate expiry, per-service availability and backup age are not among them: each needs to be told
-*which* certificate, service or backup, and a configured subject is a different kind of thing from
-one that is universally true.
+Those subjects are readable on any Linux host with no configuration. A subject that needs to be told
+*which one* is a different kind of thing, and is declared rather than discovered — a probe that went
+looking for certificates would decide for the operator what is worth watching.
+
+Declarations live one per line in `telemetry.watch` under the configuration directory. **A line this
+build cannot read is an error, not a comment**: an operator who mistypes `certificate` has told their
+machine to watch one, and a skipped line means they believe it is watched, nothing is, and the first
+they hear of it is an expired certificate. A refused file is announced with every bad line and its
+number, and the universal subjects keep running — a mistake in an optional file must not remove
+watching that was never in question.
+
+`certificate.days.remaining` is the first declared subject, one window per declared path, one finding
+per expiring certificate. Nothing is offered to remedy it: renewal is a deadline met outside this
+machine's control, and an offer would be doing something in order to be seen doing something.
+Per-service availability and backup age are still not watched.
 
 Two of them exist because an existing measure reads healthy while the machine is broken. A filesystem
 out of inodes has free bytes, so every byte-based reading says forty percent used while nothing can be

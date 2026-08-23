@@ -23,16 +23,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let core = Arc::new(TelemetryCore::new(WINDOW_SPAN, WINDOW_CAPACITY));
 
     #[cfg(target_os = "linux")]
+    let declared = linux::declarations();
+
+    #[cfg(target_os = "linux")]
+    for watched in &declared {
+        match watched {
+            cybou_telemetryd::watchlist::Watched::Certificate(path) => {
+                core.watch(
+                    cybou_protocol::telemetry::Subject::CertificateDaysRemaining,
+                    path.to_string_lossy().into_owned(),
+                );
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
     {
         use cybou_fabric::TELEMETRY;
         use cybou_telemetryd::service::Telemetry1Service;
 
         let sampling = core.clone();
+        let watching = declared.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
             loop {
                 interval.tick().await;
-                for reading in linux::sample(time::OffsetDateTime::now_utc()) {
+                let now = time::OffsetDateTime::now_utc();
+                for reading in linux::sample(now) {
+                    sampling.observe(reading);
+                }
+                for reading in linux::sample_declared(&watching, now) {
                     sampling.observe(reading);
                 }
             }
@@ -82,6 +102,7 @@ mod linux {
                 readings.push(Reading {
                     subject,
                     value,
+                    instance: None,
                     at: now,
                 });
             }
@@ -112,6 +133,94 @@ mod linux {
         }
         note(Subject::FailedUnits, failed_units());
         readings
+    }
+
+    /// Where the declaration file lives.
+    ///
+    /// Under the configuration directory rather than the state directory, because it is something a
+    /// person writes and not something the organ derives. ADR-0017 keeps those apart.
+    fn declaration_path() -> std::path::PathBuf {
+        std::env::var_os("XDG_CONFIG_HOME").map_or_else(
+            || {
+                std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_else(|| "/root".into()))
+                    .join(".config/cybou/telemetry.watch")
+            },
+            |base| std::path::PathBuf::from(base).join("cybou/telemetry.watch"),
+        )
+    }
+
+    /// What this host has been told to watch beyond the universal.
+    ///
+    /// A file that cannot be read is announced and treated as empty. Refusing to start would take
+    /// the universal subjects down with a typo in an optional file — the declaration exists to add
+    /// watching, and a mistake in it must not remove any.
+    pub fn declarations() -> Vec<cybou_telemetryd::watchlist::Watched> {
+        let path = declaration_path();
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            return Vec::new();
+        };
+        match cybou_telemetryd::watchlist::parse(&contents) {
+            Ok(watched) => {
+                println!(
+                    "[cybou-telemetryd] {} declared thing(s) to watch from {}",
+                    watched.len(),
+                    path.display()
+                );
+                watched
+            }
+            Err(refusals) => {
+                // Loud, and every line at once. A silently ignored declaration is the outage the
+                // file existed to prevent.
+                for refusal in &refusals {
+                    println!(
+                        "[cybou-telemetryd] {}: {refusal} — nothing from this file is watched",
+                        path.display()
+                    );
+                }
+                Vec::new()
+            }
+        }
+    }
+
+    /// Take one reading of each declared thing.
+    pub fn sample_declared(
+        declared: &[cybou_telemetryd::watchlist::Watched],
+        now: OffsetDateTime,
+    ) -> Vec<Reading> {
+        let mut readings = Vec::new();
+        for watched in declared {
+            let cybou_telemetryd::watchlist::Watched::Certificate(path) = watched;
+            // A certificate that cannot be read produces no reading rather than a zero. Zero days
+            // remaining is the most alarming possible answer, and an unreadable file is not that —
+            // it is a file this process cannot open, which is a different problem.
+            let Some(days) = certificate_days(path) else {
+                continue;
+            };
+            readings.push(Reading {
+                subject: Subject::CertificateDaysRemaining,
+                instance: Some(path.to_string_lossy().into_owned()),
+                value: days,
+                at: now,
+            });
+        }
+        readings
+    }
+
+    /// How long one certificate has left.
+    fn certificate_days(path: &std::path::Path) -> Option<f64> {
+        let output = std::process::Command::new("openssl")
+            .arg("x509")
+            .arg("-enddate")
+            .arg("-noout")
+            .arg("-in")
+            .arg(path)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let text = String::from_utf8(output.stdout).ok()?;
+        probe::certificate_days_remaining(&text, OffsetDateTime::now_utc())
     }
 
     /// How full the root filesystem is, from `statvfs`.

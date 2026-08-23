@@ -42,7 +42,9 @@ fn alarming_for(subject: Subject) -> Alarming {
 
 /// What the telemetry organ holds and concludes.
 pub struct TelemetryCore {
-    windows: RwLock<BTreeMap<Subject, Series>>,
+    /// Keyed by what it is about and which one. A named subject has one window per
+    /// declared thing; a universal one has a single window with no name.
+    windows: RwLock<BTreeMap<(Subject, Option<String>), Series>>,
     span: Duration,
     capacity: usize,
 }
@@ -51,9 +53,12 @@ impl TelemetryCore {
     /// Watch every subject over a window of this span, holding at most `capacity` readings each.
     #[must_use]
     pub fn new(span: Duration, capacity: usize) -> Self {
+        // Only the universal subjects. A named one exists because somebody declared it, and a
+        // window created before the declaration would report a certificate nobody asked about.
         let windows = ALL_SUBJECTS
             .iter()
-            .map(|subject| (*subject, Series::new(*subject, span, capacity)))
+            .filter(|subject| !subject.needs_naming())
+            .map(|subject| ((*subject, None), Series::new(*subject, span, capacity)))
             .collect();
         Self {
             windows: RwLock::new(windows),
@@ -74,10 +79,28 @@ impl TelemetryCore {
         self.capacity
     }
 
+    /// Begin watching one named thing.
+    ///
+    /// Called for each declaration. A window that already exists is left alone, so re-reading the
+    /// declarations does not discard the history of everything still declared.
+    pub fn watch(&self, subject: Subject, instance: String) {
+        if let Ok(mut windows) = self.windows.write() {
+            windows
+                .entry((subject, Some(instance.clone())))
+                .or_insert_with(|| {
+                    Series::named(subject, Some(instance), self.span, self.capacity)
+                });
+        }
+    }
+
     /// Record one observation.
+    ///
+    /// A reading for something not being watched is dropped rather than starting a window. Windows
+    /// begin by declaration; one that appeared because a reading arrived would let a probe decide
+    /// what this host cares about.
     pub fn observe(&self, reading: Reading) {
         if let Ok(mut windows) = self.windows.write()
-            && let Some(series) = windows.get_mut(&reading.subject)
+            && let Some(series) = windows.get_mut(&reading.watching())
         {
             series.observe(reading);
         }
@@ -133,7 +156,10 @@ impl TelemetryCore {
     /// one machine and a Tuesday on another — so projecting it against a number would be inventing
     /// the number.
     #[must_use]
-    pub fn projections(&self, now: OffsetDateTime) -> Vec<(Subject, crate::trend::Projection)> {
+    pub fn projections(
+        &self,
+        now: OffsetDateTime,
+    ) -> Vec<(Subject, Option<String>, crate::trend::Projection)> {
         let Ok(windows) = self.windows.read() else {
             return Vec::new();
         };
@@ -143,6 +169,8 @@ impl TelemetryCore {
                 let alarming = series.subject().alarming()?;
                 Some((
                     series.subject(),
+                    // Which one, or a page of rows all called the same thing.
+                    series.instance().map(ToOwned::to_owned),
                     crate::trend::project(series, alarming, now)?,
                 ))
             })
@@ -185,7 +213,7 @@ impl TelemetryCore {
 /// Some things are a problem on a host where they have always been the case, and a purely
 /// statistical detector says nothing about them precisely because they are normal here.
 fn categorical(
-    windows: &BTreeMap<Subject, Series>,
+    windows: &BTreeMap<(Subject, Option<String>), Series>,
     deviations: &BTreeMap<Subject, Deviation>,
     now: OffsetDateTime,
     id: &impl Fn(Finding) -> Uuid,
@@ -202,7 +230,7 @@ fn categorical(
         Subject::RootFilesystemUsed,
         Subject::RootFilesystemInodesUsed,
     ] {
-        if let Some(series) = windows.get(&subject)
+        if let Some(series) = windows.get(&(subject, None))
             && let Some(latest) = series.latest()
             && alarming_for(subject).reached_by(latest.value)
         {
@@ -220,7 +248,31 @@ fn categorical(
         }
     }
 
-    if let Some(series) = windows.get(&Subject::OpenFileDescriptors)
+    // One per declared certificate rather than one for all of them: an operator with four needs to
+    // know which, and a single finding naming a count would send them looking.
+    for series in windows.values() {
+        if series.subject() != Subject::CertificateDaysRemaining {
+            continue;
+        }
+        let Some(latest) = series.latest() else {
+            continue;
+        };
+        let alarming = alarming_for(Subject::CertificateDaysRemaining);
+        if !alarming.reached_by(latest.value) {
+            continue;
+        }
+        explained.push(Subject::CertificateDaysRemaining);
+        found.push(SystemInsight {
+            insight_id: id(Finding::CertificateExpiring),
+            finding: Finding::CertificateExpiring,
+            because: evidence(deviations, &[Subject::CertificateDaysRemaining]),
+            strength: EvidenceStrength::Strong,
+            concluded_at: now,
+            since: series.continuously_since(alarming).unwrap_or(latest.at),
+        });
+    }
+
+    if let Some(series) = windows.get(&(Subject::OpenFileDescriptors, None))
         && let Some(latest) = series.latest()
         && alarming_for(Subject::OpenFileDescriptors).reached_by(latest.value)
     {
@@ -239,7 +291,7 @@ fn categorical(
         });
     }
 
-    if let Some(series) = windows.get(&Subject::FailedUnits)
+    if let Some(series) = windows.get(&(Subject::FailedUnits, None))
         && let Some(latest) = series.latest()
         && latest.value >= 1.0
     {
@@ -262,7 +314,7 @@ fn categorical(
 /// Memory pressure alone is weak; memory pressure with swap growing is the same story told twice,
 /// which is what makes it stronger.
 fn pressures(
-    windows: &BTreeMap<Subject, Series>,
+    windows: &BTreeMap<(Subject, Option<String>), Series>,
     deviations: &BTreeMap<Subject, Deviation>,
     now: OffsetDateTime,
     id: &impl Fn(Finding) -> Uuid,
@@ -282,7 +334,7 @@ fn pressures(
             Finding::CpuSaturation,
         ),
     ] {
-        let Some(series) = windows.get(&subject) else {
+        let Some(series) = windows.get(&(subject, None)) else {
             continue;
         };
         let Some(latest) = series.latest() else {
@@ -327,7 +379,7 @@ fn pressures(
 /// A detector that only reported what it had a name for would be silent exactly when a host is
 /// doing something nobody anticipated, which is the case an operator most wants to hear about.
 fn unexplained(
-    windows: &BTreeMap<Subject, Series>,
+    windows: &BTreeMap<(Subject, Option<String>), Series>,
     deviations: &BTreeMap<Subject, Deviation>,
     now: OffsetDateTime,
     id: &impl Fn(Finding) -> Uuid,
@@ -339,7 +391,7 @@ fn unexplained(
             continue;
         }
         let since = windows
-            .get(subject)
+            .get(&(*subject, None))
             .and_then(Series::latest)
             .map_or(now, |latest| latest.at);
         found.push(SystemInsight {
@@ -385,6 +437,7 @@ mod tests {
         for index in 0..24 {
             core.observe(Reading {
                 subject,
+                instance: None,
                 value: quiet + f64::from(u8::try_from(index % 3).unwrap_or(0)) * 0.01,
                 at: at(index * 10),
             });
@@ -394,6 +447,7 @@ mod tests {
             let offset = 240 + (index as i64) * 10;
             core.observe(Reading {
                 subject,
+                instance: None,
                 value: *value,
                 at: at(offset),
             });
@@ -409,6 +463,7 @@ mod tests {
         for index in 0..4 {
             core.observe(Reading {
                 subject: Subject::LoadAverage,
+                instance: None,
                 value: 0.4,
                 at: at(index),
             });
@@ -431,6 +486,119 @@ mod tests {
             .expect("a full disk is a finding regardless of statistics");
         assert_eq!(storage.strength, EvidenceStrength::Strong);
         assert!(!storage.because.is_empty(), "the finding cites nothing");
+    }
+
+    #[test]
+    fn a_declared_certificate_is_watched_projected_and_found() {
+        // The whole named-subject path, from declaration to finding. A certificate losing a day a
+        // day is approaching its floor, which is the direction the threshold now carries.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/example.pem".to_owned(),
+        );
+        for tick in 0..40 {
+            core.observe(Reading {
+                subject: Subject::CertificateDaysRemaining,
+                instance: Some("/etc/ssl/example.pem".to_owned()),
+                #[allow(clippy::cast_precision_loss, reason = "a test fixture of forty ticks")]
+                value: 40.0 - (tick as f64) * 0.5,
+                // A minute apart: the window in this fixture spans an hour, and readings an hour
+                // apart would leave two of them in it.
+                at: at(tick * 60),
+            });
+        }
+
+        let latest = core.latest();
+        let certificate = latest
+            .iter()
+            .find(|reading| reading.subject == Subject::CertificateDaysRemaining)
+            .expect("the declared certificate is watched");
+        assert_eq!(
+            certificate.instance.as_deref(),
+            Some("/etc/ssl/example.pem")
+        );
+
+        let projected = core.projections(at(40 * 60));
+        let (_, which, heading) = projected
+            .iter()
+            .find(|(subject, _, _)| *subject == Subject::CertificateDaysRemaining)
+            .expect("a certificate is projected");
+        assert_eq!(which.as_deref(), Some("/etc/ssl/example.pem"));
+        assert!(
+            matches!(heading.reaching, crate::trend::Reaching::AtThisRate { .. }),
+            "{heading:?}"
+        );
+    }
+
+    #[test]
+    fn each_expiring_certificate_is_its_own_finding() {
+        // An operator with four certificates needs to know which. A single finding naming a count
+        // would send them looking through the four themselves.
+        let core = core();
+        for name in ["/etc/ssl/a.pem", "/etc/ssl/b.pem"] {
+            core.watch(Subject::CertificateDaysRemaining, name.to_owned());
+            for tick in 0..20 {
+                core.observe(Reading {
+                    subject: Subject::CertificateDaysRemaining,
+                    instance: Some(name.to_owned()),
+                    value: 3.0,
+                    at: at(tick * 60),
+                });
+            }
+        }
+
+        let expiring = core
+            .insights(at(2000), ids())
+            .into_iter()
+            .filter(|insight| insight.finding == Finding::CertificateExpiring)
+            .count();
+        assert_eq!(expiring, 2);
+    }
+
+    #[test]
+    fn a_certificate_with_months_left_is_not_a_finding() {
+        // The control. Every assertion above passes on a detector that reports every watched
+        // certificate.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/a.pem".to_owned(),
+        );
+        for tick in 0..20 {
+            core.observe(Reading {
+                subject: Subject::CertificateDaysRemaining,
+                instance: Some("/etc/ssl/a.pem".to_owned()),
+                value: 88.0,
+                at: at(tick * 60),
+            });
+        }
+        assert!(
+            !core
+                .insights(at(2000), ids())
+                .iter()
+                .any(|insight| insight.finding == Finding::CertificateExpiring)
+        );
+    }
+
+    #[test]
+    fn a_certificate_nobody_declared_is_not_watched_because_a_reading_arrived() {
+        // Windows begin by declaration. One that appeared because a probe reported something would
+        // let the probe decide what this host cares about.
+        let core = core();
+        core.observe(Reading {
+            subject: Subject::CertificateDaysRemaining,
+            instance: Some("/etc/ssl/undeclared.pem".to_owned()),
+            value: 3.0,
+            at: at(0),
+        });
+        assert!(
+            !core
+                .latest()
+                .iter()
+                .any(|reading| reading.subject == Subject::CertificateDaysRemaining),
+            "an undeclared certificate started a window"
+        );
     }
 
     #[test]

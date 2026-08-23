@@ -100,6 +100,13 @@ pub enum Subject {
     IoPressure,
     /// CPU pressure, some-avg10 from the kernel, in [0.0, 100.0].
     CpuPressure,
+    /// Days remaining on a TLS certificate.
+    ///
+    /// The first subject that needs naming: a host has none, one, or forty certificates, and which
+    /// ones matter is a fact about the deployment rather than about Linux. Declared rather than
+    /// discovered — a subject that went looking for certificates would decide for the operator what
+    /// is worth watching, which is the guess this whole layer refuses everywhere else.
+    CertificateDaysRemaining,
     /// Share of the root filesystem in use, in [0.0, 1.0].
     RootFilesystemUsed,
     /// Share of the root filesystem's inodes in use, in [0.0, 1.0].
@@ -129,6 +136,7 @@ impl Subject {
             Self::MemoryPressure => "memory.pressure",
             Self::IoPressure => "io.pressure",
             Self::CpuPressure => "cpu.pressure",
+            Self::CertificateDaysRemaining => "certificate.days.remaining",
             Self::RootFilesystemUsed => "filesystem.root.used",
             Self::RootFilesystemInodesUsed => "filesystem.root.inodes.used",
             Self::OpenFileDescriptors => "files.open",
@@ -166,6 +174,10 @@ impl Subject {
                 Some(Alarming::AtOrAbove(40.0))
             }
             Self::FailedUnits => Some(Alarming::AtOrAbove(1.0)),
+            // The first subject whose problem is a low value, and the reason the direction had to
+            // travel with the number. Fourteen days is what an automated renewal has already had
+            // several chances to do and has not.
+            Self::CertificateDaysRemaining => Some(Alarming::AtOrBelow(14.0)),
             Self::LoadAverage => None,
         }
     }
@@ -183,22 +195,64 @@ pub const ALL_SUBJECTS: &[Subject] = &[
     Subject::RootFilesystemInodesUsed,
     Subject::OpenFileDescriptors,
     Subject::FailedUnits,
+    Subject::CertificateDaysRemaining,
 ];
+
+impl Subject {
+    /// Whether this subject is about one named thing rather than about the host.
+    ///
+    /// A host has one root filesystem and any number of certificates. The universal subjects are
+    /// readable anywhere with no configuration; a named one exists only because somebody declared
+    /// it, and a reading for it that carried no name would be a measurement of nothing in
+    /// particular.
+    #[must_use]
+    pub const fn needs_naming(self) -> bool {
+        matches!(self, Self::CertificateDaysRemaining)
+    }
+}
 
 /// One number, observed at one instant.
 ///
 /// Deliberately has no path into the Journal. There is no `into_contribution`, no `Kind`, and no
 /// conversion anywhere in this tree — a reading is transient by construction and not by policy.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reading {
     /// What was observed.
     pub subject: Subject,
+    /// Which one, for a subject that is about a named thing.
+    ///
+    /// `None` for the universal subjects, which are about the host itself. A named subject with no
+    /// name would be a measurement of nothing in particular, and two certificates sharing one series
+    /// would produce a baseline for a thing that does not exist.
+    #[serde(default)]
+    pub instance: Option<String>,
     /// What it was.
     pub value: f64,
     /// When.
     #[serde(with = "time::serde::rfc3339")]
     pub at: OffsetDateTime,
+}
+
+impl Reading {
+    /// The key this reading belongs under: what it is about, and which one.
+    #[must_use]
+    pub fn watching(&self) -> (Subject, Option<String>) {
+        (self.subject, self.instance.clone())
+    }
+
+    /// How this reading is named to a person.
+    ///
+    /// The subject alone for the universal ones, and the subject with the thing it is about for a
+    /// named one. A page showing four rows all called `certificate.days.remaining` would be a page
+    /// nobody can act on.
+    #[must_use]
+    pub fn label(&self) -> String {
+        match &self.instance {
+            Some(name) => format!("{} ({name})", self.subject.name()),
+            None => self.subject.name().to_owned(),
+        }
+    }
 }
 
 /// How far a reading sits from what is ordinary for this host.
@@ -282,6 +336,12 @@ pub enum Finding {
     CpuSaturation,
     /// One or more services are in a failed state.
     ServiceFailure,
+    /// A watched certificate is close to expiry, or past it.
+    ///
+    /// Its own finding because nothing else here is about a deadline. Every other failure is a
+    /// resource under pressure that a person can relieve; this one arrives on a date regardless of
+    /// what the machine is doing, and the only remedy is renewal.
+    CertificateExpiring,
     /// The machine is running out of file descriptors.
     ///
     /// Its own finding rather than folded into storage, because the remedy is different: nothing is
@@ -306,6 +366,7 @@ impl Finding {
             Self::CpuSaturation => "cpu-saturation",
             Self::ServiceFailure => "service-failure",
             Self::FileDescriptorExhaustion => "file-descriptor-exhaustion",
+            Self::CertificateExpiring => "certificate-expiring",
             Self::UnexplainedDeviation => "unexplained-deviation",
         }
     }
@@ -324,6 +385,41 @@ mod tests {
         assert_eq!(names.len(), distinct, "two subjects share a name");
         for name in &names {
             assert!(name.contains('.'), "{name} is not a dotted subject name");
+        }
+    }
+
+    #[test]
+    fn a_named_subject_is_labelled_by_the_thing_it_is_about() {
+        // A page showing four rows all called certificate.days.remaining is a page nobody can act
+        // on.
+        let named = Reading {
+            subject: Subject::CertificateDaysRemaining,
+            instance: Some("/etc/ssl/example.pem".to_owned()),
+            value: 31.0,
+            at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),
+        };
+        assert_eq!(
+            named.label(),
+            "certificate.days.remaining (/etc/ssl/example.pem)"
+        );
+
+        let universal = Reading {
+            subject: Subject::LoadAverage,
+            instance: None,
+            value: 0.4,
+            at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),
+        };
+        assert_eq!(universal.label(), "load.average");
+    }
+
+    #[test]
+    fn only_the_subjects_that_are_about_one_thing_need_naming() {
+        for subject in ALL_SUBJECTS {
+            assert_eq!(
+                subject.needs_naming(),
+                *subject == Subject::CertificateDaysRemaining,
+                "{subject:?}"
+            );
         }
     }
 

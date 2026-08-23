@@ -22,6 +22,8 @@ use time::{Duration, OffsetDateTime};
 #[derive(Clone, Debug)]
 pub struct Series {
     subject: Subject,
+    /// Which one, for a subject about a named thing.
+    instance: Option<String>,
     span: Duration,
     capacity: usize,
     readings: VecDeque<Reading>,
@@ -31,11 +33,38 @@ impl Series {
     /// A window over one subject, holding at most `capacity` readings and at most `span` of time.
     #[must_use]
     pub fn new(subject: Subject, span: Duration, capacity: usize) -> Self {
+        Self::named(subject, None, span, capacity)
+    }
+
+    /// A window over one named thing.
+    #[must_use]
+    pub fn named(
+        subject: Subject,
+        instance: Option<String>,
+        span: Duration,
+        capacity: usize,
+    ) -> Self {
         Self {
             subject,
+            instance,
             span,
             capacity: capacity.max(1),
             readings: VecDeque::new(),
+        }
+    }
+
+    /// Which one this window is about, for a named subject.
+    #[must_use]
+    pub fn instance(&self) -> Option<&str> {
+        self.instance.as_deref()
+    }
+
+    /// How this window is named to a person.
+    #[must_use]
+    pub fn label(&self) -> String {
+        match &self.instance {
+            Some(name) => format!("{} ({name})", self.subject.name()),
+            None => self.subject.name().to_owned(),
         }
     }
 
@@ -62,11 +91,14 @@ impl Series {
     /// A reading for the wrong subject is refused rather than stored: a window that accepted
     /// anything would silently mix two things a detector is about to compare against one baseline.
     pub fn observe(&mut self, reading: Reading) -> bool {
-        if reading.subject != self.subject {
+        // Both halves of the key. Two certificates in one window would produce a baseline for a
+        // thing that does not exist, and a detector comparing one against the other's ordinary.
+        if reading.subject != self.subject || reading.instance != self.instance {
             return false;
         }
+        let at = reading.at;
         self.readings.push_back(reading);
-        self.expire(reading.at);
+        self.expire(at);
         true
     }
 
@@ -107,7 +139,7 @@ impl Series {
     /// The most recent reading, if there is one.
     #[must_use]
     pub fn latest(&self) -> Option<Reading> {
-        self.readings.back().copied()
+        self.readings.back().cloned()
     }
 
     /// When the oldest held reading was taken.
@@ -150,6 +182,16 @@ mod tests {
     fn reading(subject: Subject, value: f64, offset: i64) -> Reading {
         Reading {
             subject,
+            instance: None,
+            value,
+            at: at(offset),
+        }
+    }
+
+    fn named_reading(subject: Subject, name: &str, value: f64, offset: i64) -> Reading {
+        Reading {
+            subject,
+            instance: Some(name.to_owned()),
             value,
             at: at(offset),
         }
@@ -192,6 +234,47 @@ mod tests {
         assert!(series.observe(reading(Subject::MemoryPressure, 1.0, 0)));
         assert!(!series.observe(reading(Subject::IoPressure, 90.0, 1)));
         assert_eq!(series.len(), 1);
+    }
+
+    #[test]
+    fn two_named_things_of_the_same_kind_do_not_share_a_window() {
+        // Two certificates in one window would produce a baseline for a thing that does not exist,
+        // and one would be judged against the other's notion of ordinary.
+        let mut series = Series::named(
+            Subject::CertificateDaysRemaining,
+            Some("/etc/ssl/a.pem".to_owned()),
+            Duration::minutes(10),
+            64,
+        );
+        assert!(series.observe(named_reading(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/a.pem",
+            30.0,
+            0
+        )));
+        assert!(!series.observe(named_reading(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/b.pem",
+            2.0,
+            1
+        )));
+        assert_eq!(series.len(), 1);
+        assert_eq!(series.instance(), Some("/etc/ssl/a.pem"));
+        assert_eq!(
+            series.label(),
+            "certificate.days.remaining (/etc/ssl/a.pem)"
+        );
+    }
+
+    #[test]
+    fn a_universal_reading_does_not_land_in_a_named_window() {
+        let mut series = Series::named(
+            Subject::CertificateDaysRemaining,
+            Some("/etc/ssl/a.pem".to_owned()),
+            Duration::minutes(10),
+            64,
+        );
+        assert!(!series.observe(reading(Subject::CertificateDaysRemaining, 30.0, 0)));
     }
 
     #[test]
