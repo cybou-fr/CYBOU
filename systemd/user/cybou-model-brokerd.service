@@ -13,12 +13,16 @@ ExecStart=/usr/libexec/cybou/cybou-model-brokerd
 Restart=on-failure
 RestartSec=1
 NoNewPrivileges=yes
-# No network. No remote route is configured, so the faculty has no reason to reach one, and a
-# broker that could is one configuration mistake away from being the egress nobody noticed. A
-# deployment that adds a remote provider has to remove this line, which is the point: it is a
-# decision somebody makes rather than a default nobody sees.
-RestrictAddressFamilies=AF_UNIX
-PrivateNetwork=yes
+# Egress is governed here, not prohibited. This unit shipped with PrivateNetwork=yes for one day, on
+# the reasoning that a broker able to reach a network is one mistake away from being the egress
+# nobody noticed. That is a good argument on a personal machine and the wrong default on a host
+# whose reason for existing is to be reached (ADR-0041).
+#
+# What actually protects this: no remote route is configured, so there is nothing to reach; adding
+# one is a decision; and what crosses is what a disclosure decision supplied and recorded. A
+# namespace flag would have made that machinery feel optional, which is the worse outcome — the
+# recorded, refusable route is the protection, and it has to be the one that works.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes

@@ -334,6 +334,54 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## Where this runs, decided (2026-08-23)
+
+Nothing in the tree said where Cybou runs, so every decision that needed an answer supplied one
+locally, and they did not agree.
+
+The evidence pointed one way: development, integration and every deployment target a VPS, the
+frontend is a browser artifact over HTTPS, and the desktop shell has never been run on a machine with
+a seat. The prose pointed the other: the README said *local-first*, the model profiles assumed a
+laptop with a GPU, and the brokerage unit shipped with `PrivateNetwork=yes` — a good argument on a
+personal machine and the wrong default on a host whose reason for existing is to be reached.
+
+ADR-0041 settles it. Cybou is a cognitive Linux environment for a VPS, server, VM or container.
+Outside this repository: **Linux that understands and operates itself** — not Linux with a local
+model, and not an AI desktop. The difference is not presentation: those describe a system whose
+intelligence is a component you install, and this describes one whose intelligence is the runtime,
+with models as amplifiers of it.
+
+*Local-sufficient* replaces *local-first*: nothing Cybou needs is remote, and it is built to be
+reached. A larger model may be consulted through an API — as a named external-boundary consumer, whose
+answers are proposals, whose loss is a capability deficit. All of that was already written; what
+changed is that it is now the common path rather than the hypothetical one, so every gate around it
+gets exercised in ordinary operation.
+
+The `PrivateNetwork=yes` shipped hours earlier is removed. What protects the boundary is not a
+namespace flag but the thing that was always supposed to: no remote route is configured, adding one
+is a decision, and what crosses is what a disclosure decision supplied and recorded. A flag would
+have made that machinery feel optional, which is the worse outcome — the recorded, refusable route is
+the protection, and it has to be the one that works.
+
+### Two gates that define the product
+
+**S0 — unplugged.** Cut the network and every model API. On a minimal VPS, Cybou keeps observing its
+Body, answers about its own state, detects known problems, explains them from evidence, remembers its
+open intentions, and forms typed action proposals.
+
+**S0R — plugged back in.** Restore the network and a large model. Language, analysis and planning
+improve sharply. Identity, memory, epistemics, permissions and minimum system control do not change
+owner.
+
+Between them: the model is an amplifier, and what it amplifies exists without it. A system failing S0
+is a client for somebody else's model. A system failing S0R has handed its substrate to one.
+
+**S0R is close to held. S0 is not, and one thing is why: nothing watches the Body.** Perception
+records stable facts — kernel, hostname, memory size — and nothing observes the machine minute to
+minute, so Cybou cannot detect a problem it never saw, and every stage after *detect* has nothing to
+work on. That is now the top of the list, with the constraint that is the whole design rather than a
+caveat on it: **telemetry is not biography.**
+
 ## A faculty, and the namespace is the claim (2026-08-23)
 
 `cybou-model-brokerd` exports `org.cybou.Faculty.ModelBroker1` — a different namespace from every

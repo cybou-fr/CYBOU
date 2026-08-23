@@ -11,13 +11,22 @@ SPDX-License-Identifier: MIT
 
 **An experimental agent-native operating system with a persistent cognitive control plane**
 
-Debian 13 · Rust/WebAssembly · one frontend for web and, as a target, desktop · local-first
+Debian 13 · Rust/WebAssembly · server-side, reached through a browser · local-sufficient
 
 </div>
 
 ## What Cybou is
 
-Cybou is an experimental agent-native environment targeting Debian 13. The architecture builds one
+Cybou is an experimental agent-native environment for a **server or container** running Debian 13 —
+a machine that runs unattended and is reached remotely (ADR-0041). A personal workstation is a
+supported place to run it and is not what it is for.
+
+*Local-sufficient* rather than local-first: nothing Cybou needs to function is remote, and it is
+built to be reached. The cognitive layer — biography, identity, epistemics, context, attention,
+meaning, planning, disclosure — is deterministic, loads no model, needs no accelerator, and keeps
+working with no network at all. A larger model may be consulted through an API as a governed
+external-boundary consumer; it makes answers more fluent and lets Cybou attempt things it otherwise
+cannot, and it is not what makes Cybou work. The architecture builds one
 Rust/WebAssembly frontend (Living Canvas) shared by ordinary browsers and, as a target, a lightweight
 Chromium/Wayland desktop shell. A Debian-native launcher now exists — Cage showing one Chromium
 window over the loopback gateway, installed by a deployment and left disabled — but it has never

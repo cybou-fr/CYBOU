@@ -17,6 +17,27 @@ and NixOS trees it describes were removed on 2026-08-20.
 > **Make every claim the system makes about itself traceable to a source, before giving it a
 > language.**
 
+Still the objective, and ADR-0041 says what it is *for*. Cybou is a cognitive Linux environment for
+a VPS, server, VM or container — a machine that runs unattended, is reached through a browser, and is
+expected to look after itself. Outside this repository: **Linux that understands and operates
+itself.** Not Linux with a local model, and not an AI desktop.
+
+Two gates decide whether that is true, and everything below is ordered by them:
+
+> **S0.** Cut internet access and every external model API. On a minimal VPS, Cybou continues to
+> observe its Body, answer basic questions about its own state, detect known problems, explain them
+> through evidence, remember its open intentions, and form typed action proposals.
+
+> **S0R.** Restore the network and connect a large model. Language, analysis and planning improve
+> sharply. Identity, memory, epistemics, permissions and the ability to maintain minimum system
+> control do not change owner.
+
+S0R is close to held: nothing in the substrate loads a model, and a model that answers can only
+return proposals. **S0 is not held, and the reason is one missing thing — nothing watches the Body.**
+Perception records stable facts about the machine (kernel, hostname, memory size) and nothing
+observes it minute to minute, so Cybou cannot detect a problem it never saw, and every stage after
+*detect* has nothing to work on.
+
 The previous barrier was wiring: owners existed and were connected to nothing. That is closed. The
 present barrier is different and harder to see, because nothing looks broken while it holds: a
 value that satisfies its type and states something nobody established. A random UUID passed as a
@@ -24,6 +45,48 @@ contribution identity, a `complete` flag that was the literal `true`, a readines
 true while the chain underneath it was broken.
 
 ## In order
+
+The order changed on 2026-08-23 with ADR-0041. What was queued as a laptop capability — semantic
+search over a person's files — is genuinely useful and is not what distinguishes this from a wrapper
+around a model, because a wrapper can also search files. Nothing else can tell you *why it thinks*
+the database stopped, from evidence it gathered itself, while the internet is down.
+
+The vertical that answers the server question is:
+
+```text
+observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome
+```
+
+Every stage of it exists in this tree except the first and the last two, and the first blocks the
+rest.
+
+0. **Body telemetry, and the line that keeps it out of the biography.** *Not started, and the
+   current top of the list.* A `cybou-telemetryd` that watches what a host actually does — load,
+   memory and I/O pressure, swap, filesystem usage, unit failures, listening services, container
+   state, per-process consumption — in a bounded transient window, minutes to days, configurable.
+
+   The constraint is the whole of the design, not a caveat on it: **telemetry is not biography.** A
+   Journal accumulating a CPU sample every second would be a telemetry database wearing a life story,
+   and every rule that makes the Journal worth having — erasure, retention, provenance, dependency
+   closure — would be applied to numbers that mean nothing individually and cost something to keep
+   forever. What crosses into Event1 is what is meaningful: an anomaly detected, an incident, an
+   investigation, an outcome. Raw samples never do.
+
+   Then, on top of it and in this order: typed `SystemInsight` (a diagnosis is a `Hypothesis` with
+   evidence, never a fact), the answer path so a person can ask *what is going on with this host* and
+   get it from the deterministic layer, and a first governed remediation proposal that is refused
+   until somebody authorizes it.
+
+   The first version of the detector should be statistics, not a neural network — rolling baselines,
+   EWMA, median and MAD, quantiles, change-point detection. Small, fast, explainable, and adapted to
+   the specific machine rather than to a corpus. A learned model comes after there is a corpus to
+   learn from, and exports to ONNX if it earns its place.
+
+   `predictord` is pointed at abstract forecasting and should be pointed at the domain in the same
+   pass: root filesystem utilisation, memory pressure, service availability, restart rates,
+   certificate expiry, backup age. The same statistics aimed at subjects an operator has opinions
+   about is the difference between a forecast and *at this rate `/var` reaches 95% in about three
+   days*.
 
 1. **An inspector, so the record is readable by the person it is about.** *Done 2026-08-22, and
    read the limits below before treating it as finished.* `GET /api/v1/disclosure` answers for the
