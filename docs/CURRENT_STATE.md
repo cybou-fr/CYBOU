@@ -379,6 +379,27 @@ Held as a dev-dependency test rather than an organ. The daemons are separate pro
 this composes the libraries the way a caller composes the interfaces, and its subject is the loss,
 not the transport.
 
+### Then it went flaky, which found two more
+
+A flaky test is normally a test to fix. This one was reporting.
+
+**An unfinished search was claiming an empty world.** A wall clock cut a wide walk before its first
+step. The activation honestly returned nothing, and the plan rendered that as *"Nothing is associated
+with lemon"* — a claim about the world, made from a search that never ran. The `Partial` hedge was
+there and did not help: **a hedge qualifies a claim, it does not withdraw one.** The claim itself had
+to change, to *"the search did not finish, so nothing came back"*. Which also forced a distinction
+worth having: a seed the graph does not hold is *not* a walk that was cut short. Nothing is
+associated with bergamot is true; the walk that happened finished. `was_cut_short()` separates them.
+
+**Two determinism gaps under one roof.** Overflowing the concept budget with equally salient
+concepts left eviction to hash order, so the same sequence of activations produced a different graph
+on every run of the process — including runs that evicted the concept being asked about. Fixing that
+exposed the second immediately: `bundle()` sorted by salience alone, so even an identical graph came
+back in a different order each run. A1 asks that one snapshot produce one bundle; the first fix is
+what makes one *history* produce one snapshot, and the second is what makes one snapshot produce one
+bundle. Both are a label tiebreak, and neither was visible to any single-layer test, because a set
+that is correct-but-unordered passes every assertion about its contents.
+
 ## A dispute that does not survive retrieval was never held (2026-08-23)
 
 ADR-0029 A4 asks that a disputed epistemic state still be disputed after retrieval. It held, in the

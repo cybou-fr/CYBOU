@@ -288,6 +288,11 @@ impl ContextCore {
             b.salience
                 .partial_cmp(&a.salience)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                // By label when salience ties, which it does constantly — concepts activated in one
+                // sweep share a score. Without this the bundle came back in whatever order the hash
+                // yielded, so the same graph produced a differently ordered answer on every run of
+                // the process, and A1 is about the bundle, not only about which concepts are in it.
+                .then_with(|| a.label.cmp(&b.label))
         });
 
         let item_labels: Vec<_> = items.iter().map(|n| n.label.clone()).collect();
@@ -367,6 +372,12 @@ pub fn enforce_node_budget<S: std::hash::BuildHasher>(
         a.1.partial_cmp(&b.1)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.2.cmp(&b.2))
+            // By label last, because the two keys above tie constantly: concepts activated in one
+            // sweep share an instant and often a salience, and without this the survivors were
+            // whatever the hash happened to order first — different on every run of the process.
+            // A1 asks that one snapshot produce one bundle; this is what makes one *history*
+            // produce one snapshot, which is the assumption A1 rests on.
+            .then_with(|| a.0.cmp(&b.0))
     });
 
     let dropped: Vec<String> = ranked

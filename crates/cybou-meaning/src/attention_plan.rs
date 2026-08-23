@@ -35,10 +35,19 @@ pub fn plan_attention(seed: &str, admission: &Admission, plan_id: Uuid) -> Respo
     let mut qualifications = Vec::new();
 
     if admission.considered == 0 {
-        // Nothing was proposed. Distinct from everything being refused, and worth its own sentence:
-        // one says the graph had nothing, the other says attention had no room, and a person can
-        // act on the second.
-        key_points.push(format!("Nothing is associated with {seed}."));
+        if admission.upstream_complete {
+            // Nothing was proposed, by a retrieval that finished. This is the one case where the
+            // graph genuinely holds nothing, and it is the only case where saying so is true.
+            key_points.push(format!("Nothing is associated with {seed}."));
+        } else {
+            // Nothing was proposed by a retrieval that never finished, which is not the same fact
+            // at all — and the difference is the substrate's oldest rule: partial is not empty
+            // truth. A `Partial` hedge beside "nothing is associated" does not repair it, because a
+            // hedge qualifies a claim and does not withdraw one. The claim itself has to change.
+            key_points.push(format!(
+                "The search for what is associated with {seed} did not finish, so nothing came back."
+            ));
+        }
     } else if admission.admitted.is_empty() {
         key_points.push(format!(
             "{} things came to mind for {seed}, and none could be attended to.",
@@ -191,6 +200,34 @@ mod tests {
         assert!(empty_graph.key_points[0].contains("Nothing is associated"));
         assert!(no_room.key_points[0].contains("none could be attended to"));
         assert!(no_room.qualifications.contains(&Qualification::Partial));
+    }
+
+    #[test]
+    fn a_search_that_did_not_finish_never_reports_that_nothing_is_associated() {
+        // Found by a flaky end-to-end run, which is the only place it could have been found: a
+        // wall clock cut a two-thousand-edge walk before its first step, the activation honestly
+        // returned nothing, and the plan turned an unfinished search into the claim that the graph
+        // was empty. Partial is not empty truth, and a hedge qualifies a claim without withdrawing
+        // one — so the claim itself changes.
+        let mut unfinished = admission(Vec::new(), 0, true);
+        unfinished.upstream_complete = false;
+        let plan = plan_attention("lemon", &unfinished, id());
+
+        assert!(
+            !plan.key_points[0].contains("Nothing is associated"),
+            "an unfinished search reported an empty graph: {}",
+            plan.key_points[0]
+        );
+        assert!(plan.key_points[0].contains("did not finish"));
+        assert!(plan.qualifications.contains(&Qualification::Partial));
+    }
+
+    #[test]
+    fn a_search_that_did_finish_and_found_nothing_says_so_plainly() {
+        // The control. Without it the fix above could be a renderer that never commits to anything.
+        let plan = plan_attention("bergamot", &admission(Vec::new(), 0, true), id());
+        assert!(plan.key_points[0].contains("Nothing is associated"));
+        assert!(plan.qualifications.is_empty());
     }
 
     #[test]

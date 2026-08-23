@@ -152,6 +152,21 @@ impl ActivationSession {
             .collect()
     }
 
+    /// Whether a budget stopped this walk before it ran out of graph.
+    ///
+    /// Narrower than `!complete`, and the difference matters to whoever turns this into a sentence.
+    /// A seed the graph does not hold makes a session incomplete — the answer is less than what was
+    /// asked for — but the walk that did happen finished, and "nothing is associated with bergamot"
+    /// is a true thing to say. A budget cutting the walk short is the other case entirely: nothing
+    /// came back and the graph was never asked, so the same sentence would be a claim about the
+    /// world made from a search that did not run.
+    #[must_use]
+    pub fn was_cut_short(&self) -> bool {
+        self.exhausted
+            .iter()
+            .any(|reason| *reason != Exhausted::UnknownSeed)
+    }
+
     /// Whether anything reached carries a standing a reader has to be told about.
     ///
     /// Offered so a consumer cannot present a bundle as settled without having looked. It is a
@@ -691,6 +706,39 @@ mod tests {
         assert!(whole.exhausted.is_empty());
         // "unrelated" is in the graph and reachable from nothing, so it is not brought to mind.
         assert!(!whole.items.iter().any(|item| item.label == "unrelated"));
+    }
+
+    #[test]
+    fn a_seed_that_is_not_there_is_not_a_walk_that_was_cut_short() {
+        // Two ways to come back with nothing, and only one of them means the graph was never asked.
+        let (nodes, links) = kitchen();
+        let absent = activate_from(
+            &nodes,
+            &links,
+            &seeds(&["bergamot"]),
+            &ActivationBudget::default(),
+            patient(),
+        );
+        assert!(
+            !absent.complete,
+            "the answer is less than what was asked for"
+        );
+        assert!(
+            !absent.was_cut_short(),
+            "but the walk that happened finished"
+        );
+
+        let hurried = activate_from(
+            &nodes,
+            &links,
+            &seeds(&["lemon"]),
+            &ActivationBudget {
+                time: Duration::ZERO,
+                ..ActivationBudget::default()
+            },
+            patient(),
+        );
+        assert!(hurried.was_cut_short());
     }
 
     #[test]

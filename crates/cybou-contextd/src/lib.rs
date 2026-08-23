@@ -83,6 +83,33 @@ mod tests {
     }
 
     #[test]
+    fn the_same_history_of_activations_always_leaves_the_same_concepts_behind() {
+        // Found by a flaky end-to-end test. Overflowing the concept budget with equally salient
+        // concepts activated in one sweep left the survivors to hash order, so the same sequence of
+        // activations produced a different graph on every run of the process — including runs where
+        // the concept being asked about was the one evicted. A1 asks that one snapshot produce one
+        // bundle; this is what makes one history produce one snapshot.
+        fn overflowed() -> Vec<String> {
+            let context_engine = ContextCore::new();
+            let now = OffsetDateTime::now_utc();
+            for index in 0..(context_engine.budget().nodes + 200) {
+                context_engine.activate(format!("concept-{index:04}"), 1.0, "swept", now);
+            }
+            context_engine
+                .active_context()
+                .into_iter()
+                .map(|node| node.label)
+                .collect()
+        }
+
+        let survivors = overflowed();
+        assert_eq!(survivors.len(), ContextCore::new().budget().nodes);
+        for _ in 0..4 {
+            assert_eq!(overflowed(), survivors);
+        }
+    }
+
+    #[test]
     fn the_organ_can_be_asked_what_a_word_brings_to_mind() {
         // The walk is wired to the graph the organ actually holds, and to a real clock. Without
         // this the module would be correct and unreachable, which is how `Realize` sat unused.

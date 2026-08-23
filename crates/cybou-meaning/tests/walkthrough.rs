@@ -77,7 +77,7 @@ fn walk(
 
     let seed = interpreted.primary_act.subject.clone();
     let session = context.bring_to_mind(std::slice::from_ref(&seed), budget);
-    let admission = workspace.consider(&session.proposals(), session.complete);
+    let admission = workspace.consider(&session.proposals(), !session.was_cut_short());
     let plan = plan_attention(&seed, &admission, plan_id());
     realize(&plan, Language::English)
 }
@@ -129,12 +129,16 @@ fn a_walk_the_budget_cut_short_says_so_in_the_sentence() {
 
 #[test]
 fn a_flood_reaches_the_sentence_as_a_flood_that_was_turned_away() {
-    // A11 the whole way. Two thousand things came to mind, the quota admitted a handful, and the
+    // A11 the whole way. Hundreds of things came to mind, the quota admitted a handful, and the
     // person is told both numbers rather than shown the handful.
+    //
+    // The graph is kept inside the organ's own concept budget on purpose. Overflowing that budget
+    // is a different behaviour with its own test, and mixing the two here made this test about
+    // which concepts survived eviction rather than about what attention did with them.
     let context = ContextCore::new();
     let now = OffsetDateTime::now_utc();
     context.activate_with_standing("lemon", 1.0, "observed", now, 0, EpistemicStatus::Observed);
-    for index in 0..2000 {
+    for index in 0..400 {
         let label = format!("concept-{index:04}");
         context.activate_with_standing(&label, 1.0, "observed", now, 0, EpistemicStatus::Observed);
         context.associate(
@@ -154,10 +158,15 @@ fn a_flood_reaches_the_sentence_as_a_flood_that_was_turned_away() {
         &ActivationBudget {
             nodes: 64,
             edges: 4096,
+            // Generous on purpose. This test is about the quota, and the default 30ms budget makes
+            // it about whichever machine is running it — a walk over four thousand edges on a busy
+            // builder can be cut before its first step. That behaviour is correct and has its own
+            // test; leaving it here made this one flaky, and a flaky test is a test nobody reads.
+            time: std::time::Duration::from_secs(45),
             ..ActivationBudget::default()
         },
     );
-    let admission = workspace.consider(&session.proposals(), session.complete);
+    let admission = workspace.consider(&session.proposals(), !session.was_cut_short());
     let prose = realize(
         &plan_attention(&seed, &admission, plan_id()),
         Language::English,
@@ -171,6 +180,28 @@ fn a_flood_reaches_the_sentence_as_a_flood_that_was_turned_away() {
         prose.contains(&format!("of {}", admission.considered)),
         "the size of what was turned away is not in the prose: {prose}"
     );
+    assert!(prose.contains("not the whole of it"), "{prose}");
+}
+
+#[test]
+fn a_clock_that_cuts_the_walk_before_its_first_step_does_not_produce_an_empty_graph() {
+    // The flake, pinned. A walk given no time at all reaches nothing, and "nothing came back" must
+    // not be rendered as "nothing is associated with lemon" — the first is about the search, the
+    // second is a claim about the world.
+    let prose = walk(
+        &kitchen(None),
+        &WorkspaceCore::new(32),
+        "what is lemon",
+        &ActivationBudget {
+            time: std::time::Duration::ZERO,
+            ..ActivationBudget::default()
+        },
+    );
+    assert!(
+        !prose.contains("Nothing is associated"),
+        "an unfinished search reported an empty graph: {prose}"
+    );
+    assert!(prose.contains("did not finish"), "{prose}");
     assert!(prose.contains("not the whole of it"), "{prose}");
 }
 
