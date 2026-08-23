@@ -334,6 +334,48 @@ that amendment the ADR said six, this document said thirteen, `TESTING.md` said 
 recognised thirteen — four statements, three answers, and the Accepted decision was the one nobody
 had changed. Extending the set again requires amending that ADR in the same commit as the code.
 
+## A gate nothing evaluates is a comment (2026-08-23)
+
+ADR-0032 defines a `PromotionGate` with three criteria — independent episodes, success rate, replay
+evaluation — and nothing evaluated it. The thing it was written to stop, a pattern noticed once
+becoming a rule Mind applies, happened exactly as it would have without it. `protocol::promotion`
+now decides, and every answer is either a promotion carrying the numbers it was granted on or a
+refusal naming which criterion was not met. There is no "probably ready".
+
+**The unit of evidence is the episode, not the message.** One episode that produced three messages
+is one demonstration. Counting messages would let a single lucky occasion satisfy "three independent
+episodes" while nothing was ever repeated — and repeatability is the entire content of that
+criterion. The same trap sits in the rate: an episode that went well ten times beside two that
+failed is ten-twelfths successful by message and one-third by episode. So an episode counts as a
+success only if everything observed in it succeeded, and the rate is over episodes. Both traps have
+a test.
+
+**Association is not promoted** (ADR-0029 A5). An associative candidate is refused with fifty
+successful episodes behind it — not because the evidence is weak, but because the associative layer
+is recomputed from the Journal, so a durable artifact promoted into it would be a durable claim on
+something the next erasure epoch rebuilds from nothing. `contextd` may offer associations,
+co-occurrence and activation paths as *inputs* to a candidate. Nothing about having offered them
+makes the candidate promotable. Every other layer stays reachable by earning it — a blanket ban
+would make the gate unpassable and look like caution.
+
+## The rule that held because nothing had been wired yet (2026-08-23)
+
+ADR-0029 fixes an order — Journal, epistemic, associative, attention, meaning — and one rule over
+it: *each layer may read the one above it and may not overrule it.* That rule is what stops a memory
+architecture from being decided by accident.
+
+It held. It held because the wiring did not exist: `contextd` could not reach `epistemicd` because
+`contextd` could not reach anything. That is not a rule holding, it is a rule untested, and it is the
+same shape as A11 — which held right up until activation existed, and then needed a quota. The
+pattern is worth naming: *a gate that passes because its subject is unimplemented will fail the first
+time somebody implements the subject for a good reason.*
+
+`scripts/validate-organ-layering.py` makes the edge itself the thing that fails, in CI. Three
+inverted dependencies were injected to confirm it catches them; none of the real manifests trip it.
+It checks manifests, and says plainly what it does not claim to see — reading upward is allowed, so
+`contextd` naming `epistemicd`'s types would pass and should. What A5 forbids is `contextd` making
+something *known*, and that direction is held by the promotion gate instead.
+
 ## Bounded in size is not bounded in attention (2026-08-23)
 
 Activation can now return what a word brings to mind. The next question is what happens when it

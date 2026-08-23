@@ -26,6 +26,7 @@ pub mod disclosure;
 pub mod governance;
 pub mod learning;
 pub mod meaning;
+pub mod promotion;
 pub mod security;
 
 pub use admission::Kind;
