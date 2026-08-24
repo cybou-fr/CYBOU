@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0D12">
-  <meta name="description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory and recovery, with one Rust/WebAssembly interface.">
+  <meta name="description" content="Linux that understands and operates itself. Cybou is an experimental agent-native operating environment for a server, VPS or container: it watches its own state, diagnoses what is wrong, and shows the readings it reasoned from — with no model loaded.">
   <meta property="og:title" content="Cybou — An agent-native operating environment">
   <meta property="og:description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory and recovery, with one Rust/WebAssembly interface.">
   <meta property="og:type" content="website">
@@ -23,7 +23,7 @@ SPDX-License-Identifier: MIT
   <link rel="alternate" hreflang="en" href="https://cybou.fr/index.html?lang=en">
   <link rel="alternate" hreflang="fr" href="https://cybou.fr/index.html?lang=fr">
   <link rel="alternate" hreflang="ru" href="https://cybou.fr/index.html?lang=ru">
-  <title>Cybou — An agent-native operating environment</title>
+  <title>Cybou — Linux that understands and operates itself</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=20260819-3">
@@ -39,7 +39,7 @@ SPDX-License-Identifier: MIT
         "@type": "Person",
         "name": "Stanislav Saveliev"
       },
-      "description": "An experimental agent-native operating environment: a reproducible system foundation, a twelve-service local typed cognitive runtime called Mind, and a replaceable Rust/WebAssembly interface.",
+      "description": "Linux that understands and operates itself. Cybou is an experimental agent-native operating environment for a server, VPS or container: it watches its own state, diagnoses what is wrong, and shows the readings it reasoned from — with no model loaded.",
       "license": "https://spdx.org/licenses/MIT.html",
       "url": "https://cybou.fr"
     },
@@ -76,7 +76,7 @@ SPDX-License-Identifier: MIT
           "name": "What is the interface built with?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "One Rust/WebAssembly frontend called Living Canvas serves both an ordinary browser and a lightweight desktop web shell. It reads through a read-only Rust gateway bound to loopback that exposes typed session, snapshot, and event streams and has no mutation route. The earlier KDE/Qt shell is migration-era code, not the target."
+            "text": "One Rust/WebAssembly frontend called Living Canvas, served over a Rust gateway that exposes typed session, snapshot, and resumable event routes and no mutation route. The interface is a projection of Mind and never a second owner of state, which is what makes it replaceable."
           }
         },
         {
@@ -84,7 +84,7 @@ SPDX-License-Identifier: MIT
           "name": "What is not implemented yet?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou ships no language model, no agent or worker runtime, no model or tool broker, no privileged action executor, and no autonomous security control plane. Desktop bootstrap authentication is also still open. These are planned boundaries and are never described as done."
+            "text": "Cybou ships no language model, no agent or worker runtime, no tool broker, no privileged action executor, and no autonomous security control plane. The model broker exists as a faculty with no worker behind it. These are planned boundaries and are never described as done."
           }
         },
         {
@@ -92,7 +92,7 @@ SPDX-License-Identifier: MIT
           "name": "What open-source licenses apply?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou code and Nix expressions are licensed under MIT. Original visual assets (wallpapers, desktop themes, SVGs) are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev."
+            "text": "Cybou code and most documentation are licensed under MIT. Original visual assets are licensed under CC BY-SA 4.0. The repository follows the REUSE specification. Copyright (c) 2026 Stanislav Saveliev."
           }
         }
       ]
@@ -176,11 +176,9 @@ SPDX-License-Identifier: MIT
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy reveal">
-        <div class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="hero_eyebrow">Pre-release · Rust/WebAssembly migration in progress</span></div>
-        <h1><span data-i18n="hero_h1_1">A system that remembers.</span><br><span data-i18n="hero_h1_2">A mind that stays in charge.</span></h1>
-        <p class="hero-lead" data-i18n="hero_lead">
-        Cybou is an experimental agent-native operating environment. Twelve local services give it durable memory, identity, health, and recovery — and one Rust/WebAssembly interface renders it in a browser or a desktop shell. No shipped model, no required cloud.
-      </p>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="hero_eyebrow">Pre-release · Server-first · No model shipped</span></div>
+        <h1><span data-i18n="hero_h1_1">Linux that understands</span><br><span data-i18n="hero_h1_2">and operates itself.</span></h1>
+        <p class="hero-lead" data-i18n="hero_lead">Cybou is an experimental agent-native operating environment for a server, VPS or container — a machine that runs unattended and is expected to look after itself. It watches its own state, diagnoses what is wrong, and shows you the readings it reasoned from. With the network down and no model loaded.</p>
         <div class="hero-actions">
           <a class="button button--primary" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/BUILDING.md" target="_blank" rel="noopener">
             <span data-i18n="hero_btn_explore">Build Cybou</span>
@@ -189,10 +187,10 @@ SPDX-License-Identifier: MIT
           <a class="button button--ghost" href="blueprint.html" data-i18n="hero_btn_blueprint">Read Technical Blueprint</a>
         </div>
         <div class="hero-notes" aria-label="Project principles">
-          <span data-i18n="tag_nixos">Reproducible foundation</span>
+          <span data-i18n="tag_nixos">Works unplugged</span>
           <span data-i18n="tag_plasma">Rust · WebAssembly</span>
-          <span data-i18n="tag_ai">Typed local runtime</span>
-          <span data-i18n="tag_telemetry">Zero Telemetry</span>
+          <span data-i18n="tag_ai">Evidence, not assertions</span>
+          <span data-i18n="tag_telemetry">Reports nothing to us</span>
         </div>
       </div>
 
@@ -261,10 +259,8 @@ SPDX-License-Identifier: MIT
 
     <section class="statement reveal" id="experience">
       <p class="section-kicker" data-i18n="kicker_interface">01 · Interface</p>
-      <h2><span data-i18n="exp_h2_1">One interface.</span><br><em data-i18n="exp_h2_2">Two surfaces.</em></h2>
-      <p data-i18n="exp_lead">
-        The same Rust/WebAssembly frontend runs in an ordinary browser and in a minimal desktop shell that owns a single Wayland surface. The interface is a projection of Mind, never a second owner of state — which is why it can be replaced without touching memory, identity, or policy.
-      </p>
+      <h2><span data-i18n="exp_h2_1">It watches the machine.</span><br><em data-i18n="exp_h2_2">Then it explains itself.</em></h2>
+      <p data-i18n="exp_lead">Load, memory and I/O pressure, filesystem and inode usage, open descriptors, failed units — plus the certificates, services and backups you declare. What it concludes from them is a hypothesis carrying the readings behind it, never a fact. Ask why it thinks so and it shows you the numbers, not a sentence a model composed.</p>
     </section>
 
     <section class="feature-grid">
@@ -300,14 +296,12 @@ SPDX-License-Identifier: MIT
     <section class="foundation" id="foundation">
       <div class="foundation-copy reveal">
         <p class="section-kicker" data-i18n="kicker_foundation">02 · Foundation</p>
-        <h2><span data-i18n="found_h2_1">Declarative by nature.</span><br><em data-i18n="found_h2_2">Reversible by design.</em></h2>
-        <p data-i18n="found_lead">
-          Underneath, Cybou inherits reproducible configuration and generation rollback. Updates become explicit system states — understandable, testable and recoverable. Nothing becomes visible before its owner has durably committed it.
-        </p>
+        <h2><span data-i18n="found_h2_1">It can propose.</span><br><em data-i18n="found_h2_2">It cannot act.</em></h2>
+        <p data-i18n="found_lead">Cybou forms typed remediation proposals, criticises each one against the finding it claims to relieve, and puts it to a standing policy that grants nothing until you configure it. Nothing in this build can carry a privileged operation out. The boundary was written before the executor on purpose — written the other way round, an executor arrives with the decision to act already inside it.</p>
         <div class="foundation-points">
-          <div><span>01</span><p><strong data-i18n="p1_head">Reproducible</strong><span data-i18n="p1_text">Build the same system from a locked configuration.</span></p></div>
-          <div><span>02</span><p><strong data-i18n="p2_head">Recoverable</strong><span data-i18n="p2_text">Return to a previous generation when an update fails.</span></p></div>
-          <div><span>03</span><p><strong data-i18n="p3_head">Inspectable</strong><span data-i18n="p3_text">Know what changed before trusting a new state.</span></p></div>
+          <div><span>01</span><p><strong data-i18n="p1_head">Proposed</strong><span data-i18n="p1_text">A typed operation from a closed set, never shell text.</span></p></div>
+          <div><span>02</span><p><strong data-i18n="p2_head">Criticised</strong><span data-i18n="p2_text">Checked against the finding it claims to relieve.</span></p></div>
+          <div><span>03</span><p><strong data-i18n="p3_head">Authorized</strong><span data-i18n="p3_text">Refused until a policy you set permits it.</span></p></div>
         </div>
       </div>
 
@@ -337,25 +331,25 @@ SPDX-License-Identifier: MIT
       <div class="progress-heading">
         <p class="section-kicker" data-i18n="kicker_progress">03 · Live implementation progress</p>
         <h2><span data-i18n="prog_h2_1">Measured execution.</span><br><em data-i18n="prog_h2_2">Verified milestones.</em></h2>
-        <p data-i18n="prog_lead">The verified M1–M6 substrate now carries grounded perception, epistemic projection, crash-safe erasure, and governed context delivery — while the interface layer migrates to Rust and WebAssembly through additive, separately gated steps.</p>
+        <p data-i18n="prog_lead">The substrate carries grounded perception, epistemic projection, crash-safe erasure, governed context delivery, structured meaning, bounded Body telemetry, and a remediation boundary with no executor behind it. Each layer had to be verifiable before the next was allowed to depend on it.</p>
       </div>
 
       <div class="progress-dashboard">
         <div class="progress-card">
-          <div class="card-metric" data-i18n="metric_v_services">12 Mind services</div>
-          <p class="card-label" data-i18n="metric_gate_a">Twelve isolated Mind services with explicit typed ownership</p>
+          <div class="card-metric" data-i18n="metric_v_services">Typed Mind services</div>
+          <p class="card-label" data-i18n="metric_gate_a">Isolated Mind services with explicit typed ownership over D-Bus</p>
           <div class="status-indicator"><span></span><b data-i18n="status_development">Implemented runtime</b></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric" data-i18n="metric_v_tests">37 CTest suites</div>
-          <p class="card-label" data-i18n="metric_tasks">Thirty-seven CTest suites plus reproducible repository policy gates</p>
+          <div class="card-metric" data-i18n="metric_v_tests">One gate, no partial pass</div>
+          <p class="card-label" data-i18n="metric_tasks">One gate script: format, lint, native and browser tests, document and layering validators, live-bus integration</p>
           <div class="status-indicator"><span></span><b data-i18n="status_runtime">Verified baseline</b></div>
         </div>
 
         <div class="progress-card">
           <div class="card-metric" data-i18n="metric_v_crates">Rust workspace</div>
-          <p class="card-label" data-i18n="metric_contrast">One locked Cargo workspace: protocol and codec crates, runtime and storage paths, the read-only gateway, and Living Canvas</p>
+          <p class="card-label" data-i18n="metric_contrast">One locked Cargo workspace with unsafe code forbidden across it</p>
           <div class="status-indicator"><span></span><b data-i18n="status_verified">Migration in progress</b></div>
         </div>
       </div>
@@ -413,19 +407,19 @@ SPDX-License-Identifier: MIT
       <div class="roadmap-track reveal reveal-delay-1">
         <article class="roadmap-item active">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_complete">Complete</p><h3 data-i18n="rm1_title">Reproducible foundation</h3><span data-i18n="rm1_sub">Locked builds · Horizon visual system · ISO</span>
+          <p data-i18n="rm_complete">Complete</p><h3 data-i18n="rm1_title">Mind substrate</h3><span data-i18n="rm1_sub">Durable history · Identity · Erasure · Lifecycle</span>
         </article>
         <article class="roadmap-item active">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_complete">Complete</p><h3 data-i18n="rm2_title">Mind substrate</h3><span data-i18n="rm2_sub">M1–M6 · P6.8 · Lifecycle and recovery</span>
+          <p data-i18n="rm_complete">Complete</p><h3 data-i18n="rm2_title">Web-first Rust surface</h3><span data-i18n="rm2_sub">Protocol crates · Gateway · Living Canvas</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_inprogress">In progress</p><h3 data-i18n="rm3_title">Web-first Rust surface</h3><span data-i18n="rm3_sub">Protocol crates · Gateway · Living Canvas</span>
+          <p data-i18n="rm_inprogress">In progress</p><h3 data-i18n="rm3_title">Body observation and diagnosis</h3><span data-i18n="rm3_sub">Telemetry · Findings · Projections · Meaning</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_inprogress">In progress</p><h3 data-i18n="rm4_title">Grounded cognition and governed action</h3><span data-i18n="rm4_sub">Perception · Language · Agents · Security</span>
+          <p data-i18n="rm_inprogress">In progress</p><h3 data-i18n="rm4_title">Governed action and its outcome</h3><span data-i18n="rm4_sub">Executor · Independent re-observation · Agents</span>
         </article>
       </div>
     </section>
@@ -467,7 +461,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q4">What is the interface built with?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a4">One Rust/WebAssembly frontend called Living Canvas serves both an ordinary browser and a lightweight desktop web shell. It reads through a read-only Rust gateway bound to loopback that exposes typed session, snapshot, and event streams and has no mutation route. The earlier KDE/Qt shell is migration-era code, not the target.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a4">One Rust/WebAssembly frontend called Living Canvas, served over a Rust gateway that exposes typed session, snapshot, and resumable event routes and no mutation route. The interface is a projection of Mind and never a second owner of state, which is what makes it replaceable.</p></div>
         </article>
 
         <article class="faq-item">
@@ -475,7 +469,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q5">What is not implemented yet?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a5">Cybou ships no language model, no agent or worker runtime, no model or tool broker, no privileged action executor, and no autonomous security control plane. Desktop bootstrap authentication is also still open. These are planned boundaries and are never described as done.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a5">Cybou ships no language model, no agent or worker runtime, no tool broker, no privileged action executor, and no autonomous security control plane. The model broker exists as a faculty with no worker behind it. These are planned boundaries and are never described as done.</p></div>
         </article>
 
         <article class="faq-item">
@@ -483,7 +477,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q6">What open-source licenses apply?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a6">Cybou code and Nix expressions are licensed under MIT. Original visual assets (wallpapers, desktop themes, SVGs) are licensed under CC BY-SA 4.0. Copyright (c) 2026 Stanislav Saveliev.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a6">Cybou code and most documentation are licensed under MIT. Original visual assets are licensed under CC BY-SA 4.0. The repository follows the REUSE specification. Copyright (c) 2026 Stanislav Saveliev.</p></div>
         </article>
       </div>
     </section>
@@ -493,7 +487,7 @@ SPDX-License-Identifier: MIT
         <div class="blueprint-mark"><img src="assets/cybou-mark.svg" alt=""></div>
         <p class="section-kicker" data-i18n="bp_banner_kicker">The project starts here</p>
         <h2><span data-i18n="bp_banner_h2_1">A real operating system,</span><br><span data-i18n="bp_banner_h2_2">built one trusted layer at a time.</span></h2>
-        <p data-i18n="bp_banner_desc">The blueprint defines the reproducible foundation, the twelve-service Mind runtime, the Rust/WebAssembly interface path, the verified implementation gates, and the cognitive roadmap.</p>
+        <p data-i18n="bp_banner_desc">The blueprint defines the Mind runtime and its typed ownership, the Rust/WebAssembly interface path, the observation and diagnosis layer, the action boundary, the verified implementation gates, and the cognitive roadmap.</p>
         <div class="blueprint-actions">
           <a class="button button--primary" href="blueprint.html" data-i18n="bp_banner_btn">Read Technical Whitepaper</a>
           <a class="button button--ghost" href="#top" data-i18n="btn_top">Back to top</a>

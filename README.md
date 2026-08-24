@@ -350,6 +350,16 @@ published at [cybou.fr](https://cybou.fr/).
 For collaboration, hardware enablement, distribution work, or security contact:
 [info@cybou.fr](mailto:info@cybou.fr).
 
+### Donations
+
+| | Address |
+|---|---|
+| Solana (SOL) | `39iqkHNMqncEPp3p52zKwUHnYzk2MJbcaHyY4Hhg2fWC` |
+| Bitcoin (BTC) | `bc1q5a0yq9kflu755jz9a7juveelj3lrnaml6cnjur` |
+| Ethereum / USDT (ERC-20) | `0xf4B7fF998600617785ad7D4d0aad3D2Ea342526B` |
+| TRON / USDT (TRC-20) | `TCWmbxJXwes4GLZkVjpKpY3p34mjg4C6qo` |
+
+
 ## License
 
 Code and most documentation are licensed under the MIT License. Design and visual assets may use

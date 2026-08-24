@@ -74,6 +74,7 @@ step "cognitive documents"   python3 scripts/validate-cognitive-docs.py .
 step "desktop styles"        python3 scripts/validate-desktop-styles.py
 step "organ layering"        python3 scripts/validate-organ-layering.py
 step "document links"        python3 scripts/validate-doc-links.py
+step "site wording"          python3 scripts/sync-site-i18n.py --check
 step "multi-daemon organs"   bash scripts/test-multi-daemon-integration.sh
 
 # Licensing headers, because CI runs this and a gate that claims to be every check and is not is the

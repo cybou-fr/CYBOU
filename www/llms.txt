@@ -1,19 +1,33 @@
 # Cybou
 
-> Cybou is an experimental agent-native operating environment. A persistent local runtime called Mind owns durable cognitive state — biography, identity, commitments, prediction, health, lifecycle, and evidence — while models, agents, tools, and user interfaces remain replaceable around it. Created by Stanislav Saveliev.
+> Linux that understands and operates itself. Cybou is an experimental agent-native operating environment for a VPS, server, VM or container — a machine that runs unattended, is reached through a browser, and is expected to look after itself. A persistent local runtime called Mind owns durable cognitive state — biography, identity, commitments, health, evidence, meaning — while models, agents, tools, and user interfaces remain replaceable around it. Created by Stanislav Saveliev.
+
+## What it is for
+
+Cybou is not Linux with a chatbot attached, and it is not an AI desktop. The question it answers is one a server administrator asks: *what is happening to this machine, why do you think so, and what would you do about it* — answered from evidence the machine gathered itself, with the network down and no model loaded.
+
+The vertical it implements is `observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome`. Every stage exists and is tested except one: **nothing in this repository can carry out an action.** That absence is deliberate and is described below.
 
 ## Current Product Boundary
 
-- Twelve isolated Mind user services with explicit ownership and typed local IPC. A model is not Mind, an agent is not Mind, and a tool protocol is not an authorization boundary.
-- Durable causal history, identity continuity, intentions, prediction, self projection, bounded attention, health, lifecycle, recovery, grounded perception, epistemic projection, associative context, and governed context delivery.
-- Journal v3 with crash-safe transitive erasure and independently verifiable causal metadata.
-- A reproducible system foundation with locked Flakes, atomic generations, and rollback; Debian 13 is the active build and verification environment for Linux gates.
-- One Rust/WebAssembly frontend, Living Canvas, shared by an ordinary browser and a lightweight desktop web shell. It reads through a Rust gateway that binds to loopback, is read-only by construction, and exposes typed session, snapshot, and resumable event routes with no mutation route.
-- Local-first operation with no required cloud account, API key, hosted AI service, or telemetry.
+- Mind runs as isolated user services with explicit ownership and typed local IPC over D-Bus. A model is not Mind, an agent is not Mind, and a tool protocol is not an authorization boundary.
+- Durable causal history, identity continuity, intentions, prediction, self projection, bounded attention, health, lifecycle, recovery, grounded perception, epistemic projection, associative context, structured meaning, and governed context delivery.
+- Journal v3 with crash-safe transitive erasure and independently verifiable causal metadata. An erasure destroys the data keys, so a restored backup cannot read what was erased — provided the backup does not also carry the key store.
+- Bounded transient Body telemetry: load, memory, pressure, filesystem and inode usage, open descriptors, failed units, plus certificates, services and backups an operator declares. Telemetry is **not** biography; raw samples never enter the Journal.
+- Findings are hypotheses that carry the readings behind them, never facts. A finding says what it is about — which certificate, which unit — and keeps one identity for as long as it is one condition.
+- Projections say where a watched thing is heading and when it arrives, from robust statistics rather than a model. A probe that stopped reports that its readings stopped, not that the threshold was reached.
+- Remediation proposals are typed, criticised against the finding they claim to relieve, and decided against a standing policy that grants nothing by default.
+- Model brokerage exists as a faculty, not an organ of Mind. With no worker registered it answers by saying what happens instead, which is what a no-model configuration means here.
+- One Rust/WebAssembly frontend, Living Canvas, served over a Rust gateway that exposes typed session, snapshot, and resumable event routes and no mutation route.
+- Local-sufficient operation: nothing Cybou needs to function is remote. No required cloud account, API key, hosted AI service, or telemetry of its users.
 
-Cybou does not currently ship a language model, general agent or worker runtime, model or tool broker, privileged action executor, autonomous security control plane, or distributed Mind. Desktop bootstrap authentication is also not implemented. These are planned capabilities and must not be described as implemented.
+## What is deliberately absent
 
-The KDE/Qt desktop shell is migration-era code retained during the transition, not the target architecture.
+Cybou ships **no privileged action executor**. The proposal, criticism and authorization boundary is built and nothing can carry an operation out. That order is intentional: an executor written first arrives with the decision to act already inside it, and the boundary is what had to exist first.
+
+When an executor is built it will be two processes, not one. `Action1` may authorize and cannot execute; the executor may execute and cannot authorize.
+
+Cybou also ships no language model, no general agent or worker runtime, no tool broker, no autonomous security control plane, and no distributed Mind. These are planned boundaries and must never be described as implemented.
 
 ## Key Links
 
@@ -26,13 +40,14 @@ The KDE/Qt desktop shell is migration-era code retained during the transition, n
 
 ## Technical Details
 
-- Base: NixOS 26.05 stable, locked by `flake.lock`. Debian 13 is the active build and verification host.
-- Mind runtime: C++20, Qt 6, systemd user services, typed D-Bus contracts, and SQLite.
-- Interface: one locked Cargo workspace holding the protocol and fabric codec, runtime and storage paths, web contracts, the read-only web gateway, and the Living Canvas WebAssembly frontend. The gateway binds only to `127.0.0.1`, applies no-store and browser-security headers, and enforces a bounded projection timeout.
+- Language: Rust, one locked Cargo workspace, `unsafe` forbidden across it.
+- Target: Debian 13 is the build, verification and deployment environment. Cybou is developed and deployed server-first.
+- Mind runtime: systemd user services, typed D-Bus contracts, SQLite.
+- Interface: the Living Canvas WebAssembly frontend over the Rust web gateway.
 - Canonical history: `cybou-eventd` is the sole Journal writer.
-- Verification: thirty-seven CTest suites, reproducible repository policy gates, and focused reboot, fault-injection, and KVM continuity gates.
-- Current maturity: pre-release research and engineering software. M1–M6 are complete, M7 is advancing in verified slices, and the Rust/WebAssembly interface migration is additive and separately gated.
-- Telemetry: no telemetry is implemented by Cybou.
+- Verification: one script runs formatting, lint, the native test suite, the browser test suite, the documentation and layering validators, and a multi-daemon integration test on a live session bus. It reports which step failed and never reports a pass it did not get.
+- Current maturity: pre-release research and engineering software.
+- Telemetry: Cybou observes the machine it runs on, for that machine's own operator. It reports nothing to its authors.
 - Contact: info@cybou.fr
 - Licenses: MIT for code and most documentation; CC BY-SA 4.0 for declared original visual assets.
 
@@ -40,28 +55,28 @@ The KDE/Qt desktop shell is migration-era code retained during the transition, n
 
 ### What is Cybou?
 
-Cybou is an experimental agent-native operating environment. A persistent local runtime called Mind owns durable memory, identity, commitments, lifecycle, health, grounded evidence, and bounded context, while models, agents, tools, and interfaces stay replaceable around it.
+Linux that understands and operates itself. A persistent local runtime called Mind owns durable memory, identity, commitments, lifecycle, health, grounded evidence, meaning and bounded context, while models, agents, tools, and interfaces stay replaceable around it. It is built for servers and containers rather than for a desktop.
 
 ### How is this different from adding a chatbot to Linux?
 
-Cybou makes memory, identity, health, lifecycle, and recovery explicit system services with named owners. No model, agent, user interface, or coordinator may become the owner of continuity or authority.
+A chatbot can also read your files. What it cannot do is tell you why *it* thinks the database stopped, from evidence it gathered itself, while the network is down. Cybou makes memory, identity, health, lifecycle, observation and authority explicit system services with named owners. No model, agent, interface, or coordinator may become the owner of continuity or authority.
 
 ### Does Cybou include an AI model?
 
-No. The current runtime is useful without a language model. Future language or model faculties are intended to be optional and governed, and may not become the owner of identity, memory, authorization, or continuity.
+No. The runtime is useful without one: it observes, diagnoses, explains and proposes with no model loaded. A model faculty is optional and governed, may interpret and propose, and may never become the owner of identity, memory, authorization, or continuity.
 
 ### Does Cybou require cloud services or send telemetry?
 
-No cloud account, API key, or hosted AI service is required for the current runtime or interface. Cybou implements no telemetry. Future external inference or tools, if added, must cross explicit context, sensitivity, egress, and cost policy boundaries.
+No cloud account, API key, or hosted AI service is required. Cybou observes the machine it runs on for that machine's operator and reports nothing to its authors. Future external inference or tools must cross explicit context, sensitivity, egress, and cost policy boundaries.
 
-### What is the interface built with?
+### Can Cybou change my system?
 
-One Rust/WebAssembly frontend serves both an ordinary browser and a lightweight desktop web shell, reading through a read-only gateway bound to loopback. The interface is a projection of Mind and never a second owner of state, which is what makes it replaceable.
+Not today, and not by accident when it can. Nothing in the current build can carry out a privileged operation. Cybou forms typed proposals, criticises them against the finding they claim to relieve, and puts them to a standing policy that grants nothing until an operator configures it.
 
-### How does Cybou support recovery?
+### How will it know whether an action worked?
 
-The system foundation provides declarative configuration, locked dependencies, atomic generations, and rollback. Mind adds explicit persistent ownership, bounded RPC behavior, typed health deficits, lifecycle recovery, and tested fault and reboot boundaries.
+Not from what the action said about itself. An executor reporting its own success is the system grading its own homework — `apt clean` exits zero on a filesystem that is still full. What the operation reported and what the readings show afterwards are recorded separately, and the two disagreeing is a first-class result.
 
 ### What remains planned?
 
-Bootstrap authentication for the desktop surface, and M8–M13: structured language and meaning, lifelong learning, governed action, agent and worker runtimes, model and tool brokerage, autonomous security operations, and distributed perimeter governance. These are not currently shipped.
+A privileged action executor behind the boundary that already exists, an outcome loop closing back into Mind, a registered model worker, lifelong learning and learned-artifact governance, agent and worker runtimes, tool brokerage, autonomous security operations, and distributed perimeter governance. These are not currently shipped.
