@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// tested without a kernel.
 #[cfg(target_os = "linux")]
 mod linux {
-    use cybou_protocol::telemetry::{Reading, Subject};
+    use cybou_protocol::telemetry::{MetricKey, Reading, Subject};
     use cybou_telemetryd::probe;
     use cybou_telemetryd::watchlist::Watched;
     use time::OffsetDateTime;
@@ -116,9 +116,8 @@ mod linux {
         let mut note = |subject: Subject, value: Option<f64>| {
             if let Some(value) = value {
                 readings.push(Reading {
-                    subject,
+                    key: MetricKey::host(subject),
                     value,
-                    instance: None,
                     at: now,
                 });
             }
@@ -228,8 +227,7 @@ mod linux {
                 continue;
             };
             readings.push(Reading {
-                subject,
-                instance: Some(instance),
+                key: MetricKey::named(subject, instance),
                 value,
                 at: now,
             });

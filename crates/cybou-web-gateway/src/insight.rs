@@ -18,7 +18,7 @@
 //! would say. There is no executor behind any of them, and this module has no way to reach one.
 
 use cybou_protocol::action::{AuthorizationVerdict, RiskLevel};
-use cybou_protocol::telemetry::{ALL_SUBJECTS, EvidenceStrength, Subject, SystemInsight};
+use cybou_protocol::telemetry::{ALL_SUBJECTS, EvidenceStrength, MetricKey, SystemInsight};
 use cybou_remediation::{StandingPolicy, authorize, criticise, propose};
 use cybou_telemetryd::trend::{Projection, Reaching, Trend};
 use cybou_web_contracts::{
@@ -35,9 +35,9 @@ use uuid::Uuid;
 #[must_use]
 pub fn project(
     insights: &[SystemInsight],
-    observed: &[Subject],
+    observed: &[MetricKey],
     watched_enough: bool,
-    projections: &[(Subject, Option<String>, Projection)],
+    projections: &[(MetricKey, Projection)],
     now: OffsetDateTime,
 ) -> InsightProjection {
     let plan = cybou_meaning::plan_system_state(
@@ -59,19 +59,19 @@ pub fn project(
             .collect(),
         unobserved: ALL_SUBJECTS
             .iter()
-            .filter(|subject| !observed.contains(subject))
+            .filter(|subject| !observed.iter().any(|key| key.subject == **subject))
             .map(|subject| subject.name().to_owned())
             .collect(),
         projections: projections
             .iter()
-            .map(|(subject, which, projection)| heading(*subject, which.as_deref(), projection))
+            .map(|(key, projection)| heading(key, projection))
             .collect(),
         said: cybou_meaning::realize(&plan, cybou_meaning::Language::English),
     }
 }
 
 /// One subject's direction, as a reader receives it.
-fn heading(subject: Subject, which: Option<&str>, projection: &Projection) -> ProjectionProjection {
+fn heading(key: &MetricKey, projection: &Projection) -> ProjectionProjection {
     let (reaching, after_seconds, beyond) = match projection.reaching {
         Reaching::Already => ("already", None, false),
         Reaching::AtThisRate {
@@ -89,10 +89,7 @@ fn heading(subject: Subject, which: Option<&str>, projection: &Projection) -> Pr
     ProjectionProjection {
         // The thing it is about, not just the kind. A page of rows all called
         // `certificate.days.remaining` is a page nobody can act on.
-        subject: match which {
-            Some(name) => format!("{} ({name})", subject.name()),
-            None => subject.name().to_owned(),
-        },
+        subject: key.label(),
         trend: match projection.trend {
             Trend::Rising(_) => "rising",
             Trend::Falling(_) => "falling",
@@ -144,11 +141,11 @@ fn finding(insight: &SystemInsight, now: OffsetDateTime) -> FindingProjection {
         readings: insight
             .because
             .iter()
-            .map(|(subject, deviation)| ReadingProjection {
-                subject: subject.name().to_owned(),
-                observed: deviation.observed,
-                ordinary: deviation.ordinary,
-                spread: deviation.spread,
+            .map(|evidence| ReadingProjection {
+                subject: evidence.key.label(),
+                observed: evidence.deviation.observed,
+                ordinary: evidence.deviation.ordinary,
+                spread: evidence.deviation.spread,
             })
             .collect(),
         offers: offers(insight, now),
@@ -160,9 +157,10 @@ fn finding(insight: &SystemInsight, now: OffsetDateTime) -> FindingProjection {
 /// Taken from the same planner that writes the prose, so the phrase on a card and the phrase in the
 /// sentence cannot drift apart into two descriptions of one thing.
 fn means(insight: &SystemInsight) -> String {
+    let everything: Vec<MetricKey> = ALL_SUBJECTS.iter().copied().map(MetricKey::host).collect();
     let plan = cybou_meaning::plan_system_state(
         std::slice::from_ref(insight),
-        ALL_SUBJECTS,
+        &everything,
         true,
         Uuid::nil(),
     );
@@ -219,7 +217,7 @@ fn offers(insight: &SystemInsight, now: OffsetDateTime) -> Vec<OfferProjection> 
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::telemetry::{Deviation, Finding};
+    use cybou_protocol::telemetry::{Deviation, Finding, InsightEvidence, Subject};
 
     use super::*;
 
@@ -227,19 +225,25 @@ mod tests {
         OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("a fixed instant")
     }
 
+    /// Every universal subject, read.
+    fn everything() -> Vec<MetricKey> {
+        ALL_SUBJECTS.iter().copied().map(MetricKey::host).collect()
+    }
+
     fn insight(finding: Finding, strength: EvidenceStrength) -> SystemInsight {
         SystemInsight {
             insight_id: Uuid::from_u128(1),
             finding,
-            because: vec![(
-                Subject::RootFilesystemUsed,
-                Deviation {
+            about: None,
+            because: vec![InsightEvidence {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                deviation: Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.96,
                     spreads_away: 22.9,
                 },
-            )],
+            }],
             strength,
             concluded_at: at(),
             since: at(),
@@ -251,7 +255,7 @@ mod tests {
         // A surface showing the same thing for both would tell a person their machine is fine when
         // nobody looked.
         let silent = unread();
-        let calm = project(&[], ALL_SUBJECTS, true, &[], at());
+        let calm = project(&[], &everything(), true, &[], at());
 
         assert_eq!(silent.knowledge, cybou_protocol::KnowledgeState::Unknown);
         assert_eq!(calm.knowledge, cybou_protocol::KnowledgeState::Known);
@@ -269,7 +273,7 @@ mod tests {
                 Finding::StorageExhaustion,
                 EvidenceStrength::Strong,
             )],
-            ALL_SUBJECTS,
+            &everything(),
             true,
             &[],
             at(),
@@ -287,7 +291,7 @@ mod tests {
     fn a_guess_offers_to_look_and_is_refused_everything_else() {
         let projected = project(
             &[insight(Finding::ServiceFailure, EvidenceStrength::Weak)],
-            ALL_SUBJECTS,
+            &everything(),
             true,
             &[],
             at(),
@@ -314,7 +318,7 @@ mod tests {
                 Finding::StorageExhaustion,
                 EvidenceStrength::Strong,
             )],
-            ALL_SUBJECTS,
+            &everything(),
             true,
             &[],
             at(),
@@ -329,10 +333,11 @@ mod tests {
     fn what_was_never_looked_at_is_on_the_wire_too() {
         // So an all-clear can be read against what was actually watched rather than as a statement
         // about everything.
-        let partial: Vec<Subject> = ALL_SUBJECTS
+        let partial: Vec<MetricKey> = ALL_SUBJECTS
             .iter()
             .filter(|subject| **subject != Subject::MemoryPressure)
             .copied()
+            .map(MetricKey::host)
             .collect();
         let projected = project(&[], &partial, true, &[], at());
         assert_eq!(projected.unobserved, vec!["memory.pressure".to_owned()]);
@@ -341,7 +346,7 @@ mod tests {
 
     #[test]
     fn a_host_that_has_not_watched_long_enough_says_so_on_the_wire() {
-        let projected = project(&[], ALL_SUBJECTS, false, &[], at());
+        let projected = project(&[], &everything(), false, &[], at());
         assert!(!projected.watched_enough);
         assert!(projected.said.contains("not been watching"));
     }
@@ -355,7 +360,7 @@ mod tests {
                 Finding::StorageExhaustion,
                 EvidenceStrength::Strong,
             )],
-            ALL_SUBJECTS,
+            &everything(),
             true,
             &[],
             at(),
@@ -375,9 +380,9 @@ mod tests {
             Finding::StorageExhaustion,
             EvidenceStrength::Strong,
         )];
-        let first = project(&insights, ALL_SUBJECTS, true, &[], at());
+        let first = project(&insights, &everything(), true, &[], at());
         for _ in 0..8 {
-            assert_eq!(project(&insights, ALL_SUBJECTS, true, &[], at()), first);
+            assert_eq!(project(&insights, &everything(), true, &[], at()), first);
         }
     }
 }

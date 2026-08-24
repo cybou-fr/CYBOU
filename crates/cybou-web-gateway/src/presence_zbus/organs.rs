@@ -58,7 +58,7 @@ impl ZbusPresenceSource {
             .map(|readings| {
                 readings
                     .into_iter()
-                    .map(|reading| reading.subject)
+                    .map(|reading| reading.key)
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
@@ -75,8 +75,7 @@ impl ZbusPresenceSource {
             .and_then(|encoded| {
                 ciborium::from_reader::<
                     Vec<(
-                        cybou_protocol::telemetry::Subject,
-                        Option<String>,
+                        cybou_protocol::telemetry::MetricKey,
                         cybou_telemetryd::trend::Projection,
                     )>,
                     _,

@@ -102,6 +102,26 @@ Three subjects are declared rather than universal: `certificate.days.remaining`,
 and `backup.age.days`. One window per declared thing, one finding per thing rather than one naming a
 count — an operator with four certificates needs to know which.
 
+**What a measurement is about travels as one key, not two fields.** `MetricKey` is a subject and,
+for a declared thing, which one. It is what the windows are keyed by, what a deviation is keyed by,
+what a finding cites as its evidence, what a projection names, and what a remediation proposal reads
+its target from. The two halves used to travel separately and were repeatedly dropped apart: two
+certificates produced two windows, two findings and *one* deviation, because the map holding the
+deviations had nowhere to put the name — so whichever finding was built second cited the other
+certificate's readings as the evidence for itself. A proposal about a declared service now names the
+unit it would act on, taken from the finding, rather than the `systemd:<unit>` placeholder a
+proposal falls back to when it genuinely does not know which one it means. The count of failed units
+still falls back, because it genuinely does not.
+
+**A finding keeps one identity for as long as it is one condition.** The identity is derived from
+what makes a condition itself — what was concluded, what it is about, and when it began — rather
+than generated per read. A fresh identity per read meant two requests a second apart described one
+physically identical situation with two different identities: harmless while nothing referred to
+them, and an architectural defect the moment an action proposal cites one as its cause, because the
+cause it names would not exist by the time anybody looked. An episode that ends and returns gets a
+new identity, which is correct: it is a new occurrence, and a `since` spanning both would describe a
+stretch of time the host was fine for part of.
+
 **Backup age has no universal threshold, and this build does not invent one.** How stale a backup may
 get is a policy the operator holds, and two backups on one host can honestly disagree, so the number
 comes from the declaration and the subject table supplies none. A backup declared without one is

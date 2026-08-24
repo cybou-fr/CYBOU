@@ -236,6 +236,75 @@ impl Subject {
     }
 }
 
+/// What one measurement is about: a subject, and which one.
+///
+/// The two halves travelled separately until 2026-08-24 and were repeatedly dropped apart. The
+/// windows were keyed by both, and everything downstream — deviations, evidence, projections —
+/// keyed by the subject alone. Two certificates produced two windows, two findings, and one
+/// deviation, because the second overwrote the first in a map that had nowhere to put the name.
+///
+/// A key rather than two fields on each type, so there is one thing to pass and no way to pass half
+/// of it.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricKey {
+    /// What is measured.
+    pub subject: Subject,
+    /// Which one, for a subject about a named thing.
+    ///
+    /// `None` for the universal subjects, which are about the host itself.
+    #[serde(default)]
+    pub instance: Option<String>,
+}
+
+impl MetricKey {
+    /// A key for a subject about the host itself.
+    #[must_use]
+    pub const fn host(subject: Subject) -> Self {
+        Self {
+            subject,
+            instance: None,
+        }
+    }
+
+    /// A key for one named thing.
+    #[must_use]
+    pub const fn named(subject: Subject, instance: String) -> Self {
+        Self {
+            subject,
+            instance: Some(instance),
+        }
+    }
+
+    /// How this reads to a person.
+    ///
+    /// A page showing four rows all called `certificate.days.remaining` is a page nobody can act on.
+    #[must_use]
+    pub fn label(&self) -> String {
+        match &self.instance {
+            Some(name) => format!("{} ({name})", self.subject.name()),
+            None => self.subject.name().to_owned(),
+        }
+    }
+
+    /// What an action about this would be performed on, if anything.
+    ///
+    /// The bridge from measurement to remediation. A finding about
+    /// `service.active (postgresql.service)` can name the unit an action would restart, instead of
+    /// the placeholder a proposal falls back to when it does not know which one it means.
+    #[must_use]
+    pub fn target(&self) -> Option<String> {
+        let instance = self.instance.as_ref()?;
+        Some(match self.subject {
+            Subject::ServiceActive => format!("systemd:{instance}"),
+            Subject::CertificateDaysRemaining | Subject::BackupAgeDays => {
+                format!("path:{instance}")
+            }
+            _ => instance.clone(),
+        })
+    }
+}
+
 /// One number, observed at one instant.
 ///
 /// Deliberately has no path into the Journal. There is no `into_contribution`, no `Kind`, and no
@@ -243,15 +312,8 @@ impl Subject {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reading {
-    /// What was observed.
-    pub subject: Subject,
-    /// Which one, for a subject that is about a named thing.
-    ///
-    /// `None` for the universal subjects, which are about the host itself. A named subject with no
-    /// name would be a measurement of nothing in particular, and two certificates sharing one series
-    /// would produce a baseline for a thing that does not exist.
-    #[serde(default)]
-    pub instance: Option<String>,
+    /// What was observed, and which one.
+    pub key: MetricKey,
     /// What it was.
     pub value: f64,
     /// When.
@@ -260,23 +322,16 @@ pub struct Reading {
 }
 
 impl Reading {
-    /// The key this reading belongs under: what it is about, and which one.
+    /// What was measured.
     #[must_use]
-    pub fn watching(&self) -> (Subject, Option<String>) {
-        (self.subject, self.instance.clone())
+    pub const fn subject(&self) -> Subject {
+        self.key.subject
     }
 
     /// How this reading is named to a person.
-    ///
-    /// The subject alone for the universal ones, and the subject with the thing it is about for a
-    /// named one. A page showing four rows all called `certificate.days.remaining` would be a page
-    /// nobody can act on.
     #[must_use]
     pub fn label(&self) -> String {
-        match &self.instance {
-            Some(name) => format!("{} ({name})", self.subject.name()),
-            None => self.subject.name().to_owned(),
-        }
+        self.key.label()
     }
 }
 
@@ -315,6 +370,19 @@ pub enum EvidenceStrength {
     Strong,
 }
 
+/// One reading behind a finding, and what it is about.
+///
+/// A pair of subject and deviation lost the name of the thing measured, so a finding about one
+/// certificate could carry another certificate's numbers.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightEvidence {
+    /// What the reading was about.
+    pub key: MetricKey,
+    /// How far it sat from ordinary.
+    pub deviation: Deviation,
+}
+
 /// Something the host concluded about itself.
 ///
 /// The only thing in this module that may become a contribution, and it becomes a `Hypothesis`
@@ -328,12 +396,19 @@ pub struct SystemInsight {
     pub insight_id: Uuid,
     /// What the host thinks is happening, in a closed vocabulary.
     pub finding: Finding,
-    /// The subjects that led to it, and how far each was from ordinary.
+    /// What this is about, for a finding about one named thing.
+    ///
+    /// `None` for a finding about the host itself. This is what a remediation proposal names as its
+    /// target: without it a proposal about a service knows only that *a* service is down, and falls
+    /// back to a placeholder unit — which is a proposal to restart whatever came to mind.
+    #[serde(default)]
+    pub about: Option<MetricKey>,
+    /// The readings that led to it, and how far each was from ordinary.
     ///
     /// Carried rather than summarised: *why do you think that* is answered by looking, in the same
     /// way an activation path answers *why did you think of honey*. An insight that could not show
     /// its readings would be indistinguishable from one a model made up.
-    pub because: Vec<(Subject, Deviation)>,
+    pub because: Vec<InsightEvidence>,
     /// How well the evidence supports it.
     pub strength: EvidenceStrength,
     /// When the host concluded it.
@@ -342,6 +417,30 @@ pub struct SystemInsight {
     /// When the behaviour started, as far as the window can tell.
     #[serde(with = "time::serde::rfc3339")]
     pub since: OffsetDateTime,
+}
+
+/// The namespace insight identities are derived in.
+///
+/// A fixed UUID, so the derivation is stable across builds and machines.
+const INSIGHT_NAMESPACE: Uuid = Uuid::from_u128(0x6379_626f_755f_696e_7369_6768_745f_7631);
+
+impl SystemInsight {
+    /// The identity one ongoing condition has, for as long as it is the same condition.
+    ///
+    /// Derived rather than generated. A random identity per read meant that two requests a second
+    /// apart described one physically identical situation with two different identities — harmless
+    /// while nothing referred to them, and an architectural defect the moment an action proposal
+    /// cites one as its cause.
+    ///
+    /// The three parts are what make a condition itself: what was concluded, what it is about, and
+    /// when it began. A memory-pressure episode that ends and returns is a new episode with a new
+    /// `since`, and gets a new identity, which is correct — it is not the same occurrence.
+    #[must_use]
+    pub fn derive_id(finding: Finding, about: Option<&MetricKey>, since: OffsetDateTime) -> Uuid {
+        let about = about.map_or_else(String::new, MetricKey::label);
+        let seed = format!("{}|{about}|{}", finding.name(), since.unix_timestamp());
+        Uuid::new_v5(&INSIGHT_NAMESPACE, seed.as_bytes())
+    }
 }
 
 /// What a host can conclude about itself.
@@ -439,8 +538,10 @@ mod tests {
         // A page showing four rows all called certificate.days.remaining is a page nobody can act
         // on.
         let named = Reading {
-            subject: Subject::CertificateDaysRemaining,
-            instance: Some("/etc/ssl/example.pem".to_owned()),
+            key: MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                "/etc/ssl/example.pem".to_owned(),
+            ),
             value: 31.0,
             at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),
         };
@@ -450,8 +551,7 @@ mod tests {
         );
 
         let universal = Reading {
-            subject: Subject::LoadAverage,
-            instance: None,
+            key: MetricKey::host(Subject::LoadAverage),
             value: 0.4,
             at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),
         };
@@ -515,15 +615,16 @@ mod tests {
         let insight = SystemInsight {
             insight_id: Uuid::from_u128(1),
             finding: Finding::StorageExhaustion,
-            because: vec![(
-                Subject::RootFilesystemUsed,
-                Deviation {
+            about: None,
+            because: vec![InsightEvidence {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                deviation: Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.94,
                     spreads_away: 32.0,
                 },
-            )],
+            }],
             strength: EvidenceStrength::Strong,
             concluded_at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),
             since: OffsetDateTime::from_unix_timestamp(1_786_999_000).expect("an instant"),
@@ -540,6 +641,7 @@ mod tests {
         let insight = SystemInsight {
             insight_id: Uuid::from_u128(2),
             finding: Finding::UnexplainedDeviation,
+            about: None,
             because: Vec::new(),
             strength: EvidenceStrength::Weak,
             concluded_at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),

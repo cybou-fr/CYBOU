@@ -7,10 +7,10 @@ use std::collections::BTreeMap;
 use std::sync::RwLock;
 
 use cybou_protocol::telemetry::{
-    ALL_SUBJECTS, Alarming, Deviation, EvidenceStrength, Finding, Reading, Subject, SystemInsight,
+    ALL_SUBJECTS, Alarming, Deviation, EvidenceStrength, Finding, InsightEvidence, MetricKey,
+    Reading, Subject, SystemInsight,
 };
 use time::{Duration, OffsetDateTime};
-use uuid::Uuid;
 
 use crate::baseline::{SMALLEST_JUDGEABLE_WINDOW, deviation};
 use crate::series::Series;
@@ -44,7 +44,7 @@ fn alarming_for(subject: Subject) -> Alarming {
 pub struct TelemetryCore {
     /// Keyed by what it is about and which one. A named subject has one window per
     /// declared thing; a universal one has a single window with no name.
-    windows: RwLock<BTreeMap<(Subject, Option<String>), Series>>,
+    windows: RwLock<BTreeMap<MetricKey, Series>>,
     span: Duration,
     capacity: usize,
 }
@@ -58,7 +58,12 @@ impl TelemetryCore {
         let windows = ALL_SUBJECTS
             .iter()
             .filter(|subject| !subject.needs_naming())
-            .map(|subject| ((*subject, None), Series::new(*subject, span, capacity)))
+            .map(|subject| {
+                (
+                    MetricKey::host(*subject),
+                    Series::new(*subject, span, capacity),
+                )
+            })
             .collect();
         Self {
             windows: RwLock::new(windows),
@@ -85,20 +90,18 @@ impl TelemetryCore {
     /// declarations does not discard the history of everything still declared.
     pub fn watch(&self, subject: Subject, instance: String, alarming: Option<Alarming>) {
         if let Ok(mut windows) = self.windows.write() {
-            windows
-                .entry((subject, Some(instance.clone())))
-                .or_insert_with(|| {
-                    Series::judged(
-                        subject,
-                        Some(instance),
-                        // What the declaration chose, or what the subject says by default. A named
-                        // subject with neither is watched and never judged categorically, which is
-                        // the honest state for something nobody has set a limit on.
-                        alarming.or_else(|| subject.alarming()),
-                        self.span,
-                        self.capacity,
-                    )
-                });
+            let key = MetricKey::named(subject, instance);
+            windows.entry(key.clone()).or_insert_with(|| {
+                Series::judged(
+                    key,
+                    // What the declaration chose, or what the subject says by default. A named
+                    // subject with neither is watched and never judged categorically, which is the
+                    // honest state for something nobody has set a limit on.
+                    alarming.or_else(|| subject.alarming()),
+                    self.span,
+                    self.capacity,
+                )
+            });
         }
     }
 
@@ -109,7 +112,7 @@ impl TelemetryCore {
     /// what this host cares about.
     pub fn observe(&self, reading: Reading) {
         if let Ok(mut windows) = self.windows.write()
-            && let Some(series) = windows.get_mut(&reading.watching())
+            && let Some(series) = windows.get_mut(&reading.key)
         {
             series.observe(reading);
         }
@@ -132,7 +135,7 @@ impl TelemetryCore {
     ///
     /// Subjects whose window is too short to have an opinion are absent, not neutral.
     #[must_use]
-    pub fn deviations(&self) -> Vec<(Subject, Deviation)> {
+    pub fn deviations(&self) -> Vec<(MetricKey, Deviation)> {
         let Ok(windows) = self.windows.read() else {
             return Vec::new();
         };
@@ -140,7 +143,10 @@ impl TelemetryCore {
             .values()
             .filter_map(|series| {
                 let latest = series.latest()?;
-                Some((series.subject(), deviation(&series.values(), latest.value)?))
+                Some((
+                    series.key().clone(),
+                    deviation(&series.values(), latest.value)?,
+                ))
             })
             .collect()
     }
@@ -165,10 +171,7 @@ impl TelemetryCore {
     /// one machine and a Tuesday on another — so projecting it against a number would be inventing
     /// the number.
     #[must_use]
-    pub fn projections(
-        &self,
-        now: OffsetDateTime,
-    ) -> Vec<(Subject, Option<String>, crate::trend::Projection)> {
+    pub fn projections(&self, now: OffsetDateTime) -> Vec<(MetricKey, crate::trend::Projection)> {
         let Ok(windows) = self.windows.read() else {
             return Vec::new();
         };
@@ -177,9 +180,8 @@ impl TelemetryCore {
             .filter_map(|series| {
                 let alarming = series.alarming()?;
                 Some((
-                    series.subject(),
-                    // Which one, or a page of rows all called the same thing.
-                    series.instance().map(ToOwned::to_owned),
+                    // The whole key, or a page of rows all called the same thing.
+                    series.key().clone(),
                     crate::trend::project(series, alarming, now)?,
                 ))
             })
@@ -191,28 +193,30 @@ impl TelemetryCore {
     /// Every conclusion carries the readings that produced it and is a hypothesis, never a fact.
     /// Findings are returned in a fixed order so two runs over the same windows compare.
     #[must_use]
-    pub fn insights(
-        &self,
-        now: OffsetDateTime,
-        id: impl Fn(Finding) -> Uuid,
-    ) -> Vec<SystemInsight> {
+    pub fn insights(&self, now: OffsetDateTime) -> Vec<SystemInsight> {
         let Ok(windows) = self.windows.read() else {
             return Vec::new();
         };
-        let deviations: BTreeMap<Subject, Deviation> = windows
+        // Keyed by the whole key. Keyed by subject alone, two declared certificates produced two
+        // windows, two findings and one deviation: the second overwrote the first, and whichever
+        // finding was built second cited the other certificate numbers as its evidence.
+        let deviations: BTreeMap<MetricKey, Deviation> = windows
             .values()
             .filter_map(|series| {
                 let latest = series.latest()?;
-                Some((series.subject(), deviation(&series.values(), latest.value)?))
+                Some((
+                    series.key().clone(),
+                    deviation(&series.values(), latest.value)?,
+                ))
             })
             .collect();
 
         let mut found = Vec::new();
-        let mut explained: Vec<Subject> = Vec::new();
+        let mut explained: Vec<MetricKey> = Vec::new();
 
-        categorical(&windows, &deviations, now, &id, &mut found, &mut explained);
-        pressures(&windows, &deviations, now, &id, &mut found, &mut explained);
-        unexplained(&windows, &deviations, now, &id, &mut found, &explained);
+        categorical(&windows, &deviations, now, &mut found, &mut explained);
+        pressures(&windows, &deviations, now, &mut found, &mut explained);
+        unexplained(&windows, &deviations, now, &mut found, &explained);
         found
     }
 }
@@ -222,12 +226,11 @@ impl TelemetryCore {
 /// Some things are a problem on a host where they have always been the case, and a purely
 /// statistical detector says nothing about them precisely because they are normal here.
 fn categorical(
-    windows: &BTreeMap<(Subject, Option<String>), Series>,
-    deviations: &BTreeMap<Subject, Deviation>,
+    windows: &BTreeMap<MetricKey, Series>,
+    deviations: &BTreeMap<MetricKey, Deviation>,
     now: OffsetDateTime,
-    id: &impl Fn(Finding) -> Uuid,
     found: &mut Vec<SystemInsight>,
-    explained: &mut Vec<Subject>,
+    explained: &mut Vec<MetricKey>,
 ) {
     // Categorical first. Some things do not need a baseline: a filesystem at 95% is a problem on
     // a host where it has been at 95% for a month, and a purely statistical detector would say
@@ -239,20 +242,23 @@ fn categorical(
         Subject::RootFilesystemUsed,
         Subject::RootFilesystemInodesUsed,
     ] {
-        if let Some(series) = windows.get(&(subject, None))
+        let key = MetricKey::host(subject);
+        if let Some(series) = windows.get(&key)
             && let Some(latest) = series.latest()
             && alarming_for(subject).reached_by(latest.value)
         {
-            explained.push(subject);
+            explained.push(key.clone());
+            let since = series
+                .continuously_since(alarming_for(subject))
+                .unwrap_or(latest.at);
             found.push(SystemInsight {
-                insight_id: id(Finding::StorageExhaustion),
+                insight_id: SystemInsight::derive_id(Finding::StorageExhaustion, None, since),
                 finding: Finding::StorageExhaustion,
-                because: evidence(deviations, &[subject]),
+                about: None,
+                because: evidence(deviations, &[key]),
                 strength: EvidenceStrength::Strong,
                 concluded_at: now,
-                since: series
-                    .continuously_since(alarming_for(subject))
-                    .unwrap_or(latest.at),
+                since,
             });
         }
     }
@@ -278,50 +284,62 @@ fn categorical(
         let Some(finding) = named_finding(series.subject()) else {
             continue;
         };
-        explained.push(series.subject());
+        let key = series.key().clone();
+        explained.push(key.clone());
+        let since = series.continuously_since(alarming).unwrap_or(latest.at);
         found.push(SystemInsight {
-            insight_id: id(finding),
+            insight_id: SystemInsight::derive_id(finding, Some(&key), since),
             finding,
-            because: evidence(deviations, &[series.subject()]),
+            // Which certificate, which unit, which backup. Without this a proposal to act on the
+            // finding would know only that something of this kind is wrong.
+            about: Some(key.clone()),
+            because: evidence(deviations, &[key]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
-            since: series.continuously_since(alarming).unwrap_or(latest.at),
+            since,
         });
     }
 
-    if let Some(series) = windows.get(&(Subject::OpenFileDescriptors, None))
+    let descriptors = MetricKey::host(Subject::OpenFileDescriptors);
+    if let Some(series) = windows.get(&descriptors)
         && let Some(latest) = series.latest()
         && alarming_for(Subject::OpenFileDescriptors).reached_by(latest.value)
     {
         // The other way a machine stops accepting work while looking well: memory fine, disk fine,
         // load fine, and nothing can open a socket.
-        explained.push(Subject::OpenFileDescriptors);
+        explained.push(descriptors.clone());
+        let since = series
+            .continuously_since(alarming_for(Subject::OpenFileDescriptors))
+            .unwrap_or(latest.at);
         found.push(SystemInsight {
-            insight_id: id(Finding::FileDescriptorExhaustion),
+            insight_id: SystemInsight::derive_id(Finding::FileDescriptorExhaustion, None, since),
             finding: Finding::FileDescriptorExhaustion,
-            because: evidence(deviations, &[Subject::OpenFileDescriptors]),
+            about: None,
+            because: evidence(deviations, &[descriptors]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
-            since: series
-                .continuously_since(alarming_for(Subject::OpenFileDescriptors))
-                .unwrap_or(latest.at),
+            since,
         });
     }
 
-    if let Some(series) = windows.get(&(Subject::FailedUnits, None))
+    let failed = MetricKey::host(Subject::FailedUnits);
+    if let Some(series) = windows.get(&failed)
         && let Some(latest) = series.latest()
         && latest.value >= 1.0
     {
-        explained.push(Subject::FailedUnits);
+        explained.push(failed.clone());
+        let since = series
+            .continuously_since(alarming_for(Subject::FailedUnits))
+            .unwrap_or(latest.at);
         found.push(SystemInsight {
-            insight_id: id(Finding::ServiceFailure),
+            insight_id: SystemInsight::derive_id(Finding::ServiceFailure, None, since),
             finding: Finding::ServiceFailure,
-            because: evidence(deviations, &[Subject::FailedUnits]),
+            // The count says something is wrong, not which unit. Nothing to act on by name.
+            about: None,
+            because: evidence(deviations, &[failed]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
-            since: series
-                .continuously_since(alarming_for(Subject::FailedUnits))
-                .unwrap_or(latest.at),
+            since,
         });
     }
 }
@@ -331,12 +349,11 @@ fn categorical(
 /// Memory pressure alone is weak; memory pressure with swap growing is the same story told twice,
 /// which is what makes it stronger.
 fn pressures(
-    windows: &BTreeMap<(Subject, Option<String>), Series>,
-    deviations: &BTreeMap<Subject, Deviation>,
+    windows: &BTreeMap<MetricKey, Series>,
+    deviations: &BTreeMap<MetricKey, Deviation>,
     now: OffsetDateTime,
-    id: &impl Fn(Finding) -> Uuid,
     found: &mut Vec<SystemInsight>,
-    explained: &mut Vec<Subject>,
+    explained: &mut Vec<MetricKey>,
 ) {
     for (subject, corroborator, finding) in [
         (
@@ -351,32 +368,38 @@ fn pressures(
             Finding::CpuSaturation,
         ),
     ] {
-        let Some(series) = windows.get(&(subject, None)) else {
+        let key = MetricKey::host(subject);
+        let Some(series) = windows.get(&key) else {
             continue;
         };
         let Some(latest) = series.latest() else {
             continue;
         };
         let unusual = deviations
-            .get(&subject)
+            .get(&key)
             .is_some_and(|found| found.spreads_away >= NOTEWORTHY_SPREADS);
         if !unusual && !alarming_for(subject).reached_by(latest.value) {
             continue;
         }
-        let corroborated = corroborator.is_some_and(|other| {
+        let corroborator = corroborator.map(MetricKey::host);
+        let corroborated = corroborator.as_ref().is_some_and(|other| {
             deviations
-                .get(&other)
+                .get(other)
                 .is_some_and(|found| found.spreads_away >= NOTEWORTHY_SPREADS)
         });
-        explained.push(subject);
-        let mut cited = vec![subject];
+        explained.push(key.clone());
+        let mut cited = vec![key];
         if corroborated && let Some(other) = corroborator {
-            explained.push(other);
+            explained.push(other.clone());
             cited.push(other);
         }
+        let since = series
+            .continuously_since(alarming_for(subject))
+            .unwrap_or(latest.at);
         found.push(SystemInsight {
-            insight_id: id(finding),
+            insight_id: SystemInsight::derive_id(finding, None, since),
             finding,
+            about: None,
             because: evidence(deviations, &cited),
             strength: if corroborated {
                 EvidenceStrength::Moderate
@@ -384,9 +407,7 @@ fn pressures(
                 EvidenceStrength::Weak
             },
             concluded_at: now,
-            since: series
-                .continuously_since(alarming_for(subject))
-                .unwrap_or(latest.at),
+            since,
         });
     }
 }
@@ -396,25 +417,27 @@ fn pressures(
 /// A detector that only reported what it had a name for would be silent exactly when a host is
 /// doing something nobody anticipated, which is the case an operator most wants to hear about.
 fn unexplained(
-    windows: &BTreeMap<(Subject, Option<String>), Series>,
-    deviations: &BTreeMap<Subject, Deviation>,
+    windows: &BTreeMap<MetricKey, Series>,
+    deviations: &BTreeMap<MetricKey, Deviation>,
     now: OffsetDateTime,
-    id: &impl Fn(Finding) -> Uuid,
     found: &mut Vec<SystemInsight>,
-    explained: &[Subject],
+    explained: &[MetricKey],
 ) {
-    for (subject, found_deviation) in deviations {
-        if explained.contains(subject) || found_deviation.spreads_away < NOTEWORTHY_SPREADS {
+    for (key, found_deviation) in deviations {
+        if explained.contains(key) || found_deviation.spreads_away < NOTEWORTHY_SPREADS {
             continue;
         }
         let since = windows
-            .get(&(*subject, None))
+            .get(key)
             .and_then(Series::latest)
             .map_or(now, |latest| latest.at);
         found.push(SystemInsight {
-            insight_id: id(Finding::UnexplainedDeviation),
+            insight_id: SystemInsight::derive_id(Finding::UnexplainedDeviation, Some(key), since),
             finding: Finding::UnexplainedDeviation,
-            because: evidence(deviations, &[*subject]),
+            // Whatever it was about. An unexplained deviation on one of two certificates is about
+            // that certificate, and a reader who cannot tell which is not much better off.
+            about: key.instance.as_ref().map(|_| key.clone()),
+            because: evidence(deviations, std::slice::from_ref(key)),
             strength: EvidenceStrength::Weak,
             concluded_at: now,
             since,
@@ -438,12 +461,17 @@ const fn named_finding(subject: Subject) -> Option<Finding> {
 
 /// The deviations behind a finding, in the order the finding cited them.
 fn evidence(
-    deviations: &BTreeMap<Subject, Deviation>,
-    cited: &[Subject],
-) -> Vec<(Subject, Deviation)> {
+    deviations: &BTreeMap<MetricKey, Deviation>,
+    cited: &[MetricKey],
+) -> Vec<InsightEvidence> {
     cited
         .iter()
-        .filter_map(|subject| deviations.get(subject).map(|found| (*subject, *found)))
+        .filter_map(|key| {
+            deviations.get(key).map(|found| InsightEvidence {
+                key: key.clone(),
+                deviation: *found,
+            })
+        })
         .collect()
 }
 
@@ -455,10 +483,6 @@ mod tests {
         OffsetDateTime::from_unix_timestamp(1_787_000_000 + offset).expect("a fixed instant")
     }
 
-    fn ids() -> impl Fn(Finding) -> Uuid {
-        |finding| Uuid::from_u128(finding.name().len() as u128)
-    }
-
     fn core() -> TelemetryCore {
         TelemetryCore::new(Duration::hours(1), 240)
     }
@@ -467,8 +491,7 @@ mod tests {
     fn history(core: &TelemetryCore, subject: Subject, quiet: f64, then: &[f64]) {
         for index in 0..24 {
             core.observe(Reading {
-                subject,
-                instance: None,
+                key: MetricKey::host(subject),
                 value: quiet + f64::from(u8::try_from(index % 3).unwrap_or(0)) * 0.01,
                 at: at(index * 10),
             });
@@ -477,8 +500,7 @@ mod tests {
             #[allow(clippy::cast_possible_wrap, reason = "a handful of test readings")]
             let offset = 240 + (index as i64) * 10;
             core.observe(Reading {
-                subject,
-                instance: None,
+                key: MetricKey::host(subject),
                 value: *value,
                 at: at(offset),
             });
@@ -493,14 +515,16 @@ mod tests {
         assert!(!core.has_watched_enough());
         for index in 0..4 {
             core.observe(Reading {
-                subject: Subject::LoadAverage,
-                instance: None,
+                key: MetricKey {
+                    subject: Subject::LoadAverage,
+                    instance: None,
+                },
                 value: 0.4,
                 at: at(index),
             });
         }
         assert!(!core.has_watched_enough());
-        assert!(core.insights(at(100), ids()).is_empty());
+        assert!(core.insights(at(100)).is_empty());
     }
 
     #[test]
@@ -510,7 +534,7 @@ mod tests {
         let core = core();
         history(&core, Subject::RootFilesystemUsed, 0.96, &[]);
 
-        let insights = core.insights(at(300), ids());
+        let insights = core.insights(at(300));
         let storage = insights
             .iter()
             .find(|insight| insight.finding == Finding::StorageExhaustion)
@@ -543,16 +567,17 @@ mod tests {
                 Subject::OpenFileDescriptors,
             ] {
                 core.observe(Reading {
-                    subject,
-                    instance: None,
+                    key: MetricKey::host(subject),
                     value: 0.40 + drift * 0.0001,
                     at: at(tick * 10),
                 });
             }
             for name in ["/etc/ssl/a.pem", "/etc/ssl/b.pem", "/etc/ssl/c.pem"] {
                 core.observe(Reading {
-                    subject: Subject::CertificateDaysRemaining,
-                    instance: Some(name.to_owned()),
+                    key: MetricKey {
+                        subject: Subject::CertificateDaysRemaining,
+                        instance: Some(name.to_owned()),
+                    },
                     value: 90.0 - drift * 0.001,
                     at: at(tick * 10),
                 });
@@ -586,8 +611,10 @@ mod tests {
         );
         for tick in 0..40 {
             core.observe(Reading {
-                subject: Subject::CertificateDaysRemaining,
-                instance: Some("/etc/ssl/example.pem".to_owned()),
+                key: MetricKey {
+                    subject: Subject::CertificateDaysRemaining,
+                    instance: Some("/etc/ssl/example.pem".to_owned()),
+                },
                 #[allow(clippy::cast_precision_loss, reason = "a test fixture of forty ticks")]
                 value: 40.0 - (tick as f64) * 0.5,
                 // A minute apart: the window in this fixture spans an hour, and readings an hour
@@ -599,19 +626,19 @@ mod tests {
         let latest = core.latest();
         let certificate = latest
             .iter()
-            .find(|reading| reading.subject == Subject::CertificateDaysRemaining)
+            .find(|reading| reading.subject() == Subject::CertificateDaysRemaining)
             .expect("the declared certificate is watched");
         assert_eq!(
-            certificate.instance.as_deref(),
+            certificate.key.instance.as_deref(),
             Some("/etc/ssl/example.pem")
         );
 
         let projected = core.projections(at(40 * 60));
-        let (_, which, heading) = projected
+        let (key, heading) = projected
             .iter()
-            .find(|(subject, _, _)| *subject == Subject::CertificateDaysRemaining)
+            .find(|(key, _)| key.subject == Subject::CertificateDaysRemaining)
             .expect("a certificate is projected");
-        assert_eq!(which.as_deref(), Some("/etc/ssl/example.pem"));
+        assert_eq!(key.instance.as_deref(), Some("/etc/ssl/example.pem"));
         assert!(
             matches!(heading.reaching, crate::trend::Reaching::AtThisRate { .. }),
             "{heading:?}"
@@ -627,8 +654,10 @@ mod tests {
             core.watch(Subject::CertificateDaysRemaining, name.to_owned(), None);
             for tick in 0..20 {
                 core.observe(Reading {
-                    subject: Subject::CertificateDaysRemaining,
-                    instance: Some(name.to_owned()),
+                    key: MetricKey {
+                        subject: Subject::CertificateDaysRemaining,
+                        instance: Some(name.to_owned()),
+                    },
                     value: 3.0,
                     at: at(tick * 60),
                 });
@@ -636,11 +665,167 @@ mod tests {
         }
 
         let expiring = core
-            .insights(at(2000), ids())
+            .insights(at(2000))
             .into_iter()
             .filter(|insight| insight.finding == Finding::CertificateExpiring)
             .count();
         assert_eq!(expiring, 2);
+    }
+
+    #[test]
+    fn two_certificates_in_trouble_are_two_findings_carrying_their_own_numbers() {
+        // The defect this closes: everything downstream of the windows was keyed by subject alone,
+        // so two certificates produced two windows, two findings, and one deviation — the second
+        // overwrote the first, and one of the two findings cited the other certificate readings as
+        // the evidence for itself.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/soon.pem".to_owned(),
+            None,
+        );
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/sooner.pem".to_owned(),
+            None,
+        );
+        for tick in 0..24i32 {
+            let drift = f64::from(tick) * 0.01;
+            core.observe(Reading {
+                key: MetricKey::named(
+                    Subject::CertificateDaysRemaining,
+                    "/etc/ssl/soon.pem".to_owned(),
+                ),
+                value: 12.0 - drift,
+                at: at(i64::from(tick) * 60),
+            });
+            core.observe(Reading {
+                key: MetricKey::named(
+                    Subject::CertificateDaysRemaining,
+                    "/etc/ssl/sooner.pem".to_owned(),
+                ),
+                value: 3.0 - drift,
+                at: at(i64::from(tick) * 60),
+            });
+        }
+
+        let found = core.insights(at(2000));
+        let expiring: Vec<&SystemInsight> = found
+            .iter()
+            .filter(|insight| insight.finding == Finding::CertificateExpiring)
+            .collect();
+        assert_eq!(expiring.len(), 2, "two certificates, two findings");
+
+        // Each names which one it is about...
+        let about: Vec<Option<&str>> = expiring
+            .iter()
+            .map(|insight| {
+                insight
+                    .about
+                    .as_ref()
+                    .and_then(|key| key.instance.as_deref())
+            })
+            .collect();
+        assert!(about.contains(&Some("/etc/ssl/soon.pem")), "{about:?}");
+        assert!(about.contains(&Some("/etc/ssl/sooner.pem")), "{about:?}");
+
+        // ...and each cites its own readings, not the other one numbers.
+        for insight in &expiring {
+            let its_own = insight.about.as_ref().expect("a named finding");
+            assert!(
+                insight
+                    .because
+                    .iter()
+                    .all(|evidence| &evidence.key == its_own),
+                "a finding about {} cited {:?}",
+                its_own.label(),
+                insight
+                    .because
+                    .iter()
+                    .map(|evidence| evidence.key.label())
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        // ...and the two are told apart by identity, not only by their text.
+        assert_ne!(
+            expiring[0].insight_id, expiring[1].insight_id,
+            "two conditions on two different files shared one identity"
+        );
+    }
+
+    #[test]
+    fn one_ongoing_condition_keeps_one_identity_across_reads() {
+        // A fresh identity per read meant two requests a second apart described one physically
+        // identical situation with two different identities. Harmless while nothing referred to
+        // them, and an architectural defect the moment a proposal cites one as its cause: the cause
+        // it names would not exist by the time anybody looked.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/steady.pem".to_owned(),
+            None,
+        );
+        for tick in 0..24 {
+            core.observe(Reading {
+                key: MetricKey::named(
+                    Subject::CertificateDaysRemaining,
+                    "/etc/ssl/steady.pem".to_owned(),
+                ),
+                value: 4.0,
+                at: at(tick * 60),
+            });
+        }
+
+        let first = core.insights(at(2000));
+        // A second read, at a different instant, of an unchanged host.
+        let second = core.insights(at(2600));
+        assert_eq!(first.len(), second.len());
+        for (before, after) in first.iter().zip(second.iter()) {
+            assert_eq!(
+                before.insight_id,
+                after.insight_id,
+                "{} changed identity while nothing about it changed",
+                before.finding.name()
+            );
+        }
+    }
+
+    #[test]
+    fn a_condition_that_ends_and_returns_is_a_new_occurrence() {
+        // The other half of the same property. Identity that never changed would merge two separate
+        // episodes into one, and "since" would then describe a stretch of time the host was fine
+        // for part of.
+        let key = MetricKey::named(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/renewed.pem".to_owned(),
+        );
+        let episode = |values: &[f64], from: i64| {
+            let core = core();
+            core.watch(
+                Subject::CertificateDaysRemaining,
+                "/etc/ssl/renewed.pem".to_owned(),
+                None,
+            );
+            for (index, value) in (0i64..).zip(values.iter()) {
+                core.observe(Reading {
+                    key: key.clone(),
+                    value: *value,
+                    at: at(from + index * 60),
+                });
+            }
+            core.insights(at(from + 4000))
+                .into_iter()
+                .find(|insight| insight.finding == Finding::CertificateExpiring)
+                .expect("a finding")
+        };
+
+        let earlier = episode(&[4.0; 24], 0);
+        let later = episode(&[4.0; 24], 100_000);
+        assert_ne!(
+            earlier.insight_id, later.insight_id,
+            "two separate episodes were reported as one occurrence"
+        );
     }
 
     #[test]
@@ -655,14 +840,16 @@ mod tests {
         );
         for tick in 0..20 {
             core.observe(Reading {
-                subject: Subject::ServiceActive,
-                instance: Some("postgresql.service".to_owned()),
+                key: MetricKey {
+                    subject: Subject::ServiceActive,
+                    instance: Some("postgresql.service".to_owned()),
+                },
                 value: 0.0,
                 at: at(tick * 60),
             });
         }
         assert!(
-            core.insights(at(2000), ids())
+            core.insights(at(2000))
                 .iter()
                 .any(|insight| insight.finding == Finding::ServiceInactive)
         );
@@ -686,8 +873,10 @@ mod tests {
         for name in ["/var/backups/strict", "/var/backups/relaxed"] {
             for tick in 0..20 {
                 core.observe(Reading {
-                    subject: Subject::BackupAgeDays,
-                    instance: Some(name.to_owned()),
+                    key: MetricKey {
+                        subject: Subject::BackupAgeDays,
+                        instance: Some(name.to_owned()),
+                    },
                     value: 3.0,
                     at: at(tick * 60),
                 });
@@ -695,7 +884,7 @@ mod tests {
         }
 
         let stale = core
-            .insights(at(2000), ids())
+            .insights(at(2000))
             .into_iter()
             .filter(|insight| insight.finding == Finding::BackupStale)
             .count();
@@ -714,22 +903,24 @@ mod tests {
         );
         for tick in 0..20 {
             core.observe(Reading {
-                subject: Subject::BackupAgeDays,
-                instance: Some("/var/backups/quiet".to_owned()),
+                key: MetricKey {
+                    subject: Subject::BackupAgeDays,
+                    instance: Some("/var/backups/quiet".to_owned()),
+                },
                 value: 400.0,
                 at: at(tick * 60),
             });
         }
         assert!(
             !core
-                .insights(at(2000), ids())
+                .insights(at(2000))
                 .iter()
                 .any(|insight| insight.finding == Finding::BackupStale)
         );
         assert!(
             core.latest()
                 .iter()
-                .any(|reading| reading.subject == Subject::BackupAgeDays),
+                .any(|reading| reading.subject() == Subject::BackupAgeDays),
             "and it is still watched"
         );
     }
@@ -746,15 +937,17 @@ mod tests {
         );
         for tick in 0..20 {
             core.observe(Reading {
-                subject: Subject::CertificateDaysRemaining,
-                instance: Some("/etc/ssl/a.pem".to_owned()),
+                key: MetricKey {
+                    subject: Subject::CertificateDaysRemaining,
+                    instance: Some("/etc/ssl/a.pem".to_owned()),
+                },
                 value: 88.0,
                 at: at(tick * 60),
             });
         }
         assert!(
             !core
-                .insights(at(2000), ids())
+                .insights(at(2000))
                 .iter()
                 .any(|insight| insight.finding == Finding::CertificateExpiring)
         );
@@ -766,8 +959,10 @@ mod tests {
         // let the probe decide what this host cares about.
         let core = core();
         core.observe(Reading {
-            subject: Subject::CertificateDaysRemaining,
-            instance: Some("/etc/ssl/undeclared.pem".to_owned()),
+            key: MetricKey {
+                subject: Subject::CertificateDaysRemaining,
+                instance: Some("/etc/ssl/undeclared.pem".to_owned()),
+            },
             value: 3.0,
             at: at(0),
         });
@@ -775,7 +970,7 @@ mod tests {
             !core
                 .latest()
                 .iter()
-                .any(|reading| reading.subject == Subject::CertificateDaysRemaining),
+                .any(|reading| reading.subject() == Subject::CertificateDaysRemaining),
             "an undeclared certificate started a window"
         );
     }
@@ -788,7 +983,7 @@ mod tests {
         history(&core, Subject::RootFilesystemUsed, 0.40, &[]);
         history(&core, Subject::RootFilesystemInodesUsed, 0.995, &[]);
 
-        let insights = core.insights(at(300), ids());
+        let insights = core.insights(at(300));
         assert!(
             insights
                 .iter()
@@ -804,7 +999,7 @@ mod tests {
         let core = core();
         history(&core, Subject::OpenFileDescriptors, 0.97, &[]);
 
-        let insights = core.insights(at(300), ids());
+        let insights = core.insights(at(300));
         assert!(
             insights
                 .iter()
@@ -820,7 +1015,7 @@ mod tests {
         let alone = core();
         history(&alone, Subject::MemoryPressure, 2.0, &[85.0, 88.0, 90.0]);
         let weak = alone
-            .insights(at(400), ids())
+            .insights(at(400))
             .into_iter()
             .find(|insight| insight.finding == Finding::MemoryPressure)
             .expect("pressure alone is still a finding");
@@ -831,7 +1026,7 @@ mod tests {
         history(&together, Subject::MemoryPressure, 2.0, &[85.0, 88.0, 90.0]);
         history(&together, Subject::SwapUsed, 0.02, &[0.4, 0.6, 0.8]);
         let moderate = together
-            .insights(at(400), ids())
+            .insights(at(400))
             .into_iter()
             .find(|insight| insight.finding == Finding::MemoryPressure)
             .expect("a finding");
@@ -846,7 +1041,7 @@ mod tests {
         let core = core();
         history(&core, Subject::LoadAverage, 0.4, &[19.0, 21.0, 20.0]);
 
-        let insights = core.insights(at(400), ids());
+        let insights = core.insights(at(400));
         assert!(
             insights
                 .iter()
@@ -871,7 +1066,7 @@ mod tests {
         history(&core, Subject::FailedUnits, 0.0, &[0.0, 0.0]);
 
         assert!(core.has_watched_enough());
-        assert_eq!(core.insights(at(400), ids()), Vec::new());
+        assert_eq!(core.insights(at(400)), Vec::new());
     }
 
     #[test]
@@ -879,7 +1074,7 @@ mod tests {
         let core = core();
         history(&core, Subject::MemoryPressure, 2.0, &[3.0, 85.0, 88.0]);
         let insight = core
-            .insights(at(400), ids())
+            .insights(at(400))
             .into_iter()
             .find(|insight| insight.finding == Finding::MemoryPressure)
             .expect("a finding");
@@ -897,12 +1092,12 @@ mod tests {
 
         let latest = core.latest();
         assert_eq!(latest.len(), 1);
-        assert_eq!(latest[0].subject, Subject::LoadAverage);
+        assert_eq!(latest[0].subject(), Subject::LoadAverage);
         assert!(
             !core
                 .deviations()
                 .iter()
-                .any(|(subject, _)| *subject == Subject::SwapUsed)
+                .any(|(key, _)| key.subject == Subject::SwapUsed)
         );
     }
 
@@ -911,9 +1106,9 @@ mod tests {
         let core = core();
         history(&core, Subject::MemoryPressure, 2.0, &[85.0, 88.0, 90.0]);
         history(&core, Subject::SwapUsed, 0.02, &[0.4, 0.6, 0.8]);
-        let first = core.insights(at(400), ids());
+        let first = core.insights(at(400));
         for _ in 0..8 {
-            assert_eq!(core.insights(at(400), ids()), first);
+            assert_eq!(core.insights(at(400)), first);
         }
     }
 }

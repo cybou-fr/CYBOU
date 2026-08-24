@@ -267,6 +267,7 @@ mod tests {
         SystemInsight {
             insight_id: Uuid::from_u128(42),
             finding,
+            about: None,
             because: Vec::new(),
             strength: EvidenceStrength::Strong,
             concluded_at: at(),

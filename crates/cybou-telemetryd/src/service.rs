@@ -9,9 +9,7 @@
 
 use std::sync::Arc;
 
-use cybou_protocol::telemetry::Finding;
 use time::OffsetDateTime;
-use uuid::Uuid;
 use zbus::{interface, object_server::SignalEmitter};
 
 use crate::TelemetryCore;
@@ -86,9 +84,11 @@ impl Telemetry1Service {
     /// and none of them has been written to the Journal by being asked for here — reading what the
     /// host thinks is not the same act as the host committing to it.
     async fn insights(&self) -> Vec<u8> {
-        let insights = self
-            .core
-            .insights(OffsetDateTime::now_utc(), |_: Finding| Uuid::new_v4());
+        // No identity is supplied here. It used to be a fresh v4 per read, which meant two requests
+        // a second apart described one physically identical condition with two different
+        // identities. The core derives it from what makes the condition itself, so a proposal that
+        // cites a cause cites something that still exists on the next read.
+        let insights = self.core.insights(OffsetDateTime::now_utc());
         let mut buf = Vec::new();
         let _ = ciborium::into_writer(&insights, &mut buf);
         buf

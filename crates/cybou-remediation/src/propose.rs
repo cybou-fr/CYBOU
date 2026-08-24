@@ -12,7 +12,7 @@
 //! exists is so that *why are you offering to do that* has an answer made of readings.
 
 use cybou_protocol::action::ActionProposal;
-use cybou_protocol::telemetry::{Finding, SystemInsight};
+use cybou_protocol::telemetry::{Finding, MetricKey, SystemInsight};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -78,7 +78,7 @@ pub fn propose(
             cause_id: Some(insight.insight_id),
             intent: format!("relieve {}", insight.finding.name()),
             operation: operation.verb().to_owned(),
-            target_resource: target_for(operation),
+            target_resource: target_for(operation, insight),
             parameters: Vec::new(),
             // Taken from the operation, never supplied. Something arguing for its own proposal is
             // the wrong party to assess it.
@@ -91,10 +91,13 @@ pub fn propose(
 
 /// What an operation would act on.
 ///
-/// Concrete where it is knowable and a placeholder where it is not. `service.restart` needs a unit
-/// name that only an investigation can supply, and a proposal that guessed one would be a proposal
-/// to restart whatever came to mind.
-fn target_for(operation: Operation) -> String {
+/// Taken from the finding wherever the finding knows. An insight about a declared service carries
+/// the unit it is about, and the proposal names that unit; an insight about the *count* of failed
+/// units does not know which one failed, and the proposal keeps the placeholder. The two cases must
+/// stay visibly different — a placeholder that quietly became a real unit name would be a proposal
+/// to restart whatever came to mind, wearing the look of one somebody chose.
+fn target_for(operation: Operation, insight: &SystemInsight) -> String {
+    let about = insight.about.as_ref().and_then(MetricKey::target);
     match operation {
         Operation::CleanPackageCache => "apt:archives".to_owned(),
         Operation::RotateLogs => "journald:logs".to_owned(),
@@ -102,7 +105,7 @@ fn target_for(operation: Operation) -> String {
         Operation::InspectServiceStatus
         | Operation::ReloadService
         | Operation::RestartService
-        | Operation::DeleteServiceData => "systemd:<unit>".to_owned(),
+        | Operation::DeleteServiceData => about.unwrap_or_else(|| "systemd:<unit>".to_owned()),
         Operation::FormatFilesystem => "filesystem:<device>".to_owned(),
         Operation::PowerOff => "system:self".to_owned(),
     }
@@ -127,6 +130,7 @@ mod tests {
         SystemInsight {
             insight_id: Uuid::from_u128(42),
             finding,
+            about: None,
             because: Vec::new(),
             strength: EvidenceStrength::Strong,
             concluded_at: at(),

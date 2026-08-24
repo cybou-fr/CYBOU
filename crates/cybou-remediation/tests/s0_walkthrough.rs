@@ -24,7 +24,7 @@
 
 use cybou_meaning::{Language, plan_system_state, realize};
 use cybou_protocol::action::AuthorizationVerdict;
-use cybou_protocol::telemetry::{Finding, Reading, Subject, SystemInsight};
+use cybou_protocol::telemetry::{Finding, MetricKey, Reading, Subject, SystemInsight};
 use cybou_remediation::{
     Operation, StandingPolicy, authorize, criticise, permits_unattended, propose,
 };
@@ -58,8 +58,7 @@ fn sample(
     let note = |subject: Subject, value: Option<f64>| {
         if let Some(value) = value {
             core.observe(Reading {
-                subject,
-                instance: None,
+                key: MetricKey::host(subject),
                 value,
                 at,
             });
@@ -84,11 +83,11 @@ fn sample(
 
 /// Ask the host what is going on with it, entirely from the deterministic layer.
 fn ask(core: &TelemetryCore, now: OffsetDateTime) -> (Vec<SystemInsight>, String) {
-    let insights = core.insights(now, |_| Uuid::from_u128(7));
-    let observed: Vec<Subject> = core
+    let insights = core.insights(now);
+    let observed: Vec<MetricKey> = core
         .latest()
         .into_iter()
-        .map(|reading| reading.subject)
+        .map(|reading| reading.key)
         .collect();
     let plan = plan_system_state(
         &insights,
@@ -292,11 +291,11 @@ fn the_answer_reads_in_russian_without_changing_what_it_claims() {
         );
     }
 
-    let insights = core.insights(at(500), |_| Uuid::from_u128(7));
-    let observed: Vec<Subject> = core
+    let insights = core.insights(at(500));
+    let observed: Vec<MetricKey> = core
         .latest()
         .into_iter()
-        .map(|reading| reading.subject)
+        .map(|reading| reading.key)
         .collect();
     let plan = plan_system_state(&insights, &observed, true, Uuid::from_u128(9));
 
@@ -344,7 +343,7 @@ fn a_full_disk_produces_offers_and_not_one_of_them_may_happen_unattended() {
             at(tick * 10),
         );
     }
-    let insights = core.insights(at(500), |_| Uuid::from_u128(7));
+    let insights = core.insights(at(500));
     let storage = insights
         .iter()
         .find(|insight| insight.finding == Finding::StorageExhaustion)
@@ -386,6 +385,7 @@ fn nothing_the_host_offers_is_ever_destructive() {
         let insight = SystemInsight {
             insight_id: Uuid::from_u128(3),
             finding,
+            about: None,
             because: Vec::new(),
             strength: cybou_protocol::telemetry::EvidenceStrength::Strong,
             concluded_at: at(0),
@@ -408,6 +408,7 @@ fn a_host_that_is_only_guessing_offers_to_look_and_refuses_to_change_anything() 
     let guessing = SystemInsight {
         insight_id: Uuid::from_u128(4),
         finding: Finding::ServiceFailure,
+        about: None,
         because: Vec::new(),
         strength: cybou_protocol::telemetry::EvidenceStrength::Weak,
         concluded_at: at(0),
@@ -438,6 +439,7 @@ fn a_configured_operator_can_let_one_ordinary_thing_happen_unattended() {
     let insight = SystemInsight {
         insight_id: Uuid::from_u128(5),
         finding: Finding::StorageExhaustion,
+        about: None,
         because: Vec::new(),
         strength: cybou_protocol::telemetry::EvidenceStrength::Strong,
         concluded_at: at(0),

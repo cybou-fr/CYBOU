@@ -15,15 +15,14 @@
 
 use std::collections::VecDeque;
 
-use cybou_protocol::telemetry::{Alarming, Reading, Subject};
+use cybou_protocol::telemetry::{Alarming, MetricKey, Reading, Subject};
 use time::{Duration, OffsetDateTime};
 
 /// One subject's recent history.
 #[derive(Clone, Debug)]
 pub struct Series {
-    subject: Subject,
-    /// Which one, for a subject about a named thing.
-    instance: Option<String>,
+    /// What this window is about, and which one.
+    key: MetricKey,
     /// The threshold this window is judged against.
     ///
     /// Held here rather than derived from the subject every time it is needed, because some
@@ -41,32 +40,26 @@ impl Series {
     /// A window over one subject, holding at most `capacity` readings and at most `span` of time.
     #[must_use]
     pub fn new(subject: Subject, span: Duration, capacity: usize) -> Self {
-        Self::named(subject, None, span, capacity)
+        Self::named(MetricKey::host(subject), span, capacity)
     }
 
     /// A window over one named thing.
     #[must_use]
-    pub fn named(
-        subject: Subject,
-        instance: Option<String>,
-        span: Duration,
-        capacity: usize,
-    ) -> Self {
-        Self::judged(subject, instance, subject.alarming(), span, capacity)
+    pub fn named(key: MetricKey, span: Duration, capacity: usize) -> Self {
+        let default = key.subject.alarming();
+        Self::judged(key, default, span, capacity)
     }
 
     /// A window over one named thing, judged against a threshold the declaration chose.
     #[must_use]
     pub fn judged(
-        subject: Subject,
-        instance: Option<String>,
+        key: MetricKey,
         alarming: Option<Alarming>,
         span: Duration,
         capacity: usize,
     ) -> Self {
         Self {
-            subject,
-            instance,
+            key,
             alarming,
             span,
             capacity: capacity.max(1),
@@ -80,25 +73,28 @@ impl Series {
         self.alarming
     }
 
+    /// What this window is about, and which one.
+    #[must_use]
+    pub const fn key(&self) -> &MetricKey {
+        &self.key
+    }
+
     /// Which one this window is about, for a named subject.
     #[must_use]
     pub fn instance(&self) -> Option<&str> {
-        self.instance.as_deref()
+        self.key.instance.as_deref()
     }
 
     /// How this window is named to a person.
     #[must_use]
     pub fn label(&self) -> String {
-        match &self.instance {
-            Some(name) => format!("{} ({name})", self.subject.name()),
-            None => self.subject.name().to_owned(),
-        }
+        self.key.label()
     }
 
     /// What this window is about.
     #[must_use]
     pub const fn subject(&self) -> Subject {
-        self.subject
+        self.key.subject
     }
 
     /// How many readings it currently holds.
@@ -118,9 +114,9 @@ impl Series {
     /// A reading for the wrong subject is refused rather than stored: a window that accepted
     /// anything would silently mix two things a detector is about to compare against one baseline.
     pub fn observe(&mut self, reading: Reading) -> bool {
-        // Both halves of the key. Two certificates in one window would produce a baseline for a
-        // thing that does not exist, and a detector comparing one against the other's ordinary.
-        if reading.subject != self.subject || reading.instance != self.instance {
+        // The whole key. Two certificates in one window would produce a baseline for a thing that
+        // does not exist, and a detector comparing one against the other's ordinary.
+        if reading.key != self.key {
             return false;
         }
         let at = reading.at;
@@ -208,8 +204,7 @@ mod tests {
 
     fn reading(subject: Subject, value: f64, offset: i64) -> Reading {
         Reading {
-            subject,
-            instance: None,
+            key: MetricKey::host(subject),
             value,
             at: at(offset),
         }
@@ -217,8 +212,7 @@ mod tests {
 
     fn named_reading(subject: Subject, name: &str, value: f64, offset: i64) -> Reading {
         Reading {
-            subject,
-            instance: Some(name.to_owned()),
+            key: MetricKey::named(subject, name.to_owned()),
             value,
             at: at(offset),
         }
@@ -275,8 +269,7 @@ mod tests {
         );
 
         let chosen = Series::judged(
-            Subject::RootFilesystemUsed,
-            None,
+            MetricKey::host(Subject::RootFilesystemUsed),
             Some(Alarming::AtOrAbove(0.70)),
             Duration::minutes(10),
             8,
@@ -289,8 +282,10 @@ mod tests {
         // Two certificates in one window would produce a baseline for a thing that does not exist,
         // and one would be judged against the other's notion of ordinary.
         let mut series = Series::named(
-            Subject::CertificateDaysRemaining,
-            Some("/etc/ssl/a.pem".to_owned()),
+            MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                "/etc/ssl/a.pem".to_owned(),
+            ),
             Duration::minutes(10),
             64,
         );
@@ -317,8 +312,10 @@ mod tests {
     #[test]
     fn a_universal_reading_does_not_land_in_a_named_window() {
         let mut series = Series::named(
-            Subject::CertificateDaysRemaining,
-            Some("/etc/ssl/a.pem".to_owned()),
+            MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                "/etc/ssl/a.pem".to_owned(),
+            ),
             Duration::minutes(10),
             64,
         );

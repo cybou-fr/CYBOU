@@ -26,7 +26,9 @@
 //! on four readings is worse than silence, because it will be believed.
 
 use cybou_protocol::meaning::{Qualification, ResponsePlan};
-use cybou_protocol::telemetry::{ALL_SUBJECTS, EvidenceStrength, Finding, Subject, SystemInsight};
+use cybou_protocol::telemetry::{
+    ALL_SUBJECTS, EvidenceStrength, Finding, MetricKey, Subject, SystemInsight,
+};
 use uuid::Uuid;
 
 /// The intent an answer about the host's own state carries.
@@ -42,16 +44,19 @@ pub const INTENT_SYSTEM_STATE: &str = "inform_system_state";
 #[must_use]
 pub fn plan_system_state(
     insights: &[SystemInsight],
-    observed: &[Subject],
+    observed: &[MetricKey],
     watched_enough: bool,
     plan_id: Uuid,
 ) -> ResponsePlan {
     let mut key_points = Vec::new();
     let mut qualifications = Vec::new();
 
+    // A kind of thing with no reading at all. Kept at the subject level on purpose: a host
+    // watching two certificates and reading one has observed certificates, and what a reader needs
+    // to know about the unread one is a different sentence than "nobody looked at certificates".
     let unobserved: Vec<Subject> = ALL_SUBJECTS
         .iter()
-        .filter(|subject| !observed.contains(subject))
+        .filter(|subject| !observed.iter().any(|key| key.subject == **subject))
         .copied()
         .collect();
 
@@ -81,15 +86,16 @@ pub fn plan_system_state(
 
         for insight in ordered {
             key_points.push(sentence(insight));
-            for (subject, deviation) in &insight.because {
+            for evidence in &insight.because {
                 // The readings, so *why do you think that* is answered by looking. An insight that
-                // could not show them would be indistinguishable from one a model made up.
+                // could not show them would be indistinguishable from one a model made up. Named
+                // by the whole key: two certificates produce two lines that read differently.
                 key_points.push(format!(
                     "  {} is {:.2}, where {:.2} is ordinary here (spread {:.3}).",
-                    subject.name(),
-                    deviation.observed,
-                    deviation.ordinary,
-                    deviation.spread
+                    evidence.key.label(),
+                    evidence.deviation.observed,
+                    evidence.deviation.ordinary,
+                    evidence.deviation.spread
                 ));
             }
         }
@@ -176,7 +182,7 @@ fn finish(
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::telemetry::Deviation;
+    use cybou_protocol::telemetry::{Deviation, InsightEvidence};
     use time::OffsetDateTime;
 
     use super::*;
@@ -189,23 +195,24 @@ mod tests {
         Uuid::from_u128(11)
     }
 
-    fn everything() -> Vec<Subject> {
-        ALL_SUBJECTS.to_vec()
+    fn everything() -> Vec<MetricKey> {
+        ALL_SUBJECTS.iter().copied().map(MetricKey::host).collect()
     }
 
     fn insight(finding: Finding, strength: EvidenceStrength) -> SystemInsight {
         SystemInsight {
             insight_id: Uuid::from_u128(1),
             finding,
-            because: vec![(
-                Subject::RootFilesystemUsed,
-                Deviation {
+            about: None,
+            because: vec![InsightEvidence {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                deviation: Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.96,
                     spreads_away: 22.9,
                 },
-            )],
+            }],
             strength,
             concluded_at: at(100),
             since: at(0),
@@ -252,9 +259,9 @@ mod tests {
         // A host whose kernel has no pressure accounting can say nothing needs attention about what
         // it watched. Saying it plainly reports an absence of evidence as evidence of absence, on
         // the one surface a person consults to decide whether to go back to sleep.
-        let partial: Vec<Subject> = everything()
+        let partial: Vec<MetricKey> = everything()
             .into_iter()
-            .filter(|subject| *subject != Subject::MemoryPressure)
+            .filter(|key| key.subject != Subject::MemoryPressure)
             .collect();
         let plan = plan_system_state(&[], &partial, true, id());
 

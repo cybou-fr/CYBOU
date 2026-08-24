@@ -295,7 +295,7 @@ fn robust_spread(points: &[(f64, f64)]) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::telemetry::{Reading, Subject};
+    use cybou_protocol::telemetry::{MetricKey, Reading, Subject};
 
     use super::*;
 
@@ -308,8 +308,10 @@ mod tests {
         let mut series = Series::new(Subject::RootFilesystemUsed, Duration::days(30), 10_000);
         for tick in 0..count {
             series.observe(Reading {
-                subject: Subject::RootFilesystemUsed,
-                instance: None,
+                key: MetricKey {
+                    subject: Subject::RootFilesystemUsed,
+                    instance: None,
+                },
                 value: value(tick),
                 at: at(tick * 60),
             });
