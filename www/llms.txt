@@ -27,7 +27,26 @@ Cybou ships **no privileged action executor**. The proposal, criticism and autho
 
 When an executor is built it will be two processes, not one. `Action1` may authorize and cannot execute; the executor may execute and cannot authorize.
 
-Cybou also ships no language model, no general agent or worker runtime, no tool broker, no autonomous security control plane, and no distributed Mind. These are planned boundaries and must never be described as implemented.
+Cybou also ships no language model, no agent platform, no tool broker, no autonomous security control plane, and no distributed Mind. These are planned boundaries and must never be described as implemented.
+
+## Where this is going
+
+Decided rather than sketched, in ADR-0042 and ADR-0043.
+
+Cybou hosts agents; it does not become one. The agent loop, context compaction, sub-agents, planning
+and several hundred provider quirks are what other open-source projects compete on. What Cybou
+contributes is underneath: an **Agent Capsule** is the unit of grant, an agent is autonomous inside
+it and produces an action proposal at its boundary, the kernel enforces that boundary while cognition
+only explains it, agents come from the public ACP registry rather than a catalogue of our own, and an
+agent receives a capsule-scoped model lease instead of a provider credential.
+
+```text
+autonomous inside its capsule  !=  autonomous on the host
+```
+
+None of it is implemented. It is written down first so the code can be reviewed against explicit
+invariants rather than the invariants being reconstructed afterwards from whatever the code turned
+out to do.
 
 ## Key Links
 
@@ -79,4 +98,4 @@ Not from what the action said about itself. An executor reporting its own succes
 
 ### What remains planned?
 
-A privileged action executor behind the boundary that already exists, an outcome loop closing back into Mind, a registered model worker, lifelong learning and learned-artifact governance, agent and worker runtimes, tool brokerage, autonomous security operations, and distributed perimeter governance. These are not currently shipped.
+Two tracks. Finishing the action path: a privileged action executor behind the boundary that already exists, split so that the part which authorizes cannot execute and the part which executes cannot authorize. And the agent platform: kernel-enforced capsules, a standing capability lease, a model gateway with capsule-scoped leases, ACP agent packs, capsule behaviour telemetry, and quarantine. Then lifelong learning, tool brokerage, autonomous security operations, and distributed perimeter governance. None of it is currently shipped.

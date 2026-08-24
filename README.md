@@ -68,11 +68,20 @@ sensitivity, egress, cost, and capability policy. Cybou has no required cloud de
 remote inference may reduce capability, but it must not erase identity, biography, policy, or the
 minimum local control substrate.
 
-The current repository does **not** yet implement the future agent/worker runtime, MCP/tool broker,
-authorized action executor, firewall/endpoint controller, credential broker, or autonomous
-remediation loop. The model broker exists as a faculty and has no worker registered behind it, so
-it answers every request by saying what happens instead. `CURRENT_STATE.md` is authoritative for
-what exists today.
+The current repository does **not** yet implement the agent platform, the MCP/tool broker, the
+authorized action executor, the firewall/endpoint controller, the credential broker, or the
+autonomous remediation loop. The model broker exists as a faculty and has no worker registered
+behind it, so it answers every request by saying what happens instead. `CURRENT_STATE.md` is
+authoritative for what exists today.
+
+Where this is going is decided rather than sketched.
+[ADR-0042](docs/adr/ADR-0042-agent-capsule-platform.md) and
+[ADR-0043](docs/adr/ADR-0043-model-gateway-for-external-agents.md) settle the next architecture: an
+**Agent Capsule** is the unit of grant, an agent is autonomous inside it and produces an
+`ActionProposal` at its boundary, the kernel enforces that boundary while cognition only explains it,
+agents come from the public ACP registry rather than a catalogue of our own, and an agent receives a
+capsule-scoped model lease instead of a provider credential. Cybou hosts agents; it does not become
+one.
 
 ## Why this architecture
 
@@ -159,9 +168,11 @@ gateway that cannot become a second cognitive owner.
 | Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
 | Governed action and remediation boundary | Proposals and authorization implemented; no executor |
 | Model brokerage as a faculty, not an organ | Implemented — ADR-0035; no worker registered |
+| Agent capsules with kernel-enforced boundaries | Planned — ADR-0042 |
+| A model gateway and leases for agents that are not Mind | Planned — ADR-0043 |
 | Distributed Mind prototype | Planned |
 | Lifelong learning and learned-artifact governance | Planned |
-| Agent/worker runtime and governed tool/MCP use | Planned |
+| Governed tool and MCP mediation by the host | Planned — ADR-0034 |
 | Continuous autonomous security and system operations | Planned |
 | Distributed perimeter and multi-node governance | Planned |
 

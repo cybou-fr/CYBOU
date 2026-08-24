@@ -40,6 +40,8 @@ SPDX-License-Identifier: MIT
 | [0039](ADR-0039-debian-13-base-system.md) | Debian 13 Base System | Accepted |
 | [0040](ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md) | Spatial Card Desktop (CYBOU Desktop vNext) and Bounded Body Capabilities (CYBOU Shell) | Accepted |
 | [0041](ADR-0041-server-first-deployment.md) | Cybou Is a Server-Side Cognitive System | Accepted |
+| [0042](ADR-0042-agent-capsule-platform.md) | Agent Capsules and the Agent Platform | Proposed |
+| [0043](ADR-0043-model-gateway-for-external-agents.md) | A Model Gateway for External Agents | Proposed |
 
 Numbers have gaps, and the gaps are deliberate. An ADR whose decision no longer constrains how Cybou
 may be designed is deleted rather than kept as an entry nobody should read — the number stays retired
@@ -61,11 +63,19 @@ code already enforces leaves the record contradicting itself. These do not:
   [0027](ADR-0027-local-epistemic-projection-owner.md), which settles the owner it left open.
   0021 was in this group until 2026-08-23, when the meaning path it asked for was finished and it
   became Accepted.
-- **0031 Structured Meaning**, **0032 Layered Lifelong Learning**, **0033 Learned Artifact
-  Governance**, **0034 Governed Agents and Tools**, **0035 Governed Model Brokerage** and **0036
-  Autonomous Security** describe boundaries that deliberately precede their implementation. Writing them
-  first is the point: they exist so the code can be reviewed against explicit invariants rather than
-  the invariants being reconstructed afterwards from whatever the code turned out to do.
+- **0032 Layered Lifelong Learning**, **0033 Learned Artifact Governance**, **0034 Governed Agents
+  and Tools**, **0035 Governed Model Brokerage**, **0036 Autonomous Security**, **0042 Agent
+  Capsules** and **0043 Model Gateway** describe boundaries that deliberately precede their
+  implementation. Writing them first is the point: they exist so the code can be reviewed against
+  explicit invariants rather than the invariants being reconstructed afterwards from whatever the
+  code turned out to do. 0031 was in this group until 2026-08-24, when the meaning boundary it asked
+  for was finished in both directions and it became Accepted.
+
+  0042 and 0043 are the newest of these and the largest. They rest partly on facts about an external
+  ecosystem — a protocol, a registry, a multi-provider proxy — recorded with the date they were
+  researched, because a decision quietly resting on a stale fact is the failure this repository keeps
+  finding in itself. Both are arranged so that being wrong about one of those facts costs an adapter
+  rather than an architecture.
 - **0018 Privacy and Replication** is half enforced and half absent. The Journal rejects a
   contribution whose privacy is weaker than its references, so classification and inheritance are
   real; replication does not exist at all. It should be split before either half is accepted, rather

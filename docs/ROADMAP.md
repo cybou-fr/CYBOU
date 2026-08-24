@@ -109,25 +109,36 @@ System meaning:
 
 See ADR-0022.
 
-## M11 — Agent, Worker, Model, and Tool Runtime
+## M11 — Agent Platform: capsules, gateway, and supervision
+
+Restated on 2026-08-24. The scope was written as a set of properties AI execution should have. It is
+now a product: a person installs Cybou on a server, opens a browser, picks an agent and a model,
+picks a repository, and presses Launch — and the agent gets a real Linux environment it cannot reach
+past.
 
 Engineering scope:
 
-- Faculty / Worker / Agent identities;
-- task-scoped worker lifecycle and grants;
-- context/network/resource/retention/delegation bounds;
-- local/remote model brokerage;
-- provider/model attribution and capability degradation;
-- governed tools and MCP server/method/resource mediation;
-- credential handles rather than raw credential distribution;
-- actor/tool/network attribution;
-- prompt-injection-resistant capability boundaries.
+- Faculty / Worker / Agent identities and task-scoped lifecycle;
+- the **Agent Capsule**: workspace, process, filesystem and network namespaces, resource budget,
+  model lease, MCP grants, secrets lease, lifetime, and continuous audit;
+- kernel enforcement of the capsule — namespaces, cgroups, seccomp, Landlock or AppArmor, mount and
+  network policy — holding with Mind stopped;
+- **ACP** as the way agents are driven and discovered, with the public registry upstream rather than
+  a Cybou catalogue;
+- the **Model Gateway**: a chat-completions surface for external agents beside `ModelBroker1`'s typed
+  one, sharing its provider workers, policy and cost ledger;
+- ephemeral capsule-scoped model tokens instead of provider credentials;
+- MCP mediation by the host rather than configuration inside the agent;
+- capsule behaviour telemetry, quarantine, and revocation;
+- A2A between agents, after the rest.
 
 System meaning:
 
-> AI execution becomes disposable and governed while Mind remains persistent.
+> Any AI agent can work almost autonomously, because its freedom ends at a technically enforced
+> boundary rather than at somebody's patience — and Cybou can say afterwards what it tried, why, with
+> which model, on what data, and what actually changed.
 
-See ADR-0034 and ADR-0035.
+See ADR-0042, ADR-0043, ADR-0034 and ADR-0035.
 
 ## M12 — Autonomous Security and Operations Control Plane
 
@@ -192,7 +203,7 @@ M9  experience becomes governed learned behaviour and skills
  │
 M10 external mutation crosses authorization + observation
  │
-M11 agents, workers, models, and tools become governed runtime subjects
+M11 agents become governed runtime subjects inside enforced capsules
  │
 M12 security and operations become continuously self-maintaining under standing policy
  │

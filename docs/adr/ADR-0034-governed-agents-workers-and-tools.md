@@ -94,6 +94,29 @@ observation/outcome.
 An actor may not spawn another privileged actor or delegate its grant unless policy explicitly
 permits delegation. Derived grants can only narrow.
 
+### Amendment: the unit of grant is a capsule, and the agents are other people's (2026-08-24)
+
+This ADR decides that actors have identities, receive task-scoped grants, and cross ADR-0022 to
+affect anything. It leaves two questions open, and
+[ADR-0042](ADR-0042-agent-capsule-platform.md) settles both.
+
+**Where a grant applies.** Per command is unworkable — a person asked to approve `npm install` for
+the fifteenth time is a person who has stopped reading. The grant is a capsule: one profile, granted
+once, inside which the agent is free, and at whose boundary a request becomes an `ActionProposal`.
+
+```text
+autonomous inside its capsule  ≠  autonomous on the host
+```
+
+**Who writes the agents.** Not this project. Cybou hosts agents that already exist and speak ACP,
+and contributes the layer beneath them — sandbox, leases, secrets isolation, model routing,
+behaviour observation, causal history. A Cybou operator agent for one machine is a later and
+different thing.
+
+One correction to how this ADR could be read: *prompt content is untrusted input* is necessary and
+is not the enforcement. A capsule holds because the kernel holds it. Cognition explains a
+containment; it never is one.
+
 ## Consequences
 
 AI workers can be powerful without being root-equivalent.

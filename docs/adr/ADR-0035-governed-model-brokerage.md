@@ -102,6 +102,22 @@ A request also names the disclosure its input was drawn from, and the field is n
 is a named consumer under ADR-0030; a request that could omit this would be a way to hand a model
 context nobody recorded handing it, which is MB1 defeated by an ergonomic default.
 
+### Amendment: external agents get a second surface, not a wider one (2026-08-24)
+
+The typed vocabulary above is right for Mind and wrong for an external agent under
+[ADR-0042](ADR-0042-agent-capsule-platform.md), which speaks chat completions and always will.
+
+Widening `ModelBroker1` to carry arbitrary prompts would destroy the property this ADR exists for: a
+broker whose request is a string cannot match a task to a route, cannot refuse one capability while
+permitting another, and cannot say which answer was degraded.
+
+So [ADR-0043](ADR-0043-model-gateway-for-external-agents.md) adds a second surface beside this one.
+Two request shapes, one set of provider workers, one policy, one cost ledger. What an agent receives
+is an ephemeral token scoped to its capsule, its model class and its budget — never a provider
+credential.
+
+Nothing in this ADR changes.
+
 ## Acceptance gates
 
 | | Gate |

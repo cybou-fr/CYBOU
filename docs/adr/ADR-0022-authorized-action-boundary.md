@@ -108,6 +108,17 @@ This is the same rule the rest of the architecture already runs on — a faculty
 is where getting it wrong costs the most, and is therefore the one place it must be a process
 boundary rather than a function boundary.
 
+### An agent's request to leave its capsule is a proposal
+
+Under [ADR-0042](ADR-0042-agent-capsule-platform.md) an agent is free inside its capsule and has no
+capability outside it. When it reaches for the host — restart a service, change the firewall, read a
+host key, publish a port — that is not a new mechanism and not a permission dialogue. It enters here,
+at the top, as an `ActionProposal` from a named actor.
+
+That this boundary needed no change to accept a request from an agent is the strongest evidence
+available that it was drawn in the right place: it was designed for Cybou's own remediation
+proposals, and the same gate serves a party Cybou does not trust at all.
+
 ### Execution is typed
 
 Executors should expose constrained operations/capabilities rather than accepting unrestricted
