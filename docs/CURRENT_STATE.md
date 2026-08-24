@@ -344,6 +344,13 @@ multiply the one thing the withholding rules exist to keep rare by the length of
 durable record remains the `ContextDisclosed` contribution in the Journal; this is a window onto its
 recent end, so the surface answers without a Journal query.
 
+**And the window says it is a window.** The list lives in the gateway process and starts empty when
+the process does, so three entries are three changes since this gateway started rather than three
+deliveries in the life of the machine. `historyComplete` is false and `historyCoverageSince` names
+the earliest instant the list could cover, because a surface that let a person read a fraction as
+the whole would answer *what was I supplied* with a fraction and no hedge. Making it true means
+reading the `ContextDisclosed` contributions back at start, which is worth doing and is not done.
+
 Every supply of the Mind projection across a boundary writes a `ContextDisclosed` naming the
 consumer, the contributions the supplied items came from, and what was held back and why.
 
