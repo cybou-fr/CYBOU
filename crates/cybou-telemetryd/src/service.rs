@@ -78,6 +78,21 @@ impl Telemetry1Service {
         buf
     }
 
+    /// What is known about every watched thing, including what is not known, as CBOR.
+    ///
+    /// Carries the declared things that produced no reading. A surface built from the readings
+    /// alone cannot tell a certificate nobody declared from one that was declared and never read,
+    /// and those are opposites.
+    #[zbus(property)]
+    async fn watching(&self) -> Vec<u8> {
+        let watching = self
+            .core
+            .watching(OffsetDateTime::now_utc(), crate::STALE_AFTER);
+        let mut buf = Vec::new();
+        let _ = ciborium::into_writer(&watching, &mut buf);
+        buf
+    }
+
     /// What this host currently concludes about itself, as CBOR.
     ///
     /// Every entry is a hypothesis carrying the readings that produced it. None of them is a fact,

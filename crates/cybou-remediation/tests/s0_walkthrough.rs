@@ -84,11 +84,7 @@ fn sample(
 /// Ask the host what is going on with it, entirely from the deterministic layer.
 fn ask(core: &TelemetryCore, now: OffsetDateTime) -> (Vec<SystemInsight>, String) {
     let insights = core.insights(now);
-    let observed: Vec<MetricKey> = core
-        .latest()
-        .into_iter()
-        .map(|reading| reading.key)
-        .collect();
+    let observed = core.watching(now, cybou_telemetryd::STALE_AFTER);
     let plan = plan_system_state(
         &insights,
         &observed,
@@ -292,11 +288,7 @@ fn the_answer_reads_in_russian_without_changing_what_it_claims() {
     }
 
     let insights = core.insights(at(500));
-    let observed: Vec<MetricKey> = core
-        .latest()
-        .into_iter()
-        .map(|reading| reading.key)
-        .collect();
+    let observed = core.watching(at(500), cybou_telemetryd::STALE_AFTER);
     let plan = plan_system_state(&insights, &observed, true, Uuid::from_u128(9));
 
     let english = realize(&plan, Language::English);

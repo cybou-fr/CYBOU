@@ -113,6 +113,17 @@ unit it would act on, taken from the finding, rather than the `systemd:<unit>` p
 proposal falls back to when it genuinely does not know which one it means. The count of failed units
 still falls back, because it genuinely does not.
 
+**A watched thing has four states, and three of them are not silence.** `Observed`, `NeverRead`,
+`ReadFailed` and `Stale`. A declared thing that produced no reading used to be simply absent from
+every surface, which reads exactly like a thing nobody declared — and the operator who declared a
+certificate and sees nothing about it has been told, by that silence, that it is fine. The three
+unhappy states are kept apart because they call for different actions: a path that may not exist, a
+file this process cannot open (usually a permission), and a probe that worked and has stopped
+(usually the sampler, not the thing sampled). A failed attempt outranks an old success, because
+"last read four minutes ago" hides "and every attempt since failed"; a reading that arrives clears
+the failure before it. The unread things are named in the prose *before* the all-clear, and never
+counted among the things looked at.
+
 **A finding keeps one identity for as long as it is one condition.** The identity is derived from
 what makes a condition itself — what was concluded, what it is about, and when it began — rather
 than generated per read. A fresh identity per read meant two requests a second apart described one

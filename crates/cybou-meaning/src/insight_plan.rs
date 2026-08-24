@@ -27,7 +27,7 @@
 
 use cybou_protocol::meaning::{Qualification, ResponsePlan};
 use cybou_protocol::telemetry::{
-    ALL_SUBJECTS, EvidenceStrength, Finding, MetricKey, Subject, SystemInsight,
+    ALL_SUBJECTS, EvidenceStrength, Finding, Subject, SystemInsight, WatchedResource,
 };
 use uuid::Uuid;
 
@@ -36,15 +36,17 @@ pub const INTENT_SYSTEM_STATE: &str = "inform_system_state";
 
 /// Build a plan describing what the host currently makes of itself.
 ///
-/// `observed` is the subjects that actually have readings — not the subjects that exist. The
-/// difference is the whole of the second rule above.
+/// `watched` is every thing this host was told to watch and what is known about each — not the
+/// subset that produced a number. The difference is the whole of the second rule above, and it is
+/// carried as states rather than as a filtered list because a thing declared and never read is not
+/// the same as a thing nobody declared, and silence renders them identically.
 ///
 /// The identity is supplied rather than generated, for the same reason as everywhere else in this
 /// crate: a planner that reached for a random source would be reaching for something.
 #[must_use]
 pub fn plan_system_state(
     insights: &[SystemInsight],
-    observed: &[MetricKey],
+    watched: &[WatchedResource],
     watched_enough: bool,
     plan_id: Uuid,
 ) -> ResponsePlan {
@@ -56,8 +58,23 @@ pub fn plan_system_state(
     // to know about the unread one is a different sentence than "nobody looked at certificates".
     let unobserved: Vec<Subject> = ALL_SUBJECTS
         .iter()
-        .filter(|subject| !observed.iter().any(|key| key.subject == **subject))
+        .filter(|subject| {
+            !watched
+                .iter()
+                .any(|resource| resource.key.subject == **subject && resource.state.is_observed())
+        })
         .copied()
+        .collect();
+
+    // The named things this host was told to watch and cannot currently see. Said by name, because
+    // "certificates were not read" on a host watching four of them tells an operator nothing about
+    // which one to go and look at.
+    let unseen: Vec<String> = watched
+        .iter()
+        .filter(|resource| !resource.state.is_observed() && resource.key.instance.is_some())
+        // An em dash rather than a second pair of parentheses: the label already carries the
+        // thing it is about in parentheses, and two pairs read as two labels.
+        .map(|resource| format!("{} — {}", resource.key.label(), resource.state.name()))
         .collect();
 
     if !watched_enough {
@@ -72,10 +89,23 @@ pub fn plan_system_state(
         return finish(plan_id, key_points, qualifications, &unobserved);
     }
 
+    if !unseen.is_empty() {
+        // Before the all-clear, never after it. A person who stops reading at the first sentence
+        // must not stop at one that says everything is fine when part of it was not looked at.
+        key_points.push(format!(
+            "I was told to watch these and currently cannot see them: {}.",
+            unseen.join(", ")
+        ));
+        qualifications.push(Qualification::NotRead);
+    }
+
     if insights.is_empty() {
         key_points.push(format!(
-            "Nothing needs attention among the {} thing(s) I watch.",
-            observed.len()
+            "Nothing needs attention among the {} thing(s) I can currently see.",
+            watched
+                .iter()
+                .filter(|resource| resource.state.is_observed())
+                .count()
         ));
     } else {
         key_points.push(format!("{} thing(s) need attention.", insights.len()));
@@ -182,7 +212,7 @@ fn finish(
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::telemetry::{Deviation, InsightEvidence};
+    use cybou_protocol::telemetry::{Deviation, InsightEvidence, MetricKey, Watching};
     use time::OffsetDateTime;
 
     use super::*;
@@ -195,8 +225,23 @@ mod tests {
         Uuid::from_u128(11)
     }
 
-    fn everything() -> Vec<MetricKey> {
-        ALL_SUBJECTS.iter().copied().map(MetricKey::host).collect()
+    fn everything() -> Vec<WatchedResource> {
+        ALL_SUBJECTS
+            .iter()
+            .copied()
+            .map(|subject| observed_now(MetricKey::host(subject)))
+            .collect()
+    }
+
+    /// One watched thing with a reading, for a fixture that only cares that it was read.
+    fn observed_now(key: MetricKey) -> WatchedResource {
+        WatchedResource {
+            key,
+            state: Watching::Observed {
+                value: 0.0,
+                at: OffsetDateTime::UNIX_EPOCH,
+            },
+        }
     }
 
     fn insight(finding: Finding, strength: EvidenceStrength) -> SystemInsight {
@@ -255,13 +300,71 @@ mod tests {
     }
 
     #[test]
+    fn a_declared_thing_that_could_not_be_read_is_named_before_the_all_clear() {
+        // The order matters as much as the sentence. A person who reads one line must not read an
+        // all-clear about a host that was partly not looked at, and the unread thing must be named:
+        // "certificates were not read" on a host watching four of them says nothing about which one
+        // to go and look at.
+        let mut watched = everything();
+        watched.push(WatchedResource {
+            key: MetricKey::named(Subject::ServiceActive, "caddy.service".to_owned()),
+            state: Watching::ReadFailed { since: at(0) },
+        });
+
+        let plan = plan_system_state(&[], &watched, true, id());
+        let said = plan.key_points.join(" | ");
+        assert!(said.contains("caddy.service"), "{said}");
+
+        let unseen = plan
+            .key_points
+            .iter()
+            .position(|point| point.contains("caddy.service"))
+            .expect("named");
+        let all_clear = plan
+            .key_points
+            .iter()
+            .position(|point| point.contains("Nothing needs attention"))
+            .expect("an all-clear");
+        assert!(
+            unseen < all_clear,
+            "the all-clear came before what it excludes: {plan:?}"
+        );
+        assert!(plan.qualifications.contains(&Qualification::NotRead));
+    }
+
+    #[test]
+    fn a_thing_declared_and_never_read_does_not_count_as_something_looked_at() {
+        // Otherwise the count in the all-clear includes things nobody managed to read, which is the
+        // one number on the page a person uses to decide whether to go back to sleep.
+        let mut watched = everything();
+        watched.push(WatchedResource {
+            key: MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                "/etc/ssl/never.pem".to_owned(),
+            ),
+            state: Watching::NeverRead,
+        });
+
+        let plan = plan_system_state(&[], &watched, true, id());
+        let counted = plan
+            .key_points
+            .iter()
+            .find(|point| point.contains("Nothing needs attention"))
+            .expect("an all-clear");
+        assert!(
+            counted.contains(&format!("{} thing(s)", ALL_SUBJECTS.len())),
+            "the unread certificate was counted as seen: {counted}"
+        );
+    }
+
+    #[test]
     fn an_all_clear_is_qualified_by_what_was_never_looked_at() {
         // A host whose kernel has no pressure accounting can say nothing needs attention about what
         // it watched. Saying it plainly reports an absence of evidence as evidence of absence, on
         // the one surface a person consults to decide whether to go back to sleep.
-        let partial: Vec<MetricKey> = everything()
+        let partial: Vec<WatchedResource> = everything()
             .into_iter()
-            .filter(|key| key.subject != Subject::MemoryPressure)
+            .filter(|resource| resource.key.subject != Subject::MemoryPressure)
             .collect();
         let plan = plan_system_state(&[], &partial, true, id());
 

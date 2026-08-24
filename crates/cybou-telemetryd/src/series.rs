@@ -15,7 +15,7 @@
 
 use std::collections::VecDeque;
 
-use cybou_protocol::telemetry::{Alarming, MetricKey, Reading, Subject};
+use cybou_protocol::telemetry::{Alarming, MetricKey, Reading, Subject, Watching};
 use time::{Duration, OffsetDateTime};
 
 /// One subject's recent history.
@@ -34,6 +34,12 @@ pub struct Series {
     span: Duration,
     capacity: usize,
     readings: VecDeque<Reading>,
+    /// When the last attempt to read this failed, if the last attempt failed.
+    ///
+    /// Held rather than inferred from the absence of a recent reading, because the two are
+    /// different facts with different remedies. A probe that could not open a file is usually a
+    /// permission; a sampler that stopped running is not about the file at all.
+    unreadable_since: Option<OffsetDateTime>,
 }
 
 impl Series {
@@ -64,6 +70,7 @@ impl Series {
             span,
             capacity: capacity.max(1),
             readings: VecDeque::new(),
+            unreadable_since: None,
         }
     }
 
@@ -122,6 +129,8 @@ impl Series {
         let at = reading.at;
         self.readings.push_back(reading);
         self.expire(at);
+        // A reading arrived, so whatever was wrong before is no longer what is wrong now.
+        self.unreadable_since = None;
         true
     }
 
@@ -173,6 +182,41 @@ impl Series {
     #[must_use]
     pub fn sees_back_to(&self) -> Option<OffsetDateTime> {
         self.readings.front().map(|reading| reading.at)
+    }
+
+    /// Record that an attempt to read this produced no number.
+    ///
+    /// Not a reading of zero, and not silence. Zero days remaining is the most alarming answer a
+    /// certificate can give and is not what "this process could not open the file" means; silence
+    /// is indistinguishable from a thing nobody declared.
+    pub const fn note_unreadable(&mut self, at: OffsetDateTime) {
+        self.unreadable_since = Some(at);
+    }
+
+    /// What is known about this thing right now.
+    ///
+    /// `stale_after` is how long a gap has to be before a window that was being filled counts as
+    /// one that has stopped. It is a property of how often this host samples, so it is passed in
+    /// rather than assumed here.
+    #[must_use]
+    pub fn state(&self, now: OffsetDateTime, stale_after: Duration) -> Watching {
+        // A failed attempt outranks an old success. The most recent thing that happened is what a
+        // reader needs, and "last read four minutes ago" hides "and every attempt since failed".
+        if let Some(since) = self.unreadable_since {
+            return Watching::ReadFailed { since };
+        }
+        let Some(latest) = self.readings.back() else {
+            return Watching::NeverRead;
+        };
+        if now - latest.at > stale_after {
+            return Watching::Stale {
+                last_read: latest.at,
+            };
+        }
+        Watching::Observed {
+            value: latest.value,
+            at: latest.at,
+        }
     }
 
     /// The earliest instant at which the value was continuously at or beyond `threshold`.

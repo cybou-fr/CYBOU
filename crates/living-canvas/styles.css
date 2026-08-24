@@ -12,6 +12,9 @@
   --muted: #9aa7b8;
   --surface: rgba(16, 22, 30, 0.88);
   --border: rgba(154, 167, 184, 0.24);
+  /* For a gap in what somebody believes is covered — louder than muted, quieter than an alarm,
+     because an unreadable file is a thing to go and look at rather than a thing that has broken. */
+  --warn: #e8b562;
 }
 
 * { box-sizing: border-box; }
@@ -269,6 +272,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
    it, so the readings are laid out as a table rather than buried in a tooltip. */
 .insight-card-body { display: grid; gap: 6px; }
 .insight-unobserved { color: var(--muted); font-size: 10px; }
+/* Louder than unobserved. A subject this host has no way to read is a fact about the kernel; a
+   thing an operator declared and this host cannot see is a gap in what they believe is covered. */
+.insight-unseen { color: var(--warn); font-size: 10px; }
 .finding-list { display: grid; gap: 10px; max-height: 190px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .finding-line { display: grid; gap: 3px; }
 .finding-head { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: 12px; }

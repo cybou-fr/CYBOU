@@ -370,6 +370,76 @@ pub enum EvidenceStrength {
     Strong,
 }
 
+/// What is known about one thing this host was told to watch.
+///
+/// Four states rather than a value and its absence. A declared thing with no reading used to be
+/// simply missing from every surface, which reads exactly like a thing nobody declared — and the
+/// two are opposites. An operator who declared a certificate and sees nothing about it has been
+/// told, by the silence, that it is fine.
+///
+/// The three unhappy states are kept apart because they call for different actions. Never read is a
+/// probe that has not run or a path that does not exist; read failed is a file this process cannot
+/// open, which is usually a permission; stale is a probe that worked and has stopped, which is
+/// usually the sampler and not the thing sampled.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "state")]
+pub enum Watching {
+    /// Read, recently, with this value.
+    #[serde(rename_all = "camelCase")]
+    Observed {
+        /// What it was.
+        value: f64,
+        /// When it was read.
+        #[serde(with = "time::serde::rfc3339")]
+        at: OffsetDateTime,
+    },
+    /// Declared, and never once read.
+    NeverRead,
+    /// Read attempted, and the attempt did not produce a number.
+    #[serde(rename_all = "camelCase")]
+    ReadFailed {
+        /// When the last attempt failed.
+        #[serde(with = "time::serde::rfc3339")]
+        since: OffsetDateTime,
+    },
+    /// Read once, and not lately.
+    #[serde(rename_all = "camelCase")]
+    Stale {
+        /// The last reading that did arrive.
+        #[serde(with = "time::serde::rfc3339")]
+        last_read: OffsetDateTime,
+    },
+}
+
+impl Watching {
+    /// The short name a surface labels this state with.
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Observed { .. } => "observed",
+            Self::NeverRead => "never-read",
+            Self::ReadFailed { .. } => "read-failed",
+            Self::Stale { .. } => "stale",
+        }
+    }
+
+    /// Whether this state means the host actually knows something about the thing right now.
+    #[must_use]
+    pub const fn is_observed(&self) -> bool {
+        matches!(self, Self::Observed { .. })
+    }
+}
+
+/// One watched thing, and what is known about it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchedResource {
+    /// What is watched, and which one.
+    pub key: MetricKey,
+    /// What is known about it.
+    pub state: Watching,
+}
+
 /// One reading behind a finding, and what it is about.
 ///
 /// A pair of subject and deviation lost the name of the thing measured, so a finding about one

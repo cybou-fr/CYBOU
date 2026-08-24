@@ -46,20 +46,17 @@ impl ZbusPresenceSource {
             return crate::insight::unread();
         };
 
-        let observed = self
-            .read::<Vec<u8>>(TELEMETRY, "Latest")
+        // Every watched thing and what is known about it, rather than the readings that worked. A
+        // surface built from the readings alone cannot tell a certificate nobody declared from one
+        // that was declared and never read, and those are opposites.
+        let watched = self
+            .read::<Vec<u8>>(TELEMETRY, "Watching")
             .await
             .and_then(|encoded| {
-                ciborium::from_reader::<Vec<cybou_protocol::telemetry::Reading>, _>(
+                ciborium::from_reader::<Vec<cybou_protocol::telemetry::WatchedResource>, _>(
                     encoded.as_slice(),
                 )
                 .ok()
-            })
-            .map(|readings| {
-                readings
-                    .into_iter()
-                    .map(|reading| reading.key)
-                    .collect::<Vec<_>>()
             })
             .unwrap_or_default();
 
@@ -86,7 +83,7 @@ impl ZbusPresenceSource {
 
         crate::insight::project(
             &insights,
-            &observed,
+            &watched,
             watched_enough,
             &projections,
             time::OffsetDateTime::now_utc(),

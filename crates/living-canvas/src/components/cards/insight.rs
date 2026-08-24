@@ -94,6 +94,15 @@ pub fn InsightContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
         _ => String::new(),
     };
 
+    // The declared things that produced nothing. Above the prose, because a person who reads one
+    // line must not read an all-clear about a host that was partly not looked at.
+    let unseen = move || {
+        state()
+            .as_ref()
+            .and_then(|state| crate::heading::unseen_line(&state.watched))
+            .unwrap_or_default()
+    };
+
     let said = move || state().map(|state| state.said).unwrap_or_default();
 
     let headings = move || {
@@ -111,6 +120,7 @@ pub fn InsightContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
         <div class="insight-card-body">
             <strong>{label}</strong>
             <span class="insight-unobserved">{unobserved}</span>
+            <span class="insight-unseen">{unseen}</span>
 
             <Show when=move || !headings().is_empty()>
                 <span class="heading-label">"Where things are going"</span>

@@ -18,12 +18,14 @@
 //! would say. There is no executor behind any of them, and this module has no way to reach one.
 
 use cybou_protocol::action::{AuthorizationVerdict, RiskLevel};
-use cybou_protocol::telemetry::{ALL_SUBJECTS, EvidenceStrength, MetricKey, SystemInsight};
+use cybou_protocol::telemetry::{
+    ALL_SUBJECTS, EvidenceStrength, MetricKey, SystemInsight, WatchedResource, Watching,
+};
 use cybou_remediation::{StandingPolicy, authorize, criticise, propose};
 use cybou_telemetryd::trend::{Projection, Reaching, Trend};
 use cybou_web_contracts::{
     FindingProjection, InsightProjection, OfferProjection, ProjectionProjection, ReadingProjection,
-    WEB_SCHEMA_V1,
+    WEB_SCHEMA_V1, WatchedProjection,
 };
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
@@ -35,14 +37,14 @@ use uuid::Uuid;
 #[must_use]
 pub fn project(
     insights: &[SystemInsight],
-    observed: &[MetricKey],
+    watched: &[WatchedResource],
     watched_enough: bool,
     projections: &[(MetricKey, Projection)],
     now: OffsetDateTime,
 ) -> InsightProjection {
     let plan = cybou_meaning::plan_system_state(
         insights,
-        observed,
+        watched,
         watched_enough,
         // Derived from the instant rather than random, so the same host state projects identically
         // and a reader comparing two responses is comparing the answers and not the identifiers.
@@ -59,14 +61,37 @@ pub fn project(
             .collect(),
         unobserved: ALL_SUBJECTS
             .iter()
-            .filter(|subject| !observed.iter().any(|key| key.subject == **subject))
+            .filter(|subject| {
+                // Not observed, rather than not watched. A declared thing that could not be read
+                // must not count towards "I looked at this".
+                !watched.iter().any(|resource| {
+                    resource.key.subject == **subject && resource.state.is_observed()
+                })
+            })
             .map(|subject| subject.name().to_owned())
             .collect(),
+        watched: watched.iter().map(watched_state).collect(),
         projections: projections
             .iter()
             .map(|(key, projection)| heading(key, projection))
             .collect(),
         said: cybou_meaning::realize(&plan, cybou_meaning::Language::English),
+    }
+}
+
+/// One watched thing, as a reader receives it.
+fn watched_state(resource: &WatchedResource) -> WatchedProjection {
+    let (at, value) = match &resource.state {
+        Watching::Observed { value, at } => (Some(*at), Some(*value)),
+        Watching::NeverRead => (None, None),
+        Watching::ReadFailed { since } => (Some(*since), None),
+        Watching::Stale { last_read } => (Some(*last_read), None),
+    };
+    WatchedProjection {
+        subject: resource.key.label(),
+        state: resource.state.name().to_owned(),
+        at: at.and_then(|instant| instant.format(&Rfc3339).ok()),
+        value,
     }
 }
 
@@ -118,6 +143,7 @@ pub fn unread() -> InsightProjection {
         watched_enough: false,
         findings: Vec::new(),
         unobserved: Vec::new(),
+        watched: Vec::new(),
         projections: Vec::new(),
         said: String::new(),
     }
@@ -157,7 +183,17 @@ fn finding(insight: &SystemInsight, now: OffsetDateTime) -> FindingProjection {
 /// Taken from the same planner that writes the prose, so the phrase on a card and the phrase in the
 /// sentence cannot drift apart into two descriptions of one thing.
 fn means(insight: &SystemInsight) -> String {
-    let everything: Vec<MetricKey> = ALL_SUBJECTS.iter().copied().map(MetricKey::host).collect();
+    let everything: Vec<WatchedResource> = ALL_SUBJECTS
+        .iter()
+        .copied()
+        .map(|subject| WatchedResource {
+            key: MetricKey::host(subject),
+            state: Watching::Observed {
+                value: 0.0,
+                at: OffsetDateTime::UNIX_EPOCH,
+            },
+        })
+        .collect();
     let plan = cybou_meaning::plan_system_state(
         std::slice::from_ref(insight),
         &everything,
@@ -226,8 +262,23 @@ mod tests {
     }
 
     /// Every universal subject, read.
-    fn everything() -> Vec<MetricKey> {
-        ALL_SUBJECTS.iter().copied().map(MetricKey::host).collect()
+    fn everything() -> Vec<WatchedResource> {
+        ALL_SUBJECTS
+            .iter()
+            .copied()
+            .map(|subject| observed_now(MetricKey::host(subject)))
+            .collect()
+    }
+
+    /// One watched thing with a reading, for a fixture that only cares that it was read.
+    fn observed_now(key: MetricKey) -> WatchedResource {
+        WatchedResource {
+            key,
+            state: Watching::Observed {
+                value: 0.0,
+                at: OffsetDateTime::UNIX_EPOCH,
+            },
+        }
     }
 
     fn insight(finding: Finding, strength: EvidenceStrength) -> SystemInsight {
@@ -333,11 +384,11 @@ mod tests {
     fn what_was_never_looked_at_is_on_the_wire_too() {
         // So an all-clear can be read against what was actually watched rather than as a statement
         // about everything.
-        let partial: Vec<MetricKey> = ALL_SUBJECTS
+        let partial: Vec<WatchedResource> = ALL_SUBJECTS
             .iter()
             .filter(|subject| **subject != Subject::MemoryPressure)
             .copied()
-            .map(MetricKey::host)
+            .map(|subject| observed_now(MetricKey::host(subject)))
             .collect();
         let projected = project(&[], &partial, true, &[], at());
         assert_eq!(projected.unobserved, vec!["memory.pressure".to_owned()]);

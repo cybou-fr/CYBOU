@@ -191,6 +191,13 @@ pub struct InsightProjection {
     /// A kernel without pressure accounting, a host without swap. Named so an all-clear can be read
     /// against what was actually looked at, rather than as a statement about everything.
     pub unobserved: Vec<String>,
+    /// Every watched thing and what is known about it, including what is not known.
+    ///
+    /// Carries the declared things that produced no reading. A surface built from the readings
+    /// alone cannot tell a certificate nobody declared from one that was declared and never read,
+    /// and those are opposites — the second is a watched thing an operator believes is covered.
+    #[serde(default)]
+    pub watched: Vec<WatchedProjection>,
     /// Where the watched subjects are heading.
     pub projections: Vec<ProjectionProjection>,
     /// The answer in prose, from the deterministic layer.
@@ -199,6 +206,26 @@ pub struct InsightProjection {
     /// draws; this is what the host would say if asked, and having both means the two can be
     /// compared.
     pub said: String,
+}
+
+/// One watched thing, as a reader receives it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchedProjection {
+    /// What is watched, named by the thing it is about.
+    pub subject: String,
+    /// `observed`, `never-read`, `read-failed` or `stale`.
+    ///
+    /// The three unhappy ones are kept apart because they call for different actions: a path that
+    /// does not exist, a file this process cannot open, and a sampler that has stopped.
+    pub state: String,
+    /// The instant the state refers to, if it refers to one.
+    ///
+    /// When it was read, when reading last failed, or when it was last read before going stale.
+    /// Absent for a thing never read at all, because there is no instant to name.
+    pub at: Option<String>,
+    /// The value, for something actually observed.
+    pub value: Option<f64>,
 }
 
 /// A subject and a reason, never a value. Restating what was withheld in order to explain that it

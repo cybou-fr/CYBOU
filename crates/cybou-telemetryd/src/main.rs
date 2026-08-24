@@ -67,8 +67,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for reading in linux::sample(now) {
                     sampling.observe(reading);
                 }
-                for reading in linux::sample_declared(&watching, now) {
+                // Both halves. A declared thing that could not be read is announced as unreadable
+                // rather than skipped: skipping it makes it indistinguishable from a thing nobody
+                // declared, and an operator who declared a certificate and sees nothing about it
+                // has been told, by the silence, that it is fine.
+                let (readings, unreadable) = linux::sample_declared(&watching, now);
+                for reading in readings {
                     sampling.observe(reading);
+                }
+                for key in unreadable {
+                    sampling.note_unreadable(&key, now);
                 }
             }
         });
@@ -197,12 +205,17 @@ mod linux {
         }
     }
 
-    /// Take one reading of each declared thing.
+    /// Take one reading of each declared thing, and name the ones that could not be read.
+    ///
+    /// Two lists rather than one, because a declared thing that produced nothing is a fact worth
+    /// carrying. Returning only the readings makes an unreadable certificate indistinguishable
+    /// from one nobody declared.
     pub fn sample_declared(
         declared: &[cybou_telemetryd::watchlist::Watched],
         now: OffsetDateTime,
-    ) -> Vec<Reading> {
+    ) -> (Vec<Reading>, Vec<MetricKey>) {
         let mut readings = Vec::new();
+        let mut unreadable = Vec::new();
         for watched in declared {
             // Every one of these produces no reading rather than a substitute when it cannot be
             // read. Zero days remaining, an inactive service and a backup of age zero are the three
@@ -223,16 +236,18 @@ mod linux {
                     backup_age_days(marker, now),
                 ),
             };
+            let key = MetricKey::named(subject, instance);
             let Some(value) = value else {
+                unreadable.push(key);
                 continue;
             };
             readings.push(Reading {
-                key: MetricKey::named(subject, instance),
+                key,
                 value,
                 at: now,
             });
         }
-        readings
+        (readings, unreadable)
     }
 
     /// Whether one declared unit is active.

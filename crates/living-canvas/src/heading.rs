@@ -11,7 +11,44 @@
 //! Two decisions are made here rather than left to whoever writes the markup, and both are about
 //! not overstating an estimate.
 
-use cybou_web_contracts::ProjectionProjection;
+use cybou_web_contracts::{ProjectionProjection, WatchedProjection};
+
+/// The watched things this host currently cannot see, worded for a person.
+///
+/// Empty when everything declared was read, so the card shows nothing rather than a reassuring
+/// "0 problems". What it exists to prevent is the opposite failure: a declared certificate that
+/// produced no reading used to be simply absent from the page, which reads exactly like a
+/// certificate nobody declared — and the operator who declared it is the one being told, by that
+/// silence, that it is fine.
+///
+/// Each state is worded differently because they call for different actions. Never read is a path
+/// that may not exist; read failed is usually a permission; stale is usually the sampler and not
+/// the thing sampled.
+#[must_use]
+pub fn unseen_line(watched: &[WatchedProjection]) -> Option<String> {
+    let unseen: Vec<String> = watched
+        .iter()
+        .filter_map(|resource| {
+            let why = match resource.state.as_str() {
+                "never-read" => "never read",
+                "read-failed" => "could not be read",
+                "stale" => "not read lately",
+                // Observed, or a state this build does not know about. Neither is something to
+                // report as unseen — inventing a complaint about an unknown state would be worse
+                // than the silence this function exists to break.
+                _ => return None,
+            };
+            // An em dash rather than a second pair of parentheses. The subject already
+            // carries the thing it is about in parentheses, and "(/etc/ssl/a.pem) (never read)"
+            // reads as two labels rather than one thing and its state.
+            Some(format!("{} — {why}", resource.subject))
+        })
+        .collect();
+    if unseen.is_empty() {
+        return None;
+    }
+    Some(format!("Watched but not seen: {}", unseen.join(", ")))
+}
 
 /// How long until something, in the words a person would use.
 ///
@@ -62,6 +99,62 @@ pub fn heading_line(projection: &ProjectionProjection) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use cybou_web_contracts::WatchedProjection;
+
+    fn watched(subject: &str, state: &str) -> WatchedProjection {
+        WatchedProjection {
+            subject: subject.to_owned(),
+            state: state.to_owned(),
+            at: None,
+            value: None,
+        }
+    }
+
+    #[test]
+    fn a_host_that_read_everything_it_watches_says_nothing_about_it() {
+        // Not "0 problems". A reassurance nobody asked for is one more line between the reader and
+        // the line that matters.
+        let all_read = [
+            watched("certificate.days.remaining (/etc/ssl/a.pem)", "observed"),
+            watched("service.active (caddy.service)", "observed"),
+        ];
+        assert_eq!(super::unseen_line(&all_read), None);
+    }
+
+    #[test]
+    fn each_way_of_not_seeing_something_is_worded_as_itself() {
+        // They call for different actions: a path that may not exist, a permission, and a sampler
+        // that stopped. One word for all three would send an operator to the wrong place.
+        let line = super::unseen_line(&[
+            watched("certificate.days.remaining (/etc/ssl/a.pem)", "never-read"),
+            watched("service.active (caddy.service)", "read-failed"),
+            watched("backup.age.days (/var/backups/db)", "stale"),
+            watched("load.average", "observed"),
+        ])
+        .expect("three of the four are not seen");
+
+        assert!(line.contains("(/etc/ssl/a.pem) — never read"), "{line}");
+        assert!(
+            line.contains("(caddy.service) — could not be read"),
+            "{line}"
+        );
+        assert!(
+            line.contains("(/var/backups/db) — not read lately"),
+            "{line}"
+        );
+        assert!(!line.contains("load.average"), "{line}");
+    }
+
+    #[test]
+    fn a_state_this_build_does_not_know_is_not_invented_into_a_complaint() {
+        // A newer organ sending a state this canvas has not been taught must not produce a line
+        // saying something is wrong with a thing that may be perfectly fine.
+        assert_eq!(
+            super::unseen_line(&[watched("load.average", "shimmering")]),
+            None
+        );
+    }
+
     use super::*;
 
     fn projection(reaching: &str, after: Option<i64>, beyond: bool) -> ProjectionProjection {

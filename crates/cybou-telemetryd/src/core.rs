@@ -8,7 +8,7 @@ use std::sync::RwLock;
 
 use cybou_protocol::telemetry::{
     ALL_SUBJECTS, Alarming, Deviation, EvidenceStrength, Finding, InsightEvidence, MetricKey,
-    Reading, Subject, SystemInsight,
+    Reading, Subject, SystemInsight, WatchedResource,
 };
 use time::{Duration, OffsetDateTime};
 
@@ -21,6 +21,13 @@ use crate::series::Series;
 /// people mute, and a muted detector detects nothing — the failure mode of an alerting system is
 /// almost never that it missed something, it is that everybody stopped reading it.
 const NOTEWORTHY_SPREADS: f64 = 6.0;
+
+/// How long a gap turns a window that was being filled into one that has stopped.
+///
+/// Six missed samples at one every ten seconds. Long enough that a slow tick or a busy moment is
+/// not reported as a broken probe, short enough that an operator looking at the page is not shown a
+/// four-minute-old number as if it were current.
+pub const STALE_AFTER: Duration = Duration::seconds(60);
 
 /// How full a filesystem has to be before fullness is the story regardless of statistics.
 ///
@@ -116,6 +123,38 @@ impl TelemetryCore {
         {
             series.observe(reading);
         }
+    }
+
+    /// Record that an attempt to read one watched thing produced no number.
+    ///
+    /// A window that is not being watched is ignored, for the same reason a reading for one is: a
+    /// probe must not be able to add to what this host cares about.
+    pub fn note_unreadable(&self, key: &MetricKey, at: OffsetDateTime) {
+        if let Ok(mut windows) = self.windows.write()
+            && let Some(series) = windows.get_mut(key)
+        {
+            series.note_unreadable(at);
+        }
+    }
+
+    /// What is known about every watched thing, including the ones nothing is known about.
+    ///
+    /// The whole list, not the part that worked. A declared thing with no reading used to be simply
+    /// absent from every surface, which reads exactly like a thing nobody declared — and an operator
+    /// who declared a certificate and sees nothing about it has been told, by the silence, that it
+    /// is fine.
+    #[must_use]
+    pub fn watching(&self, now: OffsetDateTime, stale_after: Duration) -> Vec<WatchedResource> {
+        let Ok(windows) = self.windows.read() else {
+            return Vec::new();
+        };
+        windows
+            .values()
+            .map(|series| WatchedResource {
+                key: series.key().clone(),
+                state: series.state(now, stale_after),
+            })
+            .collect()
     }
 
     /// The most recent reading for each subject that has one.
@@ -477,6 +516,8 @@ fn evidence(
 
 #[cfg(test)]
 mod tests {
+    use cybou_protocol::telemetry::Watching;
+
     use super::*;
 
     fn at(offset: i64) -> OffsetDateTime {
@@ -670,6 +711,127 @@ mod tests {
             .filter(|insight| insight.finding == Finding::CertificateExpiring)
             .count();
         assert_eq!(expiring, 2);
+    }
+
+    #[test]
+    fn a_declared_thing_that_was_never_read_is_not_silence() {
+        // The failure this closes: a declared certificate with no reading was simply absent from
+        // every surface, which reads exactly like a certificate nobody declared. The operator who
+        // declared it is the one being told, by that silence, that it is fine.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/never.pem".to_owned(),
+            None,
+        );
+
+        let watched = core.watching(at(100), Duration::seconds(60));
+        let never = watched
+            .iter()
+            .find(|resource| resource.key.instance.as_deref() == Some("/etc/ssl/never.pem"))
+            .expect("a declared thing is listed even with nothing known about it");
+        assert_eq!(never.state, Watching::NeverRead);
+    }
+
+    #[test]
+    fn two_services_one_unreadable_are_told_apart() {
+        // The two are opposites and used to render identically. One is a unit this host looked at
+        // and found running; the other is a unit it could not ask about at all, and reporting the
+        // second as absent is reporting it as fine.
+        let core = core();
+        for unit in ["postgresql.service", "caddy.service"] {
+            core.watch(Subject::ServiceActive, unit.to_owned(), None);
+        }
+        for tick in 0..24 {
+            core.observe(Reading {
+                key: MetricKey::named(Subject::ServiceActive, "postgresql.service".to_owned()),
+                value: 1.0,
+                at: at(tick * 60),
+            });
+        }
+        core.note_unreadable(
+            &MetricKey::named(Subject::ServiceActive, "caddy.service".to_owned()),
+            at(1400),
+        );
+
+        let watched = core.watching(at(1440), Duration::seconds(60));
+        let state = |unit: &str| {
+            watched
+                .iter()
+                .find(|resource| resource.key.instance.as_deref() == Some(unit))
+                .map(|resource| resource.state.clone())
+                .expect("both are listed")
+        };
+        assert!(
+            state("postgresql.service").is_observed(),
+            "{:?}",
+            state("postgresql.service")
+        );
+        assert_eq!(
+            state("caddy.service"),
+            Watching::ReadFailed { since: at(1400) },
+            "an unreadable unit was reported as something other than unreadable"
+        );
+    }
+
+    #[test]
+    fn a_probe_that_stopped_is_not_a_probe_that_failed() {
+        // Different remedies. A file this process cannot open is usually a permission; a window
+        // that stopped being filled is usually the sampler, and is not about the file at all.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/quiet.pem".to_owned(),
+            None,
+        );
+        core.observe(Reading {
+            key: MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                "/etc/ssl/quiet.pem".to_owned(),
+            ),
+            value: 90.0,
+            at: at(0),
+        });
+
+        let state = |now| {
+            core.watching(now, Duration::seconds(60))
+                .into_iter()
+                .find(|resource| resource.key.instance.as_deref() == Some("/etc/ssl/quiet.pem"))
+                .expect("listed")
+                .state
+        };
+        assert!(state(at(30)).is_observed(), "a fresh reading is fresh");
+        assert_eq!(state(at(600)), Watching::Stale { last_read: at(0) });
+    }
+
+    #[test]
+    fn a_reading_that_arrives_clears_the_failure_before_it() {
+        // Otherwise a permission fixed at noon is still reported as broken at midnight, and the
+        // page that exists to say what is wrong becomes the page nobody believes.
+        let core = core();
+        core.watch(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/fixed.pem".to_owned(),
+            None,
+        );
+        let key = MetricKey::named(
+            Subject::CertificateDaysRemaining,
+            "/etc/ssl/fixed.pem".to_owned(),
+        );
+        core.note_unreadable(&key, at(0));
+        core.observe(Reading {
+            key: key.clone(),
+            value: 90.0,
+            at: at(10),
+        });
+
+        let state = core
+            .watching(at(20), Duration::seconds(60))
+            .into_iter()
+            .find(|resource| resource.key == key)
+            .expect("listed")
+            .state;
+        assert!(state.is_observed(), "{state:?}");
     }
 
     #[test]

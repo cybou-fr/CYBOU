@@ -32,5 +32,5 @@ pub mod watchlist;
 #[cfg(target_os = "linux")]
 pub mod service;
 
-pub use core::TelemetryCore;
+pub use core::{STALE_AFTER, TelemetryCore};
 pub use series::Series;
