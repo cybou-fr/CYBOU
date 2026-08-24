@@ -153,6 +153,9 @@ pub fn unread() -> InsightProjection {
 fn finding(insight: &SystemInsight, now: OffsetDateTime) -> FindingProjection {
     FindingProjection {
         finding: insight.finding.name().to_owned(),
+        // The thing itself, not the kind of thing. Without it two findings about two certificates
+        // are two identical rows.
+        about: insight.about.as_ref().and_then(|key| key.instance.clone()),
         means: means(insight),
         strength: match insight.strength {
             EvidenceStrength::Weak => "weak",
@@ -378,6 +381,85 @@ mod tests {
         assert_eq!(reading.subject, "filesystem.root.used");
         assert!((reading.observed - 0.96).abs() < f64::EPSILON);
         assert!((reading.ordinary - 0.62).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn two_findings_about_two_certificates_reach_the_wire_as_two_things() {
+        // Everything under this was rewritten so a measurement keeps track of which one it is
+        // about. It used to stop one inch short of the reader: the instance reached this function
+        // and was dropped before the wire.
+        let expiring = |name: &str| SystemInsight {
+            insight_id: Uuid::from_u128(1),
+            finding: Finding::CertificateExpiring,
+            about: Some(MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                name.to_owned(),
+            )),
+            because: vec![InsightEvidence {
+                key: MetricKey::named(Subject::CertificateDaysRemaining, name.to_owned()),
+                deviation: Deviation {
+                    ordinary: 60.0,
+                    spread: 1.0,
+                    observed: 3.0,
+                    spreads_away: 57.0,
+                },
+            }],
+            strength: EvidenceStrength::Strong,
+            concluded_at: at(),
+            since: at(),
+        };
+
+        let projected = project(
+            &[expiring("/etc/ssl/a.pem"), expiring("/etc/ssl/b.pem")],
+            &everything(),
+            true,
+            &[],
+            at(),
+        );
+
+        let about: Vec<Option<String>> = projected
+            .findings
+            .iter()
+            .map(|finding| finding.about.clone())
+            .collect();
+        assert_eq!(
+            about,
+            vec![
+                Some("/etc/ssl/a.pem".to_owned()),
+                Some("/etc/ssl/b.pem".to_owned())
+            ],
+            "the reader cannot tell which certificate either row is about"
+        );
+        // And each row's readings are its own, not the other one's.
+        for (finding, name) in projected
+            .findings
+            .iter()
+            .zip(["/etc/ssl/a.pem", "/etc/ssl/b.pem"])
+        {
+            assert!(
+                finding
+                    .readings
+                    .iter()
+                    .all(|reading| reading.subject.contains(name)),
+                "a row about {name} carries {:?}",
+                finding.readings
+            );
+        }
+    }
+
+    #[test]
+    fn a_finding_about_the_host_carries_no_name_on_the_wire() {
+        let projected = project(
+            &[insight(
+                Finding::StorageExhaustion,
+                EvidenceStrength::Strong,
+            )],
+            &everything(),
+            true,
+            &[],
+            at(),
+        );
+        assert_eq!(projected.findings[0].about, None);
     }
 
     #[test]

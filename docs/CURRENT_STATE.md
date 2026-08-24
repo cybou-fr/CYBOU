@@ -127,6 +127,17 @@ What is held is the estimate and never the projection. A held projection would c
 instant that is receding, which is an error this module already removed once — and it would come
 back invisibly, as a number that simply stopped moving.
 
+**The instance reaches the reader, and a target the proposal did not know does not pretend to be
+one.** The path from a window to a screen was correct up to the last inch and then dropped it: the
+gateway held which certificate a finding was about and did not put it on the wire, so a host
+watching four of them drew four rows reading *a watched certificate is close to expiry, or past it*
+and nothing else. And `OfferProjection` carried the target from the day it existed while the card
+never drew it, so a proposal naming a real unit and one naming `systemd:<unit>` looked identical.
+Both are on screen now, and the placeholder is drawn as an absence rather than literally — rendered
+as written it reads as a real name badly formatted, which is the opposite of this host admitting it
+does not know which unit it means. Both decisions live in `heading.rs`, where the native test run
+reaches them.
+
 **An action does not get to say whether it worked.** The outcome stage is built before the
 executor, on purpose and for the same reason the gate was: the natural shape of an executor is one
 that returns whether it succeeded, and an executor written first arrives with that answer already in

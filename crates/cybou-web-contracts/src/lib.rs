@@ -78,6 +78,13 @@ pub struct SessionProjection {
 pub struct FindingProjection {
     /// The finding, in the frozen vocabulary.
     pub finding: String,
+    /// Which thing it is about, for a finding about one named thing.
+    ///
+    /// `None` for a finding about the host itself. Carried separately from `means`, which describes
+    /// the *kind*: two certificates close to expiry produce two findings whose `means` is the same
+    /// sentence, and a reader looking at two identical rows cannot act on either.
+    #[serde(default)]
+    pub about: Option<String>,
     /// What it means, in the words a person would use.
     pub means: String,
     /// How well the evidence supports it: `weak`, `moderate` or `strong`.

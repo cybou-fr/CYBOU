@@ -11,7 +11,38 @@
 //! Two decisions are made here rather than left to whoever writes the markup, and both are about
 //! not overstating an estimate.
 
-use cybou_web_contracts::{ProjectionProjection, WatchedProjection};
+use cybou_web_contracts::{
+    FindingProjection, OfferProjection, ProjectionProjection, WatchedProjection,
+};
+
+/// The line that names one finding.
+///
+/// What it means, and which thing it is about. The second half is the one that took a rewrite of
+/// every layer beneath this to arrive, and it used to stop one inch short: the instance reached the
+/// gateway and was dropped before the wire, so a host watching four certificates drew four rows
+/// reading *a watched certificate is close to expiry, or past it* and nothing else.
+#[must_use]
+pub fn finding_title(finding: &FindingProjection) -> String {
+    match &finding.about {
+        Some(about) => format!("{} — {about}", finding.means),
+        None => finding.means.clone(),
+    }
+}
+
+/// What an offer would act on, when that is worth showing.
+///
+/// Nothing for a target the proposal did not know. `systemd:<unit>` is a placeholder meaning *some
+/// unit, and this host cannot say which* — drawn literally it reads as a unit called `<unit>`, and
+/// a reader would take it for a real name badly formatted rather than for an admission. The two
+/// cases have to stay distinguishable on screen for the same reason they stay distinguishable in
+/// the proposal.
+#[must_use]
+pub fn offer_target(offer: &OfferProjection) -> Option<String> {
+    if offer.target.contains('<') {
+        return None;
+    }
+    Some(offer.target.clone())
+}
 
 /// The watched things this host currently cannot see, worded for a person.
 ///
@@ -100,6 +131,64 @@ pub fn heading_line(projection: &ProjectionProjection) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use cybou_web_contracts::WatchedProjection;
+
+    fn finding(about: Option<&str>) -> cybou_web_contracts::FindingProjection {
+        cybou_web_contracts::FindingProjection {
+            finding: "certificate.expiring".to_owned(),
+            about: about.map(ToOwned::to_owned),
+            means: "a watched certificate is close to expiry, or past it".to_owned(),
+            strength: "strong".to_owned(),
+            since: String::new(),
+            readings: Vec::new(),
+            offers: Vec::new(),
+        }
+    }
+
+    fn offer(target: &str) -> cybou_web_contracts::OfferProjection {
+        cybou_web_contracts::OfferProjection {
+            operation: "service.restart".to_owned(),
+            target: target.to_owned(),
+            risk: "medium".to_owned(),
+            reversible: true,
+            verdict: "requires-confirmation".to_owned(),
+            reason: String::new(),
+        }
+    }
+
+    #[test]
+    fn two_findings_about_two_things_are_two_different_lines() {
+        // The whole point of carrying the instance from the window to the reader. Two certificates
+        // close to expiry share a `means` word for word, and two identical rows are two rows a
+        // person cannot act on.
+        let first = super::finding_title(&finding(Some("/etc/ssl/a.pem")));
+        let second = super::finding_title(&finding(Some("/etc/ssl/b.pem")));
+        assert_ne!(first, second);
+        assert!(first.contains("/etc/ssl/a.pem"), "{first}");
+        assert!(first.contains("close to expiry"), "{first}");
+    }
+
+    #[test]
+    fn a_finding_about_the_host_itself_is_not_given_a_name_it_does_not_have() {
+        // A trailing dash with nothing after it, or the word "None", would both be this surface
+        // inventing a subject for something that is about the machine.
+        let title = super::finding_title(&finding(None));
+        assert_eq!(
+            title,
+            "a watched certificate is close to expiry, or past it"
+        );
+    }
+
+    #[test]
+    fn a_target_the_proposal_did_not_know_is_not_drawn_as_one_it_did() {
+        // `systemd:<unit>` is this host saying it does not know which unit it means. Drawn
+        // literally it reads as a real name badly formatted, which is the opposite of an admission.
+        assert_eq!(super::offer_target(&offer("systemd:<unit>")), None);
+        assert_eq!(super::offer_target(&offer("filesystem:<device>")), None);
+        assert_eq!(
+            super::offer_target(&offer("systemd:postgresql.service")),
+            Some("systemd:postgresql.service".to_owned())
+        );
+    }
 
     fn watched(subject: &str, state: &str) -> WatchedProjection {
         WatchedProjection {

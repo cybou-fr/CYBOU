@@ -275,6 +275,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 /* Louder than unobserved. A subject this host has no way to read is a fact about the kernel; a
    thing an operator declared and this host cannot see is a gap in what they believe is covered. */
 .insight-unseen { color: var(--warn); font-size: 10px; }
+.offer-target { color: var(--muted); font-size: 10px; font-family: ui-monospace, monospace; }
 .finding-list { display: grid; gap: 10px; max-height: 190px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .finding-line { display: grid; gap: 3px; }
 .finding-head { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: 12px; }

@@ -162,7 +162,7 @@ fn FindingRow(finding: FindingProjection) -> impl IntoView {
     view! {
         <div class="finding-line">
             <span class="finding-head">
-                <b>{finding.means.clone()}</b>
+                <b>{crate::heading::finding_title(&finding)}</b>
                 <small class="finding-strength">{strength}</small>
             </span>
             <small class="finding-since">{format!("since {since}")}</small>
@@ -192,9 +192,14 @@ fn FindingRow(finding: FindingProjection) -> impl IntoView {
                     .into_iter()
                     .map(|offer| {
                         let undo = if offer.reversible { "reversible" } else { "cannot be undone" };
+                        // What it would act on. Absent rather than drawn as `systemd:<unit>`, which
+                        // reads as a badly formatted unit name rather than as this host saying it
+                        // does not know which unit it means.
+                        let target = crate::heading::offer_target(&offer);
                         view! {
                             <span class="offer-line">
                                 <code>{offer.operation}</code>
+                                <small class="offer-target">{target}</small>
                                 <small class="offer-risk">{offer.risk}</small>
                                 <small class="offer-undo">{undo}</small>
                                 <small class="offer-verdict">{verdict_text(&offer.verdict)}</small>
