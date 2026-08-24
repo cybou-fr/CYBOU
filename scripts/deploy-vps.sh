@@ -49,9 +49,27 @@ cybou_ssh "
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
   done
 
-  # Install Living Canvas web assets
-  sudo cp -a target/living-canvas/. /usr/share/cybou/web/
-  sudo chown -R root:root /usr/libexec/cybou /usr/share/cybou
+  # Install Living Canvas web assets by replacing the directory, not by merging into it.
+  #
+  # `cp -a` into the live directory only ever adds. Every build produces content-hashed bundles under
+  # new names, so nothing was ever overwritten and nothing was ever removed: by 2026-08-24 the web
+  # root held 64 WebAssembly bundles and 94 MB, accumulated since the first deployment, on a machine
+  # whose whole purpose is to notice a disk filling up. It would have diagnosed itself eventually,
+  # which is the least dignified way for that feature to get its first real finding.
+  #
+  # Staged and swapped rather than emptied in place: `rm -rf` followed by a copy leaves the surface
+  # serving nothing for as long as the copy takes, and a failure in between leaves it serving nothing
+  # at all. A rename is one step, and the old directory is only removed once the new one is live.
+  sudo rm -rf /usr/share/cybou/web.new /usr/share/cybou/web.old
+  sudo install -d -m 0755 /usr/share/cybou/web.new
+  sudo cp -a target/living-canvas/. /usr/share/cybou/web.new/
+  sudo chown -R root:root /usr/share/cybou/web.new
+  if [ -d /usr/share/cybou/web ]; then
+    sudo mv /usr/share/cybou/web /usr/share/cybou/web.old
+  fi
+  sudo mv /usr/share/cybou/web.new /usr/share/cybou/web
+  sudo rm -rf /usr/share/cybou/web.old
+  sudo chown -R root:root /usr/libexec/cybou
 
   # Install systemd user units and target
   sudo install -m 0644 systemd/user/*.service systemd/user/*.target /usr/lib/systemd/user/
