@@ -48,9 +48,11 @@
 //! of whatever the agent could be persuaded to report about itself.
 
 pub mod grant;
+pub mod lease;
 pub mod reach;
 pub mod verdict;
 
 pub use grant::{CapsuleGrant, NetworkGrant, ResourceBudget, Workspace};
+pub use lease::{Ended, Lease, decide_under_lease};
 pub use reach::Reach;
 pub use verdict::{Refusal, Verdict, decide};

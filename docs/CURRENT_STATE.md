@@ -192,6 +192,26 @@ that is where sandboxes actually fail, and a mutation check confirms the test se
 not followed: resolving them means touching a filesystem, and a decision whose answer depends on when
 it was asked is not a decision. A symlink out of the workspace is the kernel's to refuse.
 
+**A grant has an end, and reaching it is not a request.** The lease carries the clock and the
+ledger: after its lifetime, after its spending ceiling, or after somebody withdraws it, nothing it
+used to permit is permitted. The agent is not told to stop — telling an untrusted party to stop is a
+request, and a boundary made of requests is not a boundary. This produces the first half, that
+nothing further is `Allowed`; freezing the capsule is the kernel's, and this module does not pretend
+otherwise.
+
+Three endings, kept apart because only one of them is something a person did. A lease withdrawn and
+then expired was **withdrawn**: reporting the expiry would quietly replace somebody's action with a
+timer running out. The ceiling is reached *at* the ceiling, not one unit past it — `>` lets every
+limit be exceeded by exactly one, which is invisible until a month of them is added up — and
+charging is saturating, so no arithmetic here can make a lease look healthier than it is. Both are
+mutation-checked. A request that would be refused outright is still recorded as refused rather than
+as a dead lease, because an audit saying *lease ended* for an attempt on the key store would have
+lost the interesting half.
+
+Spend is whole units of the smallest denomination. A ceiling compared as a float is one that is
+occasionally exceeded by a fraction in whichever direction the rounding went, and *occasionally* is
+not a property a limit may have.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 
