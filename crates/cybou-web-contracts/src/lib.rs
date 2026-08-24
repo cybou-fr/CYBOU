@@ -112,10 +112,18 @@ pub struct ReadingProjection {
     pub subject: String,
     /// What was observed.
     pub observed: f64,
-    /// What is ordinary for this host.
-    pub ordinary: f64,
-    /// How much this host ordinarily varies.
-    pub spread: f64,
+    /// What is ordinary for this host, once it has watched long enough to know.
+    ///
+    /// Absent on a host that has not. A categorical finding needs no baseline — a filesystem at 97%
+    /// is a problem wherever it is — so the reading is the required half and this is the optional
+    /// one. Sending  for a baseline nobody established would put a number on the page that
+    /// says the observation is thirty-five spreads from normal, which is a fabricated claim about a
+    /// host nobody has watched.
+    #[serde(default)]
+    pub ordinary: Option<f64>,
+    /// How much this host ordinarily varies, when that is established.
+    #[serde(default)]
+    pub spread: Option<f64>,
 }
 
 /// Something the host could do, and what it decided about doing it.

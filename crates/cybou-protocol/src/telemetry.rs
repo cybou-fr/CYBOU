@@ -443,14 +443,29 @@ pub struct WatchedResource {
 /// One reading behind a finding, and what it is about.
 ///
 /// A pair of subject and deviation lost the name of the thing measured, so a finding about one
-/// certificate could carry another certificate's numbers.
+/// certificate could carry another certificate's numbers. Carrying a `Deviation` and nothing else
+/// then lost something subtler and worse: a categorical finding needs no baseline, so a first
+/// reading of a filesystem at 97% produced a `StorageExhaustion` of `Strong` strength citing
+/// **nothing at all**. An insight that cannot show its readings is indistinguishable from one a
+/// model made up, and this one was reaching that state by the ordinary route.
+///
+/// So the observation is the required part and the baseline is the optional one. That is also the
+/// true shape of the two detectors: one asks *is this value a problem*, which needs one reading,
+/// and the other asks *is this value unusual here*, which needs a window.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightEvidence {
     /// What the reading was about.
     pub key: MetricKey,
-    /// How far it sat from ordinary.
-    pub deviation: Deviation,
+    /// What was observed.
+    pub observed: f64,
+    /// How far it sat from ordinary, when this host has watched long enough to have an ordinary.
+    ///
+    /// `None` is a real answer and says so: the value is a problem regardless of what is usual
+    /// here, and nothing yet establishes what is usual here. Reporting a fabricated baseline, or
+    /// dropping the reading for want of one, are the two ways this used to go wrong.
+    #[serde(default)]
+    pub deviation: Option<Deviation>,
 }
 
 /// Something the host concluded about itself.
@@ -517,7 +532,11 @@ impl SystemInsight {
 ///
 /// A closed set, and short on purpose. Every entry is something with a distinct remedy; a finding
 /// nobody can act on differently from another finding is not a finding, it is a synonym.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+//  and  so a finding can be part of a key elsewhere without that layer restating the
+// vocabulary as strings.  seeds by finding, and the first draft of that took text: the
+// drift showed up immediately, with one side writing  and this one saying
+// .
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Finding {
     /// Memory is under sustained pressure, and swapping with it.
@@ -688,12 +707,13 @@ mod tests {
             about: None,
             because: vec![InsightEvidence {
                 key: MetricKey::host(Subject::RootFilesystemUsed),
-                deviation: Deviation {
+                observed: 0.96,
+                deviation: Some(Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.94,
                     spreads_away: 32.0,
-                },
+                }),
             }],
             strength: EvidenceStrength::Strong,
             concluded_at: OffsetDateTime::from_unix_timestamp(1_787_000_000).expect("an instant"),

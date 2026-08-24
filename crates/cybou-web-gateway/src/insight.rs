@@ -175,9 +175,11 @@ fn finding(insight: &SystemInsight, now: OffsetDateTime) -> FindingProjection {
             .iter()
             .map(|evidence| ReadingProjection {
                 subject: evidence.key.label(),
-                observed: evidence.deviation.observed,
-                ordinary: evidence.deviation.ordinary,
-                spread: evidence.deviation.spread,
+                observed: evidence.observed,
+                // Both absent together, or both present. A baseline is one measurement of this
+                // host and splitting it would let half of it reach a reader alone.
+                ordinary: evidence.deviation.map(|deviation| deviation.ordinary),
+                spread: evidence.deviation.map(|deviation| deviation.spread),
             })
             .collect(),
         offers: offers(insight, now),
@@ -294,12 +296,13 @@ mod tests {
             about: None,
             because: vec![InsightEvidence {
                 key: MetricKey::host(Subject::RootFilesystemUsed),
-                deviation: Deviation {
+                observed: 0.96,
+                deviation: Some(Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.96,
                     spreads_away: 22.9,
-                },
+                }),
             }],
             strength,
             concluded_at: at(),
@@ -383,7 +386,7 @@ mod tests {
         let reading = &projected.findings[0].readings[0];
         assert_eq!(reading.subject, "filesystem.root.used");
         assert!((reading.observed - 0.96).abs() < f64::EPSILON);
-        assert!((reading.ordinary - 0.62).abs() < f64::EPSILON);
+        assert_eq!(reading.ordinary, Some(0.62));
     }
 
     #[test]
@@ -400,12 +403,13 @@ mod tests {
             )),
             because: vec![InsightEvidence {
                 key: MetricKey::named(Subject::CertificateDaysRemaining, name.to_owned()),
-                deviation: Deviation {
+                observed: 0.96,
+                deviation: Some(Deviation {
                     ordinary: 60.0,
                     spread: 1.0,
                     observed: 3.0,
                     spreads_away: 57.0,
-                },
+                }),
             }],
             strength: EvidenceStrength::Strong,
             concluded_at: at(),

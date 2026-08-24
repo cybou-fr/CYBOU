@@ -154,6 +154,23 @@ as written it reads as a real name badly formatted, which is the opposite of thi
 does not know which unit it means. Both decisions live in `heading.rs`, where the native test run
 reaches them.
 
+**A finding shows its reading whether or not there is a baseline behind it.** The two detectors ask
+different questions: *is this value a problem*, which needs one reading, and *is this value unusual
+here*, which needs a window. Evidence carried only the second, so on a fresh host the first cited
+nothing at all — a filesystem at 97% produced a `StorageExhaustion` of `Strong` strength with an
+empty `because`, which is precisely the shape this build calls indistinguishable from something a
+model made up. `InsightEvidence` now carries the observation, with the deviation as the optional
+half, and the absent baseline is said in the prose and on the card rather than filled in with a zero
+that would claim the reading is enormously far from a normal nobody established.
+
+That emptiness had a second consequence, and it is the reason this was a defect rather than a gap.
+The outcome layer checked that every measure behind a finding was readable again with `all()`, and
+`all()` over an empty list is *true* — so an action against a baseline-free finding was reported as
+having worked whatever happened to the readings afterwards. On a fresh VPS, which is every VPS for
+its first six hours, that was the ordinary path. It is fixed at the source and refused again at the
+outcome, because a vacuous truth that says *it worked* must not be one upstream change away from
+returning.
+
 **An action does not get to say whether it worked.** The outcome stage is built before the
 executor, on purpose and for the same reason the gate was: the natural shape of an executor is one
 that returns whether it succeeded, and an executor written first arrives with that answer already in

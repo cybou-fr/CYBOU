@@ -21,6 +21,17 @@
 //! entirely plausibly and is about the wrong thing. Namespacing by kind is what stops two unrelated
 //! things sharing a node because they share a name.
 //!
+//! ## The vocabulary is the other layer's, not a copy of it
+//!
+//! A finding is a [`Finding`] and a metric is a [`MetricKey`], not strings that happen to look like
+//! them. The first version of this file took both as text, and the drift was already visible before
+//! anything used it: the tests here wrote `storage.exhaustion` while `Finding::name` says
+//! `storage-exhaustion`. Two layers spelling one thing differently is how a seed comes to find
+//! nothing and be reported as an empty corner of the graph.
+//!
+//! This crate already depends on the protocol, so there was never a reason to restate the
+//! vocabulary here beyond the shape of the first draft.
+//!
 //! ## Nothing here reaches outside the graph
 //!
 //! A seed is turned into a label and looked up. It does not open a file, resolve a person, or ask
@@ -29,6 +40,7 @@
 //! a fact about the graph, and an activation that quietly returned an empty list would be saying
 //! something much stronger.
 
+use cybou_protocol::telemetry::{Finding, MetricKey};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -47,19 +59,15 @@ pub enum Seed {
     Intention(Uuid),
     /// A finding the host reached about itself.
     ///
-    /// By name from the frozen vocabulary — `storage.exhaustion`, `certificate.expiring` — rather
-    /// than by insight identity. The identity belongs to one occurrence; what a person means by
-    /// *bring to mind what relates to this* is the kind of thing, across occurrences.
-    Finding(String),
+    /// The kind of finding, not one occurrence of it. The identity of an insight belongs to one
+    /// episode; what a person means by *bring to mind what relates to this* is the kind of thing,
+    /// across episodes.
+    Finding(Finding),
     /// Something the host measures about itself.
     ///
-    /// Named by subject and, where there is one, which one — so two certificates are two seeds.
-    Metric {
-        /// What is measured.
-        subject: String,
-        /// Which one, for a subject about a named thing.
-        instance: Option<String>,
-    },
+    /// The whole key, so two certificates are two seeds — the same rule the telemetry path spent a
+    /// rewrite establishing, arriving here rather than being decided again.
+    Metric(MetricKey),
     /// An episode in the biography.
     Episode(Uuid),
 }
@@ -82,7 +90,7 @@ impl Seed {
             Self::Focus(_) => "focus",
             Self::Intention(_) => "intention",
             Self::Finding(_) => "finding",
-            Self::Metric { .. } => "metric",
+            Self::Metric(_) => "metric",
             Self::Episode(_) => "episode",
         }
     }
@@ -99,11 +107,8 @@ impl Seed {
             Self::Concept(label) => label.clone(),
             Self::Focus(item) => format!("focus:{item}"),
             Self::Intention(id) => format!("intention:{id}"),
-            Self::Finding(name) => format!("finding:{name}"),
-            Self::Metric { subject, instance } => match instance {
-                Some(instance) => format!("metric:{subject}({instance})"),
-                None => format!("metric:{subject}"),
-            },
+            Self::Finding(finding) => format!("finding:{}", finding.name()),
+            Self::Metric(key) => format!("metric:{}", key.label()),
             Self::Episode(id) => format!("episode:{id}"),
         }
     }
@@ -119,15 +124,8 @@ impl Seed {
             Self::Concept(label) => format!("the concept {label}"),
             Self::Focus(item) => format!("what the workspace is looking at ({item})"),
             Self::Intention(id) => format!("an intention being held ({id})"),
-            Self::Finding(name) => format!("a finding about this host ({name})"),
-            Self::Metric {
-                subject,
-                instance: Some(instance),
-            } => format!("something measured here ({subject}, {instance})"),
-            Self::Metric {
-                subject,
-                instance: None,
-            } => format!("something measured here ({subject})"),
+            Self::Finding(finding) => format!("a finding about this host ({})", finding.name()),
+            Self::Metric(key) => format!("something measured here ({})", key.label()),
             Self::Episode(id) => format!("an episode ({id})"),
         }
     }
@@ -135,6 +133,8 @@ impl Seed {
 
 #[cfg(test)]
 mod tests {
+    use cybou_protocol::telemetry::Subject;
+
     use super::*;
 
     #[test]
@@ -159,30 +159,38 @@ mod tests {
     fn two_certificates_are_two_seeds() {
         // The same rule the telemetry path spent a rewrite establishing, arriving here rather than
         // being re-decided: a subject about a named thing is not one thing.
-        let first = Seed::Metric {
-            subject: "certificate.days.remaining".to_owned(),
-            instance: Some("/etc/ssl/a.pem".to_owned()),
+        let of = |name: &str| {
+            Seed::Metric(MetricKey::named(
+                Subject::CertificateDaysRemaining,
+                name.to_owned(),
+            ))
         };
-        let second = Seed::Metric {
-            subject: "certificate.days.remaining".to_owned(),
-            instance: Some("/etc/ssl/b.pem".to_owned()),
-        };
-        assert_ne!(first.label(), second.label());
+        assert_ne!(of("/etc/ssl/a.pem").label(), of("/etc/ssl/b.pem").label());
 
         // And neither is the subject itself, which is about the kind rather than either file.
-        let kind = Seed::Metric {
-            subject: "certificate.days.remaining".to_owned(),
-            instance: None,
-        };
-        assert_ne!(first.label(), kind.label());
+        let kind = Seed::Metric(MetricKey::host(Subject::CertificateDaysRemaining));
+        assert_ne!(of("/etc/ssl/a.pem").label(), kind.label());
+    }
+
+    #[test]
+    fn a_seed_spells_a_finding_the_way_the_finding_spells_itself() {
+        // The drift this closes was visible before anything used it: this file's own tests wrote
+        // `storage.exhaustion` while `Finding::name` says `storage-exhaustion`. Two layers spelling
+        // one thing differently is how a seed comes to find nothing and be reported as an empty
+        // corner of the graph.
+        let seed = Seed::Finding(Finding::StorageExhaustion);
+        assert_eq!(
+            seed.label(),
+            format!("finding:{}", Finding::StorageExhaustion.name())
+        );
     }
 
     #[test]
     fn a_seed_reads_as_something_a_person_can_check() {
         // A path beginning `intention:0f3a…` is a path nobody can check against anything they know,
         // and A12 is answered by a path a person can follow.
-        let described = Seed::Finding("storage.exhaustion".to_owned()).describe();
-        assert!(described.contains("storage.exhaustion"), "{described}");
+        let described = Seed::Finding(Finding::StorageExhaustion).describe();
+        assert!(described.contains("storage-exhaustion"), "{described}");
         assert!(described.contains("finding"), "{described}");
     }
 
@@ -191,10 +199,7 @@ mod tests {
         let seeds = vec![
             Seed::concept("lemon"),
             Seed::Intention(Uuid::from_u128(7)),
-            Seed::Metric {
-                subject: "memory.pressure".to_owned(),
-                instance: None,
-            },
+            Seed::Metric(MetricKey::host(Subject::MemoryPressure)),
         ];
         let mut encoded = Vec::new();
         ciborium::into_writer(&seeds, &mut encoded).expect("encodes");

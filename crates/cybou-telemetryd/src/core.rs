@@ -265,13 +265,20 @@ impl TelemetryCore {
         // Keyed by the whole key. Keyed by subject alone, two declared certificates produced two
         // windows, two findings and one deviation: the second overwrote the first, and whichever
         // finding was built second cited the other certificate numbers as its evidence.
-        let deviations: BTreeMap<MetricKey, Deviation> = windows
+        //
+        // The reading is the entry and the baseline is a field of it. Built the other way — an
+        // entry only where a deviation existed — a categorical finding on a young window cited
+        // nothing, because there is no baseline yet and it does not need one.
+        let observations: BTreeMap<MetricKey, Observation> = windows
             .values()
             .filter_map(|series| {
                 let latest = series.latest()?;
                 Some((
                     series.key().clone(),
-                    deviation(&series.values(), latest.value)?,
+                    Observation {
+                        observed: latest.value,
+                        deviation: deviation(&series.values(), latest.value),
+                    },
                 ))
             })
             .collect();
@@ -279,9 +286,9 @@ impl TelemetryCore {
         let mut found = Vec::new();
         let mut explained: Vec<MetricKey> = Vec::new();
 
-        categorical(&windows, &deviations, now, &mut found, &mut explained);
-        pressures(&windows, &deviations, now, &mut found, &mut explained);
-        unexplained(&windows, &deviations, now, &mut found, &explained);
+        categorical(&windows, &observations, now, &mut found, &mut explained);
+        pressures(&windows, &observations, now, &mut found, &mut explained);
+        unexplained(&windows, &observations, now, &mut found, &explained);
         found
     }
 }
@@ -292,7 +299,7 @@ impl TelemetryCore {
 /// statistical detector says nothing about them precisely because they are normal here.
 fn categorical(
     windows: &BTreeMap<MetricKey, Series>,
-    deviations: &BTreeMap<MetricKey, Deviation>,
+    observations: &BTreeMap<MetricKey, Observation>,
     now: OffsetDateTime,
     found: &mut Vec<SystemInsight>,
     explained: &mut Vec<MetricKey>,
@@ -320,7 +327,7 @@ fn categorical(
                 insight_id: SystemInsight::derive_id(Finding::StorageExhaustion, None, since),
                 finding: Finding::StorageExhaustion,
                 about: None,
-                because: evidence(deviations, &[key]),
+                because: evidence(observations, &[key]),
                 strength: EvidenceStrength::Strong,
                 concluded_at: now,
                 since,
@@ -358,7 +365,7 @@ fn categorical(
             // Which certificate, which unit, which backup. Without this a proposal to act on the
             // finding would know only that something of this kind is wrong.
             about: Some(key.clone()),
-            because: evidence(deviations, &[key]),
+            because: evidence(observations, &[key]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
             since,
@@ -380,7 +387,7 @@ fn categorical(
             insight_id: SystemInsight::derive_id(Finding::FileDescriptorExhaustion, None, since),
             finding: Finding::FileDescriptorExhaustion,
             about: None,
-            because: evidence(deviations, &[descriptors]),
+            because: evidence(observations, &[descriptors]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
             since,
@@ -401,7 +408,7 @@ fn categorical(
             finding: Finding::ServiceFailure,
             // The count says something is wrong, not which unit. Nothing to act on by name.
             about: None,
-            because: evidence(deviations, &[failed]),
+            because: evidence(observations, &[failed]),
             strength: EvidenceStrength::Strong,
             concluded_at: now,
             since,
@@ -415,7 +422,7 @@ fn categorical(
 /// which is what makes it stronger.
 fn pressures(
     windows: &BTreeMap<MetricKey, Series>,
-    deviations: &BTreeMap<MetricKey, Deviation>,
+    observations: &BTreeMap<MetricKey, Observation>,
     now: OffsetDateTime,
     found: &mut Vec<SystemInsight>,
     explained: &mut Vec<MetricKey>,
@@ -440,16 +447,18 @@ fn pressures(
         let Some(latest) = series.latest() else {
             continue;
         };
-        let unusual = deviations
+        let unusual = observations
             .get(&key)
+            .and_then(|seen| seen.deviation)
             .is_some_and(|found| found.spreads_away >= NOTEWORTHY_SPREADS);
         if !unusual && !alarming_for(subject).reached_by(latest.value) {
             continue;
         }
         let corroborator = corroborator.map(MetricKey::host);
         let corroborated = corroborator.as_ref().is_some_and(|other| {
-            deviations
+            observations
                 .get(other)
+                .and_then(|seen| seen.deviation)
                 .is_some_and(|found| found.spreads_away >= NOTEWORTHY_SPREADS)
         });
         explained.push(key.clone());
@@ -465,7 +474,7 @@ fn pressures(
             insight_id: SystemInsight::derive_id(finding, None, since),
             finding,
             about: None,
-            because: evidence(deviations, &cited),
+            because: evidence(observations, &cited),
             strength: if corroborated {
                 EvidenceStrength::Moderate
             } else {
@@ -483,12 +492,18 @@ fn pressures(
 /// doing something nobody anticipated, which is the case an operator most wants to hear about.
 fn unexplained(
     windows: &BTreeMap<MetricKey, Series>,
-    deviations: &BTreeMap<MetricKey, Deviation>,
+    observations: &BTreeMap<MetricKey, Observation>,
     now: OffsetDateTime,
     found: &mut Vec<SystemInsight>,
     explained: &[MetricKey],
 ) {
-    for (key, found_deviation) in deviations {
+    for (key, seen) in observations {
+        // Only the statistical half can report an unexplained deviation: *unexplained* means it did
+        // not match a named pattern and is far from ordinary, and a window with no ordinary yet has
+        // established neither half of that.
+        let Some(found_deviation) = seen.deviation else {
+            continue;
+        };
         if explained.contains(key) || found_deviation.spreads_away < NOTEWORTHY_SPREADS {
             continue;
         }
@@ -502,12 +517,23 @@ fn unexplained(
             // Whatever it was about. An unexplained deviation on one of two certificates is about
             // that certificate, and a reader who cannot tell which is not much better off.
             about: key.instance.as_ref().map(|_| key.clone()),
-            because: evidence(deviations, std::slice::from_ref(key)),
+            because: evidence(observations, std::slice::from_ref(key)),
             strength: EvidenceStrength::Weak,
             concluded_at: now,
             since,
         });
     }
+}
+
+/// What one watched thing currently reads, and how unusual that is here.
+///
+/// The reading is required and the baseline is not. A categorical detector asks *is this value a
+/// problem* and needs one reading; the statistical one asks *is this value unusual here* and needs
+/// a window. Holding only the second meant the first cited nothing on a young host.
+#[derive(Clone, Copy, Debug)]
+struct Observation {
+    observed: f64,
+    deviation: Option<Deviation>,
 }
 
 /// What a named subject reaching its threshold means.
@@ -526,15 +552,16 @@ const fn named_finding(subject: Subject) -> Option<Finding> {
 
 /// The deviations behind a finding, in the order the finding cited them.
 fn evidence(
-    deviations: &BTreeMap<MetricKey, Deviation>,
+    observations: &BTreeMap<MetricKey, Observation>,
     cited: &[MetricKey],
 ) -> Vec<InsightEvidence> {
     cited
         .iter()
         .filter_map(|key| {
-            deviations.get(key).map(|found| InsightEvidence {
+            observations.get(key).map(|seen| InsightEvidence {
                 key: key.clone(),
-                deviation: *found,
+                observed: seen.observed,
+                deviation: seen.deviation,
             })
         })
         .collect()
@@ -984,6 +1011,59 @@ mod tests {
             .expect("listed")
             .state;
         assert!(state.is_observed(), "{state:?}");
+    }
+
+    #[test]
+    fn a_categorical_finding_on_a_young_host_still_shows_its_reading() {
+        // A filesystem at 97% is a problem wherever it is, so the categorical detector fires on the
+        // first sample. The statistical one has nothing yet — no window, no ordinary — and the
+        // evidence used to be built only from deviations, so this finding cited *nothing at all*
+        // while calling itself Strong. An insight that cannot show its readings is
+        // indistinguishable from one a model made up, and this one was arriving there by the
+        // ordinary route on every fresh host.
+        let core = core();
+        core.observe(Reading {
+            key: MetricKey::host(Subject::RootFilesystemUsed),
+            value: 0.97,
+            at: at(0),
+        });
+
+        let found = core.insights(at(10));
+        let storage = found
+            .iter()
+            .find(|insight| insight.finding == Finding::StorageExhaustion)
+            .expect("a full disk is a finding on the first reading");
+
+        assert_eq!(storage.because.len(), 1, "{:?}", storage.because);
+        let evidence = &storage.because[0];
+        assert_eq!(evidence.key, MetricKey::host(Subject::RootFilesystemUsed));
+        assert!((evidence.observed - 0.97).abs() < f64::EPSILON);
+        assert_eq!(
+            evidence.deviation, None,
+            "a baseline was reported for a host that has watched one reading"
+        );
+    }
+
+    #[test]
+    fn a_baseline_appears_once_there_is_one_and_not_before() {
+        // The control. Without it the field above could be hard-coded to None.
+        let core = core();
+        for tick in 0..24 {
+            core.observe(Reading {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                value: 0.97,
+                at: at(tick * 60),
+            });
+        }
+        let found = core.insights(at(2000));
+        let storage = found
+            .iter()
+            .find(|insight| insight.finding == Finding::StorageExhaustion)
+            .expect("a finding");
+        assert!(
+            storage.because[0].deviation.is_some(),
+            "a window long enough to judge reported no baseline"
+        );
     }
 
     #[test]

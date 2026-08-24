@@ -131,6 +131,21 @@ fn relief(
         };
     }
 
+    // A finding that cites nothing cannot be checked against anything, and `all` over an empty
+    // list is *true* — so this used to answer `Relieved` for it, by arithmetic rather than by
+    // evidence. That was reachable by the ordinary route: a categorical finding needs no baseline,
+    // so the first reading of a filesystem at 97% produced a `StorageExhaustion` citing nothing at
+    // all, and an action against it was reported as having worked whatever happened.
+    //
+    // Fixed at the source — a finding now cites its observation whether or not a baseline exists —
+    // and refused here as well, because a vacuous truth that says "it worked" must not be one
+    // upstream change away from returning.
+    if cause.because.is_empty() {
+        return Relief::NotEstablished {
+            because: CannotTell::NotReadAfterwards,
+        };
+    }
+
     // Every reading the finding rested on has to be readable again, or the two sides are not
     // comparable. One unreadable measure among them is enough: the finding was concluded from all
     // of them, and its absence afterwards could be the absence of the measurement rather than the
@@ -155,10 +170,13 @@ fn relief(
     // as recorded, so a condition that drifted between the diagnosis and the attempt is measured
     // from where it actually was.
     let was = same_condition(cause, seen.before).unwrap_or(cause);
-    if worst_deviation(still) > worst_deviation(was) {
-        Relief::Worse
-    } else {
-        Relief::StillPresent
+    match (worst_deviation(still), worst_deviation(was)) {
+        (Some(after), Some(before)) if after > before => Relief::Worse,
+        // Either side without a baseline. *Worse* is a comparison against what is ordinary here,
+        // and a host that has not established one cannot make it — so the answer is the weaker of
+        // the two claims, which is still present. Guessing from the raw values would need to know
+        // which direction is bad, and that is the threshold's business rather than this module's.
+        _ => Relief::StillPresent,
     }
 }
 
@@ -177,16 +195,24 @@ fn same_condition<'a>(
         .find(|insight| insight.finding == cause.finding && insight.about == cause.about)
 }
 
-/// How far from ordinary the furthest of a finding's readings sits.
+/// How far from ordinary the furthest of a finding's readings sits, if any of them says.
 ///
 /// The furthest rather than the average, because a finding that cites two measures is as bad as the
 /// worse of them: memory pressure easing while swap keeps climbing is not an improvement.
-fn worst_deviation(insight: &SystemInsight) -> f64 {
+///
+/// `None` when nothing it cites has a baseline. A categorical finding on a young host is the whole
+/// case: it is a real finding, it is entitled to no opinion about what is unusual here, and a
+/// caller that read a missing baseline as zero would compare a real deviation against a fabricated
+/// one and call the result an improvement.
+fn worst_deviation(insight: &SystemInsight) -> Option<f64> {
     insight
         .because
         .iter()
-        .map(|evidence| evidence.deviation.spreads_away)
-        .fold(0.0_f64, f64::max)
+        .filter_map(|evidence| evidence.deviation)
+        .map(|deviation| deviation.spreads_away)
+        .fold(None, |worst: Option<f64>, spreads| {
+            Some(worst.map_or(spreads, |worst| worst.max(spreads)))
+        })
 }
 
 /// Whether the claim and the readings tell the same story.
@@ -235,12 +261,13 @@ mod tests {
             about: None,
             because: vec![InsightEvidence {
                 key: MetricKey::host(Subject::RootFilesystemUsed),
-                deviation: Deviation {
+                observed: 0.96,
+                deviation: Some(Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.96,
                     spreads_away,
-                },
+                }),
             }],
             strength: EvidenceStrength::Strong,
             concluded_at: at(0),
@@ -303,6 +330,99 @@ mod tests {
             },
             Uuid::from_u128(9),
         )
+    }
+
+    /// A finding with no baseline, as a fresh host produces on its first reading.
+    fn categorical() -> SystemInsight {
+        SystemInsight {
+            insight_id: Uuid::from_u128(1),
+            finding: Finding::StorageExhaustion,
+            about: None,
+            because: vec![InsightEvidence {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                observed: 0.97,
+                deviation: None,
+            }],
+            strength: EvidenceStrength::Strong,
+            concluded_at: at(0),
+            since: at(-1000),
+        }
+    }
+
+    #[test]
+    fn a_finding_with_no_baseline_is_still_checked_against_what_can_be_read() {
+        // The regression this closes had two halves. A categorical finding cited nothing, and
+        // `all()` over nothing is true — so a measure that went unreadable after the attempt was
+        // read as a condition relieved, by arithmetic rather than by evidence. On a fresh VPS,
+        // which is every VPS for its first six hours, this was the ordinary path.
+        let unreadable = vec![WatchedResource {
+            key: MetricKey::host(Subject::RootFilesystemUsed),
+            state: Watching::ReadFailed { since: at(100) },
+        }];
+        let outcome = observe_outcome(
+            &attempt(AttemptReport::Completed),
+            &proposal(),
+            Some(&categorical()),
+            &Reobservation {
+                before: &[categorical()],
+                after: &[],
+                watched_after: &unreadable,
+                at: at(1000),
+            },
+            Uuid::from_u128(9),
+        );
+        assert_eq!(
+            outcome.observed,
+            Relief::NotEstablished {
+                because: CannotTell::NotReadAfterwards
+            },
+            "an unread measure behind a baseline-free finding was reported as solved"
+        );
+    }
+
+    #[test]
+    fn a_finding_that_cites_nothing_at_all_establishes_nothing() {
+        // Defence in depth. The source no longer produces one, and a vacuous truth that says "it
+        // worked" must not be one upstream change away from returning.
+        let mut cites_nothing = categorical();
+        cites_nothing.because.clear();
+        let outcome = observe_outcome(
+            &attempt(AttemptReport::Completed),
+            &proposal(),
+            Some(&cites_nothing),
+            &Reobservation {
+                before: &[cites_nothing.clone()],
+                after: &[],
+                watched_after: &readable(),
+                at: at(1000),
+            },
+            Uuid::from_u128(9),
+        );
+        assert!(
+            matches!(outcome.observed, Relief::NotEstablished { .. }),
+            "{:?}",
+            outcome.observed
+        );
+    }
+
+    #[test]
+    fn a_condition_with_no_baseline_is_not_declared_worse_or_better() {
+        // *Worse* is a comparison against what is ordinary here, and a host that has not
+        // established one cannot make it. Reading a missing baseline as zero would compare a real
+        // deviation against a fabricated one and call the result an improvement.
+        let outcome = observe_outcome(
+            &attempt(AttemptReport::Completed),
+            &proposal(),
+            Some(&categorical()),
+            &Reobservation {
+                before: &[categorical()],
+                after: &[categorical()],
+                watched_after: &readable(),
+                at: at(1000),
+            },
+            Uuid::from_u128(9),
+        );
+        assert_eq!(outcome.observed, Relief::StillPresent);
     }
 
     #[test]
@@ -445,12 +565,13 @@ mod tests {
             )),
             because: vec![InsightEvidence {
                 key: MetricKey::named(Subject::CertificateDaysRemaining, name.to_owned()),
-                deviation: Deviation {
+                observed: 0.96,
+                deviation: Some(Deviation {
                     ordinary: 60.0,
                     spread: 1.0,
                     observed: 3.0,
                     spreads_away: 57.0,
-                },
+                }),
             }],
             strength: EvidenceStrength::Strong,
             concluded_at: at(0),

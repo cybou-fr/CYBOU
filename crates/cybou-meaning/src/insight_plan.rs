@@ -120,13 +120,24 @@ pub fn plan_system_state(
                 // The readings, so *why do you think that* is answered by looking. An insight that
                 // could not show them would be indistinguishable from one a model made up. Named
                 // by the whole key: two certificates produce two lines that read differently.
-                key_points.push(format!(
-                    "  {} is {:.2}, where {:.2} is ordinary here (spread {:.3}).",
-                    evidence.key.label(),
-                    evidence.deviation.observed,
-                    evidence.deviation.ordinary,
-                    evidence.deviation.spread
-                ));
+                key_points.push(match evidence.deviation {
+                    Some(deviation) => format!(
+                        "  {} is {:.2}, where {:.2} is ordinary here (spread {:.3}).",
+                        evidence.key.label(),
+                        evidence.observed,
+                        deviation.ordinary,
+                        deviation.spread
+                    ),
+                    // The reading, and the absence of a baseline said rather than left out. A
+                    // filesystem at 97% is a problem on a host nobody has watched yet, and the
+                    // honest sentence carries both halves: the number, and that there is nothing
+                    // yet to call it unusual against.
+                    None => format!(
+                        "  {} is {:.2}. I have not watched this host long enough to know what is ordinary for it.",
+                        evidence.key.label(),
+                        evidence.observed
+                    ),
+                });
             }
         }
     }
@@ -251,12 +262,13 @@ mod tests {
             about: None,
             because: vec![InsightEvidence {
                 key: MetricKey::host(Subject::RootFilesystemUsed),
-                deviation: Deviation {
+                observed: 0.96,
+                deviation: Some(Deviation {
                     ordinary: 0.62,
                     spread: 0.01,
                     observed: 0.96,
                     spreads_away: 22.9,
-                },
+                }),
             }],
             strength,
             concluded_at: at(100),

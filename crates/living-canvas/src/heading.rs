@@ -12,8 +12,23 @@
 //! not overstating an estimate.
 
 use cybou_web_contracts::{
-    DeliveryProjection, FindingProjection, OfferProjection, ProjectionProjection, WatchedProjection,
+    DeliveryProjection, FindingProjection, OfferProjection, ProjectionProjection,
+    ReadingProjection, WatchedProjection,
 };
+
+/// What is ordinary for this host, in the words a person reads beside a reading.
+///
+/// A baseline that does not exist yet is said, not filled in. A categorical finding needs none — a
+/// filesystem at 97% is a problem wherever it is — so a fresh host produces real findings with no
+/// notion of ordinary behind them, and drawing `ordinary 0.00` there would put a number on the page
+/// claiming the reading is enormously far from normal, about a host nobody has watched.
+#[must_use]
+pub fn baseline_line(reading: &ReadingProjection) -> String {
+    match reading.ordinary {
+        Some(ordinary) => format!("ordinary {ordinary:.2}"),
+        None => "no baseline yet".to_owned(),
+    }
+}
 
 /// One earlier delivery, as a line a person reads.
 ///
@@ -151,6 +166,21 @@ pub fn heading_line(projection: &ProjectionProjection) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use cybou_web_contracts::WatchedProjection;
+
+    #[test]
+    fn a_baseline_nobody_has_established_is_said_rather_than_filled_in() {
+        // A categorical finding needs no baseline, so a fresh host produces real findings with none
+        // behind them. Drawing "ordinary 0.00" there would put a number on the page claiming the
+        // reading is enormously far from normal, about a host nobody has watched.
+        let reading = |ordinary: Option<f64>| ReadingProjection {
+            subject: "filesystem.root.used".to_owned(),
+            observed: 0.97,
+            ordinary,
+            spread: ordinary.map(|_| 0.01),
+        };
+        assert_eq!(super::baseline_line(&reading(None)), "no baseline yet");
+        assert_eq!(super::baseline_line(&reading(Some(0.62))), "ordinary 0.62");
+    }
 
     fn delivery(supplied: u32, withheld_count: u32) -> DeliveryProjection {
         DeliveryProjection {

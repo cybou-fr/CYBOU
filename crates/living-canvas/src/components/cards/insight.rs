@@ -173,11 +173,12 @@ fn FindingRow(finding: FindingProjection) -> impl IntoView {
                     .map(|reading| {
                         // The observation beside what is ordinary for this host. A number without
                         // its baseline is a number a reader has to take on faith.
+                        let baseline = crate::heading::baseline_line(&reading);
                         view! {
                             <span class="reading-line">
                                 <code>{reading.subject}</code>
                                 <b>{format!("{:.2}", reading.observed)}</b>
-                                <small>{format!("ordinary {:.2}", reading.ordinary)}</small>
+                                <small>{baseline}</small>
                             </span>
                         }
                     })

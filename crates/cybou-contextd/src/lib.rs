@@ -27,6 +27,7 @@ pub use types::{
 
 #[cfg(test)]
 mod tests {
+    use cybou_protocol::telemetry::{Finding, MetricKey, Subject};
     use cybou_protocol::{admission::Privacy, epistemic::EpistemicStatus};
     use time::OffsetDateTime;
     use uuid::Uuid;
@@ -42,15 +43,14 @@ mod tests {
         // it.
         let context_engine = ContextCore::new();
         let now = OffsetDateTime::now_utc();
-        context_engine.activate(
-            "finding:storage.exhaustion",
-            1.0,
-            "the host concluded it",
-            now,
-        );
+        // Named by the finding rather than by hand. The first draft of this test wrote
+        // "storage.exhaustion" while the frozen vocabulary says "storage-exhaustion", which is
+        // exactly the drift the typed seed exists to make impossible.
+        let exhaustion = Seed::Finding(Finding::StorageExhaustion);
+        context_engine.activate(exhaustion.label(), 1.0, "the host concluded it", now);
         context_engine.activate("package cache", 0.6, "seen before in this situation", now);
         context_engine.associate(
-            "finding:storage.exhaustion",
+            exhaustion.label(),
             "package cache",
             0.8,
             AssociationOrigin::Episodic,
@@ -58,7 +58,7 @@ mod tests {
         );
 
         let session = context_engine.bring_to_mind(
-            &[Seed::Finding("storage.exhaustion".to_owned())],
+            std::slice::from_ref(&exhaustion),
             &ActivationBudget::default(),
         );
 
@@ -137,10 +137,7 @@ mod tests {
             &[
                 Seed::concept("lemon"),
                 Seed::concept("quince"),
-                Seed::Metric {
-                    subject: "memory.pressure".to_owned(),
-                    instance: None,
-                },
+                Seed::Metric(MetricKey::host(Subject::MemoryPressure)),
             ],
             &ActivationBudget::default(),
         );
@@ -149,10 +146,7 @@ mod tests {
             session.unknown_seeds,
             vec![
                 Seed::concept("quince"),
-                Seed::Metric {
-                    subject: "memory.pressure".to_owned(),
-                    instance: None,
-                }
+                Seed::Metric(MetricKey::host(Subject::MemoryPressure))
             ]
         );
         assert!(
