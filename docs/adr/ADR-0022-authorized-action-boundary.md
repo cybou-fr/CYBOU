@@ -3,18 +3,24 @@ SPDX-FileCopyrightText: 2026 Cybou contributors
 SPDX-License-Identifier: MIT
 -->
 
-# ADR-0022: Authorized Action Boundary for NixOS Mutation
+# ADR-0022: Authorized Action Boundary for System Mutation
 
 ## Status
 
-Proposed
+Accepted
+
+The boundary is built up to the executor, and the executor is deliberately absent.
+`cybou-remediation` implements proposal, criticism and authorization as separate steps over a
+closed set of typed operations. No executor exists: nothing in this repository can carry out any of
+them. That is the state this ADR describes, not a gap in it — the boundary is the part that had to
+exist first, and building it in the other order would mean an executor waiting for a policy.
 
 ## Context
 
-Future autonomous action creates a high-risk path from uncertain cognition to system mutation.
+Autonomous action creates a high-risk path from uncertain cognition to system mutation.
 
-The system may eventually observe a problem, form an intention, use planning or language faculties,
-and propose a change to NixOS or another external resource. None of those cognitive stages should
+The system observes a problem, forms an intention, may use planning or language faculties, and
+proposes a change to the host or another external resource. None of those cognitive stages should
 automatically imply execution authority.
 
 A direct model-to-shell path would combine uncertain interpretation, planning, authorization, and
@@ -65,8 +71,11 @@ user/system policy.
 Executors should expose constrained operations/capabilities rather than accepting unrestricted
 model-generated shell text as authority.
 
-Where NixOS mutation is involved, build/test/switch semantics should be used when applicable so the
-system can inspect a candidate before activation.
+Where the host offers a way to inspect a candidate before activating it, that way is used. On a
+declarative host that is build/test/switch; on the Debian servers ADR-0041 makes the primary target
+it is whatever dry-run, `--simulate` or staged form the operation has. Where an operation has no
+such form, that is a property of the operation and belongs in its risk, not something to paper over
+with a rehearsal that does not rehearse anything.
 
 ### Confirmation is policy-dependent
 
@@ -76,7 +85,8 @@ Higher-risk actions may require explicit confirmation.
 
 Destructive or forbidden actions may remain unavailable regardless of model confidence.
 
-The exact policy matrix belongs to M10 design.
+The policy matrix is carried by the standing policy rather than compiled in: a host on which
+nobody has granted anything is the default, and it grants nothing.
 
 ### Every attempted action returns to cognition
 

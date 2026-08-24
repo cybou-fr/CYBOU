@@ -68,9 +68,11 @@ sensitivity, egress, cost, and capability policy. Cybou has no required cloud de
 remote inference may reduce capability, but it must not erase identity, biography, policy, or the
 minimum local control substrate.
 
-The current repository does **not** yet implement the future agent/worker runtime, model broker,
-MCP/tool broker, general authorized action executor, firewall/endpoint controller, credential
-broker, or autonomous remediation loop. `CURRENT_STATE.md` is authoritative for what exists today.
+The current repository does **not** yet implement the future agent/worker runtime, MCP/tool broker,
+authorized action executor, firewall/endpoint controller, credential broker, or autonomous
+remediation loop. The model broker exists as a faculty and has no worker registered behind it, so
+it answers every request by saying what happens instead. `CURRENT_STATE.md` is authoritative for
+what exists today.
 
 ## Why this architecture
 
@@ -131,31 +133,39 @@ gateway that cannot become a second cognitive owner.
 
 | Capability | Status |
 |---|---|
-| Accepted durable events and live Presence projection | Implemented — M1 |
-| Journal v2 causal, privacy, hashing, and migration semantics | Implemented — M2 |
-| Single canonical Journal writer (`cybou-eventd`) | Implemented — M3 |
-| Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented — M4 |
+| Accepted durable events and live Presence projection | Implemented |
+| Journal v2 causal, privacy, hashing, and migration semantics | Implemented |
+| Single canonical Journal writer (`cybou-eventd`) | Implemented |
+| Process-isolated identity, intention, prediction, Self, Workspace, Presence | Implemented |
 | Restart continuity and lifecycle/consolidation core | Implemented |
 | Continuity across a real reboot | Implemented — gated on the deployed Debian host |
 | Capability health, RPC resilience, typed homeostatic observation | Implemented |
-| Contribution origin bound to the calling executable | Implemented — P7.0 |
-| Measured Journal scale budgets, paged replay, incremental verification | Implemented — P7.0 |
+| Contribution origin bound to the calling executable | Implemented |
+| Measured Journal scale budgets, paged replay, incremental verification | Implemented |
 | Grounded local perception and epistemic projection (`cybou-epistemicd`) | Implemented — ADR-0027 |
 | Associative context live integration (`cybou-contextd`) | Partial — ADR-0029 |
 | Journal v3 commitments and crash-safe transitive erasure | Implemented |
 | Erasure a person can ask for, reaching what was derived | Implemented — ADR-0028, live-bus gated |
-| A record of what was supplied to whom, and withheld | Implemented — ADR-0030 B4, no inspector yet |
+| A record of what was supplied to whom, and withheld | Implemented — ADR-0030 |
+| An inspector for that record, answering for the caller alone | Implemented — last delivery only |
 | Sensitivity as a durable schema axis | Implemented |
-| Distributed Mind prototype | Planned |
-| Structured language and meaning boundary | Partial — ADR-0031, no generative model |
+| Bounded transient Body telemetry, kept out of the biography | Implemented — ADR-0041 |
+| Named things an operator declares: certificates, services, backups | Implemented |
+| Findings as hypotheses carrying the readings behind them | Implemented |
+| Where a watched thing is heading, and when it arrives | Implemented — robust statistics, no model |
+| Structured language and meaning boundary | Implemented — ADR-0031, non-generative |
 | Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
-| Lifelong learning and learned-artifact governance | Planned |
 | Governed action and remediation boundary | Proposals and authorization implemented; no executor |
-| Agent/worker runtime, model broker, and governed tool/MCP use | Broker implemented; no worker |
+| Model brokerage as a faculty, not an organ | Implemented — ADR-0035; no worker registered |
+| Distributed Mind prototype | Planned |
+| Lifelong learning and learned-artifact governance | Planned |
+| Agent/worker runtime and governed tool/MCP use | Planned |
 | Continuous autonomous security and system operations | Planned |
 | Distributed perimeter and multi-node governance | Planned |
 
-The milestone labels describe engineering capability, not consciousness or biological equivalence.
+These describe engineering capability, not consciousness or biological equivalence. The milestone
+numbers live in [the roadmap](docs/ROADMAP.md) and nowhere else, because a number repeated in five
+documents is a number that is wrong in four of them.
 
 ## Target agent-native control plane
 
@@ -325,9 +335,9 @@ Choose a route:
 ## Project maturity
 
 Cybou is pre-release research and engineering software. Do not treat planned behaviour as
-implemented. The current tree does not yet contain the general agent/worker runtime, model broker,
-MCP governance layer, privileged security control plane, or unattended remediation engine described
-by the future ADRs.
+implemented. The current tree does not yet contain the general agent/worker runtime, MCP governance
+layer, privileged security control plane, or unattended remediation engine described by the future
+ADRs. The model broker exists and has no worker behind it.
 
 ## Support and partnerships
 

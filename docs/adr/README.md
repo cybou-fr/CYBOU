@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT
 | [0018](ADR-0018-privacy-classification-and-replication.md) | Privacy Classification and Replication | Proposed |
 | [0019](ADR-0019-degraded-modes-and-capability-deficits.md) | Degraded Modes and Capability Deficits | Accepted |
 | [0021](ADR-0021-language-models-are-optional-faculties.md) | Language and Models Are Optional Faculties | Accepted |
-| [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary for NixOS Mutation | Proposed |
+| [0022](ADR-0022-authorized-action-boundary.md) | Authorized Action Boundary for System Mutation | Accepted |
 | [0024](ADR-0024-cognitive-lifecycle-and-consolidation.md) | Cognitive Lifecycle and Consolidation | Accepted |
 | [0025](ADR-0025-grounding-epistemics-and-cognitive-governance.md) | Grounding, Epistemics, and Cognitive Governance | Proposed |
 | [0026](ADR-0026-lifecycle-owner-and-wire-contract.md) | Lifecycle Owner and Wire Contract | Accepted |
@@ -29,7 +29,7 @@ SPDX-License-Identifier: MIT
 | [0028](ADR-0028-retention-and-erasure.md) | Retention and Erasure in an Append-Only Journal | Accepted |
 | [0029](ADR-0029-associative-context-projection.md) | Associative Context Projection and Semantic Activation | Accepted |
 | [0030](ADR-0030-transparent-context-delivery.md) | Transparent Context Selection and Delivery | Accepted |
-| [0031](ADR-0031-structured-meaning-and-cognitive-acts.md) | Structured Meaning and Cognitive Acts | Proposed |
+| [0031](ADR-0031-structured-meaning-and-cognitive-acts.md) | Structured Meaning and Cognitive Acts | Accepted |
 | [0032](ADR-0032-layered-lifelong-learning.md) | Layered Lifelong Learning and Consolidation | Proposed |
 | [0033](ADR-0033-learned-artifact-governance.md) | Learned Artifact Provenance, Promotion, Rollback, and Erasure | Proposed |
 | [0034](ADR-0034-governed-agents-workers-and-tools.md) | Governed Agents, Workers, and Tool Use | Proposed |

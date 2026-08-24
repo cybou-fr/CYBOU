@@ -7,13 +7,18 @@ SPDX-License-Identifier: MIT
 
 ## Status
 
-Proposed
+Accepted
+
+`cybou-meaning` implements the boundary in both directions: an utterance becomes a
+`MeaningInterpretation`, a resolved reference and a `CognitiveAct` before it reaches any Mind API,
+and typed Mind state becomes a `ResponsePlan` before any sentence is realized from it. Realization
+is deterministic and non-generative, and the plan is what a surface may compare a sentence against.
 
 ## Context
 
 Mind already distinguishes durable biography, epistemic force, associative relevance, attention,
-and presentation. Natural-language input is planned for M8, but passing raw text directly into
-planning or action would collapse several different questions:
+and presentation. Passing raw text directly into planning or action would collapse several
+different questions:
 
 - what words were observed;
 - what the person probably meant;
