@@ -37,6 +37,21 @@ use time::{Duration, OffsetDateTime};
 
 use crate::series::Series;
 
+/// The most points a slope is estimated from.
+///
+/// Theil–Sen compares every pair, so the work is quadratic in the number of points. A six-hour
+/// window sampled every ten seconds holds 2160 of them, which is 2.33 million pairwise slopes for
+/// one subject — and a host watching its own state plus a handful of declared certificates and
+/// services has a dozen subjects. Recomputed for every page load on one vCPU, the surface that
+/// answers *why is this server busy* would be a reason the server is busy.
+///
+/// Bounded by sampling the window evenly rather than by shortening it. The detector still sees all
+/// 2160 readings; only the slope is estimated from a subset, and 128 points is 8128 pairs — about
+/// three hundred times less work for an estimator whose breakdown point does not depend on how many
+/// points it was given. What a smaller sample costs is a little precision in the slope, which is
+/// the right thing to spend: the answer is rounded to "about three days" before anybody reads it.
+const MOST_POINTS_FOR_A_SLOPE: usize = 128;
+
 /// The smallest number of readings a slope will be estimated from.
 ///
 /// Below this the pairwise medians are dominated by whichever two readings happened to be furthest
@@ -144,9 +159,10 @@ pub fn theil_sen(points: &[(f64, f64)]) -> Option<f64> {
     if points.len() < SMALLEST_TRENDABLE_WINDOW {
         return None;
     }
+    let sampled = evenly_sampled(points);
     let mut slopes = Vec::new();
-    for (index, (earlier_at, earlier)) in points.iter().enumerate() {
-        for (later_at, later) in &points[index + 1..] {
+    for (index, (earlier_at, earlier)) in sampled.iter().enumerate() {
+        for (later_at, later) in &sampled[index + 1..] {
             let elapsed = later_at - earlier_at;
             if elapsed.abs() > f64::EPSILON {
                 slopes.push((later - earlier) / elapsed);
@@ -245,6 +261,30 @@ pub fn project(series: &Series, alarming: Alarming, now: OffsetDateTime) -> Opti
         reaching,
         watched,
     })
+}
+
+/// At most [`MOST_POINTS_FOR_A_SLOPE`] points, spread evenly across the window.
+///
+/// Deterministic: the same window always yields the same subset, so two projections of one state
+/// are the same projection. A random sample would make the date wobble between reads, which is the
+/// property this module spends its whole design protecting.
+///
+/// The last point is always kept. It is the one the arrival time is measured from, and a sample
+/// that dropped it would project from a reading that is not the most recent one.
+fn evenly_sampled(points: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    if points.len() <= MOST_POINTS_FOR_A_SLOPE {
+        return points.to_vec();
+    }
+    // Rounded up. Dividing down gives a stride that undershoots — 2160 over 128 is 16, and every
+    // sixteenth of 2160 is 135 points, over the bound this exists to hold.
+    let stride = points.len().div_ceil(MOST_POINTS_FOR_A_SLOPE);
+    let mut sampled: Vec<(f64, f64)> = points.iter().step_by(stride.max(1)).copied().collect();
+    if let Some(latest) = points.last()
+        && sampled.last() != Some(latest)
+    {
+        sampled.push(*latest);
+    }
+    sampled
 }
 
 /// How much the observed values vary, without being moved by one of them.
@@ -500,6 +540,55 @@ mod tests {
             .collect();
         let slope = theil_sen(&ramp).expect("a slope");
         assert!((slope - 0.01 / 60.0).abs() < 1e-12, "{slope}");
+    }
+
+    #[test]
+    fn a_long_window_does_not_cost_what_every_pair_of_it_would() {
+        // 2160 readings is 2.33 million pairwise slopes. The surface that answers "why is this
+        // server busy" must not be a reason the server is busy.
+        let long: Vec<(f64, f64)> = (0..2160)
+            .map(|index| {
+                let seconds = f64::from(index) * 10.0;
+                (seconds, 0.60 + f64::from(index) * 0.0001)
+            })
+            .collect();
+        assert!(evenly_sampled(&long).len() <= MOST_POINTS_FOR_A_SLOPE + 1);
+
+        // And the answer it gives is the same one the whole window would.
+        let slope = theil_sen(&long).expect("a slope");
+        assert!((slope - 0.0001 / 10.0).abs() < 1e-9, "{slope}");
+    }
+
+    #[test]
+    fn the_most_recent_reading_is_always_in_the_sample() {
+        // It is the point the arrival time is measured from; a sample that dropped it would project
+        // from a reading that is not the latest.
+        let long: Vec<(f64, f64)> = (0..1000)
+            .map(|index| (f64::from(index), f64::from(index)))
+            .collect();
+        let sampled = evenly_sampled(&long);
+        assert_eq!(sampled.last(), long.last());
+    }
+
+    #[test]
+    fn the_same_window_always_yields_the_same_sample() {
+        // A random subset would make the date wobble between reads, which is the property this
+        // module spends its whole design protecting.
+        let long: Vec<(f64, f64)> = (0..900)
+            .map(|index| (f64::from(index), f64::from(index) * 0.5))
+            .collect();
+        let first = evenly_sampled(&long);
+        for _ in 0..8 {
+            assert_eq!(evenly_sampled(&long), first);
+        }
+    }
+
+    #[test]
+    fn a_window_shorter_than_the_bound_is_used_whole() {
+        let short: Vec<(f64, f64)> = (0..40)
+            .map(|index| (f64::from(index), f64::from(index)))
+            .collect();
+        assert_eq!(evenly_sampled(&short).len(), 40);
     }
 
     #[test]

@@ -520,6 +520,61 @@ mod tests {
     }
 
     #[test]
+    fn a_full_window_of_every_subject_is_projected_in_a_blink() {
+        // The number that matters on a one-vCPU host: a page load projects every watched subject,
+        // and the honest way to know it is affordable is to measure it rather than to reason about
+        // the exponent. Unbounded, this same fixture is eleven subjects times 2.33 million pairwise
+        // slopes.
+        let core = TelemetryCore::new(Duration::hours(6), 2160);
+        for name in ["/etc/ssl/a.pem", "/etc/ssl/b.pem", "/etc/ssl/c.pem"] {
+            core.watch(Subject::CertificateDaysRemaining, name.to_owned(), None);
+        }
+        for tick in 0..2160i64 {
+            #[allow(clippy::cast_precision_loss, reason = "a benchmark fixture")]
+            let drift = tick as f64;
+            for subject in [
+                Subject::LoadAverage,
+                Subject::MemoryUsed,
+                Subject::MemoryPressure,
+                Subject::IoPressure,
+                Subject::CpuPressure,
+                Subject::RootFilesystemUsed,
+                Subject::RootFilesystemInodesUsed,
+                Subject::OpenFileDescriptors,
+            ] {
+                core.observe(Reading {
+                    subject,
+                    instance: None,
+                    value: 0.40 + drift * 0.0001,
+                    at: at(tick * 10),
+                });
+            }
+            for name in ["/etc/ssl/a.pem", "/etc/ssl/b.pem", "/etc/ssl/c.pem"] {
+                core.observe(Reading {
+                    subject: Subject::CertificateDaysRemaining,
+                    instance: Some(name.to_owned()),
+                    value: 90.0 - drift * 0.001,
+                    at: at(tick * 10),
+                });
+            }
+        }
+
+        let started = std::time::Instant::now();
+        let projected = core.projections(at(2160 * 10));
+        let took = started.elapsed();
+
+        assert!(
+            projected.len() >= 10,
+            "{} subjects projected",
+            projected.len()
+        );
+        assert!(
+            took < std::time::Duration::from_millis(250),
+            "projecting a full window of every subject took {took:?}"
+        );
+    }
+
+    #[test]
     fn a_declared_certificate_is_watched_projected_and_found() {
         // The whole named-subject path, from declaration to finding. A certificate losing a day a
         // day is approaching its floor, which is the direction the threshold now carries.

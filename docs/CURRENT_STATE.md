@@ -130,8 +130,14 @@ at 95%, a failed unit) are evidence in their own right and do not need a baselin
 A window too short to have an opinion says so. That is a different answer from *nothing is wrong*.
 
 **Where things are heading** is a separate question from what is wrong now, and a disk at 71% that
-produces no finding can be the most important thing on the page. The slope is a Theil–Sen estimate —
-the median of every pairwise slope — so one spike does not move the date, and the yardstick it is
+produces no finding can be the most important thing on the page. The slope is a Theil–Sen estimate
+over at most 128 points sampled evenly from the window — the estimator compares every pair, so a
+full six-hour window would be 2.33 million comparisons for one subject and four seconds for a page
+load on one vCPU. The surface that answers *why is this server busy* must not be a reason it is.
+The detector still sees every reading; only the slope is estimated from a subset, and the sampling
+is deterministic so two projections of one state are the same projection. What it costs is a little
+precision in a number that is rounded to "about three days" before anyone reads it. The slope is
+the median of the sampled pairwise slopes — so one spike does not move the date, and the yardstick it is
 called flat against is a median absolute deviation for the same reason. A subject that is flat or
 moving away does not arrive: *not at this rate* is an answer, and a very large number would be read
 as a date — and *away* depends on which side of the threshold the problem is on, because a
