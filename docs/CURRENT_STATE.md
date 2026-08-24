@@ -282,6 +282,16 @@ so a short list is never mistaken for a whole one.
 
 ## Disclosure
 
+**A person can see what they were supplied before now, not only what they are being supplied.** The
+surface answered one question — what am I being given — which makes it a status light rather than a
+record. The recent deliveries to this consumer are carried beside the current one, bounded to
+sixteen per consumer and sixty-four consumers, and only *changes* produce an entry: a reader
+receiving the same projection every few seconds fills nothing. The history carries counts and an
+instant, never the items or the subjects — repeating every subject for every past delivery would
+multiply the one thing the withholding rules exist to keep rare by the length of the list. The
+durable record remains the `ContextDisclosed` contribution in the Journal; this is a window onto its
+recent end, so the surface answers without a Journal query.
+
 Every supply of the Mind projection across a boundary writes a `ContextDisclosed` naming the
 consumer, the contributions the supplied items came from, and what was held back and why.
 

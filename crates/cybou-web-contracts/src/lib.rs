@@ -235,6 +235,30 @@ pub struct WatchedProjection {
     pub value: Option<f64>,
 }
 
+/// One earlier delivery to this consumer.
+///
+/// Counts and an instant, and deliberately not the items or the subjects. What a history answers is
+/// *when did what I am given change, and by how much* — repeating every subject for every past
+/// delivery would multiply the one thing the withholding rules exist to keep rare by the length of
+/// the list.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryProjection {
+    /// When it was recorded, RFC 3339.
+    pub at: String,
+    /// How many items crossed.
+    pub supplied: u32,
+    /// How many of them could be traced to a source.
+    pub accounted_for: u32,
+    /// How many distinct sources those came from.
+    pub provenance_count: u32,
+    /// How many items were held back.
+    ///
+    /// A count, not the reasons. The reasons for the delivery a person is looking at are beside it;
+    /// a reason repeated for every past delivery is the same refusal restated sixteen times.
+    pub withheld_count: u32,
+}
+
 /// A subject and a reason, never a value. Restating what was withheld in order to explain that it
 /// was withheld would defeat the withholding, so this says what the item was *about* and why, and
 /// stops there. Where even the subject would say too much, the subject is absent and the item is
@@ -308,6 +332,18 @@ pub struct DisclosureProjection {
     /// are facts about the system rather than about the person. The flag exists so a reader can
     /// tell "no subject could be named" from "you are not the person this record is about".
     pub subjects_visible: bool,
+    /// What this consumer was supplied before now, newest first.
+    ///
+    /// A person could see what they were supplied and not what they were supplied last week, which
+    /// makes the surface a status light rather than a record. Only *changes* are recorded — a
+    /// reader receiving the same projection every few seconds produces no new entry — so this is a
+    /// list of the times what they were being given actually became something else.
+    ///
+    /// Bounded, and short. The durable record is the `ContextDisclosed` contribution in the
+    /// Journal; this is a window onto its recent end, and a full list here would be the Journal
+    /// again, in memory, unbounded.
+    #[serde(default)]
+    pub history: Vec<DeliveryProjection>,
     /// Whether this consumer has been supplied anything at all yet.
     ///
     /// An empty delivery and no delivery are different facts, and the first reading of this route

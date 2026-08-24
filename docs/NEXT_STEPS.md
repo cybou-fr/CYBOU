@@ -69,20 +69,14 @@ own report is one of two fields and not the deciding one.
    software rather than a declaration — nothing in this tree takes a backup, so no rotation is
    being enforced by anything but a statement (ADR-0028 E11, E12).
 
-2. **A delivery history, not only the last delivery.** `GET /api/v1/disclosure` answers for the
-   caller and nobody else, and the `Disclosure` card shows how much was supplied against how much
-   can be accounted for, with every refusal and its reason. What it shows is the *last* delivery to
-   this consumer. A person can see what they were supplied; they cannot yet see what they were
-   supplied last week.
-
-3. **A registered worker for the broker.** The brokerage faculty is built and answers `NoModel` on
+2. **A registered worker for the broker.** The brokerage faculty is built and answers `NoModel` on
    an installation with nothing registered, which is what ADR-0021 means by that being a
    configuration rather than a failure. No inference runtime is implemented beside it, on purpose:
    `llama.cpp`, `mistral.rs` and an ONNX runtime are three shapes of process, and a broker whose
    only backend was written next to it would have that backend's assumptions built in. The next
    step is one real worker behind the existing interface, not a second interface.
 
-4. **The desktop launcher on real hardware.** `scripts/cybou-desktop-session.sh` and
+3. **The desktop launcher on real hardware.** `scripts/cybou-desktop-session.sh` and
    `systemd/user/cybou-desktop.service` exist and are installed disabled. What is proven is narrow
    and listed in [Current State](CURRENT_STATE.md): the launcher refuses a silent gateway, refuses
    a missing browser, creates its profile directory, and can print what it would run. What is not

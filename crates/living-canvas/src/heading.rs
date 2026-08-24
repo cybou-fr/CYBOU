@@ -12,8 +12,28 @@
 //! not overstating an estimate.
 
 use cybou_web_contracts::{
-    FindingProjection, OfferProjection, ProjectionProjection, WatchedProjection,
+    DeliveryProjection, FindingProjection, OfferProjection, ProjectionProjection, WatchedProjection,
 };
+
+/// One earlier delivery, as a line a person reads.
+///
+/// The counts, not the contents. What a history answers is *when did what I am given change, and by
+/// how much*, and the change is what a person is looking for — a delivery that supplied more than
+/// the one before it is the thing worth noticing on a page about what somebody was shown.
+#[must_use]
+pub fn delivery_line(delivery: &DeliveryProjection) -> String {
+    // Said only when there was something. "0 withheld" on every line is noise that trains a reader
+    // to skip the column that occasionally says something.
+    let held_back = if delivery.withheld_count > 0 {
+        format!(", {} withheld", delivery.withheld_count)
+    } else {
+        String::new()
+    };
+    format!(
+        "{} — {} supplied, {} accounted for{held_back}",
+        delivery.at, delivery.supplied, delivery.accounted_for
+    )
+}
 
 /// The line that names one finding.
 ///
@@ -131,6 +151,31 @@ pub fn heading_line(projection: &ProjectionProjection) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use cybou_web_contracts::WatchedProjection;
+
+    fn delivery(supplied: u32, withheld_count: u32) -> DeliveryProjection {
+        DeliveryProjection {
+            at: "2026-08-24T11:00:00Z".to_owned(),
+            supplied,
+            accounted_for: supplied,
+            provenance_count: supplied,
+            withheld_count,
+        }
+    }
+
+    #[test]
+    fn a_delivery_that_held_nothing_back_does_not_say_so() {
+        // "0 withheld" on every line is noise that trains a reader to skip the column that
+        // occasionally says something.
+        let line = super::delivery_line(&delivery(4, 0));
+        assert!(!line.contains("withheld"), "{line}");
+        assert!(line.contains("4 supplied"), "{line}");
+    }
+
+    #[test]
+    fn a_delivery_that_held_something_back_says_how_much() {
+        let line = super::delivery_line(&delivery(4, 2));
+        assert!(line.contains("2 withheld"), "{line}");
+    }
 
     fn finding(about: Option<&str>) -> cybou_web_contracts::FindingProjection {
         cybou_web_contracts::FindingProjection {

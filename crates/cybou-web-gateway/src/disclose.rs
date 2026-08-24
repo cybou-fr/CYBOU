@@ -26,13 +26,43 @@ use uuid::Uuid;
 
 use crate::Delivered;
 
+/// How many deliveries are remembered per consumer.
+///
+/// A person asking *what was I supplied last week* needs more than the last one, and a gateway
+/// holding every delivery it ever made is a gateway that runs out of memory on a long uptime. Only
+/// changes are recorded — a reader receiving the same projection every few seconds produces no new
+/// entry — so sixteen covers a real span rather than sixteen seconds.
+///
+/// The record that matters durably is the `ContextDisclosed` contribution in the Journal. This is a
+/// window onto the recent part of it, held here so the surface answers without a Journal query.
+pub const DELIVERIES_REMEMBERED: usize = 16;
+
+/// How many consumers are remembered at all.
+///
+/// A destination is `living-canvas:<username>`, so this is bounded by the people who sign in and
+/// not by traffic. Bounded anyway: an in-memory map keyed by anything derived from a request is one
+/// change away from being keyed by something unbounded, and finding that out on a long-running
+/// deployment is finding it out the expensive way.
+const CONSUMERS_REMEMBERED: usize = 64;
+
+/// One delivery, and when it was recorded.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Recorded {
+    /// What crossed and what did not.
+    pub delivered: Delivered,
+    /// When this was recorded.
+    pub at: OffsetDateTime,
+}
+
 /// Builds disclosure records, and knows what it has already recorded for each consumer.
 pub struct Disclosures {
-    /// What was last recorded as supplied to each destination.
+    /// What has been recorded as supplied to each destination, oldest first.
     ///
-    /// Compared rather than counted: the question is whether this consumer is now seeing something
-    /// different, not how many times it has asked.
-    last: Mutex<Vec<(String, Delivered)>>,
+    /// The last of each is compared rather than counted: the question is whether this consumer is
+    /// now seeing something different, not how many times it has asked. The ones before it are what
+    /// lets a person see what they were supplied last week and not only what they are being
+    /// supplied now.
+    history: Mutex<Vec<(String, Vec<Recorded>)>>,
 }
 
 impl Default for Disclosures {
@@ -46,7 +76,7 @@ impl Disclosures {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            last: Mutex::new(Vec::new()),
+            history: Mutex::new(Vec::new()),
         }
     }
 
@@ -57,10 +87,29 @@ impl Disclosures {
     /// supplied and it was empty.
     #[must_use]
     pub fn last_for(&self, destination_id: &str) -> Option<Delivered> {
-        let last = self.last.lock().ok()?;
-        last.iter()
+        let history = self.history.lock().ok()?;
+        history
+            .iter()
             .find(|(id, _)| id == destination_id)
-            .map(|(_, delivered)| delivered.clone())
+            .and_then(|(_, recorded)| recorded.last())
+            .map(|recorded| recorded.delivered.clone())
+    }
+
+    /// Every delivery to this consumer that is still remembered, newest first.
+    ///
+    /// Bounded by [`DELIVERIES_REMEMBERED`]. A caller that received the bound back has not been
+    /// told there were only that many — the Journal holds the durable record, and this is a window
+    /// onto its recent end.
+    #[must_use]
+    pub fn history_for(&self, destination_id: &str) -> Vec<Recorded> {
+        let Ok(history) = self.history.lock() else {
+            return Vec::new();
+        };
+        history
+            .iter()
+            .find(|(id, _)| id == destination_id)
+            .map(|(_, recorded)| recorded.iter().rev().cloned().collect())
+            .unwrap_or_default()
     }
 
     /// The contribution to record for this delivery, or `None` when there is nothing new to say.
@@ -79,14 +128,32 @@ impl Disclosures {
         }
 
         {
-            let mut last = self.last.lock().ok()?;
-            if let Some((_, previous)) = last.iter().find(|(id, _)| id == &destination.id)
-                && previous == delivered
+            let mut history = self.history.lock().ok()?;
+            if let Some((_, recorded)) = history.iter().find(|(id, _)| id == &destination.id)
+                && recorded
+                    .last()
+                    .is_some_and(|previous| &previous.delivered == delivered)
             {
                 return None;
             }
-            last.retain(|(id, _)| id != &destination.id);
-            last.push((destination.id.clone(), delivered.clone()));
+            // Moved to the end as well as appended to, so the consumer evicted when the bound binds
+            // is the one nobody has supplied anything to for longest.
+            let mut recorded = history
+                .iter()
+                .position(|(id, _)| id == &destination.id)
+                .map(|index| history.remove(index).1)
+                .unwrap_or_default();
+            recorded.push(Recorded {
+                delivered: delivered.clone(),
+                at: now,
+            });
+            while recorded.len() > DELIVERIES_REMEMBERED {
+                recorded.remove(0);
+            }
+            history.push((destination.id.clone(), recorded));
+            while history.len() > CONSUMERS_REMEMBERED {
+                history.remove(0);
+            }
         }
 
         let record = ContextDisclosedV1 {
@@ -136,6 +203,114 @@ mod tests {
     use cybou_protocol::disclosure::{ConsumerTrust, Withheld, WithheldBecause};
 
     use super::*;
+
+    fn a_delivery(items: u32) -> Delivered {
+        Delivered {
+            items: Vec::new(),
+            provenance_count: items,
+            item_count: items,
+            accounted_for: items,
+            withheld: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_person_can_see_what_they_were_supplied_before_now() {
+        // The surface answered "what am I being given" and nothing else, which makes it a status
+        // light rather than a record. What was supplied last week is the question a record is for.
+        let disclosures = Disclosures::new();
+        let destination = Destination {
+            id: "living-canvas:owner".to_owned(),
+            trust: ConsumerTrust::Owner,
+            retains: false,
+            external_boundary: true,
+        };
+        for (minute, items) in [(1i64, 3u32), (2, 5), (3, 4)] {
+            disclosures.record_for(&destination, &a_delivery(items), at(minute));
+        }
+
+        let history = disclosures.history_for(&destination.id);
+        let counts: Vec<u32> = history
+            .iter()
+            .map(|recorded| recorded.delivered.item_count)
+            .collect();
+        assert_eq!(counts, vec![4, 5, 3], "newest first");
+        assert_eq!(history[0].at, at(3));
+        assert_eq!(
+            disclosures.last_for(&destination.id).map(|d| d.item_count),
+            Some(4),
+            "the most recent is still what the top of the card describes"
+        );
+    }
+
+    #[test]
+    fn a_consumer_receiving_the_same_thing_twice_does_not_grow_a_history() {
+        // A reader watching the event stream receives the same projection every few seconds. An
+        // entry per response would fill sixteen slots in under a minute and answer no question
+        // anybody would ask.
+        let disclosures = Disclosures::new();
+        let destination = Destination {
+            id: "living-canvas:owner".to_owned(),
+            trust: ConsumerTrust::Owner,
+            retains: false,
+            external_boundary: true,
+        };
+        for minute in 1..=8 {
+            disclosures.record_for(&destination, &a_delivery(3), at(minute));
+        }
+        assert_eq!(disclosures.history_for(&destination.id).len(), 1);
+    }
+
+    #[test]
+    fn a_long_lived_gateway_does_not_remember_every_delivery_it_ever_made() {
+        // Held in memory in a process meant to run for months. The durable record is the
+        // ContextDisclosed contribution in the Journal; this is a window onto its recent end.
+        let disclosures = Disclosures::new();
+        let destination = Destination {
+            id: "living-canvas:owner".to_owned(),
+            trust: ConsumerTrust::Owner,
+            retains: false,
+            external_boundary: true,
+        };
+        let overshoot = u32::try_from(DELIVERIES_REMEMBERED).expect("small") + 20;
+        for items in 1..=overshoot {
+            disclosures.record_for(&destination, &a_delivery(items), at(i64::from(items)));
+        }
+
+        let history = disclosures.history_for(&destination.id);
+        assert_eq!(history.len(), DELIVERIES_REMEMBERED);
+        // And what it dropped is the oldest, not the newest.
+        assert_eq!(history[0].delivered.item_count, overshoot,);
+    }
+
+    #[test]
+    fn one_consumer_history_is_not_another_consumer_history() {
+        let disclosures = Disclosures::new();
+        let owner = Destination {
+            id: "living-canvas:owner".to_owned(),
+            trust: ConsumerTrust::Owner,
+            retains: false,
+            external_boundary: true,
+        };
+        let public = Destination {
+            id: "living-canvas:public".to_owned(),
+            trust: ConsumerTrust::Public,
+            retains: false,
+            external_boundary: true,
+        };
+        disclosures.record_for(&owner, &a_delivery(9), at(1));
+        disclosures.record_for(&public, &a_delivery(2), at(2));
+
+        assert_eq!(disclosures.history_for(&owner.id).len(), 1);
+        assert_eq!(
+            disclosures.history_for(&public.id)[0].delivered.item_count,
+            2
+        );
+        assert!(
+            disclosures.history_for("living-canvas:nobody").is_empty(),
+            "a consumer nothing was supplied to has no history rather than somebody else's"
+        );
+    }
 
     fn at(minute: i64) -> OffsetDateTime {
         OffsetDateTime::UNIX_EPOCH + time::Duration::minutes(minute)

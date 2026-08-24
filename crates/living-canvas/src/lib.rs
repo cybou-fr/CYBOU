@@ -256,6 +256,7 @@ impl MindClient for MockMindClient {
                 provenance_count: 0,
                 items: Vec::new(),
                 withheld: Vec::new(),
+                history: Vec::new(),
                 subjects_visible: false,
                 delivered: false,
             }))

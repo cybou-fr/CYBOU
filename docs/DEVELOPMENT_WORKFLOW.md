@@ -30,17 +30,24 @@ problem or capability
 
 ## Local development
 
+One script runs every check that has to pass, on a Linux host with the Rust toolchain and
+`chromedriver` present:
+
 ```bash
-nix develop
-cmake -S mind -B build/dev -G Ninja -DBUILD_TESTING=ON
-cmake --build build/dev
-ctest --test-dir build/dev --output-on-failure
+bash scripts/gate.sh
 ```
 
-Then run the reproducible package gates from [Building](BUILDING.md). Do not treat a host-only CMake
-build as proof that Nix packaging, D-Bus activation, or Plasma integration works.
+It stops at the first failure and names the step. Do not assemble the same checks by hand in a
+shell: the ad-hoc form of this lied twice in one afternoon, once because a `;` sat where an `&&`
+belonged and once because `cmd | grep x | head -1` takes its exit status from `head` and reports
+success whether or not grep matched. A check whose failure is invisible is not a check.
 
-From Windows, use the repository helper to send the current working tree to the Debian 13 builder:
+**The browser step is not optional and is not covered by the native one.**
+`crates/living-canvas/src/components` is compiled only for `wasm32`, so `cargo check --workspace`
+says nothing about it and a broken card passes a native run clean. That has cost this tree several
+times.
+
+From Windows, send the current working tree to the Debian builder:
 
 ```bash
 bash scripts/vps-checks.sh fast

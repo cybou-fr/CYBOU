@@ -148,7 +148,8 @@ gateway that cannot become a second cognitive owner.
 | Journal v3 commitments and crash-safe transitive erasure | Implemented |
 | Erasure a person can ask for, reaching what was derived | Implemented — ADR-0028, live-bus gated |
 | A record of what was supplied to whom, and withheld | Implemented — ADR-0030 |
-| An inspector for that record, answering for the caller alone | Implemented — last delivery only |
+| An inspector for that record, answering for the caller alone | Implemented — ADR-0030 |
+| A bounded history of what a consumer was supplied over time | Implemented — recent deliveries |
 | Sensitivity as a durable schema axis | Implemented |
 | Bounded transient Body telemetry, kept out of the biography | Implemented — ADR-0041 |
 | Named things an operator declares: certificates, services, backups | Implemented |

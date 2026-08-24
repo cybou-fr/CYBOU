@@ -119,6 +119,21 @@ pub fn DisclosureContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     // them would report one refusal where two happened.
     let withheld_rows = move || withheld().into_iter().enumerate().collect::<Vec<_>>();
 
+    // What this consumer was supplied before now. Without it the card is a status light: a person
+    // can see what they are being given and not when it became that.
+    let history = move || {
+        record()
+            .map(|record| {
+                record
+                    .history
+                    .iter()
+                    .map(crate::heading::delivery_line)
+                    .enumerate()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+
     view! {
         <div class="disclosure-card-body">
             <strong>{label}</strong>
@@ -153,6 +168,17 @@ pub fn DisclosureContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                     }
                 />
             </div>
+            <Show when=move || !history().is_empty()>
+                <strong class="disclosure-history-label">"Supplied before this"</strong>
+            </Show>
+            <div class="history-list">
+                <For
+                    each=history
+                    key=|(index, line)| format!("{index}:{line}")
+                    children=move |(_, line)| view! { <span class="history-line">{line}</span> }
+                />
+            </div>
+
             <span class="panel-link">"Delivery is not permission"</span>
         </div>
     }

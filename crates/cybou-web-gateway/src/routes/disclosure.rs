@@ -22,8 +22,10 @@
 use axum::{Json, extract::State, http::HeaderMap, http::StatusCode};
 use cybou_protocol::disclosure::{ConsumerTrust, WithheldBecause};
 use cybou_web_contracts::{
-    DISCLOSURE_ITEM_SAMPLE, DisclosureProjection, WEB_SCHEMA_V1, WithheldProjection,
+    DISCLOSURE_ITEM_SAMPLE, DeliveryProjection, DisclosureProjection, WEB_SCHEMA_V1,
+    WithheldProjection,
 };
+use time::format_description::well_known::Rfc3339;
 
 use crate::state::GatewayState;
 
@@ -58,6 +60,9 @@ pub async fn disclosure_handler(
     let session = state.session_for(&headers);
     let destination = GatewayState::destination_for(session.as_ref());
     let last = state.disclosures.last_for(&destination.id);
+    // Everything still remembered, newest first. The most recent is the one detailed above; the
+    // rest are what makes this a record rather than a status light.
+    let history = state.disclosures.history_for(&destination.id);
 
     // No delivery is not an empty delivery. On a gateway nobody has read from yet, the honest
     // answer is that nothing has been supplied — not that nothing was.
@@ -99,6 +104,18 @@ pub async fn disclosure_handler(
                     None
                 },
                 because: reason(withheld.because).to_owned(),
+            })
+            .collect(),
+        history: history
+            .into_iter()
+            .skip(1)
+            .map(|recorded| DeliveryProjection {
+                at: recorded.at.format(&Rfc3339).unwrap_or_default(),
+                supplied: recorded.delivered.item_count,
+                accounted_for: recorded.delivered.accounted_for,
+                provenance_count: recorded.delivered.provenance_count,
+                withheld_count: u32::try_from(recorded.delivered.withheld.len())
+                    .unwrap_or(u32::MAX),
             })
             .collect(),
         subjects_visible,
