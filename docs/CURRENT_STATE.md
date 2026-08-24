@@ -113,6 +113,20 @@ unit it would act on, taken from the finding, rather than the `systemd:<unit>` p
 proposal falls back to when it genuinely does not know which one it means. The count of failed units
 still falls back, because it genuinely does not.
 
+**The slope is taken from the readings, and taken again only when the readings change.** Theil–Sen
+compares every pair, so the work is quadratic; a six-hour window at one sample every ten seconds
+holds 2160 points, and a host watching a dozen subjects would spend four seconds per page load
+answering *why is this server busy* — which would be a reason the server is busy. Two bounds hold
+it. The slope is estimated from at most 128 points sampled evenly across the window, which the
+detector still sees whole, and the newest point is always kept because it is the one the arrival
+time is measured from. And the estimate is held per window against a revision counter, so a person
+refreshing a page does not pay for a slope that has not moved: a second projection of an unchanged
+host costs over four hundred times less than the first.
+
+What is held is the estimate and never the projection. A held projection would count down from an
+instant that is receding, which is an error this module already removed once — and it would come
+back invisibly, as a number that simply stopped moving.
+
 **A watched thing has four states, and three of them are not silence.** `Observed`, `NeverRead`,
 `ReadFailed` and `Stale`. A declared thing that produced no reading used to be simply absent from
 every surface, which reads exactly like a thing nobody declared — and the operator who declared a

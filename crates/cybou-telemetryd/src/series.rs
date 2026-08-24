@@ -34,6 +34,14 @@ pub struct Series {
     span: Duration,
     capacity: usize,
     readings: VecDeque<Reading>,
+    /// How many times this window has changed.
+    ///
+    /// The only exact way to ask *is this the same window I last looked at*. The obvious cheap
+    /// substitutes are wrong in a way that is hard to see: the newest instant and the length are
+    /// both unchanged when a full window accepts a reading stamped at the same instant as the one
+    /// it already holds, which drops the oldest and shifts every interior point. A counter cannot
+    /// be fooled that way, because it counts the thing that actually happened.
+    revision: u64,
     /// When the last attempt to read this failed, if the last attempt failed.
     ///
     /// Held rather than inferred from the absence of a recent reading, because the two are
@@ -70,6 +78,7 @@ impl Series {
             span,
             capacity: capacity.max(1),
             readings: VecDeque::new(),
+            revision: 0,
             unreadable_since: None,
         }
     }
@@ -129,6 +138,7 @@ impl Series {
         let at = reading.at;
         self.readings.push_back(reading);
         self.expire(at);
+        self.revision = self.revision.wrapping_add(1);
         // A reading arrived, so whatever was wrong before is no longer what is wrong now.
         self.unreadable_since = None;
         true
@@ -182,6 +192,16 @@ impl Series {
     #[must_use]
     pub fn sees_back_to(&self) -> Option<OffsetDateTime> {
         self.readings.front().map(|reading| reading.at)
+    }
+
+    /// How many times this window has changed.
+    ///
+    /// Two calls returning the same number mean the readings are identical, so anything derived
+    /// only from the readings is still valid. It says nothing about anything derived from the
+    /// clock — an arrival time counted down from now changes while this does not.
+    #[must_use]
+    pub const fn revision(&self) -> u64 {
+        self.revision
     }
 
     /// Record that an attempt to read this produced no number.

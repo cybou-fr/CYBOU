@@ -187,20 +187,76 @@ pub fn theil_sen(points: &[(f64, f64)]) -> Option<f64> {
 /// measured from a reading taken an hour ago.
 #[must_use]
 pub fn project(series: &Series, alarming: Alarming, now: OffsetDateTime) -> Option<Projection> {
+    project_from(series, alarming, now, &estimate(series))
+}
+
+/// What the readings alone say, with no reference to the clock.
+///
+/// Split out because this is the expensive half and the only half that can be reused. Everything
+/// after it is arithmetic on three numbers; this compares pairs of points. A page that recomputed
+/// it for every watched subject on every load would be a page that costs what it exists to warn
+/// about.
+///
+/// Depends on the window and nothing else, so a caller holding a window's revision knows exactly
+/// when a held estimate stopped being true.
+#[must_use]
+pub fn estimate(series: &Series) -> Estimate {
+    let Some(oldest) = series.sees_back_to() else {
+        return Estimate {
+            slope: None,
+            spread: 0.0,
+            points: 0,
+        };
+    };
+    let points: Vec<(f64, f64)> = series.timed_values(oldest);
+    Estimate {
+        slope: theil_sen(&points),
+        spread: robust_spread(&points),
+        points: points.len(),
+    }
+}
+
+/// What a window's readings say about their own direction.
+///
+/// Not a projection: there is no arrival time here, because an arrival time is measured from now
+/// and this is measured from nothing.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Estimate {
+    /// Change per second, or `None` when the window is too short to have an opinion.
+    pub slope: Option<f64>,
+    /// How much the values vary, without being moved by one of them.
+    pub spread: f64,
+    /// How many readings it was taken from.
+    pub points: usize,
+}
+
+/// A projection, from a window and an estimate already taken of it.
+///
+/// # Correctness
+///
+/// The estimate must be one taken of *this* window in its current state. Passing an older one
+/// projects a direction the readings no longer have, which is a lie the types cannot catch — the
+/// caller holds a revision for exactly this reason.
+#[must_use]
+pub fn project_from(
+    series: &Series,
+    alarming: Alarming,
+    now: OffsetDateTime,
+    estimate: &Estimate,
+) -> Option<Projection> {
     let latest = series.latest()?;
     let oldest = series.sees_back_to()?;
     let watched = latest.at - oldest;
 
-    let points: Vec<(f64, f64)> = series.timed_values(oldest);
     let current = latest.value;
 
-    let Some(slope) = theil_sen(&points) else {
+    let Some(slope) = estimate.slope else {
         return Some(Projection {
             trend: Trend::Flat,
             current,
             threshold: alarming.threshold(),
             reaching: Reaching::NotEnoughHistory {
-                have: points.len(),
+                have: estimate.points,
                 need: SMALLEST_TRENDABLE_WINDOW,
             },
             watched,
@@ -209,7 +265,7 @@ pub fn project(series: &Series, alarming: Alarming, now: OffsetDateTime) -> Opti
 
     // What counts as movement is how much of this window's own spread the trend accounts for. A
     // steady ramp explains nearly all of it; noise around a constant explains almost none.
-    let spread = robust_spread(&points);
+    let spread = estimate.spread;
     let across_the_window = slope * watched.as_seconds_f64();
     let explains_enough = (spread * FLAT_FRACTION_OF_SPREAD).max(f64::EPSILON);
     let trend = if across_the_window > explains_enough {

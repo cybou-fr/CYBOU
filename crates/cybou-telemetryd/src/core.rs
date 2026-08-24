@@ -52,6 +52,12 @@ pub struct TelemetryCore {
     /// Keyed by what it is about and which one. A named subject has one window per
     /// declared thing; a universal one has a single window with no name.
     windows: RwLock<BTreeMap<MetricKey, Series>>,
+    /// The last slope taken of each window, and the revision it was taken at.
+    ///
+    /// The estimate rather than the projection. A held projection would freeze the arrival time,
+    /// and an arrival time counted down from an instant that is receding is the one error this
+    /// module already went to some trouble to remove.
+    estimates: RwLock<BTreeMap<MetricKey, (u64, crate::trend::Estimate)>>,
     span: Duration,
     capacity: usize,
 }
@@ -74,6 +80,7 @@ impl TelemetryCore {
             .collect();
         Self {
             windows: RwLock::new(windows),
+            estimates: RwLock::new(BTreeMap::new()),
             span,
             capacity,
         }
@@ -214,14 +221,33 @@ impl TelemetryCore {
         let Ok(windows) = self.windows.read() else {
             return Vec::new();
         };
+        let mut held = self.estimates.write().ok();
         windows
             .values()
             .filter_map(|series| {
                 let alarming = series.alarming()?;
+                let key = series.key();
+                // Taken again only when the window has actually changed. A host sampling every ten
+                // seconds and a person refreshing a page do not move at the same rate, and the
+                // slope belongs to the first of those.
+                let estimate = match held.as_mut() {
+                    Some(held) => {
+                        let entry = held
+                            .entry(key.clone())
+                            .or_insert_with(|| (series.revision(), crate::trend::estimate(series)));
+                        if entry.0 != series.revision() {
+                            *entry = (series.revision(), crate::trend::estimate(series));
+                        }
+                        entry.1
+                    }
+                    // A poisoned cache is a reason to do the work, never a reason to answer from
+                    // something that may be stale.
+                    None => crate::trend::estimate(series),
+                };
                 Some((
                     // The whole key, or a page of rows all called the same thing.
-                    series.key().clone(),
-                    crate::trend::project(series, alarming, now)?,
+                    key.clone(),
+                    crate::trend::project_from(series, alarming, now, &estimate)?,
                 ))
             })
             .collect()
@@ -582,6 +608,130 @@ mod tests {
             .expect("a full disk is a finding regardless of statistics");
         assert_eq!(storage.strength, EvidenceStrength::Strong);
         assert!(!storage.because.is_empty(), "the finding cites nothing");
+    }
+
+    #[test]
+    fn projecting_an_unchanged_host_twice_does_not_do_the_work_twice() {
+        // A host samples every ten seconds; a person refreshes a page rather more often than that.
+        // The slope belongs to the first of those, and recomputing it for the second is work the
+        // page does to answer a question whose answer has not moved.
+        let core = TelemetryCore::new(Duration::hours(6), 2160);
+        for tick in 0..2160i64 {
+            #[allow(clippy::cast_precision_loss, reason = "a benchmark fixture")]
+            let drift = tick as f64;
+            for subject in [
+                Subject::MemoryUsed,
+                Subject::RootFilesystemUsed,
+                Subject::RootFilesystemInodesUsed,
+                Subject::OpenFileDescriptors,
+            ] {
+                core.observe(Reading {
+                    key: MetricKey::host(subject),
+                    value: 0.40 + drift * 0.0001,
+                    at: at(tick * 10),
+                });
+            }
+        }
+
+        let cold = std::time::Instant::now();
+        let first = core.projections(at(21_600));
+        let cold = cold.elapsed();
+
+        let warm = std::time::Instant::now();
+        let second = core.projections(at(21_600));
+        let warm = warm.elapsed();
+
+        assert_eq!(first, second, "the same host projected differently twice");
+        assert!(
+            warm * 4 < cold,
+            "a second projection of an unchanged host cost {warm:?} against {cold:?}"
+        );
+    }
+
+    #[test]
+    fn a_reading_that_arrives_is_in_the_next_projection() {
+        // The failure a cache invites: an answer that stays right for as long as nobody needs it to
+        // change. A window that turned around while a held slope said otherwise would keep
+        // projecting the arrival it was heading for before.
+        let core = TelemetryCore::new(Duration::hours(6), 2160);
+        for tick in 0..200i64 {
+            #[allow(clippy::cast_precision_loss, reason = "a small test fixture")]
+            let drift = tick as f64;
+            core.observe(Reading {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                value: 0.50 + drift * 0.001,
+                at: at(tick * 10),
+            });
+        }
+        let rising = core
+            .projections(at(2000))
+            .into_iter()
+            .find(|(key, _)| key.subject == Subject::RootFilesystemUsed)
+            .expect("a projection");
+        assert!(
+            matches!(rising.1.trend, crate::trend::Trend::Rising(_)),
+            "{:?}",
+            rising.1
+        );
+
+        // Now it turns around, hard enough that a held slope would be visibly wrong.
+        for tick in 200..400i64 {
+            #[allow(clippy::cast_precision_loss, reason = "a small test fixture")]
+            let drift = tick as f64;
+            core.observe(Reading {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                value: 0.70 - (drift - 200.0) * 0.002,
+                at: at(tick * 10),
+            });
+        }
+        let after = core
+            .projections(at(4000))
+            .into_iter()
+            .find(|(key, _)| key.subject == Subject::RootFilesystemUsed)
+            .expect("a projection");
+        assert!(
+            !matches!(after.1.trend, crate::trend::Trend::Rising(_)),
+            "a held slope outlived the readings it was taken from: {:?}",
+            after.1
+        );
+    }
+
+    #[test]
+    fn a_held_slope_does_not_freeze_the_arrival_time() {
+        // What is held is the estimate, not the answer. A held projection would count down from an
+        // instant that is receding, which is the error this module already went to some trouble to
+        // remove — and it would come back invisibly, as a number that simply stopped moving.
+        let core = TelemetryCore::new(Duration::hours(6), 2160);
+        for tick in 0..200i64 {
+            #[allow(clippy::cast_precision_loss, reason = "a small test fixture")]
+            let drift = tick as f64;
+            core.observe(Reading {
+                key: MetricKey::host(Subject::RootFilesystemUsed),
+                value: 0.60 + drift * 0.0005,
+                at: at(tick * 10),
+            });
+        }
+
+        let after = |now| {
+            core.projections(now)
+                .into_iter()
+                .find(|(key, _)| key.subject == Subject::RootFilesystemUsed)
+                .map(|(_, projection)| projection.reaching)
+                .expect("a projection")
+        };
+
+        let crate::trend::Reaching::AtThisRate { after: sooner, .. } = after(at(2000)) else {
+            panic!("expected an arrival at this rate");
+        };
+        // Nothing arrives in between. The window is unchanged, so the slope is the held one — and
+        // the clock has still moved.
+        let crate::trend::Reaching::AtThisRate { after: later, .. } = after(at(2600)) else {
+            panic!("expected an arrival at this rate");
+        };
+        assert!(
+            later < sooner,
+            "the countdown stood still: {later:?} against {sooner:?}"
+        );
     }
 
     #[test]
