@@ -169,6 +169,7 @@ pub fn authorize(
     );
 
     AuthorizationDecision {
+        decision_id: AuthorizationDecision::derive_id(proposal.proposal_id, &verdict, now),
         proposal_id: proposal.proposal_id,
         verdict,
         checked_capabilities: operation

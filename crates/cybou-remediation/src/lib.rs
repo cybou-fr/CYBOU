@@ -22,11 +22,17 @@
 //!   standing policy a person set, and the default policy grants nothing.
 //! - **A policy cannot grant what the operation table forbids.** Otherwise the forbidden list is
 //!   advisory, which is the same as absent.
+//! - **An action does not get to say whether it worked.** [`outcome`] concludes that from findings
+//!   taken before and after by the telemetry organ, which did not carry the action out and has no
+//!   notion that one was carried out. What the executor said is recorded beside it, as a claim, and
+//!   the two disagreeing is a first-class value rather than something a reader must work out.
 
 pub mod authorize;
 pub mod operation;
+pub mod outcome;
 pub mod propose;
 
 pub use authorize::{StandingPolicy, authorize, criticise, permits_unattended};
 pub use operation::{ALL_OPERATIONS, Operation};
+pub use outcome::{Reobservation, TOO_SOON_AFTER, observe_outcome};
 pub use propose::{propose, remedies_for};

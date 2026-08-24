@@ -127,6 +127,31 @@ What is held is the estimate and never the projection. A held projection would c
 instant that is receding, which is an error this module already removed once — and it would come
 back invisibly, as a number that simply stopped moving.
 
+**An action does not get to say whether it worked.** The outcome stage is built before the
+executor, on purpose and for the same reason the gate was: the natural shape of an executor is one
+that returns whether it succeeded, and an executor written first arrives with that answer already in
+its return type. Written second, it arrives to find its own report is one of two fields and not the
+deciding one.
+
+`AttemptReport` is what the thing that carried it out said; `Relief` is what the readings say
+afterwards, derived from findings taken before and after by the telemetry organ — which did not
+carry the action out and has no notion that one happened. `Agreement` is whether those two tell the
+same story, and it is a value rather than something a reader is left to work out, because the case
+that matters is the one where they differ: `apt clean` exits zero on a filesystem that is still
+full, and anything recording only the exit code records a remedy that worked.
+
+Three of the relief states are ways of not knowing, and none collapses into failure. A measure that
+went unreadable after the attempt is the worst of them to get wrong — a finding disappearing because
+nothing could read the thing it was about, reported as the problem being solved. An attempt read
+sooner than ninety seconds after it ended establishes nothing, because a restart takes longer than a
+sample interval. An operation that was declined has nothing to have relieved, and is not offered a
+rollback for something that never happened.
+
+A finding is matched across the two sets by what it is and what it is about, never by identity: a
+condition that briefly cleared and returned carries a different identity, and for this question it
+is still present. An authorization decision now carries its own derived identity, so an attempt can
+name the permission it rested on and not only the proposal it carried out.
+
 **A watched thing has four states, and three of them are not silence.** `Observed`, `NeverRead`,
 `ReadFailed` and `Stale`. A declared thing that produced no reading used to be simply absent from
 every surface, which reads exactly like a thing nobody declared — and the operator who declared a

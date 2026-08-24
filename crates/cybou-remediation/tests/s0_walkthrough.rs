@@ -17,16 +17,20 @@
 //! literal, which is what makes it a test rather than an observation about the machine it runs on.
 //! Nothing here imports an inference runtime, and there is none to import.
 //!
-//! What this walks is *observe → detect → explain → propose → authorize*. Carrying an action out is
-//! not built, and this file does not pretend otherwise: there is no executor, and the last two
-//! stages of S0 — *act* and *observe outcome* — do not exist. What is walked is everything up to the
-//! point where a person would have to say yes.
+//! What this walks is *observe → detect → explain → propose → authorize → observe outcome*. The one
+//! stage missing is *act*: there is no executor, and this file does not pretend otherwise. The last
+//! two tests supply an attempt by hand — including one that claims success while the disk is still
+//! full — because the point of the outcome stage is that the attempt's own word is not what
+//! decides.
 
 use cybou_meaning::{Language, plan_system_state, realize};
-use cybou_protocol::action::AuthorizationVerdict;
+use cybou_protocol::action::{
+    Agreement, AttemptReport, AuthorizationVerdict, ExecutionAttempt, Relief,
+};
 use cybou_protocol::telemetry::{Finding, MetricKey, Reading, Subject, SystemInsight};
 use cybou_remediation::{
-    Operation, StandingPolicy, authorize, criticise, permits_unattended, propose,
+    Operation, Reobservation, StandingPolicy, authorize, criticise, observe_outcome,
+    permits_unattended, propose,
 };
 use cybou_telemetryd::TelemetryCore;
 use cybou_telemetryd::probe;
@@ -454,4 +458,181 @@ fn a_configured_operator_can_let_one_ordinary_thing_happen_unattended() {
         at(0),
     );
     assert!(permits_unattended(&decision));
+}
+
+/// A disk that fills, is acted on, and is still full — told by the readings and not by the exit
+/// code.
+///
+/// The whole vertical in one test, with nothing mocked between the stages: a real window fills, the
+/// real detector concludes, the real proposer offers, the real gate decides, and the real outcome
+/// logic compares findings taken before and after by an organ that has no idea an action happened.
+/// The only fabricated part is the attempt, because there is no executor — and that is exactly the
+/// part whose word is not taken.
+#[test]
+fn an_action_that_reported_success_does_not_get_to_say_the_disk_is_fine() {
+    let core = TelemetryCore::new(Duration::hours(1), 240);
+    // A filesystem that has been full for a while, which is the case a purely statistical detector
+    // says nothing about precisely because it is normal here.
+    for tick in 0..40i64 {
+        core.observe(Reading {
+            key: MetricKey::host(Subject::RootFilesystemUsed),
+            value: 0.97,
+            at: at(tick * 60),
+        });
+    }
+
+    let before = core.insights(at(2500));
+    let cause = before
+        .iter()
+        .find(|insight| insight.finding == Finding::StorageExhaustion)
+        .expect("a full disk is a finding");
+
+    // What could be offered, and what the gate says about it on a machine nobody has granted
+    // anything on.
+    let proposals = propose(cause, at(2500), |operation| {
+        Uuid::from_u128(operation.verb().len() as u128)
+    });
+    let proposal = proposals
+        .iter()
+        .find(|proposal| proposal.operation == "package.cache.clean")
+        .expect("emptying the package cache is offered for a full disk");
+    let checks = criticise(proposal, cause);
+    let decision = authorize(
+        proposal,
+        &checks,
+        false,
+        &StandingPolicy::nothing_pre_authorized(),
+        at(2500),
+    );
+    assert!(
+        matches!(
+            decision.verdict,
+            AuthorizationVerdict::RequiresUserConfirmation { .. }
+        ),
+        "an unconfigured machine granted something: {:?}",
+        decision.verdict
+    );
+
+    // Suppose it happened, and suppose whatever did it reported success. `apt clean` exits zero on
+    // a filesystem that is still full.
+    let attempt = ExecutionAttempt {
+        attempt_id: Uuid::from_u128(31),
+        proposal_id: proposal.proposal_id,
+        decision_id: decision.decision_id,
+        operation: proposal.operation.clone(),
+        target_resource: proposal.target_resource.clone(),
+        report: AttemptReport::Completed,
+        started_at: at(2500),
+        ended_at: Some(at(2520)),
+    };
+
+    // The host keeps watching, and the disk is still full.
+    for tick in 42..60i64 {
+        core.observe(Reading {
+            key: MetricKey::host(Subject::RootFilesystemUsed),
+            value: 0.97,
+            at: at(tick * 60),
+        });
+    }
+    let after = core.insights(at(3560));
+    let watched_after = core.watching(at(3560), cybou_telemetryd::STALE_AFTER);
+
+    let outcome = observe_outcome(
+        &attempt,
+        proposal,
+        Some(cause),
+        &Reobservation {
+            before: &before,
+            after: &after,
+            watched_after: &watched_after,
+            at: at(3560),
+        },
+        Uuid::from_u128(32),
+    );
+
+    assert_eq!(
+        outcome.reported,
+        AttemptReport::Completed,
+        "it claimed this"
+    );
+    assert_eq!(
+        outcome.observed,
+        Relief::StillPresent,
+        "and the readings say this"
+    );
+    assert!(
+        matches!(outcome.agreement, Agreement::Disagree { .. }),
+        "the disagreement was not recorded: {:?}",
+        outcome.agreement
+    );
+    assert_eq!(
+        outcome.cause_id,
+        Some(cause.insight_id),
+        "an outcome that cannot name what it was for is an outcome nobody can argue with"
+    );
+}
+
+/// And when it genuinely worked, the same path says so without hedging.
+#[test]
+fn a_disk_that_actually_emptied_is_reported_as_relieved() {
+    let core = TelemetryCore::new(Duration::hours(1), 240);
+    for tick in 0..40i64 {
+        core.observe(Reading {
+            key: MetricKey::host(Subject::RootFilesystemUsed),
+            value: 0.97,
+            at: at(tick * 60),
+        });
+    }
+    let before = core.insights(at(2500));
+    let cause = before
+        .iter()
+        .find(|insight| insight.finding == Finding::StorageExhaustion)
+        .expect("a finding");
+    let proposals = propose(cause, at(2500), |operation| {
+        Uuid::from_u128(operation.verb().len() as u128)
+    });
+    let proposal = proposals
+        .iter()
+        .find(|proposal| proposal.operation == "package.cache.clean")
+        .expect("offered");
+
+    // This time the disk empties, and the host sees it.
+    for tick in 42..60i64 {
+        core.observe(Reading {
+            key: MetricKey::host(Subject::RootFilesystemUsed),
+            value: 0.41,
+            at: at(tick * 60),
+        });
+    }
+    let after = core.insights(at(3560));
+    let watched_after = core.watching(at(3560), cybou_telemetryd::STALE_AFTER);
+
+    let outcome = observe_outcome(
+        &ExecutionAttempt {
+            attempt_id: Uuid::from_u128(41),
+            proposal_id: proposal.proposal_id,
+            decision_id: Uuid::from_u128(42),
+            operation: proposal.operation.clone(),
+            target_resource: proposal.target_resource.clone(),
+            report: AttemptReport::Completed,
+            started_at: at(2500),
+            ended_at: Some(at(2520)),
+        },
+        proposal,
+        Some(cause),
+        &Reobservation {
+            before: &before,
+            after: &after,
+            watched_after: &watched_after,
+            at: at(3560),
+        },
+        Uuid::from_u128(43),
+    );
+
+    assert_eq!(outcome.observed, Relief::Relieved);
+    assert_eq!(outcome.agreement, Agreement::Agree);
+    assert!(
+        !outcome.rollback_available,
+        "emptying a cache cannot be undone in place; that the files can be downloaded again is a          different claim, and offering to roll it back would be offering something this host has          no way to do"
+    );
 }
