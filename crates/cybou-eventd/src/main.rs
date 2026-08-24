@@ -19,6 +19,30 @@ const VERIFICATION_PAGE: u64 = 512;
 #[cfg(target_os = "linux")]
 const VERIFICATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// Say, at every start, whether one backup would capture both the sealed records and the keys.
+///
+/// The precondition ADR-0028's whole erasure guarantee rests on, and one that is invisible from
+/// inside. Destroying a data key makes a record unreadable in every copy of the database — and only
+/// in copies that do not also hold the key. By default the store sits beside the Journal, so the
+/// most obvious backup anybody would take captures both, and a restore of it reads exactly what the
+/// erasure was meant to reach.
+///
+/// A warning rather than a different default. Moving the store would leave existing deployments
+/// unable to unwrap yesterday's keys, which is the failure this file already learned the hard way
+/// and says so above. What an operator needs here is to know, not to be migrated.
+fn warn_if_one_backup_would_take_both(keys_dir: &std::path::Path, journal_path: &std::path::Path) {
+    if keys_dir.parent() != journal_path.parent() {
+        return;
+    }
+    println!(
+        "[cybou-eventd] The key store sits beside the Journal. A backup of {} holds both the sealed records and the keys that open them, which puts it outside the erasure guarantee (ADR-0028 E12). Back them up separately, or set CYBOU_KEYSTORE_PATH.",
+        journal_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .display()
+    );
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let journal_path = env::var("CYBOU_JOURNAL_PATH").map_or_else(
@@ -70,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 domain.key_domain_id,
                 domain.key_epoch
             );
+            warn_if_one_backup_would_take_both(&keys_dir, &journal_path);
             core.set_key_store(key_store, kek, domain);
         }
         Err(error) => {

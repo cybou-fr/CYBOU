@@ -282,6 +282,25 @@ so a short list is never mistaken for a whole one.
 
 ## Disclosure
 
+**What a restored backup can read is checked against an actual backup.** ADR-0028 says a copy taken
+before an erasure still holds the ciphertext and only a destroyed key reaches it. Every other test
+here checks the live database — the copy the erasure ran against — which can prove a row was
+redacted and can prove nothing about a copy nobody controlled. So the file is copied, the erasure
+runs, and the copy is opened as a journal afterwards: that is the restore, not a simulation of one.
+
+**The guarantee has a precondition, and it is now a test rather than an assumption.** It holds only
+because the key is somewhere the backup did not reach, and `cybou-eventd` puts the key store beside
+the Journal by default — so `tar czf backup.tgz ~/.local/share/cybou/` captures both, and a restore
+of that reads everything the erasure was meant to make unreadable. A second test demonstrates
+exactly that, and the daemon says so at every start. It is not a defect the crypto can fix; it is a
+fact about what a deployment must exclude, and a guarantee whose precondition is untested is one
+that will be reported as holding on the day it does not.
+
+Writing this found a second thing worth keeping. SQLite in WAL mode holds recent writes in
+`journal.sqlite3-wal` until a checkpoint moves them, so copying the main file alone from a running
+system produces a backup that opens cleanly and is missing the newest contributions — worse than one
+that fails, because it restores and looks right.
+
 **A person can see what they were supplied before now, not only what they are being supplied.** The
 surface answered one question — what am I being given — which makes it a status light rather than a
 record. The recent deliveries to this consumer are carried beside the current one, bounded to

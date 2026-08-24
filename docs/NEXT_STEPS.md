@@ -63,11 +63,15 @@ own report is one of two fields and not the deciding one.
    evidence that the disk has space is a telemetry reading taken afterwards, not an exit code.
 
 1. **Erasure beyond the live database.** *Partly done.* An erasure reports a typed `BackupState`
-   rather than implying completeness: a deployment declares its rotation in the unit, and the
-   terminal `ErasureApplied` record carries what the erasure actually reached, with `unknown` as
-   the default because silence about backups is not evidence that none exist. What remains needs
-   software rather than a declaration — nothing in this tree takes a backup, so no rotation is
-   being enforced by anything but a statement (ADR-0028 E11, E12).
+   rather than implying completeness, and E11 is now held by a test against a real copy of the
+   database: the file is copied, the erasure runs, and the restored copy cannot read what the
+   destroyed key protected. The precondition is a test too — a backup that also took the key store
+   reads everything, and the default layout puts the two side by side, which the daemon now says at
+   every start.
+
+   What remains needs software rather than a declaration. Nothing in this tree takes a backup, so
+   no rotation is enforced by anything but a statement, and E12 is answered by what a deployment
+   declares rather than by what it does (ADR-0028 E12).
 
 2. **A registered worker for the broker.** The brokerage faculty is built and answers `NoModel` on
    an installation with nothing registered, which is what ADR-0021 means by that being a
