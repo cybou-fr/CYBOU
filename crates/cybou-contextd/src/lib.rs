@@ -9,6 +9,7 @@
 
 pub mod activation;
 pub mod core;
+pub mod seed;
 pub mod types;
 
 #[cfg(target_os = "linux")]
@@ -18,6 +19,7 @@ pub use activation::{
     ActivatedConcept, ActivationBudget, ActivationSession, Exhausted, activate_from,
 };
 pub use core::{ContextCore, enforce_edge_budget, enforce_node_budget};
+pub use seed::Seed;
 pub use types::{
     Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
     most_restrictive_privacy, shortest_retention,
@@ -30,6 +32,154 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
+
+    #[test]
+    fn a_machine_can_ask_about_its_own_state_without_phrasing_it_first() {
+        // The whole reason seeds are typed. A layer that can only be asked in words is a prompt
+        // builder with a graph inside it, and every question has to be phrased before it can be
+        // asked — which rules out the questions a machine asks itself. Nothing types
+        // "storage.exhaustion" into a box; the host reaches the finding and wants what relates to
+        // it.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate(
+            "finding:storage.exhaustion",
+            1.0,
+            "the host concluded it",
+            now,
+        );
+        context_engine.activate("package cache", 0.6, "seen before in this situation", now);
+        context_engine.associate(
+            "finding:storage.exhaustion",
+            "package cache",
+            0.8,
+            AssociationOrigin::Episodic,
+            Vec::new(),
+        );
+
+        let session = context_engine.bring_to_mind(
+            &[Seed::Finding("storage.exhaustion".to_owned())],
+            &ActivationBudget::default(),
+        );
+
+        assert!(
+            session
+                .items
+                .iter()
+                .any(|item| item.label == "package cache"),
+            "a finding brought nothing to mind: {:?}",
+            session.items
+        );
+        assert!(session.unknown_seeds.is_empty());
+    }
+
+    #[test]
+    fn a_seed_that_is_not_a_word_says_what_asked_in_words() {
+        // A12 is answered by a path a person can follow. A path beginning `intention:0f3a…` is an
+        // answer only to somebody already holding the same table.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        let held = Uuid::from_u128(7);
+        context_engine.activate(format!("intention:{held}"), 1.0, "being held", now);
+
+        let session =
+            context_engine.bring_to_mind(&[Seed::Intention(held)], &ActivationBudget::default());
+        let reached = &session.items[0];
+        assert!(
+            reached.reason.contains("an intention being held"),
+            "{}",
+            reached.reason
+        );
+    }
+
+    #[test]
+    fn a_file_named_lemon_does_not_return_what_belongs_to_the_concept() {
+        // Under plain strings these share a key, so one returns what was associated with the other
+        // along a path that reads entirely plausibly and is about the wrong thing. This is the
+        // failure the type exists to make impossible rather than unlikely.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate("lemon", 1.0, "a concept", now);
+        context_engine.activate("honey", 0.5, "a concept", now);
+        context_engine.associate(
+            "lemon",
+            "honey",
+            0.84,
+            AssociationOrigin::Episodic,
+            Vec::new(),
+        );
+
+        let asked_about_a_thing_on_screen = context_engine.bring_to_mind(
+            &[Seed::Focus("lemon".to_owned())],
+            &ActivationBudget::default(),
+        );
+        assert!(
+            asked_about_a_thing_on_screen.items.is_empty(),
+            "a focus borrowed the concept's associations: {:?}",
+            asked_about_a_thing_on_screen.items
+        );
+        assert_eq!(
+            asked_about_a_thing_on_screen.unknown_seeds,
+            vec![Seed::Focus("lemon".to_owned())],
+            "and it does not say so"
+        );
+    }
+
+    #[test]
+    fn a_seed_the_graph_never_held_is_named_rather_than_counted() {
+        // A caller that cannot tell which of four seeds found nothing cannot tell an empty corner
+        // of the graph from a mistyped one, and those need different responses.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate("lemon", 1.0, "a concept", now);
+
+        let session = context_engine.bring_to_mind(
+            &[
+                Seed::concept("lemon"),
+                Seed::concept("quince"),
+                Seed::Metric {
+                    subject: "memory.pressure".to_owned(),
+                    instance: None,
+                },
+            ],
+            &ActivationBudget::default(),
+        );
+
+        assert_eq!(
+            session.unknown_seeds,
+            vec![
+                Seed::concept("quince"),
+                Seed::Metric {
+                    subject: "memory.pressure".to_owned(),
+                    instance: None,
+                }
+            ]
+        );
+        assert!(
+            !session.complete,
+            "an activation that reached only part of what was asked called itself complete"
+        );
+    }
+
+    #[test]
+    fn one_seed_named_twice_is_one_seed_and_two_kinds_are_two() {
+        // Deduplicated by what it looks for, not by how it was written.
+        let context_engine = ContextCore::new();
+        let now = OffsetDateTime::now_utc();
+        context_engine.activate("lemon", 1.0, "a concept", now);
+        context_engine.activate("focus:lemon", 1.0, "on screen", now);
+
+        let session = context_engine.bring_to_mind(
+            &[
+                Seed::concept("lemon"),
+                Seed::concept("lemon"),
+                Seed::Focus("lemon".to_owned()),
+            ],
+            &ActivationBudget::default(),
+        );
+        let seeds_reached = session.items.iter().filter(|item| item.depth == 0).count();
+        assert_eq!(seeds_reached, 2, "{:?}", session.items);
+    }
 
     #[test]
     fn a_later_activation_that_knew_nothing_does_not_erase_a_dispute() {
@@ -48,8 +198,10 @@ mod tests {
         );
         context_engine.activate("kernel-version", 1.0, "observed again", now);
 
-        let session = context_engine
-            .bring_to_mind(&["kernel-version".to_owned()], &ActivationBudget::default());
+        let session = context_engine.bring_to_mind(
+            &[Seed::concept("kernel-version")],
+            &ActivationBudget::default(),
+        );
         assert_eq!(session.items[0].epistemic_status, EpistemicStatus::Disputed);
     }
 
@@ -76,8 +228,10 @@ mod tests {
             EpistemicStatus::Observed,
         );
 
-        let session = context_engine
-            .bring_to_mind(&["kernel-version".to_owned()], &ActivationBudget::default());
+        let session = context_engine.bring_to_mind(
+            &[Seed::concept("kernel-version")],
+            &ActivationBudget::default(),
+        );
         assert_eq!(session.items[0].epistemic_status, EpistemicStatus::Observed);
         assert!(!session.carries_qualified());
     }
@@ -126,7 +280,7 @@ mod tests {
         );
 
         let session =
-            context_engine.bring_to_mind(&["lemon".to_owned()], &ActivationBudget::default());
+            context_engine.bring_to_mind(&[Seed::concept("lemon")], &ActivationBudget::default());
         let honey = session
             .items
             .iter()
@@ -154,7 +308,7 @@ mod tests {
         assert!(context_engine.invalidate_for_epoch(1));
 
         let session =
-            context_engine.bring_to_mind(&["lemon".to_owned()], &ActivationBudget::default());
+            context_engine.bring_to_mind(&[Seed::concept("lemon")], &ActivationBudget::default());
         assert!(session.items.is_empty());
         // And it says the seed was not found rather than reporting an empty association set.
         assert!(session.exhausted.contains(&Exhausted::UnknownSeed));

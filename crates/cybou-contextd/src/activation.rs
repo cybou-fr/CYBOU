@@ -44,6 +44,7 @@ use cybou_protocol::attention::AttentionProposal;
 use cybou_protocol::epistemic::EpistemicStatus;
 use serde::{Deserialize, Serialize};
 
+use crate::seed::Seed;
 use crate::types::{Association, ConceptNode};
 
 /// Which dimension of a budget stopped the walk.
@@ -64,7 +65,7 @@ pub enum Exhausted {
     Time,
     /// The token estimate reached its ceiling.
     Tokens,
-    /// A seed named a concept the graph does not hold.
+    /// A seed named something the graph does not hold.
     ///
     /// Not a budget, and listed here anyway: it is the other way an activation is less than what
     /// was asked for, and a caller that treats "found nothing from this seed" as "there is nothing
@@ -185,7 +186,17 @@ impl ActivationSession {
 #[serde(rename_all = "camelCase")]
 pub struct ActivationSession {
     /// The seeds the walk started from.
-    pub seeds: Vec<String>,
+    ///
+    /// Typed rather than spelled. A layer that can only be asked in words is a prompt builder with
+    /// a graph inside it, and every question put to it has to be phrased before it can be asked —
+    /// which rules out the questions a machine asks itself about its own state.
+    pub seeds: Vec<Seed>,
+    /// The seeds that named something this graph has never held.
+    ///
+    /// Said by name rather than counted. *Nothing is associated with this yet* is a fact about the
+    /// graph, and a caller that cannot tell which of four seeds found nothing cannot tell an empty
+    /// corner of the graph from a mistyped one.
+    pub unknown_seeds: Vec<Seed>,
     /// What was reached, most relevant first.
     pub items: Vec<ActivatedConcept>,
     /// How many associations were followed.
@@ -218,10 +229,11 @@ fn estimated_tokens(label: &str, reason: &str) -> usize {
 pub fn activate_from<S: BuildHasher>(
     nodes: &HashMap<String, ConceptNode, S>,
     associations: &[Association],
-    seeds: &[String],
+    seeds: &[Seed],
     budget: &ActivationBudget,
     mut elapsed: impl FnMut() -> Duration,
 ) -> ActivationSession {
+    let mut unknown_seeds: Vec<Seed> = Vec::new();
     let mut exhausted: HashSet<Exhausted> = HashSet::new();
     let mut items: Vec<ActivatedConcept> = Vec::new();
     let mut settled: HashSet<String> = HashSet::new();
@@ -230,7 +242,7 @@ pub fn activate_from<S: BuildHasher>(
 
     // The frontier, held sorted so that what comes off it is the canonical next step rather than
     // whatever a hash happened to yield.
-    let mut frontier = seed_frontier(nodes, seeds, &mut exhausted);
+    let mut frontier = seed_frontier(nodes, seeds, &mut exhausted, &mut unknown_seeds);
 
     loop {
         sort_by_relevance(&mut frontier);
@@ -317,6 +329,7 @@ pub fn activate_from<S: BuildHasher>(
 
     ActivationSession {
         seeds: seeds.to_vec(),
+        unknown_seeds,
         items,
         edges_followed,
         estimated_tokens: total_tokens,
@@ -343,27 +356,34 @@ fn standing_of<S: BuildHasher>(
 /// reads "nothing came back" as "nothing is associated with it" has been told something false.
 fn seed_frontier<S: BuildHasher>(
     nodes: &HashMap<String, ConceptNode, S>,
-    seeds: &[String],
+    seeds: &[Seed],
     exhausted: &mut HashSet<Exhausted>,
+    unknown: &mut Vec<Seed>,
 ) -> Vec<ActivatedConcept> {
     let mut frontier = Vec::new();
-    let mut seen: HashSet<&String> = HashSet::new();
+    let mut seen: HashSet<String> = HashSet::new();
     for seed in seeds {
-        if !seen.insert(seed) {
+        let label = seed.label();
+        // Deduplicated by label rather than by seed, so a concept and a focus that spell the same
+        // are two seeds while the same seed named twice is one.
+        if !seen.insert(label.clone()) {
             continue;
         }
-        if !nodes.contains_key(seed) {
+        if !nodes.contains_key(&label) {
             exhausted.insert(Exhausted::UnknownSeed);
+            unknown.push(seed.clone());
             continue;
         }
-        let reason = "named as a seed".to_owned();
+        // What asked, in words a reader can check. A path beginning `intention:0f3a…` answers A12
+        // with an identifier, which is an answer only to somebody holding the same table.
+        let reason = format!("named as a seed: {}", seed.describe());
         frontier.push(ActivatedConcept {
-            estimated_tokens: estimated_tokens(seed, &reason),
-            epistemic_status: standing_of(nodes, seed),
-            label: seed.clone(),
+            estimated_tokens: estimated_tokens(&label, &reason),
+            epistemic_status: standing_of(nodes, &label),
+            label,
             relevance: 1.0,
             depth: 0,
-            path: vec![seed.clone()],
+            path: vec![seed.label()],
             reason,
         });
     }
@@ -482,8 +502,8 @@ mod tests {
         || Duration::ZERO
     }
 
-    fn seeds(labels: &[&str]) -> Vec<String> {
-        labels.iter().map(|label| (*label).to_owned()).collect()
+    fn seeds(labels: &[&str]) -> Vec<Seed> {
+        labels.iter().map(|label| Seed::concept(*label)).collect()
     }
 
     #[test]

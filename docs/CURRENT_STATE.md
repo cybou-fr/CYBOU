@@ -255,10 +255,23 @@ Everything here is deterministic and runs with no network and no model.
 
 ## Context and attention
 
-Activation walks associations from named seeds under a budget enforced in five dimensions — nodes,
-edges, depth, time, tokens — and says which one stopped it. Every reached concept carries the path
-it came along; *why did you think of that* is answered from the graph, never by asking something to
-compose a reason.
+Activation walks associations from seeds under a budget enforced in five dimensions — nodes, edges,
+depth, time, tokens — and says which one stopped it. Every reached concept carries the path it came
+along; *why did you think of that* is answered from the graph, never by asking something to compose
+a reason.
+
+**A seed is not only a word.** ADR-0029 states the cost of getting this wrong plainly: restricting
+seeds to text would make the whole layer an accessory to a chat box. A `Seed` is a concept, what the
+workspace is looking at, an intention being held, a finding this host reached about itself, a metric
+it watches, or an episode — so the host can ask what relates to `storage.exhaustion` without
+anything having to phrase it first, which is the class of question a machine asks about itself.
+
+Kind is part of identity rather than a prefix convention. A file called `lemon` and the concept
+`lemon` are different seeds; under plain strings they were one key, so activating from either
+returned what belonged to the other along a path that read entirely plausibly and was about the
+wrong thing. A concept keeps its bare label, so a graph built by people naming things is unchanged.
+Seeds the graph has never held are named back rather than counted — a caller that cannot tell which
+of four seeds found nothing cannot tell an empty corner of the graph from a mistyped one.
 
 An epistemic standing travels with a concept through retrieval and into attention. A concept reached
 *through* a disputed one is **not** thereby disputed: the walk is association, not inference.

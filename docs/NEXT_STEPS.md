@@ -36,8 +36,9 @@ stage.** The vertical is:
 observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome
 ```
 
-Every stage exists and is tested except the last two, and they are one piece of work: nothing in
-this repository can carry out an action, so nothing can observe what carrying it out did.
+Every stage exists and is tested except one. *Act* is missing, and only *act*: what an outcome is
+and how it is judged were built before the executor deliberately, so an executor arrives to find its
+own report is one of two fields and not the deciding one.
 
 ## In order
 
@@ -61,38 +62,27 @@ this repository can carry out an action, so nothing can observe what carrying it
    An executor that reported its own success would be the system grading its own homework, and the
    evidence that the disk has space is a telemetry reading taken afterwards, not an exit code.
 
-1. **What an outcome is, once there is one to have.** Every attempted action has to produce enough
-   typed state to say what was proposed, what was authorized, what was attempted, what happened,
-   and whether rollback was attempted or remains available. This is the part of ADR-0022 that
-   closes the loop back into Mind, and it is what makes an action something the host can be asked
-   about later rather than something that happened.
-
-2. **Erasure beyond the live database.** *Partly done.* An erasure reports a typed `BackupState`
+1. **Erasure beyond the live database.** *Partly done.* An erasure reports a typed `BackupState`
    rather than implying completeness: a deployment declares its rotation in the unit, and the
    terminal `ErasureApplied` record carries what the erasure actually reached, with `unknown` as
    the default because silence about backups is not evidence that none exist. What remains needs
    software rather than a declaration — nothing in this tree takes a backup, so no rotation is
    being enforced by anything but a statement (ADR-0028 E11, E12).
 
-3. **ADR-0029 completeness for `Context1`.** Bounded by node and edge budgets, invalidated by an
-   erasure epoch, and inheriting privacy and retention from evidence. What remains needs the
-   activation session this version does not have — depth, time and token budgets, and seeds that
-   are not only words. Until it exists the capability is partial and is described that way.
-
-4. **A delivery history, not only the last delivery.** `GET /api/v1/disclosure` answers for the
+2. **A delivery history, not only the last delivery.** `GET /api/v1/disclosure` answers for the
    caller and nobody else, and the `Disclosure` card shows how much was supplied against how much
    can be accounted for, with every refusal and its reason. What it shows is the *last* delivery to
    this consumer. A person can see what they were supplied; they cannot yet see what they were
    supplied last week.
 
-5. **A registered worker for the broker.** The brokerage faculty is built and answers `NoModel` on
+3. **A registered worker for the broker.** The brokerage faculty is built and answers `NoModel` on
    an installation with nothing registered, which is what ADR-0021 means by that being a
    configuration rather than a failure. No inference runtime is implemented beside it, on purpose:
    `llama.cpp`, `mistral.rs` and an ONNX runtime are three shapes of process, and a broker whose
    only backend was written next to it would have that backend's assumptions built in. The next
    step is one real worker behind the existing interface, not a second interface.
 
-6. **The desktop launcher on real hardware.** `scripts/cybou-desktop-session.sh` and
+4. **The desktop launcher on real hardware.** `scripts/cybou-desktop-session.sh` and
    `systemd/user/cybou-desktop.service` exist and are installed disabled. What is proven is narrow
    and listed in [Current State](CURRENT_STATE.md): the launcher refuses a silent gateway, refuses
    a missing browser, creates its profile directory, and can print what it would run. What is not

@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     activation::{ActivationBudget, ActivationSession, activate_from},
+    seed::Seed,
     types::{
         Association, AssociationOrigin, ConceptNode, ContextBudget, ContextBundle,
         most_restrictive_privacy, shortest_retention,
@@ -318,7 +319,7 @@ impl ContextCore {
     /// cannot be tested against one. What it hands over is elapsed time and nothing else: the
     /// instant is never an input to what gets reached, only to when the reaching stops.
     #[must_use]
-    pub fn bring_to_mind(&self, seeds: &[String], budget: &ActivationBudget) -> ActivationSession {
+    pub fn bring_to_mind(&self, seeds: &[Seed], budget: &ActivationBudget) -> ActivationSession {
         let nodes = self.nodes.read().map(|g| g.clone()).unwrap_or_default();
         let associations = self
             .associations

@@ -143,7 +143,8 @@ gateway that cannot become a second cognitive owner.
 | Contribution origin bound to the calling executable | Implemented |
 | Measured Journal scale budgets, paged replay, incremental verification | Implemented |
 | Grounded local perception and epistemic projection (`cybou-epistemicd`) | Implemented — ADR-0027 |
-| Associative context live integration (`cybou-contextd`) | Partial — ADR-0029 |
+| Associative context live integration (`cybou-contextd`) | Implemented — ADR-0029 |
+| Activation from seeds that are not words, bounded and inspectable | Implemented — ADR-0029 A2, A12 |
 | Journal v3 commitments and crash-safe transitive erasure | Implemented |
 | Erasure a person can ask for, reaching what was derived | Implemented — ADR-0028, live-bus gated |
 | A record of what was supplied to whom, and withheld | Implemented — ADR-0030 |

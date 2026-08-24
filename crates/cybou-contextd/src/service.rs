@@ -72,6 +72,33 @@ impl Context1Service {
     /// stopped it. A caller that wants only the labels can drop the rest; a caller that wants to
     /// know why a thing came back does not have to ask anything to invent a reason.
     async fn bring_to_mind(&self, seeds: Vec<String>) -> Vec<u8> {
+        let seeds: Vec<crate::Seed> = seeds.into_iter().map(crate::Seed::Concept).collect();
+        let session = self
+            .core
+            .bring_to_mind(&seeds, &ActivationBudget::default());
+        let mut buf = Vec::new();
+        let _ = ciborium::into_writer(&session, &mut buf);
+        buf
+    }
+
+    /// The same walk, from seeds that are not words, given as CBOR.
+    ///
+    /// A separate method rather than a second signature on the first, because D-Bus carries strings
+    /// and a typed seed is not one. ADR-0029 is explicit that restricting seeds to text would make
+    /// this layer an accessory to a chat box: what the workspace is looking at, an intention being
+    /// held, a finding about this host and a metric it watches are all things worth bringing to
+    /// mind, and none of them is a word anybody typed.
+    ///
+    /// Seeds that decode to nothing this graph holds are named back in the session, rather than
+    /// counted. A caller that cannot tell which of four seeds found nothing cannot tell an empty
+    /// corner of the graph from a mistyped one.
+    async fn bring_to_mind_from(&self, seeds: Vec<u8>) -> Vec<u8> {
+        // An undecodable request activates nothing rather than activating everything. A malformed
+        // seed list read as an empty one would walk from no seeds, which returns an empty session
+        // that looks exactly like a graph with nothing in it.
+        let Ok(seeds) = ciborium::from_reader::<Vec<crate::Seed>, _>(seeds.as_slice()) else {
+            return Vec::new();
+        };
         let session = self
             .core
             .bring_to_mind(&seeds, &ActivationBudget::default());

@@ -75,10 +75,12 @@ fn walk(
         .expect("the vocabulary recognises this opening");
     assert_eq!(interpreted.primary_act.kind, CognitiveActKind::Ask);
 
-    let seed = interpreted.primary_act.subject.clone();
+    // An utterance genuinely is a word, so it becomes a concept seed. The typed set exists for the
+    // questions nothing typed.
+    let seed = cybou_contextd::Seed::concept(interpreted.primary_act.subject.clone());
     let session = context.bring_to_mind(std::slice::from_ref(&seed), budget);
     let admission = workspace.consider(&session.proposals(), !session.was_cut_short());
-    let plan = plan_attention(&seed, &admission, plan_id());
+    let plan = plan_attention(&interpreted.primary_act.subject, &admission, plan_id());
     realize(&plan, Language::English)
 }
 
@@ -152,7 +154,9 @@ fn a_flood_reaches_the_sentence_as_a_flood_that_was_turned_away() {
 
     let workspace = WorkspaceCore::new(32);
     let interpreted = cybou_meaning::interpret("what is lemon", "person", now).expect("recognised");
-    let seed = interpreted.primary_act.subject.clone();
+    // An utterance genuinely is a word, so it becomes a concept seed. The typed set exists for the
+    // questions nothing typed.
+    let seed = cybou_contextd::Seed::concept(interpreted.primary_act.subject.clone());
     let session = context.bring_to_mind(
         std::slice::from_ref(&seed),
         &ActivationBudget {
@@ -168,7 +172,7 @@ fn a_flood_reaches_the_sentence_as_a_flood_that_was_turned_away() {
     );
     let admission = workspace.consider(&session.proposals(), !session.was_cut_short());
     let prose = realize(
-        &plan_attention(&seed, &admission, plan_id()),
+        &plan_attention(&interpreted.primary_act.subject, &admission, plan_id()),
         Language::English,
     );
 
