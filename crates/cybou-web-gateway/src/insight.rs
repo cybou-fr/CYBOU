@@ -109,6 +109,9 @@ fn heading(key: &MetricKey, projection: &Projection) -> ProjectionProjection {
         ),
         // No number, deliberately. Zero would be a time, and *not at this rate* is not a time.
         Reaching::NotAtThisRate => ("not-at-this-rate", None, false),
+        // Also no number. A window nobody is feeding has no rate, and the last one it had is not
+        // the current one however recently it was true.
+        Reaching::ReadingsStopped { .. } => ("readings-stopped", None, false),
         Reaching::NotEnoughHistory { .. } => ("not-enough-history", None, false),
     };
     ProjectionProjection {

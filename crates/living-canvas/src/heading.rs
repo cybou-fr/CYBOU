@@ -336,6 +336,10 @@ mod tests {
     fn nothing_is_drawn_for_a_subject_that_does_not_arrive() {
         assert!(heading_line(&projection("not-at-this-rate", None, false)).is_none());
         assert!(heading_line(&projection("not-enough-history", None, false)).is_none());
+        // A probe that stopped has no heading either. Where it *was* going is not where it is
+        // going, and the staleness is already said on its own line — a heading here would be the
+        // one place on the page still claiming a live trend for a metric nobody is reading.
+        assert!(heading_line(&projection("readings-stopped", None, false)).is_none());
         assert!(heading_line(&projection("at-this-rate", None, false)).is_none());
         assert!(heading_line(&projection("something-new", None, false)).is_none());
     }

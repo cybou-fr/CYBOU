@@ -113,6 +113,22 @@ unit it would act on, taken from the finding, rather than the `systemd:<unit>` p
 proposal falls back to when it genuinely does not know which one it means. The count of failed units
 still falls back, because it genuinely does not.
 
+**A projection from readings that stopped is not a projection.** The arrival time is counted down
+from now, which is correct and is the whole reason it is measured from now rather than from the last
+reading — but a window nobody has fed for an hour counts down past zero, is clamped there, and
+reports that the threshold is reached *now*. A stopped probe produced the most alarming answer
+available from evidence that stopped an hour ago: a disk nobody was measuring, reported as full.
+
+Past the staleness bound the answer is `ReadingsStopped`, carrying when the last reading arrived.
+The value is still shown, because it is a fact; what is refused is the rate. The card draws no
+heading for it, since the staleness is already said on its own line — a heading would be the one
+place on the page still claiming a live trend for a metric nobody is reading. Inside the bound the
+clamp still applies: a sampler that missed a tick is still measuring, and an arrival that has just
+passed is honestly *now*.
+
+This was found by asking what the projection does for a window the watched states already call
+stale — the two were built a commit apart and never asked about each other.
+
 **The slope is taken from the readings, and taken again only when the readings change.** Theil–Sen
 compares every pair, so the work is quadratic; a six-hour window at one sample every ten seconds
 holds 2160 points, and a host watching a dozen subjects would spend four seconds per page load

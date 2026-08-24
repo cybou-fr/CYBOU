@@ -247,7 +247,7 @@ impl TelemetryCore {
                 Some((
                     // The whole key, or a page of rows all called the same thing.
                     key.clone(),
-                    crate::trend::project_from(series, alarming, now, &estimate)?,
+                    crate::trend::project_from(series, alarming, now, STALE_AFTER, &estimate)?,
                 ))
             })
             .collect()
@@ -720,12 +720,14 @@ mod tests {
                 .expect("a projection")
         };
 
+        // Both instants inside the staleness bound: the last reading is at(1990), and a window
+        // past that bound has no rate at all rather than a frozen one.
         let crate::trend::Reaching::AtThisRate { after: sooner, .. } = after(at(2000)) else {
             panic!("expected an arrival at this rate");
         };
         // Nothing arrives in between. The window is unchanged, so the slope is the held one — and
         // the clock has still moved.
-        let crate::trend::Reaching::AtThisRate { after: later, .. } = after(at(2600)) else {
+        let crate::trend::Reaching::AtThisRate { after: later, .. } = after(at(2040)) else {
             panic!("expected an arrival at this rate");
         };
         assert!(
