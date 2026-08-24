@@ -87,6 +87,31 @@ pub enum Because {
     /// whatever directory systemd happened to start it in, which is not a thing the person writing
     /// the line was thinking about.
     NotAbsolute(String),
+    /// The line carries words the kind has no use for.
+    ///
+    /// Refused rather than ignored, for the reason the whole module exists. A trailing word is
+    /// usually a typo in the word before it, or a path with a space in it that the operator
+    /// believes was taken whole — and a build that quietly discarded the tail would watch something
+    /// other than what they wrote.
+    TooManyWords(String),
+    /// A number was written that is not a quantity: infinite, or not a number at all.
+    ///
+    /// `inf` parses as a float and would mean a backup that may never be too stale, which is a
+    /// declaration to watch a thing and never judge it. That state exists and is reached by
+    /// declaring no threshold, not by writing one that can never be met.
+    NotFinite(String),
+    /// A threshold that no reading can be at or above in any useful way.
+    ///
+    /// Zero days means every backup is stale the instant it completes, and a negative number means
+    /// it was stale before it ran. Both are almost certainly a typo, and both produce an alarm that
+    /// never clears — which is the fastest way to teach somebody to ignore this file.
+    NotPositive(String),
+    /// The same thing was declared twice.
+    ///
+    /// Refused rather than deduplicated, because the two lines usually disagree. Two backup lines
+    /// for one marker with two different thresholds is a person who edited one and forgot the
+    /// other, and silently keeping either one is silently choosing a policy for them.
+    AlreadyDeclared(String),
 }
 
 impl core::fmt::Display for Because {
@@ -103,6 +128,19 @@ impl core::fmt::Display for Because {
             ),
             Self::NotAbsolute(path) => {
                 write!(formatter, "'{path}' is not an absolute path")
+            }
+            Self::TooManyWords(extra) => {
+                write!(formatter, "nothing on this line uses '{extra}'")
+            }
+            Self::NotFinite(word) => {
+                write!(formatter, "'{word}' is not a finite number of days")
+            }
+            Self::NotPositive(word) => write!(
+                formatter,
+                "'{word}' days would be reached the moment the backup finished"
+            ),
+            Self::AlreadyDeclared(name) => {
+                write!(formatter, "'{name}' was already declared above")
             }
         }
     }
@@ -126,6 +164,9 @@ impl core::error::Error for Refused {}
 pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
     let mut watched = Vec::new();
     let mut refused = Vec::new();
+    // What has already been declared, so the second line about one thing is refused rather than
+    // silently preferred over the first. Two lines about one marker usually disagree.
+    let mut declared: Vec<String> = Vec::new();
 
     for (index, raw) in contents.lines().enumerate() {
         let line = raw.trim();
@@ -147,6 +188,27 @@ pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
             });
         };
 
+        // Every kind takes a fixed number of words, so a trailing one is a mistake somewhere. Read
+        // before the kinds are handled, because the check is the same for all of them and a copy
+        // per arm is a copy the next kind will be added without.
+        let threshold = if kind == "backup" {
+            words.next().unwrap_or_default()
+        } else {
+            ""
+        };
+        if let Some(extra) = words.next() {
+            refuse(Because::TooManyWords(extra.to_owned()));
+            continue;
+        }
+
+        // Two lines about one thing, whatever kind they are. Keyed by the name rather than by kind
+        // and name: one path declared once as a certificate and once as a backup is still a person
+        // who meant one of the two.
+        if !named.is_empty() && declared.iter().any(|seen| seen == named) {
+            refuse(Because::AlreadyDeclared(named.to_owned()));
+            continue;
+        }
+
         match kind {
             "certificate" => {
                 if named.is_empty() {
@@ -154,6 +216,7 @@ pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
                 } else if !named.starts_with('/') {
                     refuse(Because::NotAbsolute(named.to_owned()));
                 } else {
+                    declared.push(named.to_owned());
                     watched.push(Watched::Certificate(PathBuf::from(named)));
                 }
             }
@@ -163,11 +226,11 @@ pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
                 } else {
                     // Taken as written. A unit name is systemd's to validate, and a build that
                     // second-guessed it would refuse names that work.
+                    declared.push(named.to_owned());
                     watched.push(Watched::Service(named.to_owned()));
                 }
             }
             "backup" => {
-                let threshold = words.next().unwrap_or_default();
                 if named.is_empty() {
                     refuse(Because::NothingNamed(kind.to_owned()));
                 } else if !named.starts_with('/') {
@@ -175,10 +238,17 @@ pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
                 } else if threshold.is_empty() {
                     refuse(Because::NoThresholdGiven);
                 } else if let Ok(days) = threshold.parse::<f64>() {
-                    watched.push(Watched::Backup {
-                        marker: PathBuf::from(named),
-                        stale_after_days: days,
-                    });
+                    if !days.is_finite() {
+                        refuse(Because::NotFinite(threshold.to_owned()));
+                    } else if days <= 0.0 {
+                        refuse(Because::NotPositive(threshold.to_owned()));
+                    } else {
+                        declared.push(named.to_owned());
+                        watched.push(Watched::Backup {
+                            marker: PathBuf::from(named),
+                            stale_after_days: days,
+                        });
+                    }
                 } else {
                     refuse(Because::NotANumber(threshold.to_owned()));
                 }
@@ -197,6 +267,72 @@ pub fn parse(contents: &str) -> Result<Vec<Watched>, Vec<Refused>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_word_nothing_uses_is_a_mistake_and_not_a_comment() {
+        // Usually a typo in the word before it, or a path with a space in it that the operator
+        // believes was taken whole. Discarding the tail watches something other than what they
+        // wrote, and they find out when it matters.
+        let refused = parse("certificate /etc/ssl/a.pem weekly").expect_err("refused");
+        assert_eq!(refused.len(), 1);
+        assert_eq!(
+            refused[0].because,
+            Because::TooManyWords("weekly".to_owned())
+        );
+
+        // And the count is per kind, so the number a backup does use is not reported as extra.
+        assert!(parse("backup /var/backups/db 7").is_ok());
+        assert_eq!(
+            parse("backup /var/backups/db 7 please").expect_err("refused")[0].because,
+            Because::TooManyWords("please".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_thing_declared_twice_is_refused_rather_than_chosen_between() {
+        // The two lines usually disagree. Keeping either one silently chooses a policy for somebody
+        // who edited one line and forgot the other.
+        let refused =
+            parse("backup /var/backups/db 1\nbackup /var/backups/db 30").expect_err("refused");
+        assert_eq!(refused.len(), 1);
+        assert_eq!(refused[0].line, 2);
+        assert_eq!(
+            refused[0].because,
+            Because::AlreadyDeclared("/var/backups/db".to_owned())
+        );
+
+        // Across kinds too: one path meant as two things is a person who meant one of them.
+        assert!(parse("certificate /etc/ssl/a.pem\nbackup /etc/ssl/a.pem 7").is_err());
+    }
+
+    #[test]
+    fn a_threshold_that_can_never_be_met_is_not_a_threshold() {
+        // `inf` parses as a float. It would mean a backup watched and never judged — a state this
+        // build has, reached by declaring no threshold, not by writing one nothing can reach.
+        assert_eq!(
+            parse("backup /var/backups/db inf").expect_err("refused")[0].because,
+            Because::NotFinite("inf".to_owned())
+        );
+        assert_eq!(
+            parse("backup /var/backups/db NaN").expect_err("refused")[0].because,
+            Because::NotFinite("NaN".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_threshold_reached_the_moment_the_backup_finishes_is_a_typo() {
+        // Zero means every backup is stale as soon as it completes; negative means it was stale
+        // before it ran. Both produce an alarm that never clears, which is the fastest way to teach
+        // somebody to ignore this file.
+        assert_eq!(
+            parse("backup /var/backups/db 0").expect_err("refused")[0].because,
+            Because::NotPositive("0".to_owned())
+        );
+        assert_eq!(
+            parse("backup /var/backups/db -7").expect_err("refused")[0].because,
+            Because::NotPositive("-7".to_owned())
+        );
+    }
 
     #[test]
     fn a_kind_this_build_cannot_watch_refuses_the_file() {

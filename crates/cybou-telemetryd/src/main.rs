@@ -255,8 +255,11 @@ mod linux {
     /// `None` when systemd cannot be asked at all, which is different from a unit that is not
     /// running: a host where nothing can be enumerated has not established that anything is down.
     fn service_active(unit: &str) -> Option<f64> {
+        // The separator matters. A declared unit name is operator-supplied text, and without `--`
+        // a name beginning with a dash is read by systemctl as an option to itself — which is a
+        // declaration file deciding how this host queries systemd.
         let output = std::process::Command::new("systemctl")
-            .args(["is-active", unit])
+            .args(["is-active", "--", unit])
             .output()
             .ok()?;
         let state = String::from_utf8(output.stdout).ok()?;

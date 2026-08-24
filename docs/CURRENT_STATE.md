@@ -133,6 +133,15 @@ cause it names would not exist by the time anybody looked. An episode that ends 
 new identity, which is correct: it is a new occurrence, and a `since` spanning both would describe a
 stretch of time the host was fine for part of.
 
+**A declaration line is read strictly, because a lenient reader is a silent one.** A word no kind
+uses is refused rather than discarded — it is usually a typo in the word before it, or a path with a
+space in it the operator believes was taken whole. The same thing declared twice is refused rather
+than deduplicated, because two lines about one marker usually disagree and keeping either one
+silently chooses a policy. A threshold of `inf` or `NaN` is refused: watched-and-never-judged is a
+real state, reached by declaring no threshold, not by writing one nothing can reach. Zero or
+negative is refused too, since both mean an alarm that never clears. A declared unit name reaches
+`systemctl` after `--`, so a name beginning with a dash cannot become an option to systemctl.
+
 **Backup age has no universal threshold, and this build does not invent one.** How stale a backup may
 get is a policy the operator holds, and two backups on one host can honestly disagree, so the number
 comes from the declaration and the subject table supplies none. A backup declared without one is
