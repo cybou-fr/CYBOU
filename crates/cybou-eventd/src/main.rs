@@ -19,23 +19,22 @@ const VERIFICATION_PAGE: u64 = 512;
 #[cfg(target_os = "linux")]
 const VERIFICATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Say, at every start, whether one backup would capture both the sealed records and the keys.
+/// Say, at every start, where the keys are and whether one backup would take them with the records.
 ///
 /// The precondition ADR-0028's whole erasure guarantee rests on, and one that is invisible from
 /// inside. Destroying a data key makes a record unreadable in every copy of the database — and only
-/// in copies that do not also hold the key. By default the store sits beside the Journal, so the
-/// most obvious backup anybody would take captures both, and a restore of it reads exactly what the
-/// erasure was meant to reach.
+/// in copies that do not also hold the key.
 ///
-/// A warning rather than a different default. Moving the store would leave existing deployments
-/// unable to unwrap yesterday's keys, which is the failure this file already learned the hard way
-/// and says so above. What an operator needs here is to know, not to be migrated.
-fn warn_if_one_backup_would_take_both(keys_dir: &std::path::Path, journal_path: &std::path::Path) {
-    if keys_dir.parent() != journal_path.parent() {
+/// A fresh installation now keeps the two apart. An existing store is never moved, because doing
+/// that would leave a deployment unable to unwrap yesterday's keys, and this file learned once what
+/// that costs. So the old layout is still reachable and is still reported, every start, for as long
+/// as somebody is running it.
+fn report_where_the_keys_are(keys: &cybou_eventd::KeysLocation, journal_path: &std::path::Path) {
+    if !keys.because.one_backup_takes_both() {
         return;
     }
     println!(
-        "[cybou-eventd] The key store sits beside the Journal. A backup of {} holds both the sealed records and the keys that open them, which puts it outside the erasure guarantee (ADR-0028 E12). Back them up separately, or set CYBOU_KEYSTORE_PATH.",
+        "[cybou-eventd] The key store sits beside the Journal, where this installation created it. A backup of {} holds both the sealed records and the keys that open them, which puts it outside the erasure guarantee (ADR-0028 E12). Back them up separately, or move the store and set CYBOU_KEYSTORE_PATH. Nothing is moved for you: a store this process cannot find is yesterday's payloads becoming unreadable.",
         journal_path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."))
@@ -43,31 +42,46 @@ fn warn_if_one_backup_would_take_both(keys_dir: &std::path::Path, journal_path: 
     );
 }
 
+/// One of the XDG roots, or the fallback a login shell would have used.
+fn xdg_root(variable: &str, fallback: &str) -> PathBuf {
+    env::var(variable).map_or_else(
+        |_| {
+            let home = env::var("HOME").unwrap_or_else(|_| ".".into());
+            PathBuf::from(home).join(fallback)
+        },
+        PathBuf::from,
+    )
+}
+
+/// Where this installation keeps its Journal, and where it keeps the keys that open it.
+///
+/// The two roots are deliberately different. ADR-0017 already separates data from state, and this
+/// is the first thing for which the distinction is more than tidiness: a backup of the data
+/// directory must not carry the keys that undo an erasure of what is in it.
+fn where_things_live() -> (PathBuf, cybou_eventd::KeysLocation) {
+    let journal_path = env::var("CYBOU_JOURNAL_PATH").map_or_else(
+        |_| xdg_root("XDG_DATA_HOME", ".local/share").join("cybou/journal.sqlite3"),
+        PathBuf::from,
+    );
+    let state_dir = xdg_root("XDG_STATE_HOME", ".local/state").join("cybou");
+
+    let keys = cybou_eventd::keys_location::decide(
+        env::var("CYBOU_KEYSTORE_PATH").ok().map(PathBuf::from),
+        &journal_path,
+        &state_dir,
+        // `master.json` and nothing else. A directory is a key store when it holds the master
+        // secret this organ wraps everything else with; a directory that merely exists, or holds a
+        // stray file, is not one, and treating it as one would keep a deployment pointed at a
+        // store with no keys in it.
+        |path| path.join("master.json").is_file(),
+    );
+    (journal_path, keys)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let journal_path = env::var("CYBOU_JOURNAL_PATH").map_or_else(
-        |_| {
-            let data_dir = env::var("XDG_DATA_HOME").map_or_else(
-                |_| {
-                    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
-                    PathBuf::from(home).join(".local/share")
-                },
-                PathBuf::from,
-            );
-            data_dir.join("cybou/journal.sqlite3")
-        },
-        PathBuf::from,
-    );
-
-    let keys_dir = env::var("CYBOU_KEYSTORE_PATH").map_or_else(
-        |_| {
-            journal_path
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("."))
-                .join("keys")
-        },
-        PathBuf::from,
-    );
+    let (journal_path, keys) = where_things_live();
+    let keys_dir = keys.path.clone();
 
     println!(
         "[cybou-eventd] Opening Journal at {}",
@@ -94,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 domain.key_domain_id,
                 domain.key_epoch
             );
-            warn_if_one_backup_would_take_both(&keys_dir, &journal_path);
+            report_where_the_keys_are(&keys, &journal_path);
             core.set_key_store(key_store, kek, domain);
         }
         Err(error) => {

@@ -9,6 +9,7 @@
 pub mod core;
 pub mod erasure;
 pub mod error;
+pub mod keys_location;
 pub mod offsets;
 #[cfg(target_os = "linux")]
 pub mod service;
@@ -16,6 +17,7 @@ pub mod verification;
 
 pub use core::EventCore;
 pub use error::{EventError, RESERVED_ORGAN_IDENTITIES, SubmitResult, is_reserved_organ};
+pub use keys_location::{Chose, KeysLocation};
 pub use offsets::PersistedOffsets;
 pub use verification::{FullSweepStep, VerificationState, decode_hex, encode_hex, format_instant};
 

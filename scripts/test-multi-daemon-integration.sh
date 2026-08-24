@@ -172,9 +172,18 @@ busctl --user call org.cybou.Mind.Intention1 /org/cybou/Mind/Intention1 org.cybo
 # what that run wrote. A restart would then make earlier sealed payloads unreadable with no
 # ErasureRequested and no ErasureApplied — erasure as a side effect of a process dying.
 echo "==> Verifying key material survives a restart of the organ that owns it..."
-master="$XDG_DATA_HOME/cybou/keys/master.json"
+# The state directory, not the data directory. A fresh installation keeps the keys where a backup
+# of the Journal does not reach them, so that destroying a data key actually makes the record
+# unreadable in a copy somebody else holds (ADR-0028 E11).
+master="$XDG_STATE_HOME/cybou/keys/master.json"
 if [ ! -f "$master" ]; then
-    echo "ERROR: eventd established no durable master key material." >&2
+    echo "ERROR: eventd established no durable master key material at $master." >&2
+    exit 1
+fi
+# And the separation itself, checked rather than assumed. This is the whole guarantee: a test that
+# only looked for the file would pass just as well with both under one directory.
+if [ -e "$XDG_DATA_HOME/cybou/keys" ]; then
+    echo "ERROR: a fresh installation put its keys beside the Journal, where one backup takes both." >&2
     exit 1
 fi
 domain_before="$(tr -d ' 

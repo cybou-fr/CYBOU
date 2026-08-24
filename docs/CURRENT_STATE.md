@@ -321,6 +321,15 @@ here checks the live database — the copy the erasure ran against — which can
 redacted and can prove nothing about a copy nobody controlled. So the file is copied, the erasure
 runs, and the copy is opened as a journal afterwards: that is the restore, not a simulation of one.
 
+**A fresh installation keeps its keys where a backup of the Journal does not reach them.** The store
+goes under the state directory and the Journal under the data directory — a separation ADR-0017
+already draws, and the first thing for which it is more than tidiness. An installation that already
+has a store keeps using it, wherever it is: moving one would leave a deployment unable to unwrap
+yesterday's keys, and this organ has already learned once what that costs. So the old layout stays
+reachable and is reported at every start for as long as somebody runs it. Deployed and checked on
+the live host, which has the old layout: no second store was created, and `master.json` still
+carries its original timestamp.
+
 **The guarantee has a precondition, and it is now a test rather than an assumption.** It holds only
 because the key is somewhere the backup did not reach, and `cybou-eventd` puts the key store beside
 the Journal by default — so `tar czf backup.tgz ~/.local/share/cybou/` captures both, and a restore
