@@ -341,7 +341,20 @@ that will be reported as holding on the day it does not.
 Writing this found a second thing worth keeping. SQLite in WAL mode holds recent writes in
 `journal.sqlite3-wal` until a checkpoint moves them, so copying the main file alone from a running
 system produces a backup that opens cleanly and is missing the newest contributions — worse than one
-that fails, because it restores and looks right.
+that fails, because it restores and looks right. Measured, not assumed: the test that does it prints
+`a single-file copy held the contribution: false`.
+
+**So the writer offers the primitive a backup needs**, because it is the only party that can produce
+one. `Event1` can write a consistent copy of the Journal in a single statement against the
+connection that made the commits, and the result is a plain database file — no WAL to carry
+alongside, nothing to replay. It refuses to write over anything: the file most likely to be at a
+backup path is the last good backup, and replacing it with one that then fails halfway is how
+somebody ends up with neither.
+
+It takes a snapshot and nothing else. Scheduling one, keeping a rotation, and deciding what to
+delete are an operator's policy, and `BackupState` exists so a deployment declares theirs rather
+than having one assumed. The copy holds ciphertext and no keys, which is what keeps it inside the
+erasure guarantee.
 
 **A person can see what they were supplied before now, not only what they are being supplied.** The
 surface answered one question — what am I being given — which makes it a status light rather than a

@@ -238,3 +238,103 @@ fn a_backup_that_also_took_the_keys_is_outside_the_guarantee() {
         "a backup holding the keys reads exactly what the erasure destroyed"
     );
 }
+
+#[test]
+fn a_snapshot_holds_what_a_file_copy_of_a_running_journal_misses() {
+    // The defect the first draft of this file walked into. SQLite in WAL mode keeps recent commits
+    // in `journal.sqlite3-wal` until a checkpoint moves them, so copying the main file alone from a
+    // running system produces a database that opens cleanly and is missing the newest
+    // contributions — worse than a copy that fails, because it restores and looks right.
+    let root = tempfile::tempdir().expect("temp dir");
+    let (journal, _keys, core) = journal_with_keys(root.path());
+
+    let private = sealed_contribution();
+    core.submit(&private, None).expect("accepted");
+
+    // What a naive backup script does.
+    let naive = root.path().join("naive.sqlite3");
+    fs::copy(&journal, &naive).expect("a single-file copy");
+
+    // What the writer produces, from the connection that made the commits.
+    let snapshot = root.path().join("snapshot.sqlite3");
+    core.snapshot_into(&snapshot).expect("a snapshot");
+
+    let in_snapshot = EventCore::open(&snapshot)
+        .expect("the snapshot opens")
+        .find_by_message_id(&private.message_id);
+    assert!(
+        in_snapshot.is_some(),
+        "the snapshot is missing a contribution that was committed before it was taken"
+    );
+
+    // And say plainly what the naive copy did, whichever it did. If SQLite happened to have
+    // checkpointed, this is not a failure — the point being held is that the snapshot is the one
+    // that does not depend on that.
+    let in_naive = EventCore::open(&naive)
+        .expect("the naive copy opens, which is the problem")
+        .find_by_message_id(&private.message_id)
+        .is_some();
+    println!("a single-file copy held the contribution: {in_naive}");
+}
+
+#[test]
+fn a_snapshot_carries_ciphertext_and_no_keys() {
+    // What makes a snapshot a copy an erasure still reaches. If the keys travelled with it, the
+    // erasure guarantee would end at the first backup — which is the whole finding this file was
+    // written for.
+    let root = tempfile::tempdir().expect("temp dir");
+    let (_journal, keys, core) = journal_with_keys(root.path());
+
+    let private = sealed_contribution();
+    core.submit(&private, None).expect("accepted");
+
+    // Into a directory of its own, which is where a backup would put it.
+    let vault = root.path().join("vault");
+    fs::create_dir_all(&vault).expect("vault");
+    let snapshot = vault.join("snapshot.sqlite3");
+    core.snapshot_into(&snapshot).expect("a snapshot");
+
+    let carried = stored_payload(&snapshot, &private.message_id);
+    assert!(
+        !String::from_utf8_lossy(&carried).contains("asked to be forgotten"),
+        "a snapshot carried a sealed payload in the clear"
+    );
+
+    // One file, and nothing else. No sidecar WAL to carry along, and nothing resembling a key.
+    let alongside: Vec<String> = fs::read_dir(&vault)
+        .expect("readable")
+        .filter_map(std::result::Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(
+        alongside,
+        vec!["snapshot.sqlite3".to_owned()],
+        "a snapshot left more than one file behind"
+    );
+    assert!(
+        keys.join("master.json").is_file(),
+        "and the store that opens it is somewhere this copy does not reach"
+    );
+}
+
+#[test]
+fn a_snapshot_refuses_to_write_over_something() {
+    // The file most likely to be at a backup path is the last good backup. Replacing it with a new
+    // one that then fails halfway is how somebody ends up with neither.
+    let root = tempfile::tempdir().expect("temp dir");
+    let (_journal, _keys, core) = journal_with_keys(root.path());
+    core.submit(&sealed_contribution(), None).expect("accepted");
+
+    let target = root.path().join("snapshot.sqlite3");
+    core.snapshot_into(&target)
+        .expect("the first one is written");
+    let first = fs::metadata(&target).expect("it exists").len();
+
+    core.snapshot_into(&target)
+        .expect_err("the second must be refused rather than overwrite the first");
+    assert_eq!(
+        fs::metadata(&target).expect("still there").len(),
+        first,
+        "the existing snapshot was modified by an attempt that was supposed to be refused"
+    );
+}

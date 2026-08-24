@@ -414,6 +414,31 @@ impl EventCore {
             .unwrap_or(0)
     }
 
+    /// Write a consistent copy of the Journal to `target`.
+    ///
+    /// Offered by the only writer, because it is the only party that can produce one. A backup
+    /// script copying `journal.sqlite3` from outside gets a file that opens cleanly and is missing
+    /// whatever is still in the write-ahead log — a backup that restores and looks right.
+    ///
+    /// The copy holds ciphertext and no keys. That is what makes it a copy an erasure still
+    /// reaches: destroying a data key makes the record unreadable here too, provided whoever keeps
+    /// this file did not also keep the key store, which now lives in a different directory.
+    ///
+    /// This takes a snapshot. It does not schedule one, keep a rotation, or remove anything —
+    /// deciding what to delete and when is an operator's policy, and `BackupState` exists so a
+    /// deployment can declare theirs rather than have one assumed for them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EventError::Storage`] if anything already sits at `target` or the copy fails.
+    pub fn snapshot_into(&self, target: &std::path::Path) -> Result<(), EventError> {
+        let writer = self
+            .writer
+            .lock()
+            .map_err(|_| EventError::Storage(WriteError::Malformed("lock poisoned")))?;
+        writer.snapshot_into(target).map_err(EventError::Storage)
+    }
+
     /// Return head envelope, if any.
     #[must_use]
     pub fn head(&self) -> Option<CanonicalEnvelope> {

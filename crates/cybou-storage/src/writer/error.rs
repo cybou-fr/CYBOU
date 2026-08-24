@@ -56,6 +56,13 @@ pub enum WriteError {
     /// A database declaring a schema but missing its tables must never be repaired implicitly.
     #[error("Journal declares schema {0} but has no contribution table")]
     InconsistentSchema(i64),
+    /// A snapshot was asked for at a path that already holds something.
+    ///
+    /// Refused rather than overwritten. The file most likely to be sitting at a backup path is the
+    /// last good backup, and replacing it with a new one that then fails halfway is how somebody
+    /// ends up with neither.
+    #[error("refusing to write a snapshot over the existing {0}")]
+    SnapshotTargetExists(String),
     /// The contribution is not admissible.
     #[error("contribution refused: {0}")]
     Refused(#[from] Rejection),

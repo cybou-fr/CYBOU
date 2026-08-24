@@ -234,6 +234,41 @@ impl JournalWriter {
         u64::try_from(count).map_err(|_| WriteError::Malformed("negative count"))
     }
 
+    /// Write a consistent copy of the Journal to `target`.
+    ///
+    /// The primitive a backup needs and the one nothing in this tree had. Copying
+    /// `journal.sqlite3` with `cp` is not a backup of a running system:  in WAL mode holds
+    /// recent commits in `journal.sqlite3-wal` until a checkpoint moves them, so a single-file copy
+    /// restores cleanly and is missing the newest contributions — worse than a copy that fails,
+    /// because it looks right. The test for ADR-0028 E11 was written that way first and could not
+    /// find the row it had just written.
+    ///
+    /// `VACUUM INTO` is one statement against this connection, which is the only writer, so what
+    /// lands in the copy is every committed contribution and no partial transaction. The result is
+    /// a plain database file: no WAL to carry alongside, and nothing to replay.
+    ///
+    /// **It contains no keys.** Sealed payloads are ciphertext here, and the store that opens them
+    /// lives in a different directory for exactly this reason. A snapshot is inside the erasure
+    /// guarantee; a snapshot plus the key store is not.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::SnapshotTargetExists`] if anything is already at `target`, and
+    /// [`WriteError::Query`] if the copy cannot be written.
+    pub fn snapshot_into(&self, target: &Path) -> Result<(), WriteError> {
+        if target.exists() {
+            return Err(WriteError::SnapshotTargetExists(
+                target.display().to_string(),
+            ));
+        }
+        // Bound as a parameter rather than formatted into the statement. A path is operator input,
+        // and a quote in one would otherwise end the string and begin something else.
+        self.connection
+            .execute("VACUUM INTO ?1", [target.to_string_lossy().as_ref()])
+            .map_err(WriteError::Query)?;
+        Ok(())
+    }
+
     /// Return the latest (head) envelope, or `None` if the Journal is empty.
     ///
     /// # Errors
