@@ -24,7 +24,7 @@ cybou_ssh "
 
   sudo install -d -m 0755 /usr/libexec/cybou /usr/share/cybou/web /usr/lib/systemd/user /etc/systemd/system
 
-  # Install all 12 Mind daemons and web gateway to /usr/libexec/cybou
+  # Install every Mind daemon and the web gateway to /usr/libexec/cybou
   DAEMONS=(
     cybou-web-gateway
     cybou-eventd

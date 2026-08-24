@@ -66,6 +66,48 @@ The proposal carries no inherent permission to perform it.
 Authorization is a separate policy decision based on typed capability, target, risk, context, and
 user/system policy.
 
+### Deciding and doing are different processes
+
+The boundary above is a sequence of stages, and a sequence of stages in one process is a convention.
+One process holding both the authority to decide and the capability to perform is one refactor, one
+convenience method, one *while we are here* away from a path that skips the middle — and nothing in
+the type system objects, because both ends are already in scope.
+
+So the split is physical:
+
+```text
+              MIND
+                │
+         cybou-actiond
+             Action1
+                │
+        ExecutionPermit
+                │
+                ▼
+         cybou-executord
+          Body capability
+                │
+                ▼
+              host
+```
+
+`cybou-actiond` owns the proposal lifecycle, criticism, standing policy, user confirmation, the
+`AuthorizationDecision` and the permit that follows from it. It has **no capability to carry any
+operation out**: no privileged adapter, no shell, no ability to reach one.
+
+`cybou-executord` owns a fixed set of typed adapters and nothing else. It cannot decide whether an
+operation is allowed; it can only refuse a permit it cannot verify.
+
+```text
+Action1 can authorize but cannot execute
+Executor can execute but cannot authorize
+```
+
+This is the same rule the rest of the architecture already runs on — a faculty is not an organ,
+`contextd` may propose and `workspaced` decides, a model may interpret and never authorize. Action
+is where getting it wrong costs the most, and is therefore the one place it must be a process
+boundary rather than a function boundary.
+
 ### Execution is typed
 
 Executors should expose constrained operations/capabilities rather than accepting unrestricted

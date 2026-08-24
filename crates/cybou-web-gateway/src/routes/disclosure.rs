@@ -118,6 +118,13 @@ pub async fn disclosure_handler(
                     .unwrap_or(u32::MAX),
             })
             .collect(),
+        // Never true in this build, and said rather than left to be inferred. The list is held in
+        // this process and starts empty when it starts; the complete record is in the Journal.
+        history_complete: false,
+        history_covers_since: state
+            .disclosures
+            .covering_since()
+            .and_then(|instant| instant.format(&Rfc3339).ok()),
         subjects_visible,
         delivered,
     }))

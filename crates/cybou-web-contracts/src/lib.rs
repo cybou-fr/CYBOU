@@ -352,6 +352,24 @@ pub struct DisclosureProjection {
     /// again, in memory, unbounded.
     #[serde(default)]
     pub history: Vec<DeliveryProjection>,
+    /// Whether the history above is everything that was ever supplied to this consumer.
+    ///
+    /// **False, always, in this build**, and carried rather than assumed. The list is held in the
+    /// gateway process: it is bounded, and it starts empty when the gateway starts. A person
+    /// reading three entries has been shown three changes since this process began, not three
+    /// deliveries in the life of their machine — and a surface that let them believe otherwise
+    /// would be answering *what was I supplied* with a fraction of the answer and no hedge.
+    ///
+    /// The complete record is the `ContextDisclosed` contributions in the Journal. Making this true
+    /// means reading it back at start, which is worth doing and is not done.
+    #[serde(default)]
+    pub history_complete: bool,
+    /// The earliest instant this history could possibly cover, RFC 3339.
+    ///
+    /// When the gateway started. What it bounds is coverage, not content: nothing was necessarily
+    /// supplied then, and nothing before it can appear here.
+    #[serde(default)]
+    pub history_covers_since: Option<String>,
     /// Whether this consumer has been supplied anything at all yet.
     ///
     /// An empty delivery and no delivery are different facts, and the first reading of this route

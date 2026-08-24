@@ -122,7 +122,7 @@ future autonomous actions independently testable.
                              cybou-eventd (Event1)
                                    │
                                    ▼
-                           SQLite Journal v2
+                           SQLite Journal v3
 ```
 
 All fourteen Mind services are separate `systemd --user` D-Bus daemons written in Rust. `cybou-eventd`
@@ -253,7 +253,7 @@ does not become the owner of security state, agents, or learned artifacts.
 
 ## Model policy
 
-Cybou remains local-first, but **local-only inference is not the product boundary**.
+Cybou remains local-sufficient, but **local-only inference is not the product boundary**.
 
 Future model use may include local and remote inference through a governed model broker. Context
 must cross the same named-consumer delivery boundary as any other disclosure. External inference is
@@ -297,7 +297,8 @@ Run the repository gates described in [Building](docs/BUILDING.md) and
 
 ```text
 crates/     Rust workspace: protocol, storage, crypto, runtime, fabric, daemons, living-canvas
-systemd/    User service definitions for the 12 Mind daemons
+systemd/    User service definitions for the Mind daemons, the model-broker faculty,
+            the web gateway and the desktop session
 spec/       Machine-readable visual design tokens
 docs/       Architecture, operations, security, and ADRs
 scripts/    Repository and package validators

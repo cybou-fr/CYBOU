@@ -445,9 +445,10 @@ mentioned look identical to a reader.
 - **The context projection has no checkpoint.** It replays from the Journal on every start. Correct,
   and slower than it needs to be on a long biography.
 - **`Predictor1` is domain-neutral.** It forecasts a level — where a subject sits relative to its own
-  history — which is not what an operator asks. The operational projections (filesystem growth,
-  pressure, swap) are computed in `Telemetry1`, where the series lives; certificate expiry and
-  service availability are not projected at all.
+  history — which is not what an operator asks. The operational projections are computed in
+  `Telemetry1`, where the series lives, and cover every watched subject that has a threshold at all,
+  declared certificates and services included. What `Predictor1` still cannot answer is *when*: it
+  says where a level is going, not when it arrives.
 - **Continuity is proven across process restart, not machine reboot.** See
   [reboot continuity](evidence/reboot-continuity.md).
 - **Nothing is proven under load.** The integration gate proves the system comes up and is coherent,

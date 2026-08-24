@@ -7,7 +7,7 @@
 #
 #   code        -> the Rust workspace and the WASM frontend compile, test and lint
 #   desktop     -> the desktop's interaction logic, run in a browser because that is where it lives
-#   integration -> the twelve daemons start on a session bus and answer as a system
+#   integration -> the Mind daemons start on a session bus and answer as a system
 #   compliance  -> licence headers, the documents this repository declares authoritative, and
 #                  that every class the desktop renders has a rule to be drawn by
 #

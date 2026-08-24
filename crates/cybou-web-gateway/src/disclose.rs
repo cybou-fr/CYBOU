@@ -56,6 +56,11 @@ pub struct Recorded {
 
 /// Builds disclosure records, and knows what it has already recorded for each consumer.
 pub struct Disclosures {
+    /// When this recorder began, so a reader is told what the history could cover.
+    ///
+    /// Set on the first record rather than at construction, because `new` is `const` and a clock
+    /// is not. It answers the same question either way: nothing before this instant can be here.
+    began: Mutex<Option<OffsetDateTime>>,
     /// What has been recorded as supplied to each destination, oldest first.
     ///
     /// The last of each is compared rather than counted: the question is whether this consumer is
@@ -76,6 +81,7 @@ impl Disclosures {
     #[must_use]
     pub const fn new() -> Self {
         Self {
+            began: Mutex::new(None),
             history: Mutex::new(Vec::new()),
         }
     }
@@ -93,6 +99,16 @@ impl Disclosures {
             .find(|(id, _)| id == destination_id)
             .and_then(|(_, recorded)| recorded.last())
             .map(|recorded| recorded.delivered.clone())
+    }
+
+    /// The earliest instant this recorder could have seen anything.
+    ///
+    /// `None` before the first record. Carried so a surface can say what its history covers instead
+    /// of implying it covers everything — the list lives in this process and starts empty when the
+    /// process does, and the durable record is in the Journal.
+    #[must_use]
+    pub fn covering_since(&self) -> Option<OffsetDateTime> {
+        self.began.lock().ok().and_then(|began| *began)
     }
 
     /// Every delivery to this consumer that is still remembered, newest first.
@@ -125,6 +141,10 @@ impl Disclosures {
     ) -> Option<CanonicalEnvelope> {
         if !destination.needs_a_record() {
             return None;
+        }
+
+        if let Ok(mut began) = self.began.lock() {
+            began.get_or_insert(now);
         }
 
         {
@@ -240,6 +260,34 @@ mod tests {
             disclosures.last_for(&destination.id).map(|d| d.item_count),
             Some(4),
             "the most recent is still what the top of the card describes"
+        );
+    }
+
+    #[test]
+    fn a_history_says_what_it_could_possibly_cover() {
+        // The list lives in this process and starts empty when the process does, so three entries
+        // are three changes since the gateway started rather than three deliveries in the life of
+        // the machine. A surface that let a person believe otherwise would answer "what was I
+        // supplied" with a fraction and no hedge.
+        let disclosures = Disclosures::new();
+        assert_eq!(
+            disclosures.covering_since(),
+            None,
+            "nothing seen, nothing covered"
+        );
+
+        let destination = Destination {
+            id: "living-canvas:owner".to_owned(),
+            trust: ConsumerTrust::Owner,
+            retains: false,
+            external_boundary: true,
+        };
+        disclosures.record_for(&destination, &a_delivery(3), at(5));
+        disclosures.record_for(&destination, &a_delivery(4), at(9));
+        assert_eq!(
+            disclosures.covering_since(),
+            Some(at(5)),
+            "coverage begins when this recorder did, not at the newest entry"
         );
     }
 

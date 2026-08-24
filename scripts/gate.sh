@@ -33,6 +33,7 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/cybou-target}"
 export CHROMEDRIVER="${CHROMEDRIVER:-/usr/bin/chromedriver}"
 
 failed=""
+skipped=""
 
 announce() {
     printf '\n==> %s\n' "$1"
@@ -41,6 +42,13 @@ announce() {
 report() {
     if [ -n "$failed" ]; then
         printf '\n=== GATE FAILED: %s ===\n' "$failed"
+        return
+    fi
+    if [ -n "$skipped" ]; then
+        # Not "every gate passed". A check that did not run is not a check that passed, and a
+        # summary that says otherwise is the exact failure this script exists to remove — one step
+        # further along than the pipeline that reported success after a hidden error.
+        printf '\n=== every gate that ran passed; NOT RUN:%s ===\n' "$skipped"
         return
     fi
     printf '\n=== every gate passed ===\n'
@@ -67,3 +75,13 @@ step "desktop styles"        python3 scripts/validate-desktop-styles.py
 step "organ layering"        python3 scripts/validate-organ-layering.py
 step "document links"        python3 scripts/validate-doc-links.py
 step "multi-daemon organs"   bash scripts/test-multi-daemon-integration.sh
+
+# Licensing headers, because CI runs this and a gate that claims to be every check and is not is the
+# same defect as a check whose failure is invisible. Skipped with a said reason rather than silently
+# when the tool is absent: an absent check must not look like a passed one.
+if command -v reuse > /dev/null 2>&1; then
+    step "licence headers"      reuse lint
+else
+    announce "licence headers not run: reuse is not installed here, and CI runs it"
+    skipped="$skipped licence-headers"
+fi

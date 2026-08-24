@@ -173,8 +173,19 @@ Two of these define the product. The rest are the properties they rest on.
 ### S0 — Unplugged
 
 > Cut internet access and every external model API. On a minimal VPS, Cybou continues to observe its
-> Body, answer basic questions about its own state, detect known problems, explain them through
-> evidence, remember its open intentions, and form typed action proposals.
+> Body, answer basic questions about its own state, detect a known problem, explain it through
+> evidence, remember its open intentions, form a typed action proposal, obtain the authorization its
+> standing policy provides for, carry out at least one bounded Body capability, and independently
+> observe whether the expected outcome was reached.
+
+The gate ends at the observed outcome and not at the proposal, and the difference is the whole
+product. A system that stops at *here is what I would do* has demonstrated self-awareness; the claim
+outside this repository is that Linux **operates** itself, and the smallest honest evidence for that
+is one complete turn of the loop on a machine with no network and no model.
+
+Stating it the shorter way, as this gate did until 2026-08-24, made the gate satisfiable by
+something that cannot maintain anything — and left the vertical below it describing a longer path
+than the gate it was written to serve.
 
 ### S0R — Plugged back in
 
@@ -196,17 +207,19 @@ has handed its substrate to one.
 | **S6** | The browser session is a supported first-class surface, not a fallback for a missing desktop |
 | **S7** | Cybou observes its own Body continuously, without that observation becoming biography |
 
-S1, S2, S4 and S5 hold today, and hold because nothing in the substrate loads a model rather than
-because anything checks at run time. S3 is a contract with no runtime behind it until a remote worker
-exists. S6 is what the deployment has always actually done. **S7 does not hold**: perception records
-stable facts about the machine and nothing watches it minute to minute, so S0 is currently
-unreachable — Cybou cannot detect a problem it never observed.
+S1, S2, S4 and S5 hold by construction rather than by a run-time check: nothing in the substrate
+loads a model. S3 is a contract, and stays one until a worker exists behind the broker.
 
-S7 is therefore the next thing to build, and it carries its own constraint, which is why it is a gate
-rather than a task: high-frequency Body state is *not* biography. A Journal that accumulated a CPU
-sample every second would be a telemetry database wearing a life story, and the erasure, retention
-and provenance rules that make the Journal worth having would be applied to numbers that mean
-nothing individually. Bounded, transient, and separate; only what is meaningful crosses into Event1.
+S7 carries its own constraint, which is why it is a gate rather than a task: high-frequency Body
+state is *not* biography. A Journal that accumulated a CPU sample every second would be a telemetry
+database wearing a life story, and the erasure, retention and provenance rules that make the Journal
+worth having would be applied to numbers that mean nothing individually. Bounded, transient, and
+separate; only what is meaningful crosses into Event1.
+
+Which gates hold at any moment is not recorded here. This is an accepted decision, and a decision
+that carried a progress report would be a decision that goes stale without anyone changing it —
+which is how the paragraph this replaced came to say that nothing watches the Body months after
+something did. [Current State](../CURRENT_STATE.md) is the implementation authority.
 
 ## Alternatives Considered
 

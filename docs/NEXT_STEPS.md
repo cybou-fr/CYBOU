@@ -21,16 +21,18 @@ with a local model, and not an AI desktop.
 Two gates decide whether that is true, and everything below is ordered by them:
 
 > **S0.** Cut internet access and every external model API. On a minimal VPS, Cybou continues to
-> observe its Body, answer basic questions about its own state, detect known problems, explain them
-> through evidence, remember its open intentions, and form typed action proposals.
+> observe its Body, answer basic questions about its own state, detect a known problem, explain it
+> through evidence, remember its open intentions, form a typed action proposal, obtain the
+> authorization its standing policy provides for, carry out at least one bounded Body capability,
+> and independently observe whether the expected outcome was reached.
 
 > **S0R.** Restore the network and connect a large model. Language, analysis and planning improve
 > sharply. Identity, memory, epistemics, permissions and the ability to maintain minimum system
 > control do not change owner.
 
 S0R is held by construction: nothing in the substrate loads a model, the broker is a faculty rather
-than an organ, and a model that answers can only return proposals. **S0 is held up to the last
-stage.** The vertical is:
+than an organ, and a model that answers can only return proposals. **S0 is not held**, and the gate
+says why in one word: nothing here can act. The vertical is:
 
 ```text
 observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome
@@ -39,6 +41,10 @@ observe → understand → remember → diagnose → explain → propose → aut
 Every stage exists and is tested except one. *Act* is missing, and only *act*: what an outcome is
 and how it is judged were built before the executor deliberately, so an executor arrives to find its
 own report is one of two fields and not the deciding one.
+
+The gate used to end at *form typed action proposals*, which made it satisfiable by a system that
+cannot maintain anything, and left the vertical describing a longer path than the gate it served.
+S0 now ends where the loop closes.
 
 ## In order
 
@@ -52,15 +58,41 @@ own report is one of two fields and not the deciding one.
    mutate the host is a decision about what this machine is allowed to do to itself, and it is not
    a decision this repository should take on its owner's behalf by inference from *the boundary is
    ready*. The specific thing needed is a per-operation grant: which operations may exist at all in
-   the first executor. `package.cache.clean` is the obvious candidate — reversible in the sense
-   that matters, since what it deletes is re-downloadable — and `service.restart` is the first one
-   that is genuinely not.
+   the first executor. `package.cache.clean` is the obvious candidate: low risk, and what it
+   deletes can be fetched again.
 
-   When it exists it is `Action1` on a `cybou-executord`, and the shape is fixed by ADR-0022: a
-   typed operation, never shell text; a capability check at the boundary rather than at the caller;
-   and an **independent re-observation** afterwards. The last part is the one worth naming twice.
-   An executor that reported its own success would be the system grading its own homework, and the
-   evidence that the disk has space is a telemetry reading taken afterwards, not an exit code.
+   It is **not** reversible, and this document said it was. The operation table is right and the
+   sentence was wrong — deleted bytes cannot be put back, and that they can be downloaded again is
+   a different claim. `recoverable ≠ reversible` is a distinction worth keeping, because rollback
+   is what the second one promises.
+
+   When it exists it is **two** processes, not one, and that is now normative in ADR-0022.
+   `cybou-actiond` owns `Action1` — the proposal lifecycle, criticism, standing policy,
+   confirmation, the decision and the permit that follows — and holds no capability to carry
+   anything out. `cybou-executord` owns a fixed set of typed adapters and cannot decide whether an
+   operation is allowed.
+
+   ```text
+   Action1 can authorize but cannot execute
+   Executor can execute but cannot authorize
+   ```
+
+   One process holding both is a sequence of stages inside a function, which is a convention. It is
+   one refactor, one convenience method, one *while we are here* away from a path that skips the
+   middle, and nothing in the type system objects because both ends are already in scope. Action is
+   where getting that wrong costs the most, so it is the one place the boundary has to be a process
+   boundary.
+
+   The rest of the shape is fixed by ADR-0022: a typed operation, never shell text; a capability
+   check at the boundary rather than at the caller; and an **independent re-observation**
+   afterwards. An executor that reported its own success would be the system grading its own
+   homework, and the evidence that the disk has space is a telemetry reading taken afterwards, not
+   an exit code.
+
+   Before the first privileged line: proposal and decision identity has to move to the owner that
+   holds the lifecycle. The web projection builds proposals with
+   `Uuid::from_u128(operation.verb().len())`, which is a fixture identity and harmless only because
+   no button exists behind it. `Action1` must be the authoritative source of both.
 
 1. **Erasure beyond the live database.** *Partly done.* An erasure reports a typed `BackupState`
    rather than implying completeness, and E11 is now held by a test against a real copy of the

@@ -32,7 +32,7 @@ against the deployed host would mean proving that guard by making the deployment
 
 The workspace itself is portable: `cargo test` and `cargo clippy` run on any platform the toolchain
 supports, and that is what the GitHub workflow does. Everything behind `cfg(target_os = "linux")` —
-the twelve daemons and their D-Bus surfaces — compiles only on Linux, so a green run elsewhere says
+the Mind daemons and their D-Bus surfaces — compiles only on Linux, so a green run elsewhere says
 nothing about them.
 
 ## Build
