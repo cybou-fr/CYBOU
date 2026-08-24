@@ -32,7 +32,7 @@ pub mod operation;
 pub mod outcome;
 pub mod propose;
 
-pub use authorize::{StandingPolicy, authorize, criticise, permits_unattended};
+pub use authorize::{StandingPolicy, authorize, criticise, criticise_request, permits_unattended};
 pub use operation::{ALL_OPERATIONS, Operation};
 pub use outcome::{Reobservation, TOO_SOON_AFTER, observe_outcome};
 pub use propose::{propose, remedies_for};

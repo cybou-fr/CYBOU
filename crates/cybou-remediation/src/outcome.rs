@@ -244,6 +244,7 @@ fn agreement(reported: &AttemptReport, observed: &Relief) -> Agreement {
 
 #[cfg(test)]
 mod tests {
+    use cybou_protocol::action::Proposer;
     use cybou_protocol::telemetry::{
         Deviation, EvidenceStrength, Finding, InsightEvidence, MetricKey, Subject, Watching,
     };
@@ -288,6 +289,7 @@ mod tests {
     fn proposal() -> ActionProposal {
         ActionProposal {
             proposal_id: Uuid::from_u128(2),
+            proposed_by: Proposer::Mind,
             cause_id: Some(Uuid::from_u128(1)),
             intent: "relieve storage.exhaustion".to_owned(),
             operation: "package.cache.clean".to_owned(),

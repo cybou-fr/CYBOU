@@ -30,6 +30,14 @@ pub enum RiskLevel {
 pub struct ActionProposal {
     /// Unique proposal identifier.
     pub proposal_id: Uuid,
+    /// Who is asking.
+    ///
+    /// Absent until 2026-08-25, and its absence was a live defect the moment agents were designed.
+    /// A person pre-authorizes an operation because *Cybou's own diagnosis* is trustworthy — it came
+    /// from readings Cybou gathered itself and cited as evidence. A flat list of permitted
+    /// operations then extends that trust to anybody who asks for the same verb, including a party
+    /// inside a capsule that Cybou trusts not at all.
+    pub proposed_by: Proposer,
     /// Causal intention or problem that gave rise to this proposal.
     pub cause_id: Option<Uuid>,
     /// High-level communicative intent.
@@ -47,6 +55,50 @@ pub struct ActionProposal {
     /// Proposal creation timestamp.
     #[serde(with = "time::serde::rfc3339")]
     pub proposed_at: OffsetDateTime,
+}
+
+/// Who is asking for an action.
+///
+/// The distinction is not about politeness. Cybou's own proposal arrives with a finding behind it
+/// that the critics can check the action against; an agent's arrives from a party that may be
+/// mistaken, confused, or hostile, with nothing but a request. Those are different questions and a
+/// policy that could not tell them apart would answer both with the more permissive one.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "proposer")]
+pub enum Proposer {
+    /// Cybou, from a finding it reached about itself.
+    Mind,
+    /// An agent inside a capsule.
+    #[serde(rename_all = "camelCase")]
+    Agent {
+        /// Which capsule it is running in.
+        capsule_id: Uuid,
+        /// Which agent.
+        agent: String,
+    },
+}
+
+impl Proposer {
+    /// How this reads to a person.
+    #[must_use]
+    pub fn describe(&self) -> String {
+        match self {
+            Self::Mind => "this host, from its own readings".to_owned(),
+            Self::Agent { agent, capsule_id } => {
+                format!("the agent {agent} in capsule {capsule_id}")
+            }
+        }
+    }
+
+    /// Whether this party is one whose own account of things may be relied on.
+    ///
+    /// True only for Mind, and not because Mind is clever: because a proposal from Mind carries a
+    /// finding, and a finding carries the readings behind it. What is trusted is the evidence, not
+    /// the proposer.
+    #[must_use]
+    pub const fn brings_its_own_evidence(&self) -> bool {
+        matches!(self, Self::Mind)
+    }
 }
 
 /// Result of an automated criticism rule evaluating a proposal before authorization.
@@ -339,6 +391,7 @@ mod tests {
     fn action_proposal_and_criticism_lifecycle() {
         let proposal = ActionProposal {
             proposal_id: Uuid::new_v4(),
+            proposed_by: Proposer::Mind,
             cause_id: None,
             intent: "Recover unresponsive database".into(),
             operation: "service.restart".into(),

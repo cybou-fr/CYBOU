@@ -454,6 +454,7 @@ fn a_configured_operator_can_let_one_ordinary_thing_happen_unattended() {
         false,
         &StandingPolicy {
             pre_authorized: vec![Operation::CleanPackageCache],
+            pre_authorized_for_agents: Vec::new(),
         },
         at(0),
     );

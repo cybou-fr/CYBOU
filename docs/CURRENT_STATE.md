@@ -195,6 +195,27 @@ it was asked is not a decision. A symlink out of the workspace is the kernel's t
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 
+**A proposal carries who is asking, and a permission does not cross between them.** Found while
+wiring the capsule to the action boundary, which is where this tree keeps finding things. A person
+pre-authorizes `package.cache.clean` because the party asking reached a finding from readings it
+gathered and can show them. `ActionProposal` carried no proposer and `StandingPolicy` was one flat
+list of verbs, so the moment an agent existed it would have inherited that permission — unattended,
+on evidence nobody saw, from a party this system trusts not at all. There are two lists now, the
+agent one empty by default even on a machine whose owner has pre-authorized plenty for Cybou itself,
+and neither leaks into the other. Mutation-checked in both directions.
+
+The same wiring exposed a third instance of the vacuous truth. `find` over an empty check list
+returns nothing, so an untrusted proposal that no critic examined ran straight into the
+pre-authorization test and was granted. A proposal nothing examined is not one that passed
+examination, and that is now an explicit refusal naming who asked.
+
+And it exposed a category error worth keeping. The critic *does this action relieve the finding*
+cannot run against a request that cites no finding — it objects, correctly by its own rule, to a
+claim the agent never made. So the critics are split: the two that need a finding, and the two that
+do not. The second of those matters most here, because `ActionProposal` carries risk and
+reversibility as ordinary fields, and an untrusted party asking for something dangerous while
+calling it `Low` is exactly what that check is for.
+
 **An action does not get to say whether it worked.** The outcome stage is built before the
 executor, on purpose and for the same reason the gate was: the natural shape of an executor is one
 that returns whether it succeeded, and an executor written first arrives with that answer already in

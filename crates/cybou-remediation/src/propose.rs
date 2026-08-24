@@ -11,7 +11,7 @@
 //! cannot be named is an action nobody can argue with afterwards, and the whole reason this path
 //! exists is so that *why are you offering to do that* has an answer made of readings.
 
-use cybou_protocol::action::ActionProposal;
+use cybou_protocol::action::{ActionProposal, Proposer};
 use cybou_protocol::telemetry::{Finding, MetricKey, SystemInsight};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -73,6 +73,7 @@ pub fn propose(
         .into_iter()
         .map(|operation| ActionProposal {
             proposal_id: id(operation),
+            proposed_by: Proposer::Mind,
             // The insight, always. An action whose cause cannot be named is an action nobody can
             // argue with afterwards.
             cause_id: Some(insight.insight_id),
