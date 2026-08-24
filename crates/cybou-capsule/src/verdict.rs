@@ -139,8 +139,14 @@ pub fn decide(grant: &CapsuleGrant, reach: &Reach) -> Verdict {
                 }
             }
         }
+        // Whether the grant names this class at all. Whether there is any budget left is a fact
+        // about the lease, not the grant, and  asks it.
         Reach::UseModel { class } => {
-            if grant.model_class == *class {
+            if grant
+                .model
+                .as_ref()
+                .is_some_and(|model| model.class == *class)
+            {
                 Verdict::Allowed
             } else {
                 Verdict::NotGranted {
@@ -175,7 +181,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::grant::{NetworkGrant, ResourceBudget, Workspace};
+    use crate::grant::{ModelGrant, NetworkGrant, ResourceBudget, Workspace};
 
     /// A development profile: the shape a person actually grants.
     fn developer() -> CapsuleGrant {
@@ -187,10 +193,13 @@ mod tests {
             budget: ResourceBudget {
                 memory_mib: 4096,
                 cpus: 2,
+                tasks_max: 512,
                 lifetime: Duration::hours(4),
-                model_spend_limit: 100,
             },
-            model_class: "Strong".to_owned(),
+            model: Some(ModelGrant {
+                class: "Strong".to_owned(),
+                spend_limit: 100,
+            }),
             tools: vec!["git".to_owned(), "tests".to_owned()],
             may_execute: true,
         }

@@ -52,7 +52,7 @@ pub mod lease;
 pub mod reach;
 pub mod verdict;
 
-pub use grant::{CapsuleGrant, NetworkGrant, ResourceBudget, Workspace};
+pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
 pub use lease::{Ended, Lease, decide_under_lease};
 pub use reach::Reach;
 pub use verdict::{Refusal, Verdict, decide};

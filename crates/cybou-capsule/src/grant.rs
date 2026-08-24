@@ -117,7 +117,8 @@ impl NetworkGrant {
 /// What a capsule may consume.
 ///
 /// Ceilings, not hints. A budget nothing enforces is a number in a dialogue box, and the reason to
-/// carry it here is so the thing that does enforce it has one place to read.
+/// carry it here is so the thing that does enforce it has one place to read — a cgroup, for the
+/// three that are physical.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceBudget {
@@ -125,13 +126,44 @@ pub struct ResourceBudget {
     pub memory_mib: u32,
     /// How many CPUs' worth of time.
     pub cpus: u32,
+    /// The most processes and threads this capsule may hold at once.
+    ///
+    /// A fork bomb is not an attack scenario here; it is an ordinary mistake by an autonomous agent
+    /// running a build. Memory and CPU ceilings do not stop one — a machine with a full process
+    /// table is unusable long before it is out of memory — so this is its own limit, and cgroup has
+    /// carried it all along.
+    pub tasks_max: u32,
     /// How long this capsule may exist.
     pub lifetime: Duration,
-    /// What may be spent on models, in the smallest unit of the operator's currency.
+}
+
+/// What a capsule may ask of a model, if anything.
+///
+/// Separate from the resource budget, and optional, because those are two different kinds of
+/// ending. Running out of money for completions is a reason to refuse a completion; it is not a
+/// reason to freeze a capsule that was compiling something.
+///
+/// `None` is a first-class state and the common one on an unplugged host: a capsule may have no
+/// business with a model at all, and one using a local model has nothing to spend. Folding this
+/// into the budget made a zero ceiling indistinguishable from an exhausted one, so a capsule that
+/// wanted no model was dead before it started — including the one
+/// [`CapsuleGrant::nothing_but`] hands out as the starting point for building a profile.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelGrant {
+    /// Which class of model this capsule may use.
+    ///
+    /// A class rather than a model name: a name pins the capsule to one provider's naming, breaks
+    /// when that name is retired, and routes around whatever the class encodes.
+    pub class: String,
+    /// What may be spent, in the smallest unit of the operator's currency.
     ///
     /// An integer, because a spending ceiling compared as a float is a spending ceiling that is
     /// occasionally off by a fraction in whichever direction the rounding went.
-    pub model_spend_limit: u64,
+    ///
+    /// Zero is meaningful and is not the same as having no model grant: it says this capsule may
+    /// use a model that costs nothing, and may not run up a bill.
+    pub spend_limit: u64,
 }
 
 /// The profile a person grants once.
@@ -148,11 +180,8 @@ pub struct CapsuleGrant {
     pub network: NetworkGrant,
     /// What it may consume.
     pub budget: ResourceBudget,
-    /// Which class of model it may use.
-    ///
-    /// A class rather than a model name: a name pins the capsule to one provider's naming, breaks
-    /// when that name is retired, and routes around whatever the class encodes.
-    pub model_class: String,
+    /// What it may ask of a model, if anything.
+    pub model: Option<ModelGrant>,
     /// Which tools it may reach, by name.
     ///
     /// Mediated by the host rather than configured inside the agent. An agent that configures its
@@ -182,10 +211,10 @@ impl CapsuleGrant {
             budget: ResourceBudget {
                 memory_mib: 0,
                 cpus: 0,
+                tasks_max: 0,
                 lifetime: Duration::ZERO,
-                model_spend_limit: 0,
             },
-            model_class: String::new(),
+            model: None,
             tools: Vec::new(),
             may_execute: false,
         }
@@ -261,6 +290,10 @@ mod tests {
         assert!(grant.network.hosts.is_empty());
         assert!(grant.tools.is_empty());
         assert!(!grant.may_execute);
-        assert_eq!(grant.budget.model_spend_limit, 0);
+        assert_eq!(
+            grant.model, None,
+            "a starting point does not come with a model"
+        );
+        assert_eq!(grant.budget.tasks_max, 0);
     }
 }

@@ -199,9 +199,19 @@ request, and a boundary made of requests is not a boundary. This produces the fi
 nothing further is `Allowed`; freezing the capsule is the kernel's, and this module does not pretend
 otherwise.
 
-Three endings, kept apart because only one of them is something a person did. A lease withdrawn and
+**Two kinds of ending, and they are not the same kind.** The lifetime running out or somebody
+withdrawing the lease finishes the capsule; running out of model budget refuses completions and
+stops nothing else. Folding them together was wrong twice over. It would have frozen an agent
+halfway through a compile for running out of money it was not spending — and because a zero ceiling
+read as an exhausted one, a capsule that wanted no model at all was dead at the instant it was
+issued, including the grant this crate hands out as the starting point for a profile and every
+capsule on an unplugged host, which is the configuration the whole system exists to survive. A model
+grant is now optional and separate, and a zero ceiling is a real configuration meaning *use something
+free and run up no bill*, distinct from having no grant.
+
+Two endings, kept apart because only one of them is something a person did. A lease withdrawn and
 then expired was **withdrawn**: reporting the expiry would quietly replace somebody's action with a
-timer running out. The ceiling is reached *at* the ceiling, not one unit past it — `>` lets every
+timer running out. The spending ceiling is reached *at* the ceiling, not one unit past it — `>` lets every
 limit be exceeded by exactly one, which is invisible until a month of them is added up — and
 charging is saturating, so no arithmetic here can make a lease look healthier than it is. Both are
 mutation-checked. A request that would be refused outright is still recorded as refused rather than
