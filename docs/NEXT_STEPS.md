@@ -64,20 +64,28 @@ Track B  agent platform       the product that rests on it
 
 ## Track A — finish S0
 
-### A0. The executor, and the consent it is waiting for
+### A0. The executor
 
-*Not started, and deliberately so.* Every stage before it is built: `cybou-remediation` proposes over
-a closed set of typed operations, criticises each proposal against the finding it claims to relieve,
-and decides it against a standing policy that grants nothing by default. What does not exist is
-anything that can carry one out.
+*Granted 2026-08-25, three adapters and no more.* Every stage before it is built: `cybou-remediation`
+proposes over a closed set of typed operations, criticises each proposal against the finding it
+claims to relieve, and decides it against a standing policy that grants nothing by default.
 
-This is the one item in this document that is not blocked on engineering. Writing code that can
-mutate the host is a decision about what this machine may do to itself, and it is not a decision this
-repository should take on its owner's behalf by inference from *the boundary is ready*. **What is
-needed is a per-operation grant: which operations may exist at all in the first executor.**
-`package.cache.clean` is the obvious candidate — low risk, and what it deletes can be fetched again.
-It is *not* reversible: deleted bytes cannot be put back, and that they can be downloaded again is a
-different claim. `recoverable ≠ reversible`.
+```text
+service.status          read-only; exercises the whole transport before anything mutates
+package.cache.clean     a bounded mutation with a clear outcome
+service.restart         concrete .service units only
+```
+
+Nothing else is to be implemented. An operation absent from the code is a stronger statement than one
+refused by policy, and an implemented adapter is still not a pre-authorized one — the standing policy
+grants nothing by default and grants separately for this host and for an agent.
+
+The executor speaks the systemd manager API over D-Bus. Not `sh -c`, not `Command::new("systemctl")`,
+and **no general execution API at all**, not even a private one: an adapter is a function taking a
+typed target and doing one thing. The `systemd:<unit>` placeholder is refused there — it means *some
+unit, and this host cannot say which*, which is not something to carry out.
+
+The first live S0 pass uses a harmless unit created for the purpose, not a database.
 
 **It is two processes, not one**, and that is normative in
 [ADR-0022](adr/ADR-0022-authorized-action-boundary.md):
@@ -106,31 +114,53 @@ That is the gate, and nothing smaller is.
 
 ## Track B — the agent platform
 
-The first seven items are a shippable product on their own: install Cybou on a VPS, open a browser,
-pick an agent, pick a model, pick a repository, press Launch.
+**Reordered 2026-08-25: the capsule comes before the agent.** Prove there is somewhere safe to put
+any agent, and it stops mattering which one goes in first. That is also the shape of the claim — it
+is not the agent that decides where its freedom ends; a human grant is turned into a physical
+environment before the agent is started in it.
 
-### B1. ACP client and registry browser
-
-Speak ACP to an agent process, and list what the public registry offers. The registry is upstream;
-Cybou does not maintain a catalogue of its own. What Cybou adds is everything below.
-
-### B2. The Agent Capsule primitive
-
-The unit of grant, and the item every other one depends on.
+### B1. The Agent Capsule primitive — first, and the item everything depends on
 
 ```text
 workspace · process namespace · filesystem namespace · network namespace
-resource budget · model lease · MCP grants · secrets lease · lifetime · audit
+resource budget · model grant · MCP grants · secrets lease · lifetime · audit
 ```
 
-**Kernel first.** Namespaces, cgroups, seccomp, Landlock or AppArmor, mount and network policy. The
-acceptance test is that the capsule holds with Mind stopped — a boundary that depends on cognition is
-not a boundary, and this is the one place in the project where getting that wrong is unrecoverable.
+Rootless first, behind a `CapsuleBackend` trait with a bubblewrap implementation, and no privileged
+helper until a gate proves one is needed. In order:
+
+```text
+1. user + mount + PID + IPC + UTS namespaces
+2. an empty filesystem, built up by explicit bind mounts — never a host / with things removed
+3. Landlock as a second barrier: the mount says a path is absent, Landlock says there are no rights
+4. PR_SET_NO_NEW_PRIVS before exec
+5. seccomp for the syscalls that change the sandbox's own shape, not a brittle allow-list
+6. no nested user namespaces
+7. cgroup as the physical budget, including TasksMax; lifetime as the unit's lifetime
+8. lease expiry freezes or kills the cgroup — never an ACP stop message
+9. network deny-all: a fresh namespace with loopback and no route
+10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
+```
+
+**The gate is adversarial and runs twice**, the second time with Mind stopped. Details in
+[ADR-0042](adr/ADR-0042-agent-capsule-platform.md); the short version is that a capsule holding only
+while Mind is watching has cognition for a boundary, which the ADR refuses in its first section.
+
+`Reach` stays what it is: vocabulary for explaining, telemetry, audit and boundary crossings. The
+grant is compiled **once** into a kernel policy and the kernel enforces it. Consulting Rust per
+`open` would rebuild the runtime permission mediator this whole design replaces.
+
+### B2. ACP client and registry browser
+
+Speak ACP to an agent process, and list what the public registry offers. The registry is upstream;
+Cybou does not maintain a catalogue of its own.
 
 ### B3. Standing capability lease
 
-One profile, granted once, after which nothing is asked while the agent stays inside it. An interface
-that asks anyway has not made a weaker promise; it has made the grant meaningless.
+*Mostly done.* `Lease` carries the lifetime, the ledger and revocation, and a capsule ending is kept
+apart from a model grant being spent. What remains is issuing one from a profile a person chose on a
+screen, and an interface that then asks nothing while the agent stays inside it — one that asks
+anyway has not made a weaker promise, it has made the grant meaningless.
 
 ### B4. The Model Gateway
 
@@ -151,9 +181,9 @@ condition a person would want to know before sending their code through it.
 
 ### B7. First agent pack
 
-One agent, end to end, inside a capsule, against a real provider. The candidate is the one with the
-widest existing provider support and a custom-endpoint option, because it exercises the gateway
-without needing anything special from the agent.
+One agent, end to end, inside a capsule, against a real provider — and only after B1's gate passes
+twice. The candidate is the one with the widest existing provider support and a custom-endpoint
+option, because it exercises the gateway without needing anything special from the agent.
 
 ### B8. Agent Card and streaming session
 

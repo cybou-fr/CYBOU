@@ -190,6 +190,55 @@ A model may:
 
 It does not become the authorization authority or privileged executor.
 
+### Amendment: the first executor holds three adapters (2026-08-25)
+
+The operations that may *exist* in the first executor, decided by the owner of the machine this is
+built for. Nothing else is to be implemented, and an operation absent from the code is a stronger
+statement than one refused by policy.
+
+| Operation | In the first executor | Why |
+|---|---|---|
+| `service.status` | Yes | Read-only, and it exercises the whole `Action1` → executor transport before anything mutates |
+| `package.cache.clean` | Yes | A bounded mutation with a clear outcome |
+| `service.restart` | Yes, concrete `.service` units only | The first genuinely useful self-healing action |
+| `service.reload` | Not yet | Its outcome is poorly defined |
+| `log.rotate` | No | Needs retention semantics first |
+| `tmp.trim` | No | Too hard to establish that a file is actually disposable |
+| `service.data.delete` | Never in v1 | Critical, and on the forbidden list |
+| `filesystem.format` | Never | Critical, and on the forbidden list |
+| `system.poweroff` | Never | Critical, and on the forbidden list |
+
+**An implemented adapter is not a pre-authorized one.** The standing policy still grants nothing by
+default, and it grants separately for this host's own findings and for an agent.
+
+`service.restart` is included now and would not have been six months ago. It is included because a
+finding now carries what it is about, so `service.active (postgresql.service)` produces a proposal
+naming `systemd:postgresql.service` rather than a placeholder. An operation that cannot name its
+target is an operation nobody can authorize, and until that was true this one could not be offered.
+
+The first live S0 pass should use a harmless unit created for the purpose, not a database.
+
+### Amendment: the executor speaks to systemd, not to a shell (2026-08-25)
+
+A typed operation must stay typed all the way to the Body. Three shapes are excluded, in order of
+how bad they are:
+
+```text
+sh -c "systemctl restart …"     a string becomes an instruction
+Command::new("systemctl")       argv becomes the interface
+execute(program, args)          the executor becomes a shell with extra steps
+```
+
+The last is the one to name explicitly: **the executor exposes no general execution API**, not even
+a private one. An adapter is a function that takes a typed target and does one thing.
+
+For services, that means the systemd manager API over D-Bus — `RestartUnit("foo.service",
+"replace")` — and concrete `.service` units only. Not `.mount`, `.socket`, `.target`, `.timer`. The
+`systemd:<unit>` placeholder is refused at the executor: it means *some unit, and this host cannot
+say which*, which is not something to carry out.
+
+For the package cache, one fixed adapter with a fixed argument vector and no shell.
+
 ## Consequences
 
 Actions become traceable and reversible where possible.

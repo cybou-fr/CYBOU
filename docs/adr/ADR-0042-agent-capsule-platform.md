@@ -221,6 +221,91 @@ agent model ownership  ≠  agent execution authority
 
 The capsule, the grants, the observation and the boundary are identical either way.
 
+### Amendment: rootless first, and a backend behind a trait (2026-08-25)
+
+How the capsule is built, decided before the first line of it.
+
+**Not a bespoke container runtime.** A first implementation that is simultaneously this project's own
+`clone`/`unshare`/mount/seccomp orchestration is the wrong place to be original. The backend sits
+behind a trait with one implementation to begin with, so replacing it later changes nothing above:
+
+```text
+CapsuleBackend
+  └── BubblewrapV1        (first)
+      NativeLinuxV2       (later, if it earns its place)
+```
+
+**Rootless first, and no privileged helper until a gate proves one is needed.** Unprivileged user
+namespaces make a process root inside its own namespace and nobody outside it; Landlock only ever
+lets a process restrict itself further, and cannot be undone once applied; `no_new_privs` is
+inherited across `fork` and `execve` and stops a setuid binary gaining anything. Almost all of the
+capsule is reachable without privilege. If something later genuinely requires it — host firewall
+integration, veth management, devices — it becomes a small helper with a closed API
+(`AttachNetwork`, `FreezeCgroup`, `DestroyCapsule`) and never `run this as root`.
+
+**The filesystem starts empty.** Not the host's `/` with things removed, which is a deny-list and
+therefore a list somebody will forget to extend. Runtime directories are bind-mounted read-only,
+one granted workspace read-write, `/tmp` and a `/proc` for the capsule's own PID namespace. Never
+the Journal, the key store, the host home, an SSH agent socket, a Docker socket, or `/run/user/$UID`
+whole.
+
+Landlock is a second barrier and not a replacement for the first: the mount namespace says a path
+does not exist, Landlock says that even if it somehow did, there are no rights to it.
+
+**Nested user namespaces are refused.** An agent has no business building its own sandbox inside
+one, and the ability to do so is the ability to arrange an escape hatch.
+
+**The budget is a cgroup**, including `TasksMax` — a fork bomb is an ordinary mistake by an
+autonomous build, not an attack — and the lifetime is the lifetime of the unit rather than a timer
+inside Mind. When a lease ends, the cgroup is frozen or killed. It is not an ACP `stop` message: an
+agent may simply not answer, which is the whole of *ending is not asking*.
+
+**The network begins as deny-all.** A fresh network namespace with loopback and no route, which is
+also the first acceptance gate. What the grant permits then arrives through an egress broker rather
+than through a routed interface with a firewall allow-list, because a grant is written in DNS
+identity (`github.com`) and a firewall works in addresses. Resolving one into the other means owning
+a policy engine for DNS lifetime and rebinding, and getting it wrong is silent. A broker checks the
+hostname it was actually asked for.
+
+```text
+agent → capsule-local proxy → egress broker → the real connection
+```
+
+A program that ignores the proxy and opens a socket directly fails, so the policy does not depend on
+the agent behaving well. The model gateway is reached the same way, over a capsule-local endpoint,
+so an agent never needs Internet access to use a model and never holds a provider credential.
+
+### Amendment: `Reach` is audit vocabulary, not a syscall mediator (2026-08-25)
+
+A tempting mistake with a good-sounding shape: route every `open` through a Rust policy decision.
+That rebuilds the runtime permission mediator this whole ADR exists to replace, and puts the boundary
+back inside a conversation.
+
+The grant is compiled **once** into a kernel policy, and the kernel enforces it from then on:
+
+```text
+CapsuleGrant  →  KernelCapsuleSpec  →  namespaces · mounts · Landlock · cgroup · seccomp · egress
+```
+
+`Reach` remains what it was written for — explaining, telemetry, audit, and naming a boundary
+crossing. It is not consulted per syscall and must never become the thing that permits one.
+
+### Amendment: what G1 actually requires (2026-08-25)
+
+Not *an agent started under bubblewrap*. An adversarial gate, run twice — once normally, and once
+**with Mind stopped**, where every one of these must still fail:
+
+```text
+inside      write the workspace · compile and run from it · fork within TasksMax · use its RAM and CPU
+refused     read /etc/shadow · follow a workspace symlink to it · read the Journal · read the key store
+            see host processes · signal a host process · open a direct Internet socket
+            create a nested user namespace · reach another capsule
+            survive lease expiry · exceed MemoryMax · exceed TasksMax
+```
+
+The second run is the whole point. A capsule that holds only while Mind is watching is a capsule
+whose boundary is cognition, which this ADR refuses in its own first section.
+
 ## Consequences
 
 A person installs Cybou on a VPS, opens a browser, picks an agent, picks a model, picks a repository,
