@@ -521,6 +521,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-capsule"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-protocol",
+ "serde",
+ "time",
+ "uuid",
+]
+
+[[package]]
 name = "cybou-contextd"
 version = "0.1.0"
 dependencies = [

@@ -4,6 +4,7 @@
 [workspace]
 members = [
     "crates/cybou-authd",
+    "crates/cybou-capsule",
     "crates/cybou-contextd",
     "crates/cybou-crypto",
     "crates/cybou-epistemicd",

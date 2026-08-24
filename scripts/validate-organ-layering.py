@@ -58,7 +58,12 @@ LAYERS: list[tuple[str, set[str]]] = [
     # Last, and below meaning on purpose. What may be done is decided after what is known, what is
     # related, what has attention and what is being said — and nothing above it may read it, because
     # a layer that could consult the authorization gate could come to depend on being permitted.
-    ("governance", {"cybou-remediation"}),
+    #
+    # `cybou-capsule` is here for the same reason and answers the same kind of question about a
+    # different subject: the gate decides what Cybou may do to its host, and the capsule decides what
+    # an agent may do inside one. Neither may be read from above, and neither may reach anything that
+    # could carry out what it permits.
+    ("governance", {"cybou-remediation", "cybou-capsule"}),
 ]
 
 #: Crates that are faculties rather than organs, and what each of them must not depend on.

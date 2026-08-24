@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-capsule"
+description = "What an agent is granted, and where its autonomy ends"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# The protocol and nothing else. This crate decides what an agent may do; a dependency on anything
+# that could create a namespace, spawn a process, or open a socket would put the boundary and the
+# thing it bounds in one place — which is the mistake ADR-0042 exists to prevent, made in miniature.
+cybou-protocol = { path = "../cybou-protocol" }
+serde.workspace = true
+ciborium.workspace = true
+time.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

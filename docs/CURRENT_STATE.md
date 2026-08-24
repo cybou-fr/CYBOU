@@ -171,6 +171,30 @@ its first six hours, that was the ordinary path. It is fixed at the source and r
 outcome, because a vacuous truth that says *it worked* must not be one upstream change away from
 returning.
 
+**What an agent may do is decided before anything can create a capsule.** `cybou-capsule` holds the
+grant a person gives once and answers one question about one request. It depends on the protocol and
+on no runtime: it cannot create a namespace, spawn a process, or open a socket, and the layering
+validator fails if that changes. Written in this order for the reason the authorization gate was —
+build the sandbox first and the decision about what may happen inside it dissolves into whichever
+call site needed it.
+
+Three answers, not two, and the distinction is the load-bearing part. `Allowed` means nobody is
+asked, for hours. `CrossesBoundary` means the request left the capsule and is answerable, so it
+becomes an `ActionProposal` and takes the path ADR-0022 already defines. `Refused` means never —
+another capsule, the Journal, the key store — because there is no answer a person could give that
+would make those safe, and offering the question would be offering a choice that does not exist. A
+fourth, `NotGranted`, says a profile *could* have included this and does not, which sends a person to
+widen their profile rather than to argue with the architecture.
+
+Path containment is lexical and says so. `..` is applied before comparison, because
+`/srv/project/../../etc/shadow` is inside the workspace by string prefix and outside it by meaning —
+that is where sandboxes actually fail, and a mutation check confirms the test sees it. Symlinks are
+not followed: resolving them means touching a filesystem, and a decision whose answer depends on when
+it was asked is not a decision. A symlink out of the workspace is the kernel's to refuse.
+
+**None of this enforces anything.** A capsule holds because the kernel holds it. This is the
+description of what was granted, used to decide what to ask and what to record.
+
 **An action does not get to say whether it worked.** The outcome stage is built before the
 executor, on purpose and for the same reason the gate was: the natural shape of an executor is one
 that returns whether it succeeded, and an executor written first arrives with that answer already in
