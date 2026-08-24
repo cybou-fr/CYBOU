@@ -316,7 +316,7 @@ SPDX-License-Identifier: MIT
       <div class="bp-grid-2">
         <div class="bp-card">
           <h3 data-i18n="bp_layer1_title">Layer 1: Reproducible Body</h3>
-          <p data-i18n="bp_layer1_desc">Locked Flakes, atomic generations, VM/ISO/Hyper-V outputs, and explicit build and recovery gates. Debian 13 is the active build and verification environment for every Linux gate.</p>
+          <p data-i18n="bp_layer1_desc">Debian 13 packages and systemd user units, deployed to a server over SSH, with explicit build and recovery gates. Debian is the build, verification and deployment environment, not a host that stands in for another one.</p>
         </div>
         <div class="bp-card">
           <h3 data-i18n="bp_layer2_title">Layer 2: Typed Mind Runtime</h3>
@@ -400,8 +400,8 @@ SPDX-License-Identifier: MIT
               <td>M0</td>
               <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
               <td data-i18n="row_m0_cap">Green reproducible baseline</td>
-              <td data-i18n="row_m0_bound">Locked flake, formatting, licensing, metadata, documentation and UI gates</td>
-              <td data-i18n="row_m0_ev">Reproducible flake checks and focused gates</td>
+              <td data-i18n="row_m0_bound">Locked Cargo workspace, formatting, licensing, metadata, documentation and interface gates</td>
+              <td data-i18n="row_m0_ev">One gate script over every check, reporting which step failed</td>
             </tr>
             <tr>
               <td>M1–M4</td>
@@ -439,6 +439,13 @@ SPDX-License-Identifier: MIT
               <td data-i18n="row_m7_ev">Focused unit, process, scale, retention and disclosure gates</td>
             </tr>
             <tr>
+              <td>S7</td>
+              <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
+              <td data-i18n="row_body_cap">Body observation, diagnosis and projection</td>
+              <td data-i18n="row_body_bound">Bounded transient telemetry that never enters the biography, findings that carry the readings behind them, projections from robust statistics, and named resources an operator declares</td>
+              <td data-i18n="row_body_ev">Detector, projection, watchlist and end-to-end walkthrough gates</td>
+            </tr>
+            <tr>
               <td>W0–W1</td>
               <td><span class="status-tag done" data-i18n="tag_done">DONE</span></td>
               <td data-i18n="row_w01_cap">Rust foundation and read-only web boundary</td>
@@ -448,9 +455,9 @@ SPDX-License-Identifier: MIT
             <tr>
               <td>W2</td>
               <td><span class="status-tag inprogress" data-i18n="tag_inprogress">IN PROGRESS</span></td>
-              <td data-i18n="row_w2_cap">One interface for browser and desktop shell</td>
-              <td data-i18n="row_w2_bound">Shared WebAssembly frontend, independently buildable shell derivation, opt-in single-surface session</td>
-              <td data-i18n="row_w2_ev">Bootstrap authentication, lock screen, multi-display, input method, and accessibility gates remain open</td>
+              <td data-i18n="row_w2_cap">One interface, served to a browser</td>
+              <td data-i18n="row_w2_bound">Shared WebAssembly frontend behind a loopback gateway, reached over a reverse proxy; the opt-in single-surface desktop session installs disabled</td>
+              <td data-i18n="row_w2_ev">Browser tests and gateway gates; the desktop session is unproven on hardware with a seat</td>
             </tr>
             <tr>
               <td>M8</td>
@@ -463,8 +470,8 @@ SPDX-License-Identifier: MIT
               <td>M9–M13</td>
               <td><span class="status-tag todo" data-i18n="tag_planned">PLANNED</span></td>
               <td data-i18n="row_m913_cap">Learning, governed action, agents and security</td>
-              <td data-i18n="row_m913_bound">Learned artifacts, authorization, execution, agents, tools, and security remain separate governed boundaries</td>
-              <td data-i18n="row_m913_ev">None of these future runtimes is shipped today</td>
+              <td data-i18n="row_m913_bound">The action boundary is built — typed proposals, criticism, standing policy, authorization — and nothing behind it can execute. Learned artifacts, agents, tools and security remain separate governed boundaries.</td>
+              <td data-i18n="row_m913_ev">Proposal and authorization gates pass; no executor exists, deliberately</td>
             </tr>
           </tbody>
         </table>
@@ -475,11 +482,11 @@ SPDX-License-Identifier: MIT
       <h2 data-i18n="bp_sec5_title">5. Security, Privacy & Licensing</h2>
       <p data-i18n="bp_sec5_p1">Cybou is free software built for sovereignty and privacy:</p>
       <ul>
-        <li data-i18n="bp_lic1"><strong>Code License:</strong> MIT License for all Nix code, build scripts, Rust crates, web assets, and core logic.</li>
+        <li data-i18n="bp_lic1"><strong>Code License:</strong> MIT License for the Rust workspace, build and deployment scripts, web assets, and core logic.</li>
         <li data-i18n="bp_lic2"><strong>Visual Assets:</strong> Creative Commons Attribution-ShareAlike 4.0 for logos, wallpapers, and desktop themes.</li>
         <li data-i18n="bp_lic3"><strong>Trust Boundaries:</strong> Same-user local IPC is not treated as a complete capability-security boundary; future privileged action requires a separate authorization layer.</li>
-        <li data-i18n="bp_lic4"><strong>Interface Boundary:</strong> The web gateway binds to loopback only, is read-only by construction, and applies no-store and browser-security headers. Bootstrap authentication is not yet implemented, so no live cognitive state may be exposed beyond the local device.</li>
-        <li data-i18n="bp_lic5"><strong>Privacy:</strong> Event envelopes carry explicit privacy and sensitivity axes. Crash-safe transitive erasure and governed disclosure are implemented; sensitive payload storage, automatic expiry, backups, and replication remain open.</li>
+        <li data-i18n="bp_lic4"><strong>Interface Boundary:</strong> The gateway refuses to bind anything but loopback, is read-only by construction, and applies no-store and browser-security headers. A deployment reached from outside the machine puts a reverse proxy in front of it and requires sign-in; serving strangers is a mode the unit sets, never the default.</li>
+        <li data-i18n="bp_lic5"><strong>Privacy:</strong> Event envelopes carry explicit privacy and sensitivity axes. Sensitive payloads are sealed with per-contribution keys, and crash-safe transitive erasure destroys them. A backup that also captured the key store is outside that guarantee, which is tested rather than assumed. Automatic expiry and replication remain open.</li>
         <li data-i18n="bp_lic6"><strong>Current Cloud Boundary:</strong> The runtime and interface require no hosted AI service or API key, and no language model is shipped today.</li>
         <li data-i18n="bp_lic7"><strong>Security Documents:</strong> The repository maintains explicit threat and privacy models under version control.</li>
       </ul>
