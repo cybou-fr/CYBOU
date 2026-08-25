@@ -77,6 +77,22 @@ step "document links"        python3 scripts/validate-doc-links.py
 step "site wording"          python3 scripts/sync-site-i18n.py --check
 step "multi-daemon organs"   bash scripts/test-multi-daemon-integration.sh
 
+# ADR-0042 G1. Exit 3 means bubblewrap is absent, which is a check that did not run rather than one
+# that passed — the distinction this whole script exists to keep.
+announce "capsule escape attempts"
+failed="capsule escape attempts"
+capsule_status=0
+bash scripts/test-capsule-gate.sh || capsule_status=$?
+case "$capsule_status" in
+    0) failed="" ;;
+    3)
+        announce "capsule escape attempts not run: bubblewrap is not installed here"
+        skipped="$skipped capsule-escape-attempts"
+        failed=""
+        ;;
+    *) exit "$capsule_status" ;;
+esac
+
 # Licensing headers, because CI runs this and a gate that claims to be every check and is not is the
 # same defect as a check whose failure is invisible. Skipped with a said reason rather than silently
 # when the tool is absent: an absent check must not look like a passed one.

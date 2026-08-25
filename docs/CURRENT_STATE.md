@@ -268,6 +268,30 @@ shared one, a session of its own so nothing can push characters into the termina
 and death with the parent — a capsule that outlives its supervisor is a lease that ends with nothing
 left to act on, which turns *ending is not asking* back into asking.
 
+**A capsule now actually holds, and the gate says so by trying to break it.** `scripts/test-capsule-gate.sh`
+builds a real capsule from the argument vector this crate produces — through an example binary, so it
+tests the code rather than a command written out in a shell script and left to go stale — and then
+attempts, from inside it, everything ADR-0042 G1 says must fail. The workspace is readable and
+writable and a program runs; `/etc/shadow`, the Journal and the host root are absent; a symlink out
+of the workspace leads nowhere; fewer than ten processes are visible and a host process cannot be
+signalled; there is no interface but loopback; a nested user namespace is refused; and neither the
+key store path nor an agent socket came through. It runs twice, the second time asserting no Cybou
+process is involved, because a capsule that holds only while Mind is watching has cognition for a
+boundary.
+
+**Three of those checks were worthless when first written, and mutation testing is what found it.**
+A connectivity probe used `/dev/tcp`, which is a bash feature while the capsule runs `/bin/sh`, so it
+failed identically whether the network was denied or wide open — removing `--unshare-net` left the
+gate passing. A loopback check printed the same word on both branches and could not fail. And the
+environment checks passed on a shell that happened not to have the variables set, so removing
+`--clearenv` changed nothing; the gate now exports them itself, because a gate must create the
+condition it claims to test. All three are structural now and all three fail under mutation.
+
+The first run also found a real defect in the backend: `--seccomp` takes a file descriptor, and it
+was being emitted bare, so bubblewrap read the `--` before the program as the descriptor and nothing
+started at all. **No seccomp filter is applied by this build.** The flag is not emitted, and
+`requires_seccomp()` says the debt is owed, because a known gap is worth more than a silent one.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

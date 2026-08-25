@@ -34,6 +34,23 @@ pub trait CapsuleBackend {
 
     /// What this backend needs present to work.
     fn requires(&self) -> &'static str;
+
+    /// Whether a seccomp filter still has to be applied by whatever spawns this.
+    ///
+    /// True, and it is a separate question from [`Self::command`] for a reason worth stating: the
+    /// filter is passed to bubblewrap on a **file descriptor**, and a function that builds an
+    /// argument vector cannot know a descriptor number. The first version of this pushed a bare
+    /// `--seccomp` anyway; bubblewrap took the next token as the descriptor, which happened to be
+    /// the `--` separating the program, and every capsule failed to start. The gate caught it,
+    /// which is the only reason this note is about a fixed mistake rather than a shipped one.
+    ///
+    /// So the flag is not here, and this says so out loud instead. **No filter is applied by this
+    /// build.** A spawning layer that owns a descriptor must add it and must refuse to run without
+    /// one; until that layer exists, a capsule has its namespaces, its mounts and its cgroup, and
+    /// not this. Reporting that plainly is the difference between a known gap and a silent one.
+    fn requires_seccomp(&self) -> bool {
+        true
+    }
 }
 
 /// The first backend: bubblewrap.
@@ -112,12 +129,10 @@ impl CapsuleBackend for Bubblewrap {
         argv.push("--chdir".to_owned());
         argv.push(spec.working_directory.to_string_lossy().into_owned());
 
-        match spec.seccomp {
-            // The filter itself is compiled by the caller and passed on a file descriptor; what is
-            // recorded here is that one is required. A backend that silently ran without it would be
-            // the most reassuring possible way to have no seccomp.
-            Seccomp::NoReshaping => argv.push("--seccomp".to_owned()),
-        }
+        // No `--seccomp` here. It takes a file descriptor, and this function has none to give; see
+        // `requires_seccomp`. A flag emitted without its argument does not weaken the sandbox — it
+        // breaks it, because bubblewrap reads the next token as the descriptor.
+        let Seccomp::NoReshaping = spec.seccomp;
 
         // Everything after this is the program, whatever it looks like. Without it a program named
         // `--bind` is an argument to bwrap, which is the same lesson this repository already learned
@@ -334,10 +349,18 @@ mod tests {
     }
 
     #[test]
-    fn a_seccomp_filter_is_required_rather_than_optional() {
-        // A backend that silently ran without one would be the most reassuring possible way to have
-        // no seccomp at all.
-        assert!(asks_for(&argv(), "--seccomp"));
+    fn seccomp_is_declared_as_owed_rather_than_emitted_without_its_argument() {
+        // `--seccomp` takes a file descriptor. Pushing it bare does not weaken the sandbox, it
+        // breaks it: bubblewrap read the next token as the descriptor, which was the `--` before the
+        // program, and nothing started at all. The gate found that; this keeps it found.
+        assert!(
+            !argv().iter().any(|item| item == "--seccomp"),
+            "a flag that needs a descriptor was emitted without one"
+        );
+        assert!(
+            Bubblewrap.requires_seccomp(),
+            "the debt has to be visible to whatever spawns this"
+        );
     }
 
     #[test]
