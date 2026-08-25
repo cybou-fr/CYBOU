@@ -45,6 +45,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::grant::CapsuleGrant;
+use crate::profile::ProfileId;
 use crate::reach::Reach;
 use crate::verdict::{Verdict, decide};
 
@@ -80,36 +81,81 @@ impl Ended {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Lease {
+    /// Which explicit launch profile produced this lease.
+    pub(crate) profile_id: ProfileId,
     /// What was granted.
-    pub grant: CapsuleGrant,
+    pub(crate) grant: CapsuleGrant,
     /// When it was issued.
     #[serde(with = "time::serde::rfc3339")]
-    pub issued_at: OffsetDateTime,
+    pub(crate) issued_at: OffsetDateTime,
     /// What has been spent against the model grant, if there is one.
     ///
     /// The ledger belongs to the lease and the ceiling belongs to the grant: one is what happened,
     /// the other is what was permitted. Keeping them together would mean a record of spending that
     /// could be edited by re-granting.
-    pub model_spent: u64,
+    pub(crate) model_spent: u64,
     /// Whether somebody withdrew it, and when.
     ///
     /// Recorded rather than represented by deleting the lease: an agent stopped at 14:02 is a fact
     /// about what happened, and a record that could only say a lease does not exist could not say
     /// that it used to.
     #[serde(default, with = "time::serde::rfc3339::option")]
-    pub revoked_at: Option<OffsetDateTime>,
+    pub(crate) revoked_at: Option<OffsetDateTime>,
 }
 
 impl Lease {
-    /// Issue a lease for this grant.
-    #[must_use]
-    pub fn issued(grant: CapsuleGrant, at: OffsetDateTime) -> Self {
+    /// Mint a lease after the selected profile and resulting grant have been validated.
+    pub(crate) fn issued_from_profile(
+        profile_id: ProfileId,
+        grant: CapsuleGrant,
+        at: OffsetDateTime,
+    ) -> Self {
         Self {
+            profile_id,
             grant,
             issued_at: at,
             model_spent: 0,
             revoked_at: None,
         }
+    }
+
+    #[cfg(test)]
+    fn issued(grant: CapsuleGrant, at: OffsetDateTime) -> Self {
+        Self::issued_from_profile(
+            ProfileId::parse("test-profile").expect("static profile id"),
+            grant,
+            at,
+        )
+    }
+
+    /// The explicit launch profile that produced this lease.
+    #[must_use]
+    pub const fn profile_id(&self) -> &ProfileId {
+        &self.profile_id
+    }
+
+    /// The exact capability grant enforced for this lease.
+    #[must_use]
+    pub const fn grant(&self) -> &CapsuleGrant {
+        &self.grant
+    }
+
+    /// When this lease was minted.
+    #[must_use]
+    pub const fn issued_at(&self) -> OffsetDateTime {
+        self.issued_at
+    }
+
+    /// What has been charged against its model ceiling.
+    #[must_use]
+    pub const fn model_spent(&self) -> u64 {
+        self.model_spent
+    }
+
+    /// When this lease was first withdrawn, if it was.
+    #[must_use]
+    pub const fn revoked_at(&self) -> Option<OffsetDateTime> {
+        self.revoked_at
     }
 
     /// When this lease runs out.

@@ -199,10 +199,14 @@ agent-pack/session stages; B2 deliberately grants none of them.
 
 ### B3. Standing capability lease
 
-*Mostly done.* `Lease` carries the lifetime, the ledger and revocation, and a capsule ending is kept
-apart from a model grant being spent. What remains is issuing one from a profile a person chose on a
-screen, and an interface that then asks nothing while the agent stays inside it — one that asks
-anyway has not made a weaker promise, it has made the grant meaningless.
+**Done.** `CapabilityProfile` holds the reusable limits a launch surface shows, while `LeaseRequest`
+binds one explicit selection to a fresh capsule id, agent and workspace. The public mint validates
+exact hosts and tools, rejects ambiguous or un-runnable profiles, compiles the exact resulting grant
+before issuing it, and records the selected profile id on the `Lease`. It adds no ambient capability.
+
+The standing-lease gate drives that public boundary and proves one selection stays silent for reads,
+writes, execution, granted egress, mediated tools and model use inside the live lease. Rendering the
+launch screen belongs with the first agent pack; the authority it must invoke is complete here.
 
 ### B4. The Model Gateway
 

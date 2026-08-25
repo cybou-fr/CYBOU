@@ -193,12 +193,19 @@ that is where sandboxes actually fail, and a mutation check confirms the test se
 not followed: resolving them means touching a filesystem, and a decision whose answer depends on when
 it was asked is not a decision. A symlink out of the workspace is the kernel's to refuse.
 
+**A selected profile now has one public path to authority.** `CapabilityProfile` contains only the
+reusable limits shown at launch. `LeaseRequest` binds the explicit selection to a fresh capsule id,
+agent and workspace, and `issue_lease` validates exact host and tool names and compiles that same
+grant before minting anything. The resulting lease records the profile id and adds no implicit
+network, model, tool or execution capability. Its public-boundary gate proves that one selection is
+silent for every ordinary request inside the live lease and that an ambiguous or un-runnable
+selection fails before it becomes authority.
+
 **A grant has an end, and reaching it is not a request.** The lease carries the clock and the
-ledger: after its lifetime, after its spending ceiling, or after somebody withdraws it, nothing it
-used to permit is permitted. The agent is not told to stop — telling an untrusted party to stop is a
-request, and a boundary made of requests is not a boundary. This produces the first half, that
-nothing further is `Allowed`; freezing the capsule is the kernel's, and this module does not pretend
-otherwise.
+ledger: after its lifetime or after somebody withdraws it, nothing it used to permit is permitted.
+The agent is not told to stop — telling an untrusted party to stop is a request, and a boundary made
+of requests is not a boundary. This produces the first half, that nothing further is `Allowed`;
+freezing the capsule is the kernel's, and this module does not pretend otherwise.
 
 **Two kinds of ending, and they are not the same kind.** The lifetime running out or somebody
 withdrawing the lease finishes the capsule; running out of model budget refuses completions and
