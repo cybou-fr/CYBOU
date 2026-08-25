@@ -44,11 +44,17 @@ cargo run --quiet --locked -p cybou-agent-opencode --example render-config -- "$
 
 export CYBOU_CAPSULE_ENTRY="$CARGO_TARGET_DIR/debug/cybou-capsule-enter"
 export CYBOU_MODEL_BRIDGE="$CARGO_TARGET_DIR/debug/cybou-model-bridge"
+# The agent's own ACP entrypoint, driven by Cybou's ACP client. Deliberately not `opencode run`,
+# which would prove only that OpenCode could reach the gateway. What has to be true for B7 is that
+# Cybou drives the agent: initialize, session/new, prompt, and an answer that came back over the
+# protocol from a real provider.
 mapfile -t capsule_argv < <(cargo run --quiet --locked -p cybou-capsule --example capsule-argv -- \
   "$work/workspace" /usr/bin/env OPENCODE_CONFIG=/workspace/.cybou/opencode.json \
-  "$PACK/opencode" run --format json \
-  "Reply with exactly CYBOU_B7_LIVE and do not use a tool.")
+  "$PACK/opencode" acp --cwd /workspace)
 
-answer="$("${capsule_argv[@]}")"
-grep -q 'CYBOU_B7_LIVE' <<<"$answer"
-echo "=== B7 live provider gate passed through OpenCode inside its capsule ==="
+turn="$(CYBOU_ACP_TURN_SECONDS=180 cargo run --quiet --locked -p cybou-acp --example acp-turn -- \
+  "$work/workspace" "Reply with exactly CYBOU_B7_LIVE and do not use a tool." "${capsule_argv[@]}")"
+
+python3 -c 'import json,sys; turn=json.load(sys.stdin); assert turn["stopReason"] == "end_turn", turn["stopReason"]; assert turn["sessionId"], "no session was opened"; print(turn["message"])' <<<"$turn" >"$work/message"
+grep -q 'CYBOU_B7_LIVE' "$work/message"
+echo "=== B7 live provider gate passed: Cybou drove OpenCode over ACP inside its capsule ==="

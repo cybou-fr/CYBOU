@@ -97,6 +97,24 @@ in the worse direction if the coordinator is killed and the broker is not.
 that is easy to get wrong: that nothing is left. It exits `3` — `NOT RUN`, never passed — on a host
 with no gateway template, no configured provider, or no user service manager.
 
+## Asking the agent rather than running a program
+
+`--prompt TEXT` instead of `-- <program>` drives the session's agent over ACP: the pack's own
+entrypoint is started inside the capsule, and Cybou runs `initialize`, `session/new` and
+`session/prompt` against it. The credential-free agent configuration is written into
+`<workspace>/.cybou/`, where the agent looks for it; it names a token *file* and never a token, and
+there is no provider credential in this process to write even by mistake.
+
+The turn's deadline is what remains of the lease. A constant here would be a second clock beside the
+one a person granted.
+
+This is why a capsule's standard streams are connected to whoever started it rather than to the
+journal. For a program that is a convenience; for an agent it is the whole channel — stdio *is* the
+protocol, and a client talking to a closed pipe while the agent's half accumulates in a log is not a
+subtle failure, it is every failure at once.
+
+A program or a prompt, never both. They are two different claims about what the capsule is for.
+
 ## The one privileged step
 
 `cybou-agent-gateway@.service` is a *system* unit for exactly one reason: the LiteLLM master key stays
@@ -124,7 +142,10 @@ rather than to widen this rule.
 owner is killed, and there is no second process that can withdraw a running lease. Both belong with
 B11's quarantine and revoke rather than here.
 
-Driving an ACP agent. `launch` runs a program inside the capsule; the OpenCode pack's entrypoint is
-`opencode acp`, which speaks JSON-RPC over stdio and expects a client. The ACP client can initialize
-an agent and stops there, so `session/new` and `prompt` are the next step and the thing that makes a
-launched agent do work rather than merely exist.
+More than one turn. `--prompt` asks once and the session ends; a working agent is a conversation, and
+holding one open means keeping the ACP connection alive across prompts and streaming its updates
+somewhere a person can watch. That is B8, and the seam for it already exists — every `session/update`
+is kept whole rather than projected into a Cybou vocabulary.
+
+Agents other than OpenCode. `--prompt` refuses any agent this build has no pack for, rather than
+guessing at an entrypoint.

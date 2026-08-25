@@ -21,6 +21,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration as StdDuration;
 
+use agent_client_protocol::AcpAgentConfig;
+use cybou_acp::AcpSession;
 use cybou_agentd::plan::SessionPlan;
 use cybou_agentd::session::{Session, SessionEnd, SessionState};
 use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
@@ -37,7 +39,8 @@ const READY_TIMEOUT: StdDuration = StdDuration::from_secs(30);
 fn usage() -> &'static str {
     "usage:\n  \
      cybou-agentd plan   <selection>\n  \
-     cybou-agentd launch <selection> -- <program> [argument …]\n\n\
+     cybou-agentd launch <selection> -- <program> [argument …]\n  \
+     cybou-agentd launch <selection> --prompt TEXT\n\n\
      selection:\n  \
      --profile ID --agent NAME --workspace PATH\n  \
      --memory-mib N --cpus N --tasks-max N --lifetime-seconds N\n  \
@@ -66,6 +69,7 @@ struct Selection {
     capsule_id: Option<Uuid>,
     task_id: Option<Uuid>,
     program: Vec<String>,
+    prompt: Option<String>,
 }
 
 #[tokio::main]
@@ -111,6 +115,7 @@ fn parse(arguments: Vec<String>) -> Result<Selection, String> {
             "--spend-limit" => selection.spend_limit = Some(number(&flag, &value()?)?),
             "--capsule-id" => selection.capsule_id = Some(uuid(&flag, &value()?)?),
             "--task-id" => selection.task_id = Some(uuid(&flag, &value()?)?),
+            "--prompt" => selection.prompt = Some(value()?),
             other => return Err(format!("unknown argument {other}\n{}", usage())),
         }
     }
@@ -221,8 +226,19 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
 
 /// Carry out one launch and hold the session until it ends.
 async fn launch(selection: &Selection) -> Result<(), String> {
-    if selection.program.is_empty() {
-        return Err(format!("launch needs a program after --\n{}", usage()));
+    // A program or a prompt, never both. They are two different claims about what the capsule is
+    // for, and a launch that accepted both would have to decide which one a person meant.
+    match (selection.program.is_empty(), selection.prompt.is_some()) {
+        (true, false) => {
+            return Err(format!(
+                "launch needs a program after -- or a --prompt\n{}",
+                usage()
+            ));
+        }
+        (false, true) => {
+            return Err("a launch runs a program or asks an agent, not both".to_owned());
+        }
+        _ => {}
     }
     let (lease, plan, spec) = prepare(selection)?;
     let programs = HostPrograms::default();
@@ -279,11 +295,87 @@ async fn bring_up(
     run(&runtime::start_gateway(plan))?;
     wait_for(&[plan.model_socket.clone(), plan.model_token.clone()]).await?;
 
-    let capsule = runtime::run_capsule(plan, spec, programs, &selection.program)
-        .map_err(|error| error.to_string())?;
+    let program = match &selection.prompt {
+        Some(_) => agent_entrypoint(plan)?,
+        None => selection.program.clone(),
+    };
+    let capsule =
+        runtime::run_capsule(plan, spec, programs, &program).map_err(|error| error.to_string())?;
     session.running().map_err(|error| error.to_string())?;
     println!("session {} running", plan.instance);
-    status_of(&capsule)
+
+    match &selection.prompt {
+        Some(prompt) => ask(plan, &capsule, prompt).await,
+        None => status_of(&capsule),
+    }
+}
+
+/// The ACP entrypoint for this session's agent, and the configuration it needs to find its gateway.
+///
+/// Written into the workspace rather than passed as an argument, because that is where the agent
+/// looks and because the configuration names a token *file* and never a token. A provider credential
+/// cannot end up here: there is none in this process to write.
+fn agent_entrypoint(plan: &SessionPlan) -> Result<Vec<String>, String> {
+    let agent = &plan.lease.grant().agent;
+    if agent != cybou_agent_opencode::AGENT_ID {
+        return Err(format!(
+            "no agent pack for '{agent}'; only '{}' can be driven over ACP today",
+            cybou_agent_opencode::AGENT_ID
+        ));
+    }
+    let class = &plan
+        .lease
+        .grant()
+        .model
+        .as_ref()
+        .ok_or_else(|| "an agent driven over ACP needs the model its lease grants".to_owned())?
+        .class;
+
+    let directory = plan.lease.grant().workspace.root.join(".cybou");
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("create {}: {error}", directory.display()))?;
+    let rendered = cybou_agent_opencode::configuration(class)
+        .map_err(|error| format!("render the agent configuration: {error}"))?;
+    let path = directory.join("opencode.json");
+    fs::write(&path, rendered).map_err(|error| format!("write {}: {error}", path.display()))?;
+
+    Ok(cybou_agent_opencode::command())
+}
+
+/// Drive one prompt turn against the agent now running inside the capsule.
+///
+/// The deadline is what remains of the lease, not a constant. A turn cut short by a number in this
+/// file would be a second clock beside the one a person actually granted.
+async fn ask(plan: &SessionPlan, capsule: &[String], prompt: &str) -> Result<bool, String> {
+    let remaining = plan.expires_at - OffsetDateTime::now_utc();
+    let remaining = StdDuration::try_from(remaining)
+        .map_err(|_| "the lease has no time left to ask anything in".to_owned())?;
+
+    let (program, arguments) = capsule
+        .split_first()
+        .ok_or_else(|| "the capsule has no command".to_owned())?;
+    let mut process = AcpAgentConfig::new(program);
+    for argument in arguments {
+        process = process.arg(argument);
+    }
+
+    let turn = AcpSession::within(remaining)
+        .one_turn(process, plan.lease.grant().workspace.root.clone(), prompt)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    print!("{}", turn.message);
+    if !turn.message.ends_with('\n') {
+        println!();
+    }
+    // Surfaced rather than swallowed. An agent that keeps asking the client to widen its capsule is
+    // telling a person something about the profile they selected, and a refusal recorded nowhere
+    // would have thrown that away.
+    for wanted in &turn.refused_permissions {
+        eprintln!("session {} refused a request to {wanted}", plan.instance);
+    }
+    println!("session {} turn ended: {}", plan.instance, turn.stop_reason);
+    Ok(turn.ended_by_the_agent())
 }
 
 /// Write the lease and the launch file, in that order.

@@ -300,8 +300,11 @@ root-only `LoadCredential`, and a short-lived launch file; it has no boot instal
 started by deployment. The credential-free lifecycle gate drives a real gateway token through a
 fake LiteLLM peer and proves the proxy master key is absent from runtime artifacts.
 
-`scripts/test-opencode-pack-live.sh` remains the non-optional completion criterion: it sends a prompt
-through OpenCode inside the capsule and requires a real provider's answer. The active VPS had no
+`scripts/test-opencode-pack-live.sh` remains the non-optional completion criterion, and it now proves
+the stronger of the two claims available. It drives the pack's own `opencode acp` entrypoint with
+Cybou's ACP client rather than running `opencode run`: a green run means Cybou opened a session and
+prompted the agent, not merely that OpenCode could reach the gateway on its own. It requires a real
+provider's answer to come back over the protocol. The active VPS had no
 operator-selected LiteLLM deployment or credential at the last inspection, so that gate remains
 visibly `NOT RUN` and B7 is not marked Done. The exact fail-closed operator contract is documented in
 [Per-capsule model gateway deployment](agent-gateway-deployment.md); provisioning a provider is an

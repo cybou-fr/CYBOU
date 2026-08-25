@@ -85,4 +85,33 @@ grep -q '"cancelled"' "$work/agent.log" || {
 }
 ! grep -q '"selected"' "$work/agent.log"
 
+# The same turn again, this time with the agent under a transient unit rather than a bare process.
+#
+# This is the check that the capsule's stdio actually carries a protocol. `under_budget` used to hand
+# the streams to the journal, which is harmless for a program and fatal for an agent: stdio *is* the
+# conversation, so the client would have been talking to a closed pipe while the agent's half piled
+# up in a log. The flags below are the ones `under_budget` produces — that they are the ones it
+# produces is asserted by its own unit test; that they carry a whole ACP turn is asserted here.
+if command -v systemd-run >/dev/null && systemctl --user is-system-running >/dev/null 2>&1; then
+    unit="cybou-acp-gate-$$"
+    # --setenv, because a transient unit starts in its own environment. Worth knowing rather
+    # than working around: nothing a capsule needs is passed this way — its token is a file
+    # and its bounds are the cgroup's — but a fixture that reports back does.
+    cargo run --quiet --locked --example acp-turn -p cybou-acp -- \
+        "$work/workspace" "say something" \
+        systemd-run --user --collect --wait --pipe --quiet "--unit=$unit" \
+        "--setenv=CYBOU_FAKE_AGENT_LOG=$work/supervised.log" -- \
+        python3 "$PWD/fixtures/acp-agent-that-asks.py" >"$work/supervised.json"
+
+    supervised="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["message"])' \
+        "$work/supervised.json")"
+    test "$supervised" = "the fake agent answered" || {
+        echo "a supervised agent's turn came back as '$supervised'" >&2
+        exit 1
+    }
+    grep -q '"cancelled"' "$work/supervised.log"
+else
+    echo "==> supervised half not run: no user service manager here" >&2
+fi
+
 echo "=== ACP session gate passed: one turn, and the agent was refused ==="

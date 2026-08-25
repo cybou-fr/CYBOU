@@ -52,6 +52,18 @@ pub fn under_budget(spec: &KernelCapsuleSpec, command: &[String]) -> Vec<String>
         // Wait for it, and give back what it exited with. A supervisor that returned as soon as the
         // unit was accepted would report success for a capsule that failed a second later.
         "--wait".to_owned(),
+        // Connect the capsule's standard streams to whoever started it.
+        //
+        // Without this systemd attaches them to the journal, and a capsule's output becomes
+        // something to go and read afterwards rather than something its owner has. For a capsule
+        // running a program that is merely fine; for one running an ACP agent it is fatal, because
+        // stdio *is* the protocol — the client would be talking to a closed pipe while the agent's
+        // half of the conversation accumulated in the log.
+        "--pipe".to_owned(),
+        // And nothing of the supervisor's own on those streams. "Running as unit: …" is a fact about
+        // systemd, not output from the capsule, and a caller reading a protocol cannot be asked to
+        // tell the two apart.
+        "--quiet".to_owned(),
     ];
 
     for property in properties(spec) {
@@ -190,6 +202,18 @@ mod tests {
             name.chars()
                 .all(|character| character.is_ascii_alphanumeric() || character == '-'),
             "{name} would need escaping"
+        );
+    }
+
+    #[test]
+    fn the_capsules_streams_belong_to_whoever_started_it() {
+        // Not to the journal. An agent speaking a protocol over stdio would otherwise be holding its
+        // half of the conversation with a log file, and its client with a closed pipe.
+        let argv = argv();
+        assert!(argv.iter().any(|item| item == "--pipe"));
+        assert!(
+            argv.iter().any(|item| item == "--quiet"),
+            "the supervisor's own chatter would be indistinguishable from the capsule's output"
         );
     }
 

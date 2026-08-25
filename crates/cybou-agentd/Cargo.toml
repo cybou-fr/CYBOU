@@ -11,7 +11,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+agent-client-protocol.workspace = true
 ciborium.workspace = true
+cybou-acp = { path = "../cybou-acp" }
 cybou-agent-opencode = { path = "../cybou-agent-opencode" }
 cybou-capsule = { path = "../cybou-capsule" }
 time.workspace = true

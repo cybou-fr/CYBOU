@@ -786,7 +786,9 @@ dependencies = [
 name = "cybou-agentd"
 version = "0.1.0"
 dependencies = [
+ "agent-client-protocol",
  "ciborium",
+ "cybou-acp",
  "cybou-agent-opencode",
  "cybou-capsule",
  "time",
