@@ -100,6 +100,22 @@ case "$acp_status" in
     *) exit "$acp_status" ;;
 esac
 
+# A real daemon, a real bus name, a real service manager. Exit 3 means this host has no user session
+# to run one against, which is a check that did not run rather than one that passed.
+announce "agent runtime ownership"
+failed="agent runtime ownership"
+runtime_status=0
+bash scripts/test-agent-runtime-gate.sh || runtime_status=$?
+case "$runtime_status" in
+    0) failed="" ;;
+    3)
+        announce "agent runtime ownership not run: no user session to hold a bus name in"
+        skipped="$skipped agent-runtime-ownership"
+        failed=""
+        ;;
+    *) exit "$runtime_status" ;;
+esac
+
 # One launch, carried out on a real host, leaving nothing behind. Exit 3 means this host has no
 # deployed gateway template, provider or user service manager to launch against — a check that did
 # not run rather than one that passed.

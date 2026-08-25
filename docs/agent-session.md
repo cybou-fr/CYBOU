@@ -245,6 +245,20 @@ It ends nothing on the way out. A capsule outlives this process on purpose, and 
 session because the owner was restarted would make the coordinator into the boundary that ADR-0042
 says it must not be.
 
+`scripts/test-agent-runtime-gate.sh` runs one. It writes a session's two files the way a launch
+would, starts a unit named the way a capsule's is, and then asks the owner over D-Bus what is
+running — so the bus name, the launch directory, the service-manager question, the published ledger
+and the teardown are exercised rather than reasoned about. Everything above had been checked without
+a host until then, and code that is only ever right on paper accumulates until the first real host is
+a bad place to discover which part of it was wrong.
+
+`cybou-agentd sessions` and `cybou-agentd stop` are clients of that surface, not second readers of
+the host. Two things walking the launch directory would be two answers to *what is running*, and the
+one that is not the owner would be wrong the moment a session started between its listing and its
+reading. Stopping goes through the owner for a stronger reason: the owner is what records *why* a
+session ended, and units stopped behind its back would leave an agent that was stopped looking
+exactly like one that finished.
+
 ### Read and stop, deliberately not launch
 
 The surface offers `Sessions`, `Session` and `Stop`. It does not offer `Launch`, and that is a

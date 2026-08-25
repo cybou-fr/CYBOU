@@ -45,7 +45,9 @@ fn usage() -> &'static str {
      cybou-agentd launch <selection> -- <program> [argument …]\n  \
      cybou-agentd launch <selection> --prompt TEXT\n  \
      cybou-agentd start  --profile ID --agent NAME --workspace PATH [--model CLASS]\n  \
-     cybou-agentd serve\n\n\
+     cybou-agentd serve\n  \
+     cybou-agentd sessions\n  \
+     cybou-agentd stop <capsule-uuid>\n\n\
      selection:\n  \
      --profile ID --agent NAME --workspace PATH\n  \
      --memory-mib N --cpus N --tasks-max N --lifetime-seconds N\n  \
@@ -86,6 +88,8 @@ async fn main() -> Result<(), String> {
         Some("launch") => launch(&parse(arguments.collect())?).await,
         Some("start") => start(&parse(arguments.collect())?).await,
         Some("serve") => serve().await,
+        Some("sessions") => sessions().await,
+        Some("stop") => stop(&parse(arguments.collect())?).await,
         _ => Err(usage().to_owned()),
     }
 }
@@ -779,4 +783,85 @@ async fn start(selection: &Selection) -> Result<(), String> {
         prompt: selection.prompt.clone(),
     };
     launch(&approved).await
+}
+
+/// Ask the running owner what it is holding.
+///
+/// A client of `Agent1`, not a second reader of the host. Two things walking the launch directory
+/// would be two answers to *what is running*, and the one that is not the owner would be wrong the
+/// moment a session started or ended between its listing and its reading.
+#[cfg(target_os = "linux")]
+async fn sessions() -> Result<(), String> {
+    use cybou_fabric::AGENT;
+
+    let encoded: Vec<u8> = zbus::Connection::session()
+        .await
+        .map_err(|error| error.to_string())?
+        .call_method(
+            Some(AGENT.service),
+            AGENT.object_path,
+            Some(AGENT.interface),
+            "Sessions",
+            &(),
+        )
+        .await
+        .map_err(|error| format!("{} is not answering: {error}", AGENT.service))?
+        .body()
+        .deserialize()
+        .map_err(|error| error.to_string())?;
+
+    let views: Vec<SessionView> =
+        cybou_fabric::decode(&encoded).map_err(|error| error.to_string())?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&views).map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn sessions() -> Result<(), String> {
+    Err("cybou-agentd serves capsules on Linux".to_owned())
+}
+
+/// Ask the running owner to end one session.
+///
+/// Through the owner rather than by stopping units directly, because the owner is what records
+/// *why* it ended. A session whose units were stopped behind its back would be reported as an agent
+/// that finished, and nobody would be able to tell that from one that did.
+#[cfg(target_os = "linux")]
+async fn stop(selection: &Selection) -> Result<(), String> {
+    use cybou_fabric::AGENT;
+
+    let capsule_id = required(selection.capsule_id, "--capsule-id")?;
+    let stopped: bool = zbus::Connection::session()
+        .await
+        .map_err(|error| error.to_string())?
+        .call_method(
+            Some(AGENT.service),
+            AGENT.object_path,
+            Some(AGENT.interface),
+            "Stop",
+            &(capsule_id.to_string(),),
+        )
+        .await
+        .map_err(|error| format!("{} is not answering: {error}", AGENT.service))?
+        .body()
+        .deserialize()
+        .map_err(|error| error.to_string())?;
+
+    if stopped {
+        println!("session {capsule_id} stopped");
+    } else {
+        // Not an error. In both cases the session is over by the time this is answered, and telling
+        // a person their request failed because somebody else stopped it first would be reporting a
+        // difference that does not matter to them.
+        println!("session {capsule_id} was not running");
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn stop(_selection: &Selection) -> Result<(), String> {
+    Err("cybou-agentd serves capsules on Linux".to_owned())
 }
