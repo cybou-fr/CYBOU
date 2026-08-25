@@ -36,6 +36,7 @@
 
 pub mod discovery;
 pub mod plan;
+pub mod profiles;
 pub mod registry;
 pub mod runtime;
 
@@ -46,6 +47,7 @@ pub mod view;
 
 pub use discovery::{CannotRead, LaunchFiles, read_launch, read_lease, read_session};
 pub use plan::{CannotPlan, Ceilings, Launch, SessionPlan, TeardownStep};
+pub use profiles::{CannotOffer, OfferedProfile, ProfileCatalogue, Wanted};
 pub use registry::{Found, LiveSession, Recovered, SessionRegistry, recover};
 pub use runtime::HostPrograms;
 pub use session::{Session, SessionEnd, SessionState};

@@ -25,6 +25,7 @@ use std::time::Duration as StdDuration;
 use agent_client_protocol::AcpAgentConfig;
 use cybou_acp::AcpSession;
 use cybou_agentd::plan::SessionPlan;
+use cybou_agentd::profiles::{ProfileCatalogue, Wanted};
 use cybou_agentd::session::{Session, SessionEnd, SessionState};
 use cybou_agentd::view::{Ledger, SessionView};
 use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
@@ -43,6 +44,7 @@ fn usage() -> &'static str {
      cybou-agentd plan   <selection>\n  \
      cybou-agentd launch <selection> -- <program> [argument …]\n  \
      cybou-agentd launch <selection> --prompt TEXT\n  \
+     cybou-agentd start  --profile ID --agent NAME --workspace PATH [--model CLASS]\n  \
      cybou-agentd serve\n\n\
      selection:\n  \
      --profile ID --agent NAME --workspace PATH\n  \
@@ -82,6 +84,7 @@ async fn main() -> Result<(), String> {
     match verb.as_deref() {
         Some("plan") => show_plan(&parse(arguments.collect())?),
         Some("launch") => launch(&parse(arguments.collect())?).await,
+        Some("start") => start(&parse(arguments.collect())?).await,
         Some("serve") => serve().await,
         _ => Err(usage().to_owned()),
     }
@@ -719,4 +722,61 @@ impl cybou_agentd::service::Teardown for HostTeardown {
     fn tear_down(&self, plan: &SessionPlan) {
         teardown(plan);
     }
+}
+
+/// Where an operator writes down the profiles this host offers.
+const CATALOGUE: &str = "/etc/cybou/agent-profiles.json";
+
+/// Launch under bounds an operator approved, rather than bounds the caller named.
+///
+/// The same session as `launch` and a different door to it. `launch` takes ceilings as arguments,
+/// which is right for bring-up on a host somebody is sitting at — whoever can run it is already
+/// `cybou`. This one is the shape a bus method or a web endpoint can have: the caller names a
+/// profile, an agent, a workspace and one of the models that profile offers, and every bound comes
+/// from the file only root can write.
+///
+/// The flags this deliberately does not accept are the point. No memory, no CPUs, no tasks, no
+/// lifetime, no hosts, no spending policy, no token ceilings, no sensitivity. A door that took those
+/// would be asking its caller to invent a `CapsuleGrant`.
+async fn start(selection: &Selection) -> Result<(), String> {
+    let catalogue = fs::read(CATALOGUE)
+        .map_err(|error| format!("read {CATALOGUE}: {error}"))
+        .and_then(|bytes| ProfileCatalogue::read(&bytes).map_err(|why| why.to_string()))?;
+
+    let wanted = Wanted {
+        profile: required(selection.profile.clone(), "--profile")?,
+        agent: required(selection.agent.clone(), "--agent")?,
+        workspace: required(selection.workspace.clone(), "--workspace")?,
+        model_class: selection.model.clone(),
+    };
+    let (granted, workspace, ceilings) = catalogue
+        .grant(&wanted)
+        .map_err(|why| format!("{why}\napproved profiles: {}", catalogue.names().join(", ")))?;
+
+    // Rebuilt as a selection so both doors converge on one launch path. A second bring-up written
+    // beside the first is a second set of decisions about what a launch does.
+    let approved = Selection {
+        profile: Some(granted.id.as_str().to_owned()),
+        agent: Some(wanted.agent),
+        workspace: Some(workspace.root),
+        memory_mib: Some(granted.budget.memory_mib),
+        cpus: Some(granted.budget.cpus),
+        tasks_max: Some(granted.budget.tasks_max),
+        lifetime_seconds: Some(granted.budget.lifetime.whole_seconds()),
+        token_limit: ceilings.map(|ceilings| ceilings.token_limit),
+        max_output_tokens: ceilings.map(|ceilings| ceilings.max_output_tokens),
+        sensitivity: ceilings.map(|ceilings| ceilings.sensitivity),
+        model: granted.model.as_ref().map(|model| model.class.clone()),
+        spend_limit: granted.model.as_ref().map(|model| match model.spend {
+            cybou_capsule::SpendPolicy::ZeroCostOnly => "zero-cost".to_owned(),
+            cybou_capsule::SpendPolicy::Capped(limit) => limit.to_string(),
+        }),
+        hosts: granted.network.hosts.clone(),
+        may_execute: granted.may_execute,
+        capsule_id: selection.capsule_id,
+        task_id: selection.task_id,
+        program: selection.program.clone(),
+        prompt: selection.prompt.clone(),
+    };
+    launch(&approved).await
 }

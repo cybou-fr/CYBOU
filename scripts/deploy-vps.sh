@@ -167,6 +167,16 @@ cybou_ssh "
   # session files is not a privilege boundary — the boundary is the provider credential, which stays
   # root-only and never appears here.
   sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
+  # What an operator has approved for agents to run under. An empty catalogue offers nothing, which
+  # is the fail-closed state by construction rather than by a flag: a caller can only name a profile
+  # that is in here, and until somebody writes one there is nothing to name. Root-owned and readable
+  # by cybou, because the session owner must read it and must never be able to add to it.
+  if [ ! -e /etc/cybou/agent-profiles.json ]; then
+    printf '%s\n' '[]' | sudo tee /etc/cybou/agent-profiles.json >/dev/null
+  fi
+  sudo chown root:cybou /etc/cybou/agent-profiles.json
+  sudo chmod 0640 /etc/cybou/agent-profiles.json
+
   # The one privileged step of a launch. Start and stop, that unit template, that user, nothing else.
   sudo install -d -m 0755 /etc/polkit-1/rules.d
   sudo install -m 0644 debian/cybou-agent-gateway.rules /etc/polkit-1/rules.d/50-cybou.rules

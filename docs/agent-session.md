@@ -295,7 +295,34 @@ What cannot be read back is reported rather than skipped. A launch file this bui
 is either a defect or a session from another version, and both are things an operator should be told
 about instead of having them quietly stop existing in a list of what is running.
 
-The launch flags are a bring-up interface and should not become the web one. A browser should send a
-profile, an agent, a workspace and a model class; the owner reads the ceilings, the lifetime and the
-network allowance out of the operator-approved profile. An endpoint that accepted memory, CPUs, hosts
-and lifetime from the caller would be asking the browser to invent its own `CapsuleGrant`.
+### Two doors, and only one of them is safe to expose
+
+`launch` takes ceilings as arguments. That is right for bring-up on a host somebody is sitting at:
+whoever can run it is already `cybou`. It is wrong for anything reachable, because a bus method or a
+web endpoint carrying the same shape would be asking its caller to invent a `CapsuleGrant`.
+
+`start` is the other door. A caller names a profile, an agent, a workspace and one of the models that
+profile offers; every bound comes from `/etc/cybou/agent-profiles.json`, which only root can write.
+Deployment creates it empty, so a host offers nothing until an operator writes something — fail-closed
+by construction rather than by a flag.
+
+Three things a caller could otherwise have widened, and the last two are easy to miss:
+
+**The workspace** is the one directory an agent may change, and a caller supplying it freely could
+supply `/etc`. A profile carries the roots a workspace may live under, and the check is lexical, so
+`/projects/../etc` is inside `/projects` by spelling and outside it by meaning — which is the one that
+decides. A profile naming no roots permits no workspace, because reading an absent field as *anywhere*
+would make the most permissive configuration the one an operator gets by leaving something out.
+
+**The agent.** Ceilings are approved for a pack, not in the abstract, so a profile runs only the
+agents it names.
+
+**The model.** A caller picks a class from what the profile offers and supplies no bound that goes
+with one: the spending policy, the token ceilings and the sensitivity are attached to the class the
+operator approved. Choosing *Free* cannot arrive with a ceiling of a hundred beside it, and no caller
+decides how exposing a prompt its agent may send — sensitivity is what governs which routes may see it
+at all.
+
+None of this is authorization. It decides what a named profile permits and would answer the same for
+anyone; whether a particular caller may use a particular profile is a different question, and one this
+layer would answer badly by guessing.

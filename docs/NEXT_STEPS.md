@@ -414,8 +414,12 @@ The model gateway publishes a typed `ModelUsageSnapshot` beside its socket and t
 a listing reports a real figure together with the instant it was observed rather than a spend of
 *unknown* — and never a nought nobody measured.
 
-What remains: a record of finished sessions a person can still read; and the profile registry that
-`Launch` needs. See [The agent session owner](agent-session.md).
+The profile registry `Launch` needs now exists, and `cybou-agentd start` is the door that uses it: a
+caller names a profile, an agent, a workspace and one of the models that profile offers, and every
+bound comes from a file only root can write. Deployment creates it empty, so a host offers nothing
+until an operator writes something.
+
+What remains: `Launch` itself on the bus, and a record of finished sessions a person can still read. See [The agent session owner](agent-session.md).
 
 ### B8. Agent Card and streaming session
 
