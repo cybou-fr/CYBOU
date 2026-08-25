@@ -218,9 +218,135 @@ check_the_budget "memory.max=67108864" "the memory ceiling reaches the kernel"
 [ "$skipped_budget" = 0 ] && check_the_budget "pids.max=17" "the process ceiling reaches the kernel"
 [ "$skipped_budget" = 0 ] && check_the_budget "cpu.max=50000 100000" "the CPU quota reaches the kernel"
 
+# ---------------------------------------------------------------- the ending
+#
+# A lease that has ended is a decision. This checks it is also a stop.
+#
+# Behaviourally, and against a capsule that is really running: a ticker appending a line a second,
+# frozen with the steps `cybou-capsule` itself produces, watched for a window long enough that a
+# running ticker could not be mistaken for a frozen one. An earlier version of this measurement
+# demanded the count not move at all and reported that freezing did nothing — freezing is
+# asynchronous, and the one line already in flight when it lands is not the capsule carrying on.
+#
+# The second half is the one that would be catastrophic to assume: `SIGKILL` must reach a *frozen*
+# cgroup. If it did not, freeze-then-kill would leave a capsule alive for as long as the host was up
+# while every record said it had been ended.
+check_the_ending() {
+    if ! command -v systemd-run > /dev/null 2>&1 || ! systemctl --user is-system-running > /dev/null 2>&1; then
+        echo "    note: no user systemd manager here, so the ending was NOT checked" >&2
+        skipped_ending=1
+        return
+    fi
+
+    local unit
+    unit="$(cargo run --quiet -p cybou-capsule --example capsule-end -- unit)"
+    mapfile -t freeze_argv < <(cargo run --quiet -p cybou-capsule --example capsule-end -- freeze)
+    mapfile -t kill_argv < <(cargo run --quiet -p cybou-capsule --example capsule-end -- kill)
+
+    # The capsule ignores every signal it is allowed to ignore, because an agent that wanted to
+    # outlive its lease would. Without this the gate could not tell SIGKILL from SIGTERM: a plain
+    # /bin/sh dies to either, so a capsule that was merely *asked* to stop looked exactly like one
+    # that was stopped, and "ending is not asking" was checked only by a string in a unit test.
+    local probe="$WORKSPACE/ticks"
+    : > "$probe"
+    systemctl --user reset-failed "$unit" > /dev/null 2>&1 || true
+    systemd-run --user --collect --unit="${unit%.service}" \
+        /bin/sh -c "trap '' TERM INT HUP QUIT; while true; do echo tick >> '$probe'; sleep 1; done" > /dev/null 2>&1
+
+    sleep 3
+    local running frozen thawed_never
+    running="$(wc -l < "$probe")"
+    if [ "$running" -lt 2 ]; then
+        printf '    FAILED  %s\n        the capsule never ran, so nothing below tested anything\n' \
+            "the ending stops a running capsule"
+        failures=$((failures + 1))
+        systemctl --user kill --signal=SIGKILL "$unit" > /dev/null 2>&1 || true
+        systemctl --user reset-failed "$unit" > /dev/null 2>&1 || true
+        return
+    fi
+
+    "${freeze_argv[@]}" > /dev/null 2>&1 || true
+    sleep 8
+    frozen="$(wc -l < "$probe")"
+
+    # The kernel's own account, not systemd's. Same reason as the budget above.
+    local cgroup kernel
+    cgroup="$(systemctl --user show "$unit" -p ControlGroup | cut -d= -f2-)"
+    kernel="$(cat "/sys/fs/cgroup$cgroup/cgroup.freeze" 2>&1)"
+
+    if [ "$kernel" = 1 ]; then
+        printf '    ok      %s\n' "freezing reaches the kernel"
+    else
+        printf '    FAILED  %s\n        wanted %q\n        got    %q\n' \
+            "freezing reaches the kernel" "1" "$kernel"
+        failures=$((failures + 1))
+    fi
+
+    # One line may already have been in flight. Eight seconds of a live ticker would be eight.
+    if [ "$((frozen - running))" -le 1 ]; then
+        printf '    ok      %s\n' "a frozen capsule stops working"
+    else
+        printf '    FAILED  %s\n        %s lines appeared during 8 frozen seconds\n' \
+            "a frozen capsule stops working" "$((frozen - running))"
+        failures=$((failures + 1))
+    fi
+
+    # The half that would be catastrophic to assume.
+    #
+    # Read the cgroup's process list *before* the kill as well as after. The first version only read
+    # it after, where a missing file counted as zero survivors — and systemd removes the directory
+    # along with the unit, so the check passed because the path had gone rather than because the
+    # processes had. It would have passed just as cheerfully against a typo.
+    local procs="/sys/fs/cgroup$cgroup/cgroup.procs"
+    local before
+    before="$(wc -l < "$procs" 2>/dev/null || echo 0)"
+    "${kill_argv[@]}" > /dev/null 2>&1 || true
+    sleep 4
+
+    if [ "$before" -lt 1 ]; then
+        printf '    FAILED  %s\n        %s\n' "SIGKILL reaches a frozen cgroup" \
+            "the cgroup held no processes before the kill, so this tested nothing"
+        failures=$((failures + 1))
+    elif [ ! -e "$procs" ]; then
+        # Stronger than an empty list: systemd removes the directory once the unit is over, and the
+        # path was proved live a moment ago by the reading above.
+        printf '    ok      %s\n' "SIGKILL reaches a frozen cgroup"
+    elif [ "$(wc -l < "$procs")" = 0 ]; then
+        printf '    ok      %s\n' "SIGKILL reaches a frozen cgroup"
+    else
+        printf '    FAILED  %s\n        %s process(es) survived in the cgroup\n' \
+            "SIGKILL reaches a frozen cgroup" "$(wc -l < "$procs")"
+        failures=$((failures + 1))
+    fi
+
+    # And it is over, not merely quiet: a capsule left frozen holds its memory ceiling for as long as
+    # the host is up.
+    thawed_never="$(systemctl --user show "$unit" -p ActiveState | cut -d= -f2-)"
+    if [ "$thawed_never" != active ]; then
+        printf '    ok      %s\n' "the capsule is gone and not merely stopped"
+    else
+        printf '    FAILED  %s\n        the unit is still %q\n' \
+            "the capsule is gone and not merely stopped" "$thawed_never"
+        failures=$((failures + 1))
+    fi
+
+    systemctl --user thaw "$unit" > /dev/null 2>&1 || true
+    systemctl --user kill --signal=SIGKILL "$unit" > /dev/null 2>&1 || true
+    systemctl --user reset-failed "$unit" > /dev/null 2>&1 || true
+}
+
+echo
+echo "=== A lease that ended is a capsule that stopped ==="
+skipped_ending=0
+check_the_ending
+
 echo
 if [ "$failures" -gt 0 ]; then
     echo "=== CAPSULE GATE FAILED: $failures check(s) ==="
     exit 1
 fi
-echo "=== capsule gate passed ==="
+if [ "$skipped_budget" = 1 ] || [ "$skipped_ending" = 1 ]; then
+    echo "=== every capsule check that ran passed; some were NOT RUN (see the notes above) ==="
+else
+    echo "=== capsule gate passed ==="
+fi

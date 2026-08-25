@@ -311,6 +311,43 @@ A capsule with no CPU quota is now refused at compile time alongside no memory, 
 time. Zero is not a small share; the cgroup holds the capsule at a standstill, which looks exactly
 like one that hung.
 
+**A lease that ends is now a capsule that stops.** Until this week the end of a lease was a
+decision and nothing more: after it no request was `Allowed`, and the agent carried on running,
+holding its memory, writing to its workspace and talking to whatever it had already opened. A
+permission withdrawn from a process that never notices is not a withdrawal.
+
+`cybou-capsule::end` produces two commands, in order. Freeze, then kill — and the order is the whole
+point rather than tidiness. Killing a live process tree is a race the tree can win: a capsule under a
+ceiling of a few hundred tasks can fork faster than the signals arrive, and every new process is one
+the kill pass has already gone past. Freezing ends that race before it starts.
+
+That sequence is only sound because `SIGKILL` reaches a *frozen* cgroup, which is not obvious, and
+would be catastrophic to assume: if it did not, a capsule would stay alive for as long as the host
+was up while every record said it had been ended. It was measured on a frozen unit rather than
+believed, and the gate repeats the measurement on every run.
+
+`SIGTERM` appears nowhere. A termination signal is a request honoured at the recipient's discretion,
+and the recipient here is the party this crate exists to bound. The kill addresses the whole cgroup,
+not the first process, because a capsule's first process is not the capsule — everything it forked
+would carry on, reparented and no longer named by anything that could find it again.
+
+The first version of the gate for this could not tell the difference. Its capsule was a plain
+`/bin/sh`, which dies to `SIGTERM` as readily as to `SIGKILL`, so a build that merely *asked* the
+capsule to stop passed every check; *ending is not asking* was being verified by a string in a unit
+test. The gate's capsule now ignores every signal it is allowed to ignore, the way an agent that
+wanted to outlive its lease would, and the `SIGTERM` build fails with two processes still running.
+Two more checks were vacuous before they were mutation-tested: one read `cgroup.procs` only after the
+kill, where a missing file counted as zero survivors — and systemd removes the directory along with
+the unit, so it passed because the path had gone rather than because the processes had.
+
+There is no `thaw`. Nothing in this design resumes a capsule, because nothing in it un-ends a lease.
+
+`Ended::Expired` and `Ended::Revoked` produce the same two commands. They differ in what is recorded,
+which matters — an operator told their agent ran out of time when somebody in fact stopped it has
+been told the wrong thing — but not in what is done. A gentler ending for the gentler reason would be
+a lease that expires more politely than it is revoked, which is a lease an agent could prefer to
+reach.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

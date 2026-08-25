@@ -130,17 +130,30 @@ Rootless first, behind a `CapsuleBackend` trait with a bubblewrap implementation
 helper until a gate proves one is needed. In order:
 
 ```text
-1. user + mount + PID + IPC + UTS namespaces
-2. an empty filesystem, built up by explicit bind mounts — never a host / with things removed
-3. Landlock as a second barrier: the mount says a path is absent, Landlock says there are no rights
-4. PR_SET_NO_NEW_PRIVS before exec
-5. seccomp for the syscalls that change the sandbox's own shape, not a brittle allow-list
-6. no nested user namespaces
-7. cgroup as the physical budget, including TasksMax; lifetime as the unit's lifetime
-8. lease expiry freezes or kills the cgroup — never an ACP stop message
-9. network deny-all: a fresh namespace with loopback and no route
-10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
+done  1. user + mount + PID + IPC + UTS namespaces
+done  2. an empty filesystem, built up by explicit bind mounts — never a host / with things removed
+      3. Landlock as a second barrier: the mount says a path is absent, Landlock says no rights
+done  4. PR_SET_NO_NEW_PRIVS before exec
+      5. seccomp for the syscalls that change the sandbox's own shape, not a brittle allow-list
+done  6. no nested user namespaces
+done  7. cgroup as the physical budget, including TasksMax; lifetime as the unit's lifetime
+done  8. lease expiry freezes or kills the cgroup — never an ACP stop message
+done  9. network deny-all: a fresh namespace with loopback and no route
+     10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
 ```
+
+Two remain, and neither is a detail. **Step 5 is an open debt**: `Bubblewrap::requires_seccomp`
+declares the filter this build does not install — an earlier version passed `--seccomp` with no file
+descriptor, which made bubblewrap read the `--` before the program as its argument and started
+nothing at all. Removing the flag was the honest repair; a build that names a filter it does not load
+would be worse than one that admits it. **Step 3** is defence in depth against the mount namespace
+being wrong, and is next.
+
+Step 8 is done as two commands and not one: freeze, then kill. Not tidiness — a capsule under a task
+ceiling can fork faster than signals arrive, and freezing ends that race before it starts. It is only
+sound because `SIGKILL` reaches a frozen cgroup, which the gate rechecks on every run rather than
+trusting, and the gate's own capsule ignores every signal it is allowed to ignore, so a build that
+merely *asked* it to stop fails.
 
 **The gate is adversarial and runs twice**, the second time with Mind stopped. Details in
 [ADR-0042](adr/ADR-0042-agent-capsule-platform.md); the short version is that a capsule holding only

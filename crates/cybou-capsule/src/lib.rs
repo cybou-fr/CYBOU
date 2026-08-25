@@ -49,6 +49,7 @@
 
 pub mod backend;
 pub mod compile;
+pub mod end;
 pub mod grant;
 pub mod lease;
 pub mod reach;
@@ -58,6 +59,7 @@ pub mod verdict;
 
 pub use backend::{Bubblewrap, CapsuleBackend};
 pub use compile::{CannotCompile, compile};
+pub use end::end;
 pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
 pub use lease::{Ended, Lease, decide_under_lease};
 pub use reach::Reach;
