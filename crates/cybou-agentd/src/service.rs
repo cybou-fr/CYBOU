@@ -207,7 +207,11 @@ mod tests {
 
         let mut session = Session::launching(CAPSULE, at(0));
         session.running().expect("it came up");
-        LiveSession { plan, session }
+        LiveSession {
+            plan,
+            session,
+            ledger: crate::view::Ledger::Elsewhere,
+        }
     }
 
     fn serving() -> (

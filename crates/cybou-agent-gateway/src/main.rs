@@ -20,7 +20,7 @@ use std::{
 use cybou_capsule::Lease;
 use cybou_model_brokerd::BrokerCore;
 use cybou_model_gateway::{GatewayCore, TokenPolicy, router};
-use cybou_protocol::model::{ModelIdentity, ModelManifest, ModelRoute};
+use cybou_protocol::model::{ModelIdentity, ModelManifest, ModelRoute, ModelUsageSnapshot};
 use cybou_provider_litellm::{LiteLlmRoute, LiteLlmWorker};
 use hyper::server::conn::http1;
 use hyper_util::rt::TokioIo;
@@ -198,7 +198,9 @@ fn worker(config: &Config, model_class: &str) -> Result<LiteLlmWorker, String> {
     .map_err(|error| error.to_string())
 }
 
-fn gateway(config: &Config, lease: Lease) -> Result<(Arc<GatewayCore>, String), String> {
+type Started = (Arc<GatewayCore>, Arc<Mutex<Lease>>, String);
+
+fn gateway(config: &Config, lease: Lease) -> Result<Started, String> {
     let now = OffsetDateTime::now_utc();
     if let Some(ended) = lease.ended(now) {
         return Err(format!(
@@ -230,9 +232,10 @@ fn gateway(config: &Config, lease: Lease) -> Result<(Arc<GatewayCore>, String), 
         Box::new(worker(config, &model_class)?),
     );
     let core = Arc::new(GatewayCore::new(Arc::new(providers)));
+    let lease = Arc::new(Mutex::new(lease));
     let issued = core
         .issue_token(
-            Arc::new(Mutex::new(lease)),
+            Arc::clone(&lease),
             config.task_id,
             TokenPolicy {
                 local_only: false,
@@ -243,7 +246,61 @@ fn gateway(config: &Config, lease: Lease) -> Result<(Arc<GatewayCore>, String), 
             now,
         )
         .map_err(|error| error.to_string())?;
-    Ok((core, issued.expose_secret().to_owned()))
+    Ok((core, lease, issued.expose_secret().to_owned()))
+}
+
+/// How often the ledger is written down for whoever owns this session.
+///
+/// A poll rather than a write per completion, and the snapshot carries the instant it was taken, so
+/// the lag is stated rather than hidden. Writing on every completion would put a filesystem round
+/// trip on the path a person is waiting on, to save a reader at most this long.
+const USAGE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Publish what this gateway has spent, so the session owner can stop guessing.
+///
+/// The owner holds the grant a person approved and never the ledger: it handed this process a lease
+/// as bytes, and this process charges its own copy. Without this file an owner reading its own lease
+/// would report nought for a session that had been billed — so it reports *unknown* instead, and this
+/// is what turns that into a figure.
+///
+/// Written only when something changed, and replaced atomically. A reader that caught a half-written
+/// file would be reading a number that was never true.
+async fn publish_usage(core: Arc<GatewayCore>, lease: Arc<Mutex<Lease>>, path: PathBuf) {
+    let mut previous: Option<(u64, u64, u64)> = None;
+    loop {
+        if let Some(snapshot) = core.usage(&lease, OffsetDateTime::now_utc()) {
+            let current = (snapshot.spend_units, snapshot.tokens, snapshot.completions);
+            if previous != Some(current)
+                && let Err(error) = write_usage(&path, &snapshot)
+            {
+                eprintln!("the ledger could not be published: {error}");
+                // Kept as unwritten, so the next pass tries again rather than assuming a figure
+                // reached a reader that never saw it.
+                previous = None;
+            } else if previous != Some(current) {
+                previous = Some(current);
+            }
+        }
+        tokio::time::sleep(USAGE_INTERVAL).await;
+    }
+}
+
+fn write_usage(path: &Path, snapshot: &ModelUsageSnapshot) -> Result<(), String> {
+    let rendered = serde_json::to_vec(snapshot).map_err(|error| error.to_string())?;
+    let staging = path.with_extension("writing");
+    {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&staging)
+            .map_err(|error| format!("create {}: {error}", staging.display()))?;
+        file.write_all(&rendered)
+            .and_then(|()| file.sync_all())
+            .map_err(|error| format!("write {}: {error}", staging.display()))?;
+    }
+    fs::rename(&staging, path).map_err(|error| format!("publish {}: {error}", path.display()))
 }
 
 fn prepare_runtime(path: &Path) -> Result<(), String> {
@@ -281,7 +338,7 @@ fn main() -> Result<(), String> {
         return Err("runtime socket or token already exists; refusing to replace it".to_owned());
     }
     let lease = load_lease(&config.lease_file)?;
-    let (core, secret) = gateway(&config, lease)?;
+    let (core, ledger, secret) = gateway(&config, lease)?;
     write_token(&token_path, &secret)?;
     let listener = StdUnixListener::bind(&socket_path)
         .map_err(|error| format!("bind {}: {error}", socket_path.display()))?;
@@ -293,8 +350,16 @@ fn main() -> Result<(), String> {
     println!("CYBOU_MODEL_SOCKET={}", socket_path.display());
     println!("CYBOU_MODEL_TOKEN_FILE={}", token_path.display());
 
+    let usage_path = config.runtime_dir.join("model-usage.json");
+    println!("CYBOU_MODEL_USAGE_FILE={}", usage_path.display());
+
     let runtime = tokio::runtime::Runtime::new().map_err(|error| error.to_string())?;
-    let result = runtime.block_on(serve(listener, Arc::clone(&core)));
+    let published = Arc::clone(&core);
+    let serving = Arc::clone(&core);
+    let result = runtime.block_on(async move {
+        tokio::spawn(publish_usage(published, ledger, usage_path));
+        serve(listener, serving).await
+    });
     drop(runtime);
     drop(core);
     result

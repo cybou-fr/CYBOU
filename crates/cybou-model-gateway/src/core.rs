@@ -3,12 +3,14 @@
 
 //! Authentication, lease accounting and the handoff to the shared provider pool.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cybou_capsule::{Lease, SpendPolicy};
 use cybou_model_brokerd::{
     AgentChatRequest, AgentChatResult, BrokerCore, ChatMessage, ChatRefused,
 };
+use cybou_protocol::model::ModelUsageSnapshot;
 use sha2::{Digest as _, Sha256};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -145,6 +147,12 @@ struct TokenAccount {
 pub struct GatewayCore {
     providers: Arc<BrokerCore>,
     tokens: Mutex<Vec<TokenAccount>>,
+    /// How many completions this gateway has served, across every token it issued.
+    ///
+    /// Counted here rather than derived from the token table, because a token can be dropped when a
+    /// task ends and the completions it served still happened. A figure that fell when a table was
+    /// tidied would be a count of what is remembered rather than of what was done.
+    completions: AtomicU64,
 }
 
 const TOKEN_BYTES: usize = 32;
@@ -157,6 +165,7 @@ impl GatewayCore {
         Self {
             providers,
             tokens: Mutex::new(Vec::new()),
+            completions: AtomicU64::new(0),
         }
     }
 
@@ -164,6 +173,43 @@ impl GatewayCore {
     #[must_use]
     pub fn providers(&self) -> &Arc<BrokerCore> {
         &self.providers
+    }
+
+    /// What this gateway has actually spent, for whoever owns the session.
+    ///
+    /// The only truthful source for that figure. A session owner holds the grant a person approved
+    /// and never the ledger — this process received the lease as bytes and charges its own copy — so
+    /// an owner reading its own lease would report nought for a session that had been billed.
+    ///
+    /// Stamped with the instant it was taken, because *has spent* and *had spent when last observed*
+    /// are different claims and only the second is true of anything read elsewhere afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Returns nothing and reports `None` when the lease or the token table cannot be reached; a
+    /// figure that guessed past a poisoned lock would be a figure nobody measured.
+    #[must_use]
+    pub fn usage(
+        &self,
+        lease: &Arc<Mutex<Lease>>,
+        now: OffsetDateTime,
+    ) -> Option<ModelUsageSnapshot> {
+        let lease = lease.lock().ok()?;
+        let tokens = self
+            .tokens
+            .lock()
+            .ok()?
+            .iter()
+            .fold(0_u64, |total, account| {
+                total.saturating_add(account.tokens_spent)
+            });
+        Some(ModelUsageSnapshot {
+            capsule_id: lease.grant().capsule_id,
+            spend_units: lease.model_spent(),
+            tokens,
+            completions: self.completions.load(Ordering::Relaxed),
+            observed_at: now,
+        })
     }
 
     /// Mint an ephemeral bearer for one task under one live capsule lease.
@@ -317,6 +363,7 @@ impl GatewayCore {
         let charged_tokens = u64::from(result.input_tokens) + u64::from(result.output_tokens);
         account.tokens_spent = account.tokens_spent.saturating_add(charged_tokens);
         lease.charge(result.spend_units);
+        self.completions.fetch_add(1, Ordering::Relaxed);
         Ok(GatewayCompletion {
             result,
             model_class: request.model_class.clone(),

@@ -130,6 +130,12 @@ pub struct SessionPlan {
     pub model_socket: Option<PathBuf>,
     /// The ephemeral bearer file the capsule is given, when a model was granted.
     pub model_token: Option<PathBuf>,
+    /// Where that gateway publishes what it has spent.
+    ///
+    /// Not given to the capsule. The agent has no business reading its own ledger from a file: an
+    /// agent reporting its own consumption is the executor grading its own homework, and this is the
+    /// figure that exists precisely so nobody has to ask it.
+    pub model_usage: Option<PathBuf>,
     /// The transient unit the capsule itself runs under.
     pub capsule_unit: String,
     /// The directory this owner creates for the session's own runtime files.
@@ -182,6 +188,9 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
         gateway_unit: wants_a_model.then(|| format!("cybou-agent-gateway@{instance}.service")),
         model_socket: runtime.as_ref().map(|runtime| runtime.join("model.sock")),
         model_token: runtime.as_ref().map(|runtime| runtime.join("model-token")),
+        model_usage: runtime
+            .as_ref()
+            .map(|runtime| runtime.join("model-usage.json")),
         gateway_runtime: runtime,
         capsule_unit: cybou_capsule::unit_name(&spec),
         egress_socket: session_runtime.join("egress.sock"),

@@ -66,6 +66,12 @@ pub struct LiveSession {
     pub plan: SessionPlan,
     /// What has happened to it.
     pub session: Session,
+    /// What its gateway had spent when last read, if it has ever been read.
+    ///
+    /// Held beside the session rather than fetched when a listing is built, because reading a file
+    /// per session on every call would put filesystem work on the path a surface refreshes. The
+    /// snapshot carries the instant it was taken, so a reading that is a little old says so.
+    pub ledger: Ledger,
 }
 
 /// Sessions this owner is holding.
@@ -135,15 +141,37 @@ impl SessionRegistry {
 
     /// Every held session, as a surface should show it.
     ///
-    /// [`Ledger::Elsewhere`] for all of them, and not as a placeholder: the model gateway charges its
-    /// own copy of each lease, so this owner holds grants and never ledgers. A registry that reported
-    /// nought here would be stating, of every session it holds, that nothing has been spent.
+    /// Whatever [`Self::read_ledgers`] last read for each, which is [`Ledger::Elsewhere`] until
+    /// something has. Never a nought this owner invented: it holds the grant a person approved and
+    /// the gateway holds the ledger, so a registry reporting nought would be stating, of every
+    /// session on it, that nothing has been spent.
     #[must_use]
     pub fn views(&self) -> Vec<SessionView> {
         self.sessions
             .values()
-            .map(|live| SessionView::of(&live.session, &live.plan, Ledger::Elsewhere))
+            .map(|live| SessionView::of(&live.session, &live.plan, live.ledger))
             .collect()
+    }
+
+    /// Re-read the ledger each held session's gateway published.
+    ///
+    /// The reader is supplied rather than called directly, so the judgement of what a published
+    /// ledger means stays here and the filesystem stays out of it. A session whose gateway has
+    /// published nothing keeps whatever was last read — an absent file is a gateway that has not
+    /// written yet, not a session that has spent nothing, and overwriting a real figure with a nought
+    /// because a read failed would be the same lie in a new place.
+    pub fn read_ledgers(
+        &mut self,
+        read: impl Fn(&std::path::Path) -> Option<cybou_protocol::model::ModelUsageSnapshot>,
+    ) {
+        for live in self.sessions.values_mut() {
+            let Some(path) = live.plan.model_usage.as_ref() else {
+                continue;
+            };
+            if let Some(snapshot) = read(path) {
+                live.ledger = Ledger::published(&snapshot);
+            }
+        }
     }
 
     /// Ask every held session's lease whether it is over, and begin ending the ones that are.
@@ -208,7 +236,12 @@ pub fn recover(found: Vec<Found>, now: OffsetDateTime) -> Recovered {
             out.orphaned.push(plan);
             continue;
         }
-        out.registry.insert(LiveSession { plan, session });
+        // Nothing is claimed about spending until a gateway's own ledger has been read.
+        out.registry.insert(LiveSession {
+            plan,
+            session,
+            ledger: Ledger::Elsewhere,
+        });
     }
     out
 }
@@ -400,6 +433,69 @@ mod tests {
             }
             other => panic!("a capped grant showed as {other:?}"),
         }
+    }
+
+    fn snapshot(spent: u64, observed: OffsetDateTime) -> cybou_protocol::model::ModelUsageSnapshot {
+        cybou_protocol::model::ModelUsageSnapshot {
+            capsule_id: Uuid::from_u128(0xd001),
+            spend_units: spent,
+            tokens: 1234,
+            completions: 3,
+            observed_at: observed,
+        }
+    }
+
+    #[test]
+    fn a_spend_appears_only_once_a_gateway_has_published_one() {
+        // Before that the owner holds the grant and nothing else. Reporting nought would state, of a
+        // session that may have been billed, that nothing was spent.
+        let mut recovered = recover(vec![found(0xd001, Duration::hours(4), true)], at(60));
+        let view = &recovered.registry.views()[0];
+        assert!(matches!(
+            view.spend,
+            Some(crate::view::SpendView::Capped { spent: None, .. })
+        ));
+        assert_eq!(view.spend_observed_at, None);
+
+        recovered
+            .registry
+            .read_ledgers(|_| Some(snapshot(42, at(120))));
+
+        let view = &recovered.registry.views()[0];
+        assert!(matches!(
+            view.spend,
+            Some(crate::view::SpendView::Capped {
+                spent: Some(42),
+                ..
+            })
+        ));
+        assert_eq!(
+            view.spend_observed_at,
+            Some(at(120)),
+            "a figure arrives with the instant somebody looked"
+        );
+    }
+
+    #[test]
+    fn a_ledger_that_could_not_be_read_leaves_the_last_one_standing() {
+        // An absent or unreadable file is a gateway that has not written yet, not a session that has
+        // spent nothing. Overwriting a real figure with a nought because a read failed would be the
+        // same lie in a new place.
+        let mut recovered = recover(vec![found(0xd001, Duration::hours(4), true)], at(60));
+        recovered
+            .registry
+            .read_ledgers(|_| Some(snapshot(42, at(120))));
+        recovered.registry.read_ledgers(|_| None);
+
+        let view = &recovered.registry.views()[0];
+        assert!(matches!(
+            view.spend,
+            Some(crate::view::SpendView::Capped {
+                spent: Some(42),
+                ..
+            })
+        ));
+        assert_eq!(view.spend_observed_at, Some(at(120)));
     }
 
     #[test]

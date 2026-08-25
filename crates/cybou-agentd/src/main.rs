@@ -602,7 +602,10 @@ async fn serve() -> Result<(), String> {
 
     loop {
         tokio::select! {
-            () = tokio::time::sleep(EXPIRY_POLL) => expire(&registry),
+            () = tokio::time::sleep(EXPIRY_POLL) => {
+                read_ledgers(&registry);
+                expire(&registry);
+            }
             result = tokio::signal::ctrl_c() => {
                 result.map_err(|error| error.to_string())?;
                 // Nothing is torn down on the way out. A capsule outlives this process on purpose,
@@ -618,6 +621,22 @@ async fn serve() -> Result<(), String> {
 #[cfg(not(target_os = "linux"))]
 async fn serve() -> Result<(), String> {
     Err("cybou-agentd serves capsules on Linux".to_owned())
+}
+
+/// Re-read what each session's gateway has published about its own spending.
+///
+/// The only truthful source for that figure. This process holds the grant a person approved and the
+/// gateway holds the ledger, so a listing says *unknown* until one of these reads succeeds — which is
+/// the honest answer, and a great deal better than a nought nobody measured.
+#[cfg(target_os = "linux")]
+fn read_ledgers(registry: &Arc<std::sync::Mutex<cybou_agentd::registry::SessionRegistry>>) {
+    let Ok(mut held) = registry.lock() else {
+        return;
+    };
+    held.read_ledgers(|path| {
+        let bytes = fs::read(path).ok()?;
+        cybou_agentd::discovery::read_usage(&bytes).ok()
+    });
 }
 
 /// End the sessions whose leases have run out, exactly once each.

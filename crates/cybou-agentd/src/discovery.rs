@@ -28,6 +28,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use cybou_capsule::Lease;
+use cybou_protocol::model::ModelUsageSnapshot;
 
 use crate::plan::Ceilings;
 use crate::registry::Found;
@@ -44,6 +45,8 @@ pub enum CannotRead {
     Malformed(&'static str),
     /// The lease bytes are not a lease.
     UnreadableLease,
+    /// The published ledger is not a snapshot.
+    UnreadableUsage,
 }
 
 impl core::fmt::Display for CannotRead {
@@ -52,6 +55,9 @@ impl core::fmt::Display for CannotRead {
             Self::Missing(name) => write!(formatter, "the launch file does not define {name}"),
             Self::Malformed(name) => write!(formatter, "{name} is not the kind of value it names"),
             Self::UnreadableLease => formatter.write_str("the lease file is not a lease"),
+            Self::UnreadableUsage => {
+                formatter.write_str("the published ledger is not a usage snapshot")
+            }
         }
     }
 }
@@ -101,6 +107,20 @@ pub fn read_launch(contents: &str) -> Result<(Uuid, Ceilings), CannotRead> {
 /// Returns [`CannotRead::UnreadableLease`] when the bytes are not a lease this build understands.
 pub fn read_lease(bytes: &[u8]) -> Result<Lease, CannotRead> {
     ciborium::from_reader(bytes).map_err(|_| CannotRead::UnreadableLease)
+}
+
+/// Read the ledger a session's gateway published.
+///
+/// The one place a spend figure may come from. An owner reading its own copy of the lease would
+/// report nought forever: it holds the grant a person approved, and the gateway holds the ledger.
+///
+/// # Errors
+///
+/// Returns [`CannotRead::UnreadableUsage`] when the bytes are not a snapshot this build understands.
+/// A snapshot that cannot be read is reported rather than treated as nought, because *nobody looked*
+/// and *nothing was spent* are different facts and only one of them is ever safe to show.
+pub fn read_usage(bytes: &[u8]) -> Result<ModelUsageSnapshot, CannotRead> {
+    serde_json::from_slice(bytes).map_err(|_| CannotRead::UnreadableUsage)
 }
 
 /// The pair of files one session wrote, by capsule identity.
@@ -324,6 +344,23 @@ mod tests {
 
         assert_eq!(task_id, TASK);
         assert_eq!(read, ceilings(), "nothing smuggled in changed a bound");
+    }
+
+    #[test]
+    fn a_published_ledger_reads_back_and_a_broken_one_is_not_read_as_nought() {
+        // "Nobody looked" and "nothing was spent" are different facts, and only one of them is ever
+        // safe to put in front of a person who set a spending bound.
+        let snapshot = ModelUsageSnapshot {
+            capsule_id: CAPSULE,
+            spend_units: 42,
+            tokens: 1234,
+            completions: 3,
+            observed_at: at(600),
+        };
+        let rendered = serde_json::to_vec(&snapshot).expect("encodes");
+
+        assert_eq!(read_usage(&rendered).expect("decodes"), snapshot);
+        assert_eq!(read_usage(b"{"), Err(CannotRead::UnreadableUsage));
     }
 
     #[test]

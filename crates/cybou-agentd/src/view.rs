@@ -39,12 +39,18 @@
 //! only produce by actually having one — and a caller that does not has to say
 //! [`Ledger::Elsewhere`], which shows as *unknown* rather than as nought. A surface reading nought
 //! for a session that has been billed is the one failure this whole module exists to prevent.
+//!
+//! The gateway publishes what it has spent, so an owner can read one rather than only ever saying
+//! unknown. What it publishes is stamped with the instant it was written, and that instant is carried
+//! all the way onto the card: *€0.42, seen four minutes ago* is the truth, and *€0.42* is a claim
+//! about now that nothing outside the gateway is in a position to make.
 
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 use cybou_capsule::{Lease, SpendPolicy};
+use cybou_protocol::model::ModelUsageSnapshot;
 
 use crate::plan::SessionPlan;
 use crate::session::{Session, SessionEnd, SessionState};
@@ -70,9 +76,19 @@ pub enum Standing {
 /// process cannot see what has been spent* and is false whenever the gateway has charged anything.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Ledger {
-    /// This reporter holds the lease that is being charged, and it says this.
-    Held(u64),
-    /// The ledger is in another process. Nothing here may claim a figure.
+    /// What a gateway had spent when it was last observed.
+    ///
+    /// The instant travels with the figure because *has spent* and *had spent when last observed*
+    /// are different claims, and only the second is true of anything read out of a published
+    /// snapshot. A surface showing the first would quietly become wrong every time a completion
+    /// happened between two readings.
+    Observed {
+        /// What had been charged.
+        spent: u64,
+        /// When the gateway wrote that down.
+        at: OffsetDateTime,
+    },
+    /// The ledger is in another process and has not been read. Nothing here may claim a figure.
     Elsewhere,
 }
 
@@ -82,13 +98,32 @@ impl Ledger {
     /// Only call this with a lease a completion path actually charges. The grant copy every other
     /// component holds is not one, and passing it is the mistake this type exists to make visible.
     #[must_use]
-    pub const fn of(lease: &Lease) -> Self {
-        Self::Held(lease.model_spent())
+    pub const fn of(lease: &Lease, at: OffsetDateTime) -> Self {
+        Self::Observed {
+            spent: lease.model_spent(),
+            at,
+        }
+    }
+
+    /// What a gateway published about itself.
+    #[must_use]
+    pub const fn published(snapshot: &ModelUsageSnapshot) -> Self {
+        Self::Observed {
+            spent: snapshot.spend_units,
+            at: snapshot.observed_at,
+        }
     }
 
     const fn spent(self) -> Option<u64> {
         match self {
-            Self::Held(spent) => Some(spent),
+            Self::Observed { spent, .. } => Some(spent),
+            Self::Elsewhere => None,
+        }
+    }
+
+    const fn observed_at(self) -> Option<OffsetDateTime> {
+        match self {
+            Self::Observed { at, .. } => Some(at),
             Self::Elsewhere => None,
         }
     }
@@ -148,8 +183,15 @@ pub struct SessionView {
     pub ended_at: Option<OffsetDateTime>,
     /// The model class the lease granted, if any.
     pub model_class: Option<String>,
-    /// What may be spent, and what has been.
+    /// What may be spent, and what had been when the ledger was last read.
     pub spend: Option<SpendView>,
+    /// When that spending figure was observed, if it was.
+    ///
+    /// Beside the figure rather than folded into it, so a card can say *€0.42, seen four minutes ago*
+    /// — which is the truth — instead of *€0.42*, which is a claim about now that nothing here can
+    /// make.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub spend_observed_at: Option<OffsetDateTime>,
     /// Memory ceiling in mebibytes, as granted.
     pub memory_mib: u32,
     /// CPU ceiling, as granted.
@@ -201,6 +243,7 @@ impl SessionView {
                     spent: ledger.spent(),
                 },
             }),
+            spend_observed_at: grant.model.as_ref().and_then(|_| ledger.observed_at()),
             memory_mib: grant.budget.memory_mib,
             cpus: grant.budget.cpus,
             tasks_max: grant.budget.tasks_max,
@@ -326,7 +369,14 @@ mod tests {
             &["github.com", "registry.npmjs.org"],
             Some(SpendPolicy::Capped(100)),
         );
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::Held(0));
+        let view = SessionView::of(
+            &running(),
+            &planned(&lease),
+            Ledger::Observed {
+                spent: 0,
+                at: at(60),
+            },
+        );
 
         assert_eq!(view.agent, "opencode");
         assert_eq!(view.profile, "sandboxed-autonomous");
@@ -349,7 +399,14 @@ mod tests {
     fn a_countdown_stops_at_nothing_left_rather_than_going_negative() {
         // A surface should not have to know that a remaining time can pass through zero.
         let lease = lease(&[], Some(SpendPolicy::Capped(100)));
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::Held(0));
+        let view = SessionView::of(
+            &running(),
+            &planned(&lease),
+            Ledger::Observed {
+                spent: 0,
+                at: at(60),
+            },
+        );
 
         assert_eq!(view.remaining(at(5 * 60 * 60)), Duration::ZERO);
     }
@@ -370,7 +427,15 @@ mod tests {
             })
         );
         assert_eq!(
-            SessionView::of(&running(), &plan, Ledger::Held(0)).spend,
+            SessionView::of(
+                &running(),
+                &plan,
+                Ledger::Observed {
+                    spent: 0,
+                    at: at(60)
+                }
+            )
+            .spend,
             Some(SpendView::Capped {
                 limit: 100,
                 spent: Some(0)
@@ -385,7 +450,7 @@ mod tests {
         // from whichever lease was nearest to hand.
         let mut charged = lease(&[], Some(SpendPolicy::Capped(100)));
         charged.charge(42);
-        let view = SessionView::of(&running(), &planned(&charged), Ledger::of(&charged));
+        let view = SessionView::of(&running(), &planned(&charged), Ledger::of(&charged, at(60)));
 
         assert_eq!(
             view.spend,
@@ -402,11 +467,11 @@ mod tests {
         // billed, and a person who selected no spending is entitled to see that rather than have it
         // summarised away.
         let mut lease = lease(&[], Some(SpendPolicy::ZeroCostOnly));
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::of(&lease));
+        let view = SessionView::of(&running(), &planned(&lease), Ledger::of(&lease, at(60)));
         assert_eq!(view.spend, Some(SpendView::ZeroCost { spent: Some(0) }));
 
         lease.charge(3);
-        let broken = SessionView::of(&running(), &planned(&lease), Ledger::of(&lease));
+        let broken = SessionView::of(&running(), &planned(&lease), Ledger::of(&lease, at(60)));
         assert_eq!(broken.spend, Some(SpendView::ZeroCost { spent: Some(3) }));
     }
 
@@ -415,7 +480,14 @@ mod tests {
         // Naming a unit that was never started would send somebody looking for a fault that is in
         // fact a correctly enforced grant.
         let lease = lease(&[], Some(SpendPolicy::Capped(100)));
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::Held(0));
+        let view = SessionView::of(
+            &running(),
+            &planned(&lease),
+            Ledger::Observed {
+                spent: 0,
+                at: at(60),
+            },
+        );
 
         assert_eq!(view.units.len(), 2);
         assert!(view.units.iter().all(|unit| !unit.contains("egress")));
@@ -442,7 +514,14 @@ mod tests {
     fn every_unit_a_session_started_can_be_looked_up_by_name() {
         let lease = lease(&["github.com"], Some(SpendPolicy::Capped(100)));
         let plan = planned(&lease);
-        let view = SessionView::of(&running(), &plan, Ledger::Held(0));
+        let view = SessionView::of(
+            &running(),
+            &plan,
+            Ledger::Observed {
+                spent: 0,
+                at: at(60),
+            },
+        );
 
         assert!(
             view.units
@@ -467,7 +546,14 @@ mod tests {
         session.begin_ending(SessionEnd::Stopped);
         session.finish_ending(at(300));
 
-        let view = SessionView::of(&session, &planned(&lease), Ledger::Held(0));
+        let view = SessionView::of(
+            &session,
+            &planned(&lease),
+            Ledger::Observed {
+                spent: 0,
+                at: at(60),
+            },
+        );
         assert_eq!(view.standing, Standing::Ended);
         assert_eq!(
             view.ended_because.as_deref(),
@@ -483,7 +569,14 @@ mod tests {
         // A duration is stale the moment it is serialised. Given both ends a card keeps its own
         // clock honest without the owner resending anything every second.
         let lease = lease(&[], Some(SpendPolicy::Capped(100)));
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::Held(0));
+        let view = SessionView::of(
+            &running(),
+            &planned(&lease),
+            Ledger::Observed {
+                spent: 0,
+                at: at(60),
+            },
+        );
 
         assert_eq!(view.started_at, at(0));
         assert_eq!(view.expires_at, at(4 * 60 * 60));

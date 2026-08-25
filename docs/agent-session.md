@@ -175,8 +175,25 @@ off it; the invariant was right and the test stating it was right, and one line 
 the copy that could only ever say zero. Unifying the authority a launch is minted from did not
 unify the mutable ledger, and the type now makes the difference impossible to paper over.
 
-Making it *available* is a separate, unfinished piece: the gateway has the number and nothing asks
-it for one. Until a session owner can, every launch-side view says unknown.
+The gateway now publishes it. Every couple of seconds, and only when something changed, it writes a
+`ModelUsageSnapshot` beside its socket — what has been charged, tokens, completions, and the instant
+it looked — replaced atomically so a reader never catches half a figure. The session owner reads that
+file and the listing stops saying unknown.
+
+The instant travels the whole way onto the card, and that is the point rather than a detail. *Has
+spent €0.42* and *had spent €0.42 when somebody last looked* are different claims, and only the
+second is true of anything read out of a snapshot; a surface presenting the first would quietly
+become wrong every time a completion happened between two readings. It also makes a stale figure
+legible — a reading from ten minutes ago beside a session that is plainly working is worth seeing,
+and a bare integer could not say it.
+
+An unreadable or absent snapshot leaves the previous figure standing. A gateway that has not written
+yet is not a session that has spent nothing, and replacing a real figure with a nought because a read
+failed would be the same lie in a new place.
+
+The file is not given to the capsule. An agent has no business reading its own ledger: an agent
+reporting its own consumption is the executor grading its own homework, and this figure exists
+precisely so nobody has to ask it.
 
 Gathering it in one place is the point: the lease knows what was granted, the plan knows which units
 carry it, and the session knows what has happened, so a surface that reached into all three would be

@@ -19,6 +19,7 @@ cybou-model-gateway = { path = "../cybou-model-gateway" }
 cybou-provider-litellm = { path = "../cybou-provider-litellm" }
 cybou-protocol = { path = "../cybou-protocol" }
 hyper.workspace = true
+serde_json.workspace = true
 hyper-util.workspace = true
 time.workspace = true
 tokio.workspace = true

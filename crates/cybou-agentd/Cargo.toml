@@ -17,6 +17,7 @@ cybou-acp = { path = "../cybou-acp" }
 cybou-fabric = { path = "../cybou-fabric" }
 cybou-agent-opencode = { path = "../cybou-agent-opencode" }
 cybou-capsule = { path = "../cybou-capsule" }
+cybou-protocol = { path = "../cybou-protocol" }
 serde.workspace = true
 serde_json.workspace = true
 time.workspace = true

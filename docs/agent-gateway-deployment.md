@@ -51,6 +51,13 @@ CYBOU_MODEL_SOCKET=/run/cybou-agent-<instance>/model.sock
 CYBOU_MODEL_TOKEN_FILE=/run/cybou-agent-<instance>/model-token
 ```
 
+Beside those, and deliberately *not* given to the capsule, the gateway publishes
+`/run/cybou-agent-<instance>/model-usage.json`: what it has charged, the tokens and completions
+behind that, and the instant it last looked. The session owner reads it, because it holds the grant a
+person approved and this process holds the ledger — an owner reading its own copy of the lease would
+report nought for a session that had been billed. The agent is not given it for the opposite reason:
+an agent reporting its own consumption is the executor grading its own homework.
+
 The unit has no `[Install]` section and deployment never starts it. A boot target cannot manufacture
 a capsule grant. An empty provider file, empty credential, missing or unreadable lease, a lease that
 grants no model, an expired or withdrawn lease, a reused runtime path, or a malformed ceiling fails

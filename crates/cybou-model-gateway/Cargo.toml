@@ -14,6 +14,7 @@ repository.workspace = true
 axum.workspace = true
 cybou-capsule = { path = "../cybou-capsule" }
 cybou-model-brokerd = { path = "../cybou-model-brokerd" }
+cybou-protocol = { path = "../cybou-protocol" }
 getrandom.workspace = true
 serde.workspace = true
 serde_json.workspace = true

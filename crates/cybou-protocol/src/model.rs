@@ -160,6 +160,43 @@ pub struct ModelRequirements {
     pub max_ram_mb: u32,
 }
 
+/// What one capsule's model gateway has actually spent, and when it last looked.
+///
+/// The ledger a session owner cannot keep for itself. The gateway is a separate process holding a
+/// separate copy of the lease, and it is the only thing that sees a completion — so a figure that did
+/// not come from it is not a figure at all. An owner that read its own copy of the grant would report
+/// nought forever, which is the shape of defect this type exists to end.
+///
+/// ## Observed at, not as of now
+///
+/// The instant is carried because it is the difference between *this session has spent 42* and *this
+/// session had spent 42 when somebody last looked*. Only the second is true of anything read out of
+/// a file or fetched a moment ago, and a surface that presented it as the first would quietly become
+/// wrong every time a completion happened between two reads.
+///
+/// It also makes a stale reading legible rather than invisible: an observation from ten minutes ago
+/// beside a session that is plainly working is a fact worth showing, and one a bare integer could not
+/// express.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelUsageSnapshot {
+    /// Which capsule's gateway this is.
+    pub capsule_id: uuid::Uuid,
+    /// What has been charged, in the operator's smallest unit.
+    ///
+    /// Charged, not estimated. It is the sum of what providers reported, including completions that
+    /// were refused after being billed — money already gone is a fact about the session, not a
+    /// property of whether an answer was delivered.
+    pub spend_units: u64,
+    /// Input plus output tokens consumed across every completion.
+    pub tokens: u64,
+    /// How many completions this gateway has served.
+    pub completions: u64,
+    /// When the gateway wrote this down.
+    #[serde(with = "time::serde::rfc3339")]
+    pub observed_at: time::OffsetDateTime,
+}
+
 /// What a capsule may spend on models.
 ///
 /// Two modes, because one number could not say both things. A ceiling of zero is genuinely ambiguous:

@@ -410,9 +410,12 @@ The surface is `Sessions`, `Session` and `Stop`. `Launch` is not on it: a CLI la
 who can run it, and a bus method is not, so it arrives together with a registry of operator-approved
 profiles and takes a profile id rather than a set of ceilings.
 
-What remains: a typed usage snapshot from the model gateway, without which every listing reports a
-spend of *unknown* rather than a figure; a record of finished sessions a person can still read; and
-the profile registry that `Launch` needs. See [The agent session owner](agent-session.md).
+The model gateway publishes a typed `ModelUsageSnapshot` beside its socket and the owner reads it, so
+a listing reports a real figure together with the instant it was observed rather than a spend of
+*unknown* — and never a nought nobody measured.
+
+What remains: a record of finished sessions a person can still read; and the profile registry that
+`Launch` needs. See [The agent session owner](agent-session.md).
 
 ### B8. Agent Card and streaming session
 
