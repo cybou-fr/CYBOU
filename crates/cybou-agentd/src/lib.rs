@@ -35,11 +35,13 @@
 //! so what a session did is answerable by reading rather than by running.
 
 pub mod plan;
+pub mod registry;
 pub mod runtime;
 pub mod session;
 pub mod view;
 
 pub use plan::{CannotPlan, Ceilings, Launch, SessionPlan, TeardownStep};
+pub use registry::{Found, LiveSession, Recovered, SessionRegistry, recover};
 pub use runtime::HostPrograms;
 pub use session::{Session, SessionEnd, SessionState};
 pub use view::{Ledger, SessionView, SpendView, Standing};

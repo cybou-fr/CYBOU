@@ -210,9 +210,33 @@ what produced the defect above.
 It should not be a `Mind` organ. An agent runtime is not part of what Cybou is, and a bus name under
 `org.cybou.Mind.` would make the namespace assert otherwise; `Runtime` or `Control` says what it is.
 
-It must also survive its own restart. A capsule and a gateway are deliberately built to outlive the
-coordinator up to their hard deadlines, so an owner that restarted and reported no running agents
-while OpenCode was still working would be wrong about the host in the direction that matters.
+It must also survive its own restart, and the part of that which is a judgement rather than plumbing
+is now built and tested.
+
+A capsule and a gateway are deliberately built to outlive the coordinator up to their hard deadlines
+— that is what makes the boundary hold without one being alive. So an owner that came back and
+reported no running agents while OpenCode was still working would be wrong about the host in the
+direction that matters most: a working agent, in a capsule nobody is watching, with no surface
+offering a person a way to stop it.
+
+The registry is therefore not a memory of what a process started. It is a reading of the host.
+Everything needed is already written where the session put it — the lease carries the whole grant and
+the launch file carries the task and its ceilings — and recovery re-derives each session through the
+same `plan()` a launch used, so a recovered session and a fresh one are the same object rather than
+two descriptions that agree today.
+
+One judgement is made and it is a small one. Whether a capsule is still up is asked of the service
+manager, never inferred from a file: a file says what a launch intended, a running unit says what is
+true now. And if the capsule is gone, the session is over — but *why* it ended was known only to the
+owner that died with it, so recovery attributes nothing. It does not resurrect the session, does not
+invent a verdict, and does not report an agent that finished as one somebody stopped. It hands back
+the plan so the leftovers can be cleared, which is the one thing still worth doing about a session
+nobody can describe. A lease that simply ran out needs no judgement at all: the clock says so, and it
+is the same clock that ended the capsule's own unit.
+
+What cannot be read back is reported rather than skipped. A launch file this build cannot re-derive
+is either a defect or a session from another version, and both are things an operator should be told
+about instead of having them quietly stop existing in a list of what is running.
 
 The launch flags are a bring-up interface and should not become the web one. A browser should send a
 profile, an agent, a workspace and a model class; the owner reads the ceilings, the lifetime and the
