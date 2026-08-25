@@ -249,6 +249,25 @@ and one containing `/etc` exposes all of it. The first version of that check was
 refusing direction: every absolute path starts with `/`, so everything collided with the root and
 nothing compiled at all. Its own tests caught it, and both directions are now mutation-checked.
 
+**The command that builds a capsule is a value, not something buried in a spawn.**
+`CapsuleBackend::command` returns the argument vector, so whether a sandbox is correct is answerable
+by reading what it was asked to do rather than by running it on a machine willing to run it. One
+implementation, bubblewrap, behind a trait — a first implementation that is also this project's own
+`clone`/`unshare`/mount orchestration is the wrong place to be original.
+
+Three properties are mutation-checked, because each is the kind that fails silently. The environment
+is **emptied** and rebuilt by name, not filtered: a filter is a deny-list somebody keeps current, and
+the host environment of a Cybou process holds the key store path, an SSH agent socket, and the next
+thing somebody exports. `/proc` is the capsule's own — the host's, bound in, is the PID namespace
+undone by a mount, which looks like a convenience. And the program follows `--`, so a program named
+`--bind` is a program rather than an argument to bubblewrap, which is the same lesson this repository
+already learned about passing a systemd unit name.
+
+Also asked for and asserted: no nested user namespaces, a private `/tmp` rather than the host's
+shared one, a session of its own so nothing can push characters into the terminal that started it,
+and death with the parent — a capsule that outlives its supervisor is a lease that ends with nothing
+left to act on, which turns *ending is not asking* back into asking.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

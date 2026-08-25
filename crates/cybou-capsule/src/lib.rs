@@ -47,6 +47,7 @@
 //! and what to record. A design in which this module were the enforcement would be a boundary made
 //! of whatever the agent could be persuaded to report about itself.
 
+pub mod backend;
 pub mod compile;
 pub mod grant;
 pub mod lease;
@@ -54,6 +55,7 @@ pub mod reach;
 pub mod spec;
 pub mod verdict;
 
+pub use backend::{Bubblewrap, CapsuleBackend};
 pub use compile::{CannotCompile, compile};
 pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
 pub use lease::{Ended, Lease, decide_under_lease};
