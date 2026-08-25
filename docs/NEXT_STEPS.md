@@ -293,6 +293,21 @@ visibly `NOT RUN` and B7 is not marked Done. The exact fail-closed operator cont
 [Per-capsule model gateway deployment](agent-gateway-deployment.md); provisioning a provider is an
 operator decision rather than a secret silently copied by this repository.
 
+### B7a. One owner for one session
+
+**Derivation done; carrying it out remains.** Every part of a session existed and none of it was
+owned, which is how the gateway came to rebuild its own lease from environment values and produce a
+second authority beside the approved one. `cybou-agentd` is the single owner: one selection becomes
+one lease, and the capsule spec, the lease file, the model token and the clock are all derived from
+that one object. `cybou-agentd plan` prints every file, unit and teardown step a launch implies
+without touching a host, and its gate asserts the two properties that matter — every runtime name
+carries the session identity, and the launch file names nothing that is authority.
+
+What remains is executing the plan, and it is blocked on a decision rather than on typing: the
+gateway is a system unit so its provider credential can stay root-only, so an unprivileged owner
+needs either a polkit rule scoped to that one template or a typed request across the boundary in the
+shape `Action1` already uses for `Executor1`. See [The agent session owner](agent-session.md).
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

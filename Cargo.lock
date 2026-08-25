@@ -783,6 +783,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-agentd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-agent-opencode",
+ "cybou-capsule",
+ "time",
+ "uuid",
+]
+
+[[package]]
 name = "cybou-authd"
 version = "0.1.0"
 dependencies = [
