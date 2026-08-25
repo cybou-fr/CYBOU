@@ -222,6 +222,33 @@ Spend is whole units of the smallest denomination. A ceiling compared as a float
 occasionally exceeded by a fraction in whichever direction the rounding went, and *occasionally* is
 not a property a limit may have.
 
+**A grant compiles once into what the kernel is asked for.** `KernelCapsuleSpec` is that compiled
+shape — a value, inspectable and comparable, that a test asserts against with no Linux kernel in the
+room, and that is recorded beside what the capsule then did. Compiling is total and deterministic, so
+a capsule can be examined before it exists and two runs can be compared.
+
+As much as possible is unrepresentable rather than merely unused, because an unused possibility is
+one somebody uses later for a good reason. `Namespaces` has no fields: a capsule gets all seven or is
+not a capsule, and something switchable would eventually be switched off by somebody debugging. There
+is no *no-new-privileges is off*. `Network` has exactly one variant, `Denied`, and the day an egress
+broker exists is the day it grows a second one — visibly, in a commit somebody reviews. The grant's
+host list is deliberately not consulted yet: compiling it into anything would be compiling a promise.
+
+**The filesystem is built up, never pruned down.** The mount list starts empty and gains what a
+program needs to be a program, read-only, and one writable path. A host root with things removed is a
+deny-list, and a deny-list is a list somebody forgets to extend — where the thing forgotten is found
+by an agent rather than by a reviewer. The workspace appears at a fixed place inside rather than at
+its host path, so an agent learns nothing about the machine and a profile moved between hosts
+produces the same environment.
+
+The one path a person supplies is the workspace, so it is the one place a grant can ask for something
+that undoes everything else. A workspace that is, contains, or sits inside the root, `/etc`, the
+Journal, the key store, `/proc` or `/sys` is refused with a reason rather than compiled into
+something that runs — checked in both directions, since a workspace inside `/etc` exposes part of it
+and one containing `/etc` exposes all of it. The first version of that check was wrong in the
+refusing direction: every absolute path starts with `/`, so everything collided with the root and
+nothing compiled at all. Its own tests caught it, and both directions are now mutation-checked.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 
