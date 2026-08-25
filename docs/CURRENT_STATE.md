@@ -390,6 +390,40 @@ obvious fix — binding `/usr` writable — would hand an agent the compiler it 
 that could be built without it would be a type able to describe a capsule missing two of its ten
 parts, and the missing half would not appear anywhere in the command it produced.
 
+**The seccomp debt is paid, and not the way it was owed.** `Bubblewrap::requires_seccomp` used to
+return true and say plainly that no filter was applied: bubblewrap takes one on a file descriptor,
+and an argument vector has no descriptor to give. The first attempt pushed a bare `--seccomp` anyway,
+bubblewrap read the `--` before the program as the number, and nothing started at all.
+
+The answer was not a descriptor. It was that a filter, like a Landlock ruleset, is something a
+process installs on itself just before `exec` — so it belongs in the entry program, which had to
+exist for step 3 regardless. `requires_seccomp` is false for this backend now, and the reason it is
+allowed to be is that the gate kills a capsule that calls `unshare` and reads the signal.
+
+What is denied is the small set that would let a capsule rearrange itself, never an allow-list. An
+allow-list against a development agent — compilers, linkers, package managers, whatever a build
+script felt like that morning — is either enormous or breaks on a Tuesday, and a sandbox that breaks
+a legitimate build gets switched off, which is the least secure outcome available.
+
+A matched call **kills** the process rather than returning `EPERM`, and the deciding reason is about
+what can be tested. `EPERM` is already what these calls return to an unprivileged process in a user
+namespace, so a filter returning it would be indistinguishable from no filter at all — the gate would
+pass identically on a build where none was installed. That is not hypothetical: the existing check,
+`no nested user namespace`, passes with the filter removed, because bubblewrap's own flags already
+refuse it. The new check reads the exit status, sees `159`, and fails with `only-refused:1` when the
+filter is taken out.
+
+`clone3` is the one exception and has to be. Seccomp reads a syscall's arguments but never the memory
+they point at, and `clone3` takes a pointer to a struct, so its flags are invisible to any filter.
+Killing it would break modern glibc, which creates processes with it. It is answered `ENOSYS`
+instead — the documented handshake: glibc concludes the kernel lacks it and falls back to `clone`,
+whose flags *are* an argument and are checked for `CLONE_NEWUSER`. Every fork ends up inspected, at
+the price of one wasted syscall per process.
+
+Two filters, because one filter has one action for everything it matches. Seccomp evaluates all
+installed filters and returns the most severe answer, so a kill filter and an `ENOSYS` filter applied
+in turn give each call the answer meant for it.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

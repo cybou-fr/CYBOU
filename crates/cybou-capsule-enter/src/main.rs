@@ -34,6 +34,9 @@
 //! shape of failure this repository keeps finding: a check that did not run, read afterwards as a
 //! check that passed.
 
+#[cfg(target_os = "linux")]
+mod reshaping;
+
 use std::path::PathBuf;
 
 /// What this was asked to do.
@@ -61,6 +64,7 @@ fn main() -> std::process::ExitCode {
 fn run() -> Result<(), String> {
     let request = parse(std::env::args().skip(1))?;
     restrict(&request)?;
+    refuse_reshaping()?;
     execute(&request.program)
 }
 
@@ -157,6 +161,17 @@ fn restrict(request: &Request) -> Result<(), String> {
                 .into(),
         ),
     }
+}
+
+/// Refuse the calls that would let the capsule rearrange itself.
+#[cfg(target_os = "linux")]
+fn refuse_reshaping() -> Result<(), String> {
+    reshaping::refuse_reshaping()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn refuse_reshaping() -> Result<(), String> {
+    Err("a capsule is a Linux kernel arrangement; this platform has none of it".into())
 }
 
 /// There is no second barrier anywhere but Linux, and this is not built for anywhere else.

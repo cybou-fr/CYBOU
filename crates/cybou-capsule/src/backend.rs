@@ -51,17 +51,17 @@ pub trait CapsuleBackend {
 
     /// Whether a seccomp filter still has to be applied by whatever spawns this.
     ///
-    /// True, and it is a separate question from [`Self::command`] for a reason worth stating: the
-    /// filter is passed to bubblewrap on a **file descriptor**, and a function that builds an
-    /// argument vector cannot know a descriptor number. The first version of this pushed a bare
-    /// `--seccomp` anyway; bubblewrap took the next token as the descriptor, which happened to be
-    /// the `--` separating the program, and every capsule failed to start. The gate caught it,
-    /// which is the only reason this note is about a fixed mistake rather than a shipped one.
+    /// It is a separate question from [`Self::command`] for a reason worth keeping: bubblewrap takes
+    /// its filter on a **file descriptor**, and a function that builds an argument vector cannot
+    /// know a descriptor number. The first version pushed a bare `--seccomp` anyway; bubblewrap read
+    /// the next token as the descriptor, which happened to be the `--` separating the program, and
+    /// every capsule failed to start. The gate caught it, which is the only reason this note is
+    /// about a fixed mistake rather than a shipped one.
     ///
-    /// So the flag is not here, and this says so out loud instead. **No filter is applied by this
-    /// build.** A spawning layer that owns a descriptor must add it and must refuse to run without
-    /// one; until that layer exists, a capsule has its namespaces, its mounts and its cgroup, and
-    /// not this. Reporting that plainly is the difference between a known gap and a silent one.
+    /// The debt was not paid by finding a descriptor. It was paid by the filter moving to where it
+    /// always belonged: `cybou-capsule-enter` installs it on itself just before becoming the agent,
+    /// which is also the only place Landlock can go. A backend that still needs one from outside
+    /// says so here, and the default is the safe answer for a backend that has not thought about it.
     fn requires_seccomp(&self) -> bool {
         true
     }
@@ -96,6 +96,14 @@ impl Bubblewrap {
 }
 
 impl CapsuleBackend for Bubblewrap {
+    fn requires_seccomp(&self) -> bool {
+        // The entry program this backend runs installs the filter itself, on itself, before it
+        // becomes the agent — so there is nothing left for a spawning layer to add. This is only
+        // allowed to be false because the gate kills a capsule that calls `unshare` and reads the
+        // signal, rather than because the code above says so.
+        false
+    }
+
     fn requires(&self) -> &'static str {
         "bwrap, and this project's own cybou-capsule-enter"
     }
@@ -428,8 +436,8 @@ mod tests {
             "a flag that needs a descriptor was emitted without one"
         );
         assert!(
-            entering().requires_seccomp(),
-            "the debt has to be visible to whatever spawns this"
+            !entering().requires_seccomp(),
+            "the entry program installs the filter, so nothing outside has to"
         );
     }
 

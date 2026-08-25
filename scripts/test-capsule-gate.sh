@@ -158,6 +158,16 @@ run_the_gate() {
     pass "The capsule cannot rebuild itself"
     must "no nested user namespace" "denied" \
         "unshare --user true 2>/dev/null && echo NESTED || echo denied"
+    # Which of the two barriers refused it. The check above passes on the bubblewrap flags alone —
+    # and would pass just as well on a capsule where the seccomp filter was never installed, since
+    # an unprivileged process in a user namespace is told EPERM by the kernel anyway. A killed
+    # process is the one answer only the filter gives.
+    must "reshaping the sandbox kills the capsule rather than being refused" "killed-by-sigsys" \
+        "unshare --user true 2>/dev/null; status=\$?; [ \"\$status\" = 159 ] && echo killed-by-sigsys || echo \"only-refused:\$status\""
+    # And a program that makes other programs is untouched, or the filter has made the capsule
+    # useless: every shell, compiler and package manager an agent runs forks.
+    must "making processes is not what was denied" "forks-fine" \
+        "x=\$(echo a)\$(echo b); [ \"\$x\" = ab ] && echo forks-fine || echo BROKEN"
 
     pass "The environment carries nothing from the host"
     must "the key store path did not come along" "clean" \

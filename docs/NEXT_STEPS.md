@@ -134,7 +134,7 @@ done  1. user + mount + PID + IPC + UTS namespaces
 done  2. an empty filesystem, built up by explicit bind mounts — never a host / with things removed
 done  3. Landlock as a second barrier: the mount says a path is absent, Landlock says no rights
 done  4. PR_SET_NO_NEW_PRIVS before exec
-      5. seccomp for the syscalls that change the sandbox's own shape, not a brittle allow-list
+done  5. seccomp for the syscalls that change the sandbox's own shape, not a brittle allow-list
 done  6. no nested user namespaces
 done  7. cgroup as the physical budget, including TasksMax; lifetime as the unit's lifetime
 done  8. lease expiry freezes or kills the cgroup — never an ACP stop message
@@ -142,16 +142,17 @@ done  9. network deny-all: a fresh namespace with loopback and no route
      10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
 ```
 
-One remains. **Step 5 is an open debt**: `Bubblewrap::requires_seccomp` declares the filter this
-build does not install — an earlier version passed `--seccomp` with no file descriptor, which made
-bubblewrap read the `--` before the program as its argument and started nothing at all. The place to
-install it now exists: `cybou-capsule-enter`, which is where step 3 landed, because a filter and a
-Landlock ruleset are both restrictions a process applies to itself just before `exec` and neither can
-be written on a command line.
+Nine of the ten hold. **Step 10, the egress broker, is what remains**, and until it exists a
+`NetworkGrant` naming hosts is compiled to a denial of all of them — named in the spec, not honoured,
+and the gate checks the denial rather than the naming.
 
-Step 3 was not only defence in depth. Bubblewrap builds the capsule's root as a writable tmpfs, so
-until Landlock was applied an agent could write to `/` — a real hole the mount namespace did not
-close, found because the gate went looking for a place where the two barriers could be told apart.
+Two of the nine were not the tidying-up they looked like. Step 3 was not only defence in depth:
+bubblewrap builds the capsule's root as a writable tmpfs, so until Landlock was applied an agent could
+write to `/` — a real hole the mount namespace did not close, found because the gate went looking for
+somewhere the two barriers could be told apart. And step 5 closed a declared debt by moving rather
+than by solving: the filter was waiting for a file descriptor bubblewrap could be handed, and what it
+actually needed was to be installed by the process that becomes the agent, which is where Landlock
+had to go anyway.
 
 Step 8 is done as two commands and not one: freeze, then kill. Not tidiness — a capsule under a task
 ceiling can fork faster than signals arrive, and freezing ends that race before it starts. It is only
