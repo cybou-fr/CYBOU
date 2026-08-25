@@ -14,6 +14,47 @@
 //! shapes of process, and the interface they share is this one.
 
 use cybou_protocol::model::{ModelManifest, ModelOutput, ModelRequest};
+use uuid::Uuid;
+
+/// One turn in an external agent's chat-completions request.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChatMessage {
+    /// OpenAI-compatible role name: `system`, `user`, `assistant`, or `tool`.
+    pub role: String,
+    /// Text already disclosed to the model gateway.
+    pub content: String,
+}
+
+/// The provider-facing form of an external agent completion.
+///
+/// It is deliberately not a [`ModelRequest`]. Mind's closed task vocabulary remains closed; this
+/// is the neighbouring surface ADR-0043 requires.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderChatRequest {
+    /// Identity of this completion.
+    pub request_id: Uuid,
+    /// Capability class selected by the capsule lease, not a provider model name.
+    pub model_class: String,
+    /// Conversation turns in their original order.
+    pub messages: Vec<ChatMessage>,
+    /// Hard output ceiling the worker must pass to the provider.
+    pub max_output_tokens: u32,
+    /// Hard spending ceiling remaining for this request.
+    pub max_spend_units: u64,
+}
+
+/// What a provider worker returns for an external agent completion.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderChatOutput {
+    /// Assistant text.
+    pub content: String,
+    /// Provider-observed input usage.
+    pub input_tokens: u32,
+    /// Provider-observed output usage.
+    pub output_tokens: u32,
+    /// Provider-observed cost in the operator's smallest configured unit.
+    pub spend_units: u64,
+}
 
 /// Why a worker could not answer.
 ///
@@ -40,6 +81,8 @@ pub enum WorkerFailed {
     },
     /// It could not run within the resources it was allowed.
     OutOfResources,
+    /// This worker only implements the other model surface.
+    UnsupportedSurface,
 }
 
 impl core::fmt::Display for WorkerFailed {
@@ -49,6 +92,7 @@ impl core::fmt::Display for WorkerFailed {
             Self::TimedOut { after_ms } => write!(formatter, "no answer within {after_ms}ms"),
             Self::Unusable { detail } => write!(formatter, "unusable answer: {detail}"),
             Self::OutOfResources => write!(formatter, "not enough resources to run"),
+            Self::UnsupportedSurface => write!(formatter, "this model worker does not serve chat"),
         }
     }
 }
@@ -66,4 +110,20 @@ pub trait Worker: Send + Sync {
     ///
     /// Returns [`WorkerFailed`] when the artifact cannot answer this request.
     fn answer(&self, request: &ModelRequest) -> Result<ModelOutput, WorkerFailed>;
+
+    /// Answer an external agent's chat request under the hard ceilings supplied by the gateway.
+    ///
+    /// A default refusal keeps a typed-only local worker valid while still letting one registered
+    /// provider implement both neighbouring surfaces. A worker is never selected for chat unless
+    /// its registration explicitly names the requested model class.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkerFailed`] when the provider cannot answer under those ceilings.
+    fn answer_chat(
+        &self,
+        _request: &ProviderChatRequest,
+    ) -> Result<ProviderChatOutput, WorkerFailed> {
+        Err(WorkerFailed::UnsupportedSurface)
+    }
 }

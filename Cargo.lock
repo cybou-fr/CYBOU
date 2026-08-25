@@ -1022,6 +1022,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-model-gateway"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "cybou-capsule",
+ "cybou-model-brokerd",
+ "cybou-protocol",
+ "getrandom 0.2.17",
+ "http-body-util",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "time",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [

@@ -210,9 +210,20 @@ launch screen belongs with the first agent pack; the authority it must invoke is
 
 ### B4. The Model Gateway
 
-A chat-completions surface beside `ModelBroker1`'s typed one, per
-[ADR-0043](adr/ADR-0043-model-gateway-for-external-agents.md). Same provider workers, same policy,
-same cost ledger. `ModelBroker1` is unchanged.
+**Done.** `cybou-model-gateway` provides the bounded OpenAI-compatible
+`/v1/chat/completions` router beside `ModelBroker1`, not through it. Both surfaces meet at the same
+registered provider workers, route policy and bounded usage ledger; Mind's closed `ModelTask`
+vocabulary and D-Bus interface are unchanged.
+
+The only credential accepted from a capsule is a freshly generated ephemeral token bound to one
+live capsule lease, agent, task, model class, sensitivity policy, token ceiling and spend ceiling.
+The gateway derives attribution and usage from the selected worker, charges the lease itself, and
+refuses expiry, revocation, class changes and reservations that would cross a ceiling. The gate
+drives both public request shapes through one fake worker and the real HTTP/auth/accounting path.
+
+No host listener is opened implicitly. Binding the router to the capsule-only endpoint and injecting
+the issued token are lifecycle work for the first agent pack; the multi-provider implementation
+behind the worker interface is B5.
 
 ### B5. A multi-provider worker
 

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-model-gateway"
+description = "Lease-bound chat-completions surface for external agents"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum.workspace = true
+cybou-capsule = { path = "../cybou-capsule" }
+cybou-model-brokerd = { path = "../cybou-model-brokerd" }
+getrandom.workspace = true
+serde.workspace = true
+sha2.workspace = true
+time.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+cybou-protocol = { path = "../cybou-protocol" }
+http-body-util.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

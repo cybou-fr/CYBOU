@@ -28,5 +28,8 @@ pub mod worker;
 #[cfg(target_os = "linux")]
 pub mod service;
 
-pub use core::{Attempt, BrokerCore, BrokerRefused, Registered};
-pub use worker::{Worker, WorkerFailed};
+pub use core::{
+    AgentChatRequest, AgentChatResult, Attempt, BrokerCore, BrokerRefused, ChatRefused, Registered,
+    UsageRecord, UsageSubject,
+};
+pub use worker::{ChatMessage, ProviderChatOutput, ProviderChatRequest, Worker, WorkerFailed};

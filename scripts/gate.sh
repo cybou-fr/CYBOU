@@ -78,6 +78,7 @@ step "site wording"          python3 scripts/sync-site-i18n.py --check
 step "multi-daemon organs"   bash scripts/test-multi-daemon-integration.sh
 step "ACP client boundary"   bash scripts/test-acp-gate.sh
 step "standing lease mint"   bash scripts/test-standing-lease-gate.sh
+step "agent model gateway"   bash scripts/test-model-gateway-gate.sh
 
 # ADR-0042 G1. Exit 3 means bubblewrap is absent, which is a check that did not run rather than one
 # that passed — the distinction this whole script exists to keep.

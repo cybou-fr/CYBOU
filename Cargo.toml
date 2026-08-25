@@ -24,6 +24,7 @@ members = [
     "crates/cybou-meaning",
     "crates/cybou-meaningd",
     "crates/cybou-model-brokerd",
+    "crates/cybou-model-gateway",
     "crates/cybou-perception",
     "crates/cybou-perceptiond",
     "crates/cybou-predictord",

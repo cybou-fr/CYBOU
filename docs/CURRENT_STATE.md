@@ -806,6 +806,20 @@ and executes nothing.
 - A request names the disclosure its input was drawn from, in a field that is not optional.
 - Route selection is by declaration order, so the same request always chooses the same worker.
 
+External agents now have a separate OpenAI-compatible `/v1/chat/completions` router in
+`cybou-model-gateway`. It does not turn arbitrary agent prompts into a `ModelTask` and does not call
+the D-Bus surface. Instead, both neighbouring request shapes meet at the same registered provider
+worker, route policy and bounded usage ledger. Every agent completion is attributed to capsule,
+agent, task, exact model artifact and provider.
+
+The gateway accepts only an unpredictable ephemeral bearer minted from a live capsule lease. The
+token is scoped to that capsule's agent and model class, a task, route sensitivity, lifetime, token
+ceiling and the lease's spend ceiling. Revocation and expiry take effect on the next request; input
+and maximum output are reserved before a worker runs, provider-observed usage is checked against the
+reservation, and successful usage is charged by the gateway rather than reported by the agent. The
+HTTP router is complete and tested but opens no listener by itself; the first agent pack owns binding
+it to the capsule-only endpoint and injecting the token.
+
 **No inference runtime is implemented and no model has ever been loaded.** On an installation with
 no worker, every request is answered with what happens instead. That is a supported configuration.
 
@@ -838,6 +852,8 @@ bash scripts/test-capsule-gate.sh
 bash scripts/test-egress-gate.sh
 bash scripts/test-action-gate.sh
 bash scripts/test-acp-gate.sh
+bash scripts/test-standing-lease-gate.sh
+bash scripts/test-model-gateway-gate.sh
 python3 scripts/validate-cognitive-docs.py .
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py

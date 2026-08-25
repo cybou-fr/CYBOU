@@ -176,3 +176,11 @@ at what cost, under whose key.
 - [ADR-0042](ADR-0042-agent-capsule-platform.md) — the capsule a lease is scoped to
 - [ADR-0030](ADR-0030-transparent-context-delivery.md) — what may cross a boundary
 - [ADR-0021](ADR-0021-language-models-are-optional-faculties.md) — why no model owns anything, on either surface
+
+## Implementation status
+
+B4 implements the compatibility router, ephemeral lease token, shared worker registration, route
+policy, accounting and attribution ledger. Its gate exercises the typed and agent surfaces through
+one registered fake worker and the real HTTP/auth/budget path. No listener is opened implicitly, no
+provider worker exists yet, and no provider credential is part of the gateway contract; endpoint
+binding and token injection belong to the first agent pack, while the multi-provider worker is B5.

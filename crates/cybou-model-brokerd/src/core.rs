@@ -10,14 +10,135 @@ use cybou_protocol::model::{
     admissible, attributable_to,
 };
 
-use crate::worker::{Worker, WorkerFailed};
+use crate::worker::{ChatMessage, ProviderChatRequest, Worker, WorkerFailed};
 
 /// One backend, and the route it is reachable by.
 pub struct Registered {
     /// How this worker may be reached and what it may receive.
     pub route: ModelRoute,
+    /// Model classes this same worker serves on the neighbouring agent gateway.
+    pub gateway_classes: Vec<String>,
     /// The worker itself.
     pub worker: Box<dyn Worker>,
+}
+
+/// A policy-complete chat request passed from the authenticated gateway to the shared providers.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AgentChatRequest {
+    /// Identity of this completion.
+    pub request_id: uuid::Uuid,
+    /// Capsule whose token authenticated it.
+    pub capsule_id: uuid::Uuid,
+    /// Agent bound to that capsule lease.
+    pub agent: String,
+    /// Task bound when the ephemeral token was issued.
+    pub task_id: uuid::Uuid,
+    /// Capability class granted by the lease.
+    pub model_class: String,
+    /// Conversation turns.
+    pub messages: Vec<ChatMessage>,
+    /// Conservative input reservation made by the gateway.
+    pub input_tokens: u32,
+    /// Hard output reservation.
+    pub max_output_tokens: u32,
+    /// Remaining spending reservation.
+    pub max_spend_units: u64,
+    /// Whether the selected profile requires an on-device route.
+    pub local_only: bool,
+    /// Sensitivity ceiling attached to the token by the issuer.
+    pub sensitivity: u8,
+}
+
+/// An attributed completion returned to the agent gateway.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AgentChatResult {
+    /// Completion identity.
+    pub request_id: uuid::Uuid,
+    /// Assistant text.
+    pub content: String,
+    /// Exact model identity declared by the selected worker.
+    pub answered_by: ModelIdentity,
+    /// Stable provider registration name.
+    pub provider: String,
+    /// Provider-observed input tokens.
+    pub input_tokens: u32,
+    /// Provider-observed output tokens.
+    pub output_tokens: u32,
+    /// Provider-observed spend.
+    pub spend_units: u64,
+}
+
+/// Why the shared provider pool did not answer an agent chat request.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ChatRefused {
+    /// No registered worker serves this capability class.
+    NoProviderForClass(String),
+    /// Every provider for the class was outside the token's policy.
+    EveryProviderRefused,
+    /// The selected worker failed and no undeclared substitute was attempted.
+    WorkerFailed {
+        /// Named provider that failed.
+        provider: String,
+        /// Failure it reported.
+        failure: WorkerFailed,
+    },
+    /// A worker reported usage beyond a hard reservation.
+    ExceededReservation,
+}
+
+impl core::fmt::Display for ChatRefused {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoProviderForClass(class) => write!(formatter, "no provider serves {class}"),
+            Self::EveryProviderRefused => formatter.write_str("every provider refused this policy"),
+            Self::WorkerFailed { provider, failure } => write!(formatter, "{provider}: {failure}"),
+            Self::ExceededReservation => {
+                formatter.write_str("the provider exceeded the request reservation")
+            }
+        }
+    }
+}
+
+impl core::error::Error for ChatRefused {}
+
+/// Which neighbouring model surface incurred usage.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum UsageSubject {
+    /// Mind's closed typed vocabulary.
+    Mind {
+        /// Configured consumer.
+        consumer: String,
+        /// Typed task.
+        task: ModelTask,
+    },
+    /// An external agent under a capsule lease.
+    Agent {
+        /// Capsule identity.
+        capsule_id: uuid::Uuid,
+        /// Agent identity.
+        agent: String,
+        /// Task identity fixed by the ephemeral token.
+        task_id: uuid::Uuid,
+    },
+}
+
+/// One entry in the provider pool's shared cost and attribution ledger.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UsageRecord {
+    /// Completion identity.
+    pub request_id: uuid::Uuid,
+    /// Surface and governed subject.
+    pub subject: UsageSubject,
+    /// Stable provider name.
+    pub provider: String,
+    /// Exact model identity.
+    pub model: ModelIdentity,
+    /// Provider-observed input tokens.
+    pub input_tokens: u32,
+    /// Provider-observed output tokens.
+    pub output_tokens: u32,
+    /// Cost in the operator's smallest configured unit.
+    pub spend_units: u64,
 }
 
 /// Why the broker did not answer.
@@ -118,6 +239,8 @@ pub struct BrokerCore {
     /// Bounded, and holding no input or output — a broker that kept prompts would be a second
     /// memory with different rules, which is the thing ADR-0029 spent a whole decision refusing.
     attempts: Mutex<Vec<Attempt>>,
+    /// One bounded ledger for both `ModelBroker1` and the agent gateway.
+    usage: Mutex<Vec<UsageRecord>>,
 }
 
 /// How many attempts the faculty remembers.
@@ -130,12 +253,27 @@ impl BrokerCore {
         Self {
             workers: Vec::new(),
             attempts: Mutex::new(Vec::new()),
+            usage: Mutex::new(Vec::new()),
         }
     }
 
     /// Register a backend.
     pub fn register(&mut self, route: ModelRoute, worker: Box<dyn Worker>) {
-        self.workers.push(Registered { route, worker });
+        self.register_provider(route, Vec::new(), worker);
+    }
+
+    /// Register one provider worker for Mind and, explicitly, for agent model classes.
+    pub fn register_provider(
+        &mut self,
+        route: ModelRoute,
+        gateway_classes: Vec<String>,
+        worker: Box<dyn Worker>,
+    ) {
+        self.workers.push(Registered {
+            route,
+            gateway_classes,
+            worker,
+        });
     }
 
     /// Whether anything at all can answer.
@@ -161,6 +299,15 @@ impl BrokerCore {
     #[must_use]
     pub fn recent_attempts(&self) -> Vec<Attempt> {
         self.attempts
+            .lock()
+            .map(|held| held.clone())
+            .unwrap_or_default()
+    }
+
+    /// Recent usage from both neighbouring surfaces, in one ledger.
+    #[must_use]
+    pub fn recent_usage(&self) -> Vec<UsageRecord> {
+        self.usage
             .lock()
             .map(|held| held.clone())
             .unwrap_or_default()
@@ -247,6 +394,98 @@ impl BrokerCore {
             answered_by: Some(registered.route.provider.clone()),
             crossed_a_boundary: registered.route.external_boundary,
         });
+        self.note_usage(UsageRecord {
+            request_id: request.request_id,
+            subject: UsageSubject::Mind {
+                consumer: request.consumer.clone(),
+                task: request.task,
+            },
+            provider: registered.route.provider.clone(),
+            model: result.answered_by.clone(),
+            input_tokens: result.input_tokens,
+            output_tokens: result.output_tokens,
+            spend_units: 0,
+        });
+        Ok(result)
+    }
+
+    /// Complete one authenticated agent chat request through the same registered providers and
+    /// route policy as `ModelBroker1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ChatRefused`] when no worker serves the class, route policy refuses every worker,
+    /// the selected worker fails, or it reports usage beyond the hard request reservation.
+    pub fn submit_agent_chat(
+        &self,
+        request: &AgentChatRequest,
+    ) -> Result<AgentChatResult, ChatRefused> {
+        let candidates: Vec<&Registered> = self
+            .workers
+            .iter()
+            .filter(|registered| {
+                registered
+                    .gateway_classes
+                    .iter()
+                    .any(|class| class == &request.model_class)
+            })
+            .collect();
+        if candidates.is_empty() {
+            return Err(ChatRefused::NoProviderForClass(request.model_class.clone()));
+        }
+
+        let Some(registered) = candidates.into_iter().find(|registered| {
+            (!request.local_only || !registered.route.external_boundary)
+                && request.sensitivity <= registered.route.sensitivity_ceiling
+                && request.input_tokens <= registered.route.context_limit
+        }) else {
+            return Err(ChatRefused::EveryProviderRefused);
+        };
+
+        let provider_request = ProviderChatRequest {
+            request_id: request.request_id,
+            model_class: request.model_class.clone(),
+            messages: request.messages.clone(),
+            max_output_tokens: request.max_output_tokens,
+            max_spend_units: request.max_spend_units,
+        };
+        let output = registered
+            .worker
+            .answer_chat(&provider_request)
+            .map_err(|failure| ChatRefused::WorkerFailed {
+                provider: registered.route.provider.clone(),
+                failure,
+            })?;
+        if output.input_tokens > request.input_tokens
+            || output.output_tokens > request.max_output_tokens
+            || output.spend_units > request.max_spend_units
+        {
+            return Err(ChatRefused::ExceededReservation);
+        }
+
+        let model = registered.worker.manifest().identity.clone();
+        let result = AgentChatResult {
+            request_id: request.request_id,
+            content: output.content,
+            answered_by: model.clone(),
+            provider: registered.route.provider.clone(),
+            input_tokens: output.input_tokens,
+            output_tokens: output.output_tokens,
+            spend_units: output.spend_units,
+        };
+        self.note_usage(UsageRecord {
+            request_id: request.request_id,
+            subject: UsageSubject::Agent {
+                capsule_id: request.capsule_id,
+                agent: request.agent.clone(),
+                task_id: request.task_id,
+            },
+            provider: registered.route.provider.clone(),
+            model,
+            input_tokens: output.input_tokens,
+            output_tokens: output.output_tokens,
+            spend_units: output.spend_units,
+        });
         Ok(result)
     }
 
@@ -256,6 +495,15 @@ impl BrokerCore {
             attempts.push(attempt);
             while attempts.len() > REMEMBERED_ATTEMPTS {
                 attempts.remove(0);
+            }
+        }
+    }
+
+    fn note_usage(&self, record: UsageRecord) {
+        if let Ok(mut usage) = self.usage.lock() {
+            usage.push(record);
+            while usage.len() > REMEMBERED_ATTEMPTS {
+                usage.remove(0);
             }
         }
     }
