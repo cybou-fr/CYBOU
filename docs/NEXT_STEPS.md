@@ -351,6 +351,23 @@ operator knows what their deployment charges; a default either way would be Cybo
 behalf — one direction silently forbids the free models a person selected, the other silently spends
 their money.
 
+### B7c. A stream, so an agent can run at all
+
+**Protocol done; incremental delivery is B8.** The gateway refused `stream: true`, and that was not
+"no streaming yet" — a coding agent asks for a stream and treats a refusal as a broken endpoint, so
+it was an agent that could not run. `/v1/chat/completions` now answers with a real
+`text/event-stream` in the shape every OpenAI-compatible client expects.
+
+What it is not, said here because a client cannot tell: the completion is produced whole before the
+first byte leaves. Nothing arrives sooner. The upstream request to the provider is still not itself a
+stream, and the gate asserts that — the boundary stays where it was.
+
+Doing it in this order is the safe direction rather than the lazy one. The lease is charged before
+any of the response is sent, so a completion that would exceed the ceiling is refused while refusing
+is still possible. Delivering tokens as they arrive means charging as they arrive, and a ceiling
+reached mid-sentence cannot be honoured by unsending what has already gone. That needs a mid-stream
+cancellation design, and it belongs with B8's live session rather than in the compatibility adapter.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

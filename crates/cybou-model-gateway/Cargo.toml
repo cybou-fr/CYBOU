@@ -16,6 +16,7 @@ cybou-capsule = { path = "../cybou-capsule" }
 cybou-model-brokerd = { path = "../cybou-model-brokerd" }
 getrandom.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 time.workspace = true
 tokio.workspace = true

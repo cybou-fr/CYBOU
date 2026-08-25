@@ -112,6 +112,20 @@ answer="$(curl --silent --show-error --fail --unix-socket "$work/runtime/model.s
   --data '{"model":"Strong","messages":[{"role":"user","content":"hello"}],"max_tokens":9}' \
   http://localhost/v1/chat/completions)"
 grep -q 'bounded answer' <<<"$answer"
+# The same completion asked for as a stream. A coding agent asks for one and treats a refusal as a
+# broken endpoint, so this is not a nicety — it is whether an agent can run at all. What comes back
+# is the real event shape; the completion inside it was produced whole, and the fake proxy above
+# asserts the upstream request was not itself a stream, which is the boundary staying where it is.
+streamed="$(curl --silent --show-error --fail --unix-socket "$work/runtime/model.sock" \
+  -H "authorization: Bearer $token" -H 'content-type: application/json' \
+  --data '{"model":"Strong","messages":[{"role":"user","content":"hello"}],"max_tokens":9,"stream":true}' \
+  http://localhost/v1/chat/completions)"
+grep -q '^data: ' <<<"$streamed"
+grep -q 'chat.completion.chunk' <<<"$streamed"
+grep -q 'bounded answer' <<<"$streamed"
+grep -q '"finish_reason":"stop"' <<<"$streamed"
+grep -q '^data: \[DONE\]$' <<<"$streamed"
+
 for artifact in "$work/runtime/model-token" "$work/gateway.out" "$work/gateway.err"; do
   ! grep -q 'gate-master' "$artifact"
 done

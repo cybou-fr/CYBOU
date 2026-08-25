@@ -60,6 +60,10 @@ Until the session owner exists, `cargo run -p cybou-capsule --example issue-leas
 lease through the same public mint the owner will call. It is a bring-up and gate tool, not a launch
 surface: it holds no lifecycle and cannot stop what it starts.
 
+`stream: true` is answered with a `text/event-stream`, because a compatibility client that is refused
+one stops rather than falling back. The completion inside it is produced whole and charged before the
+first byte is sent; the request this gateway makes upstream is not itself a stream.
+
 `scripts/test-agent-gateway-gate.sh` proves this lifecycle against a fake LiteLLM peer on Debian.
 `scripts/test-opencode-pack-live.sh` remains the completion gate against an operator-selected real
 provider. It is `NOT RUN`, not passed, until that external deployment and credential exist.

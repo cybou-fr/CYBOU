@@ -413,3 +413,112 @@ async fn openai_compatible_http_shape_requires_the_ephemeral_bearer() {
     assert_eq!(response["choices"][0]["message"]["content"], "done");
     assert_eq!(response["usage"]["total_tokens"], 3);
 }
+
+#[tokio::test]
+async fn a_streaming_request_gets_an_event_stream_rather_than_a_refusal() {
+    // A coding agent asks for a stream and treats a refusal as a broken endpoint, so refusing this
+    // was not "no streaming yet" — it was an agent that could not run at all.
+    //
+    // What comes back is the real event shape and not incremental delivery: the completion is
+    // produced whole and charged before the first byte leaves. That order is the safe one. Charging
+    // as tokens arrive means a ceiling can be reached mid-sentence, and nothing can unsend what has
+    // already gone.
+    let now = OffsetDateTime::now_utc();
+    let mut profile = CapabilityProfile::bounded(
+        "streaming-agent",
+        ResourceBudget {
+            memory_mib: 1024,
+            cpus: 1,
+            tasks_max: 64,
+            lifetime: Duration::hours(1),
+        },
+    )
+    .expect("profile");
+    profile.model = Some(ModelGrant {
+        class: "Strong".to_owned(),
+        spend: SpendPolicy::Capped(20),
+    });
+    let lease = Arc::new(Mutex::new(
+        issue_lease(
+            LeaseRequest {
+                selected_profile: profile,
+                capsule_id: Uuid::from_u128(8473),
+                agent: "opencode".to_owned(),
+                workspace: Workspace::at("/srv/project"),
+            },
+            now,
+        )
+        .expect("lease"),
+    ));
+    let core = Arc::new(GatewayCore::new(providers()));
+    let token = core
+        .issue_token(Arc::clone(&lease), Uuid::from_u128(56), policy(), now)
+        .expect("token");
+    let app = router(core);
+
+    let response = app
+        .oneshot(
+            Request::post("/v1/chat/completions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(
+                    header::AUTHORIZATION,
+                    format!("Bearer {}", token.expose_secret()),
+                )
+                .body(Body::from(
+                    json!({
+                        "model": "Strong",
+                        "messages": [{"role": "user", "content": "work"}],
+                        "max_tokens": 16,
+                        "stream": true
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("a content type"),
+        "text/event-stream"
+    );
+    let body = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let body = String::from_utf8(body.to_vec()).expect("utf-8");
+
+    let events: Vec<&str> = body
+        .split("\n\n")
+        .filter(|event| !event.is_empty())
+        .map(|event| event.trim_start_matches("data: "))
+        .collect();
+    assert_eq!(events.len(), 4, "{body}");
+    assert_eq!(*events.last().expect("a sentinel"), "[DONE]");
+
+    let parsed: Vec<serde_json::Value> = events[..3]
+        .iter()
+        .map(|event| serde_json::from_str(event).expect("JSON"))
+        .collect();
+    for event in &parsed {
+        assert_eq!(event["object"], "chat.completion.chunk");
+    }
+    assert_eq!(parsed[0]["choices"][0]["delta"]["role"], "assistant");
+    assert_eq!(parsed[1]["choices"][0]["delta"]["content"], "done");
+    assert_eq!(parsed[2]["choices"][0]["finish_reason"], "stop");
+    assert_eq!(parsed[2]["usage"]["total_tokens"], 3);
+
+    // Charged once, before anything was sent. A stream that billed as it went would have had to
+    // decide what to do about a ceiling reached halfway through a sentence.
+    assert_eq!(
+        lease.lock().expect("lease").model_spent(),
+        7,
+        "the completion's whole cost, charged once, before any of it was sent"
+    );
+}
