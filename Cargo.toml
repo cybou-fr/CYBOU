@@ -25,6 +25,7 @@ members = [
     "crates/cybou-meaningd",
     "crates/cybou-model-brokerd",
     "crates/cybou-model-gateway",
+    "crates/cybou-provider-catalogue",
     "crates/cybou-provider-litellm",
     "crates/cybou-perception",
     "crates/cybou-perceptiond",
@@ -74,6 +75,7 @@ tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread", "s
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.0", features = ["fs", "set-header", "trace"] }
 uuid = { version = "1.24.1", features = ["serde", "v4", "v5"] }
+url = { version = "2.5.8", features = ["serde"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

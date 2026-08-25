@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "revision": "example-1",
+  "providers": [
+    {
+      "id": "preferred.invalid",
+      "name": "Preferred Example",
+      "availability": {
+        "value": "unavailable",
+        "observedAt": "1970-01-01T00:00:00Z",
+        "validUntil": "1970-01-01T01:00:00Z",
+        "evidence": ["https://preferred.invalid/status"]
+      },
+      "zeroCostAccess": {
+        "value": "unknown",
+        "observedAt": "1970-01-01T00:00:00Z",
+        "validUntil": "1970-01-01T01:00:00Z",
+        "evidence": ["https://preferred.invalid/terms"]
+      },
+      "conditions": []
+    },
+    {
+      "id": "alternative.invalid",
+      "name": "Alternative Example",
+      "availability": {
+        "value": "available",
+        "observedAt": "1970-01-01T00:00:00Z",
+        "validUntil": "1970-01-01T01:00:00Z",
+        "evidence": ["https://alternative.invalid/status"]
+      },
+      "zeroCostAccess": {
+        "value": "available",
+        "observedAt": "1970-01-01T00:00:00Z",
+        "validUntil": "1970-01-01T01:00:00Z",
+        "evidence": ["https://alternative.invalid/terms"]
+      },
+      "conditions": [
+        {
+          "kind": "data-use",
+          "summary": "Example warning, not a real provider claim",
+          "observedAt": "1970-01-01T00:00:00Z",
+          "validUntil": "1970-01-01T01:00:00Z",
+          "evidence": ["https://alternative.invalid/terms"]
+        }
+      ]
+    }
+  ]
+}

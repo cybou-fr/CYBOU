@@ -835,6 +835,15 @@ known token pricing, so `max_tokens` can be priced and reserved before provider 
 worker is exercised against a fake HTTP proxy. On an installation with no registered worker, every
 request is answered with what happens instead. That remains a supported configuration.
 
+Provider availability, zero-cost access and material terms now have a separate data boundary in
+`cybou-provider-catalogue`. The compiled catalogue is empty. External schema-v1 entries carry
+independent UTC observation and expiry times plus HTTPS evidence for availability and zero-cost
+claims; warnings about data use, payment methods, geography and quota are source-backed the same
+way. Stale claims remain visible but are ineligible for routing. Operator policy supplies the only
+preferred and alternative provider names, and resolution reports a fallback as `NamedAlternative`
+rather than silently relabelling it as the preferred route. See the
+[provider catalogue contract](provider-catalogue.md).
+
 ## Action boundary
 
 The host observes itself, concludes, explains, offers, and refuses.
@@ -867,6 +876,7 @@ bash scripts/test-acp-gate.sh
 bash scripts/test-standing-lease-gate.sh
 bash scripts/test-model-gateway-gate.sh
 bash scripts/test-litellm-worker-gate.sh
+bash scripts/test-provider-catalogue-gate.sh
 python3 scripts/validate-cognitive-docs.py .
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py

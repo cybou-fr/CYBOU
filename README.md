@@ -168,6 +168,7 @@ gateway that cannot become a second cognitive owner.
 | Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
 | Governed action and remediation boundary | Implemented through three typed adapters and independent re-observation — ADR-0022 gate |
 | Model brokerage as a faculty, not an organ | Implemented — ADR-0035; replaceable LiteLLM worker available, not deployed |
+| Source-backed provider catalogue | Implemented — ADR-0043 B6; compiled default is empty |
 | Agent capsules with kernel-enforced boundaries and brokered egress | Implemented — ADR-0042 gates |
 | A model gateway and leases for agents that are not Mind | Implemented through B5 — ADR-0043; first live agent/provider is B7 |
 | Distributed Mind prototype | Planned |

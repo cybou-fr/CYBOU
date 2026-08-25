@@ -136,7 +136,8 @@ impl LiteLlmWorker {
     ) -> Result<String, WorkerFailed> {
         if request.max_spend_units == 0 {
             // LiteLLM installations differ on whether a zero key budget means zero or unlimited.
-            // Until B6 supplies an observed zero-cost catalogue entry, ambiguity is a refusal.
+            // A catalogue observation does not weaken this transport boundary: B7 must register a
+            // route whose proxy-side reservation can prove even a zero ceiling before enabling it.
             return Err(WorkerFailed::OutOfResources);
         }
         let max_microusd = request

@@ -1123,6 +1123,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-provider-catalogue"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "url",
+]
+
+[[package]]
 name = "cybou-provider-litellm"
 version = "0.1.0"
 dependencies = [
@@ -4191,6 +4202,7 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]

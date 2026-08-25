@@ -111,6 +111,13 @@ A catalogue with a timestamp, and a warning where a provider's free tier carries
 would want to know about before sending their code through it. A hardcoded free-tier claim becomes a
 lie on the provider's schedule rather than on ours.
 
+The implemented catalogue starts empty. Availability and zero-cost access are separate expiring
+observations with HTTPS evidence, and material conditions carry independent observation windows.
+Stale evidence is shown as stale and cannot authorize routing. Preferred and fallback provider names
+come from operator policy; resolution returns a distinct named-alternative result with the preferred
+route's refusal reason, or reports absence. The catalogue therefore contains volatile facts but no
+route priority and the binary contains neither.
+
 ### Cost and attribution are the gateway's, not the agent's
 
 Every completion is attributed to a capsule, an agent, a task, a model and a provider, and spending
@@ -192,3 +199,7 @@ before the provider sees the request. A proxy that cannot price the route is not
 The B5 gate uses a fake HTTP proxy and no provider credential. No listener, LiteLLM service or real
 provider is deployed implicitly; endpoint binding, token injection and the first live provider call
 belong to the first agent pack.
+
+B6 adds the implementation-neutral, source-backed provider catalogue and its stale/fallback gate.
+Its checked-in data uses only reserved example domains. Producing a deployment snapshot and proving
+one real route belong to B7.

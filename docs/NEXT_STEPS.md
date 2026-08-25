@@ -252,6 +252,19 @@ Free tiers exist and their limits change without notice. Cybou must not contain 
 model is free* — a catalogue entry with a timestamp, and a warning where a free tier carries a
 condition a person would want to know before sending their code through it.
 
+**Done.** `cybou-provider-catalogue` starts empty and parses only external schema-v1 observations.
+Availability and zero-cost access are separate claims, each with UTC `observedAt`, `validUntil` and
+credential-free HTTPS evidence. Data-use, payment-method, regional, quota and other material
+conditions carry their own evidence and validity window. Expired claims remain displayable as stale
+evidence but cannot make a provider eligible; future-dated, unsourced, non-HTTPS, duplicate or
+malformed entries fail the entire snapshot.
+
+Provider order is operator policy rather than catalogue data. Resolution accepts an explicit
+preferred provider and explicit ordered alternatives and returns `Preferred`, `NamedAlternative` or
+`Absent`, preserving why the preferred route was rejected. The gate uses only reserved `.invalid`
+examples and proves the compiled default asserts no real provider fact. The observer that produces a
+deployment snapshot and the first live route remain B7.
+
 ### B7. First agent pack
 
 One agent, end to end, inside a capsule, against a real provider — and only after B1's gate passes
