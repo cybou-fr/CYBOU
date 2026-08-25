@@ -62,13 +62,26 @@ proxy_pid=$!
 for _ in $(seq 1 50); do [ -s "$work/proxy-port" ] && break; sleep .05; done
 port="$(cat "$work/proxy-port")"
 
-CYBOU_AGENT_RUNTIME_DIR="$work/runtime" \
+# The lease is minted by the one public mint and handed over as bytes, exactly as the session owner
+# will hand it to the unit through LoadCredential. A gate that let the gateway rebuild a lease from
+# these values would be testing a second authority rather than the approved one.
+CYBOU_PROFILE_ID=gate-live \
 CYBOU_CAPSULE_ID=00000000-0000-0000-0000-000000000701 \
-CYBOU_AGENT_TASK_ID=00000000-0000-0000-0000-000000000702 \
+CYBOU_AGENT=opencode \
 CYBOU_AGENT_WORKSPACE="$work/workspace" \
 CYBOU_AGENT_LEASE_SECONDS=120 \
+CYBOU_CAPSULE_MEMORY_MIB=4096 \
+CYBOU_CAPSULE_CPUS=2 \
+CYBOU_CAPSULE_TASKS_MAX=512 \
+CYBOU_CAPSULE_MAY_EXECUTE=yes \
 CYBOU_MODEL_CLASS=Strong \
 CYBOU_MODEL_SPEND_LIMIT=100 \
+cargo run --quiet --locked -p cybou-capsule --example issue-lease -- "$work/lease.cbor"
+test -s "$work/lease.cbor"
+
+CYBOU_AGENT_RUNTIME_DIR="$work/runtime" \
+CYBOU_AGENT_LEASE_FILE="$work/lease.cbor" \
+CYBOU_AGENT_TASK_ID=00000000-0000-0000-0000-000000000702 \
 CYBOU_MODEL_TOKEN_LIMIT=1000 \
 CYBOU_MODEL_MAX_OUTPUT_TOKENS=32 \
 CYBOU_MODEL_SENSITIVITY=1 \
@@ -101,4 +114,40 @@ grep -q 'bounded answer' <<<"$answer"
 for artifact in "$work/runtime/model-token" "$work/gateway.out" "$work/gateway.err"; do
   ! grep -q 'gate-master' "$artifact"
 done
+# A lease that is over is not a lease with less time on it. Serving one would mean the clock stopped
+# being the thing that ends a capsule.
+CYBOU_PROFILE_ID=gate-expired \
+CYBOU_CAPSULE_ID=00000000-0000-0000-0000-000000000703 \
+CYBOU_AGENT=opencode \
+CYBOU_AGENT_WORKSPACE="$work/workspace" \
+CYBOU_AGENT_LEASE_SECONDS=1 \
+CYBOU_CAPSULE_MEMORY_MIB=4096 \
+CYBOU_CAPSULE_CPUS=2 \
+CYBOU_CAPSULE_TASKS_MAX=512 \
+CYBOU_CAPSULE_MAY_EXECUTE=yes \
+CYBOU_MODEL_CLASS=Strong \
+CYBOU_MODEL_SPEND_LIMIT=100 \
+cargo run --quiet --locked -p cybou-capsule --example issue-lease -- "$work/expired.cbor"
+sleep 2
+mkdir "$work/runtime-expired"
+if CYBOU_AGENT_RUNTIME_DIR="$work/runtime-expired" \
+  CYBOU_AGENT_LEASE_FILE="$work/expired.cbor" \
+  CYBOU_AGENT_TASK_ID=00000000-0000-0000-0000-000000000704 \
+  CYBOU_MODEL_TOKEN_LIMIT=1000 \
+  CYBOU_MODEL_MAX_OUTPUT_TOKENS=32 \
+  CYBOU_MODEL_SENSITIVITY=1 \
+  CYBOU_MODEL_MICROUSD_PER_UNIT=10 \
+  CYBOU_LITELLM_BASE_URL="http://127.0.0.1:$port" \
+  CYBOU_LITELLM_MASTER_KEY=gate-master \
+  CYBOU_LITELLM_PROVIDER=gate-litellm \
+  CYBOU_LITELLM_MODEL_GROUP=cybou-strong \
+  CYBOU_LITELLM_DEPLOYMENT_SHA256=5555555555555555555555555555555555555555555555555555555555555555 \
+  CYBOU_LITELLM_TIMEOUT_MS=2000 \
+  cargo run --quiet --locked -p cybou-agent-gateway >/dev/null 2>"$work/expired.err"; then
+  echo "an expired lease was served" >&2
+  exit 1
+fi
+test ! -e "$work/runtime-expired/model.sock"
+test ! -e "$work/runtime-expired/model-token"
+
 echo "=== Per-capsule agent gateway gate passed ==="

@@ -15,12 +15,16 @@ UMask=0077
 RuntimeDirectory=cybou-agent-%i
 RuntimeDirectoryMode=0700
 
-# Provider policy has no secret. One root-created lease file binds this instance to one capsule,
-# task, workspace and set of ceilings. A missing file is a failed launch, never broad authority.
+# Provider policy has no secret. The authority is the lease itself, minted once by the session owner
+# and delivered as bytes: this unit re-derives none of it. The environment file carries only what is
+# not authority — the task id and the per-token ceilings. A missing lease or file is a failed launch,
+# never broad authority.
 EnvironmentFile=/etc/cybou/provider.env
 EnvironmentFile=/run/cybou-agent-leases/%i.env
 LoadCredential=litellm-master:/etc/cybou/litellm-master-key
+LoadCredential=lease:/run/cybou-agent-leases/%i.lease
 Environment=CYBOU_LITELLM_MASTER_KEY_FILE=%d/litellm-master
+Environment=CYBOU_AGENT_LEASE_FILE=%d/lease
 Environment=CYBOU_AGENT_RUNTIME_DIR=/run/cybou-agent-%i
 
 ExecStart=/usr/libexec/cybou/cybou-agent-gateway

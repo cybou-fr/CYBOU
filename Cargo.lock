@@ -761,6 +761,7 @@ name = "cybou-agent-gateway"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "ciborium",
  "cybou-capsule",
  "cybou-model-brokerd",
  "cybou-model-gateway",

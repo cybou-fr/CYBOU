@@ -8,8 +8,8 @@ compile_error!("cybou-agent-gateway is a Debian runtime and requires Unix domain
 
 use std::{
     env,
-    fs::{self, OpenOptions},
-    io::Write as _,
+    fs::{self, File, OpenOptions},
+    io::{BufReader, Write as _},
     num::NonZeroU64,
     os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _},
     os::unix::net::UnixListener as StdUnixListener,
@@ -17,36 +17,30 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use cybou_capsule::{
-    CapabilityProfile, LeaseRequest, ModelGrant, ResourceBudget, Workspace, issue_lease,
-};
+use cybou_capsule::Lease;
 use cybou_model_brokerd::BrokerCore;
 use cybou_model_gateway::{GatewayCore, TokenPolicy, router};
 use cybou_protocol::model::{ModelIdentity, ModelManifest, ModelRoute};
 use cybou_provider_litellm::{LiteLlmRoute, LiteLlmWorker};
 use hyper::server::conn::http1;
 use hyper_util::rt::TokioIo;
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 use tokio::net::UnixListener;
 use tower::ServiceExt as _;
 use uuid::Uuid;
 
 struct Config {
     runtime_dir: PathBuf,
-    capsule_id: Uuid,
+    lease_file: PathBuf,
     task_id: Uuid,
-    workspace: PathBuf,
-    model_class: String,
     provider: String,
     model_group: String,
     base_url: String,
     master_key: String,
     deployment_sha256: [u8; 32],
-    spend_limit: u64,
     token_limit: u64,
     max_output_tokens: u32,
     sensitivity: u8,
-    lease_seconds: i64,
     microusd_per_unit: NonZeroU64,
     timeout_ms: u32,
 }
@@ -62,18 +56,16 @@ impl Config {
                 .map_err(|_| format!("{name} is not an unsigned integer"))
         };
         let runtime_dir = PathBuf::from(get("CYBOU_AGENT_RUNTIME_DIR")?);
-        let workspace = PathBuf::from(get("CYBOU_AGENT_WORKSPACE")?);
-        if !runtime_dir.is_absolute() || !workspace.is_absolute() {
-            return Err("runtime directory and workspace must be absolute paths".to_owned());
+        let lease_file = PathBuf::from(get("CYBOU_AGENT_LEASE_FILE")?);
+        if !runtime_dir.is_absolute() || !lease_file.is_absolute() {
+            return Err("runtime directory and lease file must be absolute paths".to_owned());
         }
-        let model_class = nonblank("CYBOU_MODEL_CLASS", get("CYBOU_MODEL_CLASS")?)?;
         let provider = nonblank("CYBOU_LITELLM_PROVIDER", get("CYBOU_LITELLM_PROVIDER")?)?;
         let model_group = nonblank(
             "CYBOU_LITELLM_MODEL_GROUP",
             get("CYBOU_LITELLM_MODEL_GROUP")?,
         )?;
         let master_key = load_master_key()?;
-        let spend_limit = parse("CYBOU_MODEL_SPEND_LIMIT")?;
         let token_limit = parse("CYBOU_MODEL_TOKEN_LIMIT")?;
         let max_output_tokens = narrow(
             "CYBOU_MODEL_MAX_OUTPUT_TOKENS",
@@ -82,28 +74,21 @@ impl Config {
         let sensitivity = parse("CYBOU_MODEL_SENSITIVITY")?
             .try_into()
             .map_err(|_| "CYBOU_MODEL_SENSITIVITY exceeds 255".to_owned())?;
-        let lease_seconds = parse("CYBOU_AGENT_LEASE_SECONDS")?
-            .try_into()
-            .map_err(|_| "CYBOU_AGENT_LEASE_SECONDS is too large".to_owned())?;
-        if lease_seconds <= 0 || token_limit == 0 || max_output_tokens == 0 {
-            return Err("lease and token ceilings must be positive".to_owned());
+        if token_limit == 0 || max_output_tokens == 0 {
+            return Err("token ceilings must be positive".to_owned());
         }
         Ok(Self {
             runtime_dir,
-            capsule_id: parse_uuid("CYBOU_CAPSULE_ID", &get("CYBOU_CAPSULE_ID")?)?,
+            lease_file,
             task_id: parse_uuid("CYBOU_AGENT_TASK_ID", &get("CYBOU_AGENT_TASK_ID")?)?,
-            workspace,
-            model_class,
             provider,
             model_group,
             base_url: get("CYBOU_LITELLM_BASE_URL")?,
             master_key,
             deployment_sha256: parse_sha256(&get("CYBOU_LITELLM_DEPLOYMENT_SHA256")?)?,
-            spend_limit,
             token_limit,
             max_output_tokens,
             sensitivity,
-            lease_seconds,
             microusd_per_unit: NonZeroU64::new(parse("CYBOU_MODEL_MICROUSD_PER_UNIT")?)
                 .ok_or_else(|| "CYBOU_MODEL_MICROUSD_PER_UNIT must be positive".to_owned())?,
             timeout_ms: narrow(
@@ -155,7 +140,19 @@ fn parse_sha256(value: &str) -> Result<[u8; 32], String> {
     Ok(out)
 }
 
-fn worker(config: &Config) -> Result<LiteLlmWorker, String> {
+/// Read the one authoritative lease this instance serves.
+///
+/// The lease is minted once, by whoever owns the launch a person approved, and travels here as
+/// data. Rebuilding an equivalent-looking lease from environment values would produce a second
+/// authority: the two can each be internally valid and still describe different permissions, and
+/// nothing downstream could tell which one the person actually selected.
+fn load_lease(path: &Path) -> Result<Lease, String> {
+    let file = File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
+    ciborium::from_reader(BufReader::new(file))
+        .map_err(|error| format!("read the lease at {}: {error}", path.display()))
+}
+
+fn worker(config: &Config, model_class: &str) -> Result<LiteLlmWorker, String> {
     LiteLlmWorker::new(
         ModelManifest {
             model_id: format!("litellm:{}", config.provider),
@@ -176,7 +173,7 @@ fn worker(config: &Config) -> Result<LiteLlmWorker, String> {
         &config.base_url,
         config.master_key.clone(),
         vec![LiteLlmRoute {
-            model_class: config.model_class.clone(),
+            model_class: model_class.to_owned(),
             model_group: config.model_group.clone(),
         }],
         config.microusd_per_unit,
@@ -185,31 +182,24 @@ fn worker(config: &Config) -> Result<LiteLlmWorker, String> {
     .map_err(|error| error.to_string())
 }
 
-fn gateway(config: &Config) -> Result<(Arc<GatewayCore>, String), String> {
+fn gateway(config: &Config, lease: Lease) -> Result<(Arc<GatewayCore>, String), String> {
     let now = OffsetDateTime::now_utc();
-    let budget = ResourceBudget {
-        memory_mib: 512,
-        cpus: 1,
-        tasks_max: 64,
-        lifetime: Duration::seconds(config.lease_seconds),
-    };
-    let mut profile =
-        CapabilityProfile::bounded("opencode-live", budget).map_err(|error| error.to_string())?;
-    profile.model = Some(ModelGrant {
-        class: config.model_class.clone(),
-        spend_limit: config.spend_limit,
-    });
-    profile.may_execute = true;
-    let lease = issue_lease(
-        LeaseRequest {
-            selected_profile: profile,
-            capsule_id: config.capsule_id,
-            agent: "opencode".to_owned(),
-            workspace: Workspace::at(&config.workspace),
-        },
-        now,
-    )
-    .map_err(|error| error.to_string())?;
+    if let Some(ended) = lease.ended(now) {
+        return Err(format!(
+            "refusing to serve a lease that is over: {}",
+            ended.describe()
+        ));
+    }
+    // Every bound below is read off the lease rather than off the environment. The class this
+    // gateway routes and the ceiling it spends against are the ones on the approved grant, so a
+    // launch file cannot widen either by naming a different value.
+    let model_class = lease
+        .grant()
+        .model
+        .as_ref()
+        .ok_or_else(|| "the lease grants no model; this gateway has nothing to serve".to_owned())?
+        .class
+        .clone();
 
     let mut providers = BrokerCore::new();
     providers.register_provider(
@@ -220,8 +210,8 @@ fn gateway(config: &Config) -> Result<(Arc<GatewayCore>, String), String> {
             tasks: Vec::new(),
             context_limit: 1_000_000,
         },
-        vec![config.model_class.clone()],
-        Box::new(worker(config)?),
+        vec![model_class.clone()],
+        Box::new(worker(config, &model_class)?),
     );
     let core = Arc::new(GatewayCore::new(Arc::new(providers)));
     let issued = core
@@ -274,7 +264,8 @@ fn main() -> Result<(), String> {
     if socket_path.exists() || token_path.exists() {
         return Err("runtime socket or token already exists; refusing to replace it".to_owned());
     }
-    let (core, secret) = gateway(&config)?;
+    let lease = load_lease(&config.lease_file)?;
+    let (core, secret) = gateway(&config, lease)?;
     write_token(&token_path, &secret)?;
     let listener = StdUnixListener::bind(&socket_path)
         .map_err(|error| format!("bind {}: {error}", socket_path.display()))?;

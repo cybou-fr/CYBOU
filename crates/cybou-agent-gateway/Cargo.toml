@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 axum.workspace = true
+ciborium.workspace = true
 cybou-capsule = { path = "../cybou-capsule" }
 cybou-model-brokerd = { path = "../cybou-model-brokerd" }
 cybou-model-gateway = { path = "../cybou-model-gateway" }
