@@ -292,6 +292,25 @@ was being emitted bare, so bubblewrap read the `--` before the program as the de
 started at all. **No seccomp filter is applied by this build.** The flag is not emitted, and
 `requires_seccomp()` says the debt is owed, because a known gap is worth more than a silent one.
 
+**The budget is a cgroup, and it is a transient service rather than a scope.** That is a measured
+decision, not a stylistic one. Asked for the same limits, `systemd-run --user --scope` accepted every
+property, reported success, and left `MemoryMax` at infinity; the service form put `memory.max=67108864`,
+`pids.max=17` and `cpu.max=50000 100000` into the kernel. A scope implementation would have looked
+correct in the code, in the command and in every record, and held a capsule to nothing — which is the
+worst available outcome for a limit. The gate reads the kernel's own files rather than
+`systemctl show`, and switching that line to a scope fails three checks, which is how this is known
+rather than assumed.
+
+`MemorySwapMax=0` goes with the memory ceiling. Without it a capsule at its limit pushes the host
+into swap instead of being stopped: the limit failing in the direction that hurts the machine rather
+than the capsule. The lifetime is `RuntimeMaxSec` on the unit, not a timer inside Mind, because a
+lifetime enforced by something that has to still be running ends when that thing does — and *ending
+is not asking* means the end must not depend on anyone being there to ask.
+
+A capsule with no CPU quota is now refused at compile time alongside no memory, no processes and no
+time. Zero is not a small share; the cgroup holds the capsule at a standstill, which looks exactly
+like one that hung.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

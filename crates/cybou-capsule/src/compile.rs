@@ -127,6 +127,11 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
     if grant.budget.tasks_max == 0 {
         return Err(CannotCompile::BudgetPermitsNothing("processes"));
     }
+    // A CPU quota of zero is not a small share, it is none: the cgroup would hold the capsule at a
+    // standstill, which looks exactly like a capsule that hung.
+    if grant.budget.cpus == 0 {
+        return Err(CannotCompile::BudgetPermitsNothing("CPU"));
+    }
     if grant.budget.lifetime <= time::Duration::ZERO {
         return Err(CannotCompile::BudgetPermitsNothing("time"));
     }

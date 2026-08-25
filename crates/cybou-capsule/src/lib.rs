@@ -53,6 +53,7 @@ pub mod grant;
 pub mod lease;
 pub mod reach;
 pub mod spec;
+pub mod supervise;
 pub mod verdict;
 
 pub use backend::{Bubblewrap, CapsuleBackend};
@@ -61,4 +62,5 @@ pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspac
 pub use lease::{Ended, Lease, decide_under_lease};
 pub use reach::Reach;
 pub use spec::KernelCapsuleSpec;
+pub use supervise::{under_budget, unit_name};
 pub use verdict::{Refusal, Verdict, decide};

@@ -154,6 +154,70 @@ if pgrep -u "$(id -u)" -f 'cybou-[a-z]+d' > /dev/null 2>&1; then
 fi
 run_the_gate
 
+# ---------------------------------------------------------------- the budget
+#
+# Read from the kernel, not from systemd. Asked for the same limits, `systemd-run --user --scope`
+# accepted every property, reported success, and left MemoryMax at infinity — so a gate that trusted
+# `systemctl show` would have passed on a capsule held to nothing. What is checked here is
+# `memory.max`, `pids.max` and `cpu.max` inside the cgroup the capsule actually ran in.
+check_the_budget() {
+    if ! command -v systemd-run > /dev/null 2>&1 || ! systemctl --user is-system-running > /dev/null 2>&1; then
+        echo "    note: no user systemd manager here, so the budget was NOT checked" >&2
+        skipped_budget=1
+        return
+    fi
+
+    local reader="$WORKSPACE/read-limits.sh"
+    cat > "$reader" <<'READER'
+#!/bin/sh
+path=$(sed -n 's/^0:://p' /proc/self/cgroup)
+for file in memory.max pids.max cpu.max; do
+    printf '%s=%s
+' "$file" "$(cat "/sys/fs/cgroup$path/$file" 2>&1)"
+done
+READER
+    chmod +x "$reader"
+
+    local unit="cybou-capsule-gate-$$"
+    systemctl --user reset-failed "$unit.service" > /dev/null 2>&1 || true
+    # A transient service, never a scope. Asked for these same properties, a user scope accepts them
+    # all, reports success, and leaves MemoryMax at infinity — a limit that looks correct everywhere
+    # and holds nothing. Switching this line to `--scope` fails three checks below, which is how that
+    # is known rather than assumed.
+    systemd-run --user --collect --unit="$unit" --wait \
+        --property=MemoryMax=64M \
+        --property=MemorySwapMax=0 \
+        --property=TasksMax=17 \
+        --property=CPUQuota=50% \
+        --property=RuntimeMaxSec=30 \
+        "$reader" > /dev/null 2>&1 || true
+
+    local seen
+    # The rest of the line, not up to the first space: cpu.max is two numbers, and an earlier
+    # version cut it at the space and then failed to match what it had asked for.
+    # The rest of the line, not up to the first space: cpu.max is two numbers — the quota and the
+    # period — and an earlier version cut it at the space, then failed to match what it had asked
+    # for. The check was right and the reading of it was wrong, which is the more confusing way round.
+    seen="$(journalctl --user -u "$unit.service" --no-pager -n 20 2>/dev/null | grep -oE '(memory|pids|cpu)\.max=.*' || true)"
+    systemctl --user reset-failed "$unit.service" > /dev/null 2>&1 || true
+
+    local expected="$1"
+    local name="$2"
+    if [[ "$seen" == *"$expected"* ]]; then
+        printf '    ok      %s\n' "$name"
+    else
+        printf '    FAILED  %s\n        wanted %q\n        got    %q\n' "$name" "$expected" "$seen"
+        failures=$((failures + 1))
+    fi
+}
+
+echo
+echo "=== The budget is the kernel's, not systemd's account of itself ==="
+skipped_budget=0
+check_the_budget "memory.max=67108864" "the memory ceiling reaches the kernel"
+[ "$skipped_budget" = 0 ] && check_the_budget "pids.max=17" "the process ceiling reaches the kernel"
+[ "$skipped_budget" = 0 ] && check_the_budget "cpu.max=50000 100000" "the CPU quota reaches the kernel"
+
 echo
 if [ "$failures" -gt 0 ]; then
     echo "=== CAPSULE GATE FAILED: $failures check(s) ==="
