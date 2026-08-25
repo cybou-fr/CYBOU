@@ -14,6 +14,7 @@ repository.workspace = true
 agent-client-protocol.workspace = true
 ciborium.workspace = true
 cybou-acp = { path = "../cybou-acp" }
+cybou-fabric = { path = "../cybou-fabric" }
 cybou-agent-opencode = { path = "../cybou-agent-opencode" }
 cybou-capsule = { path = "../cybou-capsule" }
 serde.workspace = true
@@ -21,6 +22,9 @@ serde_json.workspace = true
 time.workspace = true
 tokio.workspace = true
 uuid.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
 
 [lints]
 workspace = true

@@ -19,6 +19,7 @@ use std::io::Write as _;
 use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
 use agent_client_protocol::AcpAgentConfig;
@@ -41,7 +42,8 @@ fn usage() -> &'static str {
     "usage:\n  \
      cybou-agentd plan   <selection>\n  \
      cybou-agentd launch <selection> -- <program> [argument …]\n  \
-     cybou-agentd launch <selection> --prompt TEXT\n\n\
+     cybou-agentd launch <selection> --prompt TEXT\n  \
+     cybou-agentd serve\n\n\
      selection:\n  \
      --profile ID --agent NAME --workspace PATH\n  \
      --memory-mib N --cpus N --tasks-max N --lifetime-seconds N\n  \
@@ -80,6 +82,7 @@ async fn main() -> Result<(), String> {
     match verb.as_deref() {
         Some("plan") => show_plan(&parse(arguments.collect())?),
         Some("launch") => launch(&parse(arguments.collect())?).await,
+        Some("serve") => serve().await,
         _ => Err(usage().to_owned()),
     }
 }
@@ -542,5 +545,159 @@ fn announce(session: &Session, plan: &SessionPlan) {
     match serde_json::to_string(&view) {
         Ok(line) => println!("{line}"),
         Err(error) => eprintln!("the session could not be described: {error}"),
+    }
+}
+
+/// How often a held session's own lease is asked whether it is over.
+///
+/// A poll rather than a timer per session, and neither of them is what ends anything: the capsule
+/// unit's `RuntimeMaxSec` does that, without this process. This only notices, so that a listing
+/// stops showing a session as running and its leftovers get cleared.
+const EXPIRY_POLL: StdDuration = StdDuration::from_secs(15);
+
+/// Where sessions write the two files that describe them.
+#[cfg(target_os = "linux")]
+const LEASE_ROOT: &str = "/run/cybou-agent-leases";
+
+/// Hold what is running on this host, and answer for it on the bus.
+#[cfg(target_os = "linux")]
+async fn serve() -> Result<(), String> {
+    use std::sync::Mutex;
+
+    use cybou_agentd::service::Agent1Service;
+    use cybou_fabric::AGENT;
+
+    let recovered = discover(Path::new(LEASE_ROOT), OffsetDateTime::now_utc());
+    for (capsule_id, why) in &recovered.unreadable {
+        eprintln!("[cybou-agentd] Session {capsule_id} could not be read back: {why}");
+    }
+    // Cleared before anything is served, so a listing never shows a session whose capsule is gone
+    // and never leaves a gateway holding a bearer for one.
+    for plan in &recovered.orphaned {
+        println!(
+            "[cybou-agentd] Clearing what is left of session {}",
+            plan.instance
+        );
+        teardown(plan);
+    }
+    println!(
+        "[cybou-agentd] Holding {} running session(s)",
+        recovered.registry.len()
+    );
+
+    let registry = Arc::new(Mutex::new(recovered.registry));
+    let _connection = zbus::connection::Builder::session()
+        .map_err(|error| error.to_string())?
+        .name(AGENT.service)
+        .map_err(|error| error.to_string())?
+        .serve_at(
+            AGENT.object_path,
+            Agent1Service::new(Arc::clone(&registry), Arc::new(HostTeardown)),
+        )
+        .map_err(|error| error.to_string())?
+        .build()
+        .await
+        .map_err(|error| error.to_string())?;
+    println!("[cybou-agentd] Registered {}", AGENT.service);
+
+    loop {
+        tokio::select! {
+            () = tokio::time::sleep(EXPIRY_POLL) => expire(&registry),
+            result = tokio::signal::ctrl_c() => {
+                result.map_err(|error| error.to_string())?;
+                // Nothing is torn down on the way out. A capsule outlives this process on purpose,
+                // and ending every session because the owner was restarted would make the coordinator
+                // into the boundary that ADR-0042 says it must not be.
+                println!("[cybou-agentd] Leaving running sessions running");
+                return Ok(());
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn serve() -> Result<(), String> {
+    Err("cybou-agentd serves capsules on Linux".to_owned())
+}
+
+/// End the sessions whose leases have run out, exactly once each.
+#[cfg(target_os = "linux")]
+fn expire(registry: &Arc<std::sync::Mutex<cybou_agentd::registry::SessionRegistry>>) {
+    let now = OffsetDateTime::now_utc();
+    let Ok(mut held) = registry.lock() else {
+        return;
+    };
+    for capsule_id in held.expire(now) {
+        if let Some(mut live) = held.take(capsule_id) {
+            println!("[cybou-agentd] Session {capsule_id} reached the end of its lease");
+            teardown(&live.plan);
+            live.session.finish_ending(now);
+        }
+    }
+}
+
+/// Read every session this host has written down, and ask the service manager which are still up.
+#[cfg(target_os = "linux")]
+fn discover(root: &Path, now: OffsetDateTime) -> cybou_agentd::registry::Recovered {
+    use cybou_agentd::discovery;
+
+    let files = match discovery::sessions_on(root) {
+        Ok(files) => files,
+        Err(error) => {
+            eprintln!(
+                "[cybou-agentd] {} could not be read: {error}",
+                root.display()
+            );
+            return cybou_agentd::registry::Recovered::default();
+        }
+    };
+
+    let mut found = Vec::new();
+    for entry in files {
+        let (Ok(lease), Ok(launch)) = (fs::read(&entry.lease), fs::read_to_string(&entry.launch))
+        else {
+            eprintln!(
+                "[cybou-agentd] Session {} left files that cannot be opened",
+                entry.capsule_id
+            );
+            continue;
+        };
+        // Asked of the service manager, never inferred from the files. A file says what a launch
+        // intended; only a running unit says what is true now.
+        let active = capsule_is_active(entry.capsule_id);
+        match discovery::read_session(&lease, &launch, active) {
+            Ok(session) => found.push(session),
+            Err(why) => {
+                eprintln!(
+                    "[cybou-agentd] Session {} could not be read: {why}",
+                    entry.capsule_id
+                );
+            }
+        }
+    }
+    cybou_agentd::registry::recover(found, now)
+}
+
+#[cfg(target_os = "linux")]
+fn capsule_is_active(capsule_id: Uuid) -> bool {
+    Command::new("systemctl")
+        .args([
+            "--user",
+            "is-active",
+            "--quiet",
+            &format!("cybou-capsule-{capsule_id}.service"),
+        ])
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// Run one session's teardown on the host.
+#[cfg(target_os = "linux")]
+struct HostTeardown;
+
+#[cfg(target_os = "linux")]
+impl cybou_agentd::service::Teardown for HostTeardown {
+    fn tear_down(&self, plan: &SessionPlan) {
+        teardown(plan);
     }
 }

@@ -207,8 +207,48 @@ That daemon is also where the spend becomes knowable. It needs a typed usage sna
 gateway rather than another copy of the lease, because copying a mutable ledger between processes is
 what produced the defect above.
 
-It should not be a `Mind` organ. An agent runtime is not part of what Cybou is, and a bus name under
-`org.cybou.Mind.` would make the namespace assert otherwise; `Runtime` or `Control` says what it is.
+### The daemon
+
+`cybou-agentd serve` holds what is running and answers for it on `org.cybou.Runtime.Agent1`.
+
+`Runtime`, not `Mind`, and the unit is deliberately not `PartOf=cybou-mind.target`. An agent runtime
+is not part of what Cybou *is*: it starts, holds and ends capsules containing software Cybou did not
+write and does not trust, which is the opposite of an organ owning a piece of Mind. A name under
+`org.cybou.Mind.` would say the reverse in the one place an operator looks, and binding the unit to
+Mind's target would mean stopping Mind stops the thing watching those capsules.
+
+It starts by reading the host. Every `<uuid>.lease` with an `<uuid>.env` beside it is read back —
+half a launch is not a session, because its ceilings were never written and inventing them would put
+bounds on a bearer somebody approved with different ones — and each is re-derived through the same
+`plan()` a launch used. Whether the capsule is still up is asked of the service manager. What is
+still running is held; what is not has its leftovers cleared before anything is served, so a listing
+never shows a session whose capsule is gone and never leaves a gateway holding a bearer for one.
+
+It ends nothing on the way out. A capsule outlives this process on purpose, and tearing down every
+session because the owner was restarted would make the coordinator into the boundary that ADR-0042
+says it must not be.
+
+### Read and stop, deliberately not launch
+
+The surface offers `Sessions`, `Session` and `Stop`. It does not offer `Launch`, and that is a
+decision about who may ask for a capsule rather than a gap.
+
+A CLI launch is bounded by who can run it: whoever invokes `cybou-agentd launch` is already `cybou`
+on this host. Putting `Launch` on the bus removes that bound — any process under the same UID could
+then ask for a capsule, and the only thing left between such a request and a real grant would be the
+profile it names. That is one of the conditions under which the polkit delegation below should become
+a typed boundary, and it is not something to walk into by adding a method.
+
+So `Launch` arrives together with a registry of operator-approved profiles the owner reads *itself*,
+and takes a profile id rather than a set of ceilings. `Sessions`, `Session` and `Stop` are safe in a
+way it is not: none of them can widen anything, and stopping removes authority rather than granting
+it.
+
+`Stop` runs the teardown. It sends nothing to the agent and waits for no agreement — the capsule is a
+cgroup with a kill switch. The reason is recorded *before* the teardown, because a session torn down
+first and labelled afterwards could be marked expired if the clock ran out in between, replacing a
+person's decision with a timer. A stopped session then leaves the registry, because the registry
+answers what is running; a listing of finished sessions a person can still read is not built.
 
 It must also survive its own restart, and the part of that which is a judgement rather than plumbing
 is now built and tested.

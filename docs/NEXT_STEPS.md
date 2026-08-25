@@ -393,6 +393,27 @@ leaves it empty rather than stopping it — a host that will not repair itself b
 remember is worse than one that has forgotten. Recording is best effort for the same reason, and the
 failure is printed rather than swallowed.
 
+### B7c. An owner that outlives its sessions, and one that they outlive
+
+**Partly done.** `cybou-agentd serve` holds what is running and answers on
+`org.cybou.Runtime.Agent1` — `Runtime` rather than `Mind`, because an agent runtime starts and holds
+software Cybou did not write and does not trust, and a bus name under `Mind` would assert the
+opposite of that in the one place an operator looks.
+
+Recovery is the part that had to be right. A capsule and a gateway outlive their coordinator on
+purpose, so an owner that restarted and reported nothing running would be wrong about the host in the
+direction that matters: a working agent, unwatched, with no surface offering a way to stop it. The
+registry is therefore a reading of the host rather than a memory of what a process started, and every
+session is re-derived through the same `plan()` a launch used.
+
+The surface is `Sessions`, `Session` and `Stop`. `Launch` is not on it: a CLI launch is bounded by
+who can run it, and a bus method is not, so it arrives together with a registry of operator-approved
+profiles and takes a profile id rather than a set of ceilings.
+
+What remains: a typed usage snapshot from the model gateway, without which every listing reports a
+spend of *unknown* rather than a figure; a record of finished sessions a person can still read; and
+the profile registry that `Launch` needs. See [The agent session owner](agent-session.md).
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

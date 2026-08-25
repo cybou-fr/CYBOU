@@ -34,12 +34,17 @@
 //! filesystem and a service manager, and it does nothing these modules have not already described —
 //! so what a session did is answerable by reading rather than by running.
 
+pub mod discovery;
 pub mod plan;
 pub mod registry;
 pub mod runtime;
+
+#[cfg(target_os = "linux")]
+pub mod service;
 pub mod session;
 pub mod view;
 
+pub use discovery::{CannotRead, LaunchFiles, read_launch, read_lease, read_session};
 pub use plan::{CannotPlan, Ceilings, Launch, SessionPlan, TeardownStep};
 pub use registry::{Found, LiveSession, Recovered, SessionRegistry, recover};
 pub use runtime::HostPrograms;

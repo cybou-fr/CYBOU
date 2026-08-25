@@ -57,6 +57,23 @@ endpoint!(MEANING, "Meaning", "cybou-meaningd.service");
 endpoint!(TELEMETRY, "Telemetry", "cybou-telemetryd.service");
 endpoint!(ACTION, "Action", "cybou-actiond.service");
 
+/// Stable endpoint for `Agent1`.
+///
+/// `Runtime`, not `Mind`, and written out rather than through the macro for the same reason the
+/// model broker is: the macro exists to produce Mind organs, and using it here would make the
+/// namespace assert something false.
+///
+/// An agent runtime is not part of what Cybou *is*. It starts, holds and ends capsules that contain
+/// software Cybou did not write and does not trust — which is the opposite of an organ owning a
+/// piece of Mind. A bus name under `org.cybou.Mind.` would say the reverse, and a namespace that
+/// says the reverse is one refactor away from somebody acting on it.
+pub const AGENT: BusEndpoint = BusEndpoint {
+    service: "org.cybou.Runtime.Agent1",
+    object_path: "/org/cybou/Runtime/Agent1",
+    interface: "org.cybou.Runtime.Agent1",
+    systemd_unit: "cybou-agentd.service",
+};
+
 /// Stable system-bus endpoint for the Body executor.
 pub const EXECUTOR: BusEndpoint = BusEndpoint {
     service: "org.cybou.Body.Executor1",
