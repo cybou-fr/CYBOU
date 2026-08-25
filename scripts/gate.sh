@@ -100,6 +100,22 @@ case "$acp_status" in
     *) exit "$acp_status" ;;
 esac
 
+# A whole launch with no model in it, which needs no provider and no gateway. Exit 3 means the
+# capsule's host programs are not installed here, which is a check that did not run.
+announce "capsule launch"
+failed="capsule launch"
+capsule_launch_status=0
+bash scripts/test-capsule-launch-gate.sh || capsule_launch_status=$?
+case "$capsule_launch_status" in
+    0) failed="" ;;
+    3)
+        announce "capsule launch not run: the capsule's host programs are not installed here"
+        skipped="$skipped capsule-launch"
+        failed=""
+        ;;
+    *) exit "$capsule_launch_status" ;;
+esac
+
 # What a root service manager will hand an unprivileged service. Exit 3 means there is no system
 # manager here to ask, which is a check that did not run rather than one that passed.
 announce "credential boundary"

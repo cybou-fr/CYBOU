@@ -29,7 +29,7 @@ use cybou_capsule::{
     under_budget,
 };
 
-use crate::plan::SessionPlan;
+use crate::plan::{SessionPlan, TeardownStep};
 
 /// Where deployment installs the programs a capsule is built around.
 const LIBEXEC: &str = "/usr/libexec/cybou";
@@ -141,6 +141,34 @@ pub fn stop_capsule(plan: &SessionPlan) -> Vec<String> {
         "stop".to_owned(),
         format!("{}.service", plan.capsule_unit),
     ]
+}
+
+/// How to ask whether one of this session's units is still running.
+///
+/// Teardown asks this instead of believing a stop command's exit code, and the difference is not
+/// pedantry. A capsule run to completion has already exited and been collected, so stopping it
+/// fails — every clean session ended with a teardown error, which is how an operator learns to
+/// ignore teardown errors and misses the one that matters.
+///
+/// What teardown is for is that the unit is not running. That is a question about the host, and this
+/// is how to ask it.
+#[must_use]
+pub fn still_running(plan: &SessionPlan, step: &TeardownStep) -> Option<Vec<String>> {
+    let (scoped, unit) = match step {
+        // Both are transient user units, named without the suffix systemd wants back.
+        TeardownStep::StopCapsule(unit) | TeardownStep::StopEgress(unit) => {
+            (true, format!("{unit}.service"))
+        }
+        TeardownStep::StopGateway(unit) => (false, unit.clone()),
+        TeardownStep::Remove(_) => return None,
+    };
+    let _ = plan;
+    let mut argv = vec!["systemctl".to_owned()];
+    if scoped {
+        argv.push("--user".to_owned());
+    }
+    argv.extend(["is-active".to_owned(), "--quiet".to_owned(), unit]);
+    Some(argv)
 }
 
 /// The command that runs `program` inside this session's capsule, under its budget.
@@ -378,6 +406,36 @@ mod tests {
         assert_eq!(
             stop.last().expect("a unit"),
             &format!("{}.service", plan.egress_unit)
+        );
+    }
+
+    #[test]
+    fn teardown_asks_the_host_whether_a_unit_is_running_rather_than_a_command_its_exit_code() {
+        // A capsule run to completion has already exited and been collected, so stopping it fails.
+        // Believing that exit code made every clean session end with a teardown error, which is how
+        // an operator learns to ignore teardown errors and misses the one that matters.
+        let (plan, _) = session(&["github.com"]);
+
+        let capsule = still_running(&plan, &TeardownStep::StopCapsule(plan.capsule_unit.clone()))
+            .expect("a capsule can be asked about");
+        assert_eq!(capsule[1], "--user", "the capsule needs no privilege");
+        assert!(capsule.contains(&"is-active".to_owned()));
+        assert_eq!(
+            capsule.last().expect("a unit"),
+            &format!("{}.service", plan.capsule_unit)
+        );
+
+        let gateway = still_running(
+            &plan,
+            &TeardownStep::StopGateway(plan.gateway_unit.clone().expect("a gateway")),
+        )
+        .expect("a gateway can be asked about");
+        assert_ne!(gateway[1], "--user", "the gateway is a system unit");
+
+        assert_eq!(
+            still_running(&plan, &TeardownStep::Remove(plan.lease_file.clone())),
+            None,
+            "a file is not a unit to ask about"
         );
     }
 

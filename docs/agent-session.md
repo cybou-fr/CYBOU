@@ -93,9 +93,22 @@ The broker and the capsule are transient *user* units rather than children of th
 that lives inside the coordinator survives exactly as long as the coordinator does, and outlives it
 in the worse direction if the coordinator is killed and the broker is not.
 
-`scripts/test-agent-launch-gate.sh` proves the whole of it on a deployed host and checks the part
-that is easy to get wrong: that nothing is left. It exits `3` — `NOT RUN`, never passed — on a host
-with no gateway template, no configured provider, or no user service manager.
+`scripts/test-capsule-launch-gate.sh` runs a whole launch with no model in it. That case needs no
+provider, no credential and no gateway, which is why it is the part of `launch` provable on an
+ordinary host — and it is the case that says an Agent Capsule is a bounded place to compute rather
+than a container that only exists around a model. For a while it was not merely untested but
+impossible, because planning refused a lease with no model grant outright, and nothing noticed
+because nothing ran a launch.
+
+`scripts/test-agent-launch-gate.sh` covers the other half, the one that needs a deployed gateway and a
+configured provider, and exits `3` — `NOT RUN`, never passed — where those are absent.
+
+Running the first of those found something small and corrosive. A capsule run to completion has
+already exited and been collected, so asking systemd to stop it fails; teardown believed that exit
+code, and every clean session ended by printing a teardown error. Output a person is meant to ignore
+on every good run is output they will ignore on the run that mattered. Teardown now asks the host
+whether the unit is running rather than believing what stopping returned, and asks before it tells, so
+a session that finished on its own is torn down in silence.
 
 ## Asking the agent rather than running a program
 

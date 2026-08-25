@@ -489,6 +489,35 @@ async fn wait_for(paths: &[PathBuf]) -> Result<(), String> {
     }
 }
 
+/// Stop one unit, and judge it by whether the unit is running rather than by what stopping returned.
+///
+/// A capsule run to completion has already exited and been collected, so asking systemd to stop it
+/// fails. Believing that exit code meant every clean session ended by printing a teardown error,
+/// which teaches an operator to ignore teardown errors — and the one that matters looks the same.
+///
+/// What teardown is for is that the unit is not running. So the stop is attempted, its own answer is
+/// discarded, and the host is asked.
+fn stop_unit(argv: &[String], plan: &SessionPlan, step: &TeardownStep) -> Result<(), String> {
+    let Some(check) = runtime::still_running(plan, step) else {
+        return status_of(argv).map(|_| ());
+    };
+    // Asked before it is told, so a unit that already finished is left alone. Not only to keep the
+    // result right: stopping something that is gone makes the service manager print a failure of its
+    // own, and output a person is meant to ignore on every clean run is output they will ignore on
+    // the run that mattered.
+    if status_of(&check) == Ok(false) {
+        return Ok(());
+    }
+    let attempted = status_of(argv);
+    match status_of(&check) {
+        Ok(true) => Err(format!("{} is still running", argv.join(" "))),
+        Ok(false) => Ok(()),
+        // The service manager could not be asked. The stop's own answer is then the best available
+        // account, and saying nothing would be claiming an outcome nobody observed.
+        Err(why) => attempted.map(|_| ()).map_err(|_| why),
+    }
+}
+
 fn run(argv: &[String]) -> Result<(), String> {
     if status_of(argv)? {
         Ok(())
@@ -516,11 +545,11 @@ fn status_of(argv: &[String]) -> Result<bool, String> {
 fn teardown(plan: &SessionPlan) {
     for step in plan.teardown() {
         let result = match &step {
-            TeardownStep::StopCapsule(_) => run(&runtime::stop_capsule(plan)),
+            TeardownStep::StopCapsule(_) => stop_unit(&runtime::stop_capsule(plan), plan, &step),
             TeardownStep::StopGateway(_) => {
-                runtime::stop_gateway(plan).map_or(Ok(()), |stop| run(&stop))
+                runtime::stop_gateway(plan).map_or(Ok(()), |stop| stop_unit(&stop, plan, &step))
             }
-            TeardownStep::StopEgress(_) => run(&runtime::stop_egress(plan)),
+            TeardownStep::StopEgress(_) => stop_unit(&runtime::stop_egress(plan), plan, &step),
             TeardownStep::Remove(path) => match fs::remove_file(path) {
                 Ok(()) => Ok(()),
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
