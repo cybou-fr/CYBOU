@@ -84,6 +84,22 @@ step "provider catalogue"    bash scripts/test-provider-catalogue-gate.sh
 step "OpenCode agent pack"   bash scripts/test-opencode-pack-gate.sh
 step "agent session owner"   bash scripts/test-agent-session-gate.sh
 
+# A whole prompt turn against a stand-in agent. Exit 3 means there was no python3 here to run one
+# with, which is a check that did not run rather than one that passed.
+announce "ACP prompt turn"
+failed="ACP prompt turn"
+acp_status=0
+bash scripts/test-acp-session-gate.sh || acp_status=$?
+case "$acp_status" in
+    0) failed="" ;;
+    3)
+        announce "ACP prompt turn not run: no python3 to run a stand-in agent with"
+        skipped="$skipped acp-prompt-turn"
+        failed=""
+        ;;
+    *) exit "$acp_status" ;;
+esac
+
 # One launch, carried out on a real host, leaving nothing behind. Exit 3 means this host has no
 # deployed gateway template, provider or user service manager to launch against — a check that did
 # not run rather than one that passed.

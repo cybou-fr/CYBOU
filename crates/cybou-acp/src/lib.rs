@@ -5,9 +5,11 @@
 
 mod client;
 mod registry;
+mod session;
 
 pub use client::{AcpClient, AcpClientError, AgentHandshake, AuthenticationMethod};
 pub use registry::{
     RegistryAgent, RegistryBrowser, RegistryError, RegistryIndex, RegistrySnapshot,
     UPSTREAM_REGISTRY_URL,
 };
+pub use session::{AcpSession, AgentTurn};

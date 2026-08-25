@@ -197,6 +197,20 @@ a disposable fake peer and also requires an unsupported wire version to be refus
 Authentication, `session/new`, installation and running a real registry agent belong to the later
 agent-pack/session stages; B2 deliberately grants none of them.
 
+**A whole prompt turn now exists beside the handshake.** `AcpSession` runs `initialize`,
+`session/new` and `session/prompt` against an agent process, collects every `session/update` in order
+and keeps the agent's message apart from its internal reasoning — a surface that showed a thought as
+an answer would be presenting a draft as a conclusion. The turn is bounded by a deadline its caller
+supplies rather than by a constant here, because the caller is the one holding the lease.
+
+`session/request_permission` is refused, and the refusal reaches the agent rather than only a log.
+Every reference ACP client auto-approves, which puts the decision in the hands of the thing being
+bounded. Cybou's answer is already given elsewhere: inside its capsule an agent needs no permission,
+and outside it the answer is an `ActionProposal` a person decides. The protocol client can reach
+neither, so the only honest answer it has is no — and each refused request is returned to the caller,
+because an agent that keeps asking for something is a fact worth surfacing.
+`scripts/test-acp-session-gate.sh` proves both against a stand-in agent that asks.
+
 ### B3. Standing capability lease
 
 **Done.** `CapabilityProfile` holds the reusable limits a launch surface shows, while `LeaseRequest`
