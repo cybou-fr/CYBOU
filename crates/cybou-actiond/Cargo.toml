@@ -11,6 +11,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ciborium.workspace = true
 cybou-fabric = { path = "../cybou-fabric" }
 cybou-protocol = { path = "../cybou-protocol" }
 cybou-remediation = { path = "../cybou-remediation" }

@@ -18,6 +18,8 @@ use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
+pub mod journal;
+
 #[cfg(target_os = "linux")]
 pub mod service;
 
@@ -55,7 +57,12 @@ pub enum ActionError {
     StateUnavailable,
 }
 
-/// In-memory lifecycle owner. Durable Journal recording is a separate accepted-protocol step.
+/// Owner of the action lifecycle.
+///
+/// Records are held here and written to the Journal by whatever owns the bus surface, so this type
+/// stays free of I/O and remains the thing tests can reason about. Permits live only here: a
+/// single-use sixty-second capability has no business surviving the process that issued it, and
+/// [`crate::journal`] says why in full.
 pub struct ActionCore {
     policy: StandingPolicy,
     records: Mutex<HashMap<Uuid, ActionRecord>>,
@@ -158,6 +165,27 @@ impl ActionCore {
     #[must_use]
     pub fn record(&self, proposal_id: Uuid) -> Option<ActionRecord> {
         self.records.lock().ok()?.get(&proposal_id).cloned()
+    }
+
+    /// Seed this owner with lifecycle records read back from the Journal.
+    ///
+    /// What a restarted Action1 knows. It restores what was proposed, argued and decided, and
+    /// restores no permits — an authorization nobody claimed before the restart was not claimed, and
+    /// re-offering it would resurrect a capability whose whole point is that it is used once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ActionError::StateUnavailable`] when the internal record table cannot be reached.
+    pub fn restore(&self, records: Vec<ActionRecord>) -> Result<usize, ActionError> {
+        let mut held = self
+            .records
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?;
+        for mut record in records {
+            record.permit_id = None;
+            held.insert(record.proposal.proposal_id, record);
+        }
+        Ok(held.len())
     }
 }
 

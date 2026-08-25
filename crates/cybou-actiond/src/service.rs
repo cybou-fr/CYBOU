@@ -7,13 +7,13 @@
 
 use std::sync::Arc;
 
-use cybou_fabric::{decode, encode};
+use cybou_fabric::{decode, encode, event_client::EventClient};
 use cybou_protocol::telemetry::SystemInsight;
 use time::OffsetDateTime;
 use uuid::Uuid;
 use zbus::{fdo, interface};
 
-use crate::ActionCore;
+use crate::{ActionCore, journal};
 
 /// Process-owned Action1 dispatch surface.
 pub struct Action1Service {
@@ -46,6 +46,7 @@ impl Action1Service {
             .core
             .evaluate_insight(&insight, &operation, OffsetDateTime::now_utc())
             .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        record_lifecycle(&record, OffsetDateTime::now_utc()).await;
         let permit_id = record
             .permit_id
             .map_or_else(String::new, |id| id.to_string());
@@ -61,5 +62,25 @@ impl Action1Service {
             .claim_permit(permit_id, OffsetDateTime::now_utc())
             .map_err(|error| fdo::Error::AccessDenied(error.to_string()))?;
         encode(&permit).map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+}
+
+/// Write one decided lifecycle to the Journal, best effort.
+///
+/// Best effort on purpose, and it is the uncomfortable choice rather than the convenient one. The
+/// alternative is refusing to decide when the Journal is unreachable, which turns a recording
+/// failure into a host that cannot be repaired — and the reason a host acts on itself at all is that
+/// nobody may be there to help it. So a decision stands whether or not it could be written, and the
+/// failure is said out loud rather than swallowed, because a record with a hole in it that nobody
+/// mentioned is worse than one with a hole somebody logged.
+async fn record_lifecycle(record: &crate::ActionRecord, now: OffsetDateTime) {
+    let Ok(client) = EventClient::session().await else {
+        eprintln!("[cybou-actiond] The Journal is unreachable; this decision was not recorded");
+        return;
+    };
+    for envelope in journal::contributions(record, now) {
+        if let Err(error) = client.submit(&envelope).await {
+            eprintln!("[cybou-actiond] A lifecycle step was not recorded: {error}");
+        }
     }
 }

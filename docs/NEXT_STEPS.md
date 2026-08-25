@@ -368,6 +368,31 @@ is still possible. Delivering tokens as they arrive means charging as they arriv
 reached mid-sentence cannot be honoured by unsending what has already gone. That needs a mid-stream
 cancellation design, and it belongs with B8's live session rather than in the compatibility adapter.
 
+### A2. What was authorized outlives the process that authorized it
+
+**Done.** `Action1` held proposals, criticism and decisions in memory. For the first vertical that was
+enough; for a host that acts on its own — and far more for one that lets an agent ask it to — it is
+not. The question a person asks a month later is not *what is Action1 holding*, it is *why did nginx
+restart on the fourteenth*, and answering it means the proposal, the objections and the decision are
+still there. A restart destroyed all three, which made the causal chain a property of a process's
+uptime.
+
+Nothing was invented to fix it. The Journal's contribution kinds already lined up with the lifecycle,
+so an action is ordinary Journal content rather than a private log beside it: `PlanProposal` for what
+was proposed, `Objection` for each criticism that failed, `Decision` for what was decided, all sharing
+the proposal's identity as their correlation and each citing the step before. A reader following
+causation arrives at the decision from the proposal without needing to know Action1 exists.
+
+The permit is deliberately not written. It is a single-use sixty-second capability, and a durable
+record of one would be a durable record of a key — worse, one whose presence could be mistaken for
+the authority itself. Losing permits on restart is correct: an authorization nobody claimed was not
+claimed, and restoring one would be a permission reissued by a crash.
+
+`cybou-actiond` reads its own history back before it answers anything, and a Journal it cannot reach
+leaves it empty rather than stopping it — a host that will not repair itself because it cannot
+remember is worse than one that has forgotten. Recording is best effort for the same reason, and the
+failure is printed rather than swallowed.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,
