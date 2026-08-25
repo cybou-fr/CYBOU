@@ -17,7 +17,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let permits = Arc::new(Action1PermitSource::session().await?);
         let body = Arc::new(LinuxBody::system().await?);
-        let _connection = zbus::connection::Builder::session()?
+        let builder = if std::env::var_os("CYBOU_EXECUTOR_SYSTEM_BUS").is_some() {
+            zbus::connection::Builder::system()?
+        } else {
+            zbus::connection::Builder::session()?
+        };
+        let _connection = builder
             .name(EXECUTOR.service)?
             .serve_at(EXECUTOR.object_path, Executor1Service::new(permits, body))?
             .build()

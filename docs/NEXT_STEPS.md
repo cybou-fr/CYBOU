@@ -112,7 +112,9 @@ is a fixture identity, harmless only because no button exists behind it.
 
 **Done.** One operation is authorized under an explicit standing policy, carried out against a
 harmless disposable unit, and independently re-observed. The permit is short-lived and single-use;
-the gate requires a replay to fail.
+the gate requires a replay to fail. The unprivileged Action1 service and root executor now export
+separate names on the system bus under a closed D-Bus policy on the VPS, with a root-owned action
+policy that starts empty and is changed only through the closed `cybou-action-policy` command.
 
 ---
 

@@ -16,7 +16,11 @@ const UNIT: &str = "cybou-action-gate.service";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let session = zbus::Connection::session().await?;
+    let session = if std::env::var_os("CYBOU_ACTION_SYSTEM_BUS").is_some() {
+        zbus::Connection::system().await?
+    } else {
+        zbus::Connection::session().await?
+    };
     let action = Proxy::new(
         &session,
         ACTION.service,
@@ -43,8 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Action1 did not produce a granted lifecycle record and permit".into());
     }
 
+    let executor_connection = if std::env::var_os("CYBOU_EXECUTOR_SYSTEM_BUS").is_some() {
+        zbus::Connection::system().await?
+    } else {
+        session.clone()
+    };
     let executor = Proxy::new(
-        &session,
+        &executor_connection,
         EXECUTOR.service,
         EXECUTOR.object_path,
         EXECUTOR.interface,

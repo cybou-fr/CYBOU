@@ -15,9 +15,8 @@ fi
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/cybou-target}"
 
 if [ "$(id -u)" -ne 0 ] || ! command -v systemctl >/dev/null 2>&1 \
-    || ! systemctl show --property=Version --value >/dev/null 2>&1 \
-    || ! command -v dbus-run-session >/dev/null 2>&1; then
-    echo "==> action gate NOT RUN: a root systemd host and dbus-run-session are required" >&2
+    || ! systemctl show --property=Version --value >/dev/null 2>&1; then
+    echo "==> action gate NOT RUN: a root systemd host is required" >&2
     exit 3
 fi
 
@@ -28,6 +27,9 @@ EXECUTORD="$CARGO_TARGET_DIR/debug/cybou-executord"
 ROUNDTRIP="$CARGO_TARGET_DIR/debug/examples/action-roundtrip"
 UNIT=/run/systemd/system/cybou-action-gate.service
 WORK="$(mktemp -d)"
+DBUS_POLICY="/etc/dbus-1/system.d/cybou-action-gate-$$.conf"
+action_pid=
+executor_pid=
 
 cleanup() {
     status=$?
@@ -35,9 +37,15 @@ cleanup() {
         [ -f "$WORK/actiond.log" ] && cat "$WORK/actiond.log" >&2
         [ -f "$WORK/executord.log" ] && cat "$WORK/executord.log" >&2
     fi
+    [ -n "$action_pid" ] && kill "$action_pid" >/dev/null 2>&1 || true
+    [ -n "$executor_pid" ] && kill "$executor_pid" >/dev/null 2>&1 || true
+    [ -n "$action_pid" ] && wait "$action_pid" >/dev/null 2>&1 || true
+    [ -n "$executor_pid" ] && wait "$executor_pid" >/dev/null 2>&1 || true
     systemctl stop cybou-action-gate.service >/dev/null 2>&1 || true
     rm -f "$UNIT"
     systemctl daemon-reload >/dev/null 2>&1 || true
+    rm -f "$DBUS_POLICY"
+    systemctl reload dbus.service >/dev/null 2>&1 || true
     rm -rf "$WORK"
     return "$status"
 }
@@ -55,29 +63,57 @@ EOF
 systemctl daemon-reload
 systemctl stop cybou-action-gate.service >/dev/null 2>&1 || true
 
-export ACTIOND EXECUTORD ROUNDTRIP WORK
-dbus-run-session -- bash -euo pipefail <<'INNER'
-CYBOU_PREAUTHORIZED_ACTIONS=service.restart "$ACTIOND" >"$WORK/actiond.log" 2>&1 &
+# Both halves of the production permit boundary use the system transport. Install a uniquely named,
+# temporary ownership rule rather than relying on a developer machine to have deployment policy.
+install -m 0644 /dev/stdin "$DBUS_POLICY" <<'EOF'
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy user="root">
+    <allow own="org.cybou.Mind.Action1"/>
+    <allow send_destination="org.cybou.Mind.Action1"/>
+    <allow own="org.cybou.Body.Executor1"/>
+    <allow send_destination="org.cybou.Body.Executor1"/>
+  </policy>
+</busconfig>
+EOF
+systemctl reload dbus.service
+
+echo "=== Operator policy provisioning is closed and fail-safe ==="
+POLICY="$WORK/action-policy.env"
+CYBOU_ACTION_POLICY_PATH="$POLICY" CYBOU_ACTION_POLICY_NO_RESTART=1 \
+    bash scripts/cybou-action-policy.sh service.status,service.restart >/dev/null
+grep -qx 'CYBOU_PREAUTHORIZED_ACTIONS=service.status,service.restart' "$POLICY"
+before="$(sha256sum "$POLICY")"
+if CYBOU_ACTION_POLICY_PATH="$POLICY" CYBOU_ACTION_POLICY_NO_RESTART=1 \
+    bash scripts/cybou-action-policy.sh service.reload >/dev/null 2>&1; then
+    echo "ERROR: policy provisioning accepted an adapter that does not exist" >&2
+    exit 1
+fi
+[ "$(sha256sum "$POLICY")" = "$before" ]
+CYBOU_ACTION_POLICY_PATH="$POLICY" CYBOU_ACTION_POLICY_NO_RESTART=1 \
+    bash scripts/cybou-action-policy.sh none >/dev/null
+grep -qx 'CYBOU_PREAUTHORIZED_ACTIONS=' "$POLICY"
+echo "    ok      invalid policy is refused without replacing the previous grant"
+
+CYBOU_ACTION_SYSTEM_BUS=1 CYBOU_PREAUTHORIZED_ACTIONS=service.restart \
+    "$ACTIOND" >"$WORK/actiond.log" 2>&1 &
 action_pid=$!
+export CYBOU_ACTION_SYSTEM_BUS=1
+export CYBOU_EXECUTOR_SYSTEM_BUS=1
 "$EXECUTORD" >"$WORK/executord.log" 2>&1 &
 executor_pid=$!
-cleanup_session() {
-    kill "$action_pid" "$executor_pid" >/dev/null 2>&1 || true
-    wait "$action_pid" "$executor_pid" >/dev/null 2>&1 || true
-}
-trap cleanup_session EXIT
 
 for _ in $(seq 1 50); do
-    if busctl --user --list 2>/dev/null | grep -q org.cybou.Mind.Action1 \
-        && busctl --user --list 2>/dev/null | grep -q org.cybou.Body.Executor1; then
+    if busctl --system --list 2>/dev/null | grep -q org.cybou.Mind.Action1 \
+        && busctl --system --list 2>/dev/null | grep -q org.cybou.Body.Executor1; then
         break
     fi
     sleep 0.1
 done
-busctl --user --list | grep -q org.cybou.Mind.Action1
-busctl --user --list | grep -q org.cybou.Body.Executor1
+busctl --system --list | grep -q org.cybou.Mind.Action1
+busctl --system --list | grep -q org.cybou.Body.Executor1
 
 "$ROUNDTRIP"
-INNER
 
 echo "=== action gate passed ==="

@@ -40,7 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use cybou_actiond::service::Action1Service;
         use cybou_fabric::ACTION;
 
-        let _connection = zbus::connection::Builder::session()?
+        let builder = if std::env::var_os("CYBOU_ACTION_SYSTEM_BUS").is_some() {
+            zbus::connection::Builder::system()?
+        } else {
+            zbus::connection::Builder::session()?
+        };
+        let _connection = builder
             .name(ACTION.service)?
             .serve_at(ACTION.object_path, Action1Service::new(core))?
             .build()

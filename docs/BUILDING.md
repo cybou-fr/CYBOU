@@ -70,6 +70,8 @@ That script starts all twelve, waits for each bus name, and asserts the properti
 | Artifact | What it is |
 |---|---|
 | `cybou-eventd` | the single canonical Journal writer and `org.cybou.Mind.Event1` |
-| the other eleven `cybou-*d` | one cognitive owner each, one D-Bus name each |
+| the remaining Mind `cybou-*d` processes | one cognitive owner each, one D-Bus name each |
 | `cybou-web-gateway` | read-only HTTP boundary, loopback only |
+| `cybou-actiond` | user-bus Action1 lifecycle and authorization owner; no Body adapter |
+| `cybou-executord` | root system-bus Body service with three typed adapters; no policy |
 | `living-canvas` | the Rust/WASM frontend, shared by the browser and the desktop shell |

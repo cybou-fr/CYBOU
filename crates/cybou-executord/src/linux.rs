@@ -19,15 +19,26 @@ pub struct Action1PermitSource {
 }
 
 impl Action1PermitSource {
-    /// Connect to Action1 on the cognitive session bus.
+    /// Connect to Action1 on the configured cognitive bus.
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal when no session bus can be reached.
+    /// Returns a typed refusal when the configured bus cannot be reached.
     pub async fn session() -> Result<Self, ExecutorError> {
+        let connection = match std::env::var("CYBOU_ACTION_BUS_ADDRESS") {
+            Ok(address) => {
+                zbus::connection::Builder::address(address.as_str())
+                    .map_err(|error| ExecutorError::PermitRefused(error.to_string()))?
+                    .build()
+                    .await
+            }
+            Err(_) if std::env::var_os("CYBOU_ACTION_SYSTEM_BUS").is_some() => {
+                zbus::Connection::system().await
+            }
+            Err(_) => zbus::Connection::session().await,
+        };
         Ok(Self {
-            connection: zbus::Connection::session()
-                .await
+            connection: connection
                 .map_err(|error| ExecutorError::PermitRefused(error.to_string()))?,
         })
     }

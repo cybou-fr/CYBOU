@@ -22,9 +22,10 @@ cybou_ssh "
   trunk build --release
   cd ../..
 
-  sudo install -d -m 0755 /usr/libexec/cybou /usr/share/cybou/web /usr/lib/systemd/user /etc/systemd/system
+  sudo install -d -m 0755 /usr/libexec/cybou /usr/share/cybou/web /usr/lib/systemd/user \
+    /usr/share/dbus-1/system.d /etc/systemd/system /etc/cybou
 
-  # Install every Mind daemon and the web gateway to /usr/libexec/cybou
+  # Install every Mind daemon, the typed Body executor, and the web gateway.
   DAEMONS=(
     cybou-web-gateway
     cybou-eventd
@@ -44,6 +45,8 @@ cybou_ssh "
     cybou-selfd
     cybou-presenced
     cybou-shelld
+    cybou-actiond
+    cybou-executord
   )
   for daemon in \"\${DAEMONS[@]}\"; do
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
@@ -51,13 +54,13 @@ cybou_ssh "
 
   # Install Living Canvas web assets by replacing the directory, not by merging into it.
   #
-  # `cp -a` into the live directory only ever adds. Every build produces content-hashed bundles under
+  # Copying into the live directory only ever adds. Every build produces content-hashed bundles under
   # new names, so nothing was ever overwritten and nothing was ever removed: by 2026-08-24 the web
   # root held 64 WebAssembly bundles and 94 MB, accumulated since the first deployment, on a machine
   # whose whole purpose is to notice a disk filling up. It would have diagnosed itself eventually,
   # which is the least dignified way for that feature to get its first real finding.
   #
-  # Staged and swapped rather than emptied in place: `rm -rf` followed by a copy leaves the surface
+  # Stage and swap rather than emptying in place; delete-then-copy leaves the surface
   # serving nothing for as long as the copy takes, and a failure in between leaves it serving nothing
   # at all. A rename is one step, and the old directory is only removed once the new one is live.
   sudo rm -rf /usr/share/cybou/web.new /usr/share/cybou/web.old
@@ -79,10 +82,25 @@ cybou_ssh "
   # a unit that is present but not enabled is the honest way to ship a session for machines that do
   # have one.
   sudo install -m 0755 scripts/cybou-desktop-session.sh /usr/libexec/cybou/cybou-desktop-session.sh
+  sudo install -m 0755 scripts/cybou-action-policy.sh /usr/sbin/cybou-action-policy
 
   sudo getent group cybou >/dev/null || sudo groupadd --system cybou
   sudo id cybou >/dev/null 2>&1 || sudo useradd --system --gid cybou \
     --home-dir /var/lib/cybou --create-home --shell /usr/sbin/nologin cybou
+
+  # Standing authorization is an operator-owned file and grants nothing on first install. Never
+  # overwrite it on deployment: replacing a person's policy with the repository default would be
+  # an authorization change disguised as a software update.
+  if [ ! -e /etc/cybou/action-policy.env ]; then
+    printf '%s\n' 'CYBOU_PREAUTHORIZED_ACTIONS=' | sudo tee /etc/cybou/action-policy.env >/dev/null
+  fi
+  sudo chown root:root /etc/cybou/action-policy.env
+  sudo chmod 0644 /etc/cybou/action-policy.env
+
+  # Action1 and the executor share the system transport so D-Bus can authenticate their distinct
+  # UIDs. Policy still belongs to the unprivileged Action1 process; only the fixed Body adapter is
+  # root. Remove the obsolete cross-UID session-bus address from pre-release deployments.
+  sudo rm -f /etc/cybou/executor.env
 
   # Create shell jail root
   sudo install -d -m 0755 -o cybou -g cybou /var/lib/cybou/shell-jail
@@ -125,8 +143,11 @@ cybou_ssh "
 
   # The helper is a system service because it is the one thing here that needs root. Its socket is
   # group-owned by cybou, so only the gateway can attempt a password.
-  sudo install -m 0644 systemd/system/cybou-authd.service /etc/systemd/system/
+  sudo install -m 0644 systemd/system/cybou-authd.service \
+    systemd/system/cybou-executord.service /etc/systemd/system/
+  sudo install -m 0644 debian/org.cybou.Body.Executor1.conf /usr/share/dbus-1/system.d/
   sudo systemctl daemon-reload
+  sudo systemctl reload dbus.service
   sudo systemctl enable --now cybou-authd.service
   sudo systemctl restart cybou-authd.service
 
@@ -153,6 +174,11 @@ cybou_ssh "
   # to them.
   sudo systemctl --user --machine=cybou@.host restart cybou-mind.target
   sudo systemctl --user --machine=cybou@.host --no-pager --full status cybou-mind.target || true
+
+  # Start only after the lingering user manager has brought up Action1. If its system-bus name is
+  # not ready yet, Restart=on-failure keeps the executor fail-closed until it can claim permits.
+  sudo systemctl enable --now cybou-executord.service
+  sudo systemctl --no-pager --full status cybou-executord.service
 
   sudo systemctl --no-pager --full status caddy.service
 "

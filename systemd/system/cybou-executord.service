@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# Root is the Body capability: Action1 runs without it and this process owns no authorization
+# policy. Its only public argument is a short-lived permit identity that it atomically claims back
+# from Action1 before touching the host.
+
+[Unit]
+Description=Cybou typed Body action executor
+Documentation=https://github.com/cybou-fr/CYBOU
+After=dbus.service
+Wants=dbus.service
+
+[Service]
+Type=dbus
+BusName=org.cybou.Body.Executor1
+ExecStart=/usr/libexec/cybou/cybou-executord
+Environment=CYBOU_EXECUTOR_SYSTEM_BUS=1
+Environment=CYBOU_ACTION_SYSTEM_BUS=1
+Restart=on-failure
+RestartSec=1
+
+User=root
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

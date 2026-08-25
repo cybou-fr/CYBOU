@@ -80,14 +80,19 @@ def check_relative_markdown_links(repo: Path, path: Path) -> None:
 # it moved to the units rather than being dropped with them.
 # A faculty is not an owner. ADR-0035 gives the model broker the `org.cybou.Faculty` namespace
 # precisely because it owns no part of Mind, and counting it among the Mind owners would undo that
-# distinction in the one place a reader goes to find out how many there are. The unit's own
-# `BusName` is what separates them, so the count still comes from what actually starts rather than
-# from a second list somebody has to remember to update.
+# distinction in the one place a reader goes to find out how many there are. Most owners declare
+# `BusName`; Action1 is the exception because a user manager cannot supervise a system-bus name as
+# Type=dbus, so its explicit system-bus environment is the executable ownership declaration.
 def count_installed_daemons(repo):
     owners = 0
     for unit in (repo / "systemd/user").glob("cybou-*d.service"):
         text = unit.read_text(encoding="utf-8")
-        if "BusName=org.cybou.Mind." in text:
+        owns_mind_name = "BusName=org.cybou.Mind." in text
+        owns_external_action_name = (
+            unit.name == "cybou-actiond.service"
+            and "Environment=CYBOU_ACTION_SYSTEM_BUS=1" in text
+        )
+        if owns_mind_name or owns_external_action_name:
             owners += 1
     return owners
 

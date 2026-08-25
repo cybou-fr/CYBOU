@@ -130,7 +130,7 @@ The integration gate is the only place the Mind is exercised as a system. Since 
 runs in CI on every push; the builder remains the authority on Debian 13 specifically, and on
 everything a real `systemd` and a real reboot are needed to falsify. It re-executes itself
 under `dbus-run-session` so the daemons, the PID list and the cleanup trap share one process, starts
-all twelve owners, and then asserts:
+every owner in that integration surface, and then asserts:
 
 - every organ answers `Ready`, because an organ that does not is indistinguishable from one that is
   down, and one missing method once pinned the whole control plane at unavailable;
@@ -147,6 +147,32 @@ all twelve owners, and then asserts:
 
 Each of those assertions exists because the property it names was once broken while everything
 looked fine.
+
+## What proves the authorized action deployment topology
+
+```bash
+sudo -E bash scripts/test-action-gate.sh
+```
+
+The gate creates one harmless disposable systemd service. The unprivileged production Action1 and
+root executor share the system transport so D-Bus can authenticate both UIDs, under an explicit
+least-privilege policy; the root-only gate uses an equivalent temporary rule that its cleanup trap
+removes. It proves proposal, decision, single-use permit, systemd D-Bus
+restart, independent re-observation, and replay refusal. It also exercises
+`cybou-action-policy`: only the three compiled adapters are accepted, `none` restores the empty
+default, and an invalid replacement leaves the previous grant unchanged.
+
+The VPS deploy installs the same split as `cybou-actiond.service` in the user target and
+`cybou-executord.service` in the system manager. `/etc/cybou/action-policy.env` is created empty and
+is never replaced by a deploy. An operator changes it through, for example:
+
+```bash
+sudo cybou-action-policy service.status,service.restart
+sudo cybou-action-policy none
+```
+
+The first command is a real unattended authorization decision. The second removes every standing
+grant.
 
 ## What proves continuity under systemd
 

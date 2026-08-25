@@ -30,7 +30,7 @@ Nothing in the cognitive substrate loads a model, needs an accelerator, or requi
 
 ## Mind owners
 
-There are fourteen Mind owners: fourteen user-session processes, each owning one versioned D-Bus
+There are fifteen Mind owners: fifteen user-session processes, each owning one versioned D-Bus
 interface under `org.cybou.Mind.`.
 
 | Owner | Interface | Owns |
@@ -49,6 +49,7 @@ interface under `org.cybou.Mind.`.
 | `cybou-lifecycled` | `Lifecycle1` | sleep, wake and consolidation |
 | `cybou-selfd` | `Self1` | autobiographical self-assessment |
 | `cybou-presenced` | `Presence1` | the presentation-ready projection |
+| `cybou-actiond` | `Action1` | proposals, criticism, policy decisions and permits; no Body adapter |
 
 Beside them, and deliberately not among them:
 
@@ -549,6 +550,20 @@ finding through Action1 and the executor, and then re-reads systemd independentl
 active. It also replays the permit and requires refusal. No model, shell command string, real
 workload or executor self-report supplies the final observation.
 
+**That topology now ships on the VPS.** `cybou-actiond` is a hardened user service in
+`cybou-mind.target`. The root `cybou-executord` is a separate system service and owns
+`org.cybou.Body.Executor1` on the system bus. Action1 remains owned by the unprivileged Cybou user
+but exports its permit endpoint on that same transport, because a session bus rejects a root client
+with a different UID. Explicit D-Bus policy permits only Cybou to own Action1 and call Executor1,
+and only root to own Executor1 and claim from Action1. The caller still supplies only the opaque
+identity. The gate exercises this same transport and policy shape.
+
+`/etc/cybou/action-policy.env` is root-owned, created empty, and never overwritten by a deploy.
+`cybou-action-policy` accepts only the three implemented verbs, writes the replacement atomically,
+and restarts Action1. An invalid list leaves the previous policy byte-for-byte intact. Thus
+installing or upgrading grants nothing; unattended authority appears only after an operator runs
+that explicit command.
+
 **A watched thing has four states, and three of them are not silence.** `Observed`, `NeverRead`,
 `ReadFailed` and `Stale`. A declared thing that produced no reading used to be simply absent from
 every surface, which reads exactly like a thing nobody declared — and the operator who declared a
@@ -804,9 +819,8 @@ reuse lint
 
 `unsafe_code = "forbid"` and `clippy::pedantic` are workspace-wide.
 
-There is currently no language-model process. The action gate runs the executor with host authority
-only against a disposable unit; deployment units and an operator standing policy are not installed
-by the VPS deploy script yet.
+There is currently no language-model process. The action services are deployed, but their standing
+policy is empty by default; the live gate uses host authority only against a disposable unit.
 
 ## What is not built
 
@@ -816,7 +830,6 @@ mentioned look identical to a reader.
 | | |
 |---|---|
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
-| Action deployment | the Action1/executor boundary and live gate exist; VPS service installation and operator policy provisioning are not shipped yet |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |
@@ -829,6 +842,10 @@ mentioned look identical to a reader.
 
 - **Telemetry has no persistence.** Everything it holds is in memory and bounded; a restart starts
   the window again, and the organ says it has not watched long enough rather than answering.
+- **Action lifecycle records are in memory.** A restart destroys unclaimed permits, which fails
+  closed, but durable proposal/decision/attempt recording through Event1 is still to be wired.
+- **Confirmation has no operator surface yet.** A decision may require confirmation and therefore
+  produces no permit; only an explicit standing policy can currently reach unattended execution.
 - **The context projection has no checkpoint.** It replays from the Journal on every start. Correct,
   and slower than it needs to be on a long biography.
 - **`Predictor1` is domain-neutral.** It forecasts a level — where a subject sits relative to its own
