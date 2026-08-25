@@ -229,8 +229,8 @@ impl SessionPlan {
 #[cfg(test)]
 mod tests {
     use cybou_capsule::{
-        CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget, Workspace,
-        issue_lease,
+        CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy,
+        Workspace, issue_lease,
     };
     use time::Duration;
 
@@ -271,7 +271,7 @@ mod tests {
     fn strong() -> ModelGrant {
         ModelGrant {
             class: "Strong".to_owned(),
-            spend_limit: 100,
+            spend: SpendPolicy::Capped(100),
         }
     }
 
@@ -414,14 +414,14 @@ mod tests {
     }
 
     #[test]
-    fn a_free_model_with_a_zero_spending_ceiling_still_launches() {
-        // The distinction the lease module already draws, held here too. Zero money is a selection,
-        // not an exhausted session.
+    fn a_zero_cost_model_still_launches() {
+        // The distinction the lease module already draws, held here too. Spending nothing is a
+        // selection, not an exhausted session.
         let free = lease(
             Duration::hours(4),
             Some(ModelGrant {
                 class: "Local".to_owned(),
-                spend_limit: 0,
+                spend: SpendPolicy::ZeroCostOnly,
             }),
         );
         assert!(plan(&launch(free), at(1)).is_ok());

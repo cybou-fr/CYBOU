@@ -19,9 +19,17 @@ There are four different inputs and they deliberately have different owners:
   per-token ceilings and the sensitivity class. It contains no provider secret.
 
 The provider file must explicitly define `CYBOU_LITELLM_BASE_URL`, `CYBOU_LITELLM_PROVIDER`,
-`CYBOU_LITELLM_MODEL_GROUP`, `CYBOU_LITELLM_DEPLOYMENT_SHA256`,
+`CYBOU_LITELLM_MODEL_GROUP`, `CYBOU_LITELLM_DEPLOYMENT_SHA256`, `CYBOU_LITELLM_ZERO_COST`,
 `CYBOU_LITELLM_TIMEOUT_MS`, and `CYBOU_MODEL_MICROUSD_PER_UNIT`. The digest identifies the deployed
 proxy build used for attribution; it must not be guessed from a URL.
+
+`CYBOU_LITELLM_ZERO_COST` is exactly `yes` or `no`, and there is no default. Only an operator knows
+what their deployment charges — Cybou cannot see a price list — and a default either way would be
+Cybou deciding on their behalf: one direction silently forbids the free models a person selected, the
+other silently spends their money. A lease whose policy is `ZeroCostOnly` may only be served by a
+route declared `yes`, and a completion on such a route that bills anything is refused rather than
+returned, because handing back an answer somebody has now been charged for — having asked for none —
+would make the refusal cosmetic.
 
 The launch file must explicitly define `CYBOU_AGENT_TASK_ID`, `CYBOU_MODEL_TOKEN_LIMIT`,
 `CYBOU_MODEL_MAX_OUTPUT_TOKENS` and `CYBOU_MODEL_SENSITIVITY`. It defines no capsule id, workspace,

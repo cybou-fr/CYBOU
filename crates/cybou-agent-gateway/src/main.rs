@@ -38,6 +38,7 @@ struct Config {
     base_url: String,
     master_key: String,
     deployment_sha256: [u8; 32],
+    zero_cost: bool,
     token_limit: u64,
     max_output_tokens: u32,
     sensitivity: u8,
@@ -86,6 +87,7 @@ impl Config {
             base_url: get("CYBOU_LITELLM_BASE_URL")?,
             master_key,
             deployment_sha256: parse_sha256(&get("CYBOU_LITELLM_DEPLOYMENT_SHA256")?)?,
+            zero_cost: declared("CYBOU_LITELLM_ZERO_COST", &get("CYBOU_LITELLM_ZERO_COST")?)?,
             token_limit,
             max_output_tokens,
             sensitivity,
@@ -117,6 +119,19 @@ fn nonblank(name: &str, value: String) -> Result<String, String> {
         ))
     } else {
         Ok(value)
+    }
+}
+
+/// An operator's declaration that a route bills nothing, spelled out rather than defaulted.
+///
+/// Only an operator knows what their deployment charges; Cybou cannot see a price list. A default
+/// either way would be Cybou deciding on their behalf — one direction silently forbids the free
+/// models a person selected, the other silently spends their money.
+fn declared(name: &str, value: &str) -> Result<bool, String> {
+    match value {
+        "yes" => Ok(true),
+        "no" => Ok(false),
+        _ => Err(format!("{name} must be exactly yes or no")),
     }
 }
 
@@ -175,6 +190,7 @@ fn worker(config: &Config, model_class: &str) -> Result<LiteLlmWorker, String> {
         vec![LiteLlmRoute {
             model_class: model_class.to_owned(),
             model_group: config.model_group.clone(),
+            zero_cost: config.zero_cost,
         }],
         config.microusd_per_unit,
         config.timeout_ms,

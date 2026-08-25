@@ -18,7 +18,7 @@
 
 use std::path::PathBuf;
 
-use cybou_capsule::grant::{ModelGrant, NetworkGrant, ResourceBudget, Workspace};
+use cybou_capsule::grant::{ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy, Workspace};
 use cybou_capsule::profile::{CapabilityProfile, LeaseRequest, issue_lease};
 
 fn required(name: &str) -> Result<String, String> {
@@ -29,6 +29,16 @@ fn number(name: &str) -> Result<u32, String> {
     required(name)?
         .parse()
         .map_err(|_| format!("{name} is not an unsigned integer"))
+}
+
+fn spend_policy(value: &str) -> Result<SpendPolicy, String> {
+    if value == "zero-cost" {
+        return Ok(SpendPolicy::ZeroCostOnly);
+    }
+    value
+        .parse()
+        .map(SpendPolicy::Capped)
+        .map_err(|_| "CYBOU_MODEL_SPEND_LIMIT is an integer or the word zero-cost".to_owned())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,14 +64,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     profile.network = NetworkGrant { hosts };
-    // A model class with no ceiling beside it is half a selection. Both or neither, so a launch
+    // A model class with no policy beside it is half a selection. Both or neither, so a launch
     // cannot grant a class and leave the spending bound to be invented further down.
+    //
+    // `zero-cost` is a word rather than the number nought, because "spend up to nothing" and "spend
+    // nothing, on something that costs nothing" are different selections that an integer cannot
+    // tell apart.
     profile.model = match std::env::var("CYBOU_MODEL_CLASS") {
         Ok(class) => Some(ModelGrant {
             class,
-            spend_limit: required("CYBOU_MODEL_SPEND_LIMIT")?
-                .parse()
-                .map_err(|_| "CYBOU_MODEL_SPEND_LIMIT is not an unsigned integer")?,
+            spend: spend_policy(&required("CYBOU_MODEL_SPEND_LIMIT")?)?,
         }),
         Err(_) => None,
     };

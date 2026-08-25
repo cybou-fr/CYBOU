@@ -13,7 +13,7 @@
 //! would arrive as a rewrite. `llama.cpp`, `mistral.rs` and an ONNX runtime are three different
 //! shapes of process, and the interface they share is this one.
 
-use cybou_protocol::model::{ModelManifest, ModelOutput, ModelRequest};
+use cybou_protocol::model::{ModelManifest, ModelOutput, ModelRequest, SpendPolicy};
 use uuid::Uuid;
 
 /// One turn in an external agent's chat-completions request.
@@ -39,8 +39,13 @@ pub struct ProviderChatRequest {
     pub messages: Vec<ChatMessage>,
     /// Hard output ceiling the worker must pass to the provider.
     pub max_output_tokens: u32,
-    /// Hard spending ceiling remaining for this request.
-    pub max_spend_units: u64,
+    /// What this request may spend, and whether it may spend anything.
+    ///
+    /// A policy rather than a remaining ceiling. `SpendPolicy::ZeroCostOnly` is a routing constraint
+    /// a worker has to honour — it may only be served by a route declared to cost nothing — and no
+    /// integer could have carried that: zero read as an exhausted budget, so the one request a
+    /// person makes when they want a free model was the one every worker refused.
+    pub spend: SpendPolicy,
 }
 
 /// What a provider worker returns for an external agent completion.

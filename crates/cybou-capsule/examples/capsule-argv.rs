@@ -14,7 +14,9 @@ use std::path::PathBuf;
 
 use cybou_capsule::backend::{Bubblewrap, CapsuleBackend, CapsuleRuntimeBindings};
 use cybou_capsule::compile::compile;
-use cybou_capsule::grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
+use cybou_capsule::grant::{
+    CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy, Workspace,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
@@ -53,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .map(|class| ModelGrant {
                 class,
-                spend_limit: 100,
+                spend: SpendPolicy::Capped(100),
             }),
         tools: Vec::new(),
         may_execute: true,

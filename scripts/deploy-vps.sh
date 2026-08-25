@@ -179,6 +179,7 @@ cybou_ssh "
       'CYBOU_LITELLM_PROVIDER=' \
       'CYBOU_LITELLM_MODEL_GROUP=' \
       'CYBOU_LITELLM_DEPLOYMENT_SHA256=' \
+      'CYBOU_LITELLM_ZERO_COST=' \
       'CYBOU_LITELLM_TIMEOUT_MS=30000' \
       'CYBOU_MODEL_MICROUSD_PER_UNIT=1' \
       | sudo tee /etc/cybou/provider.env >/dev/null

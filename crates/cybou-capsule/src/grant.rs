@@ -7,6 +7,8 @@ use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use time::Duration;
+
+pub use cybou_protocol::model::SpendPolicy;
 use uuid::Uuid;
 
 /// The one directory an agent may change.
@@ -156,14 +158,12 @@ pub struct ModelGrant {
     /// A class rather than a model name: a name pins the capsule to one provider's naming, breaks
     /// when that name is retired, and routes around whatever the class encodes.
     pub class: String,
-    /// What may be spent, in the smallest unit of the operator's currency.
+    /// What may be spent, and whether anything may be at all.
     ///
-    /// An integer, because a spending ceiling compared as a float is a spending ceiling that is
-    /// occasionally off by a fraction in whichever direction the rounding went.
-    ///
-    /// Zero is meaningful and is not the same as having no model grant: it says this capsule may
-    /// use a model that costs nothing, and may not run up a bill.
-    pub spend_limit: u64,
+    /// A policy rather than a number, because a ceiling of zero could not say which of two opposite
+    /// things a person meant: *use something free* or *you have spent everything*. See
+    /// [`SpendPolicy`].
+    pub spend: SpendPolicy,
 }
 
 /// The profile a person grants once.

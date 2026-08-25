@@ -61,7 +61,7 @@ pub mod verdict;
 pub use backend::{BackendError, Bubblewrap, CapsuleBackend, CapsuleRuntimeBindings};
 pub use compile::{CannotCompile, compile};
 pub use end::end;
-pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
+pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy, Workspace};
 pub use lease::{Ended, Lease, decide_under_lease};
 pub use profile::{CannotIssueLease, CapabilityProfile, LeaseRequest, ProfileId, issue_lease};
 pub use reach::Reach;

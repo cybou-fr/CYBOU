@@ -332,6 +332,25 @@ visibly `NOT RUN` anywhere without a gateway template, a configured provider and
 manager. What remains is driving an ACP agent rather than a program, which is B7's remaining half,
 and withdrawing a running lease from outside, which is B11.
 
+### B7b. Free is a selection, not an empty budget
+
+**Done.** The provider catalogue distinguishes availability from zero-cost access, and none of it
+could be used: a grant said *spend nothing* with the integer nought, and the transport read that as
+*this capsule has spent everything* and refused. One number carrying two opposite facts, with every
+component downstream guessing which one was meant — and the single selection a person makes in order
+to use a free model was the one selection the system could never serve.
+
+`SpendPolicy` says which. `Capped(n)` is a ceiling; `ZeroCostOnly` is a hard routing constraint —
+only a route an operator has *declared* to cost nothing may serve it, `--spend-limit zero-cost` is
+not `--spend-limit 0`, and a route that was declared free and then bills has broken a promise rather
+than used up a budget. That failure is refused rather than returned: handing back an answer somebody
+has now been charged for, having asked for none, would make the policy cosmetic.
+
+The declaration is `CYBOU_LITELLM_ZERO_COST`, exactly `yes` or `no`, with no default. Only an
+operator knows what their deployment charges; a default either way would be Cybou deciding on their
+behalf — one direction silently forbids the free models a person selected, the other silently spends
+their money.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

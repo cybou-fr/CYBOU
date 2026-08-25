@@ -446,7 +446,9 @@ mod tests {
 
     use super::*;
     use crate::compile::{WORKSPACE_INSIDE, compile};
-    use crate::grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
+    use crate::grant::{
+        CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy, Workspace,
+    };
 
     fn spec() -> KernelCapsuleSpec {
         let grant = CapsuleGrant {
@@ -462,7 +464,7 @@ mod tests {
             },
             model: Some(ModelGrant {
                 class: "Strong".to_owned(),
-                spend_limit: 100,
+                spend: SpendPolicy::Capped(100),
             }),
             tools: vec!["git".to_owned()],
             may_execute: true,

@@ -6,8 +6,8 @@
 use std::sync::Mutex;
 
 use cybou_protocol::model::{
-    ModelIdentity, ModelRequest, ModelResult, ModelRoute, ModelTask, RouteRefused, WithoutAModel,
-    admissible, attributable_to,
+    ModelIdentity, ModelRequest, ModelResult, ModelRoute, ModelTask, RouteRefused, SpendPolicy,
+    WithoutAModel, admissible, attributable_to,
 };
 
 use crate::worker::{ChatMessage, ProviderChatRequest, UpstreamAttribution, Worker, WorkerFailed};
@@ -41,8 +41,8 @@ pub struct AgentChatRequest {
     pub input_tokens: u32,
     /// Hard output reservation.
     pub max_output_tokens: u32,
-    /// Remaining spending reservation.
-    pub max_spend_units: u64,
+    /// What this request may spend, and whether it may spend anything.
+    pub spend: SpendPolicy,
     /// Whether the selected profile requires an on-device route.
     pub local_only: bool,
     /// Sensitivity ceiling attached to the token by the issuer.
@@ -452,7 +452,7 @@ impl BrokerCore {
             model_class: request.model_class.clone(),
             messages: request.messages.clone(),
             max_output_tokens: request.max_output_tokens,
-            max_spend_units: request.max_spend_units,
+            spend: request.spend,
         };
         let output = registered
             .worker
@@ -463,7 +463,7 @@ impl BrokerCore {
             })?;
         if output.input_tokens > request.input_tokens
             || output.output_tokens > request.max_output_tokens
-            || output.spend_units > request.max_spend_units
+            || output.spend_units > request.spend.remaining(0)
         {
             return Err(ChatRefused::ExceededReservation);
         }

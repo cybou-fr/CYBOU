@@ -160,6 +160,79 @@ pub struct ModelRequirements {
     pub max_ram_mb: u32,
 }
 
+/// What a capsule may spend on models.
+///
+/// Two modes, because one number could not say both things. A ceiling of zero is genuinely ambiguous:
+/// it reads as *this capsule may use something that costs nothing* and as *this capsule has spent
+/// everything it was given*, and those are opposite facts about the same integer. Every component
+/// that saw a zero had to guess, and they guessed differently — the transport refused it outright
+/// while the grant that produced it meant a free model.
+///
+/// So the selection says which it is.
+///
+/// ```text
+/// Capped(n)       spend up to n, on whatever route can answer
+/// ZeroCostOnly    spend nothing, on a route that is known to cost nothing
+/// ```
+///
+/// `ZeroCostOnly` is a hard routing constraint and not an expectation. It is not "prefer something
+/// free" and it is not "this looks free": a route must be *declared* zero-cost before it may serve
+/// one, and a route that bills anyway has broken a promise rather than used up a budget. Those are
+/// different failures and a person needs to be told which happened.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SpendPolicy {
+    /// At most this much, in the smallest unit of the operator's currency.
+    ///
+    /// An integer, because a ceiling compared as a float is a ceiling that is occasionally exceeded
+    /// by a fraction in whichever direction the rounding went.
+    Capped(u64),
+    /// No money at all, and only routes that cost none.
+    ZeroCostOnly,
+}
+
+impl SpendPolicy {
+    /// Whether a capsule that has spent this much may ask for another completion.
+    ///
+    /// Under [`Self::ZeroCostOnly`] any charge at all closes the grant. Nothing was supposed to cost
+    /// anything, so a charge is evidence the route was not what it was declared to be, and carrying
+    /// on would mean spending money against a selection that said none.
+    #[must_use]
+    pub const fn permits_another(self, spent: u64) -> bool {
+        match self {
+            Self::Capped(ceiling) => spent < ceiling,
+            Self::ZeroCostOnly => spent == 0,
+        }
+    }
+
+    /// Whether this grant is finished as far as money is concerned.
+    #[must_use]
+    pub const fn is_finished(self, spent: u64) -> bool {
+        !self.permits_another(spent)
+    }
+
+    /// What may still be spent.
+    ///
+    /// Zero under [`Self::ZeroCostOnly`], which is the true answer and not a spent-out one: nothing
+    /// may be spent, and nothing was ever going to be.
+    #[must_use]
+    pub const fn remaining(self, spent: u64) -> u64 {
+        match self {
+            Self::Capped(ceiling) => ceiling.saturating_sub(spent),
+            Self::ZeroCostOnly => 0,
+        }
+    }
+
+    /// Whether a completion that cost this much broke the promise this policy made.
+    ///
+    /// Only [`Self::ZeroCostOnly`] can be broken this way. A capped grant that is charged within its
+    /// ceiling got exactly what it asked for.
+    #[must_use]
+    pub const fn broken_by(self, cost: u64) -> bool {
+        matches!(self, Self::ZeroCostOnly) && cost > 0
+    }
+}
+
 /// Where an answer would come from.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

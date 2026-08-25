@@ -36,7 +36,7 @@ plan() {
 }
 
 plan --token-limit 200000 --max-output-tokens 4096 --sensitivity 1 \
-    --model Strong --spend-limit 0 >"$work/plan"
+    --model Strong --spend-limit zero-cost >"$work/plan"
 
 # Every name is the capsule's own identity. A gateway instance named separately from the capsule it
 # serves is a pair nobody can match up again from a service manager's list.
@@ -73,14 +73,16 @@ test "$(cat "$work/order")" = "$expected" || {
     exit 1
 }
 
-# A zero *spending* ceiling is a real selection — cost nothing — and must plan. This is the free-model
-# case the whole provider catalogue exists for, and an earlier version of this system refused it.
+# `--spend-limit zero-cost` is a real selection — spend nothing, on a route that costs nothing — and
+# it plans. This is the free-model case the whole provider catalogue exists for, and it is the one
+# selection an earlier version of this system could never serve: as the number nought it was
+# indistinguishable from a budget somebody had already spent, so every worker refused it.
 grep -q '^expires ' "$work/plan"
 
 # A zero *token* ceiling is a bearer that permits nothing, and is refused before one exists. Distinct
 # from the above, and confusing the two is how "use a free model" became "your capsule is finished".
 if plan --token-limit 0 --max-output-tokens 4096 --sensitivity 1 \
-    --model Strong --spend-limit 0 >/dev/null 2>"$work/empty.err"; then
+    --model Strong --spend-limit zero-cost >/dev/null 2>"$work/empty.err"; then
     echo "a bearer that permits nothing was planned" >&2
     exit 1
 fi
@@ -107,5 +109,13 @@ grep -q 'spend-limit' "$work/half.err"
 # The broker is a unit of its own, torn down with the rest. A way out that lives inside the
 # coordinator survives exactly as long as the coordinator does.
 grep -q '^teardown stop-egress ' "$work/plan"
+
+# A spending selection that is neither an integer nor the word is refused rather than guessed at.
+if plan --token-limit 200000 --max-output-tokens 4096 --sensitivity 1 \
+    --model Strong --spend-limit cheap >/dev/null 2>"$work/spend.err"; then
+    echo "an unreadable spending selection was accepted" >&2
+    exit 1
+fi
+grep -q 'zero-cost' "$work/spend.err"
 
 echo "=== Agent session ownership gate passed ==="

@@ -14,7 +14,7 @@ use std::{collections::BTreeMap, num::NonZeroU64, time::Duration};
 use cybou_model_brokerd::{
     ProviderChatOutput, ProviderChatRequest, UpstreamAttribution, Worker, WorkerFailed,
 };
-use cybou_protocol::model::{ModelManifest, ModelOutput, ModelRequest};
+use cybou_protocol::model::{ModelManifest, ModelOutput, ModelRequest, SpendPolicy};
 use reqwest::{StatusCode, blocking::Client};
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +27,13 @@ pub struct LiteLlmRoute {
     pub model_class: String,
     /// Alias from the `LiteLLM` `model_list`, not a provider model hardcoded into Cybou.
     pub model_group: String,
+    /// Whether the operator has declared that this group bills nothing.
+    ///
+    /// Declared rather than inferred. Cybou cannot see a price list, and a worker that decided a
+    /// group was free because the last completion happened to cost nothing would be treating an
+    /// observation as a guarantee — which is precisely the distinction the provider catalogue was
+    /// built to keep. Only a route carrying this may serve a `ZeroCostOnly` request.
+    pub zero_cost: bool,
 }
 
 /// Invalid worker configuration.
@@ -54,7 +61,7 @@ pub struct LiteLlmWorker {
     manifest: ModelManifest,
     base_url: String,
     master_key: String,
-    routes: BTreeMap<String, String>,
+    routes: BTreeMap<String, (String, bool)>,
     /// Number of micro-US-dollars represented by one operator spend unit.
     microusd_per_unit: NonZeroU64,
     timeout_ms: u32,
@@ -103,7 +110,7 @@ impl LiteLlmWorker {
             if route.model_class.trim().is_empty()
                 || route.model_group.trim().is_empty()
                 || mapped
-                    .insert(route.model_class, route.model_group)
+                    .insert(route.model_class, (route.model_group, route.zero_cost))
                     .is_some()
             {
                 return Err(ConfigError::InvalidRoute);
@@ -134,23 +141,34 @@ impl LiteLlmWorker {
         request: &ProviderChatRequest,
         group: &str,
     ) -> Result<String, WorkerFailed> {
-        if request.max_spend_units == 0 {
-            // LiteLLM installations differ on whether a zero key budget means zero or unlimited.
-            // A catalogue observation does not weaken this transport boundary: B7 must register a
-            // route whose proxy-side reservation can prove even a zero ceiling before enabling it.
-            return Err(WorkerFailed::OutOfResources);
-        }
-        let max_microusd = request
-            .max_spend_units
-            .checked_mul(self.microusd_per_unit.get())
-            .ok_or(WorkerFailed::OutOfResources)?;
-        let max_budget = format!(
-            "{}.{:06}",
-            max_microusd / 1_000_000,
-            max_microusd % 1_000_000
-        )
-        .parse::<serde_json::Number>()
-        .map_err(|_| WorkerFailed::OutOfResources)?;
+        // Under a zero-cost policy the key carries no budget at all.
+        //
+        // Not a budget of zero: LiteLLM installations differ on whether that means nought or
+        // unlimited, and a boundary that means opposite things on different deployments is not one.
+        // The constraint is carried where it can be checked instead — the route had to be declared
+        // free before it was reached, and a completion that bills anyway is refused below. The key
+        // still names one model group and one concurrent request, so it is not a wider key than a
+        // capped one; it is a key with a different thing bounding it.
+        let max_budget = match request.spend {
+            SpendPolicy::ZeroCostOnly => None,
+            SpendPolicy::Capped(units) => {
+                if units == 0 {
+                    return Err(WorkerFailed::OutOfResources);
+                }
+                let max_microusd = units
+                    .checked_mul(self.microusd_per_unit.get())
+                    .ok_or(WorkerFailed::OutOfResources)?;
+                Some(
+                    format!(
+                        "{}.{:06}",
+                        max_microusd / 1_000_000,
+                        max_microusd % 1_000_000
+                    )
+                    .parse::<serde_json::Number>()
+                    .map_err(|_| WorkerFailed::OutOfResources)?,
+                )
+            }
+        };
         let response = self
             .client
             .post(self.endpoint("/key/generate"))
@@ -276,14 +294,28 @@ impl Worker for LiteLlmWorker {
         &self,
         request: &ProviderChatRequest,
     ) -> Result<ProviderChatOutput, WorkerFailed> {
-        let group = self
+        let (group, zero_cost) = self
             .routes
             .get(&request.model_class)
             .ok_or(WorkerFailed::UnsupportedSurface)?;
+        // A zero-cost request may only be served by a route somebody declared costs nothing. Serving
+        // it from a billable route "because it is probably cheap" would spend money against a
+        // selection that said none, which is the one thing this policy exists to prevent.
+        if matches!(request.spend, SpendPolicy::ZeroCostOnly) && !zero_cost {
+            return Err(WorkerFailed::UnsupportedSurface);
+        }
         let key = self.virtual_key(request, group)?;
         let answer = self.chat(request, group, &key);
         self.revoke(&key);
-        answer
+
+        let answer = answer?;
+        // The promise was that this costs nothing. A charge means the route was not what it was
+        // declared to be, and handing back an answer somebody has now been billed for — having asked
+        // for none — would make the refusal cosmetic.
+        if request.spend.broken_by(answer.spend_units) {
+            return Err(WorkerFailed::OutOfResources);
+        }
+        Ok(answer)
     }
 }
 
@@ -362,7 +394,8 @@ fn unusable(detail: &str) -> WorkerFailed {
 struct KeyRequest<'a> {
     models: [&'a str; 1],
     duration: &'static str,
-    max_budget: serde_json::Number,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_budget: Option<serde_json::Number>,
     max_parallel_requests: u8,
     metadata: KeyMetadata,
 }

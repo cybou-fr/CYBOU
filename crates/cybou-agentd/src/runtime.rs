@@ -182,7 +182,7 @@ pub fn run_capsule(
 mod tests {
     use cybou_capsule::{
         CapabilityProfile, Lease, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget,
-        Workspace, compile, issue_lease,
+        SpendPolicy, Workspace, compile, issue_lease,
     };
     use time::{Duration, OffsetDateTime};
     use uuid::Uuid;
@@ -210,7 +210,7 @@ mod tests {
         profile.network = NetworkGrant::to(hosts);
         profile.model = Some(ModelGrant {
             class: "Strong".to_owned(),
-            spend_limit: 100,
+            spend: SpendPolicy::Capped(100),
         });
         profile.may_execute = true;
         issue_lease(

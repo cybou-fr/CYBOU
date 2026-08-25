@@ -181,7 +181,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::grant::{ModelGrant, NetworkGrant, ResourceBudget, Workspace};
+    use crate::grant::{ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy, Workspace};
 
     /// A development profile: the shape a person actually grants.
     fn developer() -> CapsuleGrant {
@@ -198,7 +198,7 @@ mod tests {
             },
             model: Some(ModelGrant {
                 class: "Strong".to_owned(),
-                spend_limit: 100,
+                spend: SpendPolicy::Capped(100),
             }),
             tools: vec!["git".to_owned(), "tests".to_owned()],
             may_execute: true,

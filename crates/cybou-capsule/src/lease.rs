@@ -31,6 +31,14 @@
 //! grant this crate hands out as the starting point for building a profile, and every capsule on an
 //! unplugged host, which is the configuration this system exists to survive.
 //!
+//! ## Free is a selection, not an empty budget
+//!
+//! The second of those was patched by saying a zero ceiling *means* a free model. That was still one
+//! integer carrying two opposite facts, and every component that read it guessed: the grant meant
+//! "use something free", the transport read "nothing left" and refused. `SpendPolicy::ZeroCostOnly`
+//! says which one, so nothing downstream has to infer it — and it fails differently, because a route
+//! that was declared free and then billed has broken a promise rather than used up a budget.
+//!
 //! ## A ceiling is not a budget line
 //!
 //! The spending ceiling is enforced where the accounting is — at the model gateway, which sees every
@@ -189,10 +197,9 @@ impl Lease {
     /// is not an ending and not a failure — on an unplugged host it is the ordinary case.
     #[must_use]
     pub fn may_use_model(&self, class: &str) -> bool {
-        self.grant
-            .model
-            .as_ref()
-            .is_some_and(|model| model.class == class && self.model_spent < model.spend_limit)
+        self.grant.model.as_ref().is_some_and(|model| {
+            model.class == class && model.spend.permits_another(self.model_spent)
+        })
     }
 
     /// Whether a model grant exists and has been used up.
@@ -206,7 +213,7 @@ impl Lease {
             .as_ref()
             // At the ceiling, not past it. `>` would let every ceiling be exceeded by exactly one
             // unit, which stays invisible until a month of them is added up.
-            .is_some_and(|model| self.model_spent >= model.spend_limit)
+            .is_some_and(|model| model.spend.is_finished(self.model_spent))
     }
 
     /// What remains of the spending ceiling, or nothing if there is no model grant.
@@ -215,7 +222,7 @@ impl Lease {
         self.grant
             .model
             .as_ref()
-            .map(|model| model.spend_limit.saturating_sub(self.model_spent))
+            .map(|model| model.spend.remaining(self.model_spent))
     }
 
     /// Record what a completion cost.
@@ -284,7 +291,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::grant::{ModelGrant, NetworkGrant, ResourceBudget, Workspace};
+    use crate::grant::{ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy, Workspace};
 
     fn at(offset: i64) -> OffsetDateTime {
         OffsetDateTime::from_unix_timestamp(1_787_000_000 + offset).expect("a fixed instant")
@@ -304,7 +311,7 @@ mod tests {
             },
             model: Some(ModelGrant {
                 class: "Strong".to_owned(),
-                spend_limit: 100,
+                spend: SpendPolicy::Capped(100),
             }),
             tools: vec!["git".to_owned()],
             may_execute: true,
@@ -356,19 +363,67 @@ mod tests {
     }
 
     #[test]
-    fn a_free_model_with_a_zero_ceiling_is_still_a_grant() {
-        // Zero means: use something that costs nothing, and run up no bill. A real configuration,
-        // and not the same as having no grant at all.
+    fn a_zero_cost_grant_may_actually_ask_for_a_completion() {
+        // The defect a policy replaces an integer to close. As a ceiling of zero this grant was
+        // indistinguishable from a spent-out one, so the capsule a person selected in order to use
+        // free models refused every completion before making one.
         let mut free = grant();
         free.model = Some(ModelGrant {
             class: "Local".to_owned(),
-            spend_limit: 0,
+            spend: SpendPolicy::ZeroCostOnly,
         });
         let lease = Lease::issued(free, at(0));
 
         assert!(lease.is_live(at(60)), "the capsule is fine");
-        assert!(lease.model_spent_out(), "there is nothing to spend");
+        assert!(
+            lease.may_use_model("Local"),
+            "a grant that may spend nothing may still ask something that costs nothing"
+        );
+        assert!(!lease.model_spent_out(), "nothing has gone wrong yet");
         assert_eq!(lease.remaining_spend(), Some(0));
+        assert!(
+            decide_under_lease(
+                &lease,
+                &Reach::UseModel {
+                    class: "Local".to_owned()
+                },
+                at(60)
+            )
+            .is_allowed()
+        );
+    }
+
+    #[test]
+    fn a_zero_cost_grant_that_gets_billed_is_finished() {
+        // A charge under this policy is not a budget being used; it is evidence the route was not
+        // what it was declared to be. Carrying on would mean spending money against a selection
+        // that said none.
+        let mut free = grant();
+        free.model = Some(ModelGrant {
+            class: "Local".to_owned(),
+            spend: SpendPolicy::ZeroCostOnly,
+        });
+        let mut lease = Lease::issued(free, at(0));
+        lease.charge(1);
+
+        assert!(lease.is_live(at(60)), "the capsule itself is not finished");
+        assert!(!lease.may_use_model("Local"));
+        assert!(lease.model_spent_out());
+    }
+
+    #[test]
+    fn a_capped_grant_of_zero_permits_nothing_and_that_is_a_different_thing() {
+        // Both exist and they are not the same. This one is a ceiling that happens to be empty; the
+        // one above is a selection that money may not be spent at all.
+        let mut empty = grant();
+        empty.model = Some(ModelGrant {
+            class: "Local".to_owned(),
+            spend: SpendPolicy::Capped(0),
+        });
+        let lease = Lease::issued(empty, at(0));
+
+        assert!(!lease.may_use_model("Local"));
+        assert!(lease.model_spent_out());
     }
 
     #[test]

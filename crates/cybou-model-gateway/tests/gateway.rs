@@ -10,7 +10,8 @@ use axum::{
     http::{Request, StatusCode, header},
 };
 use cybou_capsule::{
-    CapabilityProfile, Lease, LeaseRequest, ModelGrant, ResourceBudget, Workspace, issue_lease,
+    CapabilityProfile, Lease, LeaseRequest, ModelGrant, ResourceBudget, SpendPolicy, Workspace,
+    issue_lease,
 };
 use cybou_model_brokerd::{
     BrokerCore, ChatMessage, ProviderChatOutput, ProviderChatRequest, UsageSubject, Worker,
@@ -124,7 +125,7 @@ fn capsule_lease() -> Arc<Mutex<Lease>> {
     .expect("profile");
     profile.model = Some(ModelGrant {
         class: "Strong".to_owned(),
-        spend_limit: 20,
+        spend: SpendPolicy::Capped(20),
     });
     Arc::new(Mutex::new(
         issue_lease(
@@ -348,7 +349,7 @@ async fn openai_compatible_http_shape_requires_the_ephemeral_bearer() {
     .expect("profile");
     profile.model = Some(ModelGrant {
         class: "Strong".to_owned(),
-        spend_limit: 20,
+        spend: SpendPolicy::Capped(20),
     });
     let lease = Arc::new(Mutex::new(
         issue_lease(

@@ -28,7 +28,7 @@ use cybou_agentd::session::{Session, SessionEnd, SessionState};
 use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
 use cybou_capsule::{
     CapabilityProfile, KernelCapsuleSpec, Lease, LeaseRequest, ModelGrant, NetworkGrant,
-    ResourceBudget, Workspace, compile, issue_lease,
+    ResourceBudget, SpendPolicy, Workspace, compile, issue_lease,
 };
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -45,7 +45,7 @@ fn usage() -> &'static str {
      --profile ID --agent NAME --workspace PATH\n  \
      --memory-mib N --cpus N --tasks-max N --lifetime-seconds N\n  \
      --token-limit N --max-output-tokens N --sensitivity N\n  \
-     [--model CLASS --spend-limit N] [--host HOST]… [--may-execute]\n  \
+     [--model CLASS --spend-limit N|zero-cost] [--host HOST]… [--may-execute]\n  \
      [--capsule-id UUID] [--task-id UUID]"
 }
 
@@ -63,7 +63,7 @@ struct Selection {
     max_output_tokens: Option<u32>,
     sensitivity: Option<u8>,
     model: Option<String>,
-    spend_limit: Option<u64>,
+    spend_limit: Option<String>,
     hosts: Vec<String>,
     may_execute: bool,
     capsule_id: Option<Uuid>,
@@ -112,7 +112,7 @@ fn parse(arguments: Vec<String>) -> Result<Selection, String> {
             "--token-limit" => selection.token_limit = Some(number(&flag, &value()?)?),
             "--max-output-tokens" => selection.max_output_tokens = Some(number(&flag, &value()?)?),
             "--sensitivity" => selection.sensitivity = Some(number(&flag, &value()?)?),
-            "--spend-limit" => selection.spend_limit = Some(number(&flag, &value()?)?),
+            "--spend-limit" => selection.spend_limit = Some(value()?),
             "--capsule-id" => selection.capsule_id = Some(uuid(&flag, &value()?)?),
             "--task-id" => selection.task_id = Some(uuid(&flag, &value()?)?),
             "--prompt" => selection.prompt = Some(value()?),
@@ -130,6 +130,22 @@ fn number<T: std::str::FromStr>(flag: &str, value: &str) -> Result<T, String> {
 
 fn uuid(flag: &str, value: &str) -> Result<Uuid, String> {
     Uuid::parse_str(value).map_err(|_| format!("{flag} is not a UUID"))
+}
+
+/// The two spending selections, said in words rather than encoded in whether a number is zero.
+///
+/// `--spend-limit zero-cost` is not `--spend-limit 0`. One says *spend nothing, on a route that is
+/// known to cost nothing*; the other says *there is a ceiling and it is empty*. They lead to
+/// different routing and they fail differently, and an integer could not tell them apart — which is
+/// how the selection a person makes to use a free model became the one every worker refused.
+fn spend_policy(value: &str) -> Result<SpendPolicy, String> {
+    if value == "zero-cost" {
+        return Ok(SpendPolicy::ZeroCostOnly);
+    }
+    value
+        .parse()
+        .map(SpendPolicy::Capped)
+        .map_err(|_| "--spend-limit takes an integer or the word zero-cost".to_owned())
 }
 
 fn required<T>(value: Option<T>, flag: &str) -> Result<T, String> {
@@ -159,7 +175,7 @@ fn mint(selection: &Selection, now: OffsetDateTime) -> Result<Lease, String> {
     profile.model = match &selection.model {
         Some(class) => Some(ModelGrant {
             class: class.clone(),
-            spend_limit: required(selection.spend_limit, "--spend-limit")?,
+            spend: spend_policy(&required(selection.spend_limit.clone(), "--spend-limit")?)?,
         }),
         None => None,
     };

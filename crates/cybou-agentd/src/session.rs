@@ -228,7 +228,8 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use cybou_capsule::{
-        CapabilityProfile, LeaseRequest, ModelGrant, ResourceBudget, Workspace, issue_lease,
+        CapabilityProfile, LeaseRequest, ModelGrant, ResourceBudget, SpendPolicy, Workspace,
+        issue_lease,
     };
     use time::Duration;
 
@@ -251,7 +252,7 @@ mod tests {
         .expect("a valid profile");
         profile.model = Some(ModelGrant {
             class: "Strong".to_owned(),
-            spend_limit: 100,
+            spend: SpendPolicy::Capped(100),
         });
         profile.may_execute = true;
         issue_lease(

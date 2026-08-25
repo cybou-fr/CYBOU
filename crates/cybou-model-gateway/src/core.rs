@@ -5,7 +5,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use cybou_capsule::Lease;
+use cybou_capsule::{Lease, SpendPolicy};
 use cybou_model_brokerd::{
     AgentChatRequest, AgentChatResult, BrokerCore, ChatMessage, ChatRefused,
 };
@@ -270,9 +270,15 @@ impl GatewayCore {
         {
             return Err(GatewayRefused::BudgetExceeded);
         }
-        let remaining_spend = lease
-            .remaining_spend()
-            .ok_or(GatewayRefused::Unauthorized)?;
+        // What is left of the grant, expressed the same way the grant expresses it. Handing the
+        // broker a remaining *number* was how "spend nothing, on something that costs nothing"
+        // arrived at the transport indistinguishable from "you have spent everything".
+        let spend = match grant.spend {
+            SpendPolicy::ZeroCostOnly => SpendPolicy::ZeroCostOnly,
+            SpendPolicy::Capped(_) => {
+                SpendPolicy::Capped(grant.spend.remaining(lease.model_spent()))
+            }
+        };
 
         let result = self
             .providers
@@ -285,7 +291,7 @@ impl GatewayCore {
                 messages: request.messages.clone(),
                 input_tokens,
                 max_output_tokens: request.max_output_tokens,
-                max_spend_units: remaining_spend,
+                spend,
                 local_only: account.policy.local_only,
                 sensitivity: account.policy.sensitivity,
             })

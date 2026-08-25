@@ -272,6 +272,7 @@ mod tests {
     use time::Duration;
 
     use super::*;
+    use crate::grant::SpendPolicy;
     use crate::{Reach, Verdict, decide_under_lease};
 
     fn at(offset: i64) -> OffsetDateTime {
@@ -292,7 +293,7 @@ mod tests {
         profile.network = NetworkGrant::to(&["github.com", "registry.npmjs.org"]);
         profile.model = Some(ModelGrant {
             class: "Strong".to_owned(),
-            spend_limit: 100,
+            spend: SpendPolicy::Capped(100),
         });
         profile.tools = vec!["git".to_owned(), "tests".to_owned()];
         profile.may_execute = true;

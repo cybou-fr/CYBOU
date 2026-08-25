@@ -6,8 +6,8 @@
 use std::path::PathBuf;
 
 use cybou_capsule::{
-    CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, Reach, ResourceBudget, Verdict,
-    Workspace, decide_under_lease, issue_lease,
+    CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, Reach, ResourceBudget, SpendPolicy,
+    Verdict, Workspace, decide_under_lease, issue_lease,
 };
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -26,7 +26,7 @@ fn selected_development_profile() -> CapabilityProfile {
     profile.network = NetworkGrant::to(&["github.com", "registry.npmjs.org"]);
     profile.model = Some(ModelGrant {
         class: "Strong".to_owned(),
-        spend_limit: 100,
+        spend: SpendPolicy::Capped(100),
     });
     profile.tools = vec!["git".to_owned(), "tests".to_owned()];
     profile.may_execute = true;
