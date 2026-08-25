@@ -74,6 +74,9 @@ pub fn decide(grant: &NetworkGrant, asked: &Asked) -> Egress {
 /// rule that ends up switched off.
 #[must_use]
 pub fn may_be_connected_to(address: IpAddr) -> bool {
+    // IPv4-mapped IPv6 must be judged as IPv4. `::ffff:127.0.0.1` is not IPv6 loopback according
+    // to `Ipv6Addr::is_loopback`, but it reaches IPv4 loopback after the kernel canonicalises it.
+    let address = address.to_canonical();
     match address {
         IpAddr::V4(address) => {
             !address.is_loopback()
@@ -175,6 +178,11 @@ mod tests {
         assert!(!may_be_connected_to("fe80::1".parse().unwrap()));
         assert!(!may_be_connected_to("0.0.0.0".parse().unwrap()));
         assert!(!may_be_connected_to("::".parse().unwrap()));
+        assert!(!may_be_connected_to("::ffff:127.0.0.1".parse().unwrap()));
+        assert!(!may_be_connected_to(
+            "::ffff:169.254.169.254".parse().unwrap()
+        ));
+        assert!(!may_be_connected_to("::ffff:0.0.0.0".parse().unwrap()));
     }
 
     #[test]

@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use cybou_capsule::backend::{Bubblewrap, CapsuleBackend};
+use cybou_capsule::backend::{Bubblewrap, CapsuleBackend, CapsuleRuntimeBindings};
 use cybou_capsule::compile::compile;
 use cybou_capsule::grant::{CapsuleGrant, NetworkGrant, ResourceBudget, Workspace};
 
@@ -26,13 +26,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("no program given; a capsule with nothing to run is not a test".into());
     }
 
+    let hosts: Vec<String> = std::env::var("CYBOU_EGRESS_HOSTS")
+        .ok()
+        .into_iter()
+        .flat_map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|host| !host.is_empty())
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .collect();
     let grant = CapsuleGrant {
         capsule_id: uuid::Uuid::from_u128(0x9a75),
         agent: "gate".to_owned(),
         workspace: Workspace::at(PathBuf::from(workspace)),
-        // Named, and deliberately not honoured: the spec denies the network whatever a grant lists,
-        // until an egress broker exists. The gate checks that the denial actually happens.
-        network: NetworkGrant::to(&["github.com"]),
+        network: NetworkGrant { hosts },
         budget: ResourceBudget {
             memory_mib: 512,
             cpus: 1,
@@ -51,7 +61,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let entry = std::env::var("CYBOU_CAPSULE_ENTRY")
         .map_err(|_| "CYBOU_CAPSULE_ENTRY must name the entry program on this host")?;
 
-    for argument in Bubblewrap::entering_through(entry).command(&spec, &program) {
+    let mut backend = Bubblewrap::entering_through(entry);
+    let mut bindings = CapsuleRuntimeBindings::default();
+    if !grant.network.hosts.is_empty() {
+        let bridge = std::env::var("CYBOU_EGRESS_BRIDGE")
+            .map_err(|_| "CYBOU_EGRESS_BRIDGE must name the bridge program on this host")?;
+        let socket = std::env::var("CYBOU_EGRESS_SOCKET")
+            .map_err(|_| "CYBOU_EGRESS_SOCKET must name this capsule's broker socket")?;
+        backend = backend.with_egress_bridge(bridge);
+        bindings.egress_socket_host = Some(PathBuf::from(socket));
+    }
+    for argument in backend.command(&spec, &bindings, &program)? {
         println!("{argument}");
     }
     Ok(())

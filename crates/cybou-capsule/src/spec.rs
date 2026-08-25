@@ -27,8 +27,8 @@
 //! - There is no way to express *do not unshare this namespace*. [`Namespaces`] has no fields; a
 //!   capsule gets all of them or is not a capsule.
 //! - There is no way to express *and no new privileges is off*. It is not a field.
-//! - [`Network`] has one variant. Reaching a granted host is an egress broker's job, and the day
-//!   that exists is the day this type grows a second one — visibly, in a commit somebody reviews.
+//! - [`Network`] says only whether a brokered channel exists. Host names remain in the grant and
+//!   are decided by the broker; duplicating them here would create two owners of network policy.
 //! - A mount is read-only unless something asked for otherwise, and the compiler is the only thing
 //!   that builds the list.
 
@@ -101,7 +101,7 @@ pub struct PathRule {
 }
 
 /// What a capsule may reach on the network.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Network {
     /// A fresh network namespace with loopback and no route.
@@ -111,6 +111,16 @@ pub enum Network {
     /// `github.com` and a firewall works in addresses, and turning one into the other means owning a
     /// policy engine for DNS lifetime and rebinding — where being wrong is silent.
     Denied,
+    /// A fresh network namespace with one capsule-local compatibility listener.
+    ///
+    /// This is plumbing, not policy. The pathname reaches exactly one broker and the port lets
+    /// ordinary clients use `HTTPS_PROXY`; neither field says which hosts may be reached.
+    Brokered {
+        /// TCP port on capsule loopback.
+        proxy_port: u16,
+        /// Pathname Unix socket as seen inside the capsule.
+        socket_inside: PathBuf,
+    },
 }
 
 /// What the capsule may consume, as the kernel counts it.
@@ -238,11 +248,14 @@ mod tests {
     }
 
     #[test]
-    fn the_network_type_can_only_say_one_thing_today() {
-        // Reaching a granted host is an egress broker's job. The day that exists is the day this
-        // grows a second variant — visibly, in a commit somebody reviews.
-        let modes = [Network::Denied];
-        assert_eq!(modes.len(), 1);
+    fn brokered_network_names_plumbing_and_not_policy() {
+        let network = Network::Brokered {
+            proxy_port: 3128,
+            socket_inside: PathBuf::from("/run/cybou/egress.sock"),
+        };
+        let written = format!("{network:?}");
+        assert!(!written.contains("github.com"));
+        assert!(written.contains("3128"));
     }
 
     #[test]

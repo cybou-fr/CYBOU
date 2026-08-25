@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "cybou-egressd"
-description = "The one way out of a capsule: a broker that decides by name and resolves for itself"
+name = "cybou-egress-bridge"
+description = "Capsule-local opaque TCP to Unix egress transport"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,8 +11,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-cybou-capsule = { path = "../cybou-capsule" }
-tokio = { workspace = true, features = ["io-util", "sync"] }
+tokio = { workspace = true, features = ["io-util"] }
 
 [lints]
 workspace = true

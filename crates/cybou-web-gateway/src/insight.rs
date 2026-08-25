@@ -218,45 +218,46 @@ fn means(insight: &SystemInsight) -> String {
 
 /// What could be offered about a finding, and what the gate decided.
 fn offers(insight: &SystemInsight, now: OffsetDateTime) -> Vec<OfferProjection> {
-    propose(insight, now, |operation| {
-        Uuid::from_u128(operation.verb().len() as u128)
-    })
-    .into_iter()
-    .map(|proposal| {
-        let checks = criticise(&proposal, insight);
-        let decision = authorize(
-            &proposal,
-            &checks,
-            insight.strength == EvidenceStrength::Weak,
-            // The gate is asked with an unconfigured policy, deliberately. This surface shows what
-            // would be decided on a machine nobody has granted anything on, which is every machine
-            // today, and a projection that read a policy would show a different answer per reader.
-            &StandingPolicy::nothing_pre_authorized(),
-            now,
-        );
-        let (verdict, reason) = match decision.verdict {
-            AuthorizationVerdict::Granted => ("granted".to_owned(), String::new()),
-            AuthorizationVerdict::RequiresUserConfirmation { prompt } => {
-                ("requires-confirmation".to_owned(), prompt)
+    // A projection is not a lifecycle owner and must not mint identities. `nil` is an explicit
+    // preview sentinel; the proposal and decision that can produce a permit are created and
+    // retained by Action1 with real identities.
+    propose(insight, now, |_| Uuid::nil())
+        .into_iter()
+        .map(|proposal| {
+            let checks = criticise(&proposal, insight);
+            let decision = authorize(
+                &proposal,
+                &checks,
+                insight.strength == EvidenceStrength::Weak,
+                // The gate is asked with an unconfigured policy, deliberately. This surface shows what
+                // would be decided on a machine nobody has granted anything on, which is every machine
+                // today, and a projection that read a policy would show a different answer per reader.
+                &StandingPolicy::nothing_pre_authorized(),
+                now,
+            );
+            let (verdict, reason) = match decision.verdict {
+                AuthorizationVerdict::Granted => ("granted".to_owned(), String::new()),
+                AuthorizationVerdict::RequiresUserConfirmation { prompt } => {
+                    ("requires-confirmation".to_owned(), prompt)
+                }
+                AuthorizationVerdict::Denied { reason } => ("denied".to_owned(), reason),
+            };
+            OfferProjection {
+                operation: proposal.operation,
+                target: proposal.target_resource,
+                risk: match proposal.risk_level {
+                    RiskLevel::Low => "low",
+                    RiskLevel::Medium => "medium",
+                    RiskLevel::High => "high",
+                    RiskLevel::Critical => "critical",
+                }
+                .to_owned(),
+                reversible: proposal.reversible,
+                verdict,
+                reason,
             }
-            AuthorizationVerdict::Denied { reason } => ("denied".to_owned(), reason),
-        };
-        OfferProjection {
-            operation: proposal.operation,
-            target: proposal.target_resource,
-            risk: match proposal.risk_level {
-                RiskLevel::Low => "low",
-                RiskLevel::Medium => "medium",
-                RiskLevel::High => "high",
-                RiskLevel::Critical => "critical",
-            }
-            .to_owned(),
-            reversible: proposal.reversible,
-            verdict,
-            reason,
-        }
-    })
-    .collect()
+        })
+        .collect()
 }
 
 #[cfg(test)]

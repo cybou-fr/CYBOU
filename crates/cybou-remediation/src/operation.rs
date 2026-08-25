@@ -136,8 +136,12 @@ impl Operation {
             Self::CleanPackageCache | Self::RotateLogs | Self::TrimTemporaryFiles => {
                 &[Finding::StorageExhaustion]
             }
-            Self::RestartService => &[Finding::ServiceFailure, Finding::MemoryPressure],
-            Self::ReloadService => &[Finding::ServiceFailure],
+            Self::RestartService => &[
+                Finding::ServiceFailure,
+                Finding::ServiceInactive,
+                Finding::MemoryPressure,
+            ],
+            Self::ReloadService => &[Finding::ServiceFailure, Finding::ServiceInactive],
             // Reading a unit's state relieves nothing and is worth proposing anyway: it is how a
             // person finds out more without changing anything, and a system that could only offer
             // mutations would push every investigation toward one. The forbidden three relieve

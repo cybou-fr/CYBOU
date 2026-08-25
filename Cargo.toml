@@ -4,13 +4,16 @@
 [workspace]
 members = [
     "crates/cybou-authd",
+    "crates/cybou-actiond",
     "crates/cybou-capsule",
     "crates/cybou-capsule-enter",
     "crates/cybou-contextd",
     "crates/cybou-crypto",
     "crates/cybou-epistemicd",
     "crates/cybou-egressd",
+    "crates/cybou-egress-bridge",
     "crates/cybou-eventd",
+    "crates/cybou-executord",
     "crates/cybou-fabric",
     "crates/cybou-healthd",
     "crates/cybou-identityd",

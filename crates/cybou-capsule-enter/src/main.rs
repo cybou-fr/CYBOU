@@ -45,8 +45,17 @@ struct Request {
     readable: Vec<PathBuf>,
     /// Paths the capsule may also write to.
     writable: Vec<PathBuf>,
+    /// Optional capsule-local compatibility transport.
+    egress: Option<EgressBridge>,
     /// The agent, and its arguments.
     program: Vec<String>,
+}
+
+/// Everything needed to start transport, and nothing about egress policy.
+struct EgressBridge {
+    program: PathBuf,
+    socket: PathBuf,
+    port: u16,
 }
 
 fn main() -> std::process::ExitCode {
@@ -65,6 +74,9 @@ fn run() -> Result<(), String> {
     let request = parse(std::env::args().skip(1))?;
     restrict(&request)?;
     refuse_reshaping()?;
+    if let Some(egress) = &request.egress {
+        start_egress_bridge(egress)?;
+    }
     execute(&request.program)
 }
 
@@ -76,12 +88,35 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Request, String> {
     let mut readable = Vec::new();
     let mut writable = Vec::new();
     let mut program = Vec::new();
+    let mut egress_bridge = None;
+    let mut egress_socket = None;
+    let mut egress_port = None;
     let mut arguments = arguments.peekable();
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--ro" => readable.push(PathBuf::from(arguments.next().ok_or("--ro wants a path")?)),
             "--rw" => writable.push(PathBuf::from(arguments.next().ok_or("--rw wants a path")?)),
+            "--egress-bridge" => {
+                egress_bridge = Some(PathBuf::from(
+                    arguments.next().ok_or("--egress-bridge wants a path")?,
+                ));
+            }
+            "--egress-socket" => {
+                egress_socket = Some(PathBuf::from(
+                    arguments.next().ok_or("--egress-socket wants a path")?,
+                ));
+            }
+            "--egress-port" => {
+                let value = arguments.next().ok_or("--egress-port wants a number")?;
+                let port = value
+                    .parse::<u16>()
+                    .map_err(|_| format!("{value} is not a port"))?;
+                if port == 0 {
+                    return Err("zero is not an egress port".to_owned());
+                }
+                egress_port = Some(port);
+            }
             "--" => {
                 program.extend(arguments.by_ref());
                 break;
@@ -102,11 +137,57 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Request, String> {
     if writable.is_empty() {
         return Err("no writable path; the agent could not do anything it was granted".into());
     }
+    let egress = match (egress_bridge, egress_socket, egress_port) {
+        (None, None, None) => None,
+        (Some(program), Some(socket), Some(port)) => Some(EgressBridge {
+            program,
+            socket,
+            port,
+        }),
+        _ => return Err("egress bridge, socket and port must be supplied together".to_owned()),
+    };
     Ok(Request {
         readable,
         writable,
+        egress,
         program,
     })
+}
+
+/// Start the compatibility transport as one child in the capsule's own cgroup and namespaces.
+///
+/// It inherits Landlock and seccomp because both were applied before this fork. The parent then
+/// becomes the agent, so there is no third supervisor and both processes count under one `TasksMax`.
+fn start_egress_bridge(egress: &EgressBridge) -> Result<(), String> {
+    let mut child = std::process::Command::new(&egress.program)
+        .arg("--port")
+        .arg(egress.port.to_string())
+        .arg("--socket")
+        .arg(&egress.socket)
+        .spawn()
+        .map_err(|why| {
+            format!(
+                "could not start egress bridge {}: {why}",
+                egress.program.display()
+            )
+        })?;
+    let address = (std::net::Ipv4Addr::LOCALHOST, egress.port);
+    for _ in 0..100 {
+        if std::net::TcpStream::connect(address).is_ok() {
+            return Ok(());
+        }
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|why| format!("could not inspect the egress bridge: {why}"))?
+        {
+            return Err(format!(
+                "egress bridge stopped before it was ready: {status}"
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let _ = child.kill();
+    Err("egress bridge did not become ready within one second".to_owned())
 }
 
 /// Apply Landlock to this process, so the agent inherits it and cannot shed it.
@@ -219,6 +300,7 @@ mod tests {
         assert_eq!(request.program, vec!["--ro".to_owned(), "x".to_owned()]);
         assert_eq!(request.readable, vec![PathBuf::from("/usr")]);
         assert_eq!(request.writable, vec![PathBuf::from("/workspace")]);
+        assert!(request.egress.is_none());
     }
 
     #[test]
@@ -246,5 +328,39 @@ mod tests {
     fn a_missing_path_is_not_an_empty_one() {
         assert!(parse_of(&["--ro"]).is_err());
         assert!(parse_of(&["--rw"]).is_err());
+    }
+
+    #[test]
+    fn bridge_plumbing_is_all_or_nothing() {
+        let complete = parse_of(&[
+            "--ro",
+            "/usr",
+            "--rw",
+            "/workspace",
+            "--egress-bridge",
+            "/.cybou-egress-bridge",
+            "--egress-socket",
+            "/run/cybou/egress.sock",
+            "--egress-port",
+            "3128",
+            "--",
+            "agent",
+        ])
+        .expect("complete bridge");
+        let egress = complete.egress.expect("egress");
+        assert_eq!(egress.port, 3128);
+        assert!(
+            parse_of(&[
+                "--ro",
+                "/usr",
+                "--rw",
+                "/workspace",
+                "--egress-port",
+                "3128",
+                "--",
+                "agent"
+            ])
+            .is_err()
+        );
     }
 }

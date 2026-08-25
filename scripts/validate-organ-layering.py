@@ -63,7 +63,7 @@ LAYERS: list[tuple[str, set[str]]] = [
     # different subject: the gate decides what Cybou may do to its host, and the capsule decides what
     # an agent may do inside one. Neither may be read from above, and neither may reach anything that
     # could carry out what it permits.
-    ("governance", {"cybou-remediation", "cybou-capsule"}),
+    ("governance", {"cybou-remediation", "cybou-actiond", "cybou-capsule"}),
 ]
 
 #: Crates that are faculties rather than organs, and what each of them must not depend on.
@@ -88,7 +88,7 @@ FACULTIES = {"cybou-model-brokerd"}
 #: a real connection — which is why it is checked here rather than remembered.
 #:
 #: The other direction is fine and is the point: the broker reads a grant.
-ENFORCERS = {"cybou-egressd"}
+ENFORCERS = {"cybou-egressd", "cybou-executord"}
 
 #: What each layer owns, for the error message. An operator reading a failure should not have to
 #: open the ADR to know what was crossed.

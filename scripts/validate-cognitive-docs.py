@@ -345,7 +345,7 @@ def main(argv: list[str]) -> int:
     require(
         paths["current"],
         "no current model owner",
-        "There is currently no language-model process and no privileged action-executor process",
+        "There is currently no language-model process.",
     )
     # Derived, not hardcoded.
     #

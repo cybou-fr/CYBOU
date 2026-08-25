@@ -55,6 +55,15 @@ endpoint!(PRESENCE, "Presence", "cybou-presenced.service");
 endpoint!(LIFECYCLE, "Lifecycle", "cybou-lifecycled.service");
 endpoint!(MEANING, "Meaning", "cybou-meaningd.service");
 endpoint!(TELEMETRY, "Telemetry", "cybou-telemetryd.service");
+endpoint!(ACTION, "Action", "cybou-actiond.service");
+
+/// Stable system-bus endpoint for the Body executor.
+pub const EXECUTOR: BusEndpoint = BusEndpoint {
+    service: "org.cybou.Body.Executor1",
+    object_path: "/org/cybou/Body/Executor1",
+    interface: "org.cybou.Body.Executor1",
+    systemd_unit: "cybou-executord.service",
+};
 
 /// Stable endpoint for `ModelBroker1`.
 ///

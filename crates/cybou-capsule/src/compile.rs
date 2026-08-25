@@ -36,6 +36,12 @@ use crate::spec::{
 /// hosts produces the same environment.
 pub const WORKSPACE_INSIDE: &str = "/workspace";
 
+/// Fixed capsule-side endpoint for its one broker.
+pub const EGRESS_SOCKET_INSIDE: &str = "/run/cybou/egress.sock";
+
+/// Ordinary proxy clients are pointed at this capsule-local compatibility listener.
+pub const EGRESS_PROXY_PORT: u16 = 3128;
+
 /// Paths a workspace may not be, or be inside, or contain.
 ///
 /// Not a general filesystem policy — the mount list is built up, so nothing else is exposed anyway.
@@ -127,6 +133,11 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
     if grant.budget.tasks_max == 0 {
         return Err(CannotCompile::BudgetPermitsNothing("processes"));
     }
+    if !grant.network.hosts.is_empty() && grant.budget.tasks_max < 2 {
+        return Err(CannotCompile::BudgetPermitsNothing(
+            "processes after reserving one for the egress bridge",
+        ));
+    }
     // A CPU quota of zero is not a small share, it is none: the cgroup would hold the capsule at a
     // standstill, which looks exactly like a capsule that hung.
     if grant.budget.cpus == 0 {
@@ -178,6 +189,12 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
             access: Access::ReadWrite,
         });
     }
+    if !grant.network.hosts.is_empty() {
+        landlock.push(PathRule {
+            path: PathBuf::from(EGRESS_SOCKET_INSIDE),
+            access: Access::ReadWrite,
+        });
+    }
 
     Ok(KernelCapsuleSpec {
         capsule_id: grant.capsule_id,
@@ -196,9 +213,14 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
                 .try_into()
                 .unwrap_or(u64::MAX),
         },
-        // One variant, and the grant's host list is deliberately not consulted. Until an egress
-        // broker exists, compiling those hosts into anything would be compiling a promise.
-        network: Network::Denied,
+        network: if grant.network.hosts.is_empty() {
+            Network::Denied
+        } else {
+            Network::Brokered {
+                proxy_port: EGRESS_PROXY_PORT,
+                socket_inside: PathBuf::from(EGRESS_SOCKET_INSIDE),
+            }
+        },
         working_directory: inside,
     })
 }
@@ -377,13 +399,33 @@ mod tests {
     }
 
     #[test]
-    fn the_network_is_denied_whatever_the_grant_lists() {
-        // Until an egress broker exists, compiling those hosts into anything would be compiling a
-        // promise. The grant keeps them; the spec does not pretend to honour them.
+    fn a_network_grant_compiles_to_one_channel_and_not_a_second_policy() {
         let mut generous = grant_at("/srv/project");
         generous.network = NetworkGrant::to(&["github.com", "example.com", "anything.at.all"]);
         let spec = compile(&generous).expect("compiles");
-        assert_eq!(spec.network, Network::Denied);
+        assert_eq!(
+            spec.network,
+            Network::Brokered {
+                proxy_port: EGRESS_PROXY_PORT,
+                socket_inside: PathBuf::from(EGRESS_SOCKET_INSIDE),
+            }
+        );
+        assert!(!format!("{:?}", spec.network).contains("github.com"));
+    }
+
+    #[test]
+    fn the_bridge_is_counted_before_a_brokered_capsule_is_built() {
+        let mut grant = grant_at("/srv/project");
+        grant.budget.tasks_max = 1;
+        assert_eq!(
+            compile(&grant),
+            Err(CannotCompile::BudgetPermitsNothing(
+                "processes after reserving one for the egress bridge"
+            ))
+        );
+
+        grant.network = NetworkGrant::default();
+        assert!(compile(&grant).is_ok(), "one task can hold one agent");
     }
 
     #[test]

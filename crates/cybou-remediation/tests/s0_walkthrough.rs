@@ -523,6 +523,7 @@ fn an_action_that_reported_success_does_not_get_to_say_the_disk_is_fine() {
         operation: proposal.operation.clone(),
         target_resource: proposal.target_resource.clone(),
         report: AttemptReport::Completed,
+        body_readings: Vec::new(),
         started_at: at(2500),
         ended_at: Some(at(2520)),
     };
@@ -616,6 +617,7 @@ fn a_disk_that_actually_emptied_is_reported_as_relieved() {
             operation: proposal.operation.clone(),
             target_resource: proposal.target_resource.clone(),
             report: AttemptReport::Completed,
+            body_readings: Vec::new(),
             started_at: at(2500),
             ended_at: Some(at(2520)),
         },

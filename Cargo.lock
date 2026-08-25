@@ -511,6 +511,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-actiond"
+version = "0.1.0"
+dependencies = [
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-remediation",
+ "serde",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-authd"
 version = "0.1.0"
 dependencies = [
@@ -574,6 +589,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-egress-bridge"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "cybou-egressd"
 version = "0.1.0"
 dependencies = [
@@ -613,6 +635,20 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
+name = "cybou-executord"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cybou-fabric",
+ "cybou-protocol",
  "thiserror 2.0.20",
  "time",
  "tokio",

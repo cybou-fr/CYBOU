@@ -37,6 +37,41 @@ use crate::spec::{Access, KernelCapsuleSpec, Network, Seccomp};
 /// applied, and it is bound read-only over a root the ruleset never grants.
 pub const ENTRY_INSIDE: &str = "/.cybou-capsule-enter";
 
+/// Where the capsule-local compatibility bridge is bound read-only.
+pub const EGRESS_BRIDGE_INSIDE: &str = "/.cybou-egress-bridge";
+
+/// Host paths chosen when one capsule is started, kept separate from the human grant and its
+/// deterministic kernel spec.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct CapsuleRuntimeBindings {
+    /// The one broker socket created for this capsule.
+    pub egress_socket_host: Option<PathBuf>,
+}
+
+/// Why a backend could not translate a complete spec into a command.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BackendError {
+    /// Brokered network was compiled but no bridge executable was installed.
+    MissingEgressBridge,
+    /// Brokered network was compiled but this capsule has no broker socket.
+    MissingEgressSocket,
+}
+
+impl core::fmt::Display for BackendError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::MissingEgressBridge => {
+                write!(formatter, "brokered network needs an egress bridge")
+            }
+            Self::MissingEgressSocket => {
+                write!(formatter, "brokered network needs a broker socket")
+            }
+        }
+    }
+}
+
+impl core::error::Error for BackendError {}
+
 /// Something that can build a capsule from a spec.
 pub trait CapsuleBackend {
     /// The command and arguments that would build this capsule.
@@ -44,7 +79,17 @@ pub trait CapsuleBackend {
     /// Returned rather than run, so the decision and the doing stay separable and the first is
     /// testable. A backend that could only be checked by running it could only be checked on a
     /// machine willing to run it.
-    fn command(&self, spec: &KernelCapsuleSpec, program: &[String]) -> Vec<String>;
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BackendError`] when a brokered spec lacks its bridge executable or per-capsule
+    /// runtime socket binding.
+    fn command(
+        &self,
+        spec: &KernelCapsuleSpec,
+        bindings: &CapsuleRuntimeBindings,
+        program: &[String],
+    ) -> Result<Vec<String>, BackendError>;
 
     /// What this backend needs present to work.
     fn requires(&self) -> &'static str;
@@ -77,6 +122,7 @@ pub trait CapsuleBackend {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Bubblewrap {
     entry: PathBuf,
+    egress_bridge: Option<PathBuf>,
 }
 
 impl Bubblewrap {
@@ -85,7 +131,15 @@ impl Bubblewrap {
     pub fn entering_through(entry: impl Into<PathBuf>) -> Self {
         Self {
             entry: entry.into(),
+            egress_bridge: None,
         }
+    }
+
+    /// Install the capsule-local transport used only by brokered specs.
+    #[must_use]
+    pub fn with_egress_bridge(mut self, bridge: impl Into<PathBuf>) -> Self {
+        self.egress_bridge = Some(bridge.into());
+        self
     }
 
     /// Where the entry program is on the host.
@@ -108,7 +162,12 @@ impl CapsuleBackend for Bubblewrap {
         "bwrap, and this project's own cybou-capsule-enter"
     }
 
-    fn command(&self, spec: &KernelCapsuleSpec, program: &[String]) -> Vec<String> {
+    fn command(
+        &self,
+        spec: &KernelCapsuleSpec,
+        bindings: &CapsuleRuntimeBindings,
+        program: &[String],
+    ) -> Result<Vec<String>, BackendError> {
         let mut argv = vec!["bwrap".to_owned()];
 
         // Die with the parent. Without it, a capsule outlives whatever was supervising it, and a
@@ -133,9 +192,9 @@ impl CapsuleBackend for Bubblewrap {
         argv.push("--disable-userns".to_owned());
         argv.push("--assert-userns-disabled".to_owned());
 
-        match spec.network {
-            Network::Denied => argv.push("--unshare-net".to_owned()),
-        }
+        // Both modes get a fresh namespace with no route. Brokered means one loopback listener can
+        // reach one pathname socket; it never means sharing or routing the host network.
+        argv.push("--unshare-net".to_owned());
 
         // The environment, emptied and then rebuilt by name.
         argv.push("--clearenv".to_owned());
@@ -144,6 +203,24 @@ impl CapsuleBackend for Bubblewrap {
             argv.push(name);
             argv.push(value);
         }
+
+        let brokered = match &spec.network {
+            Network::Denied => None,
+            Network::Brokered {
+                proxy_port,
+                socket_inside,
+            } => Some((
+                *proxy_port,
+                socket_inside,
+                self.egress_bridge
+                    .as_ref()
+                    .ok_or(BackendError::MissingEgressBridge)?,
+                bindings
+                    .egress_socket_host
+                    .as_ref()
+                    .ok_or(BackendError::MissingEgressSocket)?,
+            )),
+        };
 
         // The filesystem, in the order the spec lists it: read-only first, the one writable path
         // last, so nothing is layered over it afterwards.
@@ -172,11 +249,27 @@ impl CapsuleBackend for Bubblewrap {
         argv.push("--tmpfs".to_owned());
         argv.push("/tmp".to_owned());
 
+        if let Some((_, socket_inside, _, socket_host)) = brokered {
+            argv.push("--dir".to_owned());
+            argv.push("/run".to_owned());
+            argv.push("--dir".to_owned());
+            argv.push("/run/cybou".to_owned());
+            argv.push("--bind".to_owned());
+            argv.push(socket_host.to_string_lossy().into_owned());
+            argv.push(socket_inside.to_string_lossy().into_owned());
+        }
+
         // The entry program, read-only, layered over the `/usr` bound above. Last of the binds so
         // nothing the spec lists can be placed on top of it.
         argv.push("--ro-bind".to_owned());
         argv.push(self.entry.to_string_lossy().into_owned());
         argv.push(ENTRY_INSIDE.to_owned());
+
+        if let Some((_, _, bridge, _)) = brokered {
+            argv.push("--ro-bind".to_owned());
+            argv.push(bridge.to_string_lossy().into_owned());
+            argv.push(EGRESS_BRIDGE_INSIDE.to_owned());
+        }
 
         argv.push("--chdir".to_owned());
         argv.push(spec.working_directory.to_string_lossy().into_owned());
@@ -205,10 +298,20 @@ impl CapsuleBackend for Bubblewrap {
             );
             argv.push(rule.path.to_string_lossy().into_owned());
         }
+        if let Some((proxy_port, socket_inside, _, _)) = brokered {
+            argv.push("--ro".to_owned());
+            argv.push(EGRESS_BRIDGE_INSIDE.to_owned());
+            argv.push("--egress-bridge".to_owned());
+            argv.push(EGRESS_BRIDGE_INSIDE.to_owned());
+            argv.push("--egress-socket".to_owned());
+            argv.push(socket_inside.to_string_lossy().into_owned());
+            argv.push("--egress-port".to_owned());
+            argv.push(proxy_port.to_string());
+        }
         argv.push("--".to_owned());
         argv.extend(program.iter().cloned());
 
-        argv
+        Ok(argv)
     }
 }
 
@@ -217,7 +320,7 @@ impl CapsuleBackend for Bubblewrap {
 /// By name, and short. Everything here is something a program cannot work without; anything else is
 /// something the agent can be told through its own configuration, where it is visible.
 fn environment(spec: &KernelCapsuleSpec) -> Vec<(String, String)> {
-    vec![
+    let mut environment = vec![
         (
             "HOME".to_owned(),
             spec.working_directory.to_string_lossy().into_owned(),
@@ -231,7 +334,14 @@ fn environment(spec: &KernelCapsuleSpec) -> Vec<(String, String)> {
         // So a program inside can tell it is inside, and say so in a bug report rather than
         // producing a mystery.
         ("CYBOU_CAPSULE".to_owned(), spec.capsule_id.to_string()),
-    ]
+    ];
+    if let Network::Brokered { proxy_port, .. } = &spec.network {
+        let proxy = format!("http://127.0.0.1:{proxy_port}");
+        environment.push(("HTTPS_PROXY".to_owned(), proxy.clone()));
+        environment.push(("HTTP_PROXY".to_owned(), proxy));
+        environment.push(("NO_PROXY".to_owned(), "127.0.0.1,localhost".to_owned()));
+    }
+    environment
 }
 
 #[cfg(test)]
@@ -240,6 +350,13 @@ mod tests {
     /// one, which is the point: a capsule missing Landlock and seccomp should not be expressible.
     fn entering() -> Bubblewrap {
         Bubblewrap::entering_through("/opt/cybou/libexec/cybou-capsule-enter")
+            .with_egress_bridge("/opt/cybou/libexec/cybou-egress-bridge")
+    }
+
+    fn bindings() -> CapsuleRuntimeBindings {
+        CapsuleRuntimeBindings {
+            egress_socket_host: Some(PathBuf::from("/run/user/1000/cybou/egress.sock")),
+        }
     }
 
     use std::path::PathBuf;
@@ -274,7 +391,13 @@ mod tests {
     }
 
     fn argv() -> Vec<String> {
-        entering().command(&spec(), &["cargo".to_owned(), "test".to_owned()])
+        entering()
+            .command(
+                &spec(),
+                &bindings(),
+                &["cargo".to_owned(), "test".to_owned()],
+            )
+            .expect("builds")
     }
 
     /// Whether `flag` appears before the `--` that ends bwrap's own arguments.
@@ -348,7 +471,17 @@ mod tests {
             .collect();
         for name in &names {
             assert!(
-                ["HOME", "PWD", "TMPDIR", "PATH", "CYBOU_CAPSULE"].contains(&name.as_str()),
+                [
+                    "HOME",
+                    "PWD",
+                    "TMPDIR",
+                    "PATH",
+                    "CYBOU_CAPSULE",
+                    "HTTPS_PROXY",
+                    "HTTP_PROXY",
+                    "NO_PROXY",
+                ]
+                .contains(&name.as_str()),
                 "{name} reached the capsule's environment"
             );
         }
@@ -396,7 +529,13 @@ mod tests {
             .filter(|(index, _)| index > &0 && argv[index - 1] == "--bind")
             .map(|(_, source)| source)
             .collect();
-        assert_eq!(writable, vec![&"/srv/project".to_owned()]);
+        assert_eq!(
+            writable,
+            vec![
+                &"/srv/project".to_owned(),
+                &"/run/user/1000/cybou/egress.sock".to_owned()
+            ]
+        );
     }
 
     #[test]
@@ -404,7 +543,9 @@ mod tests {
         // A program named `--bind` is otherwise an argument to bwrap. The same lesson this
         // repository already learned about passing a systemd unit name.
         let hostile = vec!["--bind".to_owned(), "/etc".to_owned(), "/etc".to_owned()];
-        let argv = entering().command(&spec(), &hostile);
+        let argv = entering()
+            .command(&spec(), &bindings(), &hostile)
+            .expect("builds");
 
         // The last separator, not the first. There are two now: bubblewrap's arguments end at the
         // first, the entry program's at the second, and the agent is what follows the second. A
@@ -464,9 +605,9 @@ mod tests {
         // one useless as evidence of what was actually built.
         let spec = spec();
         let program = ["cargo".to_owned()];
-        let first = entering().command(&spec, &program);
+        let first = entering().command(&spec, &bindings(), &program);
         for _ in 0..8 {
-            assert_eq!(entering().command(&spec, &program), first);
+            assert_eq!(entering().command(&spec, &bindings(), &program), first);
         }
     }
 
@@ -500,7 +641,9 @@ mod tests {
         // Landlock denies what it was not told about, so a rule dropped here is not a tighter
         // capsule — it is an agent that cannot open /dev/null.
         let spec = spec();
-        let argv = entering().command(&spec, &["sh".to_owned()]);
+        let argv = entering()
+            .command(&spec, &bindings(), &["sh".to_owned()])
+            .expect("builds");
         for rule in &spec.landlock {
             let path = rule.path.to_string_lossy().into_owned();
             assert!(

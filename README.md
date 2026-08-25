@@ -166,9 +166,9 @@ gateway that cannot become a second cognitive owner.
 | Where a watched thing is heading, and when it arrives | Implemented — robust statistics, no model |
 | Structured language and meaning boundary | Implemented — ADR-0031, non-generative |
 | Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
-| Governed action and remediation boundary | Proposals and authorization implemented; no executor |
+| Governed action and remediation boundary | Implemented through three typed adapters and independent re-observation — ADR-0022 gate |
 | Model brokerage as a faculty, not an organ | Implemented — ADR-0035; no worker registered |
-| Agent capsules with kernel-enforced boundaries | Planned — ADR-0042 |
+| Agent capsules with kernel-enforced boundaries and brokered egress | Implemented — ADR-0042 gates |
 | A model gateway and leases for agents that are not Mind | Planned — ADR-0043 |
 | Distributed Mind prototype | Planned |
 | Lifelong learning and learned-artifact governance | Planned |

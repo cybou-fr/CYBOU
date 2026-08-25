@@ -57,7 +57,7 @@ pub mod spec;
 pub mod supervise;
 pub mod verdict;
 
-pub use backend::{Bubblewrap, CapsuleBackend};
+pub use backend::{BackendError, Bubblewrap, CapsuleBackend, CapsuleRuntimeBindings};
 pub use compile::{CannotCompile, compile};
 pub use end::end;
 pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};

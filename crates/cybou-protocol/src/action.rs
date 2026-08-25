@@ -155,6 +155,50 @@ pub struct AuthorizationDecision {
     pub decided_at: OffsetDateTime,
 }
 
+/// The only Body operations the first executor can perform.
+///
+/// This is deliberately not an open verb plus arguments. A new variant is a new physical
+/// capability and therefore requires a code change on both sides of the action boundary.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "action")]
+pub enum ExecutableAction {
+    /// Read one concrete systemd service's state.
+    ServiceStatus {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
+    /// Delete only the package manager's downloaded archive cache.
+    PackageCacheClean,
+    /// Restart one concrete systemd service.
+    ServiceRestart {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
+}
+
+/// A short-lived, single-use capability minted from one granted decision.
+///
+/// The executor never accepts an operation from its caller. It receives only a permit identity,
+/// atomically claims that identity from Action1, and performs the typed action stored here.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionPermit {
+    /// Opaque bearer identity used exactly once.
+    pub permit_id: Uuid,
+    /// The decision that created this capability.
+    pub decision_id: Uuid,
+    /// The proposal that decision concerned.
+    pub proposal_id: Uuid,
+    /// The complete action; no caller-supplied arguments are added later.
+    pub action: ExecutableAction,
+    /// When Action1 minted the permit.
+    #[serde(with = "time::serde::rfc3339")]
+    pub issued_at: OffsetDateTime,
+    /// Last instant at which it may be atomically claimed.
+    #[serde(with = "time::serde::rfc3339")]
+    pub expires_at: OffsetDateTime,
+}
+
 /// The namespace authorization identities are derived in.
 const DECISION_NAMESPACE: Uuid = Uuid::from_u128(0x6379_626f_755f_6465_6369_7369_6f6e_5f31);
 
@@ -352,6 +396,16 @@ pub struct ActionOutcome {
     pub concluded_at: OffsetDateTime,
 }
 
+/// One typed value read by a Body adapter while performing an attempt.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BodyReading {
+    /// Stable field name such as `systemd.active-state`.
+    pub field: String,
+    /// The value returned by the owning host interface.
+    pub value: String,
+}
+
 /// An attempt to carry out an authorized proposal.
 ///
 /// Records what was tried and when, and nothing about whether it worked. Whether it worked is an
@@ -375,6 +429,12 @@ pub struct ExecutionAttempt {
     pub target_resource: String,
     /// What the thing that carried it out said about itself.
     pub report: AttemptReport,
+    /// Values read as part of a read-only adapter.
+    ///
+    /// These are adapter results, not the independent post-mutation observation used to conclude
+    /// an [`ActionOutcome`]. Mutation adapters therefore normally leave this empty.
+    #[serde(default)]
+    pub body_readings: Vec<BodyReading>,
     /// Execution start timestamp.
     #[serde(with = "time::serde::rfc3339")]
     pub started_at: OffsetDateTime,

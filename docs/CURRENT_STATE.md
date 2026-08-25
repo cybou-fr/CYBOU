@@ -230,9 +230,10 @@ a capsule can be examined before it exists and two runs can be compared.
 As much as possible is unrepresentable rather than merely unused, because an unused possibility is
 one somebody uses later for a good reason. `Namespaces` has no fields: a capsule gets all seven or is
 not a capsule, and something switchable would eventually be switched off by somebody debugging. There
-is no *no-new-privileges is off*. `Network` has exactly one variant, `Denied`, and the day an egress
-broker exists is the day it grows a second one — visibly, in a commit somebody reviews. The grant's
-host list is deliberately not consulted yet: compiling it into anything would be compiling a promise.
+is no *no-new-privileges is off*. `Network` has two variants: `Denied`, and `Brokered`, which carries
+only a capsule-local port and pathname. The grant's host list never enters the kernel spec: it stays
+with the broker that owns the name decision, so runtime plumbing cannot become a second network
+policy by accident.
 
 **The filesystem is built up, never pruned down.** The mount list starts empty and gains what a
 program needs to be a program, read-only, and one writable path. A host root with things removed is a
@@ -452,16 +453,29 @@ It is a tunnel and not a proxy. After the decision it copies bytes it does not i
 capsule's traffic is between the capsule and what it was granted, and the broker is not a place that
 traffic could be read.
 
-Eight checks against a running broker, over the socket a capsule would use, and the two that matter
-most are mutation-tested: removing the address refusal fails two of them, and removing the
-resolved-address check fails the one where a granted name points back at the host.
+The address check canonicalizes IPv4-mapped IPv6 before classification, so
+`::ffff:127.0.0.1`, `::ffff:169.254.169.254` and `::ffff:0.0.0.0` cannot cross through the IPv6
+arm. Immediately before connect it also asks the kernel whether each exact resolved address belongs
+to this host. Private ranges remain permitted; this host's `10.0.0.4` is refused while another
+machine's `10.0.0.20` is not refused merely for being private.
 
-**The last hop is missing, and it is not a detail.** A capsule's network namespace has no route to
-anything — the point of it — and ordinary clients cannot be pointed at a proxy on a Unix socket.
-Something has to listen inside the capsule's namespace and forward, which means a process inside the
-capsule and a decision about what starts it and what counts it against the task ceiling. Until then
-a `NetworkGrant` naming hosts still compiles to `Network::Denied`: the name is in the spec and is not
-honoured, and the gate checks the denial rather than the naming.
+CONNECT is read through the blank line under one 8 KiB ceiling, so ordinary proxy headers never
+become the first bytes of the TLS tunnel. Handshake, DNS/connect and idle time are bounded, and one
+broker admits at most 64 concurrent tunnels; the 65th receives 503 rather than allocating another
+host task, file descriptor and outbound socket. The runtime directory is `0700`, the socket is
+`0600`, and startup replaces only a socket proven stale — never a file, symlink or active listener.
+
+**The last hop exists.** `cybou-egress-bridge` runs inside the capsule and copies opaque bytes from
+`127.0.0.1:3128` to its one pathname Unix socket. It has no grant, DNS or policy vocabulary. The
+entry program applies Landlock and seccomp, forks the bridge, waits until it is listening, and then
+execs the agent, so the agent is PID 1 and the bridge is its one infrastructure child. Both inherit
+the same namespaces, barriers, cgroup and lifetime. A brokered grant with fewer than two tasks is
+refused at compile time rather than producing a capsule that cannot hold agent plus bridge.
+
+The network gate now runs `curl` and `git ls-remote` through that complete path. It also checks a
+denied name, direct-address no-route, exact host-interface refusal, cross-capsule socket absence,
+bridge death, and the host-side tunnel ceiling. Killing the bridge removes network and grants no
+direct route. Mind participates in none of it.
 
 `validate-organ-layering.py` now refuses a governance crate that names `cybou-egressd`. The capsule
 crate decides what an agent may reach and the broker connects it — the same split as `cybou-actiond`
@@ -516,6 +530,24 @@ A finding is matched across the two sets by what it is and what it is about, nev
 condition that briefly cleared and returned carries a different identity, and for this question it
 is still present. An authorization decision now carries its own derived identity, so an attempt can
 name the permission it rested on and not only the proposal it carried out.
+
+**The first executor now exists, and the split is a process boundary.** `cybou-actiond` owns the
+proposal lifecycle and mints a random, 60-second, single-use `ExecutionPermit` only after criticism
+and a granted standing-policy decision. The default policy still grants nothing. The browser's
+read-only offer projection mints no lifecycle identity; Action1 is the owner of proposal and permit
+identity.
+
+`cybou-executord` receives only an opaque permit identity. It atomically claims the complete typed
+action from Action1, so its caller supplies neither a verb, a program nor arguments. There are three
+adapters: `service.status`, fixed `/usr/bin/apt-get clean`, and `service.restart`. Services use the
+systemd manager D-Bus API and only concrete names ending in `.service`; the `systemd:<unit>`
+placeholder and every operation without one of those adapters are refused before a permit exists.
+The layering validator rejects any dependency from the governance owner to `cybou-executord`.
+
+The A1 gate creates a harmless disposable systemd unit, observes it inactive, passes a strong named
+finding through Action1 and the executor, and then re-reads systemd independently until the unit is
+active. It also replays the permit and requires refusal. No model, shell command string, real
+workload or executor self-report supplies the final observation.
 
 **A watched thing has four states, and three of them are not silence.** `Observed`, `NeverRead`,
 `ReadFailed` and `Stale`. A declared thing that produced no reading used to be simply absent from
@@ -746,8 +778,9 @@ Critical operations — deleting a service's data, formatting a filesystem, powe
 offered and are refused if something else builds them. A standing policy cannot grant what the
 operation table forbids, and a failed critic stops a pre-authorised operation.
 
-**Nothing is granted on an installation nobody has configured**, and nothing is carried out at all:
-there is no executor and no code path that could reach one.
+**Nothing is granted on an installation nobody has configured.** The executor exists, but without a
+granted Action1 decision it has no operation to perform: its public request contains only an opaque
+permit identity and a missing, expired or consumed identity is refused.
 
 ## Current gates
 
@@ -759,6 +792,9 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo test -p living-canvas --target wasm32-unknown-unknown --locked
 bash scripts/test-multi-daemon-integration.sh
+bash scripts/test-capsule-gate.sh
+bash scripts/test-egress-gate.sh
+bash scripts/test-action-gate.sh
 python3 scripts/validate-cognitive-docs.py .
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py
@@ -768,8 +804,9 @@ reuse lint
 
 `unsafe_code = "forbid"` and `clippy::pedantic` are workspace-wide.
 
-There is currently no language-model process and no privileged action-executor process, so nothing
-in this tree can execute a mutation of the host.
+There is currently no language-model process. The action gate runs the executor with host authority
+only against a disposable unit; deployment units and an operator standing policy are not installed
+by the VPS deploy script yet.
 
 ## What is not built
 
@@ -779,7 +816,7 @@ mentioned look identical to a reader.
 | | |
 |---|---|
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
-| Action executor | proposals and authorization exist; nothing can carry one out |
+| Action deployment | the Action1/executor boundary and live gate exist; VPS service installation and operator policy provisioning are not shipped yet |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |

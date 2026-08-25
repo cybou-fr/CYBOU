@@ -9,11 +9,11 @@ SPDX-License-Identifier: MIT
 
 Accepted
 
-The boundary is built up to the executor, and the executor is deliberately absent.
-`cybou-remediation` implements proposal, criticism and authorization as separate steps over a
-closed set of typed operations. No executor exists: nothing in this repository can carry out any of
-them. That is the state this ADR describes, not a gap in it — the boundary is the part that had to
-exist first, and building it in the other order would mean an executor waiting for a policy.
+The boundary is implemented through the first executor. `cybou-actiond` owns proposal identity,
+criticism, standing policy, decisions and short-lived single-use permits. `cybou-executord` can
+atomically claim such a permit and exposes only the three typed adapters below. The live gate uses a
+disposable systemd service and independently reads its state after a restart; the executor's own
+report is not treated as that observation.
 
 ## Context
 

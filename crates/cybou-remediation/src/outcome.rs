@@ -309,6 +309,7 @@ mod tests {
             operation: "package.cache.clean".to_owned(),
             target_resource: "apt:archives".to_owned(),
             report,
+            body_readings: Vec::new(),
             started_at: at(0),
             ended_at: Some(at(10)),
         }

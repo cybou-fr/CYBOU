@@ -109,6 +109,22 @@ case "$egress_status" in
     *) exit "$egress_status" ;;
 esac
 
+# ADR-0022 A1. The gate uses a disposable systemd service, never a real workload. Exit 3 keeps an
+# environment without a root system manager visibly distinct from one in which the boundary held.
+announce "authorized action boundary"
+failed="authorized action boundary"
+action_status=0
+bash scripts/test-action-gate.sh || action_status=$?
+case "$action_status" in
+    0) failed="" ;;
+    3)
+        announce "authorized action boundary not run: a root systemd host is unavailable"
+        skipped="$skipped authorized-action-boundary"
+        failed=""
+        ;;
+    *) exit "$action_status" ;;
+esac
+
 # Licensing headers, because CI runs this and a gate that claims to be every check and is not is the
 # same defect as a check whose failure is invisible. Skipped with a said reason rather than silently
 # when the tool is absent: an absent check must not look like a passed one.

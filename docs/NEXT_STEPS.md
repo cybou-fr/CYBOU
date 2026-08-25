@@ -37,16 +37,17 @@ Two gates decide whether the foundation is real, and everything below is ordered
 > control do not change owner.
 
 S0R is held by construction: nothing in the substrate loads a model, the broker is a faculty rather
-than an organ, and a model that answers can only return proposals. **S0 is not held**, and the gate
-says why in one word: nothing here can act.
+than an organ, and a model that answers can only return proposals. **S0 is now held by the offline
+walkthrough plus the live action gate**: one disposable service is authorized by configured policy,
+restarted through the typed executor, and independently re-observed through systemd.
 
 ```text
 observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome
 ```
 
-Every stage exists and is tested except *act*. What an outcome is and how it is judged were built
-before the executor deliberately, so an executor arrives to find its own report is one of two fields
-and not the deciding one.
+Every stage exists and is tested. What an outcome is and how it is judged was built before the
+executor deliberately, so the executor arrived to find its own report is one of two fields and not
+the deciding one.
 
 ## The two tracks
 
@@ -65,6 +66,8 @@ Track B  agent platform       the product that rests on it
 ## Track A — finish S0
 
 ### A0. The executor
+
+**Done.**
 
 *Granted 2026-08-25, three adapters and no more.* Every stage before it is built: `cybou-remediation`
 proposes over a closed set of typed operations, criticises each proposal against the finding it
@@ -107,8 +110,9 @@ is a fixture identity, harmless only because no button exists behind it.
 
 ### A1. The first real S0 pass
 
-One operation, authorized under a policy a person set, carried out, and independently re-observed.
-That is the gate, and nothing smaller is.
+**Done.** One operation is authorized under an explicit standing policy, carried out against a
+harmless disposable unit, and independently re-observed. The permit is short-lived and single-use;
+the gate requires a replay to fail.
 
 ---
 
@@ -139,21 +143,19 @@ done  6. no nested user namespaces
 done  7. cgroup as the physical budget, including TasksMax; lifetime as the unit's lifetime
 done  8. lease expiry freezes or kills the cgroup — never an ACP stop message
 done  9. network deny-all: a fresh namespace with loopback and no route
-half 10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
+done 10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
 ```
 
-Nine of the ten hold, and the tenth is half done. `cybou-egressd` exists, decides by name, resolves
-for itself, refuses an address where a name belongs, and refuses a granted name that resolves back to
-the host — each of those checked against a running broker over the socket a capsule would use, and
-each mutation-tested.
+All ten hold. `cybou-egressd` decides by name, resolves for itself, rejects special and exact host
+addresses, and is bounded by concurrency and time. `cybou-egress-bridge` is the capsule-local last
+hop from an ordinary HTTP proxy port to one pathname socket; it copies bytes and owns no policy.
+The bridge is forked by the entry program after Landlock and seccomp, counts inside `TasksMax`, and
+the compiler refuses a brokered capsule too small to contain both it and the agent.
 
-**What is missing is the last hop, and it is not a detail.** A capsule's network namespace has no
-route to anything, which is the point; the broker listens on a Unix socket; and ordinary clients —
-`curl`, `git`, a language runtime's HTTP library — cannot be pointed at a proxy on a Unix socket.
-Something has to listen on `127.0.0.1` *inside* the capsule's namespace and forward to that socket,
-which means a process inside the capsule and therefore a decision about what starts it and what
-counts it against the task ceiling. Until that is made, `NetworkGrant` still compiles to
-`Network::Denied` and the gate checks the denial rather than the naming.
+The gate exercises `curl` and `git` from a real capsule, denial outside the grant, direct no-route,
+mapped/local-address refusal, another capsule's absent socket, bridge death and broker resource
+amplification. B1 is complete. A0/A1 are complete too: `Action1` and the executor have a separate
+live gate. The next implementation work is B2, the ACP client and registry browser.
 
 The layering rule that keeps the two apart is now checked rather than remembered: a governance crate
 that names `cybou-egressd` fails `validate-organ-layering.py`. `cybou-capsule` decides what an agent

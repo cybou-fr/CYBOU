@@ -27,8 +27,10 @@ if ! command -v python3 > /dev/null 2>&1; then
     exit 3
 fi
 
-cargo build --quiet -p cybou-egressd
+cargo build --quiet -p cybou-egressd -p cybou-egress-bridge -p cybou-capsule-enter
 BROKER="$CARGO_TARGET_DIR/debug/cybou-egressd"
+BRIDGE="$CARGO_TARGET_DIR/debug/cybou-egress-bridge"
+ENTRY="$CARGO_TARGET_DIR/debug/cybou-capsule-enter"
 
 WORK="$(mktemp -d)"
 SOCKET="$WORK/egress.sock"
@@ -42,7 +44,17 @@ trap cleanup EXIT
 # `localhost` is granted on purpose. It is the check that matters most: a name the grant permits,
 # which resolves to the machine the capsule is running on. A broker that checked the name correctly
 # and connected anyway would have done everything right and handed over the host.
-"$BROKER" --socket "$SOCKET" --host example.com --host localhost > "$LOG" 2>&1 &
+HOST_IPV4="$(ip -4 -o address show scope global 2>/dev/null | awk 'NR == 1 { sub(/\/.*/, "", $4); print $4 }')"
+HOST_NAME=""
+if [ -n "$HOST_IPV4" ]; then
+    HOST_NAME="${HOST_IPV4//./-}.sslip.io"
+fi
+
+broker_arguments=(--socket "$SOCKET" --host example.com --host github.com --host localhost)
+if [ -n "$HOST_NAME" ]; then
+    broker_arguments+=(--host "$HOST_NAME")
+fi
+"$BROKER" "${broker_arguments[@]}" > "$LOG" 2>&1 &
 BROKER_PID=$!
 
 for _ in $(seq 1 50); do
@@ -56,6 +68,12 @@ if [ ! -S "$SOCKET" ]; then
 fi
 
 failures=0
+if [ "$(stat -c '%a' "$WORK")" = 700 ] && [ "$(stat -c '%a' "$SOCKET")" = 600 ]; then
+    printf '    ok      %s\n' "runtime directory and broker socket are private"
+else
+    printf '    FAILED  %s\n' "runtime directory and broker socket are private"
+    failures=1
+fi
 
 # Send one request line and print the status the broker answered with.
 say() {
@@ -120,6 +138,14 @@ must "an address in brackets is still an address" "400" \
 must "a granted name that resolves to the host is refused" "403" \
     "CONNECT localhost:443 HTTP/1.1"
 
+if [ -n "$HOST_NAME" ] && getent ahostsv4 "$HOST_NAME" 2>/dev/null | grep -q "$HOST_IPV4"; then
+    must "a granted name resolving to an exact host interface address is refused" "403" \
+        "CONNECT $HOST_NAME:443 HTTP/1.1"
+else
+    echo "    note: no resolvable non-loopback host address, so the exact-interface case was NOT checked" >&2
+    skipped=1
+fi
+
 # Not a proxy. Anything but CONNECT would mean the broker handling the capsule's payload.
 must "this is a tunnel and not a proxy" "400" \
     "GET http://example.com/ HTTP/1.1"
@@ -128,6 +154,146 @@ must "this is a tunnel and not a proxy" "400" \
 # a way to deny every other capsule the egress it was granted.
 must "a malformed request does not take the broker down with it" "403" \
     "CONNECT deny.example:443 HTTP/1.1"
+
+echo
+echo "=== Ordinary clients use the broker from inside a capsule ==="
+
+if command -v bwrap > /dev/null 2>&1 && command -v curl > /dev/null 2>&1; then
+    CAPSULE_WORKSPACE="$WORK/workspace"
+    mkdir "$CAPSULE_WORKSPACE"
+    export CYBOU_CAPSULE_ENTRY="$ENTRY"
+    export CYBOU_EGRESS_BRIDGE="$BRIDGE"
+    export CYBOU_EGRESS_SOCKET="$SOCKET"
+    export CYBOU_EGRESS_HOSTS="example.com,github.com"
+
+    inside_network() {
+        local script="$1"
+        mapfile -t capsule_argv < <(cargo run --quiet -p cybou-capsule --example capsule-argv -- \
+            "$CAPSULE_WORKSPACE" /bin/sh -c "$script")
+        "${capsule_argv[@]}" 2>&1 || true
+    }
+
+    allowed="$(inside_network \
+        "curl --fail --silent --show-error --max-time 20 https://example.com/ -o /workspace/allowed.html && test -s /workspace/allowed.html && echo ALLOWED")"
+    if [[ "$allowed" == *"ALLOWED"* ]]; then
+        printf '    ok      %s\n' "curl reaches a granted host through the bridge"
+    else
+        printf '    FAILED  %s\n        got %q\n' \
+            "curl reaches a granted host through the bridge" "$allowed"
+        failures=$((failures + 1))
+    fi
+
+    if command -v git > /dev/null 2>&1; then
+        git_allowed="$(inside_network \
+            "git ls-remote https://github.com/octocat/Hello-World.git HEAD >/workspace/remote.txt && grep -q HEAD /workspace/remote.txt && echo GIT-ALLOWED")"
+        if [[ "$git_allowed" == *"GIT-ALLOWED"* ]]; then
+            printf '    ok      %s\n' "git uses the same granted bridge"
+        else
+            printf '    FAILED  %s\n        got %q\n' \
+                "git uses the same granted bridge" "$git_allowed"
+            failures=$((failures + 1))
+        fi
+    else
+        echo "    note: git is absent, so its ordinary-client case was NOT checked" >&2
+        skipped=1
+    fi
+
+    denied="$(inside_network \
+        "code=\$(curl --silent --insecure --max-time 10 -o /dev/null -w '%{http_connect}' https://deny.example/ 2>/dev/null || true); [ \"\$code\" = 403 ] && echo REFUSED || echo \"WRONG:\$code\"")"
+    if [[ "$denied" == *"REFUSED"* ]]; then
+        printf '    ok      %s\n' "curl is refused a host outside the grant"
+    else
+        printf '    FAILED  %s\n        got %q\n' \
+            "curl is refused a host outside the grant" "$denied"
+        failures=$((failures + 1))
+    fi
+
+    direct_ip="$(python3 - <<'PYTHON'
+import socket
+print(socket.getaddrinfo("example.com", 443, type=socket.SOCK_STREAM)[0][4][0])
+PYTHON
+)"
+    direct="$(inside_network \
+        "if env -u HTTPS_PROXY -u HTTP_PROXY -u NO_PROXY curl --insecure --silent --connect-timeout 2 --max-time 3 --noproxy '*' https://$direct_ip/ >/dev/null 2>&1; then echo ESCAPED; else echo NO-ROUTE; fi")"
+    if [[ "$direct" == *"NO-ROUTE"* ]]; then
+        printf '    ok      %s\n' "direct address access still has no route"
+    else
+        printf '    FAILED  %s\n        got %q\n' \
+            "direct address access still has no route" "$direct"
+        failures=$((failures + 1))
+    fi
+
+    OTHER_SOCKET="$WORK/other-capsule.sock"
+    python3 - "$OTHER_SOCKET" <<'PYTHON' &
+import socket
+import sys
+import time
+
+listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+listener.bind(sys.argv[1])
+listener.listen()
+time.sleep(30)
+PYTHON
+    OTHER_SOCKET_PID=$!
+    for _ in $(seq 1 20); do [ -S "$OTHER_SOCKET" ] && break; sleep .05; done
+    cross="$(inside_network \
+        "test -e /run/cybou/other-capsule.sock && echo CROSSED || echo ISOLATED")"
+    kill "$OTHER_SOCKET_PID" 2>/dev/null || true
+    if [[ "$cross" == *"ISOLATED"* ]]; then
+        printf '    ok      %s\n' "another capsule's pathname socket is absent"
+    else
+        printf '    FAILED  %s\n        got %q\n' \
+            "another capsule's pathname socket is absent" "$cross"
+        failures=$((failures + 1))
+    fi
+
+    bridge_death="$(inside_network \
+        "bridge=\$(pgrep -f '^/.cybou-egress-bridge ' | head -n1); kill \"\$bridge\"; sleep .1; code=\$(curl --silent --insecure --connect-timeout 2 --max-time 3 -o /dev/null -w '%{http_connect}' https://example.com/ 2>/dev/null || true); direct=blocked; env -u HTTPS_PROXY -u HTTP_PROXY -u NO_PROXY curl --insecure --silent --connect-timeout 1 --max-time 2 --noproxy '*' https://$direct_ip/ >/dev/null 2>&1 && direct=ESCAPED; [ \"\$code\" = 000 ] && [ \"\$direct\" = blocked ] && echo CONTAINED || echo \"WRONG:\$code:\$direct\"")"
+    if [[ "$bridge_death" == *"CONTAINED"* ]]; then
+        printf '    ok      %s\n' "killing the bridge removes egress and opens no direct route"
+    else
+        printf '    FAILED  %s\n        got %q\n' \
+            "killing the bridge removes egress and opens no direct route" "$bridge_death"
+        failures=$((failures + 1))
+    fi
+else
+    echo "    note: bubblewrap or curl is absent, so the capsule-to-Internet cases were NOT checked" >&2
+    skipped=1
+fi
+
+echo
+echo "=== Broker resource amplification is bounded ==="
+
+resource_answer="$(python3 - "$SOCKET" <<'PYTHON'
+import socket
+import sys
+import time
+
+path = sys.argv[1]
+held = []
+for _ in range(64):
+    connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    connection.connect(path)
+    connection.sendall(b"C")
+    held.append(connection)
+time.sleep(0.2)
+excess = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+excess.settimeout(5)
+excess.connect(path)
+excess.sendall(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+answer = excess.recv(4096).decode("utf-8", "replace")
+print(answer.splitlines()[0] if answer else "NOTHING")
+for connection in held:
+    connection.close()
+PYTHON
+)"
+if [[ "$resource_answer" == *"503"* ]]; then
+    printf '    ok      %s\n' "connections above the per-capsule ceiling are refused"
+else
+    printf '    FAILED  %s\n        got %q\n' \
+        "connections above the per-capsule ceiling are refused" "$resource_answer"
+    failures=$((failures + 1))
+fi
 
 echo
 if [ "$failures" -gt 0 ]; then
