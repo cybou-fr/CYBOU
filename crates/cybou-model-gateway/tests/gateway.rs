@@ -75,6 +75,29 @@ impl Worker for BothSurfaces {
 
 struct UnreachableChat;
 
+/// A provider that answered, billed, and broke the policy it was serving under.
+struct BilledThenRefused;
+
+impl Worker for BilledThenRefused {
+    fn manifest(&self) -> &ModelManifest {
+        BothSurfaces.manifest()
+    }
+
+    fn answer(&self, request: &ModelRequest) -> Result<ModelOutput, WorkerFailed> {
+        BothSurfaces.answer(request)
+    }
+
+    fn answer_chat(
+        &self,
+        _request: &ProviderChatRequest,
+    ) -> Result<ProviderChatOutput, WorkerFailed> {
+        Err(WorkerFailed::PolicyViolatedAfterCharge {
+            spend_units: 7,
+            detail: "the route was declared to cost nothing and billed".to_owned(),
+        })
+    }
+}
+
 impl Worker for UnreachableChat {
     fn manifest(&self) -> &ModelManifest {
         BothSurfaces.manifest()
@@ -520,5 +543,42 @@ async fn a_streaming_request_gets_an_event_stream_rather_than_a_refusal() {
         lease.lock().expect("lease").model_spent(),
         7,
         "the completion's whole cost, charged once, before any of it was sent"
+    );
+}
+
+#[test]
+fn a_refusal_that_cost_money_still_charges_the_lease() {
+    // The failure this closes: the provider billed, the answer was withheld, and the charge went
+    // nowhere - so a person who selected a spending bound would be told they had spent nothing
+    // while their account said otherwise. Money already gone is a fact about the session, not a
+    // property of whether the answer was delivered.
+    let mut providers = BrokerCore::new();
+    providers.register_provider(
+        ModelRoute {
+            provider: "shared-provider".to_owned(),
+            external_boundary: false,
+            sensitivity_ceiling: 3,
+            tasks: vec![ModelTask::InterpretActV1],
+            context_limit: 4096,
+        },
+        vec!["Strong".to_owned()],
+        Box::new(BilledThenRefused),
+    );
+    let core = GatewayCore::new(Arc::new(providers));
+
+    let lease = capsule_lease();
+    let token = core
+        .issue_token(Arc::clone(&lease), Uuid::from_u128(9), policy(), at(0))
+        .expect("a token");
+
+    let refused = core
+        .complete(token.expose_secret(), &request(), at(1))
+        .expect_err("the answer is withheld");
+    assert!(matches!(refused, GatewayRefused::Provider(_)));
+
+    assert_eq!(
+        lease.lock().expect("the lease").model_spent(),
+        7,
+        "the charge reached the ledger even though the content did not reach the agent"
     );
 }

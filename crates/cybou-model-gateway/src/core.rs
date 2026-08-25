@@ -295,7 +295,24 @@ impl GatewayCore {
                 local_only: account.policy.local_only,
                 sensitivity: account.policy.sensitivity,
             })
-            .map_err(GatewayRefused::Provider)?;
+            .map_err(|refused| {
+                // A refusal that cost money is charged before it is returned. Otherwise a provider
+                // that billed and then broke its policy would leave the ledger reading nought, and
+                // a person who selected a spending bound would be told they had spent nothing while
+                // their account said otherwise. Money already gone is a fact about the session, not
+                // a property of whether the answer was delivered.
+                if let cybou_model_brokerd::ChatRefused::WorkerFailed {
+                    failure:
+                        cybou_model_brokerd::WorkerFailed::PolicyViolatedAfterCharge {
+                            spend_units, ..
+                        },
+                    ..
+                } = &refused
+                {
+                    lease.charge(*spend_units);
+                }
+                GatewayRefused::Provider(refused)
+            })?;
 
         let charged_tokens = u64::from(result.input_tokens) + u64::from(result.output_tokens);
         account.tokens_spent = account.tokens_spent.saturating_add(charged_tokens);

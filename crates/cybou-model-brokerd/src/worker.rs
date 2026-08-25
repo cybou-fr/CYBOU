@@ -83,6 +83,19 @@ pub struct UpstreamAttribution {
 /// nothing about identity, biography or policy changes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WorkerFailed {
+    /// The provider answered, billed for it, and the answer may not be delivered.
+    ///
+    /// Its own variant rather than a plain refusal, because the two differ in the one way that
+    /// matters to a ledger: nothing was spent on a refusal, and something was spent on this. A
+    /// zero-cost route that bills has broken a promise — the content is withheld, and the charge is
+    /// reported anyway, because money a person was not told about is worse than an answer they did
+    /// not receive.
+    PolicyViolatedAfterCharge {
+        /// What the provider charged despite the policy.
+        spend_units: u64,
+        /// What was violated, in words a person can act on.
+        detail: String,
+    },
     /// The artifact is not loaded, or the process behind it is not running.
     NotReady,
     /// It ran and did not finish inside the time it was given.
@@ -113,6 +126,13 @@ impl core::fmt::Display for WorkerFailed {
             Self::Unusable { detail } => write!(formatter, "unusable answer: {detail}"),
             Self::OutOfResources => write!(formatter, "not enough resources to run"),
             Self::UnsupportedSurface => write!(formatter, "this model worker does not serve chat"),
+            Self::PolicyViolatedAfterCharge {
+                spend_units,
+                detail,
+            } => write!(
+                formatter,
+                "{detail}; {spend_units} unit(s) were charged and the answer was withheld"
+            ),
         }
     }
 }

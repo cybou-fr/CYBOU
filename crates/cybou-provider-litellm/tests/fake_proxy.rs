@@ -310,10 +310,19 @@ async fn a_declared_free_route_that_bills_is_refused_rather_than_returned() {
     .expect("blocking task")
     .expect_err("a billed zero-cost completion is not a completion");
 
-    assert!(matches!(
-        refusal,
-        cybou_model_brokerd::WorkerFailed::OutOfResources
-    ));
+    // The charge travels with the refusal. A bare failure would leave the gateway unable to charge
+    // the lease, so a session that had been billed would read as having spent nothing - the answer
+    // withheld and the money hidden, which is the worse of the two halves left undone.
+    match refusal {
+        cybou_model_brokerd::WorkerFailed::PolicyViolatedAfterCharge {
+            spend_units,
+            ref detail,
+        } => {
+            assert!(spend_units > 0, "a violation with no charge is not one");
+            assert!(detail.contains("cost nothing"), "{detail}");
+        }
+        other => panic!("a billed zero-cost completion was reported as {other:?}"),
+    }
     assert_eq!(
         seen.lock().expect("seen").delete.len(),
         1,

@@ -117,6 +117,19 @@ A program or a prompt, never both. They are two different claims about what the 
 
 ## The one privileged step
 
+### When to leave it
+
+The trigger is not the number of verbs. It is any of: more than one OS user or tenant on the host;
+arbitrary unit templates rather than one; root-side filesystem mutation; network configuration;
+credential creation; or a profile authorization that has to be enforced above the `cybou` UID. Any of
+those means the delegation has stopped being "start a process that already runs as this user", and
+the typed boundary is then the smaller thing to build.
+
+One adversarial gate is still owed before calling this production-ready: a malicious lease pathname
+or symlink at `/run/cybou-agent-leases/<instance>.lease` must not be able to make the root-side
+`LoadCredential=` expose an unrelated root-owned file. systemd ignores symlinks for directory
+credential sources, but a single-file source deserves the test rather than the assumption.
+
 `cybou-agent-gateway@.service` is a *system* unit for exactly one reason: the LiteLLM master key stays
 root-owned and reaches the unprivileged gateway through `LoadCredential` rather than sitting in a file
 the `cybou` user can read. The gateway process itself already runs as `cybou` and holds no privilege
@@ -151,9 +164,19 @@ can observe the latter — that is what the telemetry layer is for — and until
 actually pointed at a capsule's cgroup, printing a number that *looked* like usage would be inventing
 the one thing a person is watching for.
 
-**What was spent is read from the lease.** The gateway charges it on every completion. An agent
-reporting its own consumption is the executor grading its own homework, which this repository refuses
-in the place where it matters most.
+**Whoever reports a spend has to hold the ledger.** The model gateway is a *different process*: it
+receives the lease as bytes and charges its own copy, so the lease the launch path holds is the grant
+and not the ledger — identical in everything a person selected, and permanently at nought in what has
+been spent. So the figure does not arrive on a lease at all. It arrives as a `Ledger`, and a reporter
+that has none must say `Elsewhere`, which shows as *unknown* rather than as nought.
+
+That distinction is not theoretical. The first version of this module took a lease and read a spend
+off it; the invariant was right and the test stating it was right, and one line of wiring handed it
+the copy that could only ever say zero. Unifying the authority a launch is minted from did not
+unify the mutable ledger, and the type now makes the difference impossible to paper over.
+
+Making it *available* is a separate, unfinished piece: the gateway has the number and nothing asks
+it for one. Until a session owner can, every launch-side view says unknown.
 
 Gathering it in one place is the point: the lease knows what was granted, the plan knows which units
 carry it, and the session knows what has happened, so a surface that reached into all three would be
@@ -179,3 +202,19 @@ daemon despite its name — `launch` owns one session and exits with it, so ther
 web gateway to call and no registry of what is running. That is the next piece, and the card follows
 it rather than the other way round: a card fed by anything other than the session's own owner would
 be a second assembly of the same facts.
+
+That daemon is also where the spend becomes knowable. It needs a typed usage snapshot from the model
+gateway rather than another copy of the lease, because copying a mutable ledger between processes is
+what produced the defect above.
+
+It should not be a `Mind` organ. An agent runtime is not part of what Cybou is, and a bus name under
+`org.cybou.Mind.` would make the namespace assert otherwise; `Runtime` or `Control` says what it is.
+
+It must also survive its own restart. A capsule and a gateway are deliberately built to outlive the
+coordinator up to their hard deadlines, so an owner that restarted and reported no running agents
+while OpenCode was still working would be wrong about the host in the direction that matters.
+
+The launch flags are a bring-up interface and should not become the web one. A browser should send a
+profile, an agent, a workspace and a model class; the owner reads the ceilings, the lifetime and the
+network allowance out of the operator-approved profile. An endpoint that accepted memory, CPUs, hosts
+and lifetime from the caller would be asking the browser to invent its own `CapsuleGrant`.

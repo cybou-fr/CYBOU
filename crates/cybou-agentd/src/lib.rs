@@ -42,4 +42,4 @@ pub mod view;
 pub use plan::{CannotPlan, Ceilings, Launch, SessionPlan, TeardownStep};
 pub use runtime::HostPrograms;
 pub use session::{Session, SessionEnd, SessionState};
-pub use view::{SessionView, SpendView, Standing};
+pub use view::{Ledger, SessionView, SpendView, Standing};

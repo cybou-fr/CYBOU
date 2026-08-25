@@ -25,7 +25,7 @@ use agent_client_protocol::AcpAgentConfig;
 use cybou_acp::AcpSession;
 use cybou_agentd::plan::SessionPlan;
 use cybou_agentd::session::{Session, SessionEnd, SessionState};
-use cybou_agentd::view::SessionView;
+use cybou_agentd::view::{Ledger, SessionView};
 use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
 use cybou_capsule::{
     CapabilityProfile, KernelCapsuleSpec, Lease, LeaseRequest, ModelGrant, NetworkGrant,
@@ -221,12 +221,19 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
     println!("expires {}", plan.expires_at);
     println!("lease-file {}", plan.lease_file.display());
     println!("launch-file {}", plan.launch_file.display());
-    println!("gateway-unit {}", plan.gateway_unit);
+    match (&plan.gateway_unit, &plan.model_socket, &plan.model_token) {
+        (Some(unit), Some(socket), Some(token)) => {
+            println!("gateway-unit {unit}");
+            println!("model-socket {}", socket.display());
+            println!("model-token {}", token.display());
+        }
+        // Said out loud rather than left blank. A capsule granted no model has no gateway, and a
+        // reader should be able to tell that from a gateway whose name failed to print.
+        _ => println!("gateway-unit none: this lease grants no model"),
+    }
     println!("capsule-unit {}", plan.capsule_unit);
     println!("egress-unit {}", plan.egress_unit);
     println!("egress-socket {}", plan.egress_socket.display());
-    println!("model-socket {}", plan.model_socket.display());
-    println!("model-token {}", plan.model_token.display());
     for line in plan.launch_environment.lines() {
         println!("launch-env {line}");
     }
@@ -284,7 +291,7 @@ async fn launch(selection: &Selection) -> Result<(), String> {
             Err(format!("session {} failed: {why}", plan.instance))
         }
         SessionState::Ended(end) => {
-            announce(&session, &plan, OffsetDateTime::now_utc());
+            announce(&session, &plan);
             println!("session {} ended: {}", plan.instance, end.describe());
             Ok(())
         }
@@ -310,8 +317,14 @@ async fn bring_up(
         wait_for(std::slice::from_ref(&plan.egress_socket)).await?;
     }
 
-    run(&runtime::start_gateway(plan))?;
-    wait_for(&[plan.model_socket.clone(), plan.model_token.clone()]).await?;
+    if let Some(gateway) = runtime::start_gateway(plan) {
+        run(&gateway)?;
+        let expected: Vec<PathBuf> = [plan.model_socket.clone(), plan.model_token.clone()]
+            .into_iter()
+            .flatten()
+            .collect();
+        wait_for(&expected).await?;
+    }
 
     let program = match &selection.prompt {
         Some(_) => agent_entrypoint(plan)?,
@@ -323,7 +336,7 @@ async fn bring_up(
     // One line a surface can read, rather than prose a surface would have to parse. Everything on it
     // is a fact off the approved lease and the compiled spec — the ceilings a person selected, not a
     // reading of what the capsule is using, which nothing here can honestly observe yet.
-    announce(session, plan, OffsetDateTime::now_utc());
+    announce(session, plan);
 
     match &selection.prompt {
         Some(prompt) => ask(plan, &capsule, prompt).await,
@@ -494,7 +507,9 @@ fn teardown(plan: &SessionPlan) {
     for step in plan.teardown() {
         let result = match &step {
             TeardownStep::StopCapsule(_) => run(&runtime::stop_capsule(plan)),
-            TeardownStep::StopGateway(_) => run(&runtime::stop_gateway(plan)),
+            TeardownStep::StopGateway(_) => {
+                runtime::stop_gateway(plan).map_or(Ok(()), |stop| run(&stop))
+            }
             TeardownStep::StopEgress(_) => run(&runtime::stop_egress(plan)),
             TeardownStep::Remove(path) => match fs::remove_file(path) {
                 Ok(()) => Ok(()),
@@ -517,8 +532,13 @@ fn teardown(plan: &SessionPlan) {
 ///
 /// A line rather than prose, and the same shape at every point in the session's life, so a card
 /// drawing it does not have to know which stage produced it.
-fn announce(session: &Session, plan: &SessionPlan, now: OffsetDateTime) {
-    let view = SessionView::of(session, plan, &plan.lease, now);
+///
+/// [`Ledger::Elsewhere`], and this is the whole point of that type existing. The model gateway is a
+/// different process: it received the lease as bytes and charges its own copy, so nothing here can
+/// see what has been spent. Reporting nought would be a claim this process is in no position to
+/// make, and would be wrong the moment a completion happened.
+fn announce(session: &Session, plan: &SessionPlan) {
+    let view = SessionView::of(session, plan, Ledger::Elsewhere);
     match serde_json::to_string(&view) {
         Ok(line) => println!("{line}"),
         Err(error) => eprintln!("the session could not be described: {error}"),

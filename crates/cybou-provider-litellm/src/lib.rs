@@ -312,8 +312,19 @@ impl Worker for LiteLlmWorker {
         // The promise was that this costs nothing. A charge means the route was not what it was
         // declared to be, and handing back an answer somebody has now been billed for — having asked
         // for none — would make the refusal cosmetic.
+        //
+        // The charge travels with the refusal rather than disappearing into it. Returning a bare
+        // failure meant the gateway never learned what had been spent, so the ledger read nought for
+        // a session that had been billed — the answer withheld *and* the money hidden, which is the
+        // worse of the two halves left undone.
         if request.spend.broken_by(answer.spend_units) {
-            return Err(WorkerFailed::OutOfResources);
+            return Err(WorkerFailed::PolicyViolatedAfterCharge {
+                spend_units: answer.spend_units,
+                detail: format!(
+                    "'{}' was declared to cost nothing and billed for this completion",
+                    request.model_class
+                ),
+            });
         }
         Ok(answer)
     }

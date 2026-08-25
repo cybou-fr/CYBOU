@@ -63,17 +63,16 @@ impl Default for HostPrograms {
     }
 }
 
-/// The command that starts this session's private model gateway.
+/// The command that starts this session's private model gateway, if it was granted a model.
 ///
 /// A system unit, so this is the one step of a launch that an unprivileged owner cannot take on its
-/// own authority.
+/// own authority. Nothing at all for a capsule with no model grant: a gateway with nothing to serve
+/// refuses to come up, and asking for one would fail a launch on a surface it never needed.
 #[must_use]
-pub fn start_gateway(plan: &SessionPlan) -> Vec<String> {
-    vec![
-        "systemctl".to_owned(),
-        "start".to_owned(),
-        plan.gateway_unit.clone(),
-    ]
+pub fn start_gateway(plan: &SessionPlan) -> Option<Vec<String>> {
+    plan.gateway_unit
+        .as_ref()
+        .map(|unit| vec!["systemctl".to_owned(), "start".to_owned(), unit.clone()])
 }
 
 /// The command that starts this capsule's egress broker, or nothing if it was granted no network.
@@ -122,14 +121,12 @@ pub fn stop_egress(plan: &SessionPlan) -> Vec<String> {
     ]
 }
 
-/// The command that ends this session's private model gateway.
+/// The command that ends this session's private model gateway, if it has one.
 #[must_use]
-pub fn stop_gateway(plan: &SessionPlan) -> Vec<String> {
-    vec![
-        "systemctl".to_owned(),
-        "stop".to_owned(),
-        plan.gateway_unit.clone(),
-    ]
+pub fn stop_gateway(plan: &SessionPlan) -> Option<Vec<String>> {
+    plan.gateway_unit
+        .as_ref()
+        .map(|unit| vec!["systemctl".to_owned(), "stop".to_owned(), unit.clone()])
 }
 
 /// The command that ends the capsule.
@@ -168,9 +165,13 @@ pub fn run_capsule(
         backend = backend.with_egress_bridge(programs.egress_bridge.clone());
         bindings.egress_socket_host = Some(plan.egress_socket.clone());
     }
-    backend = backend.with_model_bridge(programs.model_bridge.clone());
-    bindings.model_socket_host = Some(plan.model_socket.clone());
-    bindings.model_token_host = Some(plan.model_token.clone());
+    // The same rule as the broker above: a bridge mounted for a capsule that was granted no model
+    // is a loopback endpoint nobody granted, sitting there waiting for something to find it.
+    if let (Some(socket), Some(token)) = (&plan.model_socket, &plan.model_token) {
+        backend = backend.with_model_bridge(programs.model_bridge.clone());
+        bindings.model_socket_host = Some(socket.clone());
+        bindings.model_token_host = Some(token.clone());
+    }
 
     Ok(under_budget(
         spec,
@@ -244,6 +245,14 @@ mod tests {
         (plan, spec)
     }
 
+    fn socket(plan: &SessionPlan) -> String {
+        plan.model_socket
+            .as_ref()
+            .expect("a model grant has a socket")
+            .display()
+            .to_string()
+    }
+
     fn programs() -> HostPrograms {
         HostPrograms {
             entry: PathBuf::from("/usr/libexec/cybou/cybou-capsule-enter"),
@@ -258,10 +267,12 @@ mod tests {
         // A stop that named a differently-derived unit would leave a live gateway holding a bearer
         // for a session that a person believes is over.
         let (plan, _) = session(&["github.com"]);
-        assert_eq!(start_gateway(&plan).last(), Some(&plan.gateway_unit));
-        assert_eq!(stop_gateway(&plan).last(), Some(&plan.gateway_unit));
-        assert_eq!(start_gateway(&plan)[1], "start");
-        assert_eq!(stop_gateway(&plan)[1], "stop");
+        let started = start_gateway(&plan).expect("a model grant has a gateway");
+        let stopped = stop_gateway(&plan).expect("a model grant has a gateway");
+        assert_eq!(started.last(), plan.gateway_unit.as_ref());
+        assert_eq!(stopped.last(), plan.gateway_unit.as_ref());
+        assert_eq!(started[1], "start");
+        assert_eq!(stopped[1], "stop");
     }
 
     #[test]
@@ -288,8 +299,7 @@ mod tests {
             .expect("a capsule command");
         let joined = argv.join(" ");
 
-        assert!(joined.contains(&plan.model_socket.display().to_string()));
-        assert!(joined.contains(&plan.model_token.display().to_string()));
+        assert!(joined.contains(&socket(&plan)));
         assert!(joined.contains(&plan.egress_socket.display().to_string()));
     }
 
@@ -323,7 +333,7 @@ mod tests {
         assert!(!joined.contains("cybou-egress-bridge"));
         assert!(!joined.contains(&plan.egress_socket.display().to_string()));
         assert!(
-            joined.contains(&plan.model_socket.display().to_string()),
+            joined.contains(&socket(&plan)),
             "a capsule with no network still has its model gateway"
         );
     }

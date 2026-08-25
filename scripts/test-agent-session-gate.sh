@@ -88,14 +88,24 @@ if plan --token-limit 0 --max-output-tokens 4096 --sensitivity 1 \
 fi
 grep -q 'permits nothing' "$work/empty.err"
 
-# A session with no model grant has no gateway to hold, and is refused whole rather than by whichever
-# component first noticed. Half a session is the state that leaves runtime files nobody owns.
-if plan --token-limit 200000 --max-output-tokens 4096 --sensitivity 1 \
-    >/dev/null 2>"$work/nomodel.err"; then
-    echo "a session with no model grant was planned" >&2
+# A session with no model grant is an ordinary session, and this is the check that says an Agent
+# Capsule is a bounded place to compute rather than a container that only exists around a model.
+# Refusing it was a real defect: every local, unplugged, model-free capsule was unlaunchable.
+plan --token-limit 200000 --max-output-tokens 4096 --sensitivity 1 >"$work/nomodel"
+
+grep -q '^gateway-unit none' "$work/nomodel" || {
+    echo "a capsule with no model grant was given a gateway" >&2
+    cat "$work/nomodel" >&2
+    exit 1
+}
+if grep -q '^model-socket \|^model-token \|^teardown stop-gateway ' "$work/nomodel"; then
+    echo "a capsule with no model grant names a surface nobody started" >&2
     exit 1
 fi
-grep -q 'grants no model' "$work/nomodel.err"
+# It keeps everything else it was granted. The absent gateway is one withheld grant, not a
+# diminished session.
+grep -q '^teardown stop-egress ' "$work/nomodel"
+grep -q '^teardown stop-capsule ' "$work/nomodel"
 
 # A class named without a ceiling beside it is half a selection, and is refused rather than completed
 # with an invented bound.

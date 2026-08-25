@@ -118,14 +118,18 @@ pub struct SessionPlan {
     pub launch_file: PathBuf,
     /// The exact body of the launch file.
     pub launch_environment: String,
-    /// The templated gateway unit for this instance.
-    pub gateway_unit: String,
-    /// The runtime directory systemd creates for that unit.
-    pub gateway_runtime: PathBuf,
-    /// The gateway socket the capsule is given.
-    pub model_socket: PathBuf,
-    /// The ephemeral bearer file the capsule is given.
-    pub model_token: PathBuf,
+    /// The templated gateway unit for this instance, when a model was granted.
+    ///
+    /// Absent for a capsule granted no model, in the same way the broker is absent for one granted
+    /// no network. A gateway started for a session with nothing to serve refuses to come up, and a
+    /// launch that started one anyway would fail on a surface it should never have asked for.
+    pub gateway_unit: Option<String>,
+    /// The runtime directory systemd creates for that unit, when there is one.
+    pub gateway_runtime: Option<PathBuf>,
+    /// The gateway socket the capsule is given, when a model was granted.
+    pub model_socket: Option<PathBuf>,
+    /// The ephemeral bearer file the capsule is given, when a model was granted.
+    pub model_token: Option<PathBuf>,
     /// The transient unit the capsule itself runs under.
     pub capsule_unit: String,
     /// The directory this owner creates for the session's own runtime files.
@@ -152,10 +156,12 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
     if let Some(ended) = launch.lease.ended(now) {
         return Err(CannotPlan::LeaseOver(ended));
     }
-    if launch.lease.grant().model.is_none() {
-        return Err(CannotPlan::NoModelGrant);
-    }
-    if launch.ceilings.token_limit == 0 || launch.ceilings.max_output_tokens == 0 {
+    // A capsule with no model grant is not a broken launch. It is a capsule that was never going to
+    // ask — the ordinary case on an unplugged host, and the one this system exists to survive.
+    // Refusing it here made the Agent Capsule a container that only exists around a model.
+    let wants_a_model = launch.lease.grant().model.is_some();
+    if wants_a_model && (launch.ceilings.token_limit == 0 || launch.ceilings.max_output_tokens == 0)
+    {
         return Err(CannotPlan::EmptyCeiling);
     }
     let spec =
@@ -164,7 +170,7 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
     // The capsule's own identity, not a fresh one. A session named separately from the capsule it
     // holds is a session whose units cannot be traced back to it from the manager's list.
     let instance = launch.lease.grant().capsule_id.to_string();
-    let runtime = PathBuf::from(format!("{RUNTIME_PREFIX}{instance}"));
+    let runtime = wants_a_model.then(|| PathBuf::from(format!("{RUNTIME_PREFIX}{instance}")));
     let session_runtime = PathBuf::from(format!("{SESSION_PREFIX}{instance}"));
     let root = Path::new(LEASE_ROOT);
 
@@ -173,9 +179,9 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
         lease_file: root.join(format!("{instance}.lease")),
         launch_file: root.join(format!("{instance}.env")),
         launch_environment: launch_environment(launch),
-        gateway_unit: format!("cybou-agent-gateway@{instance}.service"),
-        model_socket: runtime.join("model.sock"),
-        model_token: runtime.join("model-token"),
+        gateway_unit: wants_a_model.then(|| format!("cybou-agent-gateway@{instance}.service")),
+        model_socket: runtime.as_ref().map(|runtime| runtime.join("model.sock")),
+        model_token: runtime.as_ref().map(|runtime| runtime.join("model-token")),
         gateway_runtime: runtime,
         capsule_unit: cybou_capsule::unit_name(&spec),
         egress_socket: session_runtime.join("egress.sock"),
@@ -215,14 +221,19 @@ impl SessionPlan {
     /// read back.
     #[must_use]
     pub fn teardown(&self) -> Vec<TeardownStep> {
-        vec![
-            TeardownStep::StopCapsule(self.capsule_unit.clone()),
-            TeardownStep::StopGateway(self.gateway_unit.clone()),
-            TeardownStep::StopEgress(self.egress_unit.clone()),
-            TeardownStep::Remove(self.egress_socket.clone()),
-            TeardownStep::Remove(self.launch_file.clone()),
-            TeardownStep::Remove(self.lease_file.clone()),
-        ]
+        let mut steps = vec![TeardownStep::StopCapsule(self.capsule_unit.clone())];
+        // Only what was started. Stopping a unit that never existed is a failure a person would go
+        // and investigate, and what they would find is a grant correctly withheld.
+        if let Some(gateway) = &self.gateway_unit {
+            steps.push(TeardownStep::StopGateway(gateway.clone()));
+        }
+        if !self.hosts.is_empty() {
+            steps.push(TeardownStep::StopEgress(self.egress_unit.clone()));
+            steps.push(TeardownStep::Remove(self.egress_socket.clone()));
+        }
+        steps.push(TeardownStep::Remove(self.launch_file.clone()));
+        steps.push(TeardownStep::Remove(self.lease_file.clone()));
+        steps
     }
 }
 
@@ -294,16 +305,34 @@ mod tests {
         let plan = plan(&launch(lease(Duration::hours(4), Some(strong()))), at(1)).expect("a plan");
 
         assert_eq!(plan.instance, CAPSULE.to_string());
-        assert!(plan.gateway_unit.contains(&plan.instance));
+        let gateway = plan
+            .gateway_unit
+            .clone()
+            .expect("a model grant has a gateway");
+        let gateway_runtime = plan
+            .gateway_runtime
+            .clone()
+            .expect("and a runtime directory");
+        assert!(gateway.contains(&plan.instance));
         assert!(plan.capsule_unit.contains(&plan.instance));
         assert!(plan.lease_file.to_string_lossy().contains(&plan.instance));
         assert!(plan.launch_file.to_string_lossy().contains(&plan.instance));
-        assert!(plan.model_socket.starts_with(&plan.gateway_runtime));
-        assert!(plan.model_token.starts_with(&plan.gateway_runtime));
+        assert!(
+            plan.model_socket
+                .as_ref()
+                .expect("a socket")
+                .starts_with(&gateway_runtime)
+        );
+        assert!(
+            plan.model_token
+                .as_ref()
+                .expect("a bearer file")
+                .starts_with(&gateway_runtime)
+        );
         assert!(plan.egress_unit.contains(&plan.instance));
         assert!(plan.egress_socket.starts_with(&plan.session_runtime));
         assert!(
-            !plan.session_runtime.starts_with(&plan.gateway_runtime),
+            !plan.session_runtime.starts_with(&gateway_runtime),
             "the owner's directory and systemd's are not the same directory"
         );
     }
@@ -357,7 +386,7 @@ mod tests {
         assert_eq!(
             &steps[1..3],
             &[
-                TeardownStep::StopGateway(plan.gateway_unit.clone()),
+                TeardownStep::StopGateway(plan.gateway_unit.clone().expect("a gateway")),
                 TeardownStep::StopEgress(plan.egress_unit.clone()),
             ],
             "the surfaces the capsule was using go after the capsule itself"
@@ -393,11 +422,33 @@ mod tests {
     }
 
     #[test]
-    fn a_session_with_no_model_grant_has_no_gateway_to_hold() {
-        assert_eq!(
-            plan(&launch(lease(Duration::hours(4), None)), at(1)),
-            Err(CannotPlan::NoModelGrant)
+    fn a_session_with_no_model_grant_is_an_ordinary_session_with_no_gateway() {
+        // Refusing this was the defect. A capsule with no model grant was never going to ask, which
+        // is the ordinary case on an unplugged host — and refusing it made the Agent Capsule a
+        // container that only exists around a model rather than a bounded place to compute.
+        let plan = plan(&launch(lease(Duration::hours(4), None)), at(1)).expect("a plan");
+
+        assert!(plan.gateway_unit.is_none());
+        assert!(plan.gateway_runtime.is_none());
+        assert!(plan.model_socket.is_none());
+        assert!(plan.model_token.is_none());
+        assert!(
+            !plan
+                .teardown()
+                .iter()
+                .any(|step| matches!(step, TeardownStep::StopGateway(_))),
+            "nothing was started, so nothing is stopped"
         );
+    }
+
+    #[test]
+    fn a_session_with_no_model_ignores_token_ceilings_it_will_never_use() {
+        // The ceilings bound a bearer. There is no bearer, so a zero one is not an empty authority
+        // — it is a field that does not apply, and refusing on it would refuse every local capsule.
+        let mut without = launch(lease(Duration::hours(4), None));
+        without.ceilings.token_limit = 0;
+        without.ceilings.max_output_tokens = 0;
+        assert!(plan(&without, at(1)).is_ok());
     }
 
     #[test]
