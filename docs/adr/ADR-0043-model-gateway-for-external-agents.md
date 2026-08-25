@@ -180,7 +180,15 @@ at what cost, under whose key.
 ## Implementation status
 
 B4 implements the compatibility router, ephemeral lease token, shared worker registration, route
-policy, accounting and attribution ledger. Its gate exercises the typed and agent surfaces through
-one registered fake worker and the real HTTP/auth/budget path. No listener is opened implicitly, no
-provider worker exists yet, and no provider credential is part of the gateway contract; endpoint
-binding and token injection belong to the first agent pack, while the multi-provider worker is B5.
+policy, accounting and attribution ledger. B5 adds the replaceable `cybou-provider-litellm` worker
+without adding it as a gateway dependency. It maps classes to operator-owned proxy model groups and
+mints one short-lived, model/budget/concurrency-scoped virtual key per completion, keeping the proxy
+master key out of capsules. Proxy-observed cost is rounded upward into the integer lease currency;
+model group, deployment id, response model and call id join each answer to proxy spend evidence.
+The deployment contract requires database-backed budget reservation and known token pricing for
+every mapped route: only then can the forwarded `max_tokens` become a maximum-cost reservation
+before the provider sees the request. A proxy that cannot price the route is not admissible.
+
+The B5 gate uses a fake HTTP proxy and no provider credential. No listener, LiteLLM service or real
+provider is deployed implicitly; endpoint binding, token injection and the first live provider call
+belong to the first agent pack.

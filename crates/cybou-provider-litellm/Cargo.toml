@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-provider-litellm"
+description = "Replaceable, budget-bounded LiteLLM worker for Cybou model brokerage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cybou-model-brokerd = { path = "../cybou-model-brokerd" }
+cybou-protocol = { path = "../cybou-protocol" }
+reqwest = { workspace = true, features = ["blocking", "json"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

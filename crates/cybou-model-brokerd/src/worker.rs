@@ -54,6 +54,21 @@ pub struct ProviderChatOutput {
     pub output_tokens: u32,
     /// Provider-observed cost in the operator's smallest configured unit.
     pub spend_units: u64,
+    /// Proxy-side attribution for the concrete routed deployment.
+    pub upstream: Option<UpstreamAttribution>,
+}
+
+/// Provider-proxy evidence attached to one completion.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpstreamAttribution {
+    /// Model group requested from the proxy.
+    pub model_group: String,
+    /// Concrete deployment identifier returned by the proxy.
+    pub deployment_id: String,
+    /// Model string in the OpenAI-compatible response.
+    pub response_model: String,
+    /// Proxy call identifier used to join its spend log.
+    pub call_id: String,
 }
 
 /// Why a worker could not answer.

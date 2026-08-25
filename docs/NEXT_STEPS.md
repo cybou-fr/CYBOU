@@ -230,6 +230,22 @@ behind the worker interface is B5.
 One worker in front of a multi-provider proxy, so provider breadth is not this project's maintenance
 burden. Behind an interface Cybou owns, so replacing it later changes nothing above it.
 
+**Done.** `cybou-provider-litellm` implements only the provider-neutral `Worker` chat surface and
+maps lease capability classes to operator-owned LiteLLM model groups. The gateway has no dependency
+on this crate. For every request the worker uses its private proxy master key to mint one five-minute
+virtual key scoped to that model group, the remaining spend budget and one parallel request; only
+that virtual key reaches `/v1/chat/completions`, and cleanup is attempted after the response.
+
+Cost is read from the proxy rather than trusted from the agent, converted from decimal dollars to
+integer operator units with upward rounding, and checked again by the broker and lease. The usage
+record carries the proxy model group, concrete deployment id, response model and call id, so the
+proxy spend row can be joined without pretending a remote artifact digest was locally verified. A
+fake-proxy HTTP gate proves the credential split, request ceilings, attribution and replacement
+boundary. Registration requires a database-backed LiteLLM deployment with budget reservation enabled
+and token pricing known for every mapped group; otherwise the proxy cannot reserve maximum request
+cost before dispatch and the lease ceiling is not proven. No real provider, proxy deployment or
+provider catalogue is implied; those are B7 and B6.
+
 ### B6. Provider catalogue with observation times
 
 Free tiers exist and their limits change without notice. Cybou must not contain the sentence *this

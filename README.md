@@ -167,9 +167,9 @@ gateway that cannot become a second cognitive owner.
 | Structured language and meaning boundary | Implemented — ADR-0031, non-generative |
 | Public surface withholds what is the person's | Implemented — filtered projection plus a credential |
 | Governed action and remediation boundary | Implemented through three typed adapters and independent re-observation — ADR-0022 gate |
-| Model brokerage as a faculty, not an organ | Implemented — ADR-0035; no worker registered |
+| Model brokerage as a faculty, not an organ | Implemented — ADR-0035; replaceable LiteLLM worker available, not deployed |
 | Agent capsules with kernel-enforced boundaries and brokered egress | Implemented — ADR-0042 gates |
-| A model gateway and leases for agents that are not Mind | Planned — ADR-0043 |
+| A model gateway and leases for agents that are not Mind | Implemented through B5 — ADR-0043; first live agent/provider is B7 |
 | Distributed Mind prototype | Planned |
 | Lifelong learning and learned-artifact governance | Planned |
 | Governed tool and MCP mediation by the host | Planned — ADR-0034 |

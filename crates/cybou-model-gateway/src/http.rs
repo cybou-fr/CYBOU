@@ -116,7 +116,20 @@ async fn chat_completions(
             .collect(),
         max_output_tokens: request.max_tokens.unwrap_or(DEFAULT_MAX_OUTPUT_TOKENS),
     };
-    match core.complete(bearer, &request, now) {
+    let bearer = bearer.to_owned();
+    let completed =
+        tokio::task::spawn_blocking(move || core.complete(&bearer, &request, now)).await;
+    let Ok(completed) = completed else {
+        return refusal(&GatewayRefused::Provider(
+            cybou_model_brokerd::ChatRefused::WorkerFailed {
+                provider: "gateway-worker".to_owned(),
+                failure: cybou_model_brokerd::WorkerFailed::Unusable {
+                    detail: "worker task stopped".to_owned(),
+                },
+            },
+        ));
+    };
+    match completed {
         Ok(completion) => {
             let result = completion.result;
             let model = format!(

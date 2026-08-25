@@ -32,4 +32,6 @@ pub use core::{
     AgentChatRequest, AgentChatResult, Attempt, BrokerCore, BrokerRefused, ChatRefused, Registered,
     UsageRecord, UsageSubject,
 };
-pub use worker::{ChatMessage, ProviderChatOutput, ProviderChatRequest, Worker, WorkerFailed};
+pub use worker::{
+    ChatMessage, ProviderChatOutput, ProviderChatRequest, UpstreamAttribution, Worker, WorkerFailed,
+};

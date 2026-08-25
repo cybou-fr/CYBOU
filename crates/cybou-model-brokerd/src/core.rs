@@ -10,7 +10,7 @@ use cybou_protocol::model::{
     admissible, attributable_to,
 };
 
-use crate::worker::{ChatMessage, ProviderChatRequest, Worker, WorkerFailed};
+use crate::worker::{ChatMessage, ProviderChatRequest, UpstreamAttribution, Worker, WorkerFailed};
 
 /// One backend, and the route it is reachable by.
 pub struct Registered {
@@ -66,6 +66,8 @@ pub struct AgentChatResult {
     pub output_tokens: u32,
     /// Provider-observed spend.
     pub spend_units: u64,
+    /// Concrete proxy route used for this completion, when applicable.
+    pub upstream: Option<UpstreamAttribution>,
 }
 
 /// Why the shared provider pool did not answer an agent chat request.
@@ -139,6 +141,8 @@ pub struct UsageRecord {
     pub output_tokens: u32,
     /// Cost in the operator's smallest configured unit.
     pub spend_units: u64,
+    /// Concrete proxy route used for this completion, when applicable.
+    pub upstream: Option<UpstreamAttribution>,
 }
 
 /// Why the broker did not answer.
@@ -405,6 +409,7 @@ impl BrokerCore {
             input_tokens: result.input_tokens,
             output_tokens: result.output_tokens,
             spend_units: 0,
+            upstream: None,
         });
         Ok(result)
     }
@@ -472,6 +477,7 @@ impl BrokerCore {
             input_tokens: output.input_tokens,
             output_tokens: output.output_tokens,
             spend_units: output.spend_units,
+            upstream: output.upstream.clone(),
         };
         self.note_usage(UsageRecord {
             request_id: request.request_id,
@@ -485,6 +491,7 @@ impl BrokerCore {
             input_tokens: output.input_tokens,
             output_tokens: output.output_tokens,
             spend_units: output.spend_units,
+            upstream: output.upstream,
         });
         Ok(result)
     }

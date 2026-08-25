@@ -810,7 +810,9 @@ External agents now have a separate OpenAI-compatible `/v1/chat/completions` rou
 `cybou-model-gateway`. It does not turn arbitrary agent prompts into a `ModelTask` and does not call
 the D-Bus surface. Instead, both neighbouring request shapes meet at the same registered provider
 worker, route policy and bounded usage ledger. Every agent completion is attributed to capsule,
-agent, task, exact model artifact and provider.
+agent, task, registered worker and provider. A proxy worker additionally records its model group,
+concrete deployment id, response model and call id; it does not mislabel a remote model name as a
+locally verified artifact digest.
 
 The gateway accepts only an unpredictable ephemeral bearer minted from a live capsule lease. The
 token is scoped to that capsule's agent and model class, a task, route sensitivity, lifetime, token
@@ -820,8 +822,18 @@ reservation, and successful usage is charged by the gateway rather than reported
 HTTP router is complete and tested but opens no listener by itself; the first agent pack owns binding
 it to the capsule-only endpoint and injecting the token.
 
-**No inference runtime is implemented and no model has ever been loaded.** On an installation with
-no worker, every request is answered with what happens instead. That is a supported configuration.
+`cybou-provider-litellm` is the first replaceable provider worker. Capability classes map to
+operator-owned LiteLLM model groups rather than compiled provider names. Its proxy master key never
+enters a capsule: each completion receives a separate five-minute virtual key scoped to one model
+group, the request's remaining budget and one parallel request. Proxy-observed decimal cost is
+rounded upward into whole operator units; missing cost or attribution is a refusal. The blocking
+HTTP adapter runs outside the async gateway executor. A deployable registration additionally
+requires LiteLLM's database-backed budget reservation to be enabled and every mapped route to have
+known token pricing, so `max_tokens` can be priced and reserved before provider dispatch.
+
+**No inference runtime or LiteLLM service is deployed, and no real model has ever been called.** The
+worker is exercised against a fake HTTP proxy. On an installation with no registered worker, every
+request is answered with what happens instead. That remains a supported configuration.
 
 ## Action boundary
 
@@ -854,6 +866,7 @@ bash scripts/test-action-gate.sh
 bash scripts/test-acp-gate.sh
 bash scripts/test-standing-lease-gate.sh
 bash scripts/test-model-gateway-gate.sh
+bash scripts/test-litellm-worker-gate.sh
 python3 scripts/validate-cognitive-docs.py .
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py

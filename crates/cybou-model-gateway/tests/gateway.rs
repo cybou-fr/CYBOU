@@ -67,6 +67,7 @@ impl Worker for BothSurfaces {
             input_tokens: 2,
             output_tokens: 1,
             spend_units: 7,
+            upstream: None,
         })
     }
 }
