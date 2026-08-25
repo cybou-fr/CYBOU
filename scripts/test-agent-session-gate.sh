@@ -40,7 +40,7 @@ plan --token-limit 200000 --max-output-tokens 4096 --sensitivity 1 \
 
 # Every name is the capsule's own identity. A gateway instance named separately from the capsule it
 # serves is a pair nobody can match up again from a service manager's list.
-for line in gateway-unit capsule-unit lease-file launch-file model-socket model-token; do
+for line in gateway-unit capsule-unit egress-unit lease-file launch-file model-socket model-token egress-socket; do
     grep -q "^$line .*$CAPSULE" "$work/plan" || {
         echo "$line does not carry the session identity" >&2
         exit 1
@@ -61,7 +61,12 @@ grep -q "^launch-env CYBOU_AGENT_TASK_ID=$TASK\$" "$work/plan"
 # The capsule stops first. Taking its gateway away first is a refusal it can see and retry; taking
 # the capsule away first is an ending it cannot.
 grep '^teardown ' "$work/plan" | cut -d' ' -f2 >"$work/order"
-expected=$'stop-capsule\nstop-gateway\nremove\nremove'
+expected=$'stop-capsule
+stop-gateway
+stop-egress
+remove
+remove
+remove'
 test "$(cat "$work/order")" = "$expected" || {
     echo "teardown is out of order:" >&2
     cat "$work/order" >&2
@@ -98,5 +103,9 @@ if plan --token-limit 200000 --max-output-tokens 4096 --sensitivity 1 \
     exit 1
 fi
 grep -q 'spend-limit' "$work/half.err"
+
+# The broker is a unit of its own, torn down with the rest. A way out that lives inside the
+# coordinator survives exactly as long as the coordinator does.
+grep -q '^teardown stop-egress ' "$work/plan"
 
 echo "=== Agent session ownership gate passed ==="

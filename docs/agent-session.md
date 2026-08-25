@@ -70,27 +70,61 @@ disagree with the approved grant.
 ```text
 1. stop the capsule       the untrusted party loses its hands first
 2. stop the gateway
-3. remove the launch file
-4. remove the lease file  the record outlives the things it granted
+3. stop the egress broker
+4. remove the broker socket
+5. remove the launch file
+6. remove the lease file  the record outlives the things it granted
 ```
 
 Stopping the gateway first would leave a running agent making requests against a socket that has
 disappeared, which it experiences as a refusal it can retry rather than as an ending. *Ending is not
 asking*, so the thing that can ask is the thing that stops first.
 
+## Carrying it out
+
+`cybou-agentd launch <selection> -- <program>` runs the same plan. It writes the lease and then the
+launch file, starts this capsule's egress broker if any network was granted, starts the gateway,
+waits for the socket and bearer to exist, runs the program inside the capsule under its cgroup, and
+then tears the session down in the order above — including when something failed on the way up. A
+launch that gave up halfway and returned would leave a live gateway holding a bearer for a session
+nobody is watching.
+
+The broker and the capsule are transient *user* units rather than children of this process. A way out
+that lives inside the coordinator survives exactly as long as the coordinator does, and outlives it
+in the worse direction if the coordinator is killed and the broker is not.
+
+`scripts/test-agent-launch-gate.sh` proves the whole of it on a deployed host and checks the part
+that is easy to get wrong: that nothing is left. It exits `3` — `NOT RUN`, never passed — on a host
+with no gateway template, no configured provider, or no user service manager.
+
+## The one privileged step
+
+`cybou-agent-gateway@.service` is a *system* unit for exactly one reason: the LiteLLM master key stays
+root-owned and reaches the unprivileged gateway through `LoadCredential` rather than sitting in a file
+the `cybou` user can read. The gateway process itself already runs as `cybou` and holds no privilege
+— the credential is the whole of the difference.
+
+So the session owner, which is unprivileged, needs permission to start and stop that one template.
+Deployment installs `debian/cybou-agent-gateway.rules`, which grants exactly that: two verbs, one unit
+name pattern matched by shape rather than by prefix, one user. Not reload, not enable, not mask, and
+no unit outside the pattern — those would let a session owner reshape the host rather than start the
+surface its own lease already describes.
+
+The alternative was a typed request across the boundary, in the shape `Action1` already uses for
+`Executor1`. It is the better long-term answer and it is a larger one: a new organ with its own bus
+policy, for a delegation whose whole content is "start a process that already runs as this user". The
+polkit rule was chosen because it is narrower than what the executor already permits, and because the
+authorization is legible in one file rather than distributed across a protocol. If agent launches ever
+need to do more than start and stop one template, that is the signal to move to the typed boundary
+rather than to widen this rule.
+
 ## What is not built yet
 
-Carrying the plan out. `plan` derives and refuses; it does not write the files, start the units or
-hold the session. That is deliberate rather than pending polish: a coordinator that starts part of a
-session and cannot end it is worse than one that has not started yet.
+`Pause`. `Stop` from outside — today a session ends when its program ends, its lease expires, or the
+owner is killed, and there is no second process that can withdraw a running lease. Both belong with
+B11's quarantine and revoke rather than here.
 
-The open question it depends on is a privilege boundary, not an implementation detail.
-`cybou-agent-gateway@.service` is a *system* unit precisely so the LiteLLM master key can stay
-root-only and reach it through `LoadCredential`. An unprivileged owner therefore cannot start it
-without either a narrow polkit rule scoped to that one template, or a typed request across the
-boundary in the shape `Action1` already uses for `Executor1`. Choosing between those decides what the
-owner is, so it is being chosen rather than defaulted into by whichever is easier to write.
-
-Until then, `scripts/test-agent-gateway-gate.sh` starts a gateway directly against a fake LiteLLM
-peer, and [Per-capsule model gateway deployment](agent-gateway-deployment.md) documents the file
-contract the owner will produce.
+Driving an ACP agent. `launch` runs a program inside the capsule; the OpenCode pack's entrypoint is
+`opencode acp`, which speaks JSON-RPC over stdio and expects a client. The ACP client can initialize
+an agent and stops there, so `session/new` and `prompt` are the next step and the thing that makes a
+launched agent do work rather than merely exist.

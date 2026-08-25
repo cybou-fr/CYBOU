@@ -3,32 +3,47 @@
 
 //! The agent session owner.
 //!
-//! Today it can work out and show what one selection implies, and nothing more: `plan` mints the one
-//! lease and prints every file, unit and teardown step that launch would produce, without touching a
-//! filesystem or a service manager. Carrying the plan out is the next step and is deliberately not
-//! half-present here — a coordinator that starts some of a session and cannot end it is worse than
-//! one that has not started yet.
+//! `plan` mints the one lease and prints every file, unit and teardown step a launch implies without
+//! touching a host. `launch` carries that same plan out and holds the session until it ends.
 //!
-//! It is already useful as it stands: the derivation is the part that was missing. Every runtime
-//! piece of a session now comes from one object, so `plan` is also the answer to *what exactly did
-//! this person approve*, printable before anything runs.
+//! Nothing here decides anything. Every path, unit name, file body and command was already produced
+//! by `cybou_agentd::plan` and `cybou_agentd::runtime`; this file is where those meet a filesystem
+//! and a service manager, and it is deliberately the only part of the crate that cannot be answered
+//! by reading.
 
-use std::path::PathBuf;
+#[cfg(not(unix))]
+compile_error!("cybou-agentd owns Linux capsules and systemd units");
 
-use cybou_agentd::{Ceilings, Launch, plan};
+use std::fs::{self, OpenOptions};
+use std::io::Write as _;
+use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::Duration as StdDuration;
+
+use cybou_agentd::plan::SessionPlan;
+use cybou_agentd::session::{Session, SessionEnd, SessionState};
+use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
 use cybou_capsule::{
-    CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget, Workspace,
-    issue_lease,
+    CapabilityProfile, KernelCapsuleSpec, Lease, LeaseRequest, ModelGrant, NetworkGrant,
+    ResourceBudget, Workspace, compile, issue_lease,
 };
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
+/// How long a launch waits for a surface it has just started to exist.
+const READY_TIMEOUT: StdDuration = StdDuration::from_secs(30);
+
 fn usage() -> &'static str {
-    "usage: cybou-agentd plan --profile ID --agent NAME --workspace PATH \\\n\
-     \x20   --memory-mib N --cpus N --tasks-max N --lifetime-seconds N \\\n\
-     \x20   --token-limit N --max-output-tokens N --sensitivity N \\\n\
-     \x20   [--model CLASS --spend-limit N] [--host HOST]… [--may-execute] \\\n\
-     \x20   [--capsule-id UUID] [--task-id UUID]"
+    "usage:\n  \
+     cybou-agentd plan   <selection>\n  \
+     cybou-agentd launch <selection> -- <program> [argument …]\n\n\
+     selection:\n  \
+     --profile ID --agent NAME --workspace PATH\n  \
+     --memory-mib N --cpus N --tasks-max N --lifetime-seconds N\n  \
+     --token-limit N --max-output-tokens N --sensitivity N\n  \
+     [--model CLASS --spend-limit N] [--host HOST]… [--may-execute]\n  \
+     [--capsule-id UUID] [--task-id UUID]"
 }
 
 /// One launch selection, exactly as a person made it.
@@ -50,12 +65,16 @@ struct Selection {
     may_execute: bool,
     capsule_id: Option<Uuid>,
     task_id: Option<Uuid>,
+    program: Vec<String>,
 }
 
-fn main() -> Result<(), String> {
+#[tokio::main]
+async fn main() -> Result<(), String> {
     let mut arguments = std::env::args().skip(1);
-    match arguments.next().as_deref() {
+    let verb = arguments.next();
+    match verb.as_deref() {
         Some("plan") => show_plan(&parse(arguments.collect())?),
+        Some("launch") => launch(&parse(arguments.collect())?).await,
         _ => Err(usage().to_owned()),
     }
 }
@@ -64,6 +83,12 @@ fn parse(arguments: Vec<String>) -> Result<Selection, String> {
     let mut selection = Selection::default();
     let mut arguments = arguments.into_iter();
     while let Some(flag) = arguments.next() {
+        // Everything after the separator is the program. A program whose name begins with a dash is
+        // a program, not an option — the same rule the capsule command itself follows.
+        if flag == "--" {
+            selection.program = arguments.collect();
+            break;
+        }
         let mut value = || {
             arguments
                 .next()
@@ -106,10 +131,8 @@ fn required<T>(value: Option<T>, flag: &str) -> Result<T, String> {
     value.ok_or_else(|| format!("{flag} is required\n{}", usage()))
 }
 
-fn show_plan(selection: &Selection) -> Result<(), String> {
-    let now = OffsetDateTime::now_utc();
-
-    // The one mint, called once. Every name printed below is derived from what it returns.
+/// Mint the one lease this selection produces.
+fn mint(selection: &Selection, now: OffsetDateTime) -> Result<Lease, String> {
     let mut profile = CapabilityProfile::bounded(
         required(selection.profile.clone(), "--profile")?,
         ResourceBudget {
@@ -137,7 +160,7 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
     };
     profile.may_execute = selection.may_execute;
 
-    let lease = issue_lease(
+    issue_lease(
         LeaseRequest {
             selected_profile: profile,
             capsule_id: selection.capsule_id.unwrap_or_else(Uuid::new_v4),
@@ -146,10 +169,14 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
         },
         now,
     )
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| error.to_string())
+}
 
+fn prepare(selection: &Selection) -> Result<(Lease, SessionPlan, KernelCapsuleSpec), String> {
+    let now = OffsetDateTime::now_utc();
+    let lease = mint(selection, now)?;
     let launch = Launch {
-        lease,
+        lease: lease.clone(),
         task_id: selection.task_id.unwrap_or_else(Uuid::new_v4),
         ceilings: Ceilings {
             token_limit: required(selection.token_limit, "--token-limit")?,
@@ -158,19 +185,24 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
         },
     };
     let plan = plan::plan(&launch, now).map_err(|error| error.to_string())?;
+    let spec = compile(lease.grant()).map_err(|error| error.to_string())?;
+    Ok((lease, plan, spec))
+}
+
+fn show_plan(selection: &Selection) -> Result<(), String> {
+    let (lease, plan, _) = prepare(selection)?;
 
     println!("session {}", plan.instance);
-    println!("profile {}", launch.lease.profile_id().as_str());
-    println!("agent {}", launch.lease.grant().agent);
-    println!(
-        "workspace {}",
-        launch.lease.grant().workspace.root.display()
-    );
+    println!("profile {}", lease.profile_id().as_str());
+    println!("agent {}", lease.grant().agent);
+    println!("workspace {}", lease.grant().workspace.root.display());
     println!("expires {}", plan.expires_at);
     println!("lease-file {}", plan.lease_file.display());
     println!("launch-file {}", plan.launch_file.display());
     println!("gateway-unit {}", plan.gateway_unit);
     println!("capsule-unit {}", plan.capsule_unit);
+    println!("egress-unit {}", plan.egress_unit);
+    println!("egress-socket {}", plan.egress_socket.display());
     println!("model-socket {}", plan.model_socket.display());
     println!("model-token {}", plan.model_token.display());
     for line in plan.launch_environment.lines() {
@@ -178,16 +210,192 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
     }
     for step in plan.teardown() {
         match step {
-            cybou_agentd::TeardownStep::StopCapsule(unit) => {
-                println!("teardown stop-capsule {unit}");
-            }
-            cybou_agentd::TeardownStep::StopGateway(unit) => {
-                println!("teardown stop-gateway {unit}");
-            }
-            cybou_agentd::TeardownStep::Remove(path) => {
-                println!("teardown remove {}", path.display());
-            }
+            TeardownStep::StopCapsule(unit) => println!("teardown stop-capsule {unit}"),
+            TeardownStep::StopGateway(unit) => println!("teardown stop-gateway {unit}"),
+            TeardownStep::StopEgress(unit) => println!("teardown stop-egress {unit}"),
+            TeardownStep::Remove(path) => println!("teardown remove {}", path.display()),
         }
     }
     Ok(())
+}
+
+/// Carry out one launch and hold the session until it ends.
+async fn launch(selection: &Selection) -> Result<(), String> {
+    if selection.program.is_empty() {
+        return Err(format!("launch needs a program after --\n{}", usage()));
+    }
+    let (lease, plan, spec) = prepare(selection)?;
+    let programs = HostPrograms::default();
+    let mut session = Session::launching(lease.grant().capsule_id, OffsetDateTime::now_utc());
+    println!("session {} launching", plan.instance);
+
+    // From here on every path ends in teardown, including the ones that fail. A launch that gave up
+    // halfway and returned would leave a live gateway holding a bearer for a session nobody watches.
+    match bring_up(&plan, &spec, &programs, selection, &mut session).await {
+        Ok(true) => session.begin_ending(SessionEnd::AgentFinished),
+        Ok(false) => session.begin_ending(SessionEnd::Failed(
+            "the agent exited with a failure".to_owned(),
+        )),
+        Err(why) => session.begin_ending(SessionEnd::Failed(why)),
+    };
+
+    // The lease has the last word on why, and it is consulted after the fact rather than before: an
+    // agent whose capsule hit its deadline did not finish, and saying it did would report a session
+    // that was stopped as one that completed.
+    session.observe(&lease, OffsetDateTime::now_utc());
+    teardown(&plan);
+    session.finish_ending(OffsetDateTime::now_utc());
+
+    match session.state() {
+        SessionState::Ended(SessionEnd::Failed(why)) => {
+            Err(format!("session {} failed: {why}", plan.instance))
+        }
+        SessionState::Ended(end) => {
+            println!("session {} ended: {}", plan.instance, end.describe());
+            Ok(())
+        }
+        other => Err(format!(
+            "session {} is {other:?} after teardown",
+            plan.instance
+        )),
+    }
+}
+
+/// Write the files, start the surfaces, run the capsule. Whether the capsule succeeded.
+async fn bring_up(
+    plan: &SessionPlan,
+    spec: &KernelCapsuleSpec,
+    programs: &HostPrograms,
+    selection: &Selection,
+    session: &mut Session,
+) -> Result<bool, String> {
+    write_session_files(plan)?;
+
+    if let Some(broker) = runtime::start_egress(plan, spec, programs) {
+        run(&broker)?;
+        wait_for(std::slice::from_ref(&plan.egress_socket)).await?;
+    }
+
+    run(&runtime::start_gateway(plan))?;
+    wait_for(&[plan.model_socket.clone(), plan.model_token.clone()]).await?;
+
+    let capsule = runtime::run_capsule(plan, spec, programs, &selection.program)
+        .map_err(|error| error.to_string())?;
+    session.running().map_err(|error| error.to_string())?;
+    println!("session {} running", plan.instance);
+    status_of(&capsule)
+}
+
+/// Write the lease and the launch file, in that order.
+///
+/// The lease first. It is the authority; a launch file that existed without one would let a unit
+/// start against ceilings with nothing to check them against.
+fn write_session_files(plan: &SessionPlan) -> Result<(), String> {
+    private_directory(&plan.session_runtime)?;
+
+    let mut encoded = Vec::new();
+    ciborium::into_writer(&plan.lease, &mut encoded)
+        .map_err(|error| format!("encode the lease: {error}"))?;
+    write_private(&plan.lease_file, &encoded)?;
+    write_private(&plan.launch_file, plan.launch_environment.as_bytes())
+}
+
+fn private_directory(path: &Path) -> Result<(), String> {
+    if path.exists() {
+        let metadata = fs::symlink_metadata(path)
+            .map_err(|error| format!("inspect {}: {error}", path.display()))?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err(format!("{} is not a real directory", path.display()));
+        }
+    } else {
+        fs::create_dir_all(path).map_err(|error| format!("create {}: {error}", path.display()))?;
+    }
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+        .map_err(|error| format!("restrict {}: {error}", path.display()))
+}
+
+/// Create a file that did not exist, mode `0600`.
+///
+/// `create_new`, so a session never writes over another session's launch. Two sessions holding the
+/// same capsule id is not a collision to resolve; it is a launch that must not happen.
+fn write_private(path: &Path, contents: &[u8]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("create {}: {error}", parent.display()))?;
+    }
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+        .map_err(|error| format!("create {}: {error}", path.display()))?;
+    file.write_all(contents)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| format!("write {}: {error}", path.display()))
+}
+
+/// Wait for surfaces that were just started to exist.
+async fn wait_for(paths: &[PathBuf]) -> Result<(), String> {
+    let deadline = tokio::time::Instant::now() + READY_TIMEOUT;
+    loop {
+        if paths.iter().all(|path| path.exists()) {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            let missing: Vec<String> = paths
+                .iter()
+                .filter(|path| !path.exists())
+                .map(|path| path.display().to_string())
+                .collect();
+            return Err(format!("timed out waiting for {}", missing.join(", ")));
+        }
+        tokio::time::sleep(StdDuration::from_millis(50)).await;
+    }
+}
+
+fn run(argv: &[String]) -> Result<(), String> {
+    if status_of(argv)? {
+        Ok(())
+    } else {
+        Err(format!("{} failed", argv.join(" ")))
+    }
+}
+
+fn status_of(argv: &[String]) -> Result<bool, String> {
+    let (program, arguments) = argv
+        .split_first()
+        .ok_or_else(|| "an empty command".to_owned())?;
+    Command::new(program)
+        .args(arguments)
+        .status()
+        .map(|status| status.success())
+        .map_err(|error| format!("{program}: {error}"))
+}
+
+/// Undo the launch, in the planned order, whatever else happened.
+///
+/// Every step is attempted even if an earlier one failed. A teardown that stopped at the first error
+/// would leave exactly the pieces that are hardest to notice: a broker with no capsule, a gateway
+/// holding a bearer for a session that is over.
+fn teardown(plan: &SessionPlan) {
+    for step in plan.teardown() {
+        let result = match &step {
+            TeardownStep::StopCapsule(_) => run(&runtime::stop_capsule(plan)),
+            TeardownStep::StopGateway(_) => run(&runtime::stop_gateway(plan)),
+            TeardownStep::StopEgress(_) => run(&runtime::stop_egress(plan)),
+            TeardownStep::Remove(path) => match fs::remove_file(path) {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(format!("remove {}: {error}", path.display())),
+            },
+        };
+        if let Err(why) = result {
+            eprintln!("teardown step {step:?} did not complete: {why}");
+        }
+    }
+    if let Err(error) = fs::remove_dir(&plan.session_runtime)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        eprintln!("teardown left {}: {error}", plan.session_runtime.display());
+    }
 }

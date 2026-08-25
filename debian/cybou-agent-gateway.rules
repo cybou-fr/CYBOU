@@ -1,0 +1,48 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+//
+// The one privileged step of an agent launch, and no other.
+//
+// `cybou-agent-gateway@.service` is a *system* unit for exactly one reason: the LiteLLM master key
+// stays root-owned and reaches the unprivileged gateway through `LoadCredential`, rather than
+// sitting in a file the `cybou` user can read. The gateway process itself already runs as `cybou`
+// and holds no privilege — the credential is the whole of the difference.
+//
+// So `cybou-agentd`, which owns the session and is unprivileged, needs permission to start and stop
+// that one template. This grants exactly that: two verbs, one unit name pattern, one user. It is not
+// permission to manage units, and it is deliberately not `org.freedesktop.systemd1.manage-units`
+// with a check somewhere in Cybou's own code — a rule enforced by the thing being restricted is not
+// a rule.
+//
+// What this does not grant, and must not: reload, enable, mask, or any unit outside the pattern.
+// Those would let a session owner reshape the host rather than start the surface its own lease
+// already describes. Anything Cybou needs to do *to a host* goes through `Action1` and the typed
+// executor, where a person answers for it.
+
+polkit.addRule(function (action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.user !== "cybou") {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    var unit = action.lookup("unit");
+    var verb = action.lookup("verb");
+    if (unit === null || verb === null) {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    // Instance names are capsule UUIDs. Matched by shape rather than by prefix: a prefix test would
+    // also admit `cybou-agent-gateway@anything.service`, and the point of an allow-list is that it
+    // cannot be widened by choosing a name.
+    var permitted = /^cybou-agent-gateway@[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.service$/;
+    if (!permitted.test(unit)) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (verb !== "start" && verb !== "stop") {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    return polkit.Result.YES;
+});

@@ -84,6 +84,23 @@ step "provider catalogue"    bash scripts/test-provider-catalogue-gate.sh
 step "OpenCode agent pack"   bash scripts/test-opencode-pack-gate.sh
 step "agent session owner"   bash scripts/test-agent-session-gate.sh
 
+# One launch, carried out on a real host, leaving nothing behind. Exit 3 means this host has no
+# deployed gateway template, provider or user service manager to launch against — a check that did
+# not run rather than one that passed.
+announce "agent launch teardown"
+failed="agent launch teardown"
+launch_status=0
+bash scripts/test-agent-launch-gate.sh || launch_status=$?
+case "$launch_status" in
+    0) failed="" ;;
+    3)
+        announce "agent launch teardown not run: this host has no deployed agent session to launch"
+        skipped="$skipped agent-launch-teardown"
+        failed=""
+        ;;
+    *) exit "$launch_status" ;;
+esac
+
 # ADR-0042 G1. Exit 3 means bubblewrap is absent, which is a check that did not run rather than one
 # that passed — the distinction this whole script exists to keep.
 announce "capsule escape attempts"

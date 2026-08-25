@@ -15,6 +15,7 @@ ciborium.workspace = true
 cybou-agent-opencode = { path = "../cybou-agent-opencode" }
 cybou-capsule = { path = "../cybou-capsule" }
 time.workspace = true
+tokio.workspace = true
 uuid.workspace = true
 
 [lints]

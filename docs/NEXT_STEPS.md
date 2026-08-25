@@ -303,10 +303,17 @@ that one object. `cybou-agentd plan` prints every file, unit and teardown step a
 without touching a host, and its gate asserts the two properties that matter — every runtime name
 carries the session identity, and the launch file names nothing that is authority.
 
-What remains is executing the plan, and it is blocked on a decision rather than on typing: the
-gateway is a system unit so its provider credential can stay root-only, so an unprivileged owner
-needs either a polkit rule scoped to that one template or a typed request across the boundary in the
-shape `Action1` already uses for `Executor1`. See [The agent session owner](agent-session.md).
+`cybou-agentd launch` carries the same plan out: it writes the lease and the launch file, starts this
+capsule's egress broker and its private gateway, runs a program inside the capsule under its cgroup,
+and tears the session down in the planned order including when the way up failed. The privileged step
+— starting the system gateway unit — is delegated by a polkit rule granting start and stop on exactly
+that unit-name shape to exactly the `cybou` user, and nothing else; the reasoning and the rejected
+alternative are in [The agent session owner](agent-session.md).
+
+`scripts/test-agent-launch-gate.sh` proves a launch and its teardown on a deployed host and is
+visibly `NOT RUN` anywhere without a gateway template, a configured provider and a user service
+manager. What remains is driving an ACP agent rather than a program, which is B7's remaining half,
+and withdrawing a running lease from outside, which is B11.
 
 ### B8. Agent Card and streaming session
 

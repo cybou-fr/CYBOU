@@ -21,6 +21,13 @@ const LEASE_ROOT: &str = "/run/cybou-agent-leases";
 /// Prefix of the runtime directory systemd creates for one gateway instance.
 const RUNTIME_PREFIX: &str = "/run/cybou-agent-";
 
+/// Prefix of the directory this owner creates for one session's own runtime files.
+///
+/// Separate from the gateway's. That one belongs to systemd, which creates and removes it with the
+/// unit; sharing it would mean two owners for one directory and a broker socket that disappears when
+/// an unrelated unit restarts.
+const SESSION_PREFIX: &str = "/run/cybou-session-";
+
 /// The bounds that belong to one model token rather than to the lease.
 ///
 /// Deliberately not on the profile. A lease says what a person granted; these say how much of it one
@@ -91,13 +98,18 @@ pub enum TeardownStep {
     StopCapsule(String),
     /// End the private model gateway.
     StopGateway(String),
+    /// End the capsule's egress broker.
+    StopEgress(String),
     /// Remove a launch-time file.
     Remove(PathBuf),
 }
 
 /// Every path, unit and file body one launch implies.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SessionPlan {
+    /// The one authority this session runs under, carried so it can be written where the gateway
+    /// reads it. Everything else in this structure was derived from it.
+    pub lease: Lease,
     /// systemd instance name and session identity, the capsule's own UUID.
     pub instance: String,
     /// Where the authoritative lease is written for the gateway to read.
@@ -116,6 +128,14 @@ pub struct SessionPlan {
     pub model_token: PathBuf,
     /// The transient unit the capsule itself runs under.
     pub capsule_unit: String,
+    /// The directory this owner creates for the session's own runtime files.
+    pub session_runtime: PathBuf,
+    /// The one way out of this capsule, if it was granted any network.
+    pub egress_socket: PathBuf,
+    /// The transient unit this session's egress broker runs under.
+    pub egress_unit: String,
+    /// Exactly the hosts the approved grant permits, for the broker that decides by name.
+    pub hosts: Vec<String>,
     /// When the lease runs out. The deadline the kernel is given, not a timer anybody watches.
     pub expires_at: OffsetDateTime,
 }
@@ -145,9 +165,11 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
     // holds is a session whose units cannot be traced back to it from the manager's list.
     let instance = launch.lease.grant().capsule_id.to_string();
     let runtime = PathBuf::from(format!("{RUNTIME_PREFIX}{instance}"));
+    let session_runtime = PathBuf::from(format!("{SESSION_PREFIX}{instance}"));
     let root = Path::new(LEASE_ROOT);
 
     Ok(SessionPlan {
+        lease: launch.lease.clone(),
         lease_file: root.join(format!("{instance}.lease")),
         launch_file: root.join(format!("{instance}.env")),
         launch_environment: launch_environment(launch),
@@ -156,6 +178,10 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
         model_token: runtime.join("model-token"),
         gateway_runtime: runtime,
         capsule_unit: cybou_capsule::unit_name(&spec),
+        egress_socket: session_runtime.join("egress.sock"),
+        egress_unit: format!("cybou-egress-{instance}"),
+        hosts: launch.lease.grant().network.hosts.clone(),
+        session_runtime,
         expires_at: launch.lease.expires_at(),
         instance,
     })
@@ -192,6 +218,8 @@ impl SessionPlan {
         vec![
             TeardownStep::StopCapsule(self.capsule_unit.clone()),
             TeardownStep::StopGateway(self.gateway_unit.clone()),
+            TeardownStep::StopEgress(self.egress_unit.clone()),
+            TeardownStep::Remove(self.egress_socket.clone()),
             TeardownStep::Remove(self.launch_file.clone()),
             TeardownStep::Remove(self.lease_file.clone()),
         ]
@@ -272,6 +300,12 @@ mod tests {
         assert!(plan.launch_file.to_string_lossy().contains(&plan.instance));
         assert!(plan.model_socket.starts_with(&plan.gateway_runtime));
         assert!(plan.model_token.starts_with(&plan.gateway_runtime));
+        assert!(plan.egress_unit.contains(&plan.instance));
+        assert!(plan.egress_socket.starts_with(&plan.session_runtime));
+        assert!(
+            !plan.session_runtime.starts_with(&plan.gateway_runtime),
+            "the owner's directory and systemd's are not the same directory"
+        );
     }
 
     #[test]
@@ -321,12 +355,17 @@ mod tests {
             TeardownStep::StopCapsule(plan.capsule_unit.clone())
         );
         assert_eq!(
-            steps[1],
-            TeardownStep::StopGateway(plan.gateway_unit.clone())
+            &steps[1..3],
+            &[
+                TeardownStep::StopGateway(plan.gateway_unit.clone()),
+                TeardownStep::StopEgress(plan.egress_unit.clone()),
+            ],
+            "the surfaces the capsule was using go after the capsule itself"
         );
         assert_eq!(
-            &steps[2..],
+            &steps[3..],
             &[
+                TeardownStep::Remove(plan.egress_socket.clone()),
                 TeardownStep::Remove(plan.launch_file.clone()),
                 TeardownStep::Remove(plan.lease_file.clone()),
             ],

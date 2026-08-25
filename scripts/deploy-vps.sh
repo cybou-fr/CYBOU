@@ -48,6 +48,8 @@ cybou_ssh "
     cybou-shelld
     cybou-actiond
     cybou-executord
+    cybou-agentd
+    cybou-egressd
   )
   for daemon in \"\${DAEMONS[@]}\"; do
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
@@ -160,7 +162,14 @@ cybou_ssh "
   sudo install -m 0644 systemd/system/cybou-authd.service \
     systemd/system/cybou-executord.service systemd/system/cybou-agent-gateway@.service \
     /etc/systemd/system/
-  sudo install -d -m 0750 -o root -g cybou /run/cybou-agent-leases
+  # The session owner writes the lease and the launch file here; systemd reads them back as root
+  # through LoadCredential and EnvironmentFile. Owned by cybou, because the owner writing its own
+  # session files is not a privilege boundary — the boundary is the provider credential, which stays
+  # root-only and never appears here.
+  sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
+  # The one privileged step of a launch. Start and stop, that unit template, that user, nothing else.
+  sudo install -d -m 0755 /etc/polkit-1/rules.d
+  sudo install -m 0644 debian/cybou-agent-gateway.rules /etc/polkit-1/rules.d/50-cybou.rules
   # Provider routing is operator policy and the master key is a systemd credential. Deployment
   # creates fail-closed placeholders once, never replaces configured values, and never starts a
   # per-capsule gateway by itself.

@@ -28,13 +28,16 @@
 //! ## Two halves, on purpose
 //!
 //! [`plan`] is pure: given one launch it produces every path, unit name and file body that launch
-//! implies, and the ordered teardown that undoes it. [`session`] is pure: it tracks what has
-//! happened to a session and refuses transitions that would misreport it. The binary does the part
-//! that touches a filesystem and a service manager, and it does nothing this crate has not already
-//! described — so what a session did is answerable by reading rather than by running.
+//! implies, and the ordered teardown that undoes it. [`runtime`] is pure: it produces the exact
+//! commands that carry a plan out, as data. [`session`] is pure: it tracks what has happened to a
+//! session and refuses transitions that would misreport it. The binary does the part that touches a
+//! filesystem and a service manager, and it does nothing these modules have not already described —
+//! so what a session did is answerable by reading rather than by running.
 
 pub mod plan;
+pub mod runtime;
 pub mod session;
 
 pub use plan::{CannotPlan, Ceilings, Launch, SessionPlan, TeardownStep};
+pub use runtime::HostPrograms;
 pub use session::{Session, SessionEnd, SessionState};
