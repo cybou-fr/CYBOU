@@ -62,16 +62,17 @@ well-known names of a system that is already running:
 dbus-run-session -- bash scripts/test-multi-daemon-integration.sh
 ```
 
-That script starts all twelve, waits for each bus name, and asserts the properties listed in
-[Testing](TESTING.md). It is the fastest way to see the whole Mind alive.
+That script starts every owner in its integration surface, waits for each bus name, and asserts the
+properties listed in [Testing](TESTING.md). It is the fastest way to see the whole Mind alive.
 
 ## What each artifact is
 
 | Artifact | What it is |
 |---|---|
+| `cybou-acp` | deployed read-only upstream registry browser; the ACP client is also its library |
 | `cybou-eventd` | the single canonical Journal writer and `org.cybou.Mind.Event1` |
 | the remaining Mind `cybou-*d` processes | one cognitive owner each, one D-Bus name each |
 | `cybou-web-gateway` | read-only HTTP boundary, loopback only |
-| `cybou-actiond` | user-bus Action1 lifecycle and authorization owner; no Body adapter |
+| `cybou-actiond` | unprivileged Action1 lifecycle owner on the system transport; no Body adapter |
 | `cybou-executord` | root system-bus Body service with three typed adapters; no policy |
 | `living-canvas` | the Rust/WASM frontend, shared by the browser and the desktop shell |

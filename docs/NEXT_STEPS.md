@@ -188,8 +188,14 @@ grant is compiled **once** into a kernel policy and the kernel enforces it. Cons
 
 ### B2. ACP client and registry browser
 
-Speak ACP to an agent process, and list what the public registry offers. The registry is upstream;
-Cybou does not maintain a catalogue of its own.
+**Done.** `cybou-acp` uses the official Rust SDK to negotiate stable ACP v1 over process stdio and
+projects the agent identity, authentication methods and capabilities. Its read-only browser fetches
+the canonical upstream index, bounds and validates the response, records when it was observed, and
+searches it locally. It neither installs a distribution nor keeps a Cybou catalogue. The gate uses
+a disposable fake peer and also requires an unsupported wire version to be refused.
+
+Authentication, `session/new`, installation and running a real registry agent belong to the later
+agent-pack/session stages; B2 deliberately grants none of them.
 
 ### B3. Standing capability lease
 

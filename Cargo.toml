@@ -3,6 +3,7 @@
 
 [workspace]
 members = [
+    "crates/cybou-acp",
     "crates/cybou-authd",
     "crates/cybou-actiond",
     "crates/cybou-capsule",
@@ -49,6 +50,7 @@ license = "MIT"
 repository = "https://github.com/cybou-fr/CYBOU"
 
 [workspace.dependencies]
+agent-client-protocol = "2.0.0"
 cybou-jailfs = { path = "crates/cybou-jailfs" }
 cybou-shelld = { path = "crates/cybou-shelld" }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -59,6 +61,7 @@ chacha20poly1305 = "0.10.1"
 getrandom = "0.2.15"
 async-trait = "0.1.92"
 axum = "0.8.9"
+reqwest = { version = "0.12.23", default-features = false, features = ["rustls-tls"] }
 ciborium = "0.2.2"
 http-body-util = "0.1.5"
 futures-core = "0.3.31"

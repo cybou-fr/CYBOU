@@ -174,6 +174,25 @@ sudo cybou-action-policy none
 The first command is a real unattended authorization decision. The second removes every standing
 grant.
 
+## What proves the ACP client boundary
+
+```bash
+bash scripts/test-acp-gate.sh
+```
+
+The gate launches a disposable fake agent, requires the client to send the stable ACP v1
+`initialize` request over stdio, and checks that identity, authentication methods and capabilities
+come back through the official SDK. A second peer selects an unsupported wire version and must be
+refused. Registry parsing is covered by native tests, including duplicate identities and manifests
+with no distribution. The mutable public index is not a CI dependency; a deliberate live read is:
+
+```bash
+cargo run -p cybou-acp -- registry codex
+```
+
+That command fetches only the canonical ACP registry and executes none of the distribution metadata
+it receives.
+
 ## What proves continuity under systemd
 
 ```bash

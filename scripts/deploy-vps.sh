@@ -51,6 +51,9 @@ cybou_ssh "
   for daemon in \"\${DAEMONS[@]}\"; do
     sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/\"\$daemon\" \"/usr/libexec/cybou/\$daemon\"
   done
+  # The installed ACP command is discovery-only. Process probing remains a development example so
+  # a registry entry cannot accidentally be launched outside an Agent Capsule.
+  sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/cybou-acp /usr/bin/cybou-acp
 
   # Install Living Canvas web assets by replacing the directory, not by merging into it.
   #

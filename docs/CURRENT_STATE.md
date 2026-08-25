@@ -564,6 +564,26 @@ and restarts Action1. An invalid list leaves the previous policy byte-for-byte i
 installing or upgrading grants nothing; unattended authority appears only after an operator runs
 that explicit command.
 
+## ACP discovery boundary
+
+`cybou-acp` now speaks stable ACP v1 to an agent subprocess over stdio using the upstream Rust SDK.
+The implemented exchange is deliberately only `initialize`: it records the negotiated wire
+version, implementation identity, authentication methods and advertised capabilities, and refuses
+an agent that selects an unsupported version. The process configuration passed to this library must
+be a capsule entrypoint; the protocol client is not a sandbox and no production command exposes a
+raw host-process launcher.
+
+The deployed `cybou-acp registry` command exposes only that read-only browser. The handshake probe
+is a development example and is not installed on the VPS.
+
+The registry browser fetches the canonical public index at
+`https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json` over HTTPS, with a fifteen
+second deadline and an eight MiB response ceiling. Required manifest fields, unique identities and
+at least one distribution declaration are checked before an entry is presented. Search is local and
+deterministic. Distribution commands, arguments, environment declarations and URLs remain inert
+upstream metadata: B2 discovers them and installs nothing. Every snapshot carries its source and
+observation time because `latest` is mutable.
+
 **A watched thing has four states, and three of them are not silence.** `Observed`, `NeverRead`,
 `ReadFailed` and `Stale`. A declared thing that produced no reading used to be simply absent from
 every surface, which reads exactly like a thing nobody declared — and the operator who declared a
@@ -810,6 +830,7 @@ bash scripts/test-multi-daemon-integration.sh
 bash scripts/test-capsule-gate.sh
 bash scripts/test-egress-gate.sh
 bash scripts/test-action-gate.sh
+bash scripts/test-acp-gate.sh
 python3 scripts/validate-cognitive-docs.py .
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py
@@ -830,6 +851,7 @@ mentioned look identical to a reader.
 | | |
 |---|---|
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
+| Agent installation and session | ACP initialization and registry discovery exist; authentication, installation, `session/new` and prompts do not |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |
@@ -846,6 +868,8 @@ mentioned look identical to a reader.
   closed, but durable proposal/decision/attempt recording through Event1 is still to be wired.
 - **Confirmation has no operator surface yet.** A decision may require confirmation and therefore
   produces no permit; only an explicit standing policy can currently reach unattended execution.
+- **ACP has no live agent pack yet.** The client is proven against a protocol peer and the public
+  registry is read live, but no registry distribution has been installed or run inside a capsule.
 - **The context projection has no checkpoint.** It replays from the Journal on every start. Correct,
   and slower than it needs to be on a long biography.
 - **`Predictor1` is domain-neutral.** It forecasts a level — where a subject sits relative to its own
