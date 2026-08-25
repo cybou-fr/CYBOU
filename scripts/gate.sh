@@ -93,6 +93,22 @@ case "$capsule_status" in
     *) exit "$capsule_status" ;;
 esac
 
+# ADR-0042 step ten. Exit 3 means there was nothing here to speak to a Unix socket with, which is a
+# check that did not run rather than one that passed.
+announce "egress broker refusals"
+failed="egress broker refusals"
+egress_status=0
+bash scripts/test-egress-gate.sh || egress_status=$?
+case "$egress_status" in
+    0) failed="" ;;
+    3)
+        announce "egress broker refusals not run: see the note above"
+        skipped="$skipped egress-broker-refusals"
+        failed=""
+        ;;
+    *) exit "$egress_status" ;;
+esac
+
 # Licensing headers, because CI runs this and a gate that claims to be every check and is not is the
 # same defect as a check whose failure is invisible. Skipped with a said reason rather than silently
 # when the tool is absent: an absent check must not look like a passed one.

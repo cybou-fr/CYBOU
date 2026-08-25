@@ -79,6 +79,17 @@ LAYERS: list[tuple[str, set[str]]] = [
 #: from holding a piece of what it was built to stay outside of.
 FACULTIES = {"cybou-model-brokerd"}
 
+#: Crates that carry out what a governance crate permits, and which it may therefore never name.
+#:
+#: The same split as `cybou-actiond` and `cybou-executord`, one layer down. `cybou-capsule` decides
+#: what an agent may reach; `cybou-egressd` is the thing that connects it. A dependency from the
+#: decider to the doer is how "deciding" quietly becomes "arranging", and it is the kind of edge
+#: somebody adds for a good reason — the broker wanting a type, the decider wanting to test against
+#: a real connection — which is why it is checked here rather than remembered.
+#:
+#: The other direction is fine and is the point: the broker reads a grant.
+ENFORCERS = {"cybou-egressd"}
+
 #: What each layer owns, for the error message. An operator reading a failure should not have to
 #: open the ADR to know what was crossed.
 OWNS = {
@@ -118,6 +129,18 @@ def main() -> int:
 
     for manifest in sorted(CRATES.glob("*/Cargo.toml")):
         crate = manifest.parent.name
+        here = layer_of(crate)
+        if here is not None and OWNS.get(here[1]) == OWNS["governance"]:
+            checked += 1
+            for dependency in sorted(path_dependencies(manifest)):
+                if dependency in ENFORCERS:
+                    print(
+                        f"error: {crate} decides what may be done and depends on {dependency}, "
+                        f"which does it. A decider that can name its enforcer is one refactor "
+                        f"away from being the thing that acts."
+                    )
+                    violations += 1
+
         if crate in FACULTIES:
             checked += 1
             for dependency in sorted(path_dependencies(manifest)):

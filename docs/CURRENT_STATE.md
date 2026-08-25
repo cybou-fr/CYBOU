@@ -424,6 +424,50 @@ Two filters, because one filter has one action for everything it matches. Seccom
 installed filters and returns the most severe answer, so a kill filter and an `ENOSYS` filter applied
 in turn give each call the answer meant for it.
 
+**There is a way out of a capsule now, and it decides by name.** `cybou-egressd` speaks `CONNECT`
+over a Unix socket, checks the host against the grant, and then does the resolving itself.
+
+That last clause is the whole design. A grant says `github.com`; a firewall works in addresses; and
+turning one into the other means owning a policy for how long a resolution is good for, what happens
+when it changes underneath you, and what a name means when it answers differently to every caller.
+Every one of those is somewhere being wrong is silent — the rule still loads, the counters still
+increment, and the capsule reaches somewhere nobody granted. Here there is one resolution, it happens
+after the decision, and the capsule neither performs nor supplies one, so there is no window between
+checking a name and using it.
+
+An address where a name belongs is refused before any grant is consulted, and that refusal is about
+grammar rather than permission: `CONNECT 140.82.121.4:443` cannot be checked against a grant at all,
+and accepting it would make the name in a grant decoration.
+
+The second check is not about the grant. A name is controlled by whoever runs it and can answer with
+anything, including `169.254.169.254` — where every cloud host serves its own credentials to whatever
+asks. A broker that checked the name correctly and connected there would have done everything right
+and handed over the machine. So every address a granted name resolves to is checked against loopback,
+link-local and the unspecified address, and it is every address rather than the first, because a name
+that answers with the metadata endpoint second would otherwise be reached on a retry. Private ranges
+are permitted: an operator who grants an internal host name means it, and a rule people work around
+is a rule that ends up switched off.
+
+It is a tunnel and not a proxy. After the decision it copies bytes it does not interpret, so the
+capsule's traffic is between the capsule and what it was granted, and the broker is not a place that
+traffic could be read.
+
+Eight checks against a running broker, over the socket a capsule would use, and the two that matter
+most are mutation-tested: removing the address refusal fails two of them, and removing the
+resolved-address check fails the one where a granted name points back at the host.
+
+**The last hop is missing, and it is not a detail.** A capsule's network namespace has no route to
+anything — the point of it — and ordinary clients cannot be pointed at a proxy on a Unix socket.
+Something has to listen inside the capsule's namespace and forward, which means a process inside the
+capsule and a decision about what starts it and what counts it against the task ceiling. Until then
+a `NetworkGrant` naming hosts still compiles to `Network::Denied`: the name is in the spec and is not
+honoured, and the gate checks the denial rather than the naming.
+
+`validate-organ-layering.py` now refuses a governance crate that names `cybou-egressd`. The capsule
+crate decides what an agent may reach and the broker connects it — the same split as `cybou-actiond`
+and `cybou-executord`, one layer down, and the kind of edge somebody adds for a good reason, which is
+why it is checked rather than remembered.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

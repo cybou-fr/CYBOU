@@ -574,6 +574,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-egressd"
+version = "0.1.0"
+dependencies = [
+ "cybou-capsule",
+ "tokio",
+]
+
+[[package]]
 name = "cybou-epistemicd"
 version = "0.1.0"
 dependencies = [

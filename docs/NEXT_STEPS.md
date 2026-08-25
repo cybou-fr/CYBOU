@@ -139,12 +139,26 @@ done  6. no nested user namespaces
 done  7. cgroup as the physical budget, including TasksMax; lifetime as the unit's lifetime
 done  8. lease expiry freezes or kills the cgroup — never an ACP stop message
 done  9. network deny-all: a fresh namespace with loopback and no route
-     10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
+half 10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
 ```
 
-Nine of the ten hold. **Step 10, the egress broker, is what remains**, and until it exists a
-`NetworkGrant` naming hosts is compiled to a denial of all of them — named in the spec, not honoured,
-and the gate checks the denial rather than the naming.
+Nine of the ten hold, and the tenth is half done. `cybou-egressd` exists, decides by name, resolves
+for itself, refuses an address where a name belongs, and refuses a granted name that resolves back to
+the host — each of those checked against a running broker over the socket a capsule would use, and
+each mutation-tested.
+
+**What is missing is the last hop, and it is not a detail.** A capsule's network namespace has no
+route to anything, which is the point; the broker listens on a Unix socket; and ordinary clients —
+`curl`, `git`, a language runtime's HTTP library — cannot be pointed at a proxy on a Unix socket.
+Something has to listen on `127.0.0.1` *inside* the capsule's namespace and forward to that socket,
+which means a process inside the capsule and therefore a decision about what starts it and what
+counts it against the task ceiling. Until that is made, `NetworkGrant` still compiles to
+`Network::Denied` and the gate checks the denial rather than the naming.
+
+The layering rule that keeps the two apart is now checked rather than remembered: a governance crate
+that names `cybou-egressd` fails `validate-organ-layering.py`. `cybou-capsule` decides what an agent
+may reach and `cybou-egressd` connects it, which is the `cybou-actiond` / `cybou-executord` split one
+layer down.
 
 Two of the nine were not the tidying-up they looked like. Step 3 was not only defence in depth:
 bubblewrap builds the capsule's root as a writable tmpfs, so until Landlock was applied an agent could
