@@ -125,10 +125,29 @@ credential creation; or a profile authorization that has to be enforced above th
 those means the delegation has stopped being "start a process that already runs as this user", and
 the typed boundary is then the smaller thing to build.
 
-One adversarial gate is still owed before calling this production-ready: a malicious lease pathname
-or symlink at `/run/cybou-agent-leases/<instance>.lease` must not be able to make the root-side
-`LoadCredential=` expose an unrelated root-owned file. systemd ignores symlinks for directory
-credential sources, but a single-file source deserves the test rather than the assumption.
+### The credential boundary, and a hole that was in it
+
+That gate was owed, and it found something. `LoadCredential=` is read by the service manager, which
+is root, and on systemd 257 it **follows symlinks**: a credential whose source is a symlink to a
+root-only `0600` file delivers that file's contents to a service running as `nobody`. Measured, not
+assumed — `scripts/test-credential-boundary-gate.sh` demonstrates it, and records the observation
+whichever way it comes out, because the answer is a property of a version.
+
+The gateway loaded its lease that way, out of `/run/cybou-agent-leases`, which is owned by the
+unprivileged user that writes leases into it. Together those two facts meant `cybou` could put a
+symlink where its lease goes, name any root-only file, and have root read it out into a process it
+controls — the proxy master key among the reachable targets, which is the one secret this whole
+arrangement exists to keep out of `cybou`'s reach. Neither the cybou-owned directory nor the polkit
+rule that lets `cybou` start the unit is enough alone; the two combine.
+
+The lease is no longer a credential. The gateway is told a path and opens it itself, which is the same
+user reading a file it wrote: nothing is crossed and nothing escalates. It refuses a symlink there
+anyway, and that refusal is not a boundary — it is the process declining to treat something other than
+the file the owner wrote as that file.
+
+The master key stays a credential, because its source lives in `/etc/cybou`, which is root-owned and
+where `cybou` cannot put a symlink. The rule the gate now enforces is the general form: nothing root
+reads may come from a path an unprivileged user can replace.
 
 `cybou-agent-gateway@.service` is a *system* unit for exactly one reason: the LiteLLM master key stays
 root-owned and reaches the unprivileged gateway through `LoadCredential` rather than sitting in a file

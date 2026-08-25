@@ -161,7 +161,28 @@ fn parse_sha256(value: &str) -> Result<[u8; 32], String> {
 /// data. Rebuilding an equivalent-looking lease from environment values would produce a second
 /// authority: the two can each be internally valid and still describe different permissions, and
 /// nothing downstream could tell which one the person actually selected.
+///
+/// ## Opened here, and not by the service manager
+///
+/// This used to arrive as a `LoadCredential`. It cannot, and the reason is measured rather than
+/// assumed: the manager reads a credential source as root and follows symlinks, so a symlink at the
+/// lease path delivers the contents of whatever it points at. The launch directory is owned by the
+/// unprivileged user that writes leases into it, which would have made "name a root-only file and
+/// have root read it out" a thing that user could do — the proxy credential this service is handed
+/// among the targets.
+///
+/// Opened here it is the same user reading a file it wrote, so nothing is crossed and nothing
+/// escalates. The check below is therefore not a security boundary; it is this process declining to
+/// treat something other than the file the owner wrote as that file.
 fn load_lease(path: &Path) -> Result<Lease, String> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| format!("inspect {}: {error}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!(
+            "{} is not the regular file a launch writes a lease to",
+            path.display()
+        ));
+    }
     let file = File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
     ciborium::from_reader(BufReader::new(file))
         .map_err(|error| format!("read the lease at {}: {error}", path.display()))

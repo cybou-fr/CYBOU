@@ -22,10 +22,22 @@ RuntimeDirectoryMode=0700
 EnvironmentFile=/etc/cybou/provider.env
 EnvironmentFile=/run/cybou-agent-leases/%i.env
 LoadCredential=litellm-master:/etc/cybou/litellm-master-key
-LoadCredential=lease:/run/cybou-agent-leases/%i.lease
 Environment=CYBOU_LITELLM_MASTER_KEY_FILE=%d/litellm-master
-Environment=CYBOU_AGENT_LEASE_FILE=%d/lease
+Environment=CYBOU_AGENT_LEASE_FILE=/run/cybou-agent-leases/%i.lease
 Environment=CYBOU_AGENT_RUNTIME_DIR=/run/cybou-agent-%i
+
+# The lease is a path this service opens itself, and deliberately not a LoadCredential.
+#
+# LoadCredential is read by the *service manager*, which is root, and it follows symlinks — measured,
+# not assumed: a credential loaded from a symlink to a root-only 0600 file delivers that file's
+# contents to an unprivileged service. Since the session owner runs as cybou and must be able to write
+# its own lease, /run/cybou-agent-leases is cybou-owned, so loading the lease that way would let cybou
+# name any root-only file and have root read it out — the master key below among them, which is the
+# one thing this unit exists to keep out of cybou's reach.
+#
+# Opened by this service instead, it is cybou reading a file cybou wrote. No boundary is crossed and
+# there is nothing to escalate. The master key stays a credential because its source lives in
+# /etc/cybou, which is root-owned and where cybou cannot put a symlink.
 
 ExecStart=/usr/libexec/cybou/cybou-agent-gateway
 Restart=no

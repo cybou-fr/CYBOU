@@ -100,6 +100,22 @@ case "$acp_status" in
     *) exit "$acp_status" ;;
 esac
 
+# What a root service manager will hand an unprivileged service. Exit 3 means there is no system
+# manager here to ask, which is a check that did not run rather than one that passed.
+announce "credential boundary"
+failed="credential boundary"
+credential_status=0
+bash scripts/test-credential-boundary-gate.sh || credential_status=$?
+case "$credential_status" in
+    0) failed="" ;;
+    3)
+        announce "credential boundary not run: no root system manager to ask for a credential"
+        skipped="$skipped credential-boundary"
+        failed=""
+        ;;
+    *) exit "$credential_status" ;;
+esac
+
 # A real daemon, a real bus name, a real service manager. Exit 3 means this host has no user session
 # to run one against, which is a check that did not run rather than one that passed.
 announce "agent runtime ownership"

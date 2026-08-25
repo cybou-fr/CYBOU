@@ -13,8 +13,15 @@ There are four different inputs and they deliberately have different owners:
   argument.
 - `/run/cybou-agent-leases/<instance>.lease` is the standing lease itself, CBOR-encoded, minted once
   by the session owner from the profile a person selected. It carries the capsule UUID, agent,
-  workspace, network grant, resource budget, lifetime, model class and spending ceiling. The gateway
-  reads it; it never rebuilds one.
+  workspace, network grant, resource budget, lifetime, model class and spending policy. The gateway
+  opens it directly and never rebuilds one.
+
+  Deliberately *not* a `LoadCredential`. That is read by the service manager as root and follows
+  symlinks, and this directory is owned by the unprivileged user that writes leases into it — so
+  loading the lease that way would let that user name any root-only file and have root read it out,
+  the master key below included. Opened by the gateway it is the same user reading a file it wrote.
+  `scripts/test-credential-boundary-gate.sh` holds the general rule: nothing root reads may come from
+  a path an unprivileged user can replace.
 - `/run/cybou-agent-leases/<instance>.env` carries what is *not* authority: the task UUID, the
   per-token ceilings and the sensitivity class. It contains no provider secret.
 
