@@ -23,7 +23,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::spec::{Access, KernelCapsuleSpec, Network, Seccomp};
+use crate::spec::{Access, KernelCapsuleSpec, ModelChannel, Network, Seccomp};
 
 /// Where the entry program is bound inside a capsule.
 ///
@@ -40,12 +40,19 @@ pub const ENTRY_INSIDE: &str = "/.cybou-capsule-enter";
 /// Where the capsule-local compatibility bridge is bound read-only.
 pub const EGRESS_BRIDGE_INSIDE: &str = "/.cybou-egress-bridge";
 
+/// Where the capsule-local model compatibility bridge is bound read-only.
+pub const MODEL_BRIDGE_INSIDE: &str = "/.cybou-model-bridge";
+
 /// Host paths chosen when one capsule is started, kept separate from the human grant and its
 /// deterministic kernel spec.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CapsuleRuntimeBindings {
     /// The one broker socket created for this capsule.
     pub egress_socket_host: Option<PathBuf>,
+    /// The model-gateway socket created for this capsule.
+    pub model_socket_host: Option<PathBuf>,
+    /// A private file containing only this capsule's ephemeral lease token.
+    pub model_token_host: Option<PathBuf>,
 }
 
 /// Why a backend could not translate a complete spec into a command.
@@ -55,6 +62,12 @@ pub enum BackendError {
     MissingEgressBridge,
     /// Brokered network was compiled but this capsule has no broker socket.
     MissingEgressSocket,
+    /// A model grant was compiled but no model bridge executable was installed.
+    MissingModelBridge,
+    /// A model grant was compiled but this capsule has no gateway socket.
+    MissingModelSocket,
+    /// A model grant was compiled but this capsule has no lease-token file.
+    MissingModelToken,
 }
 
 impl core::fmt::Display for BackendError {
@@ -66,6 +79,9 @@ impl core::fmt::Display for BackendError {
             Self::MissingEgressSocket => {
                 write!(formatter, "brokered network needs a broker socket")
             }
+            Self::MissingModelBridge => write!(formatter, "a model grant needs a model bridge"),
+            Self::MissingModelSocket => write!(formatter, "a model grant needs a gateway socket"),
+            Self::MissingModelToken => write!(formatter, "a model grant needs a lease-token file"),
         }
     }
 }
@@ -123,6 +139,7 @@ pub trait CapsuleBackend {
 pub struct Bubblewrap {
     entry: PathBuf,
     egress_bridge: Option<PathBuf>,
+    model_bridge: Option<PathBuf>,
 }
 
 impl Bubblewrap {
@@ -132,6 +149,7 @@ impl Bubblewrap {
         Self {
             entry: entry.into(),
             egress_bridge: None,
+            model_bridge: None,
         }
     }
 
@@ -139,6 +157,13 @@ impl Bubblewrap {
     #[must_use]
     pub fn with_egress_bridge(mut self, bridge: impl Into<PathBuf>) -> Self {
         self.egress_bridge = Some(bridge.into());
+        self
+    }
+
+    /// Install the capsule-local transport used only by model-granted specs.
+    #[must_use]
+    pub fn with_model_bridge(mut self, bridge: impl Into<PathBuf>) -> Self {
+        self.model_bridge = Some(bridge.into());
         self
     }
 
@@ -162,6 +187,10 @@ impl CapsuleBackend for Bubblewrap {
         "bwrap, and this project's own cybou-capsule-enter"
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "the security-relevant bwrap argument order is intentionally visible in one translation"
+    )]
     fn command(
         &self,
         spec: &KernelCapsuleSpec,
@@ -221,6 +250,29 @@ impl CapsuleBackend for Bubblewrap {
                     .ok_or(BackendError::MissingEgressSocket)?,
             )),
         };
+        let model = match &spec.model {
+            ModelChannel::Denied => None,
+            ModelChannel::Brokered {
+                proxy_port,
+                socket_inside,
+                token_inside,
+            } => Some((
+                *proxy_port,
+                socket_inside,
+                token_inside,
+                self.model_bridge
+                    .as_ref()
+                    .ok_or(BackendError::MissingModelBridge)?,
+                bindings
+                    .model_socket_host
+                    .as_ref()
+                    .ok_or(BackendError::MissingModelSocket)?,
+                bindings
+                    .model_token_host
+                    .as_ref()
+                    .ok_or(BackendError::MissingModelToken)?,
+            )),
+        };
 
         // The filesystem, in the order the spec lists it: read-only first, the one writable path
         // last, so nothing is layered over it afterwards.
@@ -249,14 +301,24 @@ impl CapsuleBackend for Bubblewrap {
         argv.push("--tmpfs".to_owned());
         argv.push("/tmp".to_owned());
 
-        if let Some((_, socket_inside, _, socket_host)) = brokered {
+        if brokered.is_some() || model.is_some() {
             argv.push("--dir".to_owned());
             argv.push("/run".to_owned());
             argv.push("--dir".to_owned());
             argv.push("/run/cybou".to_owned());
+        }
+        if let Some((_, socket_inside, _, socket_host)) = brokered {
             argv.push("--bind".to_owned());
             argv.push(socket_host.to_string_lossy().into_owned());
             argv.push(socket_inside.to_string_lossy().into_owned());
+        }
+        if let Some((_, socket_inside, token_inside, _, socket_host, token_host)) = model {
+            argv.push("--bind".to_owned());
+            argv.push(socket_host.to_string_lossy().into_owned());
+            argv.push(socket_inside.to_string_lossy().into_owned());
+            argv.push("--ro-bind".to_owned());
+            argv.push(token_host.to_string_lossy().into_owned());
+            argv.push(token_inside.to_string_lossy().into_owned());
         }
 
         // The entry program, read-only, layered over the `/usr` bound above. Last of the binds so
@@ -269,6 +331,11 @@ impl CapsuleBackend for Bubblewrap {
             argv.push("--ro-bind".to_owned());
             argv.push(bridge.to_string_lossy().into_owned());
             argv.push(EGRESS_BRIDGE_INSIDE.to_owned());
+        }
+        if let Some((_, _, _, bridge, _, _)) = model {
+            argv.push("--ro-bind".to_owned());
+            argv.push(bridge.to_string_lossy().into_owned());
+            argv.push(MODEL_BRIDGE_INSIDE.to_owned());
         }
 
         argv.push("--chdir".to_owned());
@@ -306,6 +373,16 @@ impl CapsuleBackend for Bubblewrap {
             argv.push("--egress-socket".to_owned());
             argv.push(socket_inside.to_string_lossy().into_owned());
             argv.push("--egress-port".to_owned());
+            argv.push(proxy_port.to_string());
+        }
+        if let Some((proxy_port, socket_inside, _, _, _, _)) = model {
+            argv.push("--ro".to_owned());
+            argv.push(MODEL_BRIDGE_INSIDE.to_owned());
+            argv.push("--model-bridge".to_owned());
+            argv.push(MODEL_BRIDGE_INSIDE.to_owned());
+            argv.push("--model-socket".to_owned());
+            argv.push(socket_inside.to_string_lossy().into_owned());
+            argv.push("--model-port".to_owned());
             argv.push(proxy_port.to_string());
         }
         argv.push("--".to_owned());
@@ -351,11 +428,14 @@ mod tests {
     fn entering() -> Bubblewrap {
         Bubblewrap::entering_through("/opt/cybou/libexec/cybou-capsule-enter")
             .with_egress_bridge("/opt/cybou/libexec/cybou-egress-bridge")
+            .with_model_bridge("/opt/cybou/libexec/cybou-model-bridge")
     }
 
     fn bindings() -> CapsuleRuntimeBindings {
         CapsuleRuntimeBindings {
             egress_socket_host: Some(PathBuf::from("/run/user/1000/cybou/egress.sock")),
+            model_socket_host: Some(PathBuf::from("/run/user/1000/cybou/model.sock")),
+            model_token_host: Some(PathBuf::from("/run/user/1000/cybou/model-token")),
         }
     }
 
@@ -533,9 +613,15 @@ mod tests {
             writable,
             vec![
                 &"/srv/project".to_owned(),
-                &"/run/user/1000/cybou/egress.sock".to_owned()
+                &"/run/user/1000/cybou/egress.sock".to_owned(),
+                &"/run/user/1000/cybou/model.sock".to_owned()
             ]
         );
+        assert!(argv.windows(3).any(|window| {
+            window[0] == "--ro-bind"
+                && window[1] == "/run/user/1000/cybou/model-token"
+                && window[2] == "/run/cybou/model-token"
+        }));
     }
 
     #[test]

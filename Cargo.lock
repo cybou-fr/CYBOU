@@ -757,6 +757,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-agent-opencode"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "cybou-authd"
 version = "0.1.0"
 dependencies = [
@@ -1007,6 +1014,13 @@ dependencies = [
  "tokio",
  "uuid",
  "zbus",
+]
+
+[[package]]
+name = "cybou-model-bridge"
+version = "0.1.0"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]

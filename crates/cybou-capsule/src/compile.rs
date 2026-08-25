@@ -26,7 +26,8 @@ use std::path::{Path, PathBuf};
 
 use crate::grant::CapsuleGrant;
 use crate::spec::{
-    Access, CgroupLimits, KernelCapsuleSpec, Mount, Namespaces, Network, PathRule, Seccomp,
+    Access, CgroupLimits, KernelCapsuleSpec, ModelChannel, Mount, Namespaces, Network, PathRule,
+    Seccomp,
 };
 
 /// Where the workspace appears inside a capsule.
@@ -41,6 +42,15 @@ pub const EGRESS_SOCKET_INSIDE: &str = "/run/cybou/egress.sock";
 
 /// Ordinary proxy clients are pointed at this capsule-local compatibility listener.
 pub const EGRESS_PROXY_PORT: u16 = 3128;
+
+/// Fixed capsule-side endpoint for the lease-bound model gateway.
+pub const MODEL_SOCKET_INSIDE: &str = "/run/cybou/model.sock";
+
+/// File containing only this capsule's ephemeral model lease token.
+pub const MODEL_TOKEN_INSIDE: &str = "/run/cybou/model-token";
+
+/// OpenAI-compatible endpoint used by agent packs inside the network namespace.
+pub const MODEL_PROXY_PORT: u16 = 3130;
 
 /// Paths a workspace may not be, or be inside, or contain.
 ///
@@ -116,6 +126,10 @@ impl core::error::Error for CannotCompile {}
 ///
 /// Returns [`CannotCompile`] for a workspace that is not absolute, one that would expose something
 /// no capsule may have, or a budget under which nothing could run.
+#[allow(
+    clippy::too_many_lines,
+    reason = "the complete deterministic grant-to-kernel translation stays reviewable in one place"
+)]
 pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile> {
     let workspace = &grant.workspace.root;
     if !workspace.is_absolute() {
@@ -133,9 +147,11 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
     if grant.budget.tasks_max == 0 {
         return Err(CannotCompile::BudgetPermitsNothing("processes"));
     }
-    if !grant.network.hosts.is_empty() && grant.budget.tasks_max < 2 {
+    let infrastructure_tasks =
+        u32::from(!grant.network.hosts.is_empty()) + u32::from(grant.model.is_some());
+    if grant.budget.tasks_max <= infrastructure_tasks {
         return Err(CannotCompile::BudgetPermitsNothing(
-            "processes after reserving one for the egress bridge",
+            "processes after reserving capsule bridge tasks",
         ));
     }
     // A CPU quota of zero is not a small share, it is none: the cgroup would hold the capsule at a
@@ -195,6 +211,16 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
             access: Access::ReadWrite,
         });
     }
+    if grant.model.is_some() {
+        landlock.push(PathRule {
+            path: PathBuf::from(MODEL_SOCKET_INSIDE),
+            access: Access::ReadWrite,
+        });
+        landlock.push(PathRule {
+            path: PathBuf::from(MODEL_TOKEN_INSIDE),
+            access: Access::ReadOnly,
+        });
+    }
 
     Ok(KernelCapsuleSpec {
         capsule_id: grant.capsule_id,
@@ -220,6 +246,15 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
                 proxy_port: EGRESS_PROXY_PORT,
                 socket_inside: PathBuf::from(EGRESS_SOCKET_INSIDE),
             }
+        },
+        model: if grant.model.is_some() {
+            ModelChannel::Brokered {
+                proxy_port: MODEL_PROXY_PORT,
+                socket_inside: PathBuf::from(MODEL_SOCKET_INSIDE),
+                token_inside: PathBuf::from(MODEL_TOKEN_INSIDE),
+            }
+        } else {
+            ModelChannel::Denied
         },
         working_directory: inside,
     })
@@ -420,12 +455,27 @@ mod tests {
         assert_eq!(
             compile(&grant),
             Err(CannotCompile::BudgetPermitsNothing(
-                "processes after reserving one for the egress bridge"
+                "processes after reserving capsule bridge tasks"
             ))
         );
 
         grant.network = NetworkGrant::default();
+        grant.model = None;
         assert!(compile(&grant).is_ok(), "one task can hold one agent");
+    }
+
+    #[test]
+    fn a_model_grant_compiles_to_transport_and_ephemeral_authority_paths() {
+        let spec = compile(&grant_at("/srv/project")).expect("compiles");
+        assert_eq!(
+            spec.model,
+            ModelChannel::Brokered {
+                proxy_port: MODEL_PROXY_PORT,
+                socket_inside: PathBuf::from(MODEL_SOCKET_INSIDE),
+                token_inside: PathBuf::from(MODEL_TOKEN_INSIDE),
+            }
+        );
+        assert!(!format!("{spec:?}").contains("provider-key"));
     }
 
     #[test]

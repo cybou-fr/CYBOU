@@ -271,6 +271,21 @@ One agent, end to end, inside a capsule, against a real provider — and only af
 twice. The candidate is the one with the widest existing provider support and a custom-endpoint
 option, because it exercises the gateway without needing anything special from the agent.
 
+**Implementation and credential-free gate done; live provider gate remains.** The first pack pins
+OpenCode 1.18.23 to the ACP-registry SHA-256 for each supported Linux architecture and starts its
+official `opencode acp` entrypoint. A model grant compiles into a second capsule-local loopback
+bridge backed by a private host Unix socket. The only authority mounted into the capsule is a
+read-only ephemeral lease-token file; provider credentials stay in the host worker and never appear
+in the pack configuration or process arguments. The Debian gate verifies the digest, ACP v1
+handshake, no-route namespace, read-only installation and real capsule plumbing.
+
+`scripts/test-opencode-pack-live.sh` is the non-optional completion criterion: it needs a running
+per-capsule gateway socket and matching ephemeral token, sends a prompt through OpenCode from inside
+the capsule, and requires the provider's answer. The active VPS currently has no LiteLLM/provider
+unit, environment name or `/etc/cybou` provider configuration, so that gate is visibly `NOT RUN` and
+B7 is not marked Done. Provisioning that operator-owned credential and worker service remains a
+deployment decision rather than a secret silently copied by this pack.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

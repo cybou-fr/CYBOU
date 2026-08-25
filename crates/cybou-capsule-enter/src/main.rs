@@ -47,6 +47,8 @@ struct Request {
     writable: Vec<PathBuf>,
     /// Optional capsule-local compatibility transport.
     egress: Option<EgressBridge>,
+    /// Optional capsule-local model compatibility transport.
+    model: Option<EgressBridge>,
     /// The agent, and its arguments.
     program: Vec<String>,
 }
@@ -75,7 +77,10 @@ fn run() -> Result<(), String> {
     restrict(&request)?;
     refuse_reshaping()?;
     if let Some(egress) = &request.egress {
-        start_egress_bridge(egress)?;
+        start_bridge("egress", egress)?;
+    }
+    if let Some(model) = &request.model {
+        start_bridge("model", model)?;
     }
     execute(&request.program)
 }
@@ -91,6 +96,9 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Request, String> {
     let mut egress_bridge = None;
     let mut egress_socket = None;
     let mut egress_port = None;
+    let mut model_bridge = None;
+    let mut model_socket = None;
+    let mut model_port = None;
     let mut arguments = arguments.peekable();
 
     while let Some(argument) = arguments.next() {
@@ -116,6 +124,26 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Request, String> {
                     return Err("zero is not an egress port".to_owned());
                 }
                 egress_port = Some(port);
+            }
+            "--model-bridge" => {
+                model_bridge = Some(PathBuf::from(
+                    arguments.next().ok_or("--model-bridge wants a path")?,
+                ));
+            }
+            "--model-socket" => {
+                model_socket = Some(PathBuf::from(
+                    arguments.next().ok_or("--model-socket wants a path")?,
+                ));
+            }
+            "--model-port" => {
+                let value = arguments.next().ok_or("--model-port wants a number")?;
+                let port = value
+                    .parse::<u16>()
+                    .map_err(|_| format!("{value} is not a port"))?;
+                if port == 0 {
+                    return Err("zero is not a model port".to_owned());
+                }
+                model_port = Some(port);
             }
             "--" => {
                 program.extend(arguments.by_ref());
@@ -146,10 +174,20 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Request, String> {
         }),
         _ => return Err("egress bridge, socket and port must be supplied together".to_owned()),
     };
+    let model = match (model_bridge, model_socket, model_port) {
+        (None, None, None) => None,
+        (Some(program), Some(socket), Some(port)) => Some(EgressBridge {
+            program,
+            socket,
+            port,
+        }),
+        _ => return Err("model bridge, socket and port must be supplied together".to_owned()),
+    };
     Ok(Request {
         readable,
         writable,
         egress,
+        model,
         program,
     })
 }
@@ -158,36 +196,38 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Request, String> {
 ///
 /// It inherits Landlock and seccomp because both were applied before this fork. The parent then
 /// becomes the agent, so there is no third supervisor and both processes count under one `TasksMax`.
-fn start_egress_bridge(egress: &EgressBridge) -> Result<(), String> {
-    let mut child = std::process::Command::new(&egress.program)
+fn start_bridge(kind: &str, bridge: &EgressBridge) -> Result<(), String> {
+    let mut child = std::process::Command::new(&bridge.program)
         .arg("--port")
-        .arg(egress.port.to_string())
+        .arg(bridge.port.to_string())
         .arg("--socket")
-        .arg(&egress.socket)
+        .arg(&bridge.socket)
         .spawn()
         .map_err(|why| {
             format!(
-                "could not start egress bridge {}: {why}",
-                egress.program.display()
+                "could not start {kind} bridge {}: {why}",
+                bridge.program.display()
             )
         })?;
-    let address = (std::net::Ipv4Addr::LOCALHOST, egress.port);
+    let address = (std::net::Ipv4Addr::LOCALHOST, bridge.port);
     for _ in 0..100 {
         if std::net::TcpStream::connect(address).is_ok() {
             return Ok(());
         }
         if let Some(status) = child
             .try_wait()
-            .map_err(|why| format!("could not inspect the egress bridge: {why}"))?
+            .map_err(|why| format!("could not inspect the {kind} bridge: {why}"))?
         {
             return Err(format!(
-                "egress bridge stopped before it was ready: {status}"
+                "{kind} bridge stopped before it was ready: {status}"
             ));
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
     let _ = child.kill();
-    Err("egress bridge did not become ready within one second".to_owned())
+    Err(format!(
+        "{kind} bridge did not become ready within one second"
+    ))
 }
 
 /// Apply Landlock to this process, so the agent inherits it and cannot shed it.
@@ -301,6 +341,7 @@ mod tests {
         assert_eq!(request.readable, vec![PathBuf::from("/usr")]);
         assert_eq!(request.writable, vec![PathBuf::from("/workspace")]);
         assert!(request.egress.is_none());
+        assert!(request.model.is_none());
     }
 
     #[test]
@@ -357,6 +398,39 @@ mod tests {
                 "/workspace",
                 "--egress-port",
                 "3128",
+                "--",
+                "agent"
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn model_bridge_plumbing_is_all_or_nothing() {
+        let complete = parse_of(&[
+            "--ro",
+            "/usr",
+            "--rw",
+            "/workspace",
+            "--model-bridge",
+            "/.cybou-model-bridge",
+            "--model-socket",
+            "/run/cybou/model.sock",
+            "--model-port",
+            "3130",
+            "--",
+            "agent",
+        ])
+        .expect("complete bridge");
+        assert_eq!(complete.model.expect("model").port, 3130);
+        assert!(
+            parse_of(&[
+                "--ro",
+                "/usr",
+                "--rw",
+                "/workspace",
+                "--model-port",
+                "3130",
                 "--",
                 "agent"
             ])

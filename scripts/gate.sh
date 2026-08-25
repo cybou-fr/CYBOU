@@ -81,6 +81,7 @@ step "standing lease mint"   bash scripts/test-standing-lease-gate.sh
 step "agent model gateway"   bash scripts/test-model-gateway-gate.sh
 step "LiteLLM worker"        bash scripts/test-litellm-worker-gate.sh
 step "provider catalogue"    bash scripts/test-provider-catalogue-gate.sh
+step "OpenCode agent pack"   bash scripts/test-opencode-pack-gate.sh
 
 # ADR-0042 G1. Exit 3 means bubblewrap is absent, which is a check that did not run rather than one
 # that passed — the distinction this whole script exists to keep.

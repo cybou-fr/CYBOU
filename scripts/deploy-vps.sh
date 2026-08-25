@@ -54,6 +54,16 @@ cybou_ssh "
   # The installed ACP command is discovery-only. Process probing remains a development example so
   # a registry entry cannot accidentally be launched outside an Agent Capsule.
   sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/cybou-acp /usr/bin/cybou-acp
+  # Capsule transports are infrastructure, not tools the agent grants itself. The OpenCode pack is
+  # fetched from its immutable upstream release and digest-checked before it enters the read-only
+  # /usr view shared by capsules. No provider credential is installed here.
+  sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/cybou-capsule-enter \
+    /usr/libexec/cybou/cybou-capsule-enter
+  sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/cybou-egress-bridge \
+    /usr/libexec/cybou/cybou-egress-bridge
+  sudo install -m 0755 '$CYBOU_VPS_TARGET'/release/cybou-model-bridge \
+    /usr/libexec/cybou/cybou-model-bridge
+  sudo bash scripts/install-opencode-pack.sh
 
   # Install Living Canvas web assets by replacing the directory, not by merging into it.
   #

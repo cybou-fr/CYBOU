@@ -65,6 +65,6 @@ pub use grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspac
 pub use lease::{Ended, Lease, decide_under_lease};
 pub use profile::{CannotIssueLease, CapabilityProfile, LeaseRequest, ProfileId, issue_lease};
 pub use reach::Reach;
-pub use spec::KernelCapsuleSpec;
+pub use spec::{KernelCapsuleSpec, ModelChannel};
 pub use supervise::{under_budget, unit_name};
 pub use verdict::{Refusal, Verdict, decide};

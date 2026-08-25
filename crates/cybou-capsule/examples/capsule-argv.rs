@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use cybou_capsule::backend::{Bubblewrap, CapsuleBackend, CapsuleRuntimeBindings};
 use cybou_capsule::compile::compile;
-use cybou_capsule::grant::{CapsuleGrant, NetworkGrant, ResourceBudget, Workspace};
+use cybou_capsule::grant::{CapsuleGrant, ModelGrant, NetworkGrant, ResourceBudget, Workspace};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
@@ -49,7 +49,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             tasks_max: 64,
             lifetime: time::Duration::minutes(2),
         },
-        model: None,
+        model: std::env::var("CYBOU_MODEL_CLASS")
+            .ok()
+            .map(|class| ModelGrant {
+                class,
+                spend_limit: 100,
+            }),
         tools: Vec::new(),
         may_execute: true,
     };
@@ -70,6 +75,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|_| "CYBOU_EGRESS_SOCKET must name this capsule's broker socket")?;
         backend = backend.with_egress_bridge(bridge);
         bindings.egress_socket_host = Some(PathBuf::from(socket));
+    }
+    if grant.model.is_some() {
+        let bridge = std::env::var("CYBOU_MODEL_BRIDGE")
+            .map_err(|_| "CYBOU_MODEL_BRIDGE must name the model bridge on this host")?;
+        let socket = std::env::var("CYBOU_MODEL_SOCKET")
+            .map_err(|_| "CYBOU_MODEL_SOCKET must name this capsule's gateway socket")?;
+        let token = std::env::var("CYBOU_MODEL_TOKEN_FILE")
+            .map_err(|_| "CYBOU_MODEL_TOKEN_FILE must name this capsule's lease-token file")?;
+        backend = backend.with_model_bridge(bridge);
+        bindings.model_socket_host = Some(PathBuf::from(socket));
+        bindings.model_token_host = Some(PathBuf::from(token));
     }
     for argument in backend.command(&spec, &bindings, &program)? {
         println!("{argument}");

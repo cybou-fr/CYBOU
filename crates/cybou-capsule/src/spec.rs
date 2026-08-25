@@ -123,6 +123,27 @@ pub enum Network {
     },
 }
 
+/// The one model endpoint made visible inside a capsule.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ModelChannel {
+    /// No model authority and no model transport.
+    #[default]
+    Denied,
+    /// A loopback compatibility listener backed by one host pathname socket.
+    ///
+    /// The token pathname contains only the ephemeral lease authority. Provider credentials stay
+    /// outside the capsule and outside this type.
+    Brokered {
+        /// TCP port on capsule loopback.
+        proxy_port: u16,
+        /// Pathname Unix socket as seen inside the capsule.
+        socket_inside: PathBuf,
+        /// Read-only file containing the ephemeral lease token.
+        token_inside: PathBuf,
+    },
+}
+
 /// What the capsule may consume, as the kernel counts it.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -195,6 +216,9 @@ pub struct KernelCapsuleSpec {
     pub cgroup: CgroupLimits,
     /// What it may reach.
     pub network: Network,
+    /// How it reaches the lease-bound model gateway, if a model was granted.
+    #[serde(default)]
+    pub model: ModelChannel,
     /// Where the agent starts, inside the capsule.
     pub working_directory: PathBuf,
 }
@@ -282,6 +306,7 @@ mod tests {
                 runtime_max_seconds: 14_400,
             },
             network: Network::Denied,
+            model: ModelChannel::Denied,
             working_directory: PathBuf::from("/workspace"),
         };
 
