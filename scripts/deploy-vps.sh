@@ -39,6 +39,7 @@ cybou_ssh "
     cybou-meaningd
     cybou-telemetryd
     cybou-model-brokerd
+    cybou-agent-gateway
     cybou-authd
     cybou-workspaced
     cybou-lifecycled
@@ -157,8 +158,31 @@ cybou_ssh "
   # The helper is a system service because it is the one thing here that needs root. Its socket is
   # group-owned by cybou, so only the gateway can attempt a password.
   sudo install -m 0644 systemd/system/cybou-authd.service \
-    systemd/system/cybou-executord.service /etc/systemd/system/
+    systemd/system/cybou-executord.service systemd/system/cybou-agent-gateway@.service \
+    /etc/systemd/system/
+  sudo install -d -m 0750 -o root -g cybou /run/cybou-agent-leases
+  # Provider routing is operator policy and the master key is a systemd credential. Deployment
+  # creates fail-closed placeholders once, never replaces configured values, and never starts a
+  # per-capsule gateway by itself.
+  if [ ! -e /etc/cybou/provider.env ]; then
+    printf '%s\n' \
+      'CYBOU_LITELLM_BASE_URL=' \
+      'CYBOU_LITELLM_PROVIDER=' \
+      'CYBOU_LITELLM_MODEL_GROUP=' \
+      'CYBOU_LITELLM_DEPLOYMENT_SHA256=' \
+      'CYBOU_LITELLM_TIMEOUT_MS=30000' \
+      'CYBOU_MODEL_MICROUSD_PER_UNIT=1' \
+      | sudo tee /etc/cybou/provider.env >/dev/null
+  fi
+  if [ ! -e /etc/cybou/litellm-master-key ]; then
+    sudo install -m 0600 -o root -g root /dev/null /etc/cybou/litellm-master-key
+  fi
+  sudo chown root:root /etc/cybou/provider.env /etc/cybou/litellm-master-key
+  sudo chmod 0644 /etc/cybou/provider.env
+  sudo chmod 0600 /etc/cybou/litellm-master-key
   sudo install -m 0644 debian/org.cybou.Body.Executor1.conf /usr/share/dbus-1/system.d/
+  sudo install -m 0644 debian/cybou-agent.conf /usr/lib/tmpfiles.d/cybou-agent.conf
+  sudo systemd-tmpfiles --create /usr/lib/tmpfiles.d/cybou-agent.conf
   sudo systemctl daemon-reload
   sudo systemctl reload dbus.service
   sudo systemctl enable --now cybou-authd.service

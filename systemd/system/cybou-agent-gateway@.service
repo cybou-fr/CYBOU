@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=Cybou private model gateway for agent capsule %i
+Documentation=https://github.com/cybou-fr/CYBOU
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cybou
+Group=cybou
+UMask=0077
+RuntimeDirectory=cybou-agent-%i
+RuntimeDirectoryMode=0700
+
+# Provider policy has no secret. One root-created lease file binds this instance to one capsule,
+# task, workspace and set of ceilings. A missing file is a failed launch, never broad authority.
+EnvironmentFile=/etc/cybou/provider.env
+EnvironmentFile=/run/cybou-agent-leases/%i.env
+LoadCredential=litellm-master:/etc/cybou/litellm-master-key
+Environment=CYBOU_LITELLM_MASTER_KEY_FILE=%d/litellm-master
+Environment=CYBOU_AGENT_RUNTIME_DIR=/run/cybou-agent-%i
+
+ExecStart=/usr/libexec/cybou/cybou-agent-gateway
+Restart=no
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+# Deliberately no [Install]: a capsule lease, not boot, owns this process.

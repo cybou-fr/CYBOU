@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-agent-gateway"
+description = "Per-capsule lease token and Unix model-gateway lifecycle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum.workspace = true
+cybou-capsule = { path = "../cybou-capsule" }
+cybou-model-brokerd = { path = "../cybou-model-brokerd" }
+cybou-model-gateway = { path = "../cybou-model-gateway" }
+cybou-provider-litellm = { path = "../cybou-provider-litellm" }
+cybou-protocol = { path = "../cybou-protocol" }
+hyper.workspace = true
+hyper-util.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

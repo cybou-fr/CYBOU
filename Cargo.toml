@@ -27,6 +27,7 @@ members = [
     "crates/cybou-model-bridge",
     "crates/cybou-model-gateway",
     "crates/cybou-agent-opencode",
+    "crates/cybou-agent-gateway",
     "crates/cybou-provider-catalogue",
     "crates/cybou-provider-litellm",
     "crates/cybou-perception",
@@ -69,6 +70,8 @@ axum = "0.8.9"
 reqwest = { version = "0.12.23", default-features = false, features = ["rustls-tls"] }
 ciborium = "0.2.2"
 http-body-util = "0.1.5"
+hyper = { version = "1.11.0", features = ["http1", "server"] }
+hyper-util = { version = "0.1.20", features = ["tokio"] }
 futures-core = "0.3.31"
 futures-util = "0.3.34"
 thiserror = "2.0.20"

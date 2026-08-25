@@ -831,6 +831,13 @@ HTTP adapter runs outside the async gateway executor. A deployable registration 
 requires LiteLLM's database-backed budget reservation to be enabled and every mapped route to have
 known token pricing, so `max_tokens` can be priced and reserved before provider dispatch.
 
+`cybou-agent-gateway` closes the host-side lifecycle gap for an external-agent model lease. One
+process owns one private Unix listener and one ephemeral token file, registers one configured
+LiteLLM worker, and binds its bearer to the capsule, task, class, lifetime and ceilings. Its systemd
+template is deliberately not boot-enabled: root-owned provider policy and credential plus a
+short-lived per-launch lease file are required before an instance can exist. The fake-provider gate
+proves the complete socket/token/worker path; a real provider remains an explicit B7 live gate.
+
 **No inference runtime or LiteLLM service is deployed, and no real model has ever been called.** The
 worker is exercised against a fake HTTP proxy. On an installation with no registered worker, every
 request is answered with what happens instead. That remains a supported configuration.

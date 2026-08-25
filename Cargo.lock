@@ -757,6 +757,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-agent-gateway"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "cybou-capsule",
+ "cybou-model-brokerd",
+ "cybou-model-gateway",
+ "cybou-protocol",
+ "cybou-provider-litellm",
+ "hyper",
+ "hyper-util",
+ "time",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "cybou-agent-opencode"
 version = "0.1.0"
 dependencies = [

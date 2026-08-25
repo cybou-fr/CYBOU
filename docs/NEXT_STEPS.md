@@ -279,12 +279,19 @@ read-only ephemeral lease-token file; provider credentials stay in the host work
 in the pack configuration or process arguments. The Debian gate verifies the digest, ACP v1
 handshake, no-route namespace, read-only installation and real capsule plumbing.
 
-`scripts/test-opencode-pack-live.sh` is the non-optional completion criterion: it needs a running
-per-capsule gateway socket and matching ephemeral token, sends a prompt through OpenCode from inside
-the capsule, and requires the provider's answer. The active VPS currently has no LiteLLM/provider
-unit, environment name or `/etc/cybou` provider configuration, so that gate is visibly `NOT RUN` and
-B7 is not marked Done. Provisioning that operator-owned credential and worker service remains a
-deployment decision rather than a secret silently copied by this pack.
+`cybou-agent-gateway` now owns the missing host lifecycle: one process registers the configured
+LiteLLM worker, issues one token for one capsule lease and task, and exposes the router only through
+that capsule's mode-`0600` Unix socket. Its systemd template consumes root-owned provider policy, a
+root-only `LoadCredential`, and a short-lived launch file; it has no boot install target and is never
+started by deployment. The credential-free lifecycle gate drives a real gateway token through a
+fake LiteLLM peer and proves the proxy master key is absent from runtime artifacts.
+
+`scripts/test-opencode-pack-live.sh` remains the non-optional completion criterion: it sends a prompt
+through OpenCode inside the capsule and requires a real provider's answer. The active VPS had no
+operator-selected LiteLLM deployment or credential at the last inspection, so that gate remains
+visibly `NOT RUN` and B7 is not marked Done. The exact fail-closed operator contract is documented in
+[Per-capsule model gateway deployment](agent-gateway-deployment.md); provisioning a provider is an
+operator decision rather than a secret silently copied by this repository.
 
 ### B8. Agent Card and streaming session
 
