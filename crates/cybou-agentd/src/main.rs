@@ -25,6 +25,7 @@ use agent_client_protocol::AcpAgentConfig;
 use cybou_acp::AcpSession;
 use cybou_agentd::plan::SessionPlan;
 use cybou_agentd::session::{Session, SessionEnd, SessionState};
+use cybou_agentd::view::SessionView;
 use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
 use cybou_capsule::{
     CapabilityProfile, KernelCapsuleSpec, Lease, LeaseRequest, ModelGrant, NetworkGrant,
@@ -283,6 +284,7 @@ async fn launch(selection: &Selection) -> Result<(), String> {
             Err(format!("session {} failed: {why}", plan.instance))
         }
         SessionState::Ended(end) => {
+            announce(&session, &plan, OffsetDateTime::now_utc());
             println!("session {} ended: {}", plan.instance, end.describe());
             Ok(())
         }
@@ -318,7 +320,10 @@ async fn bring_up(
     let capsule =
         runtime::run_capsule(plan, spec, programs, &program).map_err(|error| error.to_string())?;
     session.running().map_err(|error| error.to_string())?;
-    println!("session {} running", plan.instance);
+    // One line a surface can read, rather than prose a surface would have to parse. Everything on it
+    // is a fact off the approved lease and the compiled spec — the ceilings a person selected, not a
+    // reading of what the capsule is using, which nothing here can honestly observe yet.
+    announce(session, plan, OffsetDateTime::now_utc());
 
     match &selection.prompt {
         Some(prompt) => ask(plan, &capsule, prompt).await,
@@ -505,5 +510,17 @@ fn teardown(plan: &SessionPlan) {
         && error.kind() != std::io::ErrorKind::NotFound
     {
         eprintln!("teardown left {}: {error}", plan.session_runtime.display());
+    }
+}
+
+/// Print what a surface would show about this session, as one line of JSON.
+///
+/// A line rather than prose, and the same shape at every point in the session's life, so a card
+/// drawing it does not have to know which stage produced it.
+fn announce(session: &Session, plan: &SessionPlan, now: OffsetDateTime) {
+    let view = SessionView::of(session, plan, &plan.lease, now);
+    match serde_json::to_string(&view) {
+        Ok(line) => println!("{line}"),
+        Err(error) => eprintln!("the session could not be described: {error}"),
     }
 }

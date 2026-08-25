@@ -792,6 +792,8 @@ dependencies = [
  "cybou-acp",
  "cybou-agent-opencode",
  "cybou-capsule",
+ "serde",
+ "serde_json",
  "time",
  "tokio",
  "uuid",

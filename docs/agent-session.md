@@ -136,6 +136,29 @@ authorization is legible in one file rather than distributed across a protocol. 
 need to do more than start and stop one template, that is the signal to move to the typed boundary
 rather than to widen this rule.
 
+## What a person would see
+
+`launch` prints one line of JSON when the session comes up and again when it ends: the agent, the
+profile, the workspace, how long it has run and how long the lease has left, the model class and what
+has been spent against it, the ceilings, the exact hosts, and every unit the session put on the host
+so any of them can be looked up by name.
+
+Two things about it are deliberate.
+
+**It shows what was granted, not what is being used.** `4096` MiB on that line is the ceiling a person
+selected and the kernel enforces; it is not a reading of what the capsule currently occupies. Cybou
+can observe the latter — that is what the telemetry layer is for — and until that observation is
+actually pointed at a capsule's cgroup, printing a number that *looked* like usage would be inventing
+the one thing a person is watching for.
+
+**What was spent is read from the lease.** The gateway charges it on every completion. An agent
+reporting its own consumption is the executor grading its own homework, which this repository refuses
+in the place where it matters most.
+
+Gathering it in one place is the point: the lease knows what was granted, the plan knows which units
+carry it, and the session knows what has happened, so a surface that reached into all three would be
+deciding for itself which facts belong together — and a second surface would decide differently.
+
 ## What is not built yet
 
 `Pause`. `Stop` from outside — today a session ends when its program ends, its lease expires, or the
@@ -149,3 +172,10 @@ is kept whole rather than projected into a Cybou vocabulary.
 
 Agents other than OpenCode. `--prompt` refuses any agent this build has no pack for, rather than
 guessing at an entrypoint.
+
+A surface to draw the session on. The projection exists and is printed; what is missing between it
+and a card in the browser is a way to ask a *running* session for it. `cybou-agentd` is not yet a
+daemon despite its name — `launch` owns one session and exits with it, so there is no bus name for a
+web gateway to call and no registry of what is running. That is the next piece, and the card follows
+it rather than the other way round: a card fed by anything other than the session's own owner would
+be a second assembly of the same facts.
