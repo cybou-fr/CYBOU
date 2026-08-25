@@ -21,7 +21,21 @@
 //! `CYBOU_KEYSTORE_PATH`, an SSH agent socket, whatever the operator exported, and the next thing
 //! somebody adds. An agent that inherits it has been handed the machine.
 
+use std::path::{Path, PathBuf};
+
 use crate::spec::{Access, KernelCapsuleSpec, Network, Seccomp};
+
+/// Where the entry program is bound inside a capsule.
+///
+/// On the capsule root, which bubblewrap makes as a tmpfs, and not beneath `/usr`: `/usr` is bound
+/// read-only, so there is nowhere under it to create a mount point and bubblewrap refuses the whole
+/// capsule rather than half of it. That refusal was the right one and it is worth keeping the reason
+/// visible, because the obvious fix — binding `/usr` writable — would hand an agent the compiler it
+/// is about to run.
+///
+/// It needs no Landlock rule of its own. It has already been executed by the time any rule is
+/// applied, and it is bound read-only over a root the ruleset never grants.
+pub const ENTRY_INSIDE: &str = "/.cybou-capsule-enter";
 
 /// Something that can build a capsule from a spec.
 pub trait CapsuleBackend {
@@ -53,13 +67,37 @@ pub trait CapsuleBackend {
     }
 }
 
-/// The first backend: bubblewrap.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct Bubblewrap;
+/// The first backend: bubblewrap, entered through this project's own entry program.
+///
+/// It carries the entry program's location on the host and there is no constructor without one.
+/// Two of a capsule's ten parts — Landlock and seccomp — are restrictions a process applies to
+/// itself just before `exec`, which no command line can express. A `Bubblewrap` that could be built
+/// without knowing where that program lives would be a type able to describe a capsule with half its
+/// barriers, and the half it was missing would not appear anywhere in the command it produced.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Bubblewrap {
+    entry: PathBuf,
+}
+
+impl Bubblewrap {
+    /// A backend that enters through the entry program at this path on the host.
+    #[must_use]
+    pub fn entering_through(entry: impl Into<PathBuf>) -> Self {
+        Self {
+            entry: entry.into(),
+        }
+    }
+
+    /// Where the entry program is on the host.
+    #[must_use]
+    pub fn entry(&self) -> &Path {
+        &self.entry
+    }
+}
 
 impl CapsuleBackend for Bubblewrap {
     fn requires(&self) -> &'static str {
-        "bwrap"
+        "bwrap, and this project's own cybou-capsule-enter"
     }
 
     fn command(&self, spec: &KernelCapsuleSpec, program: &[String]) -> Vec<String> {
@@ -126,6 +164,12 @@ impl CapsuleBackend for Bubblewrap {
         argv.push("--tmpfs".to_owned());
         argv.push("/tmp".to_owned());
 
+        // The entry program, read-only, layered over the `/usr` bound above. Last of the binds so
+        // nothing the spec lists can be placed on top of it.
+        argv.push("--ro-bind".to_owned());
+        argv.push(self.entry.to_string_lossy().into_owned());
+        argv.push(ENTRY_INSIDE.to_owned());
+
         argv.push("--chdir".to_owned());
         argv.push(spec.working_directory.to_string_lossy().into_owned());
 
@@ -134,9 +178,25 @@ impl CapsuleBackend for Bubblewrap {
         // breaks it, because bubblewrap reads the next token as the descriptor.
         let Seccomp::NoReshaping = spec.seccomp;
 
-        // Everything after this is the program, whatever it looks like. Without it a program named
-        // `--bind` is an argument to bwrap, which is the same lesson this repository already learned
-        // about a systemd unit name.
+        // Everything after this is what bubblewrap runs, whatever it looks like. Without it a
+        // program named `--bind` is an argument to bwrap, which is the same lesson this repository
+        // already learned about a systemd unit name.
+        argv.push("--".to_owned());
+
+        // And what it runs is the entry program, not the agent. The agent comes after the entry
+        // program's own separator, which is why there are two of them on this line: the first ends
+        // bubblewrap's arguments, the second ends the entry program's.
+        argv.push(ENTRY_INSIDE.to_owned());
+        for rule in &spec.landlock {
+            argv.push(
+                match rule.access {
+                    Access::ReadOnly => "--ro",
+                    Access::ReadWrite => "--rw",
+                }
+                .to_owned(),
+            );
+            argv.push(rule.path.to_string_lossy().into_owned());
+        }
         argv.push("--".to_owned());
         argv.extend(program.iter().cloned());
 
@@ -168,6 +228,12 @@ fn environment(spec: &KernelCapsuleSpec) -> Vec<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    /// A backend for the tests, told where the entry program is. There is no constructor without
+    /// one, which is the point: a capsule missing Landlock and seccomp should not be expressible.
+    fn entering() -> Bubblewrap {
+        Bubblewrap::entering_through("/opt/cybou/libexec/cybou-capsule-enter")
+    }
+
     use std::path::PathBuf;
 
     use time::Duration;
@@ -200,7 +266,7 @@ mod tests {
     }
 
     fn argv() -> Vec<String> {
-        Bubblewrap.command(&spec(), &["cargo".to_owned(), "test".to_owned()])
+        entering().command(&spec(), &["cargo".to_owned(), "test".to_owned()])
     }
 
     /// Whether `flag` appears before the `--` that ends bwrap's own arguments.
@@ -330,9 +396,13 @@ mod tests {
         // A program named `--bind` is otherwise an argument to bwrap. The same lesson this
         // repository already learned about passing a systemd unit name.
         let hostile = vec!["--bind".to_owned(), "/etc".to_owned(), "/etc".to_owned()];
-        let argv = Bubblewrap.command(&spec(), &hostile);
+        let argv = entering().command(&spec(), &hostile);
 
-        let separator = argv.iter().position(|item| item == "--").expect("present");
+        // The last separator, not the first. There are two now: bubblewrap's arguments end at the
+        // first, the entry program's at the second, and the agent is what follows the second. A
+        // version of this test that kept looking at the first would have read the entry program's
+        // own flags as the agent's and passed on a command line that ran the wrong thing.
+        let separator = argv.iter().rposition(|item| item == "--").expect("present");
         assert_eq!(&argv[separator + 1..], hostile.as_slice());
         assert!(
             !asks_for(&argv, "--bind") || argv[..separator].iter().any(|item| item == "--bind"),
@@ -358,7 +428,7 @@ mod tests {
             "a flag that needs a descriptor was emitted without one"
         );
         assert!(
-            Bubblewrap.requires_seccomp(),
+            entering().requires_seccomp(),
             "the debt has to be visible to whatever spawns this"
         );
     }
@@ -386,9 +456,9 @@ mod tests {
         // one useless as evidence of what was actually built.
         let spec = spec();
         let program = ["cargo".to_owned()];
-        let first = Bubblewrap.command(&spec, &program);
+        let first = entering().command(&spec, &program);
         for _ in 0..8 {
-            assert_eq!(Bubblewrap.command(&spec, &program), first);
+            assert_eq!(entering().command(&spec, &program), first);
         }
     }
 
@@ -407,10 +477,51 @@ mod tests {
     }
 
     #[test]
+    fn bubblewrap_runs_the_entry_program_and_the_entry_program_runs_the_agent() {
+        // Landlock and seccomp are restrictions a process applies to itself just before exec, so
+        // there is a hop between the sandbox being built and the agent starting. If bubblewrap ran
+        // the agent directly, the capsule would be missing two of its ten parts and the command
+        // line would look entirely correct.
+        let argv = argv();
+        let first = argv.iter().position(|item| item == "--").expect("present");
+        assert_eq!(argv[first + 1], ENTRY_INSIDE);
+    }
+
+    #[test]
+    fn the_entry_program_is_told_every_path_the_spec_names() {
+        // Landlock denies what it was not told about, so a rule dropped here is not a tighter
+        // capsule — it is an agent that cannot open /dev/null.
+        let spec = spec();
+        let argv = entering().command(&spec, &["sh".to_owned()]);
+        for rule in &spec.landlock {
+            let path = rule.path.to_string_lossy().into_owned();
+            assert!(
+                argv.contains(&path),
+                "{path} is in the spec and not on the command line"
+            );
+        }
+    }
+
+    #[test]
+    fn the_entry_program_is_read_only_inside_the_capsule() {
+        // An agent that could rewrite it could arrange for the next capsule to be entered by
+        // something of its own choosing.
+        let argv = argv();
+        let at = argv
+            .iter()
+            .position(|item| item == ENTRY_INSIDE)
+            .expect("bound");
+        assert_eq!(argv[at - 2], "--ro-bind");
+    }
+
+    #[test]
     fn a_backend_says_what_it_needs() {
         // So a deployment missing it reports that, rather than a capsule that failed for reasons
         // nobody can see.
-        assert_eq!(Bubblewrap.requires(), "bwrap");
+        assert_eq!(
+            entering().requires(),
+            "bwrap, and this project's own cybou-capsule-enter"
+        );
     }
 
     #[test]

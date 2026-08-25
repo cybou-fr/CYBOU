@@ -132,7 +132,7 @@ helper until a gate proves one is needed. In order:
 ```text
 done  1. user + mount + PID + IPC + UTS namespaces
 done  2. an empty filesystem, built up by explicit bind mounts — never a host / with things removed
-      3. Landlock as a second barrier: the mount says a path is absent, Landlock says no rights
+done  3. Landlock as a second barrier: the mount says a path is absent, Landlock says no rights
 done  4. PR_SET_NO_NEW_PRIVS before exec
       5. seccomp for the syscalls that change the sandbox's own shape, not a brittle allow-list
 done  6. no nested user namespaces
@@ -142,12 +142,16 @@ done  9. network deny-all: a fresh namespace with loopback and no route
      10. an egress broker for the granted hosts, because a grant is DNS identity and a firewall is not
 ```
 
-Two remain, and neither is a detail. **Step 5 is an open debt**: `Bubblewrap::requires_seccomp`
-declares the filter this build does not install — an earlier version passed `--seccomp` with no file
-descriptor, which made bubblewrap read the `--` before the program as its argument and started
-nothing at all. Removing the flag was the honest repair; a build that names a filter it does not load
-would be worse than one that admits it. **Step 3** is defence in depth against the mount namespace
-being wrong, and is next.
+One remains. **Step 5 is an open debt**: `Bubblewrap::requires_seccomp` declares the filter this
+build does not install — an earlier version passed `--seccomp` with no file descriptor, which made
+bubblewrap read the `--` before the program as its argument and started nothing at all. The place to
+install it now exists: `cybou-capsule-enter`, which is where step 3 landed, because a filter and a
+Landlock ruleset are both restrictions a process applies to itself just before `exec` and neither can
+be written on a command line.
+
+Step 3 was not only defence in depth. Bubblewrap builds the capsule's root as a writable tmpfs, so
+until Landlock was applied an agent could write to `/` — a real hole the mount namespace did not
+close, found because the gate went looking for a place where the two barriers could be told apart.
 
 Step 8 is done as two commands and not one: freeze, then kill. Not tidiness — a capsule under a task
 ceiling can fork faster than signals arrive, and freezing ends that race before it starts. It is only

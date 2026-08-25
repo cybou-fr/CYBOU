@@ -45,7 +45,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let spec = compile(&grant)?;
-    for argument in Bubblewrap.command(&spec, &program) {
+    // Named rather than guessed at. An example that fell back to some plausible location would
+    // build a capsule around an entry program that might not be the one just compiled, and the
+    // difference would not show up until a barrier was missing.
+    let entry = std::env::var("CYBOU_CAPSULE_ENTRY")
+        .map_err(|_| "CYBOU_CAPSULE_ENTRY must name the entry program on this host")?;
+
+    for argument in Bubblewrap::entering_through(entry).command(&spec, &program) {
         println!("{argument}");
     }
     Ok(())

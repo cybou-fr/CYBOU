@@ -348,6 +348,48 @@ been told the wrong thing — but not in what is done. A gentler ending for the 
 a lease that expires more politely than it is revoked, which is a lease an agent could prefer to
 reach.
 
+**There is a second barrier now, and finding somewhere to test it found a hole.** Landlock is a
+restriction a process applies to itself, inherited across `exec` and never removable, which means it
+cannot be written on a command line — and a seccomp filter has the same shape, with bubblewrap's own
+`--seccomp` wanting a file descriptor no argument vector can carry. So a capsule is entered in two
+hops now: `systemd-run … -- bwrap … -- cybou-capsule-enter … -- the agent`. The new crate applies the
+ruleset to itself and then becomes the agent.
+
+It runs *after* bubblewrap, which is why the paths it is given are the ones seen inside the capsule.
+Landlock applied before would have to permit everything bubblewrap needs to build a sandbox, which is
+most of the host.
+
+An agent that finds this program can run it, and that is fine: Landlock and seccomp are monotonic. A
+process may add restrictions to itself and may never drop one, so invoking it again with a generous
+list produces a process bounded by what it already had. There is no argument to it that grants
+anything.
+
+If the kernel will not enforce what was asked, it refuses to `exec` rather than carrying on — an
+agent running with one barrier where it is supposed to have two, and nothing anywhere saying so, is
+the exact failure this tree keeps finding.
+
+The hole: the gate needed somewhere the mount namespace and Landlock could be told apart, since every
+mount had a matching rule and a write denied by both proves neither. The capsule root turned out to
+be it. Bubblewrap builds `/` as a **writable tmpfs**, and the ruleset names `/workspace`, `/tmp`,
+`/dev`, `/proc` and the read-only system paths but never the root — so before this an agent could
+write to `/`. Removing the Landlock call makes the check fail with `WROTE`, which is how that is
+known rather than argued.
+
+A second thing fell out of it. The Landlock list was built from the mounts, and `/proc`, `/dev` and
+`/tmp` are made by the backend rather than mounted — so they were absent from it, and Landlock denies
+what it was not told about. The first thing to break was `/dev/null`: every redirection in every
+script an agent runs, failing with a permission error, on a capsule whose mounts were perfectly
+correct.
+
+The entry program is bound at `/.cybou-capsule-enter`, on the root tmpfs, and not under `/usr` where
+it belongs by convention. `/usr` is bound read-only, so there is nowhere under it to make a mount
+point, and bubblewrap refused the whole capsule rather than half of it. That refusal was right; the
+obvious fix — binding `/usr` writable — would hand an agent the compiler it is about to run.
+
+`Bubblewrap` now carries the entry program's location and has no constructor without one. A backend
+that could be built without it would be a type able to describe a capsule missing two of its ten
+parts, and the missing half would not appear anywhere in the command it produced.
+
 **None of this enforces anything.** A capsule holds because the kernel holds it. This is the
 description of what was granted, used to decide what to ask and what to record.
 

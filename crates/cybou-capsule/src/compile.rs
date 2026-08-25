@@ -168,10 +168,16 @@ pub fn compile(grant: &CapsuleGrant) -> Result<KernelCapsuleSpec, CannotCompile>
             access: mount.access,
         })
         .collect();
-    landlock.push(PathRule {
-        path: PathBuf::from("/tmp"),
-        access: Access::ReadWrite,
-    });
+    // Three paths a backend makes rather than mounts, so a Landlock list built from the mounts alone
+    // does not know they exist — and Landlock denies what it was not told about. Left out, the first
+    // thing to break is `/dev/null`: every redirection in every script the agent runs fails with a
+    // permission error, on a capsule whose mounts are perfectly correct.
+    for made_by_the_backend in ["/tmp", "/dev", "/proc"] {
+        landlock.push(PathRule {
+            path: PathBuf::from(made_by_the_backend),
+            access: Access::ReadWrite,
+        });
+    }
 
     Ok(KernelCapsuleSpec {
         capsule_id: grant.capsule_id,

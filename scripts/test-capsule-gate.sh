@@ -35,6 +35,17 @@ if ! command -v bwrap > /dev/null 2>&1; then
     exit 3
 fi
 
+# The entry program, built here and named explicitly. A capsule is entered through it — Landlock and
+# seccomp are restrictions a process applies to itself just before exec, which no command line can
+# express — so a gate that could not find it would be testing a capsule missing two of its parts.
+cargo build --quiet -p cybou-capsule-enter
+CYBOU_CAPSULE_ENTRY="$CARGO_TARGET_DIR/debug/cybou-capsule-enter"
+export CYBOU_CAPSULE_ENTRY
+if [ ! -x "$CYBOU_CAPSULE_ENTRY" ]; then
+    echo "==> capsule gate NOT RUN: the entry program did not build" >&2
+    exit 3
+fi
+
 WORKSPACE="$(mktemp -d)"
 trap 'rm -rf "$WORKSPACE"' EXIT
 
@@ -129,6 +140,20 @@ run_the_gate() {
     # version of this line printed the same word on both branches and could not fail.
     must "loopback is up inside the capsule" "loopback-up" \
         "ip -o link show lo 2>/dev/null | grep -q lo && echo loopback-up || echo NO-LOOPBACK"
+
+    pass "A second barrier stands behind the mounts"
+    # The one place where Landlock and the mount namespace can be told apart. Bubblewrap builds the
+    # capsule's root as a writable tmpfs, so the mounts permit writing there; the Landlock ruleset
+    # names /workspace, /tmp, /dev, /proc and the read-only system paths, and never the root itself.
+    # A write to / that succeeds means the second barrier is not standing, whatever else passed.
+    must "the capsule root cannot be written even though it is a writable tmpfs" "denied" \
+        "touch /landlock-probe 2>/dev/null && echo WROTE || echo denied"
+    # And the paths that were granted still work, or the check above would pass on a capsule where
+    # nothing is writable at all — which is not a capsule, it is a broken one.
+    must "a granted path is still writable" "granted" \
+        "touch /workspace/landlock-ok 2>/dev/null && echo granted || echo BROKEN"
+    must "the device the whole world redirects into is reachable" "granted" \
+        "echo x > /dev/null 2>/dev/null && echo granted || echo BROKEN"
 
     pass "The capsule cannot rebuild itself"
     must "no nested user namespace" "denied" \

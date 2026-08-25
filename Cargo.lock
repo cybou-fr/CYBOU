@@ -532,6 +532,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-capsule-enter"
+version = "0.1.0"
+dependencies = [
+ "landlock",
+]
+
+[[package]]
 name = "cybou-contextd"
 version = "0.1.0"
 dependencies = [
@@ -1659,6 +1666,17 @@ name = "konst_macro_rules"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4933f3f57a8e9d9da04db23fb153356ecaf00cbd14aee46279c33dc80925c37"
+
+[[package]]
+name = "landlock"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cca98e95f35b29d469dade6724c6f96cec9236640f745a0e99b0334ec320ab1"
+dependencies = [
+ "enumflags2",
+ "libc",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "lazy_static"

@@ -5,6 +5,7 @@
 members = [
     "crates/cybou-authd",
     "crates/cybou-capsule",
+    "crates/cybou-capsule-enter",
     "crates/cybou-contextd",
     "crates/cybou-crypto",
     "crates/cybou-epistemicd",

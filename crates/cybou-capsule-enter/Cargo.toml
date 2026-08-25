@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-capsule-enter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The last thing that runs before an agent does: applies Landlock and seccomp to itself, then execs"
+
+[[bin]]
+name = "cybou-capsule-enter"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = "0.4.7"
