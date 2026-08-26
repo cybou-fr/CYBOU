@@ -304,14 +304,24 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
    verdict that looked pressable would be offering something that does not exist. */
 .offer-verdict { color: var(--muted); font-style: italic; white-space: nowrap; }
 
-/* Agents. Read-only throughout: there is no stop here and no launch, so nothing on this card is
-   styled as anything a person could press. */
+/* Agents. The form chooses among owner-approved profiles; none of these fields is a resource or
+   authority bound. */
+.card-body { min-height: 0; }
+.agents-body { align-content: start; }
 .agents-headline { font-size: 12px; color: #dfe8ed; padding-bottom: 7px; }
+.agent-launch-form { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; border-top: 1px solid rgba(154,167,184,.14); }
+.agent-launch-form input, .agent-launch-form textarea { min-width: 0; border: 1px solid rgba(154,167,184,.2); border-radius: 6px; padding: 6px 7px; background: rgba(0,0,0,.18); color: #dfe8ed; font: 10px/1.4 inherit; outline: none; }
+.agent-launch-form input:focus, .agent-launch-form textarea:focus { border-color: rgba(112,225,200,.5); }
+.agent-launch-form textarea { grid-column: 1 / -1; min-height: 48px; resize: vertical; }
+.agent-launch-form button { justify-self: start; border: 1px solid rgba(112,225,200,.35); border-radius: 7px; padding: 6px 9px; background: rgba(112,225,200,.1); color: var(--accent); font-size: 10px; cursor: pointer; }
+.agent-launch-form button:disabled { cursor: wait; opacity: .55; }
+.agent-launch-error { grid-column: 1 / -1; color: #f87171; font-size: 10px; }
 .agent-list { display: grid; gap: 10px; max-height: 200px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .agent-line { display: grid; gap: 3px; }
-.agent-head { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 12px; }
+.agent-head { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: baseline; font-size: 12px; }
 .agent-head b { color: #dfe8ed; font-weight: 500; }
 .agent-standing { color: var(--accent); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.agent-stop { border: 1px solid rgba(248,113,113,.4); border-radius: 6px; padding: 2px 7px; background: rgba(248,113,113,.08); color: #fca5a5; font-size: 9px; cursor: pointer; }
 .agent-profile { color: var(--muted); font-size: 10px; white-space: nowrap; }
 .agent-workspace code { color: var(--muted); font-size: 10px; font-family: ui-monospace, monospace; }
 .agent-grant { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: 10px; }

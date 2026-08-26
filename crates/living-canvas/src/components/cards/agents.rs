@@ -3,10 +3,10 @@
 
 //! Agents card: what is running inside a capsule, on whose say-so, and against which ceilings.
 //!
-//! Read-only, and that is a boundary rather than an unfinished feature. Stopping somebody's running
-//! work is a decision whose ending has to be confirmed before it is reported, and launching needs
-//! admission against the whole host and authorization of the caller to the profile. Neither can be
-//! done by a surface, so neither is offered by one. The card shows; `Agent1` decides.
+//! The launch form carries only a selection to `Agent1`: profile, agent, workspace, offered model
+//! class and initial prompt. It carries no authority. The owner reads operator-approved bounds and
+//! atomically admits the session against whole-host capacity; the card merely asks and shows the
+//! answer.
 //!
 //! Four things it draws that a process list would leave out:
 //!
@@ -27,19 +27,77 @@
 //! that is not there would tick confidently and be wrong. The two instants are shown instead, which
 //! is less and is true.
 
-use cybou_protocol::agent::{SessionView, SpendView, Standing};
+use cybou_protocol::agent::{LaunchRequest, SessionView, SpendView, Standing};
 use leptos::prelude::*;
+use leptos::task::spawn_local;
 use lucide_leptos::UsersRound;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use time::format_description::well_known::Rfc3339;
+use uuid::Uuid;
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout, GatewayMindClient, MindClient,
     components::card_frame::CardFrame,
     instant::instant_label,
     interaction::{DragState, ResizeState},
     state::RuntimeState,
 };
+
+#[cfg(target_arch = "wasm32")]
+async fn async_sleep(ms: i32) {
+    let promise = js_sys::Promise::new(&mut |resolve, _| {
+        if let Some(window) = web_sys::window() {
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms);
+        }
+    });
+    let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn async_sleep(_ms: i32) {}
+
+fn replace_agents(runtime: RwSignal<RuntimeState>, sessions: Vec<SessionView>) {
+    runtime.update(|state| {
+        if let RuntimeState::Ready { agents, .. } = state {
+            *agents = Some(sessions);
+        }
+    });
+}
+
+fn request_stop(
+    runtime: RwSignal<RuntimeState>,
+    capsule_id: Uuid,
+    error: RwSignal<Option<String>>,
+    mounted: Arc<AtomicBool>,
+) {
+    error.set(None);
+    spawn_local(async move {
+        let result = GatewayMindClient.stop_agent(capsule_id).await;
+        if !mounted.load(Ordering::Acquire) {
+            return;
+        }
+        match result {
+            Ok(()) => match GatewayMindClient.agents().await {
+                Ok(sessions) if mounted.load(Ordering::Acquire) => {
+                    replace_agents(runtime, sessions);
+                }
+                Ok(_) => {}
+                Err(why) => {
+                    runtime.update(|state| {
+                        if let RuntimeState::Ready { agents, .. } = state {
+                            *agents = None;
+                        }
+                    });
+                    error.set(Some(why.to_string()));
+                }
+            },
+            Err(why) => error.set(Some(why.to_string())),
+        }
+    });
+}
 
 /// What the runtime holds, if it could be asked at all.
 fn sessions_of(runtime: RwSignal<RuntimeState>) -> Option<Vec<SessionView>> {
@@ -108,7 +166,12 @@ fn spend_line(session: &SessionView) -> Option<String> {
 }
 
 /// One session, drawn.
-fn session_line(session: SessionView) -> impl IntoView {
+fn session_line(
+    session: SessionView,
+    runtime: RwSignal<RuntimeState>,
+    error: RwSignal<Option<String>>,
+    mounted: Arc<AtomicBool>,
+) -> impl IntoView {
     let spend = spend_line(&session);
     let standing = standing_text(session.standing);
     let ceilings = format!(
@@ -128,6 +191,20 @@ fn session_line(session: SessionView) -> impl IntoView {
     let expires = moment(session.expires_at);
     let ended = session.ended_at.map(moment);
     let because = session.ended_because.clone();
+    let capsule_id = session.capsule_id;
+    let stop = session.is_live().then(|| {
+        view! {
+            <button
+                type="button"
+                class="agent-stop"
+                on:click=move |_| {
+                    request_stop(runtime, capsule_id, error, Arc::clone(&mounted));
+                }
+            >
+                "Stop"
+            </button>
+        }
+    });
 
     view! {
         <div class="agent-line">
@@ -135,6 +212,7 @@ fn session_line(session: SessionView) -> impl IntoView {
                 <b>{session.agent.clone()}</b>
                 <small class="agent-standing">{standing}</small>
                 <small class="agent-profile">{session.profile.clone()}</small>
+                {stop}
             </span>
             <span class="agent-workspace">
                 <code>{session.workspace.clone()}</code>
@@ -173,15 +251,175 @@ fn session_line(session: SessionView) -> impl IntoView {
 pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let sessions = move || sessions_of(runtime);
     let label = move || headline(sessions().as_ref());
+    let profile = RwSignal::new(String::new());
+    let agent = RwSignal::new("opencode".to_owned());
+    let workspace = RwSignal::new(String::new());
+    let model = RwSignal::new(String::new());
+    let prompt = RwSignal::new(String::new());
+    let submitting = RwSignal::new(false);
+    let launch_error = RwSignal::new(None::<String>);
+    let mounted = Arc::new(AtomicBool::new(true));
+    on_cleanup({
+        let mounted = Arc::clone(&mounted);
+        move || mounted.store(false, Ordering::Release)
+    });
+    let submit_mounted = Arc::clone(&mounted);
+    let refresh_mounted = Arc::clone(&mounted);
+
+    let submit = move |_| {
+        if submitting.get_untracked() {
+            return;
+        }
+        let request = LaunchRequest {
+            profile: profile.get_untracked(),
+            agent: agent.get_untracked(),
+            workspace: workspace.get_untracked(),
+            model_class: match model.get_untracked() {
+                value if value.trim().is_empty() => None,
+                value => Some(value),
+            },
+            prompt: prompt.get_untracked(),
+        };
+        let mounted = Arc::clone(&submit_mounted);
+        submitting.set(true);
+        launch_error.set(None);
+        spawn_local(async move {
+            let result = GatewayMindClient.launch_agent(&request).await;
+            if !mounted.load(Ordering::Acquire) {
+                return;
+            }
+            match result {
+                Ok(launched) => {
+                    let capsule_id = launched.capsule_id;
+                    runtime.update(|state| {
+                        if let RuntimeState::Ready { agents, .. } = state {
+                            let sessions = agents.get_or_insert_with(Vec::new);
+                            sessions.retain(|session| session.capsule_id != capsule_id);
+                            sessions.push(launched);
+                        }
+                    });
+                    submitting.set(false);
+
+                    // Agent1 is the owner of every later transition. Refresh while this launch is
+                    // live so `launching`, `running`, a newly observed spend, and disappearance
+                    // after teardown are never replaced by the optimistic receipt above. Bounded
+                    // to five minutes: long sessions keep their last truthful view and can be
+                    // refreshed explicitly without turning one click into permanent polling.
+                    for _ in 0..300 {
+                        async_sleep(1_000).await;
+                        if !mounted.load(Ordering::Acquire) {
+                            break;
+                        }
+                        match GatewayMindClient.agents().await {
+                            Ok(sessions) => {
+                                let still_held = sessions.iter().any(|session| {
+                                    session.capsule_id == capsule_id && session.is_live()
+                                });
+                                replace_agents(runtime, sessions);
+                                if !still_held {
+                                    break;
+                                }
+                            }
+                            Err(error) => {
+                                runtime.update(|state| {
+                                    if let RuntimeState::Ready { agents, .. } = state {
+                                        *agents = None;
+                                    }
+                                });
+                                launch_error.set(Some(error.to_string()));
+                                break;
+                            }
+                        }
+                    }
+                }
+                Err(error) => {
+                    launch_error.set(Some(error.to_string()));
+                    submitting.set(false);
+                }
+            }
+        });
+    };
+
+    let refresh = move |_| {
+        let mounted = Arc::clone(&refresh_mounted);
+        launch_error.set(None);
+        spawn_local(async move {
+            let result = GatewayMindClient.agents().await;
+            if !mounted.load(Ordering::Acquire) {
+                return;
+            }
+            match result {
+                Ok(sessions) => replace_agents(runtime, sessions),
+                Err(error) => {
+                    runtime.update(|state| {
+                        if let RuntimeState::Ready { agents, .. } = state {
+                            *agents = None;
+                        }
+                    });
+                    launch_error.set(Some(error.to_string()));
+                }
+            }
+        });
+    };
+    let list_mounted = Arc::clone(&mounted);
 
     view! {
         <div class="card-body agents-body">
             <div class="agents-headline">
                 <b>{label}</b>
             </div>
+            <div class="agent-launch-form">
+                <input
+                    aria-label="Profile"
+                    placeholder="Profile"
+                    prop:value=move || profile.get()
+                    on:input=move |event| profile.set(event_target_value(&event))
+                />
+                <input
+                    aria-label="Agent"
+                    placeholder="Agent"
+                    prop:value=move || agent.get()
+                    on:input=move |event| agent.set(event_target_value(&event))
+                />
+                <input
+                    aria-label="Workspace"
+                    placeholder="Workspace"
+                    prop:value=move || workspace.get()
+                    on:input=move |event| workspace.set(event_target_value(&event))
+                />
+                <input
+                    aria-label="Model class"
+                    placeholder="Model class"
+                    prop:value=move || model.get()
+                    on:input=move |event| model.set(event_target_value(&event))
+                />
+                <textarea
+                    aria-label="Initial prompt"
+                    placeholder="What should the agent do?"
+                    prop:value=move || prompt.get()
+                    on:input=move |event| prompt.set(event_target_value(&event))
+                />
+                <button type="button" on:click=submit disabled=move || submitting.get()>
+                    {move || if submitting.get() { "Launching…" } else { "Launch agent" }}
+                </button>
+                <button type="button" on:click=refresh>"Refresh sessions"</button>
+                {move || launch_error.get().map(|error| view! { <small class="agent-launch-error">{error}</small> })}
+            </div>
             <div class="agent-list">
                 {move || {
-                    sessions().unwrap_or_default().into_iter().map(session_line).collect_view()
+                    let mounted = Arc::clone(&list_mounted);
+                    sessions()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(move |session| {
+                            session_line(
+                                session,
+                                runtime,
+                                launch_error,
+                                Arc::clone(&mounted),
+                            )
+                        })
+                        .collect_view()
                 }}
             </div>
         </div>

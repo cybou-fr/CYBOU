@@ -162,9 +162,11 @@ listing >"$WORK/after.json"
 python3 - "$WORK/after.json" "$CAPSULE" <<'PYTHON'
 import json, sys
 
-assert not [v for v in json.load(open(sys.argv[1])) if v["capsuleId"] == sys.argv[2]], (
-    "a stopped session is still listed as running"
-)
+mine = [v for v in json.load(open(sys.argv[1])) if v["capsuleId"] == sys.argv[2]]
+assert len(mine) == 1, mine
+assert mine[0]["standing"] == "ended", mine[0]
+assert mine[0]["endedBecause"] == "the session was stopped", mine[0]
+assert mine[0]["endedAt"], mine[0]
 PYTHON
 
-echo "=== Agent runtime gate passed: the owner found it, reported it, and ended it ==="
+echo "=== Agent runtime gate passed: the owner found it, reported it, and retained its ending ==="

@@ -14,16 +14,19 @@
 //! unknown, because the reason it is unknown is that nobody in this process has seen the ledger
 //! either.
 //!
-//! ## Read, and only read
-//!
-//! There is no stop here and no launch. Stopping is a decision about somebody's running work and
-//! belongs behind the owner's own surface, where the ending can be confirmed before it is reported.
-//! Launching needs admission against the whole host and authorization of the caller to the profile,
-//! neither of which a proxy can do.
+//! Launch remains a proxy as well. The gateway establishes that the HTTP request belongs to a local
+//! or authenticated seat, then carries the caller's selection whole to `Agent1`. It never reads the
+//! profile catalogue or computes admission: the owner does both, or refuses.
 
-use axum::{Json, extract::State, http::HeaderMap, http::StatusCode};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::HeaderMap,
+    http::StatusCode,
+};
 use cybou_fabric::AGENT;
-use cybou_protocol::agent::SessionView;
+use cybou_protocol::agent::{LaunchRequest, SessionView};
+use uuid::Uuid;
 
 use crate::state::GatewayState;
 
@@ -66,6 +69,116 @@ pub async fn agents_handler(
     }
 }
 
+/// Ask the owner to launch one profile-bounded agent session.
+///
+/// # Errors
+///
+/// Refuses public and signed-out callers before D-Bus is touched. Owner policy refusals are `403`,
+/// exhausted host capacity is `409`, and an unavailable runtime is `503`.
+pub async fn launch_agent_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(request): Json<LaunchRequest>,
+) -> Result<(StatusCode, Json<SessionView>), (StatusCode, Json<crate::state::ErrorBody>)> {
+    if state.shell_seat(&headers).is_none() {
+        return Err(GatewayState::sign_in_required());
+    }
+
+    match launch(request).await {
+        Ok(session) => Ok((StatusCode::ACCEPTED, Json(session))),
+        Err(why) => {
+            eprintln!("[cybou-web-gateway] Agent1 refused a launch: {why}");
+            let (status, error, retryable) = if why.contains("LimitsExceeded") {
+                (StatusCode::CONFLICT, "agentCapacityExceeded", true)
+            } else if why.contains("AccessDenied") || why.contains("InvalidArgs") {
+                (StatusCode::FORBIDDEN, "agentLaunchRefused", false)
+            } else {
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "agentRuntimeUnavailable",
+                    true,
+                )
+            };
+            Err((
+                status,
+                Json(crate::state::ErrorBody {
+                    schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                    error,
+                    retryable,
+                }),
+            ))
+        }
+    }
+}
+
+/// Ask the owner to end one session, and answer only after teardown is confirmed.
+///
+/// # Errors
+///
+/// Refuses public and signed-out callers before D-Bus is touched. An invalid capsule identity is
+/// `400`, an unconfirmed teardown is `409`, and an unavailable runtime is `503`. Stopping an
+/// already-ended or unknown session is idempotent and returns `204`.
+pub async fn stop_agent_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Path(capsule_id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<crate::state::ErrorBody>)> {
+    if state.shell_seat(&headers).is_none() {
+        return Err(GatewayState::sign_in_required());
+    }
+    let capsule_id = Uuid::parse_str(&capsule_id)
+        .map_err(|_| agent_error(StatusCode::BAD_REQUEST, "agentIdentityInvalid", false))?;
+
+    match stop(&capsule_id.to_string()).await {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => match sessions().await {
+            Ok(sessions)
+                if sessions
+                    .iter()
+                    .any(|session| session.capsule_id == capsule_id && session.is_live()) =>
+            {
+                Err(agent_error(
+                    StatusCode::CONFLICT,
+                    "agentStopUnconfirmed",
+                    true,
+                ))
+            }
+            Ok(_) => Ok(StatusCode::NO_CONTENT),
+            Err(why) => {
+                eprintln!("[cybou-web-gateway] could not verify Agent1 Stop: {why}");
+                Err(agent_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "agentRuntimeUnavailable",
+                    true,
+                ))
+            }
+        },
+        Err(why) => {
+            eprintln!("[cybou-web-gateway] Agent1 Stop failed: {why}");
+            Err(agent_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "agentRuntimeUnavailable",
+                true,
+            ))
+        }
+    }
+}
+
+fn agent_error(
+    status: StatusCode,
+    error: &'static str,
+    retryable: bool,
+) -> (StatusCode, Json<crate::state::ErrorBody>) {
+    (
+        status,
+        Json(crate::state::ErrorBody {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            error,
+            retryable,
+        }),
+    )
+}
+
 /// Ask the owner what it holds.
 async fn sessions() -> Result<Vec<SessionView>, String> {
     let encoded: Vec<u8> = zbus::Connection::session()
@@ -85,4 +198,45 @@ async fn sessions() -> Result<Vec<SessionView>, String> {
         .map_err(|error| error.to_string())?;
 
     cybou_fabric::decode(&encoded).map_err(|error| error.to_string())
+}
+
+/// Carry one launch selection to the owner without adding a grant to it.
+async fn launch(request: LaunchRequest) -> Result<SessionView, String> {
+    let encoded = cybou_fabric::encode(&request).map_err(|error| error.to_string())?;
+    let reply: Vec<u8> = zbus::Connection::session()
+        .await
+        .map_err(|error| error.to_string())?
+        .call_method(
+            Some(AGENT.service),
+            AGENT.object_path,
+            Some(AGENT.interface),
+            "Launch",
+            &(encoded,),
+        )
+        .await
+        .map_err(|error| error.to_string())?
+        .body()
+        .deserialize()
+        .map_err(|error| error.to_string())?;
+    cybou_fabric::decode(&reply).map_err(|error| error.to_string())
+}
+
+/// Ask the owner to stop one session. `false` still needs a canonical listing: it can mean either
+/// that the session was already absent or that teardown could not be proven.
+async fn stop(capsule_id: &str) -> Result<bool, String> {
+    zbus::Connection::session()
+        .await
+        .map_err(|error| error.to_string())?
+        .call_method(
+            Some(AGENT.service),
+            AGENT.object_path,
+            Some(AGENT.interface),
+            "Stop",
+            &(capsule_id.to_owned(),),
+        )
+        .await
+        .map_err(|error| error.to_string())?
+        .body()
+        .deserialize()
+        .map_err(|error| error.to_string())
 }

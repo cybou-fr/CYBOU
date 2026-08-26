@@ -85,6 +85,44 @@ impl MindClient for GatewayMindClient {
         Self::get("/api/v1/agents").await
     }
 
+    async fn launch_agent(
+        &self,
+        request: &cybou_protocol::agent::LaunchRequest,
+    ) -> Result<cybou_protocol::agent::SessionView, ClientError> {
+        let response = Request::post("/api/v1/agents")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/agents returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
+    async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError> {
+        let path = format!("/api/v1/agents/{capsule_id}");
+        let response = Request::delete(&path)
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if response.ok() {
+            Ok(())
+        } else {
+            Err(ClientError::GatewayRequest(format!(
+                "{path} returned HTTP {}",
+                response.status()
+            )))
+        }
+    }
+
     async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
         Self::post_path("/api/v1/files/list", path).await
     }

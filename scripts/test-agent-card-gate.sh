@@ -7,9 +7,9 @@
 # The whole point of the route under test is that it is a proxy. It does not read the launch
 # directory, ask a service manager, or assemble a session from a lease and a plan — the owner does
 # all of that, and a second thing doing it would be a second answer to *what is running*. So this
-# gate does not check that the endpoint produces plausible JSON. It checks that the JSON is the
-# owner's own answer, by comparing it against what the owner says directly, and that when the owner
-# is not there the endpoint says so rather than inventing an empty list.
+# gate does not check that the endpoint produces plausible JSON. It compares the JSON against the
+# owner's own answer, then stops that session through the browser route and requires the owner's
+# retained final view. When the owner is gone, the endpoint must say so rather than inventing empty.
 #
 # An empty list is the failure worth guarding. "No agents are running" and "I could not ask" look
 # identical on a card, and only one of them means a person can stop worrying.
@@ -132,6 +132,35 @@ assert view["spendObservedAt"] is None, view["spendObservedAt"]
 assert view["startedAt"] and view["expiresAt"], view
 PYTHON
 
+# HTTP success means the owner confirmed teardown. The next listing is the owner's final view rather
+# than an optimistic browser-side transition.
+status="$(curl --silent --output "$WORK/stopped-body.json" --write-out '%{http_code}' \
+    --request DELETE "http://127.0.0.1:$PORT/api/v1/agents/$CAPSULE")"
+test "$status" = "204" || {
+    echo "the Stop route answered $status:" >&2
+    cat "$WORK/stopped-body.json" >&2
+    exit 1
+}
+systemctl --user is-active --quiet "$CAPSULE_UNIT.service" && {
+    echo "the Stop route returned success while the capsule unit was still active" >&2
+    exit 1
+}
+
+curl --silent --show-error --fail "http://127.0.0.1:$PORT/api/v1/agents" >"$WORK/ended-card.json"
+"$BIN/cybou-agentd" sessions >"$WORK/ended-owner.json"
+python3 - "$WORK/ended-card.json" "$WORK/ended-owner.json" "$CAPSULE" <<'PYTHON'
+import json, sys
+
+card = json.load(open(sys.argv[1]))
+owner = json.load(open(sys.argv[2]))
+assert card == owner, "the browser invented a final view the owner did not report"
+mine = [view for view in card if view["capsuleId"] == sys.argv[3]]
+assert len(mine) == 1, mine
+assert mine[0]["standing"] == "ended", mine[0]
+assert mine[0]["endedBecause"] == "the session was stopped", mine[0]
+assert mine[0]["endedAt"], mine[0]
+PYTHON
+
 # And with the owner gone, the endpoint says it could not ask. An empty list here would be the one
 # answer a person cannot act on: "nothing is running" and "I could not find out" look the same on a
 # card, and only one of them means they can stop worrying.
@@ -155,4 +184,4 @@ grep -q 'agentRuntimeUnavailable' "$WORK/absent.json" || {
 # And it says nothing about this host's insides to somebody who may not be entitled to know them.
 ! grep -qi 'dbus\|socket\|/run/' "$WORK/absent.json"
 
-echo "=== Agent card gate passed: the browser is told what the owner says, or that it could not ask ==="
+echo "=== Agent card gate passed: browser read and Stop stay the owner's canonical answer ==="

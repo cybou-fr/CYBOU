@@ -63,6 +63,7 @@ Beside them, and deliberately not among them:
 |---|---|
 | `cybou-model-brokerd` | `org.cybou.Faculty.ModelBroker1` — a faculty, owning no part of Mind |
 | `cybou-web-gateway` | the HTTP boundary; not a Mind owner and holds no cognitive state |
+| `cybou-agentd` | `org.cybou.Runtime.Agent1` — owns bounded agent launches, live sessions, teardown and recent final views; not Mind |
 
 `cybou-shelld` is a library with no binary. Its unit exists, describes a process that does not run,
 and is excluded from the deploy and from `cybou-mind.target`.
@@ -798,6 +799,30 @@ graph. Every class the components render has a rule, checked by
 
 A stranger is served the sign-in view and nothing else where the deployment says so.
 
+The Agents card reads the canonical `SessionView` values from `Agent1` through the gateway. A local
+or authenticated seat may submit only a profile/agent/workspace/model/prompt selection; every grant
+comes from the root-owned profile catalogue and aggregate host capacity. Live rows can be stopped.
+The gateway reports success only after teardown is confirmed, and the card then shows the retained
+final reason rather than an optimistic disappearance.
+
+## Agent runtime
+
+`cybou-agentd serve` owns `org.cybou.Runtime.Agent1`. It recovers still-running capsules from their
+lease and launch records plus the service manager's answer, exposes `Sessions`, `Session`, `Launch`
+and `Stop`, and admits new sessions atomically against operator-selected whole-host limits. Deployment
+starts with an empty profile catalogue and zero capacity, so reachable launch is fail-closed until an
+operator chooses both.
+
+One accepted launch becomes one lease, capsule specification, optional model gateway and ACP prompt
+turn. The OpenCode 1.18.23 pack is digest-pinned and uses its official `opencode acp` entrypoint; the
+credential-free live capsule/ACP handshake has passed. A real provider answer has not: provider
+policy and credentials remain an explicit operator decision, and their absence is reported as
+`NOT RUN` rather than success.
+
+Confirmed endings release live admission and retain the most recent 32 canonical final views in the
+owner process. This is operational context, not durable biography. After an owner restart the host
+can recover what is still running but cannot honestly reconstruct why an already-gone unit ended.
+
 ## Model brokerage
 
 `org.cybou.Faculty.ModelBroker1` selects a route, enforces a budget, puts a request and attributes
@@ -872,6 +897,12 @@ operation table forbids, and a failed critic stops a pre-authorised operation.
 granted Action1 decision it has no operation to perform: its public request contains only an opaque
 permit identity and a missing, expired or consumed identity is refused.
 
+`cybou-remediationd` can carry an eligible finding through proposal, criticism, standing policy,
+single-use permit, execution and independent re-observation. It acts only when `Action1` can prove
+the cause belongs to the episode; an owner lookup failure grants nothing. A completed episode whose
+finding is still present remains completed evidence and is not silently retried after either daemon
+restarts.
+
 ## Current gates
 
 Every one of these runs on Debian 13 and in CI, and all pass:
@@ -890,6 +921,10 @@ bash scripts/test-standing-lease-gate.sh
 bash scripts/test-model-gateway-gate.sh
 bash scripts/test-litellm-worker-gate.sh
 bash scripts/test-provider-catalogue-gate.sh
+bash scripts/test-agent-session-gate.sh
+bash scripts/test-agent-runtime-gate.sh
+bash scripts/test-opencode-pack-gate.sh
+bash scripts/test-self-maintenance-gate.sh
 python3 scripts/validate-cognitive-docs.py .
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py
@@ -910,7 +945,7 @@ mentioned look identical to a reader.
 | | |
 |---|---|
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
-| Agent installation and session | ACP initialization and registry discovery exist; authentication, installation, `session/new` and prompts do not |
+| General agent sessions | one digest-pinned OpenCode pack and one ACP prompt turn exist; multi-turn streaming, further packs and real-provider evidence do not |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |
@@ -923,12 +958,11 @@ mentioned look identical to a reader.
 
 - **Telemetry has no persistence.** Everything it holds is in memory and bounded; a restart starts
   the window again, and the organ says it has not watched long enough rather than answering.
-- **Action lifecycle records are in memory.** A restart destroys unclaimed permits, which fails
-  closed, but durable proposal/decision/attempt recording through Event1 is still to be wired.
 - **Confirmation has no operator surface yet.** A decision may require confirmation and therefore
   produces no permit; only an explicit standing policy can currently reach unattended execution.
-- **ACP has no live agent pack yet.** The client is proven against a protocol peer and the public
-  registry is read live, but no registry distribution has been installed or run inside a capsule.
+- **The agent vertical has no real-provider evidence yet.** The real OpenCode ACP entrypoint has run
+  inside a capsule and completed the credential-free handshake, but no configured provider has
+  returned an answer through the full path. Multi-turn streaming is also not built.
 - **The context projection has no checkpoint.** It replays from the Journal on every start. Correct,
   and slower than it needs to be on a long biography.
 - **`Predictor1` is domain-neutral.** It forecasts a level — where a subject sits relative to its own

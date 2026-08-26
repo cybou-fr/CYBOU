@@ -31,7 +31,7 @@
 //! A lease that has run out is a different case and needs no judgement: the clock says so, and the
 //! clock is the same one that ended the capsule.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -76,14 +76,22 @@ pub struct LiveSession {
     pub ledger: Ledger,
 }
 
-/// Sessions this owner is holding.
+/// Live sessions this owner is holding, plus bounded process-local ending context.
 ///
-/// Ordered by capsule identity rather than by arrival, so a listing is stable across restarts and a
-/// surface does not reorder itself for reasons a person cannot see.
+/// Live sessions are ordered by capsule identity rather than arrival. Finished views retain ending
+/// order and do not contribute to capacity or any live lookup.
 #[derive(Debug, Default)]
 pub struct SessionRegistry {
     sessions: BTreeMap<Uuid, LiveSession>,
+    finished: VecDeque<SessionView>,
 }
+
+/// Recent finished sessions kept by one owner process.
+///
+/// This is operational context, not durable biography. A restarted owner can recover what is still
+/// running from the host, but cannot reconstruct why a unit that is already gone ended without
+/// inventing a reason. Bounded so repeated short tasks do not turn the owner into an event store.
+const FINISHED_REMEMBERED: usize = 32;
 
 /// What a recovery pass concluded.
 #[derive(Debug, Default)]
@@ -157,6 +165,23 @@ impl SessionRegistry {
         self.sessions.remove(&capsule_id)
     }
 
+    /// Finish one held session and retain its final canonical view in bounded process-local history.
+    ///
+    /// Returns whether the live session was still held. A concurrent ending that already took it
+    /// cannot add a second final record.
+    pub fn finish(&mut self, capsule_id: Uuid, at: OffsetDateTime) -> bool {
+        let Some(mut live) = self.take(capsule_id) else {
+            return false;
+        };
+        live.session.finish_ending(at);
+        self.finished
+            .push_back(crate::view::of(&live.session, &live.plan, live.ledger));
+        while self.finished.len() > FINISHED_REMEMBERED {
+            self.finished.pop_front();
+        }
+        true
+    }
+
     /// How many sessions are held.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -169,7 +194,7 @@ impl SessionRegistry {
         self.sessions.is_empty()
     }
 
-    /// Every held session, as a surface should show it.
+    /// Every live session and recent finished view, as a surface should show them.
     ///
     /// Whatever [`Self::read_ledgers`] last read for each, which is [`Ledger::Elsewhere`] until
     /// something has. Never a nought this owner invented: it holds the grant a person approved and
@@ -180,6 +205,7 @@ impl SessionRegistry {
         self.sessions
             .values()
             .map(|live| crate::view::of(&live.session, &live.plan, live.ledger))
+            .chain(self.finished.iter().cloned())
             .collect()
     }
 
@@ -632,5 +658,32 @@ mod tests {
         assert_eq!(taken.plan.lease.grant().capsule_id, Uuid::from_u128(0xd001));
         assert!(recovered.registry.is_empty());
         assert!(recovered.registry.get(Uuid::from_u128(0xd001)).is_none());
+    }
+
+    #[test]
+    fn finished_sessions_are_visible_but_reserve_nothing_and_are_bounded() {
+        let mut registry = SessionRegistry::new();
+        for ordinal in 0..(FINISHED_REMEMBERED + 5) {
+            let capsule = 0xe000 + ordinal as u128;
+            let mut live = recover(vec![found(capsule, Duration::hours(4), true)], at(60))
+                .registry
+                .take(Uuid::from_u128(capsule))
+                .expect("held");
+            live.session
+                .begin_ending(SessionEnd::Failed(format!("attempt {ordinal} ended")));
+            registry.insert(live);
+            assert!(registry.finish(Uuid::from_u128(capsule), at(120)));
+        }
+
+        assert!(registry.is_empty(), "history is not live admission");
+        assert_eq!(registry.reserved(), Reserved::default());
+        let views = registry.views();
+        assert_eq!(views.len(), FINISHED_REMEMBERED);
+        assert!(views.iter().all(|view| view.standing == Standing::Ended));
+        assert_eq!(
+            views[0].capsule_id,
+            Uuid::from_u128(0xe000 + 5),
+            "the oldest operational record is discarded first"
+        );
     }
 }

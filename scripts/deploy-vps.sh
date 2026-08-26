@@ -178,6 +178,17 @@ cybou_ssh "
   sudo chown root:cybou /etc/cybou/agent-profiles.json
   sudo chmod 0640 /etc/cybou/agent-profiles.json
 
+  # Admission is a promise across every live session, not a per-process preflight. Keep the initial
+  # host closed until an operator chooses real totals for this machine; absence means the historical
+  # unbounded mode, and Agent1 deliberately will not launch through a reachable surface in that mode.
+  if [ ! -e /etc/cybou/agent-capacity.json ]; then
+    printf '%s\n' \
+      '{"maxSessions":0,"memoryMiB":0,"cpus":0,"tasksMax":0,"spendUnits":0}' \
+      | sudo tee /etc/cybou/agent-capacity.json >/dev/null
+  fi
+  sudo chown root:cybou /etc/cybou/agent-capacity.json
+  sudo chmod 0640 /etc/cybou/agent-capacity.json
+
   # The one privileged step of a launch. Start and stop, that unit template, that user, nothing else.
   sudo install -d -m 0755 /etc/polkit-1/rules.d
   sudo install -m 0644 debian/cybou-agent-gateway.rules /etc/polkit-1/rules.d/50-cybou.rules

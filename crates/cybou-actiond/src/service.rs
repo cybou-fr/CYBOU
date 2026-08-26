@@ -115,6 +115,18 @@ impl Action1Service {
             .map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 
+    /// The last action actually attempted for one finding.
+    ///
+    /// This is the durable half of the remediation driver's retry guard. Its process-local map is
+    /// empty after a restart, while the owner has restored completed as well as unfinished episodes
+    /// from the Journal. A missing method here must never be mistaken for permission to act again.
+    async fn episode_for_cause(&self, cause_id: String) -> fdo::Result<Vec<u8>> {
+        let cause_id = Uuid::parse_str(&cause_id)
+            .map_err(|_| fdo::Error::InvalidArgs("invalid cause identity".to_owned()))?;
+        encode(&self.core.episode_for_cause(cause_id))
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;

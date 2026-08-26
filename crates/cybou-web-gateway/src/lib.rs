@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Bounded, read-only HTTP boundary between Living Canvas and Presence.
+//! Bounded HTTP boundary between Living Canvas and the runtime owners it presents.
 
 use std::{path::PathBuf, sync::Arc};
 
 use axum::{
     Router,
     http::{HeaderName, HeaderValue},
-    routing::{any, get, post},
+    routing::{any, delete, get, post},
 };
 use cybou_web_contracts::{SessionProjection, WEB_SCHEMA_V1};
 use time::{Duration as TimeDuration, OffsetDateTime, format_description::well_known::Rfc3339};
@@ -41,8 +41,9 @@ pub use state::{
 
 use routes::{
     agents_handler, api_not_found, disclosure_handler, events_handler, insight_handler,
-    list_directory_handler, login_handler, logout_handler, mind_handler, read_file_handler,
-    session_handler, shell_close_handler, shell_exec_handler, snapshot_handler,
+    launch_agent_handler, list_directory_handler, login_handler, logout_handler, mind_handler,
+    read_file_handler, session_handler, shell_close_handler, shell_exec_handler, snapshot_handler,
+    stop_agent_handler,
 };
 use state::GatewayState;
 
@@ -172,7 +173,11 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/events", get(events_handler))
         .route("/api/v1/disclosure", get(disclosure_handler))
         .route("/api/v1/insight", get(insight_handler))
-        .route("/api/v1/agents", get(agents_handler))
+        .route(
+            "/api/v1/agents",
+            get(agents_handler).post(launch_agent_handler),
+        )
+        .route("/api/v1/agents/{capsule_id}", delete(stop_agent_handler))
         .route("/api/v1/shell/exec", post(shell_exec_handler))
         .route("/api/v1/shell/close", post(shell_close_handler))
         .route("/api/v1/files/list", post(list_directory_handler))
@@ -222,7 +227,7 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
-    use cybou_protocol::KnowledgeState;
+    use cybou_protocol::{KnowledgeState, agent::LaunchRequest};
     use cybou_web_contracts::{
         DisclosureProjection, MindProjection, SessionMode, SessionProjection, ShellExecRequest,
         ShellExecResponse, SnapshotProjection,
@@ -1454,5 +1459,80 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn agent_launch_is_strictly_forbidden_in_public_preview() {
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::public_preview(),
+        );
+        let payload = serde_json::to_vec(&LaunchRequest {
+            profile: "bounded".into(),
+            agent: "opencode".into(),
+            workspace: "/srv/project".into(),
+            model_class: Some("Strong".into()),
+            prompt: "Inspect the repository".into(),
+        })
+        .expect("serialize request");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/agents")
+                    .header("content-type", "application/json")
+                    .body(Body::from(payload))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn agent_stop_is_strictly_forbidden_in_public_preview() {
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::public_preview(),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/api/v1/agents/00000000-0000-0000-0000-000000000001")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn agent_stop_rejects_an_invalid_identity_before_asking_the_runtime() {
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::local_desktop(),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/api/v1/agents/not-a-capsule")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }

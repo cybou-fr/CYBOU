@@ -148,10 +148,27 @@ async fn consider(
         // after a restart. The durable record is what survives; the map is a cache of it. Without
         // this the guarantee is only that it cannot act twice during one uninterrupted process, and
         // a crash must not be able to cause a second restart of a service.
-        if !handled.contains_key(&finding.insight_id)
-            && let Some(already) = episode_for(system, finding.insight_id).await
-        {
-            handled.insert(finding.insight_id, already);
+        if !handled.contains_key(&finding.insight_id) {
+            match episode_for(system, finding.insight_id).await {
+                Ok(Some(already)) => {
+                    println!(
+                        "[cybou-remediationd] Remembering the episode already carried out for {}",
+                        finding.finding.name()
+                    );
+                    handled.insert(finding.insight_id, already);
+                }
+                Ok(None) => {}
+                Err(why) => {
+                    // Failure to ask the owner is not evidence that nothing was tried. Acting on
+                    // that answer would make a transient bus failure permission to repeat a
+                    // mutation. Leave this finding alone for this pass and ask again next time.
+                    eprintln!(
+                        "[cybou-remediationd] Could not check earlier work for {}: {why}",
+                        finding.finding.name()
+                    );
+                    continue;
+                }
+            }
         }
 
         // An episode adopted from the owner has no finding of its own; this is where it gets one, so
@@ -377,10 +394,13 @@ async fn adopt_unfinished(system: &zbus::Connection) -> HashMap<Uuid, Handled> {
 
 /// What this host already did about one finding, asked of the owner that would know.
 ///
-/// `None` covers both *nothing was done* and *the owner could not be asked*, and treating them alike
-/// is deliberate: neither is grounds to act. A driver that read an unreachable owner as *nothing was
-/// tried* would restart a service because it could not check whether it already had.
-async fn episode_for(system: &zbus::Connection, cause_id: Uuid) -> Option<Handled> {
+/// Absence and failure are different answers. Absence means this cause is new and may proceed to the
+/// initiative decision. Failure means the owner could not answer, which is never grounds to act: a
+/// driver must not turn a transient bus failure into permission to repeat a mutation.
+async fn episode_for(
+    system: &zbus::Connection,
+    cause_id: Uuid,
+) -> Result<Option<Handled>, Box<dyn std::error::Error>> {
     let encoded: Vec<u8> = system
         .call_method(
             Some(ACTION.service),
@@ -389,15 +409,17 @@ async fn episode_for(system: &zbus::Connection, cause_id: Uuid) -> Option<Handle
             "EpisodeForCause",
             &(cause_id.to_string(),),
         )
-        .await
-        .ok()?
+        .await?
         .body()
-        .deserialize()
-        .ok()?;
-    let record: ActionRecord = decode(&encoded).ok()?;
-    let attempt = record.attempt?;
+        .deserialize()?;
+    let Some(record) = decode::<Option<ActionRecord>>(&encoded)? else {
+        return Ok(None);
+    };
+    let Some(attempt) = record.attempt else {
+        return Ok(None);
+    };
 
-    Some(Handled {
+    Ok(Some(Handled {
         // Not invented from the record: it holds what was proposed and decided, and the finding was
         // the telemetry organ's. The caller fills it in when the problem is still being reported.
         finding: None,
@@ -406,7 +428,7 @@ async fn episode_for(system: &zbus::Connection, cause_id: Uuid) -> Option<Handle
             outcome: record.outcome,
         },
         before: Vec::new(),
-    })
+    }))
 }
 
 /// What was proposed, asked of the owner that proposed it.

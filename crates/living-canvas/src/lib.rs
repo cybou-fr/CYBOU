@@ -111,6 +111,25 @@ pub trait MindClient {
     /// same as no sessions, and the two must not collapse into one another.
     async fn agents(&self) -> Result<Vec<cybou_protocol::agent::SessionView>, ClientError>;
 
+    /// Ask the agent runtime owner to launch one profile-bounded session.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError::GatewayRequest`] when the caller is not entitled to launch, the
+    /// profile refuses the selection, host capacity is exhausted, or Agent1 is unavailable.
+    async fn launch_agent(
+        &self,
+        request: &cybou_protocol::agent::LaunchRequest,
+    ) -> Result<cybou_protocol::agent::SessionView, ClientError>;
+
+    /// Ask the agent runtime owner to end one session and confirm its teardown.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError::GatewayRequest`] when the caller is not entitled to stop it, the
+    /// teardown cannot be confirmed, or Agent1 is unavailable.
+    async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError>;
+
     /// Execute a bounded Shell capability inside the Body host sandbox.
     ///
     /// # Errors
@@ -269,6 +288,21 @@ impl MindClient for MockMindClient {
         self.agents
             .clone()
             .ok_or_else(|| ClientError::GatewayRequest("mock client holds no agent runtime".into()))
+    }
+
+    async fn launch_agent(
+        &self,
+        _request: &cybou_protocol::agent::LaunchRequest,
+    ) -> Result<cybou_protocol::agent::SessionView, ClientError> {
+        Err(ClientError::GatewayRequest(
+            "mock client launches no agent sessions".into(),
+        ))
+    }
+
+    async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError> {
+        Err(ClientError::GatewayRequest(format!(
+            "mock client stops no agent session {capsule_id}"
+        )))
     }
 
     async fn disclosure(&self) -> Result<DisclosureProjection, ClientError> {

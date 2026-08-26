@@ -33,7 +33,7 @@ use cybou_capsule::{
     CapabilityProfile, KernelCapsuleSpec, Lease, LeaseRequest, ModelGrant, NetworkGrant,
     ResourceBudget, SpendPolicy, Workspace, compile, issue_lease,
 };
-use cybou_protocol::agent::SessionView;
+use cybou_protocol::agent::{LaunchRequest, SessionView};
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
@@ -290,7 +290,7 @@ async fn launch(selection: &Selection) -> Result<(), String> {
 
     // From here on every path ends in teardown, including the ones that fail. A launch that gave up
     // halfway and returned would leave a live gateway holding a bearer for a session nobody watches.
-    match bring_up(&plan, &spec, &programs, selection, &mut session).await {
+    match bring_up(&plan, &spec, &programs, selection, &mut session, || {}).await {
         Ok(true) => session.begin_ending(SessionEnd::AgentFinished),
         Ok(false) => session.begin_ending(SessionEnd::Failed(
             "the agent exited with a failure".to_owned(),
@@ -328,6 +328,7 @@ async fn bring_up(
     programs: &HostPrograms,
     selection: &Selection,
     session: &mut Session,
+    on_running: impl FnOnce(),
 ) -> Result<bool, String> {
     write_session_files(plan)?;
 
@@ -352,6 +353,7 @@ async fn bring_up(
     let capsule =
         runtime::run_capsule(plan, spec, programs, &program).map_err(|error| error.to_string())?;
     session.running().map_err(|error| error.to_string())?;
+    on_running();
     // One line a surface can read, rather than prose a surface would have to parse. Everything on it
     // is a fact off the approved lease and the compiled spec — the ceilings a person selected, not a
     // reading of what the capsule is using, which nothing here can honestly observe yet.
@@ -633,7 +635,11 @@ async fn serve() -> Result<(), String> {
         "[cybou-agentd] Holding {} running session(s)",
         recovered.registry.len()
     );
-    report_capacity(&recovered.registry, host_capacity());
+    // One startup snapshot is both what is reported and what admission enforces. Reading twice
+    // would let a file replacement between the calls make the owner's announcement disagree with
+    // the policy it actually holds.
+    let capacity = host_capacity();
+    report_capacity(&recovered.registry, capacity);
 
     let registry = Arc::new(Mutex::new(recovered.registry));
     let _connection = zbus::connection::Builder::session()
@@ -642,7 +648,12 @@ async fn serve() -> Result<(), String> {
         .map_err(|error| error.to_string())?
         .serve_at(
             AGENT.object_path,
-            Agent1Service::new(Arc::clone(&registry), Arc::new(HostTeardown)),
+            Agent1Service::with_launch(
+                Arc::clone(&registry),
+                Arc::new(HostTeardown),
+                capacity,
+                Arc::new(HostLauncher),
+            ),
         )
         .map_err(|error| error.to_string())?
         .build()
@@ -697,10 +708,10 @@ fn expire(registry: &Arc<std::sync::Mutex<cybou_agentd::registry::SessionRegistr
         return;
     };
     for capsule_id in held.expire(now) {
-        if let Some(mut live) = held.take(capsule_id) {
+        if let Some(plan) = held.get(capsule_id).map(|live| live.plan.clone()) {
             println!("[cybou-agentd] Session {capsule_id} reached the end of its lease");
-            teardown(&live.plan);
-            live.session.finish_ending(now);
+            teardown(&plan);
+            held.finish(capsule_id, now);
         }
     }
 }
@@ -787,6 +798,142 @@ impl cybou_agentd::service::Teardown for HostTeardown {
 /// Where an operator writes down the profiles this host offers.
 const CATALOGUE: &str = "/etc/cybou/agent-profiles.json";
 
+/// The session owner's host-dependent launch implementation.
+#[cfg(target_os = "linux")]
+struct HostLauncher;
+
+#[cfg(target_os = "linux")]
+impl cybou_agentd::service::Launcher for HostLauncher {
+    fn prepare(
+        &self,
+        request: &LaunchRequest,
+        now: OffsetDateTime,
+    ) -> Result<cybou_agentd::service::PreparedLaunch, String> {
+        if request.prompt.trim().is_empty() {
+            return Err("an agent launch needs an initial prompt".to_owned());
+        }
+        if request.agent != cybou_agent_opencode::AGENT_ID {
+            return Err(format!(
+                "no agent pack for '{}'; only '{}' can be launched today",
+                request.agent,
+                cybou_agent_opencode::AGENT_ID
+            ));
+        }
+
+        let catalogue = fs::read(CATALOGUE)
+            .map_err(|error| format!("read {CATALOGUE}: {error}"))
+            .and_then(|bytes| ProfileCatalogue::read(&bytes).map_err(|why| why.to_string()))?;
+        let wanted = Wanted {
+            profile: request.profile.clone(),
+            agent: request.agent.clone(),
+            workspace: PathBuf::from(&request.workspace),
+            model_class: request.model_class.clone(),
+        };
+        let (profile, workspace, ceilings) = catalogue
+            .grant(&wanted)
+            .map_err(|why| format!("{why}; approved profiles: {}", catalogue.names().join(", ")))?;
+        if profile.model.is_none() {
+            return Err("an ACP agent launch needs a model offered by its profile".to_owned());
+        }
+
+        let lease = issue_lease(
+            LeaseRequest {
+                selected_profile: profile,
+                capsule_id: Uuid::new_v4(),
+                agent: wanted.agent,
+                workspace,
+            },
+            now,
+        )
+        .map_err(|error| error.to_string())?;
+        let launch = Launch {
+            lease: lease.clone(),
+            task_id: Uuid::new_v4(),
+            ceilings: ceilings.ok_or_else(|| {
+                "the offered model has no token ceilings attached to it".to_owned()
+            })?,
+        };
+        let plan = plan::plan(&launch, now).map_err(|error| error.to_string())?;
+        let spec = compile(lease.grant()).map_err(|error| error.to_string())?;
+        Ok(cybou_agentd::service::PreparedLaunch {
+            plan,
+            spec,
+            prompt: request.prompt.clone(),
+        })
+    }
+
+    fn start(
+        &self,
+        prepared: cybou_agentd::service::PreparedLaunch,
+        registry: Arc<std::sync::Mutex<cybou_agentd::registry::SessionRegistry>>,
+    ) -> Result<(), String> {
+        tokio::spawn(run_owned_launch(prepared, registry));
+        Ok(())
+    }
+}
+
+/// Carry out an admitted Agent1 launch while the owner continues answering its bus surface.
+#[cfg(target_os = "linux")]
+async fn run_owned_launch(
+    prepared: cybou_agentd::service::PreparedLaunch,
+    registry: Arc<std::sync::Mutex<cybou_agentd::registry::SessionRegistry>>,
+) {
+    let capsule_id = prepared.plan.lease.grant().capsule_id;
+    let mut session = Session::launching(capsule_id, prepared.plan.lease.issued_at());
+    let selection = Selection {
+        prompt: Some(prepared.prompt),
+        ..Selection::default()
+    };
+    let running_registry = Arc::clone(&registry);
+    let result = bring_up(
+        &prepared.plan,
+        &prepared.spec,
+        &HostPrograms::default(),
+        &selection,
+        &mut session,
+        move || {
+            if let Ok(mut held) = running_registry.lock()
+                && let Some(live) = held.get_mut(capsule_id)
+            {
+                let _ = live.session.running();
+            }
+        },
+    )
+    .await;
+
+    let end = match result {
+        Ok(true) => SessionEnd::AgentFinished,
+        Ok(false) => SessionEnd::Failed("the agent exited with a failure".to_owned()),
+        Err(why) => SessionEnd::Failed(why),
+    };
+    session.begin_ending(end.clone());
+    if let Ok(mut held) = registry.lock()
+        && let Some(live) = held.get_mut(capsule_id)
+    {
+        live.session.begin_ending(end);
+    }
+
+    teardown(&prepared.plan);
+    let ended_at = OffsetDateTime::now_utc();
+    session.finish_ending(ended_at);
+    if let Ok(mut held) = registry.lock() {
+        held.finish(capsule_id, ended_at);
+    }
+
+    match session.state() {
+        SessionState::Ended(SessionEnd::Failed(why)) => {
+            eprintln!("[cybou-agentd] Session {capsule_id} failed: {why}");
+        }
+        SessionState::Ended(end) => {
+            println!(
+                "[cybou-agentd] Session {capsule_id} ended: {}",
+                end.describe()
+            );
+        }
+        _ => {}
+    }
+}
+
 /// Launch under bounds an operator approved, rather than bounds the caller named.
 ///
 /// The same session as `launch` and a different door to it. `launch` takes ceilings as arguments,
@@ -848,6 +995,16 @@ async fn start(selection: &Selection) -> Result<(), String> {
 /// moment a session started or ended between its listing and its reading.
 #[cfg(target_os = "linux")]
 async fn sessions() -> Result<(), String> {
+    let views = session_views().await?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&views).map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+async fn session_views() -> Result<Vec<SessionView>, String> {
     use cybou_fabric::AGENT;
 
     let encoded: Vec<u8> = zbus::Connection::session()
@@ -866,13 +1023,7 @@ async fn sessions() -> Result<(), String> {
         .deserialize()
         .map_err(|error| error.to_string())?;
 
-    let views: Vec<SessionView> =
-        cybou_fabric::decode(&encoded).map_err(|error| error.to_string())?;
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&views).map_err(|error| error.to_string())?
-    );
-    Ok(())
+    cybou_fabric::decode(&encoded).map_err(|error| error.to_string())
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -908,10 +1059,16 @@ async fn stop(selection: &Selection) -> Result<(), String> {
 
     if stopped {
         println!("session {capsule_id} stopped");
+    } else if session_views()
+        .await?
+        .iter()
+        .any(|view| view.capsule_id == capsule_id && view.is_live())
+    {
+        return Err(format!(
+            "session {capsule_id} is still live; teardown could not be confirmed"
+        ));
     } else {
-        // Not an error. In both cases the session is over by the time this is answered, and telling
-        // a person their request failed because somebody else stopped it first would be reporting a
-        // difference that does not matter to them.
+        // Not an error. Somebody else stopping it first is the same outcome to this caller.
         println!("session {capsule_id} was not running");
     }
     Ok(())

@@ -1,24 +1,18 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! The `org.cybou.Runtime.Agent1` surface: what is running, and how to stop it.
+//! The `org.cybou.Runtime.Agent1` surface: launch, hold and stop agent sessions.
 //!
-//! ## Read and stop, and deliberately not launch
+//! ## Launch accepts a selection, never authority
 //!
-//! A CLI launch is already bounded by who can run it: whoever invokes `cybou-agentd launch` is
-//! `cybou` on this host. Putting `Launch` on the bus removes that, because any process under the same
-//! UID could then ask for a capsule — and the only thing left standing between such a request and a
-//! real grant would be the profile it names.
+//! `Launch` takes a profile id, agent, workspace, offered model class and initial prompt. It takes no
+//! memory, CPU, task, lifetime, host, spending or token bound. The launcher reads the root-owned
+//! profile catalogue itself and derives every grant from it, so a reachable caller chooses among
+//! offers and cannot manufacture a `CapsuleGrant`.
 //!
-//! That is not an argument against ever offering it. It is an argument that `Launch` arrives with a
-//! registry of operator-approved profiles the owner reads *itself*, and takes a profile id rather
-//! than a set of ceilings. An endpoint that accepted memory, CPUs, hosts and a lifetime from its
-//! caller would be asking the caller to invent its own `CapsuleGrant`, which is the one thing a
-//! capability profile exists to prevent.
-//!
-//! So this surface answers what is running and ends what a person asks it to end. Both are safe in a
-//! way `Launch` is not: neither can widen anything, and stopping is the direction that removes
-//! authority rather than granting it.
+//! Host admission happens here, under the same registry lock that inserts the launching session.
+//! This is the owner boundary the CLI could not provide: two simultaneous callers cannot both be
+//! told the same remaining capacity is theirs.
 //!
 //! ## Stopping is stopping units, not asking an agent
 //!
@@ -41,21 +35,54 @@
 //!
 //! The reason is fixed **before** the teardown, because a session torn down first and labelled
 //! afterwards could be marked expired if the clock ran out in between, which would replace a
-//! person's decision with a timer. Where that record then goes — a listing of finished sessions a
-//! person can still read — is not built, and until it is, a stopped session simply stops being
-//! listed.
+//! person's decision with a timer. A confirmed ending releases its live reservation and leaves a
+//! bounded final view that a person can still read.
 
 #![allow(missing_docs)]
 
 use std::sync::{Arc, Mutex};
 
+use cybou_capsule::KernelCapsuleSpec;
 use cybou_fabric::encode;
+use cybou_protocol::agent::LaunchRequest;
 use time::OffsetDateTime;
 use uuid::Uuid;
 use zbus::{fdo, interface};
 
 use crate::registry::SessionRegistry;
 use crate::session::SessionEnd;
+use crate::{HostCapacity, LiveSession, SessionPlan, session::Session, view::Ledger};
+
+/// One request after the operator's profile has supplied every bound and the launch has been
+/// planned, but before anything has touched the host.
+pub struct PreparedLaunch {
+    /// The complete owner-derived session plan.
+    pub plan: SessionPlan,
+    /// The kernel boundary compiled from the same lease.
+    pub spec: KernelCapsuleSpec,
+    /// The initial task, which is content rather than authority.
+    pub prompt: String,
+}
+
+/// The host-dependent half of launching.
+///
+/// Profile reading and planning live behind this trait as well as execution so tests can prove the
+/// D-Bus owner's admission and lifecycle decisions without starting service-manager units.
+pub trait Launcher: Send + Sync {
+    /// Resolve the caller's selection only through operator-approved profiles.
+    fn prepare(
+        &self,
+        request: &LaunchRequest,
+        now: OffsetDateTime,
+    ) -> Result<PreparedLaunch, String>;
+
+    /// Begin the already-admitted launch and arrange its lifecycle updates.
+    fn start(
+        &self,
+        prepared: PreparedLaunch,
+        registry: Arc<Mutex<SessionRegistry>>,
+    ) -> Result<(), String>;
+}
 
 /// What the surface needs in order to end a session on the host.
 ///
@@ -87,13 +114,33 @@ pub enum Ended {
 pub struct Agent1Service {
     registry: Arc<Mutex<SessionRegistry>>,
     teardown: Arc<dyn Teardown>,
+    launch: Option<(HostCapacity, Arc<dyn Launcher>)>,
 }
 
 impl Agent1Service {
     /// Serve this registry.
     #[must_use]
     pub fn new(registry: Arc<Mutex<SessionRegistry>>, teardown: Arc<dyn Teardown>) -> Self {
-        Self { registry, teardown }
+        Self {
+            registry,
+            teardown,
+            launch: None,
+        }
+    }
+
+    /// Serve this registry and own new launches against one bounded host capacity.
+    #[must_use]
+    pub fn with_launch(
+        registry: Arc<Mutex<SessionRegistry>>,
+        teardown: Arc<dyn Teardown>,
+        capacity: HostCapacity,
+        launcher: Arc<dyn Launcher>,
+    ) -> Self {
+        Self {
+            registry,
+            teardown,
+            launch: Some((capacity, launcher)),
+        }
     }
 }
 
@@ -102,6 +149,48 @@ impl Agent1Service {
 impl Agent1Service {
     async fn ready(&self) -> bool {
         true
+    }
+
+    /// Launch one agent under an operator-approved profile.
+    async fn launch(&self, request: Vec<u8>) -> fdo::Result<Vec<u8>> {
+        let request: LaunchRequest = cybou_fabric::decode(&request)
+            .map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        let (capacity, launcher) = self.launch.as_ref().ok_or_else(|| {
+            fdo::Error::AccessDenied("this owner was not configured to launch sessions".to_owned())
+        })?;
+        if !capacity.is_bounded() {
+            return Err(fdo::Error::AccessDenied(
+                "Agent1 refuses reachable launches without a bounded host capacity".to_owned(),
+            ));
+        }
+
+        let now = OffsetDateTime::now_utc();
+        let prepared = launcher
+            .prepare(&request, now)
+            .map_err(fdo::Error::AccessDenied)?;
+        let capsule_id = prepared.plan.lease.grant().capsule_id;
+        let session = Session::launching(capsule_id, now);
+        let view = crate::view::of(&session, &prepared.plan, Ledger::Elsewhere);
+        let live = LiveSession {
+            plan: prepared.plan.clone(),
+            session,
+            ledger: Ledger::Elsewhere,
+        };
+
+        self.registry
+            .lock()
+            .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?
+            .admit(*capacity, live)
+            .map_err(|why| fdo::Error::LimitsExceeded(why.to_string()))?;
+
+        if let Err(why) = launcher.start(prepared, Arc::clone(&self.registry)) {
+            if let Ok(mut registry) = self.registry.lock() {
+                registry.take(capsule_id);
+            }
+            return Err(fdo::Error::Failed(why));
+        }
+
+        encode(&view).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 
     /// Every session this owner holds, as a surface should show it.
@@ -131,9 +220,9 @@ impl Agent1Service {
 
     /// End one session now.
     ///
-    /// Idempotent in the way that matters: a second Stop on a session this owner no longer holds is
-    /// not an error worth reporting differently from the first, because in both cases the session is
-    /// over by the time the caller is answered.
+    /// Idempotent in the way that matters: a second Stop on a session this owner no longer holds
+    /// returns `false` without another teardown. `false` can also mean that teardown was unproven;
+    /// callers that need to distinguish those outcomes must read the canonical session listing.
     async fn stop(&self, capsule_id: String) -> fdo::Result<bool> {
         let capsule_id = identity(&capsule_id)?;
         let now = OffsetDateTime::now_utc();
@@ -161,9 +250,7 @@ impl Agent1Service {
             .registry
             .lock()
             .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
-        if let Some(mut live) = registry.take(capsule_id) {
-            live.session.finish_ending(now);
-        }
+        registry.finish(capsule_id, now);
         Ok(true)
     }
 }
@@ -179,7 +266,7 @@ mod tests {
 
     use cybou_capsule::{
         CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy,
-        Workspace, issue_lease,
+        Workspace, compile, issue_lease,
     };
     use time::Duration;
 
@@ -209,6 +296,60 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FakeLauncher {
+        prepared: AtomicUsize,
+        started: AtomicUsize,
+    }
+
+    impl Launcher for FakeLauncher {
+        fn prepare(
+            &self,
+            request: &LaunchRequest,
+            _now: OffsetDateTime,
+        ) -> Result<PreparedLaunch, String> {
+            if request.profile != "sandboxed-autonomous" {
+                return Err("the profile is not offered".to_owned());
+            }
+            let ordinal = self.prepared.fetch_add(1, Ordering::SeqCst) as u128;
+            let live = held_for(Uuid::from_u128(CAPSULE.as_u128() + ordinal));
+            Ok(PreparedLaunch {
+                spec: compile(live.plan.lease.grant()).map_err(|error| error.to_string())?,
+                plan: live.plan,
+                prompt: request.prompt.clone(),
+            })
+        }
+
+        fn start(
+            &self,
+            _prepared: PreparedLaunch,
+            _registry: Arc<Mutex<SessionRegistry>>,
+        ) -> Result<(), String> {
+            self.started.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    struct RefusingStarter(FakeLauncher);
+
+    impl Launcher for RefusingStarter {
+        fn prepare(
+            &self,
+            request: &LaunchRequest,
+            now: OffsetDateTime,
+        ) -> Result<PreparedLaunch, String> {
+            self.0.prepare(request, now)
+        }
+
+        fn start(
+            &self,
+            _prepared: PreparedLaunch,
+            _registry: Arc<Mutex<SessionRegistry>>,
+        ) -> Result<(), String> {
+            Err("the launch task could not be owned".to_owned())
+        }
+    }
+
     fn at(offset: i64) -> OffsetDateTime {
         OffsetDateTime::from_unix_timestamp(1_787_000_000 + offset).expect("a fixed instant")
     }
@@ -216,6 +357,10 @@ mod tests {
     const CAPSULE: Uuid = Uuid::from_u128(0xf001);
 
     fn held() -> LiveSession {
+        held_for(CAPSULE)
+    }
+
+    fn held_for(capsule_id: Uuid) -> LiveSession {
         let mut profile = CapabilityProfile::bounded(
             "sandboxed-autonomous",
             ResourceBudget {
@@ -235,7 +380,7 @@ mod tests {
         let lease = issue_lease(
             LeaseRequest {
                 selected_profile: profile,
-                capsule_id: CAPSULE,
+                capsule_id,
                 agent: "opencode".to_owned(),
                 workspace: Workspace::at("/srv/project"),
             },
@@ -257,7 +402,7 @@ mod tests {
         )
         .expect("a plan");
 
-        let mut session = Session::launching(CAPSULE, at(0));
+        let mut session = Session::launching(capsule_id, at(0));
         session.running().expect("it came up");
         LiveSession {
             plan,
@@ -286,7 +431,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stopping_a_session_tears_it_down_once_and_stops_listing_it() {
+    async fn stopping_a_session_tears_it_down_once_and_lists_its_final_view() {
         let (service, teardown, registry) = serving();
         assert_eq!(registry.lock().expect("held").len(), 1);
 
@@ -296,6 +441,14 @@ mod tests {
             registry.lock().expect("held").is_empty(),
             "the registry answers what is running"
         );
+        let views = registry.lock().expect("held").views();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].standing, crate::view::Standing::Ended);
+        assert_eq!(
+            views[0].ended_because.as_deref(),
+            Some("the session was stopped")
+        );
+        assert!(views[0].ended_at.is_some());
     }
 
     #[tokio::test]
@@ -366,5 +519,108 @@ mod tests {
             Some(crate::view::SpendView::Capped { spent, .. }) => assert_eq!(spent, None),
             other => panic!("a capped grant showed as {other:?}"),
         }
+    }
+
+    fn launch_request() -> LaunchRequest {
+        LaunchRequest {
+            profile: "sandboxed-autonomous".to_owned(),
+            agent: "opencode".to_owned(),
+            workspace: "/srv/project".to_owned(),
+            model_class: Some("Strong".to_owned()),
+            prompt: "inspect this workspace".to_owned(),
+        }
+    }
+
+    fn bounded_capacity(max_sessions: u32) -> HostCapacity {
+        HostCapacity {
+            max_sessions,
+            memory_mib: 8192,
+            cpus: 4,
+            tasks_max: 1024,
+            spend_units: 200,
+        }
+    }
+
+    #[tokio::test]
+    async fn launch_admits_and_starts_one_owner_derived_session() {
+        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+        let launcher = Arc::new(FakeLauncher::default());
+        let service = Agent1Service::with_launch(
+            Arc::clone(&registry),
+            Arc::new(CountingTeardown::default()),
+            bounded_capacity(1),
+            Arc::clone(&launcher) as Arc<dyn Launcher>,
+        );
+
+        let encoded = service
+            .launch(encode(&launch_request()).expect("request encodes"))
+            .await
+            .expect("admitted");
+        let view: crate::view::SessionView = cybou_fabric::decode(&encoded).expect("view decodes");
+
+        assert_eq!(view.capsule_id, CAPSULE);
+        assert_eq!(view.standing, crate::view::Standing::Launching);
+        assert_eq!(registry.lock().expect("held").len(), 1);
+        assert_eq!(launcher.started.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn two_launches_cannot_both_take_the_last_host_slot() {
+        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+        let launcher = Arc::new(FakeLauncher::default());
+        let service = Agent1Service::with_launch(
+            Arc::clone(&registry),
+            Arc::new(CountingTeardown::default()),
+            bounded_capacity(1),
+            Arc::clone(&launcher) as Arc<dyn Launcher>,
+        );
+        let request = encode(&launch_request()).expect("request encodes");
+
+        assert!(service.launch(request.clone()).await.is_ok());
+        assert!(service.launch(request).await.is_err());
+        assert_eq!(registry.lock().expect("held").len(), 1);
+        assert_eq!(launcher.prepared.load(Ordering::SeqCst), 2);
+        assert_eq!(launcher.started.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn reachable_launch_refuses_an_unbounded_host() {
+        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+        let launcher = Arc::new(FakeLauncher::default());
+        let service = Agent1Service::with_launch(
+            Arc::clone(&registry),
+            Arc::new(CountingTeardown::default()),
+            HostCapacity::unbounded(),
+            Arc::clone(&launcher) as Arc<dyn Launcher>,
+        );
+
+        assert!(
+            service
+                .launch(encode(&launch_request()).expect("request encodes"))
+                .await
+                .is_err()
+        );
+        assert!(registry.lock().expect("held").is_empty());
+        assert_eq!(launcher.prepared.load(Ordering::SeqCst), 0);
+        assert_eq!(launcher.started.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn an_immediate_start_failure_releases_its_capacity() {
+        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+        let service = Agent1Service::with_launch(
+            Arc::clone(&registry),
+            Arc::new(CountingTeardown::default()),
+            bounded_capacity(1),
+            Arc::new(RefusingStarter(FakeLauncher::default())),
+        );
+
+        assert!(
+            service
+                .launch(encode(&launch_request()).expect("request encodes"))
+                .await
+                .is_err()
+        );
+        assert!(registry.lock().expect("held").is_empty());
     }
 }

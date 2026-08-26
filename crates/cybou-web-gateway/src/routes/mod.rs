@@ -14,7 +14,7 @@ pub mod snapshot;
 
 use axum::http::StatusCode;
 
-pub use agents::agents_handler;
+pub use agents::{agents_handler, launch_agent_handler, stop_agent_handler};
 pub use auth::{login_handler, logout_handler, session_handler};
 pub use disclosure::disclosure_handler;
 pub use events::events_handler;

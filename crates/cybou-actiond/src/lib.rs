@@ -247,6 +247,31 @@ impl ActionCore {
             .collect()
     }
 
+    /// The most recent episode that was actually carried out for one cause.
+    ///
+    /// A cause may have more than one proposal because the remediation driver walks the remedy
+    /// table until policy permits one. Refused proposals are history, but they are not what
+    /// [`cybou_remediation::initiative`] needs when deciding whether an action may be repeated.
+    /// Returning the latest attempted record also makes the answer independent of `HashMap`
+    /// iteration order if an older Journal contains more than one attempt for the same cause.
+    #[must_use]
+    pub fn episode_for_cause(&self, cause_id: Uuid) -> Option<ActionRecord> {
+        self.records
+            .lock()
+            .ok()?
+            .values()
+            .filter(|record| record.proposal.cause_id == Some(cause_id) && record.attempt.is_some())
+            .max_by_key(|record| {
+                let attempt = record.attempt.as_ref().expect("filtered above");
+                (
+                    attempt.started_at,
+                    record.proposal.proposed_at,
+                    record.proposal.proposal_id,
+                )
+            })
+            .cloned()
+    }
+
     /// Seed this owner with lifecycle records read back from the Journal.
     ///
     /// What a restarted Action1 knows. It restores what was proposed, argued and decided, and
@@ -333,7 +358,10 @@ fn executable_action(
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::telemetry::{EvidenceStrength, Finding, MetricKey, Subject, SystemInsight};
+    use cybou_protocol::{
+        action::AttemptReport,
+        telemetry::{EvidenceStrength, Finding, MetricKey, Subject, SystemInsight},
+    };
 
     use super::*;
 
@@ -461,5 +489,56 @@ mod tests {
             )
             .expect("claim");
         assert_eq!(permit.action, ExecutableAction::PackageCacheClean);
+    }
+
+    #[test]
+    fn episode_for_cause_returns_the_latest_attempt_not_a_refused_proposal() {
+        let core = ActionCore::new(StandingPolicy {
+            pre_authorized: vec![Operation::RestartService],
+            pre_authorized_for_agents: Vec::new(),
+        });
+        let finding = insight();
+        let refused = core
+            .evaluate_insight(&finding, "service.status", OffsetDateTime::UNIX_EPOCH)
+            .expect("the unapproved inspection is still a record");
+        assert!(refused.attempt.is_none());
+
+        let first = core
+            .evaluate_insight(
+                &finding,
+                "service.restart",
+                OffsetDateTime::UNIX_EPOCH + Duration::seconds(1),
+            )
+            .expect("first permitted remedy");
+        let second = core
+            .evaluate_insight(
+                &finding,
+                "service.restart",
+                OffsetDateTime::UNIX_EPOCH + Duration::seconds(2),
+            )
+            .expect("later permitted remedy");
+        for (record, offset) in [(&first, 1), (&second, 2)] {
+            core.record_attempt(ExecutionAttempt {
+                attempt_id: Uuid::new_v4(),
+                proposal_id: record.proposal.proposal_id,
+                decision_id: record.decision.decision_id,
+                operation: record.proposal.operation.clone(),
+                target_resource: record.proposal.target_resource.clone(),
+                report: AttemptReport::Completed,
+                body_readings: Vec::new(),
+                started_at: OffsetDateTime::UNIX_EPOCH + Duration::seconds(offset),
+                ended_at: Some(OffsetDateTime::UNIX_EPOCH + Duration::seconds(offset + 1)),
+            })
+            .expect("attempt belongs to its proposal");
+        }
+
+        assert_eq!(
+            core.episode_for_cause(finding.insight_id)
+                .expect("an attempted episode")
+                .proposal
+                .proposal_id,
+            second.proposal.proposal_id
+        );
+        assert!(core.episode_for_cause(Uuid::new_v4()).is_none());
     }
 }

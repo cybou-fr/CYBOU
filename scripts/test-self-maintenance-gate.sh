@@ -269,4 +269,86 @@ test "$inherited_restarts" = "0" || {
 }
 echo "    ok      it did not repeat what it had already carried out"
 
-echo "=== Self-maintenance gate passed: nobody drove this, and a crash did not make it forget ==="
+# The other side of the restart boundary is a concluded remedy that did not work. It is absent from
+# UnfinishedEpisodes by definition, but it is still the decisive reason not to execute again. Make
+# this same harmless unit permanently fail, let the driver reach StillPresent, then restart only the
+# driver while the finding remains.
+echo "==> leaving a remedy ineffective and restarting the driver after its terminal outcome"
+FAILING_UNIT="$WORK/failing.service"
+tee "$FAILING_UNIT" >/dev/null <<'EOF'
+[Unit]
+Description=Harmless failing Cybou self-maintenance gate unit
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/false
+RemainAfterExit=yes
+EOF
+install -m 0644 "$FAILING_UNIT" "$UNIT"
+systemctl daemon-reload
+
+# Start this scenario with a fresh process and a fresh log. Renaming a live process's log would not
+# redirect its open file descriptor; it would keep writing to the renamed inode and make the absence
+# of the new path look like absence of an attempt.
+driver_pid="${pids[-1]}"
+kill "$driver_pid" 2>/dev/null || true
+wait "$driver_pid" 2>/dev/null || true
+mv "$WORK/cybou-remediationd.log" "$WORK/cybou-remediationd-unfinished-recovery.log"
+spawn "$BIN/cybou-remediationd"
+for _ in $(seq 1 40); do
+    grep -q 'Watching what this host concludes' "$WORK/cybou-remediationd.log" 2>/dev/null && break
+    sleep 0.25
+done
+systemctl stop "$UNIT_NAME"
+
+for _ in $(seq 1 120); do
+    grep -q 'Carrying out service.restart' "$WORK/cybou-remediationd.log" 2>/dev/null && break
+    sleep 1
+done
+grep -q 'Carrying out service.restart' "$WORK/cybou-remediationd.log" || {
+    echo "the host never attempted the remedy that must remain ineffective:" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+
+for _ in $(seq 1 60); do
+    grep -q 'StillPresent' "$WORK/cybou-remediationd.log" && break
+    sleep 2
+done
+grep -q 'StillPresent' "$WORK/cybou-remediationd.log" || {
+    echo "the ineffective remedy never reached a terminal StillPresent outcome:" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+echo "    ok      the failed remedy was independently concluded StillPresent"
+
+driver_pid="${pids[-1]}"
+kill "$driver_pid" 2>/dev/null || true
+wait "$driver_pid" 2>/dev/null || true
+mv "$WORK/cybou-remediationd.log" "$WORK/cybou-remediationd-concluded-first.log"
+spawn "$BIN/cybou-remediationd"
+
+# Seeing this line proves the per-cause owner lookup worked. Merely observing zero executions would
+# also pass if Action1 were unreachable and the driver conservatively declined to act.
+for _ in $(seq 1 60); do
+    grep -q 'Remembering the episode already carried out' "$WORK/cybou-remediationd.log" 2>/dev/null && break
+    sleep 0.5
+done
+grep -q 'Remembering the episode already carried out' "$WORK/cybou-remediationd.log" || {
+    echo "the restarted driver did not recover the concluded episode by cause:" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+
+# Leave it through another full consideration interval. The finding remains present, so any loss of
+# the completed episode would produce another executor attempt here.
+sleep 20
+concluded_restarts="$(grep -c 'Carrying out service.restart' "$WORK/cybou-remediationd.log" || true)"
+test "$concluded_restarts" = "0" || {
+    echo "the restarted driver repeated a remedy already concluded ineffective" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+echo "    ok      a restart did not repeat the concluded ineffective remedy"
+
+echo "=== Self-maintenance gate passed: nobody drove this, and restarts did not erase its memory ==="

@@ -31,6 +31,25 @@ use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
+/// What a caller may choose when asking the session owner to launch an agent.
+///
+/// Deliberately carries no resource, network, lifetime, spending or token ceilings. Those are
+/// authority and come only from the operator-approved profile the owner reads itself.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LaunchRequest {
+    /// Which operator-approved profile to use.
+    pub profile: String,
+    /// Which agent pack from that profile to run.
+    pub agent: String,
+    /// The one directory the agent may change.
+    pub workspace: String,
+    /// Which model class offered by the profile, if the session needs a model.
+    pub model_class: Option<String>,
+    /// The first bounded task to give the agent.
+    pub prompt: String,
+}
+
 /// How a session reads on a surface.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -140,6 +159,47 @@ impl SessionView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_launch_request_carries_selection_but_no_authority() {
+        let request = LaunchRequest {
+            profile: "bounded".to_owned(),
+            agent: "opencode".to_owned(),
+            workspace: "/srv/project".to_owned(),
+            model_class: Some("Strong".to_owned()),
+            prompt: "Inspect the repository".to_owned(),
+        };
+
+        let value = serde_json::to_value(request).expect("serialize launch request");
+        assert_eq!(value["profile"], "bounded");
+        assert_eq!(value["modelClass"], "Strong");
+        for authority in [
+            "memoryMiB",
+            "cpus",
+            "tasksMax",
+            "hosts",
+            "spendLimit",
+            "lifetimeSeconds",
+        ] {
+            assert!(
+                value.get(authority).is_none(),
+                "request carried {authority}"
+            );
+        }
+
+        let attempted = serde_json::json!({
+            "profile": "bounded",
+            "agent": "opencode",
+            "workspace": "/srv/project",
+            "modelClass": "Strong",
+            "prompt": "Inspect the repository",
+            "memoryMiB": 65536
+        });
+        assert!(
+            serde_json::from_value::<LaunchRequest>(attempted).is_err(),
+            "authority-shaped input is refused rather than silently ignored"
+        );
+    }
 
     fn at(offset: i64) -> OffsetDateTime {
         OffsetDateTime::from_unix_timestamp(1_787_000_000 + offset).expect("a fixed instant")

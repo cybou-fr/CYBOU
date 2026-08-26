@@ -68,11 +68,12 @@ sensitivity, egress, cost, and capability policy. Cybou has no required cloud de
 remote inference may reduce capability, but it must not erase identity, biography, policy, or the
 minimum local control substrate.
 
-The current repository does **not** yet implement the agent platform, the MCP/tool broker, the
-authorized action executor, the firewall/endpoint controller, the credential broker, or the
-autonomous remediation loop. The model broker exists as a faculty and has no worker registered
-behind it, so it answers every request by saying what happens instead. `CURRENT_STATE.md` is
-authoritative for what exists today.
+The current repository implements the first bounded verticals of the agent platform and autonomous
+remediation: kernel-enforced capsules, one OpenCode pack, an Agent1 owner with browser Launch/Stop,
+and a three-adapter action executor with independently observed outcomes. It does **not** yet
+implement governed MCP/tool mediation, the broader privileged security controller, multi-turn agent
+sessions, or a configured real provider deployment. `CURRENT_STATE.md` is authoritative for what
+exists today.
 
 Where this is going is decided rather than sketched.
 [ADR-0042](docs/adr/ADR-0042-agent-capsule-platform.md) and
@@ -170,7 +171,7 @@ gateway that cannot become a second cognitive owner.
 | Model brokerage as a faculty, not an organ | Implemented — ADR-0035; replaceable LiteLLM worker available, not deployed |
 | Source-backed provider catalogue | Implemented — ADR-0043 B6; compiled default is empty |
 | Agent capsules with kernel-enforced boundaries and brokered egress | Implemented — ADR-0042 gates |
-| A model gateway and leases for agents that are not Mind | Implemented through B5 — ADR-0043; first live agent/provider is B7 |
+| A model gateway and leases for agents that are not Mind | Implemented through the credential-free B7 agent pack; real-provider evidence remains |
 | Distributed Mind prototype | Planned |
 | Lifelong learning and learned-artifact governance | Planned |
 | Governed tool and MCP mediation by the host | Planned — ADR-0034 |
@@ -350,9 +351,9 @@ Choose a route:
 ## Project maturity
 
 Cybou is pre-release research and engineering software. Do not treat planned behaviour as
-implemented. The current tree does not yet contain the general agent/worker runtime, MCP governance
-layer, privileged security control plane, or unattended remediation engine described by the future
-ADRs. The model broker exists and has no worker behind it.
+implemented. The current tree contains a bounded Agent1/OpenCode vertical and unattended
+remediation for three typed adapters; it does not yet contain general multi-agent/MCP governance, a
+broad privileged security control plane, or a configured real inference provider.
 
 ## Support and partnerships
 

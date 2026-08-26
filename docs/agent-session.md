@@ -233,9 +233,10 @@ deciding for itself which facts belong together — and a second surface would d
 
 ## What is not built yet
 
-`Pause`. `Stop` from outside — today a session ends when its program ends, its lease expires, or the
-owner is killed, and there is no second process that can withdraw a running lease. Both belong with
-B11's quarantine and revoke rather than here.
+`Pause`, quarantine, revoke and freeze remain B11. `Stop` is narrower and exists now: the local CLI
+and an authenticated browser seat ask `Agent1`, which records the reason, tears down the capsule and
+answers only after the host confirms that it is gone. It is not an ACP request and does not depend on
+the agent agreeing to stop.
 
 More than one turn. `--prompt` asks once and the session ends; a working agent is a conversation, and
 holding one open means keeping the ACP connection alive across prompts and streaming its updates
@@ -245,16 +246,9 @@ is kept whole rather than projected into a Cybou vocabulary.
 Agents other than OpenCode. `--prompt` refuses any agent this build has no pack for, rather than
 guessing at an entrypoint.
 
-A surface to draw the session on. The projection exists and is printed; what is missing between it
-and a card in the browser is a way to ask a *running* session for it. `cybou-agentd` is not yet a
-daemon despite its name — `launch` owns one session and exits with it, so there is no bus name for a
-web gateway to call and no registry of what is running. That is the next piece, and the card follows
-it rather than the other way round: a card fed by anything other than the session's own owner would
-be a second assembly of the same facts.
-
-That daemon is also where the spend becomes knowable. It needs a typed usage snapshot from the model
-gateway rather than another copy of the lease, because copying a mutable ledger between processes is
-what produced the defect above.
+The browser surface is built. It proxies the owner's canonical views, launches only a caller
+selection, stops by capsule identity, and keeps runtime-unavailable distinct from no running
+sessions. It never reads launch files or asks the service manager itself.
 
 ### The daemon
 
@@ -291,21 +285,29 @@ reading. Stopping goes through the owner for a stronger reason: the owner is wha
 session ended, and units stopped behind its back would leave an agent that was stopped looking
 exactly like one that finished.
 
-### Read and stop, deliberately not launch
+### Launch belongs to the owner too
 
-The surface offers `Sessions`, `Session` and `Stop`. It does not offer `Launch`, and that is a
-decision about who may ask for a capsule rather than a gap.
+The surface offers `Sessions`, `Session`, `Launch` and `Stop`. `Launch` arrived only with the bounds
+that make a reachable mutation honest: it takes a profile id and the caller's selection, never a set
+of ceilings; the owner reads the root-owned profile registry itself; and aggregate admission checks
+and reserves the promise under the same registry lock that holds every live session.
 
-A CLI launch is bounded by who can run it: whoever invokes `cybou-agentd launch` is already `cybou`
-on this host. Putting `Launch` on the bus removes that bound — any process under the same UID could
-then ask for a capsule, and the only thing left between such a request and a real grant would be the
-profile it names. That is one of the conditions under which the polkit delegation below should become
-a typed boundary, and it is not something to walk into by adding a method.
+The HTTP gateway authenticates a local desktop or signed-in seat before carrying that request to
+D-Bus. It does not turn D-Bus into a per-method principal boundary: any process already running as
+the `cybou` service user can share that user's session bus authority, just as it can invoke the local
+CLI. The security claim is narrower and checkable — neither caller can mint resources or network
+access, because every grant comes from an operator-approved profile, and `Agent1.Launch` refuses an
+unbounded host-capacity policy.
 
-So `Launch` arrives together with a registry of operator-approved profiles the owner reads *itself*,
-and takes a profile id rather than a set of ceilings. `Sessions`, `Session` and `Stop` are safe in a
-way it is not: none of them can widen anything, and stopping removes authority rather than granting
-it.
+Admission happens before startup and the returned canonical view is already registered as
+`launching`. An immediate failure to hand the prepared launch to its owner rolls that reservation
+back. Once accepted, the owner advances it to `running`, records an ending, tears down, releases the
+live reservation, and retains a bounded final view.
+
+The browser treats that first view as a receipt, not a prediction. It refreshes the owner's listing
+while the session is live, replacing `launching` with `running`, incorporating a usage snapshot once
+the gateway publishes one, and showing its final reason after teardown. The refresh is bounded
+rather than a permanent poll; a manual refresh remains available for sessions that run longer.
 
 `Stop` runs the teardown. It sends nothing to the agent and waits for no agreement — the capsule is a
 cgroup with a kill switch.
@@ -315,13 +317,16 @@ that backwards: it took the session out first and tore it down afterwards, so a 
 to die was one this owner had forgotten — absent from every listing, with no surface offering to stop
 it, and an agent still working inside. The one failure a person could not recover from was the one
 reported as success. Now the reason is fixed, the units are terminated, the host is asked whether
-they are actually gone, and only a confirmed ending forgets the session. An unproven one leaves it
-listed as `ending` and answers `false`, which is the truthful thing to tell a caller whose request
-did not take effect.
+they are actually gone, and only a confirmed ending releases the live reservation. An unproven one
+leaves it listed as `ending` and answers `false`, which is the truthful thing to tell a caller whose
+request did not take effect.
 
 The reason is fixed *before* the teardown, because a session torn down first and labelled afterwards
 could be marked expired if the clock ran out in between, replacing a person's decision with a timer.
-Where that record then goes — a listing of finished sessions a person can still read — is not built.
+On confirmation the live reservation is released and its canonical ended view enters a
+process-local history of the most recent 32 endings. That history is operational context, not durable
+biography: after an owner restart only still-running sessions can be recovered without guessing why
+an already-gone unit ended.
 
 It must also survive its own restart, and the part of that which is a judgement rather than plumbing
 is now built and tested.

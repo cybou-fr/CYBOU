@@ -310,9 +310,16 @@ visibly `NOT RUN` and B7 is not marked Done. The exact fail-closed operator cont
 [Per-capsule model gateway deployment](agent-gateway-deployment.md); provisioning a provider is an
 operator decision rather than a secret silently copied by this repository.
 
+On 2026-08-26 the digest-pinned OpenCode 1.18.23 artifact was installed in the development WSL host
+and the complete credential-free pack gate passed: the real `opencode acp` entrypoint started inside
+a model-granted capsule and completed Cybou's ACP handshake through the private Unix channel. The
+same host had no provider policy, LiteLLM master key, approved profiles or aggregate capacity file;
+the live gate therefore returned `NOT RUN` before a model request, and no real-provider claim is
+added here.
+
 ### B7a. One owner for one session
 
-**Derivation done; carrying it out remains.** Every part of a session existed and none of it was
+**Done.** Every part of a session existed and none of it was
 owned, which is how the gateway came to rebuild its own lease from environment values and produce a
 second authority beside the approved one. `cybou-agentd` is the single owner: one selection becomes
 one lease, and the capsule spec, the lease file, the model token and the clock are all derived from
@@ -329,8 +336,9 @@ alternative are in [The agent session owner](agent-session.md).
 
 `scripts/test-agent-launch-gate.sh` proves a launch and its teardown on a deployed host and is
 visibly `NOT RUN` anywhere without a gateway template, a configured provider and a user service
-manager. What remains is driving an ACP agent rather than a program, which is B7's remaining half,
-and withdrawing a running lease from outside, which is B11.
+manager. ACP prompting is now the owner's ordinary model-backed path, including launches accepted by
+`Agent1`; the remaining B7 evidence is one answer from a real provider. Confirmed immediate Stop is
+available through the owner; quarantine, revoke and freeze remain B11.
 
 ### B7b. Free is a selection, not an empty budget
 
@@ -438,7 +446,7 @@ satisfy the admission rules.
 
 ### B7c. An owner that outlives its sessions, and one that they outlive
 
-**Partly done.** `cybou-agentd serve` holds what is running and answers on
+**Done for ownership and visibility.** `cybou-agentd serve` holds what is running and answers on
 `org.cybou.Runtime.Agent1` — `Runtime` rather than `Mind`, because an agent runtime starts and holds
 software Cybou did not write and does not trust, and a bus name under `Mind` would assert the
 opposite of that in the one place an operator looks.
@@ -449,20 +457,25 @@ direction that matters: a working agent, unwatched, with no surface offering a w
 registry is therefore a reading of the host rather than a memory of what a process started, and every
 session is re-derived through the same `plan()` a launch used.
 
-The surface is `Sessions`, `Session` and `Stop`. `Launch` is not on it: a CLI launch is bounded by
-who can run it, and a bus method is not, so it arrives together with a registry of operator-approved
-profiles and takes a profile id rather than a set of ceilings.
+The surface is `Sessions`, `Session`, `Launch` and `Stop`. `Launch` takes a selection — profile,
+agent, workspace, model class and prompt — but no ceilings. The owner reads the root-owned registry
+of operator-approved profiles itself, derives every grant from that profile, and admits the promise
+against all sessions live on the host under the registry lock before it starts anything.
 
 The model gateway publishes a typed `ModelUsageSnapshot` beside its socket and the owner reads it, so
 a listing reports a real figure together with the instant it was observed rather than a spend of
 *unknown* — and never a nought nobody measured.
 
-The profile registry `Launch` needs now exists, and `cybou-agentd start` is the door that uses it: a
+The profile registry exists, and both `cybou-agentd start` and the owned `Launch` path use it: a
 caller names a profile, an agent, a workspace and one of the models that profile offers, and every
 bound comes from a file only root can write. Deployment creates it empty, so a host offers nothing
-until an operator writes something.
+until an operator writes something. Deployment also creates an explicit zero-capacity host policy;
+an operator must choose aggregate totals before the reachable launch surface opens.
 
-What remains: `Launch` itself on the bus, and a record of finished sessions a person can still read. See [The agent session owner](agent-session.md).
+Confirmed endings leave live admission immediately and remain visible as the most recent 32 final
+views held by that owner process. The record is deliberately not reconstructed after restart: the
+host can prove what is still running, but it cannot prove why an already-gone unit ended. Durable
+agent biography remains separate future work. See [The agent session owner](agent-session.md).
 
 ### B7d. Four things a reachable surface must not get wrong
 
@@ -506,16 +519,19 @@ anything, only hide capsules that exist.
 
 An absent capacity file means unbounded, which is what every earlier version did, named rather than
 defaulted into. A file that exists and cannot be read means nothing is admitted: a limit an operator
-believes is in force must not be read as no limit at all.
+believes is in force must not be read as no limit at all. `Agent1.Launch` refuses unbounded capacity
+too: a reachable mutation cannot silently inherit the historical no-limit mode. Deployment writes
+an explicit zero-capacity policy, so opening launches requires an operator to choose real totals.
 
-**What remains for `Launch`:** it is not on the bus yet, so admission binds nowhere. The CLI doors
-deliberately do not pretend to enforce it — a check in a separate process would look like admission
-and race with every other launch, which is exactly the failure this repository keeps finding. `Launch`
-belongs on `Agent1`, together with caller-to-profile authorization, and admission binds there.
+**`Launch` now binds admission where it can be atomic.** `Agent1` prepares the profile-derived plan,
+checks and inserts the live promise in one registry operation, and only then starts the capsule. Two
+requests cannot both take the last slot. An immediate start failure rolls the reservation back; once
+startup is owned by the background task, that task advances the shared session and moves it from
+live admission to bounded final history only after teardown.
 
 ### B7e. What a browser is told about running agents
 
-**The read half is done.** `GET /api/v1/agents` returns what `Agent1` says, and the type it returns
+`GET /api/v1/agents` returns what `Agent1` says, and the type it returns
 lives in `cybou-protocol` rather than beside the owner — so the owner and the browser share one
 definition instead of two that agree on the day they are written. The route is a proxy and
 deliberately nothing more: it does not read the launch directory, ask a service manager, or assemble
@@ -525,18 +541,35 @@ its listing and its reading.
 
 `scripts/test-agent-card-gate.sh` compares the endpoint's answer against the owner's own, field for
 field, because *looks like a session* is exactly what a second assembler would also produce. Then it
-kills the owner and checks the endpoint says it could not ask — an empty list there is the one answer
-a person cannot act on, since *nothing is running* and *I could not find out* look identical on a card
-and only one means they can stop worrying. The refusal names the condition without describing this
-host's insides to somebody who may not be entitled to know them.
+stops the capsule through the HTTP route, requires the unit to be gone, and compares the retained
+ended view against the owner again. Finally it kills the owner and checks the endpoint says it could
+not ask — an empty list there is the one answer a person cannot act on, since *nothing is running*
+and *I could not find out* look identical on a card and only one means they can stop worrying. The
+refusal names the condition without describing this host's insides to somebody who may not be
+entitled to know them.
 
-There is no `Stop` and no `Launch` on that route. Stopping is a decision about somebody's running work
-and belongs behind the owner's surface, where an ending can be confirmed before it is reported.
-Launching needs admission against the whole host and authorization of the caller to a profile, neither
-of which a proxy can do.
+`POST /api/v1/agents` is the launch proxy. It accepts only a local desktop seat or an authenticated
+session and refuses public preview before touching D-Bus. It carries the selection whole to
+`Agent1`; it does not read profiles, derive ceilings, or preflight capacity. The owner performs those
+steps and returns the canonical session already reserved as `launching`. This is authentication at
+the HTTP boundary, not a claim of per-method D-Bus identity: processes already running as the
+`cybou` service user share that user's bus authority and must still be contained as such.
 
-What remains for the card itself is drawing it: the browser has an authoritative source and no view
-yet.
+`DELETE /api/v1/agents/{capsule_id}` is the Stop proxy. It accepts the same local or authenticated
+seat as Launch. A confirmed or already-ended session returns `204`; if `Agent1.Stop` cannot prove
+teardown, the gateway re-reads the owner's canonical listing and returns retryable `409` while the
+session remains live. The gateway never reports an unconfirmed ending as success.
+
+The canonical `Agents` card is now drawn in Living Canvas from that same `SessionView`. It names the
+agent, profile and workspace; distinguishes starting, running, ending and ended; presents promised
+memory, CPU and task ceilings as ceilings rather than invented usage; names the exact allowed hosts;
+and timestamps model spend at the instant it was observed. Runtime unavailable and zero running
+agents remain different answers. The card also submits the bounded selection to the launch proxy and
+adds the owner's returned `launching` session immediately; resource authority never enters the form.
+While that session is live it refreshes from `Agent1`, so `running`, newly observed spend and the
+final ended reason replace the launch receipt rather than leaving an optimistic state on screen. A
+manual refresh covers longer sessions after the bounded polling window. Every live row offers Stop;
+after confirmation the card re-reads `Agent1` and presents the retained final view.
 
 ### A2b. The episode runs to what the host saw afterwards
 
@@ -584,6 +617,13 @@ four daemons, a harmless unit stopped, and then nothing. No script touches `Acti
 after that point. The host notices, proposes, is permitted by a standing policy an operator set,
 carries it out, waits, looks again, and concludes — and the gate checks the log to be sure the unit
 came back because *this host restarted it* rather than for any reason at all.
+
+The same gate covers both restart boundaries. It kills the driver after execution but before outcome
+and requires the new process to finish the inherited episode without executing again. It also leaves
+a service broken until the remedy is concluded `StillPresent`, restarts the driver after that terminal
+outcome, and requires zero new executor attempts. The second case is distinct: terminal episodes are
+not returned by `UnfinishedEpisodes`, so the driver asks `Action1.EpisodeForCause` before treating its
+empty process memory as permission to act.
 
 Running it found two defects in the first two attempts, both of the kind that reading could not have
 shown. It decoded the telemetry organ's answer as a fabric envelope, which is a convention that organ
