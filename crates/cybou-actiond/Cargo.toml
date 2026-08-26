@@ -23,6 +23,9 @@ uuid.workspace = true
 
 [dev-dependencies]
 ciborium.workspace = true
+# Only the example probe uses this, to put a finding in the Journal the way the organ that observes
+# findings does. Telemetry is above governance in ADR-0029's order, so reading it is permitted.
+cybou-telemetryd = { path = "../cybou-telemetryd" }
 serde_json.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]

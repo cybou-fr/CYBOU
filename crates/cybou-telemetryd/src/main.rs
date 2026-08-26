@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let sampling = core.clone();
         let watching = declared.clone();
+        let mut published = std::collections::HashSet::new();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
             loop {
@@ -78,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for key in unreadable {
                     sampling.note_unreadable(&key, now);
                 }
+                publish_findings(&sampling, &mut published, now).await;
             }
         });
 
@@ -351,5 +353,62 @@ mod linux {
         }
         let listing = String::from_utf8(output.stdout).ok()?;
         Some(probe::failed_units(&listing))
+    }
+}
+
+/// Put newly reached findings in the Journal, with the readings each one rests on.
+///
+/// Only findings, and only the readings they cite. Every reading this host takes is transient and
+/// belongs nowhere near a biography — a Journal holding all of them is a metrics database, which is
+/// the thing this system has said all along it is not. What a finding rests on is different: it is
+/// the answer to *why do you think that*, and a conclusion nobody can trace back is indistinguishable
+/// from one a model made up.
+///
+/// Once per finding, not once per sample. A finding's identity is derived from what it is about and
+/// when it began, so an ongoing problem is the same finding ten seconds later; submitting it again
+/// would be asking the Journal to refuse a duplicate every interval for as long as the problem lasts.
+///
+/// Downstream this is what closes a chain that was silently broken: `Action1` records a proposal
+/// citing the finding that caused it, and until the finding is in the Journal that citation points at
+/// nothing and the whole authorization lifecycle is refused.
+#[cfg(target_os = "linux")]
+async fn publish_findings(
+    core: &std::sync::Arc<cybou_telemetryd::TelemetryCore>,
+    published: &mut std::collections::HashSet<uuid::Uuid>,
+    now: time::OffsetDateTime,
+) {
+    use cybou_telemetryd::journal;
+
+    let fresh: Vec<_> = core
+        .insights(now)
+        .into_iter()
+        .filter(|insight| published.insert(insight.insight_id))
+        .collect();
+    if fresh.is_empty() {
+        return;
+    }
+
+    let Ok(client) = cybou_fabric::event_client::EventClient::session().await else {
+        // A host that cannot reach its own Journal still has to keep watching itself. Saying so and
+        // carrying on is the only behaviour that leaves it able to notice anything at all — but the
+        // finding is now marked published and will not be retried, which is a gap this records
+        // rather than papers over.
+        eprintln!("[cybou-telemetryd] The Journal is unreachable; findings were not recorded");
+        return;
+    };
+
+    for insight in fresh {
+        match journal::contributions(&insight, now) {
+            Ok(contributions) => {
+                for envelope in contributions {
+                    if let Err(error) = client.submit(&envelope).await {
+                        eprintln!("[cybou-telemetryd] A finding was not recorded: {error}");
+                    }
+                }
+            }
+            // A finding that cites no readings cannot enter, and refusing here says so instead of
+            // submitting something certain to be rejected.
+            Err(why) => eprintln!("[cybou-telemetryd] {why}"),
+        }
     }
 }

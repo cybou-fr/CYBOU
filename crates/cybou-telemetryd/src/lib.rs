@@ -24,6 +24,7 @@
 
 pub mod baseline;
 pub mod core;
+pub mod journal;
 pub mod probe;
 pub mod series;
 pub mod trend;

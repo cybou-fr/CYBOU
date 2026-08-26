@@ -407,10 +407,34 @@ kills the owner, starts it again and asks it what it authorized. `Action1` gaine
 for that question: a durable history nothing can read is a history only in the sense that the bytes
 exist.
 
-**One dependency is still open, and it is load-bearing.** Nothing in this repository puts a
-`SystemInsight` into the Journal, so on a real host the cause a proposal cites is not there and the
-lifecycle is still refused — now with a legible reason rather than silently. Journalling findings is
-what makes this work outside a gate, and it belongs to the organ that observes them.
+**That dependency is now closed.** `cybou-telemetryd` puts a finding in the Journal together with the
+readings it rests on, so the cause a proposal cites is there and the chain holds end to end:
+
+```text
+readings   Observation    what the host measured
+finding    Hypothesis     citing them
+proposal   PlanProposal   citing the finding
+objection  Objection      per criticism that failed
+decision   Decision
+```
+
+A finding is a `Hypothesis` and not an `Observation`, which `SystemInsight` had said all along: what
+was observed is the readings, and that they add up to *the database stopped because the disk filled*
+is an inference — one recorded as an observation would be a claim the host cannot support.
+
+Only the readings a finding cites are written. Every reading a host takes is transient and belongs
+nowhere near a biography; a Journal holding all of them is a metrics database, which is the thing this
+system has said it is not. What a finding rests on is the answer to *why do you think that*, and an
+inference nobody can trace back is indistinguishable from one a model made up — which is why the
+Journal will not hold a `Hypothesis` citing nothing, and why a finding that cites nothing is refused
+here rather than submitted to be rejected.
+
+Once per finding rather than once per sample: a finding's identity is derived from what it is about
+and when it began, so an ongoing problem is the same finding ten seconds later.
+
+The durability gate now drives that same path rather than a hand-built envelope, so what it proves is
+that a finding and a proposal about it form one chain a real `Event1` accepts — not that one file can
+satisfy the admission rules.
 
 ### B7c. An owner that outlives its sessions, and one that they outlive
 

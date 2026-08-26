@@ -15,7 +15,9 @@ use std::error::Error;
 use cybou_actiond::ActionRecord;
 use cybou_fabric::{ACTION, decode, encode};
 use cybou_protocol::action::AuthorizationVerdict;
-use cybou_protocol::telemetry::{EvidenceStrength, Finding, MetricKey, Subject, SystemInsight};
+use cybou_protocol::telemetry::{
+    EvidenceStrength, Finding, InsightEvidence, MetricKey, Subject, SystemInsight,
+};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -38,17 +40,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
 /// One finding, put in the Journal, then criticised and decided.
 ///
 /// The finding goes in first because a proposal cites it, and a contribution may only cite something
-/// that exists. Standing in for the organ that observes findings: this probe is not entitled to
-/// record one in a running system, and does it here only so the gate has a cause to point at.
+/// that exists. It goes in through the code the organ that observes findings uses, rather than
+/// through an envelope written out here: a probe that hand-built one would prove that *this* file
+/// can satisfy the Journal, which is not the claim. The claim is that a finding and a proposal about
+/// it form one chain the Journal accepts.
 async fn decide() -> Result<(), Box<dyn Error>> {
+    let since = OffsetDateTime::now_utc();
+    let key = MetricKey::named(Subject::ServiceActive, UNIT.to_owned());
     let insight = SystemInsight {
         insight_id: Uuid::new_v4(),
         finding: Finding::ServiceFailure,
-        about: Some(MetricKey::named(Subject::ServiceActive, UNIT.to_owned())),
-        because: Vec::new(),
+        about: Some(key.clone()),
+        // A finding has to be able to say why. The Journal will not hold an inference that cites
+        // nothing, and neither should anybody reading one afterwards.
+        because: vec![InsightEvidence {
+            key,
+            observed: 0.0,
+            deviation: None,
+        }],
         strength: EvidenceStrength::Strong,
-        concluded_at: OffsetDateTime::now_utc(),
-        since: OffsetDateTime::now_utc(),
+        concluded_at: since,
+        since,
     };
 
     observe(&insight).await?;
@@ -74,12 +86,27 @@ async fn decide() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Put the finding in the Journal under its own identity, so a proposal can cite it.
+/// Put the finding in the Journal, together with the readings it rests on.
 ///
-/// An `Observation`, which is one of the two kinds that record something that happened outside the
-/// Journal and therefore cite nothing themselves. Everything else, a proposal included, is derived
-/// and must point at something already there.
+/// Through `cybou_telemetryd::journal`, which is what the organ that observes findings uses. The
+/// readings enter as `Observation`s — the two kinds that may cite nothing — and the finding as a
+/// `Hypothesis` citing them, because what was observed is the readings and that they add up to a
+/// failure is an inference.
 async fn observe(insight: &SystemInsight) -> Result<(), Box<dyn Error>> {
+    let client = cybou_fabric::event_client::EventClient::session().await?;
+    for envelope in cybou_telemetryd::journal::contributions(insight, OffsetDateTime::now_utc())? {
+        // A refusal comes back as an error rather than a field: the client already tells "the
+        // Journal would not take this" apart from "the Journal could not be reached".
+        client.submit(&envelope).await?;
+    }
+    Ok(())
+}
+
+#[allow(
+    dead_code,
+    reason = "kept while the hand-built form is compared against the organ's"
+)]
+async fn observe_by_hand(insight: &SystemInsight) -> Result<(), Box<dyn Error>> {
     let mut payload = Vec::new();
     ciborium::into_writer(insight, &mut payload)?;
     let envelope = cybou_protocol::canonical::CanonicalEnvelope {

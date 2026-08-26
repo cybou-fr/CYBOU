@@ -749,6 +749,7 @@ dependencies = [
  "cybou-fabric",
  "cybou-protocol",
  "cybou-remediation",
+ "cybou-telemetryd",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
