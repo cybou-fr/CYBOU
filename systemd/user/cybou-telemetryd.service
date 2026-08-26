@@ -21,12 +21,17 @@ MemoryDenyWriteExecute=yes
 # Everything it holds is in memory and bounded. There is nothing to persist, because a reading that
 # survived a restart would be the beginning of the telemetry database this organ exists not to be.
 ProtectSystem=strict
-ProtectHome=yes
+# The session bus lives under /run/user. Keep that tree visible but immutable, while the actual home
+# trees remain absent rather than merely read-only.
+ProtectHome=read-only
+InaccessiblePaths=/home /root
 PrivateTmp=yes
 # /proc and /sys stay readable: they are what it watches. ProtectSystem=strict does not cover them,
 # and hiding them would leave the organ observing nothing while reporting itself healthy.
 ProtectKernelTunables=yes
-ProtectKernelModules=yes
+# Loading modules already requires privilege this user service does not have. Combining all three
+# kernel namespace protections on Debian 13 also makes the owning user's session-bus socket
+# inaccessible, so keep the protections that still constrain resources this observer can reach.
 ProtectControlGroups=yes
 
 [Install]

@@ -30,7 +30,9 @@ MemoryDenyWriteExecute=yes
 # It owns no state. A faculty that selects, budgets and attributes needs nothing on disk, and
 # anything it could write would be a second memory with different rules.
 ProtectSystem=strict
-ProtectHome=yes
+# The session bus lives under /run/user. Keep that tree visible but immutable, and hide homes.
+ProtectHome=read-only
+InaccessiblePaths=/home /root
 PrivateTmp=yes
 
 [Install]

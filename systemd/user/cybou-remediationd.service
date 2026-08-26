@@ -24,7 +24,9 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
-ProtectHome=yes
+# The session bus lives under /run/user. Keep that tree visible but immutable, and hide homes.
+ProtectHome=read-only
+InaccessiblePaths=/home /root
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

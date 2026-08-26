@@ -111,6 +111,14 @@ build outputs. Builds never happen on Windows or WSL. The remote source root def
 `/home/debian/cybou-src`; the persistent Cargo cache defaults to `/home/debian/cybou-target`.
 They may be overridden with `CYBOU_VPS_SRC` and `CYBOU_VPS_TARGET`.
 
+Agent1 is a deployed runtime but not a Mind organ, so deployment enables `cybou-agentd` explicitly
+rather than attaching it to `cybou-mind.target`. The remediation worker is part of that target, and
+the user services that use the session bus keep `/run/user` visible read-only while `/home` and
+`/root` remain inaccessible. Deployment also restarts the system executor after replacing its
+binary. A missing or malformed agent-capacity policy is repaired to explicit zero capacity; a valid
+operator policy is preserved unchanged. Together these rules make a reboot and an in-place upgrade
+start the same runtime without turning absent policy into permission.
+
 ## Safety boundary
 
 - There is no NixOS conversion path. The retired `prepare-vps-nixos.sh` has been removed rather

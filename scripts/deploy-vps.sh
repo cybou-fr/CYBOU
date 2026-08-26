@@ -181,9 +181,12 @@ cybou_ssh "
   # Admission is a promise across every live session, not a per-process preflight. Keep the initial
   # host closed until an operator chooses real totals for this machine; absence means the historical
   # unbounded mode, and Agent1 deliberately will not launch through a reachable surface in that mode.
-  if [ ! -e /etc/cybou/agent-capacity.json ]; then
+  # Preserve every valid operator policy. Repair only a missing or malformed file to the explicit
+  # zero-capacity policy; malformed input must not silently restore the historical unbounded mode.
+  if ! sudo python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); required = {\"maxSessions\", \"memoryMiB\", \"cpus\", \"tasksMax\", \"spendUnits\"}; assert set(d) == required; assert all(type(d[k]) is int and d[k] >= 0 for k in required)' \
+      /etc/cybou/agent-capacity.json 2>/dev/null; then
     printf '%s\n' \
-      '{"maxSessions":0,"memoryMiB":0,"cpus":0,"tasksMax":0,"spendUnits":0}' \
+      '{\"maxSessions\":0,\"memoryMiB\":0,\"cpus\":0,\"tasksMax\":0,\"spendUnits\":0}' \
       | sudo tee /etc/cybou/agent-capacity.json >/dev/null
   fi
   sudo chown root:cybou /etc/cybou/agent-capacity.json
@@ -242,11 +245,16 @@ cybou_ssh "
   # PartOf=cybou-mind.target, which is the directive that propagates a restart of the target down
   # to them.
   sudo systemctl --user --machine=cybou@.host restart cybou-mind.target
+  # Agent1 is deliberately outside Mind's target, but it is still a deployed runtime and must be
+  # started explicitly. Enabling it independently preserves that ownership boundary across boots.
+  sudo systemctl --user --machine=cybou@.host enable --now cybou-agentd.service
   sudo systemctl --user --machine=cybou@.host --no-pager --full status cybou-mind.target || true
 
   # Start only after the lingering user manager has brought up Action1. If its system-bus name is
   # not ready yet, Restart=on-failure keeps the executor fail-closed until it can claim permits.
   sudo systemctl enable --now cybou-executord.service
+  # enable --now leaves an already-running process on its old binary after an upgrade.
+  sudo systemctl restart cybou-executord.service
   sudo systemctl --no-pager --full status cybou-executord.service
 
   sudo systemctl --no-pager --full status caddy.service
