@@ -207,4 +207,66 @@ test "$restarts" = "1" || {
     exit 1
 }
 
-echo "=== Self-maintenance gate passed: nobody drove this ==="
+# Now the part that has to survive a crash. Until this ran, "this host acts once on a finding" meant
+# once per uninterrupted process, and Restart=on-failure would then have let a crash cause a second
+# restart of a service. The crash has to land mid-episode, between acting and concluding, because
+# that is the only window in which anything is owed.
+echo "==> breaking it again and killing the driver between the act and the conclusion"
+systemctl stop "$UNIT_NAME"
+driver_pid="${pids[-1]}"
+killed=0
+for _ in $(seq 1 240); do
+    if [ "$(grep -c 'Carrying out service.restart' "$WORK/cybou-remediationd.log")" -ge 2 ]; then
+        kill -9 "$driver_pid" 2>/dev/null || true
+        killed=1
+        break
+    fi
+    sleep 0.25
+done
+wait "$driver_pid" 2>/dev/null || true
+[ "$killed" -eq 1 ] || {
+    echo "the host never acted a second time, so there was no episode to crash inside of" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+
+# Whatever it had concluded before dying is in the log, not in the process. The new one starts with
+# nothing, and the whole question is whether it can find out what it owes.
+mv "$WORK/cybou-remediationd.log" "$WORK/cybou-remediationd-first.log"
+spawn "$BIN/cybou-remediationd"
+
+for _ in $(seq 1 60); do
+    grep -q 'Taking over' "$WORK/cybou-remediationd.log" 2>/dev/null && break
+    sleep 0.5
+done
+grep -q 'Taking over' "$WORK/cybou-remediationd.log" || {
+    echo "the restarted driver did not take over the episode it had left open:" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+echo "    ok      it asked the owner what it had left unfinished"
+
+# And it finishes it rather than leaving it open forever. The finding that caused it is gone with the
+# process that held it, so what it concludes is whatever can honestly be said with the record alone.
+for _ in $(seq 1 60); do
+    grep -q 'service.restart for ' "$WORK/cybou-remediationd.log" && break
+    sleep 2
+done
+grep -q 'service.restart for ' "$WORK/cybou-remediationd.log" || {
+    echo "the adopted episode was never concluded:" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+echo "    ok      it finished the episode it had inherited"
+
+# And it did not redo it. The unit was already back before the crash; a driver that read its own
+# amnesia as "nothing was tried" would restart it a third time.
+inherited_restarts="$(grep -c 'Carrying out service.restart' "$WORK/cybou-remediationd.log" || true)"
+test "$inherited_restarts" = "0" || {
+    echo "the restarted driver acted $inherited_restarts more times on work already done" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+echo "    ok      it did not repeat what it had already carried out"
+
+echo "=== Self-maintenance gate passed: nobody drove this, and a crash did not make it forget ==="

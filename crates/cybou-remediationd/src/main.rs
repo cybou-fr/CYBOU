@@ -91,7 +91,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let system = zbus::Connection::system().await?;
     println!("[cybou-remediationd] Watching what this host concludes about itself");
 
-    let mut handled: HashMap<Uuid, Handled> = HashMap::new();
+    // What this host started and never finished, asked for before anything else happens. Its own
+    // memory is gone; the owner's is not. Looking only at what the host currently concludes would
+    // miss exactly the episodes that worked, because a remedy that succeeded makes its finding
+    // disappear — so the successful ones would stay unfinished forever.
+    let mut handled = adopt_unfinished(&system).await;
+    if !handled.is_empty() {
+        println!(
+            "[cybou-remediationd] Taking over {} episode(s) this host began earlier",
+            handled.len()
+        );
+    }
     // Findings this host may do nothing about. Remembered so the fact is stated once: a line every
     // fifteen seconds about a thing that will not change is how a log stops being read, and a log
     // nobody reads is where the interesting line hides.
@@ -134,8 +144,18 @@ async fn consider(
 
     // Then whatever the host currently concludes about itself.
     for finding in &findings {
-        // An episode rebuilt after a restart has no finding of its own; this is where it gets one,
-        // so a still-present problem can still be concluded about properly.
+        // Asked of the owner when this process has no memory of this finding, which is every finding
+        // after a restart. The durable record is what survives; the map is a cache of it. Without
+        // this the guarantee is only that it cannot act twice during one uninterrupted process, and
+        // a crash must not be able to cause a second restart of a service.
+        if !handled.contains_key(&finding.insight_id)
+            && let Some(already) = episode_for(system, finding.insight_id).await
+        {
+            handled.insert(finding.insight_id, already);
+        }
+
+        // An episode adopted from the owner has no finding of its own; this is where it gets one, so
+        // a problem that is still present can be concluded about properly rather than vaguely.
         if let Some(entry) = handled.get_mut(&finding.insight_id)
             && entry.finding.is_none()
         {
@@ -303,6 +323,90 @@ async fn conclude(
     record_with(system, "RecordOutcome", &encode(&outcome)?).await?;
     entry.tried.outcome = Some(outcome);
     Ok(())
+}
+
+/// Take over every episode this host carried out and never concluded.
+///
+/// Asked for at startup, and it is the half a per-finding lookup cannot cover: that one only fires
+/// for findings still being reported, and a remedy that *worked* makes its finding disappear. So
+/// without this the successful episodes are exactly the ones left unfinished forever, which is the
+/// same defect as concluding only about current findings, one level up.
+///
+/// Empty when the owner cannot be asked. Nothing is adopted and nothing is acted on either: a finding
+/// still present is checked against the owner before anything is proposed about it.
+async fn adopt_unfinished(system: &zbus::Connection) -> HashMap<Uuid, Handled> {
+    let Ok(reply) = system
+        .call_method(
+            Some(ACTION.service),
+            ACTION.object_path,
+            Some(ACTION.interface),
+            "UnfinishedEpisodes",
+            &(),
+        )
+        .await
+    else {
+        eprintln!("[cybou-remediationd] The owner could not be asked what was left unfinished");
+        return HashMap::new();
+    };
+    let Ok(encoded) = reply.body().deserialize::<Vec<u8>>() else {
+        return HashMap::new();
+    };
+    let Ok(records) = decode::<Vec<ActionRecord>>(&encoded) else {
+        return HashMap::new();
+    };
+
+    records
+        .into_iter()
+        .filter_map(|record| {
+            let cause = record.proposal.cause_id?;
+            let attempt = record.attempt?;
+            Some((
+                cause,
+                Handled {
+                    finding: None,
+                    tried: Tried {
+                        attempt,
+                        outcome: record.outcome,
+                    },
+                    before: Vec::new(),
+                },
+            ))
+        })
+        .collect()
+}
+
+/// What this host already did about one finding, asked of the owner that would know.
+///
+/// `None` covers both *nothing was done* and *the owner could not be asked*, and treating them alike
+/// is deliberate: neither is grounds to act. A driver that read an unreachable owner as *nothing was
+/// tried* would restart a service because it could not check whether it already had.
+async fn episode_for(system: &zbus::Connection, cause_id: Uuid) -> Option<Handled> {
+    let encoded: Vec<u8> = system
+        .call_method(
+            Some(ACTION.service),
+            ACTION.object_path,
+            Some(ACTION.interface),
+            "EpisodeForCause",
+            &(cause_id.to_string(),),
+        )
+        .await
+        .ok()?
+        .body()
+        .deserialize()
+        .ok()?;
+    let record: ActionRecord = decode(&encoded).ok()?;
+    let attempt = record.attempt?;
+
+    Some(Handled {
+        // Not invented from the record: it holds what was proposed and decided, and the finding was
+        // the telemetry organ's. The caller fills it in when the problem is still being reported.
+        finding: None,
+        tried: Tried {
+            attempt,
+            outcome: record.outcome,
+        },
+        before: Vec::new(),
+    })
 }
 
 /// What was proposed, asked of the owner that proposed it.

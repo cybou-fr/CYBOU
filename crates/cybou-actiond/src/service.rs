@@ -105,6 +105,16 @@ impl Action1Service {
         Ok(())
     }
 
+    /// Every episode this owner holds that was carried out and never concluded.
+    ///
+    /// A driver asks for these when it starts. It cannot find them by looking at what the host
+    /// currently concludes, because a remedy that worked makes its finding disappear — so the
+    /// successful episodes are precisely the ones that would otherwise stay unfinished.
+    async fn unfinished_episodes(&self) -> fdo::Result<Vec<u8>> {
+        encode(&self.core.unfinished_episodes())
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;

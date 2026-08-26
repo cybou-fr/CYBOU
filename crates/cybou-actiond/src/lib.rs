@@ -229,6 +229,24 @@ impl ActionCore {
         Ok(())
     }
 
+    /// Every episode that was carried out and never concluded.
+    ///
+    /// What a driver has to ask for when it starts, and the question its own memory cannot answer.
+    /// Asking only about findings still being reported would miss exactly the episodes that worked:
+    /// a remedy that succeeded makes its finding disappear, so the successful case is the one whose
+    /// conclusion would be lost forever.
+    #[must_use]
+    pub fn unfinished_episodes(&self) -> Vec<ActionRecord> {
+        let Ok(records) = self.records.lock() else {
+            return Vec::new();
+        };
+        records
+            .values()
+            .filter(|record| record.attempt.is_some() && record.outcome.is_none())
+            .cloned()
+            .collect()
+    }
+
     /// Seed this owner with lifecycle records read back from the Journal.
     ///
     /// What a restarted Action1 knows. It restores what was proposed, argued and decided, and
