@@ -372,3 +372,10 @@ at all.
 None of this is authorization. It decides what a named profile permits and would answer the same for
 anyone; whether a particular caller may use a particular profile is a different question, and one this
 layer would answer badly by guessing.
+
+`scripts/test-agent-profile-gate.sh` runs `start` against a catalogue on disk, because the parsing,
+the lookup and the lexical path check all sit between a caller and a grant and none of them had ever
+read a real file. Running it found that a profile offering no model could not be launched at all: the
+launch path still demanded token ceilings, which bound a bearer that a model-free session does not
+have. So the profiles needing a model least were the ones that could not be used, and the ceilings
+are now asked for only when there will be something for them to bound.

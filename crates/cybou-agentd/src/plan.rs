@@ -43,6 +43,23 @@ pub struct Ceilings {
     pub sensitivity: u8,
 }
 
+impl Ceilings {
+    /// The bounds of a bearer that will not exist.
+    ///
+    /// For a session granted no model. Nothing reads these — [`plan`] does not check them and no
+    /// gateway is started to be bound by them — and they exist only because a launch carries one
+    /// structure whether or not a model was selected. Requiring a caller to name them anyway made
+    /// the profiles that need a model least the ones that could not be launched.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            token_limit: 0,
+            max_output_tokens: 0,
+            sensitivity: 0,
+        }
+    }
+}
+
 /// One session, as selected.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Launch {

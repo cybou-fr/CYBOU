@@ -207,14 +207,22 @@ fn mint(selection: &Selection, now: OffsetDateTime) -> Result<Lease, String> {
 fn prepare(selection: &Selection) -> Result<(Lease, SessionPlan, KernelCapsuleSpec), String> {
     let now = OffsetDateTime::now_utc();
     let lease = mint(selection, now)?;
-    let launch = Launch {
-        lease: lease.clone(),
-        task_id: selection.task_id.unwrap_or_else(Uuid::new_v4),
-        ceilings: Ceilings {
+    // Asked for only when there will be a bearer for them to bound. A session granted no model has
+    // none, and demanding ceilings for it refused every capsule that was never going to ask a model
+    // anything — which is the ordinary case on a host with no provider at all.
+    let ceilings = if lease.grant().model.is_some() {
+        Ceilings {
             token_limit: required(selection.token_limit, "--token-limit")?,
             max_output_tokens: required(selection.max_output_tokens, "--max-output-tokens")?,
             sensitivity: required(selection.sensitivity, "--sensitivity")?,
-        },
+        }
+    } else {
+        Ceilings::none()
+    };
+    let launch = Launch {
+        lease: lease.clone(),
+        task_id: selection.task_id.unwrap_or_else(Uuid::new_v4),
+        ceilings,
     };
     let plan = plan::plan(&launch, now).map_err(|error| error.to_string())?;
     let spec = compile(lease.grant()).map_err(|error| error.to_string())?;

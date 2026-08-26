@@ -100,6 +100,22 @@ case "$acp_status" in
     *) exit "$acp_status" ;;
 esac
 
+# The profile door, against a catalogue on disk. Exit 3 means the catalogue cannot be placed where
+# this build reads it, which is a check that did not run.
+announce "agent profiles"
+failed="agent profiles"
+profile_status=0
+bash scripts/test-agent-profile-gate.sh || profile_status=$?
+case "$profile_status" in
+    0) failed="" ;;
+    3)
+        announce "agent profiles not run: the approved catalogue cannot be placed here"
+        skipped="$skipped agent-profiles"
+        failed=""
+        ;;
+    *) exit "$profile_status" ;;
+esac
+
 # Action1 writing its lifecycle to a real Event1 and reading it back after a restart. Exit 3 means
 # there is no session bus to run two daemons on, which is a check that did not run.
 announce "action durability"
