@@ -100,6 +100,22 @@ case "$acp_status" in
     *) exit "$acp_status" ;;
 esac
 
+# Action1 writing its lifecycle to a real Event1 and reading it back after a restart. Exit 3 means
+# there is no session bus to run two daemons on, which is a check that did not run.
+announce "action durability"
+failed="action durability"
+durability_status=0
+bash scripts/test-action-durability-gate.sh || durability_status=$?
+case "$durability_status" in
+    0) failed="" ;;
+    3)
+        announce "action durability not run: no session bus to run Event1 and Action1 on"
+        skipped="$skipped action-durability"
+        failed=""
+        ;;
+    *) exit "$durability_status" ;;
+esac
+
 # A whole launch with no model in it, which needs no provider and no gateway. Exit 3 means the
 # capsule's host programs are not installed here, which is a check that did not run.
 announce "capsule launch"

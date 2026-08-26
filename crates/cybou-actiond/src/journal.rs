@@ -34,6 +34,23 @@
 //! and each cites the step before it. So a reader following causation arrives at the decision from
 //! the proposal without needing to know that Action1 exists.
 //!
+//! ## The proposal is not a root, and finding that out cost a working feature
+//!
+//! It was written as one — a contribution citing nothing, on the reasoning that nothing Action1 can
+//! name caused it. The Journal disagrees, and it is right: only `Observation` and `ContextDisclosed`
+//! record something that happened outside the Journal. Everything else is derived and must cite a
+//! cause that *exists*, or evidence that does.
+//!
+//! So every contribution this module wrote was refused, every time, and because recording is best
+//! effort the refusal went to stderr and nothing else changed. The feature was inert from the day it
+//! was written and the tests could not see it, because they tested the shape of the envelopes and
+//! never handed one to a Journal.
+//!
+//! What did cause a proposal is the finding, which `ActionProposal::cause_id` has always carried. The
+//! proposal cites it, and a proposal with no cause cannot be recorded at all — said out loud, because
+//! the alternative is what happened before: submitting something certain to be refused and calling
+//! the result best effort.
+//!
 //! ## What is deliberately not written
 //!
 //! The permit. It is a single-use capability with a sixty-second life, and a durable record of one
@@ -112,21 +129,34 @@ impl core::error::Error for CannotReplay {}
 
 /// Every contribution one decided action produces, in causal order.
 ///
+/// # Errors
+///
+/// Returns [`CannotRecord::ProposalHasNoCause`] for a proposal that names nothing that gave rise to
+/// it. Such a lifecycle cannot enter the Journal at all — a derived contribution must cite a cause,
+/// and one invented here would point at nothing.
+///
 /// # Panics
 ///
 /// Never: encoding a lifecycle step to CBOR cannot fail for these types, and the expectation is
 /// written out rather than swallowed so a future field that could fail is caught by a test.
-#[must_use]
-pub fn contributions(record: &ActionRecord, now: OffsetDateTime) -> Vec<CanonicalEnvelope> {
+pub fn contributions(
+    record: &ActionRecord,
+    now: OffsetDateTime,
+) -> Result<Vec<CanonicalEnvelope>, CannotRecord> {
     let episode = record.proposal.proposal_id;
+    let cause = record
+        .proposal
+        .cause_id
+        .ok_or(CannotRecord::ProposalHasNoCause(episode))?;
     let mut out = Vec::with_capacity(2 + record.checks.len());
 
-    // The proposal is the root of its own episode: it cites nothing, because nothing caused it that
-    // this organ can name. Everything after it cites what came before.
+    // The proposal cites what gave rise to it. It is not a root: only a contribution recording
+    // something that happened outside the Journal is one, and a proposal is a conclusion about a
+    // finding that is already in there.
     out.push(envelope(
         episode,
         episode,
-        Uuid::nil(),
+        cause,
         Kind::PlanProposal,
         &LifecycleStep::Proposed {
             proposal: Box::new(record.proposal.clone()),
@@ -161,8 +191,31 @@ pub fn contributions(record: &ActionRecord, now: OffsetDateTime) -> Vec<Canonica
         },
         now,
     ));
-    out
+    Ok(out)
 }
+
+/// Why one decided action cannot be written down.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CannotRecord {
+    /// The proposal names nothing that gave rise to it.
+    ///
+    /// Not recoverable here. A derived contribution must cite a cause that exists, and this module
+    /// has nothing to cite: what caused a proposal is the finding, and a proposal that named none
+    /// left no thread to follow back.
+    ProposalHasNoCause(Uuid),
+}
+
+impl core::fmt::Display for CannotRecord {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ProposalHasNoCause(id) => {
+                write!(formatter, "proposal {id} names nothing that caused it")
+            }
+        }
+    }
+}
+
+impl core::error::Error for CannotRecord {}
 
 /// Rebuild the lifecycle records a replay contains.
 ///
@@ -274,13 +327,15 @@ mod tests {
         OffsetDateTime::from_unix_timestamp(1_787_000_000 + offset).expect("a fixed instant")
     }
 
+    const CAUSE: Uuid = Uuid::from_u128(0x0a00);
+
     fn record(passed: bool) -> ActionRecord {
         let proposal_id = Uuid::from_u128(0x0a01);
         ActionRecord {
             proposal: ActionProposal {
                 proposal_id,
                 proposed_by: Proposer::Mind,
-                cause_id: None,
+                cause_id: Some(CAUSE),
                 intent: "reload the deployed application".to_owned(),
                 operation: "service.restart".to_owned(),
                 target_resource: "systemd:nginx.service".to_owned(),
@@ -318,7 +373,7 @@ mod tests {
     fn a_decided_action_becomes_one_causal_episode() {
         // One episode, so a reader following causation arrives at the decision from the proposal
         // without having to know that Action1 exists.
-        let written = contributions(&record(true), at(2));
+        let written = contributions(&record(true), at(2)).expect("it has a cause");
 
         assert_eq!(written.len(), 2, "a passing check is not an objection");
         assert_eq!(written[0].kind, Kind::PlanProposal as u16);
@@ -330,9 +385,8 @@ mod tests {
             "every step belongs to the proposal's episode"
         );
         assert_eq!(
-            written[0].causation_id,
-            Uuid::nil(),
-            "the proposal is a root"
+            written[0].causation_id, CAUSE,
+            "the proposal cites the finding that gave rise to it, because it is not a root"
         );
         assert_eq!(written[1].causation_id, written[0].message_id);
     }
@@ -341,7 +395,7 @@ mod tests {
     fn only_a_criticism_that_failed_becomes_an_objection() {
         // A check that passed is not an objection to anything. Writing one would fill the record
         // with disagreement nobody expressed.
-        let written = contributions(&record(false), at(2));
+        let written = contributions(&record(false), at(2)).expect("it has a cause");
 
         let objections: Vec<&CanonicalEnvelope> = written
             .iter()
@@ -362,7 +416,7 @@ mod tests {
         // key, and one whose presence could be mistaken for the authority itself.
         let record = record(true);
         let permit = record.permit_id.expect("a permit").to_string();
-        for envelope in contributions(&record, at(2)) {
+        for envelope in contributions(&record, at(2)).expect("it has a cause") {
             let rendered = String::from_utf8_lossy(&envelope.payload).into_owned();
             assert!(!rendered.contains(&permit));
         }
@@ -372,7 +426,8 @@ mod tests {
     fn a_lifecycle_survives_the_wire_and_comes_back_whole() {
         // The point of the exercise: this is what a restarted Action1 reads.
         let original = record(false);
-        let replayed = replay(&contributions(&original, at(2))).expect("replays");
+        let written = contributions(&original, at(2)).expect("it has a cause");
+        let replayed = replay(&written).expect("replays");
 
         assert_eq!(replayed.len(), 1);
         assert_eq!(replayed[0].proposal, original.proposal);
@@ -388,7 +443,7 @@ mod tests {
     fn a_proposal_nobody_decided_is_left_as_one() {
         // Completing it with a guess would replace "we do not know" with "it was refused", which is
         // the one substitution a record of authority must never make.
-        let written = contributions(&record(true), at(2));
+        let written = contributions(&record(true), at(2)).expect("it has a cause");
         let only_proposal = &written[..1];
 
         assert!(replay(only_proposal).expect("replays").is_empty());
@@ -397,7 +452,7 @@ mod tests {
     #[test]
     fn a_decision_whose_proposal_is_missing_is_reported_rather_than_skipped() {
         // Reading on would build a record whose authority nobody can trace back to a request.
-        let written = contributions(&record(true), at(2));
+        let written = contributions(&record(true), at(2)).expect("it has a cause");
         let orphan = &written[1..];
 
         assert_eq!(
@@ -409,10 +464,26 @@ mod tests {
     }
 
     #[test]
+    fn a_proposal_with_no_cause_is_refused_rather_than_submitted_to_be_rejected() {
+        // The failure this returns a Result to make visible. Before, an unciteable lifecycle was
+        // submitted anyway, refused by the Journal, and logged as best effort — so the whole feature
+        // was inert and nothing said so.
+        let mut uncaused = record(true);
+        uncaused.proposal.cause_id = None;
+
+        assert_eq!(
+            contributions(&uncaused, at(2)),
+            Err(CannotRecord::ProposalHasNoCause(
+                uncaused.proposal.proposal_id
+            ))
+        );
+    }
+
+    #[test]
     fn contributions_from_another_organ_are_not_read_as_lifecycle_steps() {
         // A replay is of the whole Journal. Everything in it that is not this organ's is somebody
         // else's, and reading it here would be this organ inventing actions nobody proposed.
-        let mut written = contributions(&record(true), at(2));
+        let mut written = contributions(&record(true), at(2)).expect("it has a cause");
         for envelope in &mut written {
             envelope.origin_organ = "intentiond".to_owned();
         }

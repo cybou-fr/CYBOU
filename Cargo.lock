@@ -750,6 +750,7 @@ dependencies = [
  "cybou-protocol",
  "cybou-remediation",
  "serde",
+ "serde_json",
  "thiserror 2.0.20",
  "time",
  "tokio",

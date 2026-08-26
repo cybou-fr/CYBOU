@@ -54,7 +54,7 @@ fn a_decided_action_outlives_the_process_that_decided_it() {
     );
 
     // Everything the Journal would hold. The owner that decided it is gone by the next line.
-    let written = journal::contributions(&decided, at());
+    let written = journal::contributions(&decided, at()).expect("the finding caused it");
 
     let restarted = ActionCore::new(policy());
     assert!(
@@ -86,7 +86,10 @@ fn the_permit_does_not_come_back_and_cannot_be_claimed() {
 
     let restarted = ActionCore::new(policy());
     restarted
-        .restore(journal::replay(&journal::contributions(&decided, at())).expect("reads back"))
+        .restore(
+            journal::replay(&journal::contributions(&decided, at()).expect("caused"))
+                .expect("reads back"),
+        )
         .expect("restores");
 
     assert!(
@@ -115,7 +118,10 @@ fn a_refusal_is_remembered_as_a_refusal() {
 
     let restarted = ActionCore::new(policy());
     restarted
-        .restore(journal::replay(&journal::contributions(&decided, at())).expect("reads back"))
+        .restore(
+            journal::replay(&journal::contributions(&decided, at()).expect("caused"))
+                .expect("reads back"),
+        )
         .expect("restores");
 
     let remembered = restarted

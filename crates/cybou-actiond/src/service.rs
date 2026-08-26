@@ -54,6 +54,25 @@ impl Action1Service {
         Ok((encoded, permit_id))
     }
 
+    /// What was proposed, argued and decided for one proposal.
+    ///
+    /// Writing the lifecycle down was half of answering *why did nginx restart on the fourteenth*.
+    /// This is the other half: a record nothing can read is a record only in the sense that the bytes
+    /// exist. It answers from what this owner holds, which after a restart is what it read back out
+    /// of the Journal.
+    ///
+    /// No permit is ever in the answer. It is not stored and not restored, and a lifecycle read a
+    /// month later is a history rather than a key.
+    async fn record(&self, proposal_id: String) -> fdo::Result<Vec<u8>> {
+        let proposal_id = Uuid::parse_str(&proposal_id)
+            .map_err(|_| fdo::Error::InvalidArgs("invalid proposal identity".to_owned()))?;
+        let record = self
+            .core
+            .record(proposal_id)
+            .ok_or_else(|| fdo::Error::FileNotFound("no such proposal".to_owned()))?;
+        encode(&record).map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;
@@ -78,7 +97,14 @@ async fn record_lifecycle(record: &crate::ActionRecord, now: OffsetDateTime) {
         eprintln!("[cybou-actiond] The Journal is unreachable; this decision was not recorded");
         return;
     };
-    for envelope in journal::contributions(record, now) {
+    let contributions = match journal::contributions(record, now) {
+        Ok(contributions) => contributions,
+        Err(why) => {
+            eprintln!("[cybou-actiond] This decision cannot be recorded: {why}");
+            return;
+        }
+    };
+    for envelope in contributions {
         if let Err(error) = client.submit(&envelope).await {
             eprintln!("[cybou-actiond] A lifecycle step was not recorded: {error}");
         }

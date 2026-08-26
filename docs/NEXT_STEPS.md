@@ -393,6 +393,25 @@ leaves it empty rather than stopping it — a host that will not repair itself b
 remember is worse than one that has forgotten. Recording is best effort for the same reason, and the
 failure is printed rather than swallowed.
 
+**It did not work when it was written, and running it is what found that.** The proposal was recorded
+as a root contribution — one citing nothing — on the reasoning that nothing Action1 can name caused
+it. The Journal admits only `Observation` and `ContextDisclosed` as roots; everything else is derived
+and must cite a cause that *exists*. So every contribution was refused, every time, and because
+recording is best effort the refusal went to stderr and nothing else changed. The tests could not see
+it: they checked the shape of the envelopes and never handed one to a Journal.
+
+The proposal now cites the finding that gave rise to it, which `ActionProposal::cause_id` has always
+carried, and a proposal with no cause is refused up front rather than submitted to be rejected.
+`scripts/test-action-durability-gate.sh` runs a real `Event1` and a real `Action1`, decides an action,
+kills the owner, starts it again and asks it what it authorized. `Action1` gained a `Record` method
+for that question: a durable history nothing can read is a history only in the sense that the bytes
+exist.
+
+**One dependency is still open, and it is load-bearing.** Nothing in this repository puts a
+`SystemInsight` into the Journal, so on a real host the cause a proposal cites is not there and the
+lifecycle is still refused — now with a legible reason rather than silently. Journalling findings is
+what makes this work outside a gate, and it belongs to the organ that observes them.
+
 ### B7c. An owner that outlives its sessions, and one that they outlive
 
 **Partly done.** `cybou-agentd serve` holds what is running and answers on
