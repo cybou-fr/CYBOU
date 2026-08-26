@@ -579,6 +579,25 @@ above it and not the ones below, and this must read telemetry *and* call authori
 governance it would be reaching downward. Being a peer of the gate rather than above it is also the
 honest description — it is a party that asks, not one that decides.
 
+`scripts/test-self-maintenance-gate.sh` proves it, and proves it the only way that means anything:
+four daemons, a harmless unit stopped, and then nothing. No script touches `Action1` or the executor
+after that point. The host notices, proposes, is permitted by a standing policy an operator set,
+carries it out, waits, looks again, and concludes — and the gate checks the log to be sure the unit
+came back because *this host restarted it* rather than for any reason at all.
+
+Running it found two defects in the first two attempts, both of the kind that reading could not have
+shown. It decoded the telemetry organ's answer as a fabric envelope, which is a convention that organ
+does not use — the driver had assumed one rather than reading the one in use. And it proposed the
+first entry in the remedy table, which is an inspection: `relieves()` says plainly that reading a
+unit's state relieves nothing, so a host doing that would look at a stopped service, learn it was
+stopped, and repair nothing.
+
+The second fix has a second half worth stating. Proposing only the gentlest remedy and stopping at a
+refusal would make an authorization unusable unless everything gentler was authorized too — an
+operator who permits a restart and nothing else would have granted something their host could never
+reach. So it walks the operator's own order and takes the first remedy that is *permitted*, which is
+not escalation past anybody's decision: `Action1` refuses every step the operator did not authorize.
+
 Four things stop it doing something rash, and none of them is the file being careful. It cannot choose
 an operation: the remedies for a finding are a closed table, ordered least committal first, and it
 takes the first. It cannot authorize itself: every proposal goes to `Action1`, so on a host where

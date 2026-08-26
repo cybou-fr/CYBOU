@@ -132,6 +132,22 @@ case "$profile_status" in
     *) exit "$profile_status" ;;
 esac
 
+# A host that repairs itself with nobody driving it. Exit 3 means there is no root systemd here to
+# run four daemons against, which is a check that did not run rather than one that passed.
+announce "self-maintenance"
+failed="self-maintenance"
+self_status=0
+bash scripts/test-self-maintenance-gate.sh || self_status=$?
+case "$self_status" in
+    0) failed="" ;;
+    3)
+        announce "self-maintenance not run: no root systemd to run the organs against"
+        skipped="$skipped self-maintenance"
+        failed=""
+        ;;
+    *) exit "$self_status" ;;
+esac
+
 # Action1 writing its lifecycle to a real Event1 and reading it back after a restart. Exit 3 means
 # there is no session bus to run two daemons on, which is a check that did not run.
 announce "action durability"

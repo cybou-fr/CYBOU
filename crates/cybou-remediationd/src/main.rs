@@ -43,7 +43,7 @@
 #[cfg(not(target_os = "linux"))]
 compile_error!("cybou-remediationd drives Linux system maintenance");
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use cybou_actiond::ActionRecord;
 use cybou_fabric::{ACTION, EXECUTOR, TELEMETRY, decode, encode};
@@ -80,8 +80,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[cybou-remediationd] Watching what this host concludes about itself");
 
     let mut handled: HashMap<Uuid, Handled> = HashMap::new();
+    // Findings this host may do nothing about. Remembered so the fact is stated once: a line every
+    // fifteen seconds about a thing that will not change is how a log stops being read, and a log
+    // nobody reads is where the interesting line hides.
+    let mut nothing_permitted: HashSet<Uuid> = HashSet::new();
     loop {
-        if let Err(why) = consider(&session, &system, &mut handled).await {
+        if let Err(why) = consider(&session, &system, &mut handled, &mut nothing_permitted).await {
             // A pass that could not run is not a host that should stop watching itself. The reason
             // is said out loud; the next pass tries again.
             eprintln!("[cybou-remediationd] This pass did not complete: {why}");
@@ -95,6 +99,7 @@ async fn consider(
     session: &zbus::Connection,
     system: &zbus::Connection,
     handled: &mut HashMap<Uuid, Handled>,
+    nothing_permitted: &mut HashSet<Uuid>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let findings = insights(session).await?;
     let now = OffsetDateTime::now_utc();
@@ -103,8 +108,16 @@ async fn consider(
         let known = handled.get(&finding.insight_id).map(|entry| &entry.tried);
         match initiative(finding, known) {
             Initiative::Act => {
-                if let Some(handled_now) = attempt(system, finding, &findings).await? {
-                    handled.insert(finding.insight_id, handled_now);
+                if nothing_permitted.contains(&finding.insight_id) {
+                    continue;
+                }
+                match attempt(system, finding, &findings).await? {
+                    Some(handled_now) => {
+                        handled.insert(finding.insight_id, handled_now);
+                    }
+                    None => {
+                        nothing_permitted.insert(finding.insight_id);
+                    }
                 }
             }
             waiting @ Initiative::Wait { .. } => {
@@ -130,36 +143,64 @@ async fn attempt(
     finding: &SystemInsight,
     findings: &[SystemInsight],
 ) -> Result<Option<Handled>, Box<dyn std::error::Error>> {
-    // The least committal remedy the closed table offers for this finding. Choosing is not this
-    // organ's to do: something arguing for its own proposal is the wrong party to rank the options.
-    let Some(operation) = remedies_for(finding.finding).first().copied() else {
-        return Ok(None);
-    };
+    // Every remedy the closed table offers for this finding, in the operator's own order, skipping
+    // anything that relieves nothing.
+    //
+    // The inspection is skipped because `relieves()` says plainly that reading a unit's state
+    // relieves nothing. It leads the table so a person investigating is offered the option that
+    // changes nothing; a host that proposed it and considered the finding handled would look at a
+    // stopped service, learn that it is stopped, and repair nothing.
+    //
+    // Each is proposed until one is permitted, and that is not escalation past what anybody allowed:
+    // `Action1` refuses every one the operator did not authorize, so walking the order means *the
+    // gentlest thing this host is actually allowed to do*. Stopping at the first refusal instead
+    // would make an authorization unusable unless everything gentler was authorized too — an
+    // operator who permits a restart and nothing else would have granted something their host can
+    // never reach.
+    let remedies: Vec<_> = remedies_for(finding.finding)
+        .into_iter()
+        .filter(|operation| operation.relieves().contains(&finding.finding))
+        .collect();
 
-    let reply: (Vec<u8>, String) = system
-        .call_method(
-            Some(ACTION.service),
-            ACTION.object_path,
-            Some(ACTION.interface),
-            "EvaluateInsight",
-            &(encode(finding)?, operation.verb()),
-        )
-        .await?
-        .body()
-        .deserialize()?;
+    for operation in remedies {
+        let reply: (Vec<u8>, String) = system
+            .call_method(
+                Some(ACTION.service),
+                ACTION.object_path,
+                Some(ACTION.interface),
+                "EvaluateInsight",
+                &(encode(finding)?, operation.verb()),
+            )
+            .await?
+            .body()
+            .deserialize()?;
 
-    // The decision is decoded so a malformed answer is a failure here rather than a silent success.
-    // What it said is already recorded by its owner; nothing further is kept.
-    let _decided: ActionRecord = decode(&reply.0)?;
-    if reply.1.is_empty() {
-        println!(
-            "[cybou-remediationd] {} was not permitted for {}",
-            operation.verb(),
-            finding.finding.name()
-        );
-        return Ok(None);
+        // Decoded so a malformed answer is a failure here rather than a silent success. What it said
+        // is already recorded by its owner; nothing further is kept.
+        let _decided: ActionRecord = decode(&reply.0)?;
+        if reply.1.is_empty() {
+            continue;
+        }
+        return carry_out(system, finding, operation, &reply.1, findings).await;
     }
 
+    // Nothing this host knows how to do is permitted here. Said once rather than every pass: the
+    // caller remembers, because a line every fifteen seconds is how a log stops being read.
+    println!(
+        "[cybou-remediationd] Nothing permitted for {}",
+        finding.finding.name()
+    );
+    Ok(None)
+}
+
+/// Hand the permit to the executor and report what came back.
+async fn carry_out(
+    system: &zbus::Connection,
+    finding: &SystemInsight,
+    operation: cybou_remediation::Operation,
+    permit_id: &str,
+    findings: &[SystemInsight],
+) -> Result<Option<Handled>, Box<dyn std::error::Error>> {
     println!(
         "[cybou-remediationd] Carrying out {} for {}",
         operation.verb(),
@@ -171,7 +212,7 @@ async fn attempt(
             EXECUTOR.object_path,
             Some(EXECUTOR.interface),
             "Execute",
-            &(reply.1,),
+            &(permit_id.to_owned(),),
         )
         .await?
         .body()
@@ -287,7 +328,10 @@ async fn insights(
         .await?
         .body()
         .deserialize()?;
-    Ok(decode(&encoded)?)
+    // Plain CBOR, not a fabric envelope. The telemetry organ answers in the shape it has always
+    // answered in, and the web gateway reads it the same way; decoding it as an envelope here was
+    // this organ assuming a convention rather than reading the one in use.
+    Ok(ciborium::from_reader(encoded.as_slice())?)
 }
 
 async fn watching(
@@ -304,5 +348,5 @@ async fn watching(
         .await?
         .body()
         .deserialize()?;
-    Ok(decode(&encoded)?)
+    Ok(ciborium::from_reader(encoded.as_slice())?)
 }
