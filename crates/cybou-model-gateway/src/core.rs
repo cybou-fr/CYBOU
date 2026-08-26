@@ -302,6 +302,14 @@ impl GatewayCore {
         if grant.class != request.model_class {
             return Err(GatewayRefused::ModelClassNotGranted);
         }
+        // Asked before a provider is, and it is the lease's own answer rather than arithmetic
+        // repeated here. Without it a grant that had already ended as far as money is concerned
+        // still reached a provider, and the refusal arrived after the bill: a capped grant with
+        // nothing left spent again, and a zero-cost route that had already broken its promise once
+        // went on breaking it. Both are the same defect — the ledger said stop and nobody asked it.
+        if !lease.may_use_model(&request.model_class) {
+            return Err(GatewayRefused::BudgetExceeded);
+        }
         if request.max_output_tokens > account.policy.max_output_tokens {
             return Err(GatewayRefused::BudgetExceeded);
         }

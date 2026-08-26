@@ -582,3 +582,80 @@ fn a_refusal_that_cost_money_still_charges_the_lease() {
         "the charge reached the ledger even though the content did not reach the agent"
     );
 }
+
+/// A lease that spends nothing, on a route that costs nothing.
+fn zero_cost_lease() -> Arc<Mutex<Lease>> {
+    let mut profile = CapabilityProfile::bounded(
+        "free-only",
+        ResourceBudget {
+            memory_mib: 512,
+            cpus: 1,
+            tasks_max: 64,
+            lifetime: time::Duration::hours(1),
+        },
+    )
+    .expect("profile");
+    profile.model = Some(ModelGrant {
+        class: "Strong".to_owned(),
+        spend: SpendPolicy::ZeroCostOnly,
+    });
+    Arc::new(Mutex::new(
+        issue_lease(
+            LeaseRequest {
+                selected_profile: profile,
+                capsule_id: Uuid::from_u128(8473),
+                agent: "opencode".to_owned(),
+                workspace: Workspace::at("/srv/project"),
+            },
+            at(0),
+        )
+        .expect("lease"),
+    ))
+}
+
+#[test]
+fn a_zero_cost_route_that_billed_once_is_closed_to_everything_after() {
+    // The second half of the zero-cost promise. The first was that a billed completion is charged
+    // rather than lost; this is that it is also the last. Without it a route that broke its promise
+    // once went on breaking it, billing a person who had selected nothing, one refused answer at a
+    // time - and each refusal looked like the system working.
+    let mut providers = BrokerCore::new();
+    providers.register_provider(
+        ModelRoute {
+            provider: "shared-provider".to_owned(),
+            external_boundary: false,
+            sensitivity_ceiling: 3,
+            tasks: vec![ModelTask::InterpretActV1],
+            context_limit: 4096,
+        },
+        vec!["Strong".to_owned()],
+        Box::new(BilledThenRefused),
+    );
+    let core = GatewayCore::new(Arc::new(providers));
+
+    let lease = zero_cost_lease();
+    let token = core
+        .issue_token(Arc::clone(&lease), Uuid::from_u128(11), policy(), at(0))
+        .expect("a token");
+
+    // The first call reaches the provider, is billed, and is refused for breaking the policy.
+    let first = core
+        .complete(token.expose_secret(), &request(), at(1))
+        .expect_err("the answer is withheld");
+    assert!(matches!(first, GatewayRefused::Provider(_)));
+    assert_eq!(lease.lock().expect("lease").model_spent(), 7);
+
+    // The second never reaches one. The ledger already said stop, and now somebody asks it.
+    let second = core
+        .complete(token.expose_secret(), &request(), at(2))
+        .expect_err("the route is closed");
+    assert!(
+        matches!(second, GatewayRefused::BudgetExceeded),
+        "a closed grant must be refused before a provider is called, not after: {second:?}"
+    );
+    assert_eq!(
+        lease.lock().expect("lease").model_spent(),
+        7,
+        "nothing further was spent"
+    );
+}

@@ -160,6 +160,10 @@ impl SessionRegistry {
     /// published nothing keeps whatever was last read — an absent file is a gateway that has not
     /// written yet, not a session that has spent nothing, and overwriting a real figure with a nought
     /// because a read failed would be the same lie in a new place.
+    ///
+    /// A snapshot naming a different capsule is not read. It says which session it is about, and
+    /// believing one that says a different one would attribute another session's spending to this
+    /// one — from a path left behind by an earlier session, or simply from the wrong file.
     pub fn read_ledgers(
         &mut self,
         read: impl Fn(&std::path::Path) -> Option<cybou_protocol::model::ModelUsageSnapshot>,
@@ -168,7 +172,9 @@ impl SessionRegistry {
             let Some(path) = live.plan.model_usage.as_ref() else {
                 continue;
             };
-            if let Some(snapshot) = read(path) {
+            if let Some(snapshot) = read(path)
+                && snapshot.capsule_id == live.plan.lease.grant().capsule_id
+            {
                 live.ledger = Ledger::published(&snapshot);
             }
         }
@@ -474,6 +480,24 @@ mod tests {
             Some(at(120)),
             "a figure arrives with the instant somebody looked"
         );
+    }
+
+    #[test]
+    fn a_ledger_about_a_different_session_is_not_believed() {
+        // A snapshot says which capsule it is about. Reading one that names another would attribute
+        // somebody else's spending here — from a stale file, or from the wrong path entirely.
+        let mut recovered = recover(vec![found(0xd001, Duration::hours(4), true)], at(60));
+        let mut elsewhere = snapshot(999, at(120));
+        elsewhere.capsule_id = Uuid::from_u128(0xdead);
+
+        recovered.registry.read_ledgers(|_| Some(elsewhere));
+
+        let view = &recovered.registry.views()[0];
+        assert!(matches!(
+            view.spend,
+            Some(crate::view::SpendView::Capped { spent: None, .. })
+        ));
+        assert_eq!(view.spend_observed_at, None);
     }
 
     #[test]

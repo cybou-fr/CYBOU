@@ -440,6 +440,31 @@ until an operator writes something.
 
 What remains: `Launch` itself on the bus, and a record of finished sessions a person can still read. See [The agent session owner](agent-session.md).
 
+### B7d. Four things a reachable surface must not get wrong
+
+Found by review of what had been built rather than by running it, and each is the same shape: a
+component that reported success for an outcome it had not established.
+
+**A spent grant reached a provider.** The gateway checked the lease's clock and class before
+dispatching and never asked it about money, so a capped grant with nothing left, and a zero-cost route
+that had already broken its promise once, both went on calling providers — the refusal arriving after
+the bill. It now asks `may_use_model` before a provider is called, which closes a violated zero-cost
+route to everything after it rather than to nothing.
+
+**`Stop` forgot sessions it had not ended.** It removed the session from the registry and tore it down
+afterwards, so a capsule that refused to die became one nobody could see or stop. A session now leaves
+the registry only on a confirmed ending; an unproven one stays listed as `ending` and the caller is
+told `false`.
+
+**A usage snapshot was believed whatever session it named.** It carries a capsule id; one naming a
+different session is now ignored rather than attributed here.
+
+**Aggregate host capacity is still missing, and it blocks a reachable `Launch`.** A profile bounds one
+capsule well, and nothing bounds the sum: four honest four-gigabyte grants on an eight-gigabyte host
+are each within policy. Admission is not telemetry — current usage is an observation, a reserved
+maximum is a decision — and the reservation has to be atomic inside the owner. `Launch` on the bus
+waits on this and on caller-to-profile authorization.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

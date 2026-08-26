@@ -308,10 +308,20 @@ way it is not: none of them can widen anything, and stopping removes authority r
 it.
 
 `Stop` runs the teardown. It sends nothing to the agent and waits for no agreement — the capsule is a
-cgroup with a kill switch. The reason is recorded *before* the teardown, because a session torn down
-first and labelled afterwards could be marked expired if the clock ran out in between, replacing a
-person's decision with a timer. A stopped session then leaves the registry, because the registry
-answers what is running; a listing of finished sessions a person can still read is not built.
+cgroup with a kill switch.
+
+**A session leaves the registry when it is gone, not when it was asked to go.** The first version had
+that backwards: it took the session out first and tore it down afterwards, so a capsule that refused
+to die was one this owner had forgotten — absent from every listing, with no surface offering to stop
+it, and an agent still working inside. The one failure a person could not recover from was the one
+reported as success. Now the reason is fixed, the units are terminated, the host is asked whether
+they are actually gone, and only a confirmed ending forgets the session. An unproven one leaves it
+listed as `ending` and answers `false`, which is the truthful thing to tell a caller whose request
+did not take effect.
+
+The reason is fixed *before* the teardown, because a session torn down first and labelled afterwards
+could be marked expired if the clock ran out in between, replacing a person's decision with a timer.
+Where that record then goes — a listing of finished sessions a person can still read — is not built.
 
 It must also survive its own restart, and the part of that which is a judgement rather than plumbing
 is now built and tested.

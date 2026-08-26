@@ -760,8 +760,21 @@ struct HostTeardown;
 
 #[cfg(target_os = "linux")]
 impl cybou_agentd::service::Teardown for HostTeardown {
-    fn tear_down(&self, plan: &SessionPlan) {
+    fn tear_down(&self, plan: &SessionPlan) -> cybou_agentd::service::Ended {
         teardown(plan);
+        // Asked afterwards rather than assumed. A stop that was accepted and did not take is the one
+        // outcome a caller must not be told is success, because the session would then be gone from
+        // every listing while the capsule kept working.
+        if plan
+            .teardown()
+            .iter()
+            .filter_map(|step| runtime::still_running(plan, step))
+            .any(|check| status_of(&check) == Ok(true))
+        {
+            cybou_agentd::service::Ended::Unproven
+        } else {
+            cybou_agentd::service::Ended::Confirmed
+        }
     }
 }
 

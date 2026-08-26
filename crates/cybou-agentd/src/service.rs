@@ -26,12 +26,24 @@
 //! it to agree — the capsule is a cgroup with a kill switch, and a boundary made of requests is not
 //! one.
 //!
-//! A stopped session leaves the registry, because the registry answers *what is running*. Recording
-//! that it was stopped rather than that it expired still happens, and it happens **before** the
-//! teardown: a session torn down first and labelled afterwards could be marked expired if the clock
-//! ran out in between, which would replace a person's decision with a timer. Where that record then
-//! goes — a listing of finished sessions a person can still read — is not built, and until it is, a
-//! stopped session simply stops being listed.
+//! ## A session leaves the registry when it is gone, not when it was asked to go
+//!
+//! The order matters and the earlier version had it wrong. It took the session out of the registry
+//! first and tore it down afterwards, so a capsule that refused to die was a capsule this owner had
+//! forgotten: absent from every listing, with no surface offering to stop it, and an agent still
+//! working inside it. The one failure a person could not recover from was the one reported as
+//! success.
+//!
+//! So: the reason is fixed, the units are terminated, the host is asked whether they are actually
+//! gone, and only then is the session forgotten. An ending that cannot be confirmed leaves the
+//! session listed and answers `false`, which is the truthful thing to tell a caller whose request
+//! did not take effect.
+//!
+//! The reason is fixed **before** the teardown, because a session torn down first and labelled
+//! afterwards could be marked expired if the clock ran out in between, which would replace a
+//! person's decision with a timer. Where that record then goes — a listing of finished sessions a
+//! person can still read — is not built, and until it is, a stopped session simply stops being
+//! listed.
 
 #![allow(missing_docs)]
 
@@ -50,8 +62,25 @@ use crate::session::SessionEnd;
 /// A trait rather than a direct call, so the decision to run teardown stays testable without a
 /// service manager, and so this file holds no policy about how a unit is stopped.
 pub trait Teardown: Send + Sync {
-    /// End everything one session put on the host.
-    fn tear_down(&self, plan: &crate::plan::SessionPlan);
+    /// End everything one session put on the host, and say whether it ended.
+    ///
+    /// The answer is not decoration. A session removed from the registry on the strength of having
+    /// *asked* would be a capsule still running that this owner has forgotten — no listing showing
+    /// it, no surface offering to stop it, and an agent working on inside. So the caller is told,
+    /// and an unproven ending keeps the session where a person can still see it.
+    fn tear_down(&self, plan: &crate::plan::SessionPlan) -> Ended;
+}
+
+/// Whether a session's units are actually gone.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Ended {
+    /// Every unit this session started is confirmed inactive.
+    Confirmed,
+    /// Something is still running, or could not be asked about.
+    ///
+    /// Not a failure to report and forget. It is the case where the truthful thing is to keep
+    /// showing the session, because it is still there.
+    Unproven,
 }
 
 /// Process-owned Agent1 dispatch surface.
@@ -107,23 +136,34 @@ impl Agent1Service {
     /// over by the time the caller is answered.
     async fn stop(&self, capsule_id: String) -> fdo::Result<bool> {
         let capsule_id = identity(&capsule_id)?;
-        let taken = {
+        let now = OffsetDateTime::now_utc();
+
+        // Marked as ending while it is still held, so a listing taken during the teardown shows a
+        // session on its way out rather than one that is fine.
+        let plan = {
             let mut registry = self.registry.lock().map_err(|_| {
                 fdo::Error::Failed("the session registry is unavailable".to_owned())
             })?;
-            registry.take(capsule_id)
-        };
-        let Some(mut live) = taken else {
-            return Ok(false);
+            let Some(live) = registry.get_mut(capsule_id) else {
+                return Ok(false);
+            };
+            live.session.begin_ending(SessionEnd::Stopped);
+            live.plan.clone()
         };
 
-        // The reason is fixed before the teardown, not after. A session torn down first and labelled
-        // afterwards could be recorded as having expired if the clock ran out in between, which
-        // would replace a person's decision with a timer.
-        let now = OffsetDateTime::now_utc();
-        live.session.begin_ending(SessionEnd::Stopped);
-        self.teardown.tear_down(&live.plan);
-        live.session.finish_ending(now);
+        if self.teardown.tear_down(&plan) == Ended::Unproven {
+            // Still there. Keeping it listed is the whole point: a forgotten capsule is one nobody
+            // can be shown and nobody can be offered a way to stop.
+            return Ok(false);
+        }
+
+        let mut registry = self
+            .registry
+            .lock()
+            .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
+        if let Some(mut live) = registry.take(capsule_id) {
+            live.session.finish_ending(now);
+        }
         Ok(true)
     }
 }
@@ -152,8 +192,20 @@ mod tests {
     struct CountingTeardown(AtomicUsize);
 
     impl Teardown for CountingTeardown {
-        fn tear_down(&self, _plan: &SessionPlan) {
+        fn tear_down(&self, _plan: &SessionPlan) -> Ended {
             self.0.fetch_add(1, Ordering::SeqCst);
+            Ended::Confirmed
+        }
+    }
+
+    /// A host where the capsule will not die.
+    #[derive(Default)]
+    struct StubbornTeardown(AtomicUsize);
+
+    impl Teardown for StubbornTeardown {
+        fn tear_down(&self, _plan: &SessionPlan) -> Ended {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ended::Unproven
         }
     }
 
@@ -256,6 +308,40 @@ mod tests {
         assert!(!service.stop(CAPSULE.to_string()).await.expect("answers"));
 
         assert_eq!(teardown.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn a_session_that_would_not_die_stays_listed_and_the_caller_is_told() {
+        // The failure a person could not recover from, previously reported as success. A capsule
+        // removed from the registry on the strength of having been asked to stop is one nobody can
+        // be shown and nobody can be offered a way to stop.
+        let mut registry = SessionRegistry::new();
+        registry.insert(held());
+        let registry = Arc::new(Mutex::new(registry));
+        let teardown = Arc::new(StubbornTeardown::default());
+        let service = Agent1Service::new(
+            Arc::clone(&registry),
+            Arc::clone(&teardown) as Arc<dyn Teardown>,
+        );
+
+        assert!(
+            !service.stop(CAPSULE.to_string()).await.expect("answers"),
+            "an ending that was not confirmed is not a stop"
+        );
+        assert_eq!(teardown.0.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            registry.lock().expect("held").len(),
+            1,
+            "the session is still there, so it is still listed"
+        );
+
+        // And it shows as on its way out rather than as fine, because that is what it is.
+        let views = registry.lock().expect("held").views();
+        assert_eq!(views[0].standing, crate::view::Standing::Ending);
+        assert_eq!(
+            views[0].ended_because.as_deref(),
+            Some("the session was stopped")
+        );
     }
 
     #[tokio::test]
