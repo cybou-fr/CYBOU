@@ -100,6 +100,22 @@ case "$acp_status" in
     *) exit "$acp_status" ;;
 esac
 
+# What a browser is told about running agents, and by whom. Exit 3 means this host cannot run an
+# owner and a gateway together, which is a check that did not run.
+announce "agent card"
+failed="agent card"
+card_status=0
+bash scripts/test-agent-card-gate.sh || card_status=$?
+case "$card_status" in
+    0) failed="" ;;
+    3)
+        announce "agent card not run: no session to run an owner and a gateway in"
+        skipped="$skipped agent-card"
+        failed=""
+        ;;
+    *) exit "$card_status" ;;
+esac
+
 # The profile door, against a catalogue on disk. Exit 3 means the catalogue cannot be placed where
 # this build reads it, which is a check that did not run.
 announce "agent profiles"

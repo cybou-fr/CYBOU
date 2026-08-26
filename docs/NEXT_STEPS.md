@@ -513,6 +513,31 @@ deliberately do not pretend to enforce it — a check in a separate process woul
 and race with every other launch, which is exactly the failure this repository keeps finding. `Launch`
 belongs on `Agent1`, together with caller-to-profile authorization, and admission binds there.
 
+### B7e. What a browser is told about running agents
+
+**The read half is done.** `GET /api/v1/agents` returns what `Agent1` says, and the type it returns
+lives in `cybou-protocol` rather than beside the owner — so the owner and the browser share one
+definition instead of two that agree on the day they are written. The route is a proxy and
+deliberately nothing more: it does not read the launch directory, ask a service manager, or assemble
+a session from a lease and a plan. A second thing doing that would be a second answer to *what is
+running*, and the one that is not the owner's is wrong the moment a session starts or ends between
+its listing and its reading.
+
+`scripts/test-agent-card-gate.sh` compares the endpoint's answer against the owner's own, field for
+field, because *looks like a session* is exactly what a second assembler would also produce. Then it
+kills the owner and checks the endpoint says it could not ask — an empty list there is the one answer
+a person cannot act on, since *nothing is running* and *I could not find out* look identical on a card
+and only one means they can stop worrying. The refusal names the condition without describing this
+host's insides to somebody who may not be entitled to know them.
+
+There is no `Stop` and no `Launch` on that route. Stopping is a decision about somebody's running work
+and belongs behind the owner's surface, where an ending can be confirmed before it is reported.
+Launching needs admission against the whole host and authorization of the caller to a profile, neither
+of which a proxy can do.
+
+What remains for the card itself is drawing it: the browser has an authoritative source and no view
+yet.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

@@ -45,29 +45,15 @@
 //! all the way onto the card: *€0.42, seen four minutes ago* is the truth, and *€0.42* is a claim
 //! about now that nothing outside the gateway is in a position to make.
 
-use serde::{Deserialize, Serialize};
-use time::{Duration, OffsetDateTime};
-use uuid::Uuid;
+use time::OffsetDateTime;
 
 use cybou_capsule::{Lease, SpendPolicy};
+// Re-exported so callers name one type rather than two paths for the same shape.
+pub use cybou_protocol::agent::{SessionView, SpendView, Standing};
 use cybou_protocol::model::ModelUsageSnapshot;
 
 use crate::plan::SessionPlan;
-use crate::session::{Session, SessionEnd, SessionState};
-
-/// How a session reads on a surface.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Standing {
-    /// The launch is being carried out.
-    Launching,
-    /// The agent is working inside its capsule.
-    Running,
-    /// The ending has begun.
-    Ending,
-    /// It is over.
-    Ended,
-}
+use crate::session::{Session, SessionState};
 
 /// What a reporter knows about money actually charged.
 ///
@@ -80,8 +66,7 @@ pub enum Ledger {
     ///
     /// The instant travels with the figure because *has spent* and *had spent when last observed*
     /// are different claims, and only the second is true of anything read out of a published
-    /// snapshot. A surface showing the first would quietly become wrong every time a completion
-    /// happened between two readings.
+    /// snapshot.
     Observed {
         /// What had been charged.
         spent: u64,
@@ -129,153 +114,50 @@ impl Ledger {
     }
 }
 
-/// What was granted for money, said in words a surface can print without deciding anything.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum SpendView {
-    /// A ceiling, and what has been charged against it when that is known here.
-    Capped {
-        /// The whole ceiling, in the operator's smallest unit.
-        limit: u64,
-        /// What has been charged so far, or `None` when this reporter holds no ledger.
-        spent: Option<u64>,
-    },
-    /// No money at all, and only routes that cost none.
-    ///
-    /// Carries what was charged anyway, because that is the one number worth showing here: under
-    /// this policy it should be nought, and anything else means a route that was declared free
-    /// billed — which a person selecting `€0` is entitled to see rather than have summarised away.
-    ZeroCost {
-        /// What was charged despite the policy, or `None` when this reporter holds no ledger.
-        spent: Option<u64>,
-    },
-}
-
-/// One agent session, as a surface should show it.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionView {
-    /// The capsule's identity, which is the session's.
-    pub capsule_id: Uuid,
-    /// Which agent is running.
-    pub agent: String,
-    /// The profile a person selected.
-    pub profile: String,
-    /// The one directory the agent may change.
-    pub workspace: String,
-    /// Where the session is.
-    pub standing: Standing,
-    /// Why it is over, in a person's words, when it is.
-    pub ended_because: Option<String>,
-    /// When the launch began.
-    ///
-    /// Instants rather than a duration, because a duration is stale the moment it is serialised. A
-    /// card that received `uptimeSeconds` would need it resent every second to keep a clock honest;
-    /// given the two ends it does the arithmetic itself and the owner sends nothing until something
-    /// actually changes.
-    #[serde(with = "time::serde::rfc3339")]
-    pub started_at: OffsetDateTime,
-    /// When the lease runs out.
-    #[serde(with = "time::serde::rfc3339")]
-    pub expires_at: OffsetDateTime,
-    /// When the session finished ending, if it has.
-    #[serde(default, with = "time::serde::rfc3339::option")]
-    pub ended_at: Option<OffsetDateTime>,
-    /// The model class the lease granted, if any.
-    pub model_class: Option<String>,
-    /// What may be spent, and what had been when the ledger was last read.
-    pub spend: Option<SpendView>,
-    /// When that spending figure was observed, if it was.
-    ///
-    /// Beside the figure rather than folded into it, so a card can say *€0.42, seen four minutes ago*
-    /// — which is the truth — instead of *€0.42*, which is a claim about now that nothing here can
-    /// make.
-    #[serde(default, with = "time::serde::rfc3339::option")]
-    pub spend_observed_at: Option<OffsetDateTime>,
-    /// Memory ceiling in mebibytes, as granted.
-    pub memory_mib: u32,
-    /// CPU ceiling, as granted.
-    pub cpus: u32,
-    /// Process ceiling, as granted.
-    pub tasks_max: u32,
-    /// Exactly the hosts this capsule may reach.
-    pub hosts: Vec<String>,
-    /// The units a person can look up in a service manager.
-    pub units: Vec<String>,
-}
-
-impl SessionView {
-    /// Gather one session from the three things that know about it.
-    ///
-    /// The lease is passed separately from the plan even though the plan carries one, because the
-    /// lease is the thing that has been *charged* — the plan's copy is what was minted, and showing
-    /// a spend of nought for a session that has spent something would be reading the wrong one.
-    #[must_use]
-    pub fn of(session: &Session, plan: &SessionPlan, ledger: Ledger) -> Self {
-        // The grant comes off the plan's own lease, which is the copy that carries what a person
-        // approved. Nothing here reads a spend from it: see this module's header.
-        let lease = &plan.lease;
-        let grant = lease.grant();
-        let (standing, ended_because) = match session.state() {
-            SessionState::Launching => (Standing::Launching, None),
-            SessionState::Running => (Standing::Running, None),
-            SessionState::Ending(end) => (Standing::Ending, Some(end.describe())),
-            SessionState::Ended(end) => (Standing::Ended, Some(end.describe())),
-        };
-
-        Self {
-            capsule_id: grant.capsule_id,
-            agent: grant.agent.clone(),
-            profile: lease.profile_id().as_str().to_owned(),
-            workspace: grant.workspace.root.display().to_string(),
-            standing,
-            ended_because,
-            started_at: session.started_at(),
-            expires_at: plan.expires_at,
-            ended_at: session.ended_at(),
-            model_class: grant.model.as_ref().map(|model| model.class.clone()),
-            spend: grant.model.as_ref().map(|model| match model.spend {
-                SpendPolicy::Capped(limit) => SpendView::Capped {
-                    limit,
-                    spent: ledger.spent(),
-                },
-                SpendPolicy::ZeroCostOnly => SpendView::ZeroCost {
-                    spent: ledger.spent(),
-                },
-            }),
-            spend_observed_at: grant.model.as_ref().and_then(|_| ledger.observed_at()),
-            memory_mib: grant.budget.memory_mib,
-            cpus: grant.budget.cpus,
-            tasks_max: grant.budget.tasks_max,
-            hosts: grant.network.hosts.clone(),
-            units: units(plan),
-        }
-    }
-
-    /// Whether a person would consider this session live.
-    #[must_use]
-    pub const fn is_live(&self) -> bool {
-        matches!(self.standing, Standing::Launching | Standing::Running)
-    }
-
-    /// How long is left at `now`, never negative.
-    ///
-    /// A lease that ran out has no time left rather than minus four minutes, and a surface should
-    /// not have to know that a countdown can pass through zero.
-    #[must_use]
-    pub fn remaining(&self, now: OffsetDateTime) -> Duration {
-        (self.expires_at - now).max(Duration::ZERO)
-    }
-
-    /// How long this session ran, or has been running.
-    #[must_use]
-    pub fn uptime(&self, now: OffsetDateTime) -> Duration {
-        (self.ended_at.unwrap_or(now) - self.started_at).max(Duration::ZERO)
-    }
-}
-
-/// The units this session put on the host, so a person can look up any of them by name.
+/// Gather one session from the three things that know about it.
 ///
+/// The grant comes off the plan's own lease, which is the copy that carries what a person approved.
+/// Nothing here reads a spend from it: see this module's header.
+#[must_use]
+pub fn of(session: &Session, plan: &SessionPlan, ledger: Ledger) -> SessionView {
+    let lease = &plan.lease;
+    let grant = lease.grant();
+    let (standing, ended_because) = match session.state() {
+        SessionState::Launching => (Standing::Launching, None),
+        SessionState::Running => (Standing::Running, None),
+        SessionState::Ending(end) => (Standing::Ending, Some(end.describe())),
+        SessionState::Ended(end) => (Standing::Ended, Some(end.describe())),
+    };
+
+    SessionView {
+        capsule_id: grant.capsule_id,
+        agent: grant.agent.clone(),
+        profile: lease.profile_id().as_str().to_owned(),
+        workspace: grant.workspace.root.display().to_string(),
+        standing,
+        ended_because,
+        started_at: session.started_at(),
+        expires_at: plan.expires_at,
+        ended_at: session.ended_at(),
+        model_class: grant.model.as_ref().map(|model| model.class.clone()),
+        spend: grant.model.as_ref().map(|model| match model.spend {
+            SpendPolicy::Capped(limit) => SpendView::Capped {
+                limit,
+                spent: ledger.spent(),
+            },
+            SpendPolicy::ZeroCostOnly => SpendView::ZeroCost {
+                spent: ledger.spent(),
+            },
+        }),
+        spend_observed_at: grant.model.as_ref().and_then(|_| ledger.observed_at()),
+        memory_mib: grant.budget.memory_mib,
+        cpus: grant.budget.cpus,
+        tasks_max: grant.budget.tasks_max,
+        hosts: grant.network.hosts.clone(),
+        units: units(plan),
+    }
+}
+
 /// Neither the broker nor the gateway is listed unless there is one. A capsule granted no network has
 /// no broker and one granted no model has no gateway, and naming a unit that was never started would
 /// send somebody looking for a fault that is a correctly enforced grant.
@@ -290,14 +172,12 @@ fn units(plan: &SessionPlan) -> Vec<String> {
     out
 }
 
-/// How an ending reads to a person, for a surface that has only the view.
-#[must_use]
-pub fn describe_end(end: &SessionEnd) -> String {
-    end.describe()
-}
-
 #[cfg(test)]
 mod tests {
+    use time::Duration;
+    use uuid::Uuid;
+
+    use crate::session::SessionEnd;
     use cybou_capsule::{
         CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget, Workspace,
         issue_lease,
@@ -369,7 +249,7 @@ mod tests {
             &["github.com", "registry.npmjs.org"],
             Some(SpendPolicy::Capped(100)),
         );
-        let view = SessionView::of(
+        let view = of(
             &running(),
             &planned(&lease),
             Ledger::Observed {
@@ -399,7 +279,7 @@ mod tests {
     fn a_countdown_stops_at_nothing_left_rather_than_going_negative() {
         // A surface should not have to know that a remaining time can pass through zero.
         let lease = lease(&[], Some(SpendPolicy::Capped(100)));
-        let view = SessionView::of(
+        let view = of(
             &running(),
             &planned(&lease),
             Ledger::Observed {
@@ -420,14 +300,14 @@ mod tests {
         let plan = planned(&lease);
 
         assert_eq!(
-            SessionView::of(&running(), &plan, Ledger::Elsewhere).spend,
+            of(&running(), &plan, Ledger::Elsewhere).spend,
             Some(SpendView::Capped {
                 limit: 100,
                 spent: None
             })
         );
         assert_eq!(
-            SessionView::of(
+            of(
                 &running(),
                 &plan,
                 Ledger::Observed {
@@ -450,7 +330,7 @@ mod tests {
         // from whichever lease was nearest to hand.
         let mut charged = lease(&[], Some(SpendPolicy::Capped(100)));
         charged.charge(42);
-        let view = SessionView::of(&running(), &planned(&charged), Ledger::of(&charged, at(60)));
+        let view = of(&running(), &planned(&charged), Ledger::of(&charged, at(60)));
 
         assert_eq!(
             view.spend,
@@ -467,11 +347,11 @@ mod tests {
         // billed, and a person who selected no spending is entitled to see that rather than have it
         // summarised away.
         let mut lease = lease(&[], Some(SpendPolicy::ZeroCostOnly));
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::of(&lease, at(60)));
+        let view = of(&running(), &planned(&lease), Ledger::of(&lease, at(60)));
         assert_eq!(view.spend, Some(SpendView::ZeroCost { spent: Some(0) }));
 
         lease.charge(3);
-        let broken = SessionView::of(&running(), &planned(&lease), Ledger::of(&lease, at(60)));
+        let broken = of(&running(), &planned(&lease), Ledger::of(&lease, at(60)));
         assert_eq!(broken.spend, Some(SpendView::ZeroCost { spent: Some(3) }));
     }
 
@@ -480,7 +360,7 @@ mod tests {
         // Naming a unit that was never started would send somebody looking for a fault that is in
         // fact a correctly enforced grant.
         let lease = lease(&[], Some(SpendPolicy::Capped(100)));
-        let view = SessionView::of(
+        let view = of(
             &running(),
             &planned(&lease),
             Ledger::Observed {
@@ -499,7 +379,7 @@ mod tests {
         // The same rule as the broker, and the one that says an Agent Capsule is a bounded place to
         // compute rather than a container that only exists around a model.
         let lease = lease(&["github.com"], None);
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::Elsewhere);
+        let view = of(&running(), &planned(&lease), Ledger::Elsewhere);
 
         assert_eq!(view.model_class, None);
         assert_eq!(view.spend, None);
@@ -514,7 +394,7 @@ mod tests {
     fn every_unit_a_session_started_can_be_looked_up_by_name() {
         let lease = lease(&["github.com"], Some(SpendPolicy::Capped(100)));
         let plan = planned(&lease);
-        let view = SessionView::of(
+        let view = of(
             &running(),
             &plan,
             Ledger::Observed {
@@ -546,7 +426,7 @@ mod tests {
         session.begin_ending(SessionEnd::Stopped);
         session.finish_ending(at(300));
 
-        let view = SessionView::of(
+        let view = of(
             &session,
             &planned(&lease),
             Ledger::Observed {
@@ -569,7 +449,7 @@ mod tests {
         // A duration is stale the moment it is serialised. Given both ends a card keeps its own
         // clock honest without the owner resending anything every second.
         let lease = lease(&[], Some(SpendPolicy::Capped(100)));
-        let view = SessionView::of(
+        let view = of(
             &running(),
             &planned(&lease),
             Ledger::Observed {
@@ -588,7 +468,7 @@ mod tests {
         // It travels from whatever holds the session to whatever draws it, and those are different
         // processes by design.
         let lease = lease(&["github.com"], Some(SpendPolicy::ZeroCostOnly));
-        let view = SessionView::of(&running(), &planned(&lease), Ledger::Elsewhere);
+        let view = of(&running(), &planned(&lease), Ledger::Elsewhere);
 
         let encoded = serde_json::to_string(&view).expect("encodes");
         let decoded: SessionView = serde_json::from_str(&encoded).expect("decodes");

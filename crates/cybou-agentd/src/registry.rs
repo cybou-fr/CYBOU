@@ -41,7 +41,8 @@ use cybou_capsule::Lease;
 use crate::capacity::{HostCapacity, NotAdmitted, Reserved, admits};
 use crate::plan::{CannotPlan, Ceilings, Launch, SessionPlan, plan};
 use crate::session::{Session, SessionEnd};
-use crate::view::{Ledger, SessionView};
+use crate::view::Ledger;
+use cybou_protocol::agent::SessionView;
 
 /// One session found on the host during recovery.
 ///
@@ -178,7 +179,7 @@ impl SessionRegistry {
     pub fn views(&self) -> Vec<SessionView> {
         self.sessions
             .values()
-            .map(|live| SessionView::of(&live.session, &live.plan, live.ledger))
+            .map(|live| crate::view::of(&live.session, &live.plan, live.ledger))
             .collect()
     }
 

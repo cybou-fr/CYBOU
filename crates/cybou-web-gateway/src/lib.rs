@@ -40,9 +40,9 @@ pub use state::{
 };
 
 use routes::{
-    api_not_found, disclosure_handler, events_handler, insight_handler, list_directory_handler,
-    login_handler, logout_handler, mind_handler, read_file_handler, session_handler,
-    shell_close_handler, shell_exec_handler, snapshot_handler,
+    agents_handler, api_not_found, disclosure_handler, events_handler, insight_handler,
+    list_directory_handler, login_handler, logout_handler, mind_handler, read_file_handler,
+    session_handler, shell_close_handler, shell_exec_handler, snapshot_handler,
 };
 use state::GatewayState;
 
@@ -172,6 +172,7 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/events", get(events_handler))
         .route("/api/v1/disclosure", get(disclosure_handler))
         .route("/api/v1/insight", get(insight_handler))
+        .route("/api/v1/agents", get(agents_handler))
         .route("/api/v1/shell/exec", post(shell_exec_handler))
         .route("/api/v1/shell/close", post(shell_close_handler))
         .route("/api/v1/files/list", post(list_directory_handler))

@@ -27,12 +27,13 @@ use cybou_acp::AcpSession;
 use cybou_agentd::plan::SessionPlan;
 use cybou_agentd::profiles::{ProfileCatalogue, Wanted};
 use cybou_agentd::session::{Session, SessionEnd, SessionState};
-use cybou_agentd::view::{Ledger, SessionView};
+use cybou_agentd::view::Ledger;
 use cybou_agentd::{Ceilings, HostPrograms, Launch, TeardownStep, plan, runtime};
 use cybou_capsule::{
     CapabilityProfile, KernelCapsuleSpec, Lease, LeaseRequest, ModelGrant, NetworkGrant,
     ResourceBudget, SpendPolicy, Workspace, compile, issue_lease,
 };
+use cybou_protocol::agent::SessionView;
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
@@ -585,7 +586,7 @@ fn teardown(plan: &SessionPlan) {
 /// see what has been spent. Reporting nought would be a claim this process is in no position to
 /// make, and would be wrong the moment a completion happened.
 fn announce(session: &Session, plan: &SessionPlan) {
-    let view = SessionView::of(session, plan, Ledger::Elsewhere);
+    let view = cybou_agentd::view::of(session, plan, Ledger::Elsewhere);
     match serde_json::to_string(&view) {
         Ok(line) => println!("{line}"),
         Err(error) => eprintln!("the session could not be described: {error}"),

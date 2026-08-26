@@ -53,4 +53,4 @@ pub use profiles::{CannotOffer, OfferedProfile, ProfileCatalogue, Wanted};
 pub use registry::{Found, LiveSession, Recovered, SessionRegistry, recover};
 pub use runtime::HostPrograms;
 pub use session::{Session, SessionEnd, SessionState};
-pub use view::{Ledger, SessionView, SpendView, Standing};
+pub use view::Ledger;
