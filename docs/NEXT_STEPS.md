@@ -580,14 +580,16 @@ later.
 The episode now continues:
 
 ```text
-ExecutionAttempt   Intention   what the host committed to doing about it
+ExecutionStarted   Intention   when the effect first became possible
+ExecutionAttempt   Intention   what the executor finally reported
 ActionOutcome      Outcome     what it independently saw afterwards
 ```
 
-An attempt is an `Intention` because the Journal has no kind for *acting*, and that is the nearest
-true thing: the host binding itself to carry out what was authorized. An outcome is an `Outcome`,
-which the Journal treats as terminal and permits once per cause — right for an action, which happens
-once and is answered for once.
+Both execution records are `Intention`s because the Journal has no kind for *acting*. The first is
+written synchronously by `Action1.ClaimPermit` before it returns the typed action, and therefore
+before the executor can touch the Body. The second is the executor's final report. An outcome is an
+`Outcome`, which the Journal treats as terminal and permits once per cause — right for an action,
+which happens once and is answered for once.
 
 They are two contributions and not one. What a thing says about itself and what the readings say
 afterwards are separate accounts, and the entire value of re-observation is that they can disagree;
@@ -600,8 +602,9 @@ would answer *was it done* with a guess.
 
 **And now something produces them.** `cybou-remediationd` is the join: it reads what `Telemetry1`
 concluded, asks [`initiative`] whether this host may act, proposes to `Action1`, hands the opaque
-permit to the executor, reports the attempt back, waits out `TOO_SOON_AFTER`, asks telemetry what it
-sees now, and reports the outcome. Until it existed the only thing that had ever run that loop was
+permit to the executor, waits out `TOO_SOON_AFTER`, asks telemetry what it sees now, and reports the
+outcome. Executor1 reports its own attempt directly to Action1; the coordinator is no longer a
+courier between the thing that acted and the lifecycle owner. Until it existed the only thing that had ever run that loop was
 `action-roundtrip`, an example written for a gate — so a host left to itself reached *explain* and
 stopped, which is not what this repository's own summaries have been saying.
 
@@ -624,6 +627,12 @@ a service broken until the remedy is concluded `StillPresent`, restarts the driv
 outcome, and requires zero new executor attempts. The second case is distinct: terminal episodes are
 not returned by `UnfinishedEpisodes`, so the driver asks `Action1.EpisodeForCause` before treating its
 empty process memory as permission to act.
+
+There is a third, narrower boundary before both of those. `ClaimPermit` consumes the capability,
+mints `ExecutionStarted`, and requires Event1 to durably accept it before the typed action is returned
+to Executor1. If the Body effect then happens but the executor process or D-Bus reply disappears,
+Action1 still recovers that stable attempt as `DidNotFinish`. The adversarial test holds the exact
+sequence `effect happened → final report lost → Action1 restart → zero permission to repeat`.
 
 Running it found two defects in the first two attempts, both of the kind that reading could not have
 shown. It decoded the telemetry organ's answer as a fabric envelope, which is a convention that organ

@@ -199,6 +199,91 @@ pub struct ExecutionPermit {
     pub expires_at: OffsetDateTime,
 }
 
+/// Durable boundary crossed before an executor may touch the Body.
+///
+/// This does not claim that the operation completed, failed, or even reached its first system call.
+/// It says only that the one-use permit was consumed and an executor may now begin. If no final
+/// [`ExecutionAttempt`] arrives, recovery can therefore say [`AttemptReport::DidNotFinish`] instead
+/// of treating a lost reply as permission to repeat a possibly completed effect.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionStarted {
+    /// Stable identity the eventual execution report must retain.
+    pub attempt_id: Uuid,
+    /// Proposal whose granted permit was consumed.
+    pub proposal_id: Uuid,
+    /// Decision that authorized the execution.
+    pub decision_id: Uuid,
+    /// Typed operation in its public spelling.
+    pub operation: String,
+    /// Concrete resource the operation may touch.
+    pub target_resource: String,
+    /// Instant at which execution became possible.
+    #[serde(with = "time::serde::rfc3339")]
+    pub started_at: OffsetDateTime,
+}
+
+impl ExecutionStarted {
+    /// Derive the durable execution boundary from the capability Action1 consumed.
+    #[must_use]
+    pub fn from_permit(
+        permit: &ExecutionPermit,
+        attempt_id: Uuid,
+        started_at: OffsetDateTime,
+    ) -> Self {
+        let (operation, target_resource) = match &permit.action {
+            ExecutableAction::ServiceStatus { unit } => {
+                ("service.status", format!("systemd:{unit}"))
+            }
+            ExecutableAction::PackageCacheClean => {
+                ("package.cache.clean", "apt:archives".to_owned())
+            }
+            ExecutableAction::ServiceRestart { unit } => {
+                ("service.restart", format!("systemd:{unit}"))
+            }
+        };
+        Self {
+            attempt_id,
+            proposal_id: permit.proposal_id,
+            decision_id: permit.decision_id,
+            operation: operation.to_owned(),
+            target_resource,
+            started_at,
+        }
+    }
+
+    /// Finish this exact execution identity with the executor's report.
+    #[must_use]
+    pub fn finish(
+        &self,
+        report: AttemptReport,
+        body_readings: Vec<BodyReading>,
+        ended_at: Option<OffsetDateTime>,
+    ) -> ExecutionAttempt {
+        ExecutionAttempt {
+            attempt_id: self.attempt_id,
+            proposal_id: self.proposal_id,
+            decision_id: self.decision_id,
+            operation: self.operation.clone(),
+            target_resource: self.target_resource.clone(),
+            report,
+            body_readings,
+            started_at: self.started_at,
+            ended_at,
+        }
+    }
+}
+
+/// What Action1 returns only after the execution boundary is durable.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionClaim {
+    /// Consumed capability containing the only action the executor may perform.
+    pub permit: ExecutionPermit,
+    /// Stable lifecycle identity already written before mutation becomes possible.
+    pub started: ExecutionStarted,
+}
+
 /// The namespace authorization identities are derived in.
 const DECISION_NAMESPACE: Uuid = Uuid::from_u128(0x6379_626f_755f_6465_6369_7369_6f6e_5f31);
 

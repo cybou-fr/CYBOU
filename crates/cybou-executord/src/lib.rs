@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use cybou_protocol::action::{
-    AttemptReport, BodyReading, ExecutableAction, ExecutionAttempt, ExecutionPermit,
+    AttemptReport, BodyReading, ExecutableAction, ExecutionAttempt, ExecutionClaim,
 };
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -25,13 +25,18 @@ pub enum ExecutorError {
     /// A typed Body adapter failed.
     #[error("Body adapter failed: {0}")]
     Adapter(String),
+    /// Action1 could not retain the executor's final report.
+    #[error("Action1 did not retain the execution report: {0}")]
+    ReportNotRecorded(String),
 }
 
 /// The one authority question the executor is allowed to ask.
 #[async_trait]
 pub trait PermitSource: Send + Sync {
     /// Atomically claim the complete action for an opaque permit identity.
-    async fn claim(&self, permit_id: Uuid) -> Result<ExecutionPermit, ExecutorError>;
+    async fn claim(&self, permit_id: Uuid) -> Result<ExecutionClaim, ExecutorError>;
+    /// Put the executor's final account beside the authorization that produced it.
+    async fn record_attempt(&self, attempt: &ExecutionAttempt) -> Result<(), ExecutorError>;
 }
 
 /// The three physical adapters. There is intentionally no program-and-arguments method.
@@ -55,22 +60,9 @@ pub async fn execute(
     permits: &impl PermitSource,
     body: &impl Body,
     permit_id: Uuid,
-    now: OffsetDateTime,
 ) -> Result<ExecutionAttempt, ExecutorError> {
-    let permit = permits.claim(permit_id).await?;
-    let operation = match &permit.action {
-        ExecutableAction::ServiceStatus { .. } => "service.status",
-        ExecutableAction::PackageCacheClean => "package.cache.clean",
-        ExecutableAction::ServiceRestart { .. } => "service.restart",
-    }
-    .to_owned();
-    let target_resource = match &permit.action {
-        ExecutableAction::ServiceStatus { unit } | ExecutableAction::ServiceRestart { unit } => {
-            format!("systemd:{unit}")
-        }
-        ExecutableAction::PackageCacheClean => "apt:archives".to_owned(),
-    };
-    let result = match &permit.action {
+    let claim = permits.claim(permit_id).await?;
+    let result = match &claim.permit.action {
         ExecutableAction::ServiceStatus { unit } => body.service_status(unit).await,
         ExecutableAction::PackageCacheClean => body.clean_package_cache().await,
         ExecutableAction::ServiceRestart { unit } => body.restart_service(unit).await,
@@ -84,17 +76,11 @@ pub async fn execute(
             Vec::new(),
         ),
     };
-    Ok(ExecutionAttempt {
-        attempt_id: Uuid::new_v4(),
-        proposal_id: permit.proposal_id,
-        decision_id: permit.decision_id,
-        operation,
-        target_resource,
-        report,
-        body_readings,
-        started_at: now,
-        ended_at: Some(OffsetDateTime::now_utc()),
-    })
+    let attempt = claim
+        .started
+        .finish(report, body_readings, Some(OffsetDateTime::now_utc()));
+    permits.record_attempt(&attempt).await?;
+    Ok(attempt)
 }
 
 #[cfg(test)]
@@ -102,17 +88,52 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
+    use cybou_protocol::action::{ExecutionPermit, ExecutionStarted};
+    use time::OffsetDateTime;
 
-    struct OnePermit(Mutex<Option<ExecutionPermit>>);
+    struct OnePermit {
+        claim: Mutex<Option<ExecutionClaim>>,
+        reports: Mutex<Vec<ExecutionAttempt>>,
+        lose_report: bool,
+    }
+
+    fn one_permit(id: Uuid, action: ExecutableAction) -> OnePermit {
+        let permit = ExecutionPermit {
+            permit_id: id,
+            decision_id: Uuid::new_v4(),
+            proposal_id: Uuid::new_v4(),
+            action,
+            issued_at: OffsetDateTime::UNIX_EPOCH,
+            expires_at: OffsetDateTime::UNIX_EPOCH + time::Duration::minutes(1),
+        };
+        let started =
+            ExecutionStarted::from_permit(&permit, Uuid::new_v4(), OffsetDateTime::UNIX_EPOCH);
+        OnePermit {
+            claim: Mutex::new(Some(ExecutionClaim { permit, started })),
+            reports: Mutex::new(Vec::new()),
+            lose_report: false,
+        }
+    }
 
     #[async_trait]
     impl PermitSource for OnePermit {
-        async fn claim(&self, _: Uuid) -> Result<ExecutionPermit, ExecutorError> {
-            self.0
+        async fn claim(&self, _: Uuid) -> Result<ExecutionClaim, ExecutorError> {
+            self.claim
                 .lock()
                 .expect("permit lock")
                 .take()
                 .ok_or_else(|| ExecutorError::PermitRefused("consumed".to_owned()))
+        }
+
+        async fn record_attempt(&self, attempt: &ExecutionAttempt) -> Result<(), ExecutorError> {
+            if self.lose_report {
+                return Err(ExecutorError::ReportNotRecorded("reply lost".to_owned()));
+            }
+            self.reports
+                .lock()
+                .expect("report lock")
+                .push(attempt.clone());
+            Ok(())
         }
     }
 
@@ -147,59 +168,71 @@ mod tests {
     #[tokio::test]
     async fn caller_supplies_only_identity_and_permit_supplies_the_action() {
         let id = Uuid::new_v4();
-        let permits = OnePermit(Mutex::new(Some(ExecutionPermit {
-            permit_id: id,
-            decision_id: Uuid::new_v4(),
-            proposal_id: Uuid::new_v4(),
-            action: ExecutableAction::ServiceRestart {
+        let permits = one_permit(
+            id,
+            ExecutableAction::ServiceRestart {
                 unit: "cybou-action-test.service".to_owned(),
             },
-            issued_at: OffsetDateTime::UNIX_EPOCH,
-            expires_at: OffsetDateTime::UNIX_EPOCH + time::Duration::minutes(1),
-        })));
+        );
         let body = RecordingBody::default();
-        let attempt = execute(&permits, &body, id, OffsetDateTime::UNIX_EPOCH)
-            .await
-            .expect("execute");
+        let attempt = execute(&permits, &body, id).await.expect("execute");
         assert_eq!(attempt.operation, "service.restart");
         assert_eq!(
             body.0.lock().expect("body lock").as_slice(),
             ["restart:cybou-action-test.service"]
         );
-        assert!(
-            execute(&permits, &body, id, OffsetDateTime::UNIX_EPOCH)
-                .await
-                .is_err()
+        assert_eq!(
+            permits.reports.lock().expect("report lock").as_slice(),
+            [attempt],
+            "the returned report is the report Action1 retained"
         );
+        assert!(execute(&permits, &body, id).await.is_err());
     }
 
     #[tokio::test]
     async fn service_status_returns_the_state_the_adapter_read() {
         let id = Uuid::new_v4();
-        let permits = OnePermit(Mutex::new(Some(ExecutionPermit {
-            permit_id: id,
-            decision_id: Uuid::new_v4(),
-            proposal_id: Uuid::new_v4(),
-            action: ExecutableAction::ServiceStatus {
+        let permits = one_permit(
+            id,
+            ExecutableAction::ServiceStatus {
                 unit: "cybou-action-test.service".to_owned(),
             },
-            issued_at: OffsetDateTime::UNIX_EPOCH,
-            expires_at: OffsetDateTime::UNIX_EPOCH + time::Duration::minutes(1),
-        })));
-        let attempt = execute(
-            &permits,
-            &RecordingBody::default(),
-            id,
-            OffsetDateTime::UNIX_EPOCH,
-        )
-        .await
-        .expect("execute");
+        );
+        let attempt = execute(&permits, &RecordingBody::default(), id)
+            .await
+            .expect("execute");
         assert_eq!(
             attempt.body_readings,
             [BodyReading {
                 field: "systemd.active-state".to_owned(),
                 value: "active".to_owned(),
             }]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_body_effect_can_happen_before_its_final_report_is_lost() {
+        let id = Uuid::new_v4();
+        let mut permits = one_permit(
+            id,
+            ExecutableAction::ServiceRestart {
+                unit: "cybou-action-test.service".to_owned(),
+            },
+        );
+        permits.lose_report = true;
+        let body = RecordingBody::default();
+
+        assert!(
+            matches!(
+                execute(&permits, &body, id).await,
+                Err(ExecutorError::ReportNotRecorded(_))
+            ),
+            "the caller receives no success when Action1 did not retain the final report"
+        );
+        assert_eq!(
+            body.0.lock().expect("body lock").as_slice(),
+            ["restart:cybou-action-test.service"],
+            "the adversarial window is real: the effect preceded the lost report"
         );
     }
 }

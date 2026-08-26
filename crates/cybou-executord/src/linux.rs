@@ -6,8 +6,8 @@
 use std::process::{Command, Stdio};
 
 use async_trait::async_trait;
-use cybou_fabric::{ACTION, decode};
-use cybou_protocol::action::{BodyReading, ExecutionPermit};
+use cybou_fabric::{ACTION, decode, encode};
+use cybou_protocol::action::{BodyReading, ExecutionAttempt, ExecutionClaim};
 use uuid::Uuid;
 use zbus::Proxy;
 
@@ -46,7 +46,7 @@ impl Action1PermitSource {
 
 #[async_trait]
 impl PermitSource for Action1PermitSource {
-    async fn claim(&self, permit_id: Uuid) -> Result<ExecutionPermit, ExecutorError> {
+    async fn claim(&self, permit_id: Uuid) -> Result<ExecutionClaim, ExecutorError> {
         let proxy = Proxy::new(
             &self.connection,
             ACTION.service,
@@ -60,6 +60,23 @@ impl PermitSource for Action1PermitSource {
             .await
             .map_err(|error| ExecutorError::PermitRefused(error.to_string()))?;
         decode(&encoded).map_err(|error| ExecutorError::PermitRefused(error.to_string()))
+    }
+
+    async fn record_attempt(&self, attempt: &ExecutionAttempt) -> Result<(), ExecutorError> {
+        let proxy = Proxy::new(
+            &self.connection,
+            ACTION.service,
+            ACTION.object_path,
+            ACTION.interface,
+        )
+        .await
+        .map_err(|error| ExecutorError::ReportNotRecorded(error.to_string()))?;
+        let encoded =
+            encode(attempt).map_err(|error| ExecutorError::ReportNotRecorded(error.to_string()))?;
+        proxy
+            .call::<_, _, ()>("RecordAttempt", &(encoded))
+            .await
+            .map_err(|error| ExecutorError::ReportNotRecorded(error.to_string()))
     }
 }
 

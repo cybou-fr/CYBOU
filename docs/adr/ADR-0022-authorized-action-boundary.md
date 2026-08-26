@@ -81,7 +81,8 @@ So the split is physical:
          cybou-actiond
              Action1
                 │
-        ExecutionPermit
+        claim + durable
+       ExecutionStarted
                 │
                 ▼
          cybou-executord
@@ -238,6 +239,28 @@ For services, that means the systemd manager API over D-Bus — `RestartUnit("fo
 say which*, which is not something to carry out.
 
 For the package cache, one fixed adapter with a fixed argument vector and no shell.
+
+### Amendment: durable execution starts before mutation (2026-08-27)
+
+Exactly-once external effects are not promised. The stronger honest invariant is:
+
+> Once execution may have begun, CYBOU never automatically repeats it merely because the final
+> report was lost.
+
+`Action1.ClaimPermit` therefore does three things as one ownership decision: consumes the one-use
+permit, mints a stable attempt identity, and requires Event1 to accept an `ExecutionStarted`
+contribution. Only then does it return an `ExecutionClaim` containing the typed action to Executor1.
+The durable boundary precedes the first Body adapter call.
+
+`ExecutionStarted` is not a fabricated completed attempt. It says only that the executor may now
+begin. Executor1 later records the matching `ExecutionAttempt` directly with Action1. If the
+executor dies, the machine reboots, or the D-Bus reply is lost after an effect but before that final
+report, replay turns a start with no report into `AttemptReport::DidNotFinish`. Initiative treats
+that as `OutcomeUnknown` and does not repeat the mutation automatically.
+
+If Event1 cannot acknowledge the start, ClaimPermit fails and the executor receives no action. A
+submission whose acknowledgement was lost may conservatively leave a start for an effect that did
+not occur; refusing an automatic retry in that ambiguous case is the intended fail-closed result.
 
 ## Consequences
 

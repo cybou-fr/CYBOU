@@ -553,13 +553,21 @@ read-only offer projection mints no lifecycle identity; Action1 is the owner of 
 identity.
 
 `cybou-executord` receives only an opaque permit identity. It atomically claims the complete typed
-action from Action1, so its caller supplies neither a verb, a program nor arguments. There are three
+action from Action1, so its caller supplies neither a verb, a program nor arguments. Claiming now
+also mints a stable attempt identity and synchronously writes `ExecutionStarted` to the Journal.
+Action1 does not return the action to Executor1 until that write is acknowledged, so a Body effect
+can never precede the durable fact that it may have begun. If the executor dies or its reply is lost
+after mutation, replay materializes `DidNotFinish`; that episode blocks automatic repetition rather
+than turning missing evidence into permission. Executor1 reports its final `ExecutionAttempt`
+directly to Action1, while `cybou-remediationd` only coordinates re-observation and outcome. There are three
 adapters: `service.status`, fixed `/usr/bin/apt-get clean`, and `service.restart`. Services use the
 systemd manager D-Bus API and only concrete names ending in `.service`; the `systemd:<unit>`
 placeholder and every operation without one of those adapters are refused before a permit exists.
 The layering validator rejects any dependency from the governance owner to `cybou-executord`.
 
-The A1 gate creates a harmless disposable systemd unit, observes it inactive, passes a strong named
+The A1 gates also hold the adversarial interval explicitly: a Body restart can happen and the final
+report can be lost; the durable start survives Action1 restart as `DidNotFinish`, and initiative
+returns `OutcomeUnknown`, so there is zero second mutation. The live A1 gate creates a harmless disposable systemd unit, observes it inactive, passes a strong named
 finding through Action1 and the executor, and then re-reads systemd independently until the unit is
 active. It also replays the permit and requires refusal. No model, shell command string, real
 workload or executor self-report supplies the final observation.

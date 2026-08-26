@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Mutex};
 use cybou_protocol::{
     action::{
         ActionOutcome, ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
-        ExecutableAction, ExecutionAttempt, ExecutionPermit,
+        ExecutableAction, ExecutionAttempt, ExecutionClaim, ExecutionPermit, ExecutionStarted,
     },
     telemetry::SystemInsight,
 };
@@ -38,6 +38,9 @@ pub struct ActionRecord {
     pub decision: AuthorizationDecision,
     /// Present only for a granted decision with a first-executor adapter.
     pub permit_id: Option<Uuid>,
+    /// Durable boundary crossed before the first Body effect may begin.
+    #[serde(default)]
+    pub execution_started: Option<ExecutionStarted>,
     /// What was carried out, once something has been.
     ///
     /// Absent is a real answer and a common one: a decision nobody acted on is a decision nobody
@@ -75,6 +78,9 @@ pub enum ActionError {
     /// authorized it, is the one shape this owner exists to prevent.
     #[error("proposal {0} was not made here")]
     UnknownProposal(Uuid),
+    /// A final report did not match the execution identity minted at permit claim.
+    #[error("attempt {0} does not match the execution Action1 started")]
+    AttemptMismatch(Uuid),
 }
 
 /// Owner of the action lifecycle.
@@ -151,6 +157,7 @@ impl ActionCore {
             checks,
             decision,
             permit_id,
+            execution_started: None,
             attempt: None,
             outcome: None,
         };
@@ -170,7 +177,7 @@ impl ActionCore {
         &self,
         permit_id: Uuid,
         now: OffsetDateTime,
-    ) -> Result<ExecutionPermit, ActionError> {
+    ) -> Result<ExecutionClaim, ActionError> {
         let permit = self
             .permits
             .lock()
@@ -180,7 +187,16 @@ impl ActionCore {
         if now > permit.expires_at {
             return Err(ActionError::PermitUnavailable);
         }
-        Ok(permit)
+        let started = ExecutionStarted::from_permit(&permit, Uuid::new_v4(), now);
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?;
+        let record = records
+            .get_mut(&permit.proposal_id)
+            .ok_or(ActionError::UnknownProposal(permit.proposal_id))?;
+        record.execution_started = Some(started.clone());
+        Ok(ExecutionClaim { permit, started })
     }
 
     /// Read one retained lifecycle record.
@@ -197,8 +213,9 @@ impl ActionCore {
     /// # Errors
     ///
     /// Returns [`ActionError::StateUnavailable`] when the record table cannot be reached, and
-    /// [`ActionError::UnknownProposal`] when nothing here proposed what the attempt names — an
-    /// attempt against a proposal this owner never made is not an attempt it can answer for.
+    /// [`ActionError::UnknownProposal`] when nothing here proposed what the attempt names, and
+    /// [`ActionError::AttemptMismatch`] when the report does not match the execution identity
+    /// minted while claiming the permit.
     pub fn record_attempt(&self, attempt: ExecutionAttempt) -> Result<(), ActionError> {
         let mut records = self
             .records
@@ -207,6 +224,17 @@ impl ActionCore {
         let record = records
             .get_mut(&attempt.proposal_id)
             .ok_or(ActionError::UnknownProposal(attempt.proposal_id))?;
+        let matches_started = record.execution_started.as_ref().is_some_and(|started| {
+            started.attempt_id == attempt.attempt_id
+                && started.proposal_id == attempt.proposal_id
+                && started.decision_id == attempt.decision_id
+                && started.operation == attempt.operation
+                && started.target_resource == attempt.target_resource
+                && started.started_at == attempt.started_at
+        });
+        if !matches_started {
+            return Err(ActionError::AttemptMismatch(attempt.attempt_id));
+        }
         record.attempt = Some(attempt);
         Ok(())
     }
@@ -242,8 +270,12 @@ impl ActionCore {
         };
         records
             .values()
-            .filter(|record| record.attempt.is_some() && record.outcome.is_none())
+            .filter(|record| {
+                (record.attempt.is_some() || record.execution_started.is_some())
+                    && record.outcome.is_none()
+            })
             .cloned()
+            .map(recover_interrupted)
             .collect()
     }
 
@@ -260,16 +292,30 @@ impl ActionCore {
             .lock()
             .ok()?
             .values()
-            .filter(|record| record.proposal.cause_id == Some(cause_id) && record.attempt.is_some())
+            .filter(|record| {
+                record.proposal.cause_id == Some(cause_id)
+                    && (record.attempt.is_some() || record.execution_started.is_some())
+            })
             .max_by_key(|record| {
-                let attempt = record.attempt.as_ref().expect("filtered above");
+                let started_at = record
+                    .attempt
+                    .as_ref()
+                    .map(|attempt| attempt.started_at)
+                    .or_else(|| {
+                        record
+                            .execution_started
+                            .as_ref()
+                            .map(|started| started.started_at)
+                    })
+                    .unwrap_or(OffsetDateTime::UNIX_EPOCH);
                 (
-                    attempt.started_at,
+                    started_at,
                     record.proposal.proposed_at,
                     record.proposal.proposal_id,
                 )
             })
             .cloned()
+            .map(recover_interrupted)
     }
 
     /// Seed this owner with lifecycle records read back from the Journal.
@@ -292,6 +338,19 @@ impl ActionCore {
         }
         Ok(held.len())
     }
+}
+
+fn recover_interrupted(mut record: ActionRecord) -> ActionRecord {
+    if record.attempt.is_none() {
+        record.attempt = record.execution_started.as_ref().map(|started| {
+            started.finish(
+                cybou_protocol::action::AttemptReport::DidNotFinish,
+                Vec::new(),
+                None,
+            )
+        });
+    }
+    record
 }
 
 fn operation_for(verb: &str) -> Result<Operation, ActionError> {
@@ -391,9 +450,9 @@ mod tests {
             .evaluate_insight(&insight(), "service.restart", now)
             .expect("evaluate");
         let id = record.permit_id.expect("permit");
-        let permit = core.claim_permit(id, now).expect("first claim");
+        let claim = core.claim_permit(id, now).expect("first claim");
         assert_eq!(
-            permit.action,
+            claim.permit.action,
             ExecutableAction::ServiceRestart {
                 unit: "cybou-action-test.service".to_owned()
             }
@@ -482,13 +541,48 @@ mod tests {
         let record = core
             .evaluate_insight(&storage, "package.cache.clean", OffsetDateTime::UNIX_EPOCH)
             .expect("evaluate");
-        let permit = core
+        let claim = core
             .claim_permit(
                 record.permit_id.expect("permit"),
                 OffsetDateTime::UNIX_EPOCH,
             )
             .expect("claim");
-        assert_eq!(permit.action, ExecutableAction::PackageCacheClean);
+        assert_eq!(claim.permit.action, ExecutableAction::PackageCacheClean);
+    }
+
+    #[test]
+    fn a_final_report_must_match_the_execution_action1_started() {
+        let core = ActionCore::new(StandingPolicy {
+            pre_authorized: vec![Operation::RestartService],
+            pre_authorized_for_agents: Vec::new(),
+        });
+        let record = core
+            .evaluate_insight(&insight(), "service.restart", OffsetDateTime::UNIX_EPOCH)
+            .expect("evaluate");
+        let claim = core
+            .claim_permit(
+                record.permit_id.expect("permit"),
+                OffsetDateTime::UNIX_EPOCH,
+            )
+            .expect("claim");
+        let mut substituted = claim.started.finish(
+            AttemptReport::Completed,
+            Vec::new(),
+            Some(OffsetDateTime::UNIX_EPOCH + Duration::seconds(1)),
+        );
+        substituted.attempt_id = Uuid::new_v4();
+
+        assert_eq!(
+            core.record_attempt(substituted.clone()),
+            Err(ActionError::AttemptMismatch(substituted.attempt_id))
+        );
+        assert!(
+            core.record(record.proposal.proposal_id)
+                .expect("record")
+                .attempt
+                .is_none(),
+            "a substituted report must not overwrite the durable start"
+        );
     }
 
     #[test]
@@ -518,17 +612,17 @@ mod tests {
             )
             .expect("later permitted remedy");
         for (record, offset) in [(&first, 1), (&second, 2)] {
-            core.record_attempt(ExecutionAttempt {
-                attempt_id: Uuid::new_v4(),
-                proposal_id: record.proposal.proposal_id,
-                decision_id: record.decision.decision_id,
-                operation: record.proposal.operation.clone(),
-                target_resource: record.proposal.target_resource.clone(),
-                report: AttemptReport::Completed,
-                body_readings: Vec::new(),
-                started_at: OffsetDateTime::UNIX_EPOCH + Duration::seconds(offset),
-                ended_at: Some(OffsetDateTime::UNIX_EPOCH + Duration::seconds(offset + 1)),
-            })
+            let claim = core
+                .claim_permit(
+                    record.permit_id.expect("permit"),
+                    OffsetDateTime::UNIX_EPOCH + Duration::seconds(offset),
+                )
+                .expect("claim");
+            core.record_attempt(claim.started.finish(
+                AttemptReport::Completed,
+                Vec::new(),
+                Some(OffsetDateTime::UNIX_EPOCH + Duration::seconds(offset + 1)),
+            ))
             .expect("attempt belongs to its proposal");
         }
 

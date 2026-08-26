@@ -284,9 +284,8 @@ async fn carry_out(
         .deserialize()?;
     let attempt: ExecutionAttempt = decode(&encoded)?;
 
-    // Reported to the owner of the lifecycle rather than kept here. What was authorized and what was
-    // done belong in one record, or somebody has to correlate two afterwards.
-    record_with(system, "RecordAttempt", &encode(&attempt)?).await?;
+    // Executor1 has already put this report beside its durable start in Action1. The coordinator is
+    // a reader of that lifecycle, not a courier between the thing that acted and its owner.
     Ok(Some(Handled {
         finding: Some(finding.clone()),
         tried: Tried {

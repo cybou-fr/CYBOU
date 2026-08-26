@@ -25,14 +25,16 @@
 //! ActionProposal           PlanProposal   what was proposed
 //! a criticism that failed  Objection      what was said against it
 //! AuthorizationDecision    Decision       what was decided
-//! ExecutionAttempt         Intention      what the host committed to doing about it
+//! ExecutionStarted         Intention      when an effect first became possible
+//! ExecutionAttempt         Intention      what the executor finally reported
 //! ActionOutcome            Outcome        what it independently saw afterwards
 //! ```
 //!
-//! An attempt is an `Intention` because the Journal has no kind for *acting* and that is the nearest
-//! true thing: the host binding itself to carry out what was authorized. An outcome is an `Outcome`,
-//! which the Journal treats as terminal and permits once per cause — exactly right for an action,
-//! which happens once and is answered for once.
+//! Both execution steps are `Intention`s because the Journal has no kind for *acting*. The first is
+//! the critical one: the host has bound itself to a stable attempt identity before the Body may be
+//! touched. The second adds the executor's final account. An outcome is an `Outcome`, which the
+//! Journal treats as terminal and permits once per cause — exactly right for an action, which
+//! happens once and is answered for once.
 //!
 //! The attempt and the outcome are separate contributions rather than one. What a thing says about
 //! itself and what the readings say afterwards are two accounts, and the entire value of
@@ -72,7 +74,7 @@
 
 use cybou_protocol::action::{
     ActionOutcome, ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
-    ExecutionAttempt,
+    ExecutionAttempt, ExecutionStarted,
 };
 use cybou_protocol::admission::Kind;
 use cybou_protocol::canonical::CanonicalEnvelope;
@@ -87,6 +89,10 @@ const ORIGIN: &str = "actiond";
 
 /// Schema of the envelopes this module writes.
 const SCHEMA: u16 = 3;
+
+/// Namespace for the contribution that marks an attempt as able to begin.
+const EXECUTION_STARTED_NAMESPACE: Uuid =
+    Uuid::from_u128(0x0063_7962_6f75_5f73_7461_7274_6564_5f31);
 
 /// What a lifecycle envelope carries, beside the identities on the envelope itself.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -113,6 +119,11 @@ pub enum LifecycleStep {
         decision: Box<AuthorizationDecision>,
         /// Every criticism that ran, passing and failing alike.
         checks: Vec<CriticismCheck>,
+    },
+    /// A permit was consumed and this execution may now begin.
+    Started {
+        /// Stable identity and exact operation established before the first Body effect.
+        execution: Box<ExecutionStarted>,
     },
     /// What was carried out under that decision.
     Attempted {
@@ -218,6 +229,20 @@ pub fn contributions(
     // What was done, and then what was seen. Each cites the one before, so a reader arrives at the
     // outcome from the finding without having to know which organ wrote any of it.
     let mut previous = record.decision.decision_id;
+    if let Some(started) = &record.execution_started {
+        let started_message_id = execution_started_message_id(started.attempt_id);
+        out.push(envelope(
+            started_message_id,
+            episode,
+            previous,
+            Kind::Intention,
+            &LifecycleStep::Started {
+                execution: Box::new(started.clone()),
+            },
+            now,
+        ));
+        previous = started_message_id;
+    }
     if let Some(attempt) = &record.attempt {
         out.push(envelope(
             attempt.attempt_id,
@@ -244,6 +269,31 @@ pub fn contributions(
         ));
     }
     Ok(out)
+}
+
+/// The contribution that must be accepted before the executor receives an action.
+///
+/// # Errors
+///
+/// Returns [`CannotRecord::NothingToContinue`] when no permit has been claimed for the record.
+pub fn execution_started_contribution(
+    record: &ActionRecord,
+    now: OffsetDateTime,
+) -> Result<CanonicalEnvelope, CannotRecord> {
+    let started = record
+        .execution_started
+        .as_ref()
+        .ok_or(CannotRecord::NothingToContinue)?;
+    Ok(envelope(
+        execution_started_message_id(started.attempt_id),
+        record.proposal.proposal_id,
+        record.decision.decision_id,
+        Kind::Intention,
+        &LifecycleStep::Started {
+            execution: Box::new(started.clone()),
+        },
+        now,
+    ))
 }
 
 /// Why one decided action cannot be written down.
@@ -305,7 +355,12 @@ pub fn attempt_contribution(
         record.proposal.proposal_id,
         // The decision it was carried out under. An attempt traceable to a proposal but not to the
         // authorization for it is an attempt nobody can argue with afterwards.
-        record.decision.decision_id,
+        record
+            .execution_started
+            .as_ref()
+            .map_or(record.decision.decision_id, |started| {
+                execution_started_message_id(started.attempt_id)
+            }),
         Kind::Intention,
         &LifecycleStep::Attempted {
             attempt: Box::new(attempt.clone()),
@@ -379,6 +434,13 @@ pub fn replay(envelopes: &[CanonicalEnvelope]) -> Result<Vec<ActionRecord>, Cann
                 proposals.push((envelope.correlation_id, *proposal));
             }
             LifecycleStep::Objected { .. } => {}
+            LifecycleStep::Started { execution } => {
+                if let Some(record) = records.iter_mut().find(|record: &&mut ActionRecord| {
+                    record.proposal.proposal_id == execution.proposal_id
+                }) {
+                    record.execution_started = Some(*execution);
+                }
+            }
             LifecycleStep::Attempted { attempt } => {
                 if let Some(record) = records.iter_mut().find(|record: &&mut ActionRecord| {
                     record.proposal.proposal_id == attempt.proposal_id
@@ -409,12 +471,17 @@ pub fn replay(envelopes: &[CanonicalEnvelope]) -> Result<Vec<ActionRecord>, Cann
                     // A permit that existed is gone with the process that held it, and saying so is
                     // the truthful reading: nothing here may be claimed.
                     permit_id: None,
+                    execution_started: None,
                     decision: *decision,
                 });
             }
         }
     }
     Ok(records)
+}
+
+fn execution_started_message_id(attempt_id: Uuid) -> Uuid {
+    Uuid::new_v5(&EXECUTION_STARTED_NAMESPACE, attempt_id.as_bytes())
 }
 
 /// Whether this decision authorized anything, for a reader that has only the record.
@@ -514,6 +581,7 @@ mod tests {
                 decided_at: at(1),
             },
             permit_id: Some(Uuid::from_u128(0x0a03)),
+            execution_started: None,
             attempt: None,
             outcome: None,
         }
@@ -574,6 +642,18 @@ mod tests {
         }
     }
 
+    fn started() -> ExecutionStarted {
+        let attempt = attempted();
+        ExecutionStarted {
+            attempt_id: attempt.attempt_id,
+            proposal_id: attempt.proposal_id,
+            decision_id: attempt.decision_id,
+            operation: attempt.operation,
+            target_resource: attempt.target_resource,
+            started_at: attempt.started_at,
+        }
+    }
+
     fn concluded() -> ActionOutcome {
         ActionOutcome {
             outcome_id: Uuid::from_u128(0x0a05),
@@ -593,6 +673,7 @@ mod tests {
         // The question durable authorization only half answered. "Why was this allowed" was
         // recoverable; "was it done, and what did the host independently see" was not.
         let mut whole = record(true);
+        whole.execution_started = Some(started());
         whole.attempt = Some(attempted());
         whole.outcome = Some(concluded());
         let written = contributions(&whole, at(5)).expect("it has a cause");
@@ -603,6 +684,7 @@ mod tests {
             vec![
                 Kind::PlanProposal as u16,
                 Kind::Decision as u16,
+                Kind::Intention as u16,
                 Kind::Intention as u16,
                 Kind::Outcome as u16,
             ]
@@ -625,6 +707,7 @@ mod tests {
         // both would delete the disagreement, which is the only part that could ever surprise
         // anybody.
         let mut disagreeing = record(true);
+        disagreeing.execution_started = Some(started());
         disagreeing.attempt = Some(attempted());
         disagreeing.outcome = Some(ActionOutcome {
             observed: Relief::StillPresent,
@@ -661,6 +744,7 @@ mod tests {
     fn an_attempt_survives_the_restart_that_loses_the_permit() {
         // The permit is gone by design; what was done with it is not.
         let mut whole = record(true);
+        whole.execution_started = Some(started());
         whole.attempt = Some(attempted());
         whole.outcome = Some(concluded());
 

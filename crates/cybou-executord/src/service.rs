@@ -8,7 +8,6 @@
 use std::sync::Arc;
 
 use cybou_fabric::encode;
-use time::OffsetDateTime;
 use uuid::Uuid;
 use zbus::{fdo, interface};
 
@@ -43,14 +42,9 @@ where
     async fn execute(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;
-        let attempt = execute(
-            self.permits.as_ref(),
-            self.body.as_ref(),
-            permit_id,
-            OffsetDateTime::now_utc(),
-        )
-        .await
-        .map_err(|error| fdo::Error::AccessDenied(error.to_string()))?;
+        let attempt = execute(self.permits.as_ref(), self.body.as_ref(), permit_id)
+            .await
+            .map_err(|error| fdo::Error::AccessDenied(error.to_string()))?;
         encode(&attempt).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 }

@@ -9,8 +9,9 @@
 //! later, and it is the thing an in-memory owner could not do.
 
 use cybou_actiond::{ActionCore, journal};
-use cybou_protocol::action::AuthorizationVerdict;
+use cybou_protocol::action::{AttemptReport, AuthorizationVerdict};
 use cybou_protocol::telemetry::{EvidenceStrength, Finding, MetricKey, Subject, SystemInsight};
+use cybou_remediation::initiative::{Initiative, Settled, Tried, initiative};
 use cybou_remediation::{Operation, StandingPolicy};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -131,5 +132,53 @@ fn a_refusal_is_remembered_as_a_refusal() {
     assert!(
         !journal::was_granted(&remembered),
         "a refusal restored under a laxer policy is still a refusal"
+    );
+}
+
+#[test]
+fn effect_may_have_happened_then_reply_was_lost_so_recovery_never_repeats_it() {
+    let core = ActionCore::new(policy());
+    let decided = core
+        .evaluate_insight(&insight(), "service.restart", at())
+        .expect("a decision");
+    core.claim_permit(decided.permit_id.expect("permit"), at())
+        .expect("claim establishes the durable execution boundary");
+    let started = core
+        .record(decided.proposal.proposal_id)
+        .expect("record")
+        .execution_started
+        .expect("execution may now begin");
+
+    // The Body effect may happen here. No ExecutionAttempt reply ever reaches Action1.
+    let written = journal::contributions(
+        &core.record(decided.proposal.proposal_id).expect("record"),
+        at(),
+    )
+    .expect("the start is journalled");
+    let restarted = ActionCore::new(policy());
+    restarted
+        .restore(journal::replay(&written).expect("start replays"))
+        .expect("restores");
+
+    let recovered = restarted
+        .episode_for_cause(insight().insight_id)
+        .expect("a started execution counts as an attempted episode");
+    let attempt = recovered
+        .attempt
+        .expect("recovery materializes uncertainty");
+    assert_eq!(attempt.attempt_id, started.attempt_id);
+    assert_eq!(attempt.report, AttemptReport::DidNotFinish);
+    assert_eq!(
+        initiative(
+            Some(&insight()),
+            Some(&Tried {
+                attempt,
+                outcome: None,
+            }),
+        ),
+        Initiative::Leave {
+            because: Settled::OutcomeUnknown,
+        },
+        "a lost report is never permission for a second Body mutation"
     );
 }

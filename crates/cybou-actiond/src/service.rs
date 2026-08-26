@@ -130,11 +130,23 @@ impl Action1Service {
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;
-        let permit = self
+        let claim = self
             .core
             .claim_permit(permit_id, OffsetDateTime::now_utc())
             .map_err(|error| fdo::Error::AccessDenied(error.to_string()))?;
-        encode(&permit).map_err(|error| fdo::Error::Failed(error.to_string()))
+        let record = self
+            .core
+            .record(claim.permit.proposal_id)
+            .ok_or_else(|| fdo::Error::Failed("claimed execution has no lifecycle".to_owned()))?;
+        let envelope = journal::execution_started_contribution(&record, OffsetDateTime::now_utc())
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        let client = EventClient::session().await.map_err(|error| {
+            fdo::Error::Failed(format!("execution was not made durable: {error}"))
+        })?;
+        client.submit(&envelope).await.map_err(|error| {
+            fdo::Error::Failed(format!("execution was not made durable: {error}"))
+        })?;
+        encode(&claim).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 }
 
