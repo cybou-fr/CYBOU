@@ -185,4 +185,26 @@ grep -q 'service.restart for ' "$WORK/cybou-remediationd.log" || {
 }
 echo "    ok      it re-observed and concluded on its own"
 
+# It repaired the host. The harder question is whether it *concluded* anything, and the gate that
+# only checked the repair passed while the successful case was the one being lost: a remedy that works
+# makes its finding disappear, and an episode concluded only from findings still present concludes
+# every failure and never a success.
+for _ in $(seq 1 40); do
+    grep -q 'Relieved' "$WORK/cybou-remediationd.log" && break
+    sleep 3
+done
+grep -q 'Relieved' "$WORK/cybou-remediationd.log" || {
+    echo "the host repaired the service and never concluded that it had:" >&2
+    cat "$WORK/cybou-remediationd.log" >&2
+    exit 1
+}
+
+# And it stopped. Exactly one restart, however long it is left running: a second would mean the host
+# could not tell "not yet" from "not this way".
+restarts="$(grep -c 'Carrying out service.restart' "$WORK/cybou-remediationd.log")"
+test "$restarts" = "1" || {
+    echo "the host carried out $restarts restarts where one was right" >&2
+    exit 1
+}
+
 echo "=== Self-maintenance gate passed: nobody drove this ==="

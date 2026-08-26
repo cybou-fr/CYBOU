@@ -249,6 +249,13 @@ pub fn contributions(
 /// Why one decided action cannot be written down.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CannotRecord {
+    /// There is no attempt or outcome on this record to continue the episode with.
+    NothingToContinue,
+    /// An outcome was recorded for a record that carries no attempt.
+    ///
+    /// An outcome citing a decision rather than an attempt would say the host observed the effects
+    /// of a permission, and a permission has no effects.
+    OutcomeWithoutAttempt,
     /// The proposal names nothing that gave rise to it.
     ///
     /// Not recoverable here. A derived contribution must cite a cause that exists, and this module
@@ -260,6 +267,12 @@ pub enum CannotRecord {
 impl core::fmt::Display for CannotRecord {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::NothingToContinue => {
+                formatter.write_str("this record has nothing further to add to its episode")
+            }
+            Self::OutcomeWithoutAttempt => {
+                formatter.write_str("an outcome was recorded for an action nobody attempted")
+            }
             Self::ProposalHasNoCause(id) => {
                 write!(formatter, "proposal {id} names nothing that caused it")
             }
@@ -268,6 +281,70 @@ impl core::fmt::Display for CannotRecord {
 }
 
 impl core::error::Error for CannotRecord {}
+
+/// The one contribution an attempt adds to an episode already in the Journal.
+///
+/// Separate from [`contributions`] because the rest of the episode is already there. Re-publishing
+/// the whole record would resubmit the proposal and the decision under identities the Journal
+/// already holds, and it would refuse them as duplicates — so the continuation would be lost behind
+/// a rejection of something that was never the point.
+///
+/// # Errors
+///
+/// Returns [`CannotRecord::NothingToContinue`] when the record carries no attempt.
+pub fn attempt_contribution(
+    record: &ActionRecord,
+    now: OffsetDateTime,
+) -> Result<CanonicalEnvelope, CannotRecord> {
+    let attempt = record
+        .attempt
+        .as_ref()
+        .ok_or(CannotRecord::NothingToContinue)?;
+    Ok(envelope(
+        attempt.attempt_id,
+        record.proposal.proposal_id,
+        // The decision it was carried out under. An attempt traceable to a proposal but not to the
+        // authorization for it is an attempt nobody can argue with afterwards.
+        record.decision.decision_id,
+        Kind::Intention,
+        &LifecycleStep::Attempted {
+            attempt: Box::new(attempt.clone()),
+        },
+        now,
+    ))
+}
+
+/// The one contribution an outcome adds, terminating the episode.
+///
+/// # Errors
+///
+/// Returns [`CannotRecord::NothingToContinue`] when the record carries no outcome, and
+/// [`CannotRecord::OutcomeWithoutAttempt`] when it carries one with nothing to conclude about. An
+/// outcome citing a decision rather than an attempt would say the host observed the effects of a
+/// permission, which is not a thing that has effects.
+pub fn outcome_contribution(
+    record: &ActionRecord,
+    now: OffsetDateTime,
+) -> Result<CanonicalEnvelope, CannotRecord> {
+    let outcome = record
+        .outcome
+        .as_ref()
+        .ok_or(CannotRecord::NothingToContinue)?;
+    let attempt = record
+        .attempt
+        .as_ref()
+        .ok_or(CannotRecord::OutcomeWithoutAttempt)?;
+    Ok(envelope(
+        outcome.outcome_id,
+        record.proposal.proposal_id,
+        attempt.attempt_id,
+        Kind::Outcome,
+        &LifecycleStep::Concluded {
+            outcome: Box::new(outcome.clone()),
+        },
+        now,
+    ))
+}
 
 /// Rebuild the lifecycle records a replay contains.
 ///

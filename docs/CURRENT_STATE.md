@@ -33,6 +33,11 @@ Nothing in the cognitive substrate loads a model, needs an accelerator, or requi
 There are fifteen Mind owners: fifteen user-session processes, each owning one versioned D-Bus
 interface under `org.cybou.Mind.`.
 
+One process in the table below owns no interface. `cybou-remediationd` is listed with them because it
+runs beside them and is governed by the same layering, but it offers nothing to anybody: it reads what
+the telemetry organ concluded, asks `Action1` what may be done, and reports back what happened. A bus
+name would be a second place to ask about actions when `Action1` already answers for the lifecycle.
+
 | Owner | Interface | Owns |
 |---|---|---|
 | `cybou-eventd` | `Event1` | the canonical Journal; the only writer |
@@ -50,6 +55,7 @@ interface under `org.cybou.Mind.`.
 | `cybou-selfd` | `Self1` | autobiographical self-assessment |
 | `cybou-presenced` | `Presence1` | the presentation-ready projection |
 | `cybou-actiond` | `Action1` | proposals, criticism, policy decisions and permits; no Body adapter |
+| `cybou-remediationd` | none | takes a finding as far as an outcome; owns no interface because it offers nothing |
 
 Beside them, and deliberately not among them:
 

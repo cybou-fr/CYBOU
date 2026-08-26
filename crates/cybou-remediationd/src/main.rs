@@ -61,6 +61,18 @@ const CONSIDER_EVERY: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// What this remembers about a finding it has already taken somewhere.
 struct Handled {
+    /// The finding itself, kept rather than looked up again.
+    ///
+    /// Because the best outcome makes it disappear. A remedy that worked is a finding the telemetry
+    /// organ stops reporting, so an episode concluded only from what is currently found would
+    /// conclude every failure and never a success — the one result worth recording would be the one
+    /// that never was.
+    ///
+    /// Absent for an episode rebuilt from `Action1` after a restart. The record holds what was
+    /// proposed and decided; the finding that gave rise to it was the telemetry organ's and nobody
+    /// wrote it here. Saying so is the point: an outcome concluded without it says less, and saying
+    /// less is what this host is entitled to say.
+    finding: Option<SystemInsight>,
     /// What was carried out, and what was concluded about it once anybody looked.
     tried: Tried,
     /// What the host was concluding when the action was carried out.
@@ -104,30 +116,46 @@ async fn consider(
     let findings = insights(session).await?;
     let now = OffsetDateTime::now_utc();
 
+    // Unfinished episodes first, and from what this remembers rather than from what is currently
+    // found. A remedy that worked makes its finding disappear, so concluding only about findings
+    // still present would conclude every failure and never a success.
+    let due: Vec<Uuid> = handled
+        .iter()
+        .filter(|(_, entry)| entry.tried.outcome.is_none())
+        .filter(|(_, entry)| {
+            wait_for(&initiative(entry.finding.as_ref(), Some(&entry.tried)), now)
+                == Some(time::Duration::ZERO)
+        })
+        .map(|(insight_id, _)| *insight_id)
+        .collect();
+    for insight_id in due {
+        conclude(session, system, insight_id, handled, now).await?;
+    }
+
+    // Then whatever the host currently concludes about itself.
     for finding in &findings {
+        // An episode rebuilt after a restart has no finding of its own; this is where it gets one,
+        // so a still-present problem can still be concluded about properly.
+        if let Some(entry) = handled.get_mut(&finding.insight_id)
+            && entry.finding.is_none()
+        {
+            entry.finding = Some(finding.clone());
+        }
+
         let known = handled.get(&finding.insight_id).map(|entry| &entry.tried);
-        match initiative(finding, known) {
-            Initiative::Act => {
-                if nothing_permitted.contains(&finding.insight_id) {
-                    continue;
-                }
-                match attempt(system, finding, &findings).await? {
-                    Some(handled_now) => {
-                        handled.insert(finding.insight_id, handled_now);
-                    }
-                    None => {
-                        nothing_permitted.insert(finding.insight_id);
-                    }
-                }
+        if !matches!(initiative(Some(finding), known), Initiative::Act) {
+            continue;
+        }
+        if nothing_permitted.contains(&finding.insight_id) {
+            continue;
+        }
+        match attempt(system, finding, &findings).await? {
+            Some(handled_now) => {
+                handled.insert(finding.insight_id, handled_now);
             }
-            waiting @ Initiative::Wait { .. } => {
-                if wait_for(&waiting, now) == Some(time::Duration::ZERO) {
-                    conclude(session, system, finding, handled, now).await?;
-                }
+            None => {
+                nothing_permitted.insert(finding.insight_id);
             }
-            // Nothing more to do about this one, and saying so once is enough. It stays remembered so
-            // the same conclusion is not reached again out loud every fifteen seconds.
-            Initiative::Leave { .. } => {}
         }
     }
     Ok(())
@@ -223,6 +251,7 @@ async fn carry_out(
     // done belong in one record, or somebody has to correlate two afterwards.
     record_with(system, "RecordAttempt", &encode(&attempt)?).await?;
     Ok(Some(Handled {
+        finding: Some(finding.clone()),
         tried: Tried {
             attempt,
             outcome: None,
@@ -235,16 +264,17 @@ async fn carry_out(
 async fn conclude(
     session: &zbus::Connection,
     system: &zbus::Connection,
-    finding: &SystemInsight,
+    insight_id: Uuid,
     handled: &mut HashMap<Uuid, Handled>,
     now: OffsetDateTime,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(entry) = handled.get_mut(&finding.insight_id) else {
+    let Some(entry) = handled.get_mut(&insight_id) else {
         return Ok(());
     };
     if entry.tried.outcome.is_some() {
         return Ok(());
     }
+    let finding = entry.finding.clone();
 
     // Asked of the telemetry organ, which did not carry the action out and has no notion that one
     // happened. An executor grading its own homework is refused everywhere else in this tree and
@@ -256,7 +286,7 @@ async fn conclude(
     let outcome = observe_outcome(
         &entry.tried.attempt,
         &proposal,
-        Some(finding),
+        finding.as_ref(),
         &cybou_remediation::Reobservation {
             before: &entry.before,
             after: &after,
@@ -268,9 +298,7 @@ async fn conclude(
 
     println!(
         "[cybou-remediationd] {} for {}: {:?}",
-        entry.tried.attempt.operation,
-        finding.finding.name(),
-        outcome.observed
+        entry.tried.attempt.operation, entry.tried.attempt.target_resource, outcome.observed
     );
     record_with(system, "RecordOutcome", &encode(&outcome)?).await?;
     entry.tried.outcome = Some(outcome);
@@ -334,19 +362,29 @@ async fn insights(
     Ok(ciborium::from_reader(encoded.as_slice())?)
 }
 
+/// What the telemetry organ could see when it last looked.
+///
+/// Read as a property rather than called as a method, because that is what it is. Guessing the shape
+/// of somebody else's surface from the name of a Rust function is how the first version of this
+/// failed every pass, silently, while still repairing the host.
+///
+/// It is needed because a finding can vanish for two opposite reasons — the condition cleared, or
+/// nothing could read the thing it was about — and an outcome concluded without knowing which would
+/// report a host that went blind as a host that was repaired.
 async fn watching(
     session: &zbus::Connection,
 ) -> Result<Vec<WatchedResource>, Box<dyn std::error::Error>> {
-    let encoded: Vec<u8> = session
+    let value: zbus::zvariant::OwnedValue = session
         .call_method(
             Some(TELEMETRY.service),
             TELEMETRY.object_path,
-            Some(TELEMETRY.interface),
-            "Watching",
-            &(),
+            Some("org.freedesktop.DBus.Properties"),
+            "Get",
+            &(TELEMETRY.interface, "Watching"),
         )
         .await?
         .body()
         .deserialize()?;
+    let encoded: Vec<u8> = value.try_into()?;
     Ok(ciborium::from_reader(encoded.as_slice())?)
 }

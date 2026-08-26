@@ -118,14 +118,19 @@ impl Settled {
 /// Whether this host may act on `finding` now, given what it already tried.
 ///
 /// `tried` is what is known about the most recent attempt on this same finding, and `None` means
-/// nothing has been. Same finding rather than same operation: a finding is identified by what it is
+/// nothing has been. `finding` may itself be `None`, for an episode whose finding is no longer
+/// reported — which is what success looks like. Same finding rather than same operation: a finding is identified by what it is
 /// about and when it began, so a problem that cleared and came back is a new one and may be acted on
 /// afresh.
 #[must_use]
-pub fn initiative(finding: &SystemInsight, tried: Option<&Tried>) -> Initiative {
-    // The finding is taken so a caller cannot ask this about nothing, and so a later rule that does
-    // depend on which finding it is has somewhere to go. Nothing about the decision turns on the
-    // clock: it is a function of what happened, and when somebody asks is `wait_for`'s business.
+pub fn initiative(finding: Option<&SystemInsight>, tried: Option<&Tried>) -> Initiative {
+    // The finding is optional because the two states a caller can be in are not the same: it may be
+    // asking about something the host currently concludes, or about an episode it began before it
+    // restarted, whose finding may since have gone — including because the remedy worked. Refusing
+    // the second would leave an unfinished episode unfinishable.
+    //
+    // Nothing about the decision turns on the clock either: it is a function of what happened, and
+    // when somebody asks is `wait_for`'s business.
     let _ = finding;
     let Some(tried) = tried else {
         return Initiative::Act;
@@ -252,7 +257,7 @@ mod tests {
 
     #[test]
     fn a_finding_nobody_has_acted_on_may_be_acted_on() {
-        assert_eq!(initiative(&finding(), None), Initiative::Act);
+        assert_eq!(initiative(Some(&finding()), None), Initiative::Act);
     }
 
     #[test]
@@ -261,7 +266,7 @@ mod tests {
         // sample interval, so acting on presence alone restarts, looks, sees it still down, and
         // restarts again.
         let recent = tried(&AttemptReport::Completed, None);
-        let waiting = initiative(&finding(), Some(&recent));
+        let waiting = initiative(Some(&finding()), Some(&recent));
 
         match waiting {
             Initiative::Wait { until } => assert_eq!(until, at(12) + TOO_SOON_AFTER),
@@ -277,7 +282,7 @@ mod tests {
     fn a_remedy_that_was_seen_to_work_is_not_repeated() {
         let done = tried(&AttemptReport::Completed, Some(Relief::Relieved));
         assert_eq!(
-            initiative(&finding(), Some(&done)),
+            initiative(Some(&finding()), Some(&done)),
             Initiative::Leave {
                 because: Settled::Relieved
             }
@@ -291,7 +296,7 @@ mod tests {
         // to tell "not yet" from "not this way", and this is exactly the point where a person is
         // genuinely needed — the point a retry loop would hide.
         let failed = tried(&AttemptReport::Completed, Some(Relief::StillPresent));
-        let settled = initiative(&finding(), Some(&failed));
+        let settled = initiative(Some(&finding()), Some(&failed));
 
         assert_eq!(
             settled,
@@ -308,7 +313,7 @@ mod tests {
         // lose the one that matters more.
         let worse = tried(&AttemptReport::Completed, Some(Relief::Worse));
         assert_eq!(
-            initiative(&finding(), Some(&worse)),
+            initiative(Some(&finding()), Some(&worse)),
             Initiative::Leave {
                 because: Settled::MadeItWorse
             }
@@ -324,7 +329,7 @@ mod tests {
         // "Something may well have happened" is exactly the wrong thing to answer by doing it again.
         let unknown = tried(&AttemptReport::DidNotFinish, None);
         assert_eq!(
-            initiative(&finding(), Some(&unknown)),
+            initiative(Some(&finding()), Some(&unknown)),
             Initiative::Leave {
                 because: Settled::OutcomeUnknown
             }
@@ -342,7 +347,7 @@ mod tests {
             }),
         );
         assert_eq!(
-            initiative(&finding(), Some(&blind)),
+            initiative(Some(&finding()), Some(&blind)),
             Initiative::Leave {
                 because: Settled::OutcomeUnknown
             }
@@ -360,7 +365,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            initiative(&finding(), Some(&refused)),
+            initiative(Some(&finding()), Some(&refused)),
             Initiative::Leave {
                 because: Settled::Refused
             }
@@ -368,11 +373,24 @@ mod tests {
     }
 
     #[test]
+    fn an_episode_can_be_asked_about_after_its_finding_is_gone() {
+        // What a driver has when it restarted mid-episode, and what success looks like: the remedy
+        // worked, so the telemetry organ stopped reporting the finding. Refusing to answer would
+        // leave the episode unfinishable, and the successful one is the one that would be lost.
+        let recent = tried(&AttemptReport::Completed, None);
+        assert!(matches!(
+            initiative(None, Some(&recent)),
+            Initiative::Wait { .. }
+        ));
+        assert_eq!(initiative(None, None), Initiative::Act);
+    }
+
+    #[test]
     fn nothing_here_asks_a_caller_to_poll() {
         // A waiting decision carries when the waiting is over, so a caller sleeps once rather than
         // asking a question it could have been answered fully the first time.
         let recent = tried(&AttemptReport::Completed, None);
-        let waiting = initiative(&finding(), Some(&recent));
+        let waiting = initiative(Some(&finding()), Some(&recent));
 
         assert!(wait_for(&waiting, at(20)).is_some());
         assert_eq!(wait_for(&waiting, at(10_000)), Some(Duration::ZERO));

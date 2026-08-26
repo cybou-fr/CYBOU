@@ -13,7 +13,9 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 use zbus::{fdo, interface};
 
+use crate::journal::CannotRecord;
 use crate::{ActionCore, journal};
+use cybou_protocol::canonical::CanonicalEnvelope;
 
 /// Process-owned Action1 dispatch surface.
 pub struct Action1Service {
@@ -81,18 +83,26 @@ impl Action1Service {
     async fn record_attempt(&self, attempt: Vec<u8>) -> fdo::Result<()> {
         let attempt: cybou_protocol::action::ExecutionAttempt =
             decode(&attempt).map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        let proposal_id = attempt.proposal_id;
         self.core
             .record_attempt(attempt)
-            .map_err(|error| fdo::Error::Failed(error.to_string()))
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        self.continue_episode(proposal_id, journal::attempt_contribution)
+            .await;
+        Ok(())
     }
 
     /// Record what the host saw for itself afterwards.
     async fn record_outcome(&self, outcome: Vec<u8>) -> fdo::Result<()> {
         let outcome: cybou_protocol::action::ActionOutcome =
             decode(&outcome).map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        let proposal_id = outcome.proposal_id;
         self.core
             .record_outcome(outcome)
-            .map_err(|error| fdo::Error::Failed(error.to_string()))
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        self.continue_episode(proposal_id, journal::outcome_contribution)
+            .await;
+        Ok(())
     }
 
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
@@ -103,6 +113,42 @@ impl Action1Service {
             .claim_permit(permit_id, OffsetDateTime::now_utc())
             .map_err(|error| fdo::Error::AccessDenied(error.to_string()))?;
         encode(&permit).map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+}
+
+impl Action1Service {
+    /// Add one contribution to an episode the Journal already holds.
+    ///
+    /// The rest of the episode is already there, so only the new step is published. Re-publishing the
+    /// whole record would resubmit a proposal and a decision under identities the Journal has, be
+    /// refused as duplicates, and lose the continuation behind a rejection of something that was
+    /// never the point.
+    ///
+    /// Best effort, for the same reason recording a decision is: a host that would not repair itself
+    /// because it could not write down that it had is worse than one that repaired itself and could
+    /// not say so. The failure is said out loud rather than swallowed.
+    async fn continue_episode(
+        &self,
+        proposal_id: Uuid,
+        step: fn(&crate::ActionRecord, OffsetDateTime) -> Result<CanonicalEnvelope, CannotRecord>,
+    ) {
+        let Some(record) = self.core.record(proposal_id) else {
+            return;
+        };
+        let envelope = match step(&record, OffsetDateTime::now_utc()) {
+            Ok(envelope) => envelope,
+            Err(why) => {
+                eprintln!("[cybou-actiond] This episode could not be continued: {why}");
+                return;
+            }
+        };
+        let Ok(client) = EventClient::session().await else {
+            eprintln!("[cybou-actiond] The Journal is unreachable; this step was not recorded");
+            return;
+        };
+        if let Err(error) = client.submit(&envelope).await {
+            eprintln!("[cybou-actiond] A lifecycle step was not recorded: {error}");
+        }
     }
 }
 

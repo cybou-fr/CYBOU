@@ -7,11 +7,15 @@
 //! propose -> authorize -> act -> observe outcome`. Everything up to *explain* exists. This crate is
 //! *propose* and *authorize*, and it deliberately stops there: **nothing here executes anything.**
 //!
-//! There is an executor now, and there is still nothing that drives it. `Telemetry1` finds things and
-//! the web gateway shows them to a person; from *propose* onward, the only thing that has ever run
-//! the loop is `action-roundtrip`, an example that exists for a gate. So on a host left to itself the
-//! vertical ends at *explain* — a fact worth stating here, because this header used to say the gap
-//! was a missing executor and that has not been true for some time.
+//! There is an executor, and `cybou-remediationd` drives it: it asks [`initiative`] whether this host
+//! may act, proposes here, hands the permit on, waits out [`TOO_SOON_AFTER`], and reports what the
+//! host saw afterwards. Until it existed the only thing that had ever run the loop was an example
+//! written for a gate, so a host left to itself reached *explain* and stopped.
+//!
+//! Nothing about that changes what this crate is. It still proposes and authorizes and executes
+//! nothing, and the driver still cannot authorize itself — every proposal it makes comes through
+//! [`authorize`] and the operator's standing policy, so on a host where nobody permitted anything it
+//! proposes and is refused.
 //!
 //! That is the point of building it now. The natural shape of this code — build a proposal, hand it
 //! to an executor — has no place for the decision to live, so the decision gets made by whoever
