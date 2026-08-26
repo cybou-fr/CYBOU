@@ -565,12 +565,28 @@ and both survive the restart.
 A decision nobody acted on stays one. Absent is a real answer and a common one, and filling it in
 would answer *was it done* with a guess.
 
-**What this does not do, and it is the larger half.** Nothing in production produces an attempt or an
-outcome. `observe_outcome` has no caller outside tests; `ExecutionAttempt` is built only by
-`cybou-executord` when something claims a permit; and nothing claims one — the only thing that drives
-finding → proposal → permit → execute → re-observe is `action-roundtrip`, an example that exists for
-the gate. So Cybou can now *record* a completed episode and still does not *have* one on its own: no
-daemon turns a finding into a proposal, and none carries a decision out.
+**And now something produces them.** `cybou-remediationd` is the join: it reads what `Telemetry1`
+concluded, asks [`initiative`] whether this host may act, proposes to `Action1`, hands the opaque
+permit to the executor, reports the attempt back, waits out `TOO_SOON_AFTER`, asks telemetry what it
+sees now, and reports the outcome. Until it existed the only thing that had ever run that loop was
+`action-roundtrip`, an example written for a gate — so a host left to itself reached *explain* and
+stopped, which is not what this repository's own summaries have been saying.
+
+It takes no bus name. It offers nothing to anybody, and a surface here would be a second place to ask
+about actions when `Action1` already owns the lifecycle and answers for it. It sits in the governance
+layer beside `Action1` for a structural reason rather than a tidy one: an organ may read the layers
+above it and not the ones below, and this must read telemetry *and* call authorization. Anywhere above
+governance it would be reaching downward. Being a peer of the gate rather than above it is also the
+honest description — it is a party that asks, not one that decides.
+
+Four things stop it doing something rash, and none of them is the file being careful. It cannot choose
+an operation: the remedies for a finding are a closed table, ordered least committal first, and it
+takes the first. It cannot authorize itself: every proposal goes to `Action1`, so on a host where
+nobody pre-authorized anything it proposes and is refused every time — and the refusal is recorded,
+which is the useful part, because an operator can then read what their host wanted to do. It cannot
+act twice on one finding. And it cannot conclude success: what it carried out and what the host saw
+afterwards are gathered separately, the second from the organ that did not carry it out and has no
+notion that anything happened.
 
 That is the next thing worth building, and it is a bigger piece than recording: something has to
 decide when a finding deserves an action, wait out the re-observation delay, and answer for the

@@ -37,6 +37,7 @@ members = [
     "crates/cybou-presenced",
     "crates/cybou-protocol",
     "crates/cybou-remediation",
+    "crates/cybou-remediationd",
     "crates/cybou-runtime",
     "crates/cybou-selfd",
     "crates/cybou-shelld",

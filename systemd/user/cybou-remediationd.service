@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=Cybou remediation: takes a finding as far as an outcome
+Documentation=https://github.com/cybou-fr/CYBOU
+PartOf=cybou-mind.target
+After=cybou-telemetryd.service cybou-actiond.service
+Wants=cybou-telemetryd.service cybou-actiond.service
+
+[Service]
+# Not Type=dbus: this organ takes no bus name. It offers nothing to anybody — it reads what the
+# telemetry organ concluded, asks the authorization owner what may be done, and reports back what
+# happened. A surface here would be a second place to ask about actions, and Action1 already answers
+# for the lifecycle.
+Type=simple
+ExecStart=/usr/libexec/cybou/cybou-remediationd
+Restart=on-failure
+RestartSec=5
+
+# It needs the system bus to reach Action1 and the executor, and the session bus to reach telemetry.
+# Everything else is closed.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=default.target

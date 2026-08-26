@@ -73,6 +73,28 @@ impl Action1Service {
         encode(&record).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 
+    /// Record what was carried out under a decision this owner made.
+    ///
+    /// Reported here rather than kept by whoever carried it out, so *what was authorized* and *what
+    /// was done* are one record. Two records somebody has to correlate afterwards is the shape that
+    /// makes a month-old question unanswerable.
+    async fn record_attempt(&self, attempt: Vec<u8>) -> fdo::Result<()> {
+        let attempt: cybou_protocol::action::ExecutionAttempt =
+            decode(&attempt).map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        self.core
+            .record_attempt(attempt)
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
+    /// Record what the host saw for itself afterwards.
+    async fn record_outcome(&self, outcome: Vec<u8>) -> fdo::Result<()> {
+        let outcome: cybou_protocol::action::ActionOutcome =
+            decode(&outcome).map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        self.core
+            .record_outcome(outcome)
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;

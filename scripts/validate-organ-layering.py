@@ -63,7 +63,21 @@ LAYERS: list[tuple[str, set[str]]] = [
     # different subject: the gate decides what Cybou may do to its host, and the capsule decides what
     # an agent may do inside one. Neither may be read from above, and neither may reach anything that
     # could carry out what it permits.
-    ("governance", {"cybou-remediation", "cybou-actiond", "cybou-capsule"}),
+    #
+    # `cybou-remediationd` is here because of where it has to reach. It reads what the telemetry organ
+    # concluded and calls the authorization owner, and an organ may read the layers above it and not
+    # the ones below. Anywhere above governance it would be reaching downward. Being a peer of the
+    # gate rather than above it is also the honest description: it is a party that asks, not one that
+    # decides.
+    (
+        "governance",
+        {
+            "cybou-remediation",
+            "cybou-remediationd",
+            "cybou-actiond",
+            "cybou-capsule",
+        },
+    ),
 ]
 
 #: Crates that are faculties rather than organs, and what each of them must not depend on.

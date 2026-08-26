@@ -1217,6 +1217,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-remediationd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-actiond",
+ "cybou-fabric",
+ "cybou-protocol",
+ "cybou-remediation",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-runtime"
 version = "0.1.0"
 dependencies = [

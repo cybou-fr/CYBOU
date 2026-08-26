@@ -47,6 +47,7 @@ cybou_ssh "
     cybou-presenced
     cybou-shelld
     cybou-actiond
+    cybou-remediationd
     cybou-executord
     cybou-agentd
     cybou-egressd
