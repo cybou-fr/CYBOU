@@ -577,6 +577,26 @@ decide when a finding deserves an action, wait out the re-observation delay, and
 result. Until it exists, the durable episode ends at the decision on any real host, which is what it
 already did — the difference is that the record can now hold the rest when there is a rest to hold.
 
+**The decision that driver would otherwise make by accident now exists.** `cybou_remediation::
+initiative` answers, for one finding and what was already tried about it: act, wait, or leave it
+alone. Written before the wiring, for the reason this crate's own header gives — the natural shape of
+that code has no place for the decision to live, so it gets made by whoever joins a proposer to an
+executor, on a working system, under pressure.
+
+Three of its answers are the ones a retry loop would get wrong:
+
+A finding is present *while the remedy is taking effect*. A restart takes longer than a sample
+interval, so acting on presence alone restarts a service, looks, still sees it down, and restarts
+again — the loop that turns a self-maintaining host into an outage.
+
+A remedy that ran, was observed, and did not relieve the finding is evidence about the remedy, not
+about the effort. Trying again is what something does when it cannot tell *not yet* from *not this
+way*, and this is exactly the point where a person is genuinely needed — the point a retry loop hides.
+
+*We could not see* is not *it did not work*. One needs a remedy and the other needs somebody to fix
+the looking, and an attempt whose end nobody knows is not repeated at all, because doing it again is
+the wrong answer to *something may well have happened*.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

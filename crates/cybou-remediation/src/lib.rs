@@ -5,8 +5,13 @@
 //!
 //! The vertical this belongs to is `observe -> understand -> remember -> diagnose -> explain ->
 //! propose -> authorize -> act -> observe outcome`. Everything up to *explain* exists. This crate is
-//! *propose* and *authorize*, and it deliberately stops there: **nothing here executes anything, and
-//! there is no executor to call.**
+//! *propose* and *authorize*, and it deliberately stops there: **nothing here executes anything.**
+//!
+//! There is an executor now, and there is still nothing that drives it. `Telemetry1` finds things and
+//! the web gateway shows them to a person; from *propose* onward, the only thing that has ever run
+//! the loop is `action-roundtrip`, an example that exists for a gate. So on a host left to itself the
+//! vertical ends at *explain* — a fact worth stating here, because this header used to say the gap
+//! was a missing executor and that has not been true for some time.
 //!
 //! That is the point of building it now. The natural shape of this code — build a proposal, hand it
 //! to an executor — has no place for the decision to live, so the decision gets made by whoever
@@ -28,11 +33,13 @@
 //!   the two disagreeing is a first-class value rather than something a reader must work out.
 
 pub mod authorize;
+pub mod initiative;
 pub mod operation;
 pub mod outcome;
 pub mod propose;
 
 pub use authorize::{StandingPolicy, authorize, criticise, criticise_request, permits_unattended};
+pub use initiative::{Initiative, Settled, Tried, initiative, wait_for};
 pub use operation::{ALL_OPERATIONS, Operation};
 pub use outcome::{Reobservation, TOO_SOON_AFTER, observe_outcome};
 pub use propose::{propose, remedies_for};
