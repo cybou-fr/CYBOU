@@ -34,6 +34,7 @@
 //! filesystem and a service manager, and it does nothing these modules have not already described —
 //! so what a session did is answerable by reading rather than by running.
 
+pub mod capacity;
 pub mod discovery;
 pub mod plan;
 pub mod profiles;
@@ -45,6 +46,7 @@ pub mod service;
 pub mod session;
 pub mod view;
 
+pub use capacity::{HostCapacity, NotAdmitted, Reserved, admits};
 pub use discovery::{CannotRead, LaunchFiles, read_launch, read_lease, read_session};
 pub use plan::{CannotPlan, Ceilings, Launch, SessionPlan, TeardownStep};
 pub use profiles::{CannotOffer, OfferedProfile, ProfileCatalogue, Wanted};

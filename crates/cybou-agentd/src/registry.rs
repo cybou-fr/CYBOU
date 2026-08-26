@@ -38,6 +38,7 @@ use uuid::Uuid;
 
 use cybou_capsule::Lease;
 
+use crate::capacity::{HostCapacity, NotAdmitted, Reserved, admits};
 use crate::plan::{CannotPlan, Ceilings, Launch, SessionPlan, plan};
 use crate::session::{Session, SessionEnd};
 use crate::view::{Ledger, SessionView};
@@ -109,6 +110,34 @@ impl SessionRegistry {
     pub fn insert(&mut self, live: LiveSession) {
         self.sessions
             .insert(live.plan.lease.grant().capsule_id, live);
+    }
+
+    /// Hold one session if this host can still promise what it was granted.
+    ///
+    /// Deciding and taking are one call, and that is the whole of why this lives here rather than
+    /// beside the arithmetic. Two callers that each ask *is there room* and then each take it are
+    /// both told yes, and a host that answered them separately would be oversubscribed by exactly
+    /// the sessions it admitted correctly.
+    ///
+    /// Admission is against what has been *promised*, not what is being used. A session admitted
+    /// because the others happen to be idle is a promise the host cannot keep the moment they are
+    /// not.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`NotAdmitted`] naming the first limit the total would cross. Nothing is inserted
+    /// in that case, so a refused launch leaves the registry exactly as it was.
+    pub fn admit(&mut self, capacity: HostCapacity, live: LiveSession) -> Result<(), NotAdmitted> {
+        let already = Reserved::across(self.sessions.values().map(|held| held.plan.lease.grant()));
+        admits(capacity, already, live.plan.lease.grant())?;
+        self.insert(live);
+        Ok(())
+    }
+
+    /// What this host has already promised across every session it holds.
+    #[must_use]
+    pub fn reserved(&self) -> Reserved {
+        Reserved::across(self.sessions.values().map(|held| held.plan.lease.grant()))
     }
 
     /// One session, if it is held.
@@ -533,6 +562,62 @@ mod tests {
             recovered.registry.expire(at(60 * 60 + 1)).is_empty(),
             "a second pass has nothing left to end"
         );
+    }
+
+    #[test]
+    fn a_session_is_admitted_only_if_the_host_can_still_promise_it() {
+        // Deciding and taking are one call. Two callers each asking whether there is room, and each
+        // then taking it, are both told yes — and the host is oversubscribed by exactly the sessions
+        // it admitted correctly.
+        let capacity = HostCapacity {
+            max_sessions: 1,
+            memory_mib: 8192,
+            cpus: 8,
+            tasks_max: 4096,
+            spend_units: 1000,
+        };
+        let mut registry = SessionRegistry::new();
+
+        let first = recover(vec![found(0xd001, Duration::hours(4), true)], at(60))
+            .registry
+            .take(Uuid::from_u128(0xd001))
+            .expect("held");
+        assert!(registry.admit(capacity, first).is_ok());
+
+        let second = recover(vec![found(0xd002, Duration::hours(4), true)], at(60))
+            .registry
+            .take(Uuid::from_u128(0xd002))
+            .expect("held");
+        assert_eq!(
+            registry.admit(capacity, second),
+            Err(crate::capacity::NotAdmitted::Sessions { held: 1, limit: 1 })
+        );
+        assert_eq!(
+            registry.len(),
+            1,
+            "a refused launch leaves the registry exactly as it was"
+        );
+    }
+
+    #[test]
+    fn what_a_host_has_promised_is_the_sum_of_what_it_holds() {
+        let mut registry = SessionRegistry::new();
+        assert_eq!(registry.reserved(), Reserved::default());
+
+        for capsule in [0xd001, 0xd002] {
+            let live = recover(vec![found(capsule, Duration::hours(4), true)], at(60))
+                .registry
+                .take(Uuid::from_u128(capsule))
+                .expect("held");
+            registry
+                .admit(HostCapacity::unbounded(), live)
+                .expect("an unbounded host admits it");
+        }
+
+        let reserved = registry.reserved();
+        assert_eq!(reserved.sessions, 2);
+        assert_eq!(reserved.memory_mib, 8192, "4096 promised twice");
+        assert_eq!(reserved.spend_units, 200, "100 promised twice");
     }
 
     #[test]

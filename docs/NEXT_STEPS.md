@@ -483,11 +483,35 @@ told `false`.
 **A usage snapshot was believed whatever session it named.** It carries a capsule id; one naming a
 different session is now ignored rather than attributed here.
 
-**Aggregate host capacity is still missing, and it blocks a reachable `Launch`.** A profile bounds one
-capsule well, and nothing bounds the sum: four honest four-gigabyte grants on an eight-gigabyte host
-are each within policy. Admission is not telemetry — current usage is an observation, a reserved
-maximum is a decision — and the reservation has to be atomic inside the owner. `Launch` on the bus
-waits on this and on caller-to-profile authorization.
+**Aggregate host capacity now exists.** A profile bounds one capsule and bounded nothing else, so four
+honest four-gigabyte grants fitted on an eight-gigabyte host and every one of them was within policy —
+each session correct, the host oversubscribed, and no single grant able to show it.
+
+`HostCapacity` bounds sessions, memory, CPU, processes and a spending envelope across everything live.
+It decides against what has been **promised**, never against what is being used: a session admitted
+because the others happen to be idle is a promise the host cannot keep the moment they are not. The
+module cannot see usage at all, which is the point — it could not be tempted. The consequence is worth
+saying plainly, because it will look like a bug: this refuses launches on a host that appears half
+empty.
+
+The session count is its own limit rather than something implied by memory, because sessions cost more
+than their ceilings — units, sockets, brokers, gateways — and many small capsules can make a host
+unusable long before any of them touches a byte of what it was promised. A zero-cost session reserves
+no money, or free models would be the scarcest thing on offer.
+
+Deciding and taking are one call: `SessionRegistry::admit` checks and inserts under one lock, because
+two callers that each ask *is there room* and then each take it are both told yes. Recovered sessions
+are admitted whatever the numbers say — they are already running, and refusing them would not stop
+anything, only hide capsules that exist.
+
+An absent capacity file means unbounded, which is what every earlier version did, named rather than
+defaulted into. A file that exists and cannot be read means nothing is admitted: a limit an operator
+believes is in force must not be read as no limit at all.
+
+**What remains for `Launch`:** it is not on the bus yet, so admission binds nowhere. The CLI doors
+deliberately do not pretend to enforce it — a check in a separate process would look like admission
+and race with every other launch, which is exactly the failure this repository keeps finding. `Launch`
+belongs on `Agent1`, together with caller-to-profile authorization, and admission binds there.
 
 ### B8. Agent Card and streaming session
 

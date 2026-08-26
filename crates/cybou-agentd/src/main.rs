@@ -603,6 +603,10 @@ const EXPIRY_POLL: StdDuration = StdDuration::from_secs(15);
 #[cfg(target_os = "linux")]
 const LEASE_ROOT: &str = "/run/cybou-agent-leases";
 
+/// Where an operator writes down what this whole host will promise.
+#[cfg(target_os = "linux")]
+const CAPACITY: &str = "/etc/cybou/agent-capacity.json";
+
 /// Hold what is running on this host, and answer for it on the bus.
 #[cfg(target_os = "linux")]
 async fn serve() -> Result<(), String> {
@@ -628,6 +632,7 @@ async fn serve() -> Result<(), String> {
         "[cybou-agentd] Holding {} running session(s)",
         recovered.registry.len()
     );
+    report_capacity(&recovered.registry, host_capacity());
 
     let registry = Arc::new(Mutex::new(recovered.registry));
     let _connection = zbus::connection::Builder::session()
@@ -914,4 +919,70 @@ async fn stop(selection: &Selection) -> Result<(), String> {
 #[cfg(not(target_os = "linux"))]
 async fn stop(_selection: &Selection) -> Result<(), String> {
     Err("cybou-agentd serves capsules on Linux".to_owned())
+}
+
+/// What this host will promise in total, or the absence of a bound.
+///
+/// An absent file means unbounded, which is what every version before this one did — named rather
+/// than defaulted into, so it can be said out loud instead of assumed. A `Launch` reachable from
+/// anywhere must not run against an unbounded host, and the way to make that a rule rather than a
+/// hope is to have the name for the thing it must refuse.
+#[cfg(target_os = "linux")]
+fn host_capacity() -> cybou_agentd::capacity::HostCapacity {
+    use cybou_agentd::capacity::HostCapacity;
+
+    match fs::read(CAPACITY) {
+        Ok(bytes) => match HostCapacity::read(&bytes) {
+            Ok(capacity) => capacity,
+            Err(why) => {
+                // Not silently unbounded. A capacity file somebody wrote and this build cannot read
+                // is a limit an operator believes is in force, and treating it as no limit at all is
+                // the worst of the available readings.
+                eprintln!("[cybou-agentd] {CAPACITY} is not readable: {why}; refusing to guess");
+                HostCapacity {
+                    max_sessions: 0,
+                    memory_mib: 0,
+                    cpus: 0,
+                    tasks_max: 0,
+                    spend_units: 0,
+                }
+            }
+        },
+        Err(_) => HostCapacity::unbounded(),
+    }
+}
+
+/// Say what this host has promised against what it will promise.
+///
+/// Recovered sessions are admitted whatever the numbers say, and that is deliberate: they are already
+/// running. Refusing them would not stop anything — it would only hide capsules that exist, which is
+/// the one thing an owner must never do. A host over its limit is a fact to report, most likely
+/// because somebody lowered the limit while sessions were live.
+#[cfg(target_os = "linux")]
+fn report_capacity(
+    registry: &cybou_agentd::registry::SessionRegistry,
+    capacity: cybou_agentd::capacity::HostCapacity,
+) {
+    let reserved = registry.reserved();
+    if !capacity.is_bounded() {
+        println!(
+            "[cybou-agentd] No host capacity is configured; {} MiB and {} session(s) are promised",
+            reserved.memory_mib, reserved.sessions
+        );
+        return;
+    }
+    println!(
+        "[cybou-agentd] Promised {} of {} MiB across {} of {} session(s)",
+        reserved.memory_mib, capacity.memory_mib, reserved.sessions, capacity.max_sessions
+    );
+    if reserved.sessions > capacity.max_sessions
+        || reserved.memory_mib > u64::from(capacity.memory_mib)
+        || reserved.tasks_max > u64::from(capacity.tasks_max)
+        || reserved.spend_units > capacity.spend_units
+    {
+        eprintln!(
+            "[cybou-agentd] This host has promised more than it will promise; nothing further is \
+             admitted until sessions end"
+        );
+    }
 }
