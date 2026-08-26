@@ -39,6 +39,8 @@ pub enum CardId {
     Disclosure,
     /// Telemetry1: what this host makes of itself, and what it would offer to do (ADR-0041 S0).
     Insight,
+    /// Agent1: what is running in a capsule, on whose say-so, and with what left to spend.
+    Agents,
     /// Dynamic bounded CYBOU Shell instance (Zone 3 `DemoReadOnly` capability).
     Shell(u32),
     /// Dynamic bounded File Manager instance (Zone 3 Read-Only storage).
@@ -48,8 +50,8 @@ pub enum CardId {
 }
 
 impl CardId {
-    /// All 13 canonical System cards.
-    pub const ALL_SYSTEM_CARDS: [Self; 13] = [
+    /// All 14 canonical System cards.
+    pub const ALL_SYSTEM_CARDS: [Self; 14] = [
         Self::Identity,
         Self::Session,
         Self::Capabilities,
@@ -63,6 +65,7 @@ impl CardId {
         Self::Context,
         Self::Disclosure,
         Self::Insight,
+        Self::Agents,
     ];
 
     /// Canonical string key for selection, routing, and legacy mapping.
@@ -82,6 +85,7 @@ impl CardId {
             Self::Context => "context",
             Self::Disclosure => "disclosure",
             Self::Insight => "insight",
+            Self::Agents => "agents",
             Self::Shell(_) => "shell",
             Self::FileManager(_) => "files",
             Self::JournalFeed(_) => "journal-feed",
@@ -105,6 +109,7 @@ impl CardId {
             Self::Context => "Context",
             Self::Disclosure => "Disclosure",
             Self::Insight => "System Insight",
+            Self::Agents => "Agents",
             Self::Shell(_) => "Shell",
             Self::FileManager(_) => "File Manager",
             Self::JournalFeed(_) => "Event Stream",
@@ -128,6 +133,7 @@ impl CardId {
             "context" => Some(Self::Context),
             "disclosure" => Some(Self::Disclosure),
             "insight" => Some(Self::Insight),
+            "agents" => Some(Self::Agents),
             "shell" => Some(Self::Shell(0)),
             "files" => Some(Self::FileManager(0)),
             "journal-feed" => Some(Self::JournalFeed(0)),
@@ -153,6 +159,7 @@ impl CardId {
                 | Self::Context
                 | Self::Disclosure
                 | Self::Insight
+                | Self::Agents
         )
     }
 
@@ -320,6 +327,21 @@ impl CardId {
                 // and a card that showed the headline with everything behind a scrollbar would be
                 // a card whose whole reason for existing is one scroll away.
                 default_size: (420.0, 340.0),
+                min_size: (300.0, 200.0),
+                max_size: (720.0, 720.0),
+            },
+            // Sized like Insight, and for the same reason: a session is a row of ceilings, a
+            // countdown and a spend figure, and every one of them is the one somebody opened the
+            // card to read.
+            Self::Agents => CardSpec {
+                kind: CardKind::System,
+                singleton: true,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: false,
+                deckable: true,
+                default_size: (420.0, 320.0),
                 min_size: (300.0, 200.0),
                 max_size: (720.0, 720.0),
             },

@@ -99,6 +99,18 @@ pub trait MindClient {
     /// Returns [`ClientError`] when the gateway cannot produce the projection.
     async fn insight(&self) -> Result<cybou_web_contracts::InsightProjection, ClientError>;
 
+    /// Every agent session this host is holding, as the runtime that holds them describes them.
+    ///
+    /// Carried whole rather than reshaped into a projection of its own. The owner's answer is the
+    /// only one that is right about what is running, and a second shape assembled here would
+    /// disagree with it the moment a session started between a listing and a reading.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError::GatewayRequest`] when the surface cannot be asked. That is not the
+    /// same as no sessions, and the two must not collapse into one another.
+    async fn agents(&self) -> Result<Vec<cybou_protocol::agent::SessionView>, ClientError>;
+
     /// Execute a bounded Shell capability inside the Body host sandbox.
     ///
     /// # Errors
@@ -144,6 +156,7 @@ pub struct MockMindClient {
     mind: Option<MindProjection>,
     disclosure: Option<DisclosureProjection>,
     insight: Option<cybou_web_contracts::InsightProjection>,
+    agents: Option<Vec<cybou_protocol::agent::SessionView>>,
 }
 
 impl MockMindClient {
@@ -156,6 +169,7 @@ impl MockMindClient {
             mind: None,
             disclosure: None,
             insight: None,
+            agents: None,
         }
     }
 
@@ -183,6 +197,17 @@ impl MockMindClient {
     #[must_use]
     pub fn with_insight(mut self, insight: cybou_web_contracts::InsightProjection) -> Self {
         self.insight = Some(insight);
+        self
+    }
+
+    /// Attach agent sessions to a mock that would otherwise refuse to be asked.
+    ///
+    /// A mock without them reports that the runtime could not be reached rather than that nothing
+    /// is running, because a surface drawing "no agents" from a client that was never wired to one
+    /// would be stating a fact about the host that nothing here established.
+    #[must_use]
+    pub fn with_agents(mut self, agents: Vec<cybou_protocol::agent::SessionView>) -> Self {
+        self.agents = Some(agents);
         self
     }
 
@@ -238,6 +263,12 @@ impl MindClient for MockMindClient {
                 projections: Vec::new(),
                 said: String::new(),
             }))
+    }
+
+    async fn agents(&self) -> Result<Vec<cybou_protocol::agent::SessionView>, ClientError> {
+        self.agents
+            .clone()
+            .ok_or_else(|| ClientError::GatewayRequest("mock client holds no agent runtime".into()))
     }
 
     async fn disclosure(&self) -> Result<DisclosureProjection, ClientError> {

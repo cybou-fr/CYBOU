@@ -3,6 +3,7 @@
 
 //! Modular card and content components for CYBOU Living Canvas.
 
+pub mod agents;
 pub mod attention;
 pub mod beliefs;
 pub mod capabilities;
@@ -21,6 +22,7 @@ pub mod self_model;
 pub mod session;
 pub mod shell;
 
+pub use agents::{AgentsCard, AgentsContent};
 pub use attention::{AttentionCard, AttentionContent};
 pub use beliefs::{BeliefsCard, BeliefsContent};
 pub use capabilities::{CapabilitiesCard, CapabilitiesContent};

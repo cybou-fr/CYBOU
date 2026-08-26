@@ -8,10 +8,11 @@ use leptos::prelude::*;
 use crate::{
     CardId,
     components::cards::{
-        attention::AttentionContent, beliefs::BeliefsContent, capabilities::CapabilitiesContent,
-        commitments::CommitmentsContent, context::ContextContent, disclosure::DisclosureContent,
-        file_manager::FileManagerContent, identity::IdentityContent, insight::InsightContent,
-        journal::JournalContent, journal_feed::JournalFeedContent, lifecycle::LifecycleContent,
+        agents::AgentsContent, attention::AttentionContent, beliefs::BeliefsContent,
+        capabilities::CapabilitiesContent, commitments::CommitmentsContent,
+        context::ContextContent, disclosure::DisclosureContent, file_manager::FileManagerContent,
+        identity::IdentityContent, insight::InsightContent, journal::JournalContent,
+        journal_feed::JournalFeedContent, lifecycle::LifecycleContent,
         perception::PerceptionContent, self_model::SelfModelContent, session::SessionContent,
         shell::ShellContent,
     },
@@ -45,6 +46,7 @@ pub fn CardContent(
         CardId::Context => view! { <ContextContent runtime=runtime /> }.into_any(),
         CardId::Disclosure => view! { <DisclosureContent runtime=runtime /> }.into_any(),
         CardId::Insight => view! { <InsightContent runtime=runtime /> }.into_any(),
+        CardId::Agents => view! { <AgentsContent runtime=runtime /> }.into_any(),
         CardId::Shell(instance) => {
             view! { <ShellContent runtime=runtime auth_modal_open=auth instance=instance /> }
                 .into_any()

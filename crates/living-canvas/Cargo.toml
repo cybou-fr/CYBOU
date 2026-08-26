@@ -17,6 +17,10 @@ cybou-web-contracts = { path = "../cybou-web-contracts" }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+# The lease instants on a session are `OffsetDateTime`, and a card that showed them has to format
+# them. No clock is wanted or available in the browser: `now_utc` is not enabled here, which is why
+# the Agents card shows two instants rather than a countdown that would tick without one.
+time.workspace = true
 uuid.workspace = true
 
 # Native-only: the workspace tokio carries `net`, and mio refuses to build for wasm32. The browser

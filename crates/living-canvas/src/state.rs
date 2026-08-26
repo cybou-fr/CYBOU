@@ -37,6 +37,12 @@ pub enum RuntimeState {
         /// enough — because a surface that showed one thing for all three would let "nobody looked"
         /// read as "nothing is wrong".
         insight: Option<InsightProjection>,
+        /// Every agent session the runtime is holding, if it could be asked.
+        ///
+        /// `None` is *the runtime did not answer* and an empty list is *nothing is running*. They
+        /// are drawn differently on purpose: on a host where the agent runtime is not installed at
+        /// all, a card that showed the second would be telling somebody their agents had stopped.
+        agents: Option<Vec<cybou_protocol::agent::SessionView>>,
     },
     /// Connection or protocol error.
     Error(String),

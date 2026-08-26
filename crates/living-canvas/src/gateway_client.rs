@@ -81,6 +81,10 @@ impl MindClient for GatewayMindClient {
         Self::get("/api/v1/insight").await
     }
 
+    async fn agents(&self) -> Result<Vec<cybou_protocol::agent::SessionView>, ClientError> {
+        Self::get("/api/v1/agents").await
+    }
+
     async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
         Self::post_path("/api/v1/files/list", path).await
     }

@@ -317,7 +317,11 @@ impl DesktopLayout {
                     | CardId::Insight
                     | CardId::Lifecycle
                     | CardId::Disclosure => 0,
-                    CardId::Capabilities | CardId::Journal | CardId::Attention => 1 % num_cols,
+                    // Agents sits with Capabilities and Journal: all three are about what this
+                    // host is doing on somebody's behalf rather than what it is.
+                    CardId::Capabilities | CardId::Journal | CardId::Attention | CardId::Agents => {
+                        1 % num_cols
+                    }
                     CardId::Commitments | CardId::Context | CardId::Beliefs | CardId::SelfModel => {
                         2 % num_cols
                     }

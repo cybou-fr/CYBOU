@@ -303,6 +303,33 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 /* What the gate would say. Never styled as a button: nothing on this card can be carried out, and a
    verdict that looked pressable would be offering something that does not exist. */
 .offer-verdict { color: var(--muted); font-style: italic; white-space: nowrap; }
+
+/* Agents. Read-only throughout: there is no stop here and no launch, so nothing on this card is
+   styled as anything a person could press. */
+.agents-headline { font-size: 12px; color: #dfe8ed; padding-bottom: 7px; }
+.agent-list { display: grid; gap: 10px; max-height: 200px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
+.agent-line { display: grid; gap: 3px; }
+.agent-head { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 12px; }
+.agent-head b { color: #dfe8ed; font-weight: 500; }
+.agent-standing { color: var(--accent); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.agent-profile { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.agent-workspace code { color: var(--muted); font-size: 10px; font-family: ui-monospace, monospace; }
+.agent-grant { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: 10px; }
+/* Ceilings, and never drawn as a bar. A bar reads as consumption, and what these are is what the
+   kernel will refuse to exceed — the number a person is watching for is the one nothing here has. */
+.agent-ceilings { color: var(--muted); font-variant-numeric: tabular-nums; }
+.agent-model { color: var(--muted); white-space: nowrap; }
+/* Enumerated rather than summarised. "network: yes" answers a question nobody asked. */
+.agent-reach { display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: baseline; font-size: 10px; }
+.agent-reach small { color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.agent-reach code { color: #dfe8ed; font-size: 10px; font-family: ui-monospace, monospace; }
+.agent-spend { color: #b08a3a; font-size: 10px; font-variant-numeric: tabular-nums; }
+.agent-clock { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 10px; }
+.agent-clock small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.agent-because { color: var(--muted); font-size: 10px; font-style: italic; }
+/* So a person can go and look for themselves rather than take this card's word for any of it. */
+.agent-units { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 8px; }
+.agent-unit { color: var(--muted); font-size: 10px; font-family: ui-monospace, monospace; }
 /* Where things are going. Above the findings on purpose: a disk at 71% produces no finding and can
    still be the most important thing on the page. */
 .heading-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }

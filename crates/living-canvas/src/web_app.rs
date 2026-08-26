@@ -83,6 +83,7 @@ pub fn App() -> impl IntoView {
         // reading this first would report the previous delivery as though it were this one.
         let disclosure = client.disclosure().await.ok();
         let insight = client.insight().await.ok();
+        let agents = client.agents().await.ok();
         runtime.set(match result {
             Ok((session, snapshot)) => RuntimeState::Ready {
                 mode: session.mode,
@@ -91,6 +92,7 @@ pub fn App() -> impl IntoView {
                 mind,
                 disclosure,
                 insight,
+                agents,
             },
             Err(error) => RuntimeState::Error(error.to_string()),
         });

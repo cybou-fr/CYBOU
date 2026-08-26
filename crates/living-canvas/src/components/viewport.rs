@@ -11,7 +11,7 @@ use crate::{
     CardId, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, SnapGuide,
     components::{
         cards::{
-            AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
+            AgentsCard, AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
             DisclosureCard, FileManagerCard, IdentityCard, InsightCard, JournalCard,
             JournalFeedCard, LifecycleCard, PerceptionCard, SelfModelCard, SessionCard, ShellCard,
         },
@@ -149,6 +149,7 @@ pub fn CanvasViewport(
             <ContextCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
             <DisclosureCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
             <InsightCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
+            <AgentsCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
 
             // One card per instance the layout holds, not one card per kind. `CardSpec` says these
             // are not singletons; rendering exactly one of each made that a promise the desktop
