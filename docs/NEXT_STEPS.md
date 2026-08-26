@@ -538,6 +538,45 @@ of which a proxy can do.
 What remains for the card itself is drawing it: the browser has an authoritative source and no view
 yet.
 
+### A2b. The episode runs to what the host saw afterwards
+
+Durable authorization answered *why was this allowed*. It could not answer *was it done, and what did
+the host independently see* — and those are the two halves of the only question worth asking a month
+later.
+
+The episode now continues:
+
+```text
+ExecutionAttempt   Intention   what the host committed to doing about it
+ActionOutcome      Outcome     what it independently saw afterwards
+```
+
+An attempt is an `Intention` because the Journal has no kind for *acting*, and that is the nearest
+true thing: the host binding itself to carry out what was authorized. An outcome is an `Outcome`,
+which the Journal treats as terminal and permits once per cause — right for an action, which happens
+once and is answered for once.
+
+They are two contributions and not one. What a thing says about itself and what the readings say
+afterwards are separate accounts, and the entire value of re-observation is that they can disagree;
+folding them together would delete the disagreement, which is the only part that could ever surprise
+anybody. A test holds exactly that case: the executor reports completion, the service is still down,
+and both survive the restart.
+
+A decision nobody acted on stays one. Absent is a real answer and a common one, and filling it in
+would answer *was it done* with a guess.
+
+**What this does not do, and it is the larger half.** Nothing in production produces an attempt or an
+outcome. `observe_outcome` has no caller outside tests; `ExecutionAttempt` is built only by
+`cybou-executord` when something claims a permit; and nothing claims one — the only thing that drives
+finding → proposal → permit → execute → re-observe is `action-roundtrip`, an example that exists for
+the gate. So Cybou can now *record* a completed episode and still does not *have* one on its own: no
+daemon turns a finding into a proposal, and none carries a decision out.
+
+That is the next thing worth building, and it is a bigger piece than recording: something has to
+decide when a finding deserves an action, wait out the re-observation delay, and answer for the
+result. Until it exists, the durable episode ends at the decision on any real host, which is what it
+already did — the difference is that the record can now hold the rest when there is a rest to hold.
+
 ### B8. Agent Card and streaming session
 
 What the agent is doing, continuously: task, model, processes, files changed, destinations reached,

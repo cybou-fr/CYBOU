@@ -7,8 +7,8 @@ use std::{collections::HashMap, sync::Mutex};
 
 use cybou_protocol::{
     action::{
-        ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
-        ExecutableAction, ExecutionPermit,
+        ActionOutcome, ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
+        ExecutableAction, ExecutionAttempt, ExecutionPermit,
     },
     telemetry::SystemInsight,
 };
@@ -38,6 +38,20 @@ pub struct ActionRecord {
     pub decision: AuthorizationDecision,
     /// Present only for a granted decision with a first-executor adapter.
     pub permit_id: Option<Uuid>,
+    /// What was carried out, once something has been.
+    ///
+    /// Absent is a real answer and a common one: a decision nobody acted on is a decision nobody
+    /// acted on, and filling this in with an attempt that did not happen would answer *was it done*
+    /// with a guess.
+    #[serde(default)]
+    pub attempt: Option<ExecutionAttempt>,
+    /// What the host independently saw afterwards, once it has looked.
+    ///
+    /// Separate from the attempt on purpose. What a thing says about itself and what the readings
+    /// say afterwards are two accounts, and the whole value of re-observation is that they can
+    /// disagree — folding them together would delete the disagreement.
+    #[serde(default)]
+    pub outcome: Option<ActionOutcome>,
 }
 
 /// A refusal at the action boundary.
@@ -55,6 +69,12 @@ pub enum ActionError {
     /// Internal lifecycle state could not be accessed.
     #[error("action lifecycle state is unavailable")]
     StateUnavailable,
+    /// Nothing here proposed what an attempt or an outcome names.
+    ///
+    /// Refused rather than stored beside nothing. A record of what was done, with no record of what
+    /// authorized it, is the one shape this owner exists to prevent.
+    #[error("proposal {0} was not made here")]
+    UnknownProposal(Uuid),
 }
 
 /// Owner of the action lifecycle.
@@ -131,6 +151,8 @@ impl ActionCore {
             checks,
             decision,
             permit_id,
+            attempt: None,
+            outcome: None,
         };
         self.records
             .lock()
@@ -165,6 +187,46 @@ impl ActionCore {
     #[must_use]
     pub fn record(&self, proposal_id: Uuid) -> Option<ActionRecord> {
         self.records.lock().ok()?.get(&proposal_id).cloned()
+    }
+
+    /// Record what was carried out under one decision.
+    ///
+    /// Held against the proposal it names, so *why was this authorized* and *was it done* are one
+    /// record rather than two that somebody has to correlate afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ActionError::StateUnavailable`] when the record table cannot be reached, and
+    /// [`ActionError::UnknownProposal`] when nothing here proposed what the attempt names — an
+    /// attempt against a proposal this owner never made is not an attempt it can answer for.
+    pub fn record_attempt(&self, attempt: ExecutionAttempt) -> Result<(), ActionError> {
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?;
+        let record = records
+            .get_mut(&attempt.proposal_id)
+            .ok_or(ActionError::UnknownProposal(attempt.proposal_id))?;
+        record.attempt = Some(attempt);
+        Ok(())
+    }
+
+    /// Record what the host saw afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ActionError::StateUnavailable`] when the record table cannot be reached, and
+    /// [`ActionError::UnknownProposal`] when nothing here proposed what the outcome names.
+    pub fn record_outcome(&self, outcome: ActionOutcome) -> Result<(), ActionError> {
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?;
+        let record = records
+            .get_mut(&outcome.proposal_id)
+            .ok_or(ActionError::UnknownProposal(outcome.proposal_id))?;
+        record.outcome = Some(outcome);
+        Ok(())
     }
 
     /// Seed this owner with lifecycle records read back from the Journal.

@@ -22,10 +22,22 @@
 //! log beside it:
 //!
 //! ```text
-//! ActionProposal          PlanProposal    what was proposed
+//! ActionProposal           PlanProposal   what was proposed
 //! a criticism that failed  Objection      what was said against it
 //! AuthorizationDecision    Decision       what was decided
+//! ExecutionAttempt         Intention      what the host committed to doing about it
+//! ActionOutcome            Outcome        what it independently saw afterwards
 //! ```
+//!
+//! An attempt is an `Intention` because the Journal has no kind for *acting* and that is the nearest
+//! true thing: the host binding itself to carry out what was authorized. An outcome is an `Outcome`,
+//! which the Journal treats as terminal and permits once per cause — exactly right for an action,
+//! which happens once and is answered for once.
+//!
+//! The attempt and the outcome are separate contributions rather than one. What a thing says about
+//! itself and what the readings say afterwards are two accounts, and the entire value of
+//! re-observation is that they can disagree; folding them together would delete the disagreement,
+//! which is the only part that could ever surprise anybody.
 //!
 //! Only failed checks become objections. A criticism that passed is not an objection to anything, and
 //! writing one would fill the record with disagreement nobody expressed.
@@ -59,7 +71,8 @@
 //! claimed simply was not, and the decision that produced it is still there to be read.
 
 use cybou_protocol::action::{
-    ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
+    ActionOutcome, ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
+    ExecutionAttempt,
 };
 use cybou_protocol::admission::Kind;
 use cybou_protocol::canonical::CanonicalEnvelope;
@@ -100,6 +113,16 @@ pub enum LifecycleStep {
         decision: Box<AuthorizationDecision>,
         /// Every criticism that ran, passing and failing alike.
         checks: Vec<CriticismCheck>,
+    },
+    /// What was carried out under that decision.
+    Attempted {
+        /// The attempt, whole, including what the executor said about itself.
+        attempt: Box<ExecutionAttempt>,
+    },
+    /// What the host saw for itself afterwards.
+    Concluded {
+        /// The outcome, including whether the two accounts agree.
+        outcome: Box<ActionOutcome>,
     },
 }
 
@@ -191,6 +214,35 @@ pub fn contributions(
         },
         now,
     ));
+
+    // What was done, and then what was seen. Each cites the one before, so a reader arrives at the
+    // outcome from the finding without having to know which organ wrote any of it.
+    let mut previous = record.decision.decision_id;
+    if let Some(attempt) = &record.attempt {
+        out.push(envelope(
+            attempt.attempt_id,
+            episode,
+            previous,
+            Kind::Intention,
+            &LifecycleStep::Attempted {
+                attempt: Box::new(attempt.clone()),
+            },
+            now,
+        ));
+        previous = attempt.attempt_id;
+    }
+    if let Some(outcome) = &record.outcome {
+        out.push(envelope(
+            outcome.outcome_id,
+            episode,
+            previous,
+            Kind::Outcome,
+            &LifecycleStep::Concluded {
+                outcome: Box::new(outcome.clone()),
+            },
+            now,
+        ));
+    }
     Ok(out)
 }
 
@@ -250,6 +302,20 @@ pub fn replay(envelopes: &[CanonicalEnvelope]) -> Result<Vec<ActionRecord>, Cann
                 proposals.push((envelope.correlation_id, *proposal));
             }
             LifecycleStep::Objected { .. } => {}
+            LifecycleStep::Attempted { attempt } => {
+                if let Some(record) = records.iter_mut().find(|record: &&mut ActionRecord| {
+                    record.proposal.proposal_id == attempt.proposal_id
+                }) {
+                    record.attempt = Some(*attempt);
+                }
+            }
+            LifecycleStep::Concluded { outcome } => {
+                if let Some(record) = records.iter_mut().find(|record: &&mut ActionRecord| {
+                    record.proposal.proposal_id == outcome.proposal_id
+                }) {
+                    record.outcome = Some(*outcome);
+                }
+            }
             LifecycleStep::Decided { decision, checks } => {
                 let proposal = proposals
                     .iter()
@@ -261,6 +327,8 @@ pub fn replay(envelopes: &[CanonicalEnvelope]) -> Result<Vec<ActionRecord>, Cann
                 records.push(ActionRecord {
                     proposal,
                     checks,
+                    attempt: None,
+                    outcome: None,
                     // A permit that existed is gone with the process that held it, and saying so is
                     // the truthful reading: nothing here may be claimed.
                     permit_id: None,
@@ -319,7 +387,10 @@ fn envelope(
 
 #[cfg(test)]
 mod tests {
-    use cybou_protocol::action::{ActionProposal, AuthorizationDecision, Proposer, RiskLevel};
+    use cybou_protocol::action::{
+        ActionProposal, Agreement, AttemptReport, AuthorizationDecision, Proposer, Relief,
+        RiskLevel,
+    };
 
     use super::*;
 
@@ -366,6 +437,8 @@ mod tests {
                 decided_at: at(1),
             },
             permit_id: Some(Uuid::from_u128(0x0a03)),
+            attempt: None,
+            outcome: None,
         }
     }
 
@@ -408,6 +481,118 @@ mod tests {
             objections[0].message_id,
             "the decision follows what was said against the proposal"
         );
+    }
+
+    fn attempted() -> ExecutionAttempt {
+        ExecutionAttempt {
+            attempt_id: Uuid::from_u128(0x0a04),
+            proposal_id: Uuid::from_u128(0x0a01),
+            decision_id: Uuid::from_u128(0x0a02),
+            operation: "service.restart".to_owned(),
+            target_resource: "systemd:nginx.service".to_owned(),
+            report: AttemptReport::Completed,
+            body_readings: Vec::new(),
+            started_at: at(3),
+            ended_at: Some(at(4)),
+        }
+    }
+
+    fn concluded() -> ActionOutcome {
+        ActionOutcome {
+            outcome_id: Uuid::from_u128(0x0a05),
+            attempt_id: Uuid::from_u128(0x0a04),
+            proposal_id: Uuid::from_u128(0x0a01),
+            cause_id: Some(CAUSE),
+            reported: AttemptReport::Completed,
+            observed: Relief::Relieved,
+            agreement: Agreement::Agree,
+            rollback_available: true,
+            concluded_at: at(4),
+        }
+    }
+
+    #[test]
+    fn an_episode_runs_from_the_finding_to_what_the_host_saw_afterwards() {
+        // The question durable authorization only half answered. "Why was this allowed" was
+        // recoverable; "was it done, and what did the host independently see" was not.
+        let mut whole = record(true);
+        whole.attempt = Some(attempted());
+        whole.outcome = Some(concluded());
+        let written = contributions(&whole, at(5)).expect("it has a cause");
+
+        let kinds: Vec<u16> = written.iter().map(|envelope| envelope.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                Kind::PlanProposal as u16,
+                Kind::Decision as u16,
+                Kind::Intention as u16,
+                Kind::Outcome as u16,
+            ]
+        );
+        // Each cites the one before, so a reader arrives at the outcome from the finding without
+        // knowing which organ wrote any of it.
+        for pair in written.windows(2) {
+            assert_eq!(pair[1].causation_id, pair[0].message_id);
+        }
+        assert!(
+            written
+                .iter()
+                .all(|envelope| envelope.correlation_id == whole.proposal.proposal_id)
+        );
+    }
+
+    #[test]
+    fn what_was_reported_and_what_was_seen_stay_two_accounts() {
+        // The whole value of re-observation is that they can disagree. One contribution carrying
+        // both would delete the disagreement, which is the only part that could ever surprise
+        // anybody.
+        let mut disagreeing = record(true);
+        disagreeing.attempt = Some(attempted());
+        disagreeing.outcome = Some(ActionOutcome {
+            observed: Relief::StillPresent,
+            agreement: Agreement::Disagree {
+                about: "the executor reported completion and the service is still down".to_owned(),
+            },
+            ..concluded()
+        });
+
+        let written = contributions(&disagreeing, at(5)).expect("written");
+        let replayed = replay(&written).expect("reads back");
+        let outcome = replayed[0].outcome.as_ref().expect("an outcome");
+
+        assert_eq!(outcome.reported, AttemptReport::Completed);
+        assert_eq!(outcome.observed, Relief::StillPresent);
+        assert!(
+            matches!(outcome.agreement, Agreement::Disagree { .. }),
+            "the executor said it completed and the readings say otherwise, and both survive"
+        );
+    }
+
+    #[test]
+    fn a_decision_nobody_acted_on_stays_one() {
+        // Absent is a real answer and a common one. Filling it in would answer "was it done" with a
+        // guess.
+        let written = contributions(&record(true), at(2)).expect("written");
+        let replayed = replay(&written).expect("reads back");
+
+        assert!(replayed[0].attempt.is_none());
+        assert!(replayed[0].outcome.is_none());
+    }
+
+    #[test]
+    fn an_attempt_survives_the_restart_that_loses_the_permit() {
+        // The permit is gone by design; what was done with it is not.
+        let mut whole = record(true);
+        whole.attempt = Some(attempted());
+        whole.outcome = Some(concluded());
+
+        let replayed = replay(&contributions(&whole, at(5)).expect("written")).expect("reads back");
+        assert_eq!(
+            replayed[0].attempt.as_ref().expect("an attempt").attempt_id,
+            attempted().attempt_id
+        );
+        assert_eq!(replayed[0].permit_id, None);
     }
 
     #[test]
