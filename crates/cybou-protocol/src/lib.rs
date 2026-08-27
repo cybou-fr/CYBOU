@@ -28,6 +28,7 @@ pub mod disclosure;
 pub mod epistemic;
 pub mod governance;
 pub mod learning;
+pub mod location;
 pub mod meaning;
 pub mod model;
 pub mod promotion;
@@ -35,6 +36,7 @@ pub mod security;
 pub mod telemetry;
 
 pub use admission::Kind;
+pub use location::LocationRef;
 
 /// Canonical Qt-compatible UTC wall-clock spelling: whole milliseconds since the Unix epoch.
 ///

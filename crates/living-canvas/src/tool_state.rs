@@ -83,10 +83,6 @@ pub struct FileManagerSignals {
     /// What went wrong with the last read, if anything.
     pub error_msg: RwSignal<Option<String>>,
     /// Whether this directory has ever been read.
-    ///
-    /// An empty `entries` says nothing on its own: a directory nobody has looked in and a directory
-    /// with nothing in it are different facts, and the panel used to state the second whenever the
-    /// first was true. It opened on "Empty directory" before it had asked anything.
     pub read: RwSignal<bool>,
 }
 
@@ -105,6 +101,147 @@ impl FileManagerSignals {
     }
 }
 
+/// One open file buffer / tab in the Text Editor.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EditorTab {
+    /// File name / display label.
+    pub name: String,
+    /// Typed location reference and authority domain.
+    pub location: cybou_protocol::LocationRef,
+    /// Editable text buffer.
+    pub content: String,
+    /// Original unmodified disk content for diffing.
+    pub original_content: String,
+    /// Whether the buffer contains unsaved changes.
+    pub dirty: bool,
+    /// Line number (1-indexed).
+    pub line: usize,
+    /// Column number (1-indexed).
+    pub col: usize,
+    /// Detected language / syntax format.
+    pub language: String,
+    /// Read-only protection mode.
+    pub read_only: bool,
+}
+
+impl EditorTab {
+    /// Create a new empty untitled buffer.
+    #[must_use]
+    pub fn untitled() -> Self {
+        Self {
+            name: "untitled.txt".to_string(),
+            location: cybou_protocol::LocationRef::HostUserPath("/home/cybou/untitled.txt".to_string()),
+            content: String::new(),
+            original_content: String::new(),
+            dirty: false,
+            line: 1,
+            col: 1,
+            language: "text".to_string(),
+            read_only: false,
+        }
+    }
+
+    /// Create a buffer from an existing file path and content.
+    #[must_use]
+    pub fn from_file(path: &str, content: String) -> Self {
+        let name = path.rsplit('/').next().unwrap_or(path).to_string();
+        let ext = name.rsplit('.').next().unwrap_or("");
+        let language = match ext {
+            "rs" => "rust",
+            "md" | "markdown" => "markdown",
+            "json" => "json",
+            "toml" => "toml",
+            "yaml" | "yml" => "yaml",
+            "sh" | "bash" => "shell",
+            "conf" if path.contains("nginx") => "nginx",
+            "service" | "target" | "timer" => "systemd",
+            "py" => "python",
+            "js" | "ts" => "javascript",
+            "html" | "htm" => "html",
+            "css" => "css",
+            _ => "text",
+        }.to_string();
+
+        let location = cybou_protocol::LocationRef::from_path(path);
+        let read_only = location.is_read_only();
+
+        Self {
+            name,
+            location,
+            content: content.clone(),
+            original_content: content,
+            dirty: false,
+            line: 1,
+            col: 1,
+            language,
+            read_only,
+        }
+    }
+}
+
+/// One Text Editor card's interactive state.
+#[derive(Clone, Copy)]
+pub struct EditorSignals {
+    /// Open file buffer tabs.
+    pub tabs: RwSignal<Vec<EditorTab>>,
+    /// Index of currently active tab.
+    pub active_tab_index: RwSignal<usize>,
+    /// Whether a file load/save is in progress.
+    pub loading: RwSignal<bool>,
+    /// Status or error message.
+    pub status_msg: RwSignal<Option<String>>,
+    /// Whether Markdown split preview is enabled.
+    pub markdown_preview: RwSignal<bool>,
+    /// Whether the Action1 Diff/Save confirmation modal is open.
+    pub save_proposal_open: RwSignal<bool>,
+}
+
+impl EditorSignals {
+    fn new() -> Self {
+        Self {
+            tabs: RwSignal::new(vec![EditorTab::untitled()]),
+            active_tab_index: RwSignal::new(0),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+            markdown_preview: RwSignal::new(false),
+            save_proposal_open: RwSignal::new(false),
+        }
+    }
+}
+
+/// One Diff Viewer card's interactive state.
+#[derive(Clone, Copy)]
+pub struct DiffSignals {
+    /// Target file or entity title.
+    pub title: RwSignal<String>,
+    /// Source 1 label (e.g. "On-disk / live").
+    pub original_label: RwSignal<String>,
+    /// Source 2 label (e.g. "Editor buffer / Proposed patch").
+    pub proposed_label: RwSignal<String>,
+    /// Original text content.
+    pub original_content: RwSignal<String>,
+    /// Proposed text content.
+    pub proposed_content: RwSignal<String>,
+    /// Whether an action is in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl DiffSignals {
+    fn new() -> Self {
+        Self {
+            title: RwSignal::new("Diff Viewer".to_string()),
+            original_label: RwSignal::new("Current (Disk)".to_string()),
+            proposed_label: RwSignal::new("Proposed".to_string()),
+            original_content: RwSignal::new(String::new()),
+            proposed_content: RwSignal::new(String::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
 /// The interactive state of every tool card on this desktop.
 ///
 /// Provided once at the root and read from context by the cards. It is `Copy` so a card can hold it
@@ -112,21 +249,15 @@ impl FileManagerSignals {
 #[derive(Clone, Copy)]
 pub struct ToolCardStates {
     /// The owner every piece of state is created under.
-    ///
-    /// The root one, captured where this store is built. Creating a signal on demand from inside a
-    /// card would otherwise attach it to that card's owner, which is exactly the lifetime this
-    /// store exists to escape.
     owner: StoredValue<Owner>,
     shells: StoredValue<HashMap<CardId, ShellSignals>>,
     file_managers: StoredValue<HashMap<CardId, FileManagerSignals>>,
+    editors: StoredValue<HashMap<CardId, EditorSignals>>,
+    diffs: StoredValue<HashMap<CardId, DiffSignals>>,
 }
 
 impl ToolCardStates {
     /// Build the store under the current reactive owner.
-    ///
-    /// # Panics
-    ///
-    /// If called outside a reactive owner, which for this application means outside `mount_to_body`.
     #[must_use]
     pub fn new() -> Self {
         let owner = Owner::current().expect("a reactive owner to anchor tool card state to");
@@ -134,6 +265,8 @@ impl ToolCardStates {
             owner: StoredValue::new(owner),
             shells: StoredValue::new(HashMap::new()),
             file_managers: StoredValue::new(HashMap::new()),
+            editors: StoredValue::new(HashMap::new()),
+            diffs: StoredValue::new(HashMap::new()),
         }
     }
 
@@ -168,16 +301,54 @@ impl ToolCardStates {
         created
     }
 
+    /// This Text Editor card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn editor(&self, card: CardId) -> EditorSignals {
+        if let Some(existing) = self
+            .editors
+            .with_value(|held| held.get(&card).copied())
+        {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(EditorSignals::new));
+        self.editors.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Diff Viewer card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn diff(&self, card: CardId) -> DiffSignals {
+        if let Some(existing) = self
+            .diffs
+            .with_value(|held| held.get(&card).copied())
+        {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(DiffSignals::new));
+        self.diffs.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
     /// Forget everything a card had done, because the card itself is gone.
-    ///
-    /// Closing a tool card is a person saying they are finished with it. Keeping its history would
-    /// mean reopening one handed back somebody else's session; keeping it forever would mean a
-    /// desktop that never releases anything.
     pub fn forget(&self, card: CardId) {
         self.shells.update_value(|held| {
             held.remove(&card);
         });
         self.file_managers.update_value(|held| {
+            held.remove(&card);
+        });
+        self.editors.update_value(|held| {
+            held.remove(&card);
+        });
+        self.diffs.update_value(|held| {
             held.remove(&card);
         });
     }

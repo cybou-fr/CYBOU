@@ -154,6 +154,22 @@ pub fn CommandPalette(
                         }
                     ><IconExternalLink size=15 /><span><b>"Open File Manager"</b><i>"Browse files, read-only"</i></span></button>
                     <button
+                        class:hidden=move || !command_matches(&command_query.get(), "editor text code write config edit")
+                        on:click=move |_| {
+                            layout.update(|l| l.open_card(CardId::Editor(0), 400.0, 140.0));
+                            layout.get_untracked().save();
+                            select_from_command("editor");
+                        }
+                    ><IconExternalLink size=15 /><span><b>"Open Text Editor"</b><i>"Code and configuration editor"</i></span></button>
+                    <button
+                        class:hidden=move || !command_matches(&command_query.get(), "diff compare review changes patch")
+                        on:click=move |_| {
+                            layout.update(|l| l.open_card(CardId::Diff(0), 420.0, 160.0));
+                            layout.get_untracked().save();
+                            select_from_command("diff");
+                        }
+                    ><IconExternalLink size=15 /><span><b>"Open Diff Viewer"</b><i>"Inspect and review changes"</i></span></button>
+                    <button
                         class:hidden=move || !command_matches(&command_query.get(), "events feed live stream sse journal")
                         on:click=move |_| {
                             layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));

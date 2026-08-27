@@ -10,11 +10,11 @@ use crate::{
     components::cards::{
         agents::AgentsContent, attention::AttentionContent, beliefs::BeliefsContent,
         capabilities::CapabilitiesContent, commitments::CommitmentsContent,
-        context::ContextContent, disclosure::DisclosureContent, file_manager::FileManagerContent,
-        identity::IdentityContent, insight::InsightContent, journal::JournalContent,
-        journal_feed::JournalFeedContent, lifecycle::LifecycleContent,
-        perception::PerceptionContent, self_model::SelfModelContent, session::SessionContent,
-        shell::ShellContent,
+        context::ContextContent, diff::DiffContent, disclosure::DisclosureContent,
+        editor::EditorContent, file_manager::FileManagerContent, identity::IdentityContent,
+        insight::InsightContent, journal::JournalContent, journal_feed::JournalFeedContent,
+        lifecycle::LifecycleContent, perception::PerceptionContent, self_model::SelfModelContent,
+        session::SessionContent, shell::ShellContent,
     },
     state::RuntimeState,
 };
@@ -53,6 +53,14 @@ pub fn CardContent(
         }
         CardId::FileManager(instance) => {
             view! { <FileManagerContent runtime=runtime auth_modal_open=auth instance=instance /> }
+                .into_any()
+        }
+        CardId::Editor(instance) => {
+            view! { <EditorContent runtime=runtime auth_modal_open=auth instance=instance /> }
+                .into_any()
+        }
+        CardId::Diff(instance) => {
+            view! { <DiffContent runtime=runtime auth_modal_open=auth instance=instance /> }
                 .into_any()
         }
         CardId::JournalFeed(_) => view! { <JournalFeedContent /> }.into_any(),

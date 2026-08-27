@@ -12,8 +12,9 @@ use crate::{
     components::{
         cards::{
             AgentsCard, AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
-            DisclosureCard, FileManagerCard, IdentityCard, InsightCard, JournalCard,
-            JournalFeedCard, LifecycleCard, PerceptionCard, SelfModelCard, SessionCard, ShellCard,
+            DiffCard, DisclosureCard, EditorCard, FileManagerCard, IdentityCard, InsightCard,
+            JournalCard, JournalFeedCard, LifecycleCard, PerceptionCard, SelfModelCard,
+            SessionCard, ShellCard,
         },
         deck::DeckContainerView,
         relations::RelationshipsLayer,
@@ -231,6 +232,20 @@ pub fn CanvasViewport(
                     <JournalFeedCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing instance=instance />
                 }
             />
+            <For
+                each=move || editor_instances(&layout.get())
+                key=|instance| *instance
+                children=move |instance| view! {
+                    <EditorCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
+                }
+            />
+            <For
+                each=move || diff_instances(&layout.get())
+                key=|instance| *instance
+                children=move |instance| view! {
+                    <DiffCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
+                }
+            />
 
             <For
                 each=move || layout.get().decks
@@ -272,6 +287,30 @@ fn file_manager_instances(layout: &DesktopLayout) -> Vec<u32> {
         .iter()
         .filter_map(|card| match card.id {
             CardId::FileManager(instance) => Some(instance),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The Text Editor cards this layout holds, by instance.
+fn editor_instances(layout: &DesktopLayout) -> Vec<u32> {
+    layout
+        .cards
+        .iter()
+        .filter_map(|card| match card.id {
+            CardId::Editor(instance) => Some(instance),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The Diff Viewer cards this layout holds, by instance.
+fn diff_instances(layout: &DesktopLayout) -> Vec<u32> {
+    layout
+        .cards
+        .iter()
+        .filter_map(|card| match card.id {
+            CardId::Diff(instance) => Some(instance),
             _ => None,
         })
         .collect()

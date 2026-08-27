@@ -10,7 +10,7 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use crate::instant_label;
 use crate::{
     ArrangementMode, CardId, DesktopItemId, DesktopLayout,
-    components::icons::{IconFolder, IconHome, IconLayers, IconShield, IconTerminal},
+    components::icons::{IconFile, IconFolder, IconHome, IconLayers, IconShield, IconTerminal},
     state::RuntimeState,
 };
 
@@ -124,6 +124,24 @@ pub fn DesktopDock(
                 >
                     <IconFolder size=18 />
                     <span class="dock-tooltip">"Files"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "editor"))
+                    title="Text Editor"
+                    on:click=move |_| open_or_focus(CardId::Editor(0), 400.0, 200.0)
+                >
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Editor"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "diff"))
+                    title="Diff Viewer"
+                    on:click=move |_| open_or_focus(CardId::Diff(0), 420.0, 220.0)
+                >
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Diff"</span>
                 </button>
                 <button
                     class="dock-item"
