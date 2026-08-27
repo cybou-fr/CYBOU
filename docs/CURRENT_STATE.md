@@ -797,7 +797,7 @@ say how many sources there were, and that is not zero.
 ## Desktop (CYBOU Spatial Desktop)
 
 One Rust/WebAssembly frontend — Living Canvas — served to browsers and, as a target, to a
-Chromium/Wayland session ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md), [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md), [ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md)). The browser is a renderer and an untrusted client: it talks only to the
+Chromium/Wayland session ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md), [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md), [ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md), [ADR-0045](adr/ADR-0045-cybou-core-desktop-pack-and-workspace-primitives.md)). The browser is a renderer and an untrusted client: it talks only to the
 gateway and never becomes a Mind owner, D-Bus peer, or authority.
 
 CYBOU Desktop is an infinite spatial presence map of host reality, rejecting classical window managers and tabbed page-routed SPAs:
@@ -807,6 +807,7 @@ CYBOU Desktop is an infinite spatial presence map of host reality, rejecting cla
 - **Agents Runtime**: Reads canonical `SessionView` records and structured `AgentOffersResponse` (`profiles_state`, `capacity_state`, `provider_state`) from `Agent1` through the gateway. When unconfigured, it displays multi-dimensional setup readiness diagnostics. When configured, it offers guided profile, workspace, model class, and autonomy boundary selections, alongside live task prompt, real-time execution phase tracking, agent result response, and direct File Manager workspace inspection.
 - **Ask CYBOU & Command Palette**: Provides instant deterministic query resolution across host findings, remediation actions, running agents, and isolation boundaries with strict epistemic truthfulness.
 - **Spatial Architecture v2 ([ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md))**: Defines the formal blueprint for Panel 2.0 representations (`Glance`, `Standard`, `Expanded`, `Focus`), semantic clusters, semantic zoom / level-of-detail, canvas anchors, camera history, typed relations, contextual spawning, and non-cognitive layout invariants across milestones SD0–SD14.
+- **Core Desktop Pack & Universal Workspaces ([ADR-0045](adr/ADR-0045-cybou-core-desktop-pack-and-workspace-primitives.md))**: Defines the 3-tier desktop capability model (`Desktop Core`, `Personal Core`, `CYBOU-native Core`), `LocationRef` authority domains (`HostUserPath`, `SystemConfigPath`, `AgentWorkspace`, `SafeShellJail`, `BackupSnapshot`), Text Editor & Diff Engine with Action1 commit governance, Files 2.0 multi-panel management, Mail/Calendar/Notes zero-trust architecture, Control Center, Storage/Disks vs Files differentiation, and Dual Terminal execution across phases CP0–CP10.
 
 Every class the components render has a rule, checked by `scripts/validate-desktop-styles.py`; interaction is exercised in real Chromium. See [desktop and browser gate](evidence/desktop-browser-gate.md).
 
