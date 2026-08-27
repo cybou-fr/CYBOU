@@ -35,6 +35,10 @@ pub fn CardFrame(
     let is_selected = move || selected.get() == Some(item());
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
+    let representation = move || layout.get().presentation(card).representation;
+    let is_glance = move || representation() == crate::PanelRepresentation::Glance;
+    let is_expanded = move || representation() == crate::PanelRepresentation::Expanded;
+    let is_standard = move || representation() == crate::PanelRepresentation::Standard;
     let is_magnet_target = move || dragging.get().and_then(|d| d.drop_target) == Some(card);
 
     let aria_label = format!(
@@ -53,6 +57,9 @@ pub fn CardFrame(
                 class:selected=is_selected
                 class:pinned=is_pinned
                 class:collapsed=is_collapsed
+                class:glance=is_glance
+                class:expanded=is_expanded
+                class:standard=is_standard
                 class:magnet-target=is_magnet_target
                 style=move || card_style(layout.get(), card)
                 tabindex="0"

@@ -29,7 +29,9 @@ pub mod tool_state;
 mod gateway_client;
 #[cfg(all(test, target_arch = "wasm32"))]
 mod interaction_gate;
-pub use card::{CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec};
+pub use card::{
+    CardGeometry, CardId, CardInstance, CardKind, CardPresentation, CardSpec, PanelRepresentation,
+};
 pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;

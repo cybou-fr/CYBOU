@@ -442,13 +442,42 @@ impl CardGeometry {
     }
 }
 
+/// Panel 2.0 representation tier for a Card instance (ADR-0044).
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PanelRepresentation {
+    /// Standard regular working view (~360x260 px).
+    #[default]
+    Standard,
+    /// Highly compact status chip (~220x70 px).
+    Glance,
+    /// Comprehensive forensic and in-depth view (~640x480 px).
+    Expanded,
+}
+
+impl PanelRepresentation {
+    /// Return human-readable label.
+    #[must_use]
+    pub const fn label(&self) -> &'static str {
+        match self {
+            Self::Standard => "Standard",
+            Self::Glance => "Glance",
+            Self::Expanded => "Expanded",
+        }
+    }
+
+    /// Next representation in cycle.
+    #[must_use]
+    pub const fn cycle(&self) -> Self {
+        match self {
+            Self::Standard => Self::Expanded,
+            Self::Expanded => Self::Glance,
+            Self::Glance => Self::Standard,
+        }
+    }
+}
+
 /// Presentation mode of a Card instance.
-///
-/// There was a `maximized` flag here until 2026-08-22. Nothing ever set it and nothing ever read
-/// it: focus is [`DesktopViewMode::Focus`](crate::DesktopViewMode), which fills the viewport
-/// without touching the geometry underneath and restores it on `Escape`. Two fields that could
-/// each answer "is this card filling the screen?" is one field too many, and the one that was
-/// persisted was the one that never knew.
 ///
 /// Unknown fields are ignored on the way in, so a layout saved while the flag existed still loads.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -458,6 +487,8 @@ pub struct CardPresentation {
     pub collapsed: bool,
     /// Whether the card is pinned (locked against automatic arrangement).
     pub pinned: bool,
+    /// Panel 2.0 representation tier (Standard, Glance, Expanded). Focus is a separate viewport mode.
+    pub representation: PanelRepresentation,
 }
 
 /// Static capabilities and bounds of a Card type.
@@ -508,6 +539,7 @@ impl CardInstance {
             presentation: CardPresentation {
                 collapsed: false,
                 pinned: false,
+                representation: PanelRepresentation::Standard,
             },
         }
     }

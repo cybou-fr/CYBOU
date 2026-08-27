@@ -11,24 +11,39 @@ use leptos::task::spawn_local;
 use crate::{
     CardId, DesktopItemId, DesktopLayout, DesktopViewMode, GatewayMindClient, MindClient,
     components::icons::{
-        IconClose, IconExternalLink, IconMaximize, IconMinimize, IconPin, IconResizeGrip,
+        IconClose, IconExternalLink, IconLayers, IconMaximize, IconMinimize, IconPin, IconResizeGrip,
     },
     interaction::{ResizeState, start_deck_resize, start_resize},
     tool_state::ToolCardStates,
 };
 
-/// Card header window management controls (Pin, Focus, Collapse/Expand, Close/Detach).
+/// Card header window management controls (Pin, Representation, Focus, Collapse/Expand, Close/Detach).
 #[component]
 pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
     let tool_states = expect_context::<ToolCardStates>();
     let is_pinned = move || layout.get().presentation(card).pinned;
     let is_collapsed = move || layout.get().presentation(card).collapsed;
+    let representation = move || layout.get().presentation(card).representation;
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
     let is_focused = move || view_mode.get() == DesktopViewMode::Focus(DesktopItemId::Card(card));
 
     view! {
         <div class="card-controls" on:pointerdown=move |e: PointerEvent| e.stop_propagation() on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+            <button
+                class="card-control-btn representation-btn"
+                title=move || format!("Panel mode: {} (Click to cycle)", representation().label())
+                aria-label=move || format!("Panel mode: {}", representation().label())
+                on:click=move |_| {
+                    layout.update(|current| {
+                        let p = current.presentation(card);
+                        current.set_representation(card, p.representation.cycle());
+                    });
+                    layout.get_untracked().save();
+                }
+            >
+                <IconLayers size=12 />
+            </button>
             <button
                 class:active=is_pinned
                 class="card-control-btn pin-btn"

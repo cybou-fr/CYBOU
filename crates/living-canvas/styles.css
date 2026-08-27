@@ -188,10 +188,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .object.selected { border-color: rgba(112, 225, 200, 0.82); box-shadow: 0 0 0 1px rgba(112, 225, 200, 0.15), 0 0 36px rgba(62, 206, 178, 0.17), 0 24px 70px rgba(0, 0, 0, 0.42); }
 .object.pinned { border-color: rgba(112, 225, 200, 0.45); }
 .object.collapsed { height: 44px !important; min-height: 44px !important; padding: 10px 14px !important; gap: 0; }
+.object.glance { border-color: rgba(154, 167, 184, 0.28); }
+.object.expanded { border-color: rgba(112, 225, 200, 0.55); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55); }
+.object.standard { border-color: var(--border); }
 .card-header { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
 .card-controls { display: flex; align-items: center; gap: 3px; opacity: 0.55; transition: opacity 140ms ease; }
 .object:hover .card-controls, .object.selected .card-controls, .object.pinned .card-controls { opacity: 1; }
 .card-control-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+.card-control-btn.representation-btn { font-size: 9px; font-weight: 600; text-transform: uppercase; }
+.panel-representation-badge { font-size: 8px; color: var(--accent); padding: 1px 4px; border-radius: 4px; background: rgba(112, 225, 200, 0.12); margin-left: 4px; }
 .card-control-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .card-control-btn.active { color: var(--accent); background: rgba(112, 225, 200, 0.14); }
 .card-collapsed-summary { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -295,7 +300,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .reading-line b { color: var(--accent); font-weight: 500; }
 .reading-line small { color: var(--muted); white-space: nowrap; }
 .offer-label { margin-top: 5px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
-.offer-list { display: grid; gap: 2px; margin-left: 8px; }
+.offer-list { display: grid; gap: 6px; margin-left: 8px; }
+.offer-item { display: grid; gap: 4px; padding: 4px 0; }
 .offer-line { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: baseline; font-size: 10px; }
 .offer-line code { color: #dfe8ed; font-size: 10px; }
 .offer-risk { color: #b08a3a; white-space: nowrap; }
@@ -595,9 +601,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .agent-launch-form { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .agent-launch-form input, .agent-launch-form textarea { min-width: 0; border: 1px solid rgba(154,167,184,.2); border-radius: 6px; padding: 6px 7px; background: rgba(0,0,0,.18); color: #dfe8ed; font: 10px/1.4 inherit; outline: none; }
 .agent-launch-form input:focus, .agent-launch-form textarea:focus { border-color: rgba(112,225,200,.5); }
-.agent-launch-form textarea { grid-column: 1 / -1; min-height: 48px; resize: vertical; }
 .agent-launch-form button { justify-self: start; border: 1px solid rgba(112,225,200,.35); border-radius: 7px; padding: 6px 9px; background: rgba(112,225,200,.1); color: var(--accent); font-size: 10px; cursor: pointer; }
 .agent-launch-form button:disabled { cursor: wait; opacity: .55; }
+.agent-launch-form .launch-button { background: rgba(112, 225, 200, 0.15); font-weight: 500; }
+.agent-launch-form .refresh-button { border-color: rgba(154, 167, 184, 0.25); color: var(--muted); background: transparent; }
+.agent-launch-form .refresh-button:hover { background: rgba(154, 167, 184, 0.1); color: #dfe8ed; }
 .agent-launch-error { grid-column: 1 / -1; color: #f87171; font-size: 10px; }
 .agent-list { display: grid; gap: 10px; max-height: 200px; overflow-y: auto; padding: 9px 0; border-top: 1px solid rgba(154,167,184,.14); }
 .agent-line { display: grid; gap: 3px; }

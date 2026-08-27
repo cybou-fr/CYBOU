@@ -71,6 +71,13 @@ impl DesktopLayout {
         }
     }
 
+    /// Set panel representation tier (Standard, Glance, Expanded) for a card.
+    pub fn set_representation(&mut self, id: CardId, representation: crate::card::PanelRepresentation) {
+        if let Some(card) = self.card_mut(id) {
+            card.presentation.representation = representation;
+        }
+    }
+
     /// Bring any desktop item (Card or Deck) forward in stacking order (Invariant L14).
     pub fn bring_item_forward(&mut self, item_id: &DesktopItemId) {
         let max_z = self

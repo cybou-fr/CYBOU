@@ -115,6 +115,16 @@ pub fn card_style(layout: DesktopLayout, card: CardId) -> String {
             "left:{:.1}px;top:{:.1}px;width:{:.1}px;z-index:{}",
             geom.x, geom.y, geom.width, geom.z
         )
+    } else if pres.representation == crate::PanelRepresentation::Glance {
+        format!(
+            "left:{:.1}px;top:{:.1}px;width:{:.1}px;height:74px;z-index:{}",
+            geom.x, geom.y, geom.width.clamp(200.0, 280.0), geom.z
+        )
+    } else if pres.representation == crate::PanelRepresentation::Expanded {
+        format!(
+            "left:{:.1}px;top:{:.1}px;width:{:.1}px;height:{:.1}px;z-index:{}",
+            geom.x, geom.y, geom.width.max(520.0), geom.height.max(400.0), geom.z
+        )
     } else {
         format!(
             "left:{:.1}px;top:{:.1}px;width:{:.1}px;height:{:.1}px;z-index:{}",
