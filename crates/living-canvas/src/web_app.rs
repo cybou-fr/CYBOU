@@ -10,8 +10,8 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::KeyboardEvent;
 
 use living_canvas::{
-    ClientError, DesktopLayout, DesktopViewMode, GatewayMindClient, LayoutHistory, MindClient,
-    SnapGuide,
+    CameraHistory, ClientError, DesktopLayout, DesktopViewMode, GatewayMindClient, LayoutHistory,
+    MindClient, SnapGuide, apply_camera_back, apply_camera_forward,
     components::{
         AuthModal, CanvasViewport, CommandPalette, DesktopDock, IconGrid, IconMaximize, Minimap,
         SignInView, Topbar,
@@ -51,6 +51,7 @@ pub fn App() -> impl IntoView {
     provide_context(ToolCardStates::new());
     let layout = RwSignal::new(load_layout());
     let history = RwSignal::new(LayoutHistory::new());
+    let camera_history = RwSignal::new(CameraHistory::new());
     let dragging = RwSignal::new(None::<DragState>);
     let resizing = RwSignal::new(None::<ResizeState>);
     let snap_guides = RwSignal::new(Vec::<SnapGuide>::new());
@@ -163,6 +164,12 @@ pub fn App() -> impl IntoView {
             {
                 event.prevent_default();
                 set_zoom.update(|z| *z = (*z - 0.1).max(0.4));
+            } else if event.alt_key() && event.key() == "ArrowLeft" {
+                event.prevent_default();
+                apply_camera_back(camera_history, pan, set_pan, zoom, set_zoom);
+            } else if event.alt_key() && event.key() == "ArrowRight" {
+                event.prevent_default();
+                apply_camera_forward(camera_history, pan, set_pan, zoom, set_zoom);
             }
         });
         let _ = listener_window
@@ -208,6 +215,11 @@ pub fn App() -> impl IntoView {
                 set_runtime_menu_open=set_runtime_menu_open
                 layout=layout
                 history=history
+                camera_history=camera_history
+                pan=pan
+                set_pan=set_pan
+                zoom=zoom
+                set_zoom=set_zoom
             />
 
             <CanvasViewport
@@ -226,6 +238,7 @@ pub fn App() -> impl IntoView {
                 set_pan=set_pan
                 panning=panning
                 set_panning=set_panning
+                camera_history=camera_history
             />
 
             <DesktopDock

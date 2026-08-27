@@ -177,6 +177,16 @@ pub fn IconArrowLeft(#[prop(default = 13)] size: u32) -> impl IntoView {
 }
 
 #[component]
+pub fn IconArrowRight(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 5 7 7-7 7"></path>
+            <path d="M5 12h14"></path>
+        </svg>
+    }
+}
+
+#[component]
 pub fn IconHome(#[prop(default = 13)] size: u32) -> impl IntoView {
     view! {
         <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

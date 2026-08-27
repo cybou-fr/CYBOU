@@ -40,6 +40,7 @@ pub fn CanvasViewport(
     set_pan: WriteSignal<(f64, f64)>,
     panning: ReadSignal<Option<(f64, f64, f64, f64)>>,
     set_panning: WriteSignal<Option<(f64, f64, f64, f64)>>,
+    #[prop(optional)] camera_history: Option<RwSignal<crate::CameraHistory>>,
 ) -> impl IntoView {
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
@@ -94,6 +95,15 @@ pub fn CanvasViewport(
                 move_resize(event, layout, resizing);
             }
             on:pointerup=move |_| {
+                if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
+                    let cur_px = pan.get_untracked().0;
+                    let cur_py = pan.get_untracked().1;
+                    if (cur_px - init_px).abs() > 15.0 || (cur_py - init_py).abs() > 15.0 {
+                        if let Some(ch) = camera_history {
+                            ch.update(|h| h.record(crate::CameraState::new(init_px, init_py, zoom.get_untracked())));
+                        }
+                    }
+                }
                 set_panning.set(None);
                 finish_drag(layout, history, dragging, snap_guides);
                 finish_resize(layout, resizing);

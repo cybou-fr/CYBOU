@@ -8,9 +8,12 @@ use leptos::prelude::*;
 use lucide_leptos::{Ellipsis, FolderOpen, Link, ListChecks, Sparkles};
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout, LayoutHistory,
-    components::icons::{IconLayers, IconPin, IconRedo, IconRefresh, IconUndo},
+    CardId, DesktopItemId, DesktopLayout, LayoutHistory, CameraHistory,
+    components::icons::{
+        IconArrowLeft, IconArrowRight, IconLayers, IconPin, IconRedo, IconRefresh, IconUndo,
+    },
     interaction::{apply_redo, apply_undo},
+    layout::{apply_camera_back, apply_camera_forward},
     state::RuntimeState,
 };
 
@@ -25,6 +28,11 @@ pub fn Topbar(
     set_runtime_menu_open: WriteSignal<bool>,
     layout: RwSignal<DesktopLayout>,
     history: RwSignal<LayoutHistory>,
+    #[prop(optional)] camera_history: Option<RwSignal<CameraHistory>>,
+    #[prop(optional)] pan: Option<ReadSignal<(f64, f64)>>,
+    #[prop(optional)] set_pan: Option<WriteSignal<(f64, f64)>>,
+    #[prop(optional)] zoom: Option<ReadSignal<f64>>,
+    #[prop(optional)] set_zoom: Option<WriteSignal<f64>>,
 ) -> impl IntoView {
     let runtime_label = move || match runtime.get() {
         RuntimeState::Loading => "Connecting".to_owned(),
@@ -96,6 +104,39 @@ pub fn Topbar(
             </div>
 
             <div class="topbar-actions">
+                {if let (Some(ch), Some(p), Some(sp), Some(z), Some(sz)) = (camera_history, pan, set_pan, zoom, set_zoom) {
+                    view! {
+                        <div class="history-controls" aria-label="Camera spatial navigation history">
+                            <button
+                                class="history-btn"
+                                title="Back in spatial camera history (Alt+Left)"
+                                aria-label="Camera back"
+                                disabled=move || !ch.get().can_back()
+                                on:click=move |_| {
+                                    apply_camera_back(ch, p, sp, z, sz);
+                                }
+                            >
+                                <IconArrowLeft size=13 />
+                                <span>"Back"</span>
+                            </button>
+                            <button
+                                class="history-btn"
+                                title="Forward in spatial camera history (Alt+Right)"
+                                aria-label="Camera forward"
+                                disabled=move || !ch.get().can_forward()
+                                on:click=move |_| {
+                                    apply_camera_forward(ch, p, sp, z, sz);
+                                }
+                            >
+                                <IconArrowRight size=13 />
+                                <span>"Forward"</span>
+                            </button>
+                        </div>
+                    }.into_any()
+                } else {
+                    ().into_any()
+                }}
+
                 <div class="history-controls" aria-label="Layout history">
                     <button
                         class="history-btn"

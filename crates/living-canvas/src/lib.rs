@@ -36,11 +36,13 @@ pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
 pub use instant::{instant_label, time_label};
+#[cfg(target_arch = "wasm32")]
+pub use layout::{apply_camera_back, apply_camera_forward};
 pub use layout::{
-    ArrangementMode, DesktopItem, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory,
-    MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, PlacementResolver, Rect,
-    SnapGuide, SnapResult, UsableViewport, pan_centring, selected_rect, selected_z,
-    visible_desktop_rect,
+    ArrangementMode, CameraHistory, CameraState, DesktopItem, DesktopItemId, DesktopLayout,
+    DesktopViewMode, LayoutHistory, MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH,
+    MinimapProjection, PlacementResolver, Rect, SnapGuide, SnapResult, UsableViewport, pan_centring,
+    selected_rect, selected_z, visible_desktop_rect,
 };
 
 /// Error returned by a typed Mind client operation.

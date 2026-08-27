@@ -3,6 +3,7 @@
 
 //! Desktop layout persistence, migration, and spatial arrangement engine.
 
+pub mod camera;
 pub mod engine;
 pub mod history;
 pub mod migration;
@@ -13,6 +14,9 @@ pub mod relations;
 pub mod selection;
 pub mod snap;
 
+pub use camera::{CameraHistory, CameraState};
+#[cfg(target_arch = "wasm32")]
+pub use camera::{apply_camera_back, apply_camera_forward};
 pub use engine::DesktopLayout;
 pub use history::LayoutHistory;
 pub use migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, PointV8, from_v8};
