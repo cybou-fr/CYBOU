@@ -108,6 +108,8 @@ pub fn Minimap(
                         };
                         let collapsed = item.presentation.collapsed;
                         let pinned = item.presentation.pinned;
+                        let is_glance = item.presentation.representation == crate::PanelRepresentation::Glance;
+                        let is_expanded = item.presentation.representation == crate::PanelRepresentation::Expanded;
                         view! {
                             <button
                                 type="button"
@@ -115,6 +117,8 @@ pub fn Minimap(
                                 class:deck=is_deck
                                 class:collapsed=collapsed
                                 class:pinned=pinned
+                                class:glance=is_glance
+                                class:expanded=is_expanded
                                 style=placement(drawn)
                                 title=label.clone()
                                 aria-label=label

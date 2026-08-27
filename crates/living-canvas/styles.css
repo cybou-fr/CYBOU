@@ -1965,3 +1965,32 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .snap-guide-line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 4; opacity: .8; }
 .snap-guide-line.vertical,
 .snap-guide-line.horizontal { shape-rendering: crispEdges; }
+
+/* --- Semantic Zoom LOD Tiers (ADR-0044) ---------------------------------------------------- */
+.canvas.lod-overview .object {
+  border-width: 2px;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.4), 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+.canvas.lod-overview .card-header .panel-kicker span {
+  font-size: 13px;
+  font-weight: 700;
+}
+.canvas.lod-glance .object {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.canvas.lod-standard .object {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+}
+.canvas.lod-detail .object {
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(99, 102, 241, 0.3);
+}
+
+/* Minimap radar representation tiers */
+.minimap-item.glance {
+  opacity: 0.85;
+  border-style: dashed;
+}
+.minimap-item.expanded {
+  border-color: #818cf8;
+  background: rgba(99, 102, 241, 0.35);
+}

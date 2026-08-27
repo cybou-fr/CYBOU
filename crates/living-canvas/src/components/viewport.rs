@@ -45,10 +45,19 @@ pub fn CanvasViewport(
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
 
+    let is_lod_overview = move || zoom.get() <= 0.35;
+    let is_lod_glance = move || zoom.get() > 0.35 && zoom.get() <= 0.75;
+    let is_lod_standard = move || zoom.get() > 0.75 && zoom.get() <= 1.25;
+    let is_lod_detail = move || zoom.get() > 1.25;
+
     view! {
         <section
             class="canvas"
             id="canvas"
+            class:lod-overview=is_lod_overview
+            class:lod-glance=is_lod_glance
+            class:lod-standard=is_lod_standard
+            class:lod-detail=is_lod_detail
             // No transform while something is focused. A `position: fixed` element inside a
             // transformed ancestor is positioned against that ancestor and scaled with it, so a
             // focused card meant to fill the window was drawn at the canvas zoom and offset by the
