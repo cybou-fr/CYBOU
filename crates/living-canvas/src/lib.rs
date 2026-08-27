@@ -39,8 +39,8 @@ pub use instant::{instant_label, time_label};
 #[cfg(target_arch = "wasm32")]
 pub use layout::{apply_camera_back, apply_camera_forward};
 pub use layout::{
-    ArrangementMode, CameraHistory, CameraState, DesktopItem, DesktopItemId, DesktopLayout,
-    DesktopViewMode, LayoutHistory, MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH,
+    ArrangementMode, CameraHistory, CameraState, DesktopCluster, DesktopItem, DesktopItemId,
+    DesktopLayout, DesktopViewMode, LayoutHistory, MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH,
     MinimapProjection, PlacementResolver, Rect, SnapGuide, SnapResult, UsableViewport, pan_centring,
     selected_rect, selected_z, visible_desktop_rect,
 };

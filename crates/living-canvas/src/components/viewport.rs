@@ -126,12 +126,12 @@ pub fn CanvasViewport(
             <svg class="snap-guides-layer" aria-hidden="true">
                 <For
                     each=move || snap_guides.get()
-                    key=|g| match g {
-                        SnapGuide::Vertical(x) => format!("v-{x}"),
-                        SnapGuide::Horizontal(y) => format!("h-{y}"),
+                    key=|guide| match guide {
+                        SnapGuide::Vertical(x) => format!("v-{}", x),
+                        SnapGuide::Horizontal(y) => format!("h-{}", y),
                     }
-                    children=move |g| {
-                        match g {
+                    children=move |guide| {
+                        match guide {
                             SnapGuide::Vertical(x) => view! {
                                 <line
                                     class="snap-guide-line vertical"
@@ -154,6 +154,43 @@ pub fn CanvasViewport(
                     }
                 />
             </svg>
+
+            <For
+                each=move || layout.get().clusters
+                key=|cluster| cluster.id.clone()
+                children=move |cluster| {
+                    let cluster_id = cluster.id.clone();
+                    let color = cluster.color.clone();
+                    let label = cluster.label.clone();
+                    let get_rect = move || {
+                        let current_layout = layout.get();
+                        current_layout
+                            .clusters
+                            .iter()
+                            .find(|c| c.id == cluster_id)
+                            .and_then(|c| current_layout.cluster_rect(c))
+                    };
+                    view! {
+                        {move || {
+                            if let Some(r) = get_rect() {
+                                let style = format!(
+                                    "left: {}px; top: {}px; width: {}px; height: {}px;",
+                                    r.x, r.y, r.width, r.height
+                                );
+                                view! {
+                                    <div class=format!("canvas-cluster theme-{}", color) style=style>
+                                        <div class="canvas-cluster-header">
+                                            <span class="canvas-cluster-title">{label.clone()}</span>
+                                        </div>
+                                    </div>
+                                }.into_any()
+                            } else {
+                                view! { <div/> }.into_any()
+                            }
+                        }}
+                    }
+                }
+            />
 
             <IdentityCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />
             <SessionCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing runtime=runtime />

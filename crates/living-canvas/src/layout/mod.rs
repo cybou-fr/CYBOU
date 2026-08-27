@@ -25,7 +25,8 @@ pub use minimap::{
     visible_desktop_rect,
 };
 pub use model::{
-    ArrangementMode, DesktopItem, DesktopItemId, DesktopViewMode, Rect, UsableViewport,
+    ArrangementMode, DesktopCluster, DesktopItem, DesktopItemId, DesktopViewMode, Rect,
+    UsableViewport,
 };
 pub use placement::PlacementResolver;
 pub use relations::{

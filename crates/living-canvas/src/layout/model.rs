@@ -160,3 +160,26 @@ pub enum DesktopViewMode {
     /// carry a `maximized` flag as well, which nothing set and nothing read.
     Focus(DesktopItemId),
 }
+
+/// Semantic spatial grouping bounding multiple Panels (ADR-0044, ADR-0045).
+///
+/// A Cluster is an open region on the Canvas grouping related panels (e.g., "Production Infrastructure",
+/// "Agent Workspaces", "Diagnosis Incident #42"). Unlike a Deck (which stacks tabs inside a single geometry),
+/// a Cluster is a spatial region that does not constrain independent panel movement or ownership.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DesktopCluster {
+    /// Unique cluster identifier.
+    pub id: String,
+    /// Human-readable label / title.
+    pub label: String,
+    /// Color theme or accent (e.g. "cyan", "purple", "amber", "emerald").
+    #[serde(default = "default_cluster_color")]
+    pub color: String,
+    /// Associated card identifiers in this cluster.
+    #[serde(default)]
+    pub card_keys: Vec<String>,
+}
+
+fn default_cluster_color() -> String {
+    "cyan".to_string()
+}

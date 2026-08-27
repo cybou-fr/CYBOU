@@ -20,6 +20,7 @@ use crate::layout::{
 
 mod arrange;
 mod cards;
+mod clusters;
 mod decks;
 mod persistence;
 
@@ -33,6 +34,9 @@ pub struct DesktopLayout {
     /// Optional decks grouping cards into tabbed presentation containers.
     #[serde(default)]
     pub decks: Vec<DeckInstance>,
+    /// Optional semantic spatial clusters grouping related panels.
+    #[serde(default)]
+    pub clusters: Vec<crate::layout::model::DesktopCluster>,
 }
 
 impl Default for DesktopLayout {
@@ -49,6 +53,7 @@ impl DesktopLayout {
             schema_version: 9,
             cards: Vec::new(),
             decks: Vec::new(),
+            clusters: Vec::new(),
         }
     }
 
