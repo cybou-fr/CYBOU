@@ -116,6 +116,71 @@ pub fn unseen_line(watched: &[WatchedProjection]) -> Option<String> {
     Some(format!("Watched but not seen: {}", unseen.join(", ")))
 }
 
+/// Five-stage self-healing lifecycle for an action proposal.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SelfHealingStage {
+    /// Stage name.
+    pub name: &'static str,
+    /// Whether this stage is currently in progress.
+    pub active: bool,
+    /// Whether this stage has completed.
+    pub completed: bool,
+}
+
+/// Compute the self-healing timeline stages from authorization and execution status.
+#[must_use]
+pub fn self_healing_timeline(verdict: &str, executed: bool, relieved: bool) -> Vec<SelfHealingStage> {
+    let decided = verdict == "granted" || verdict.contains("pre-authorized");
+    vec![
+        SelfHealingStage {
+            name: "Detected",
+            active: false,
+            completed: true,
+        },
+        SelfHealingStage {
+            name: "Decided",
+            active: !decided && !executed,
+            completed: decided || executed || relieved,
+        },
+        SelfHealingStage {
+            name: "Acting",
+            active: decided && !executed && !relieved,
+            completed: executed || relieved,
+        },
+        SelfHealingStage {
+            name: "Re-observed",
+            active: executed && !relieved,
+            completed: relieved,
+        },
+        SelfHealingStage {
+            name: "Relieved",
+            active: relieved,
+            completed: relieved,
+        },
+    ]
+}
+
+/// Explain why a reading constitutes a finding by comparing observation to baseline.
+#[must_use]
+pub fn why_explanation(observed: f64, ordinary: Option<f64>, spread: Option<f64>) -> String {
+    match (ordinary, spread) {
+        (Some(ord), Some(spr)) if ord > 0.0 => {
+            let ratio = (observed - ord) / ord * 100.0;
+            if ratio.abs() >= 1.0 {
+                format!("{ratio:+.0}% vs ordinary ({ord:.2} ± {spr:.2})")
+            } else {
+                format!("at ordinary ({ord:.2} ± {spr:.2})")
+            }
+        }
+        (Some(ord), _) if ord > 0.0 => {
+            let ratio = (observed - ord) / ord * 100.0;
+            format!("{ratio:+.0}% vs baseline ({ord:.2})")
+        }
+        (None, Some(spr)) => format!("observed {observed:.2} (spread {spr:.2})"),
+        _ => format!("observed reading: {observed:.2}"),
+    }
+}
+
 /// How long until something, in the words a person would use.
 ///
 /// Rounded hard and deliberately. A projection is an extrapolation from a slope; rendering it as

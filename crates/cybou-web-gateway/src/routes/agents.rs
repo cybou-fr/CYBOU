@@ -69,6 +69,38 @@ pub async fn agents_handler(
     }
 }
 
+/// Return operator-approved profile offers and launch readiness.
+///
+/// # Errors
+///
+/// Refuses with `401` when sign-in is required, or `503` when the runtime is unavailable.
+pub async fn agent_offers_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+) -> Result<Json<cybou_protocol::agent::AgentOffersResponse>, (StatusCode, Json<crate::state::ErrorBody>)> {
+    if !state.may_read_mind(&headers) {
+        return Err(GatewayState::sign_in_required());
+    }
+
+    match offers().await {
+        Ok(offers) => Ok(Json(offers)),
+        Err(why) => {
+            eprintln!(
+                "[cybou-web-gateway] {} offers query failed: {why}",
+                AGENT.service
+            );
+            Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(crate::state::ErrorBody {
+                    schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                    error: "agentRuntimeUnavailable",
+                    retryable: true,
+                }),
+            ))
+        }
+    }
+}
+
 /// Ask the owner to launch one profile-bounded agent session.
 ///
 /// # Errors
@@ -189,6 +221,27 @@ async fn sessions() -> Result<Vec<SessionView>, String> {
             AGENT.object_path,
             Some(AGENT.interface),
             "Sessions",
+            &(),
+        )
+        .await
+        .map_err(|error| error.to_string())?
+        .body()
+        .deserialize()
+        .map_err(|error| error.to_string())?;
+
+    cybou_fabric::decode(&encoded).map_err(|error| error.to_string())
+}
+
+/// Ask the owner what profiles and capabilities it offers.
+async fn offers() -> Result<cybou_protocol::agent::AgentOffersResponse, String> {
+    let encoded: Vec<u8> = zbus::Connection::session()
+        .await
+        .map_err(|error| error.to_string())?
+        .call_method(
+            Some(AGENT.service),
+            AGENT.object_path,
+            Some(AGENT.interface),
+            "Offers",
             &(),
         )
         .await

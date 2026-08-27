@@ -800,18 +800,17 @@ One Rust/WebAssembly frontend — Living Canvas — served to browsers and, as a
 Chromium/Wayland session. The browser is a renderer and an untrusted client: it talks only to the
 gateway and never becomes a Mind owner, D-Bus peer, or authority.
 
-Thirteen singleton system cards and dynamic tool cards. Arrangement follows a declared relationship
-graph. Every class the components render has a rule, checked by
+Fourteen singleton system cards and dynamic tool cards. Arrangement supports both the canonical **Home / Operator** view (System Insight, Agents, and Recent Activity) and the relational **Mind Explorer** view. Every class the components render has a rule, checked by
 `scripts/validate-desktop-styles.py`; interaction is exercised in real Chromium. See
 [desktop and browser gate](evidence/desktop-browser-gate.md).
 
 A stranger is served the sign-in view and nothing else where the deployment says so.
 
-The Agents card reads the canonical `SessionView` values from `Agent1` through the gateway. A local
-or authenticated seat may submit only a profile/agent/workspace/model/prompt selection; every grant
-comes from the root-owned profile catalogue and aggregate host capacity. Live rows can be stopped.
-The gateway reports success only after teardown is confirmed, and the card then shows the retained
-final reason rather than an optimistic disappearance.
+The **System Insight** card renders the 5-stage self-healing lifecycle (`Detected → Decided → Acting → Re-observed → Relieved`) and comparative baseline explanations (`Why?`), matching durable `ActionRecord` projections from `Action1`.
+
+The **Agents** card reads canonical `SessionView` values and `Agent1.Offers` from `Agent1` through the gateway. When unconfigured, it displays an actionable setup readiness banner. When configured, it offers guided profile, workspace, model class, and autonomy boundary selections, alongside live task prompt, execution phase, agent result response, and direct File Manager inspection.
+
+The **Command Palette** and **Ask CYBOU** provide instant deterministic query resolution across host findings, remediation actions, running agents, and isolation boundaries.
 
 ## Agent runtime
 

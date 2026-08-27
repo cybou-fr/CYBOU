@@ -127,6 +127,20 @@ impl Action1Service {
             .map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 
+    /// All records associated with one finding cause, newest first.
+    async fn records_for_cause(&self, cause_id: String) -> fdo::Result<Vec<u8>> {
+        let cause_id = Uuid::parse_str(&cause_id)
+            .map_err(|_| fdo::Error::InvalidArgs("invalid cause identity".to_owned()))?;
+        encode(&self.core.records_for_cause(cause_id))
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
+    /// Every retained lifecycle record held by Action1, newest first.
+    async fn recent_records(&self) -> fdo::Result<Vec<u8>> {
+        encode(&self.core.recent_records())
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
+
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
         let permit_id = Uuid::parse_str(&permit_id)
             .map_err(|_| fdo::Error::InvalidArgs("invalid permit identity".to_owned()))?;

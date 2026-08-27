@@ -107,6 +107,22 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
+    async fn agent_offers(
+        &self,
+    ) -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError> {
+        Self::get("/api/v1/agents/offers").await
+    }
+
+    async fn actions(
+        &self,
+        cause_id: Option<uuid::Uuid>,
+    ) -> Result<Vec<cybou_web_contracts::ActionRecordProjection>, ClientError> {
+        match cause_id {
+            Some(id) => Self::get(&format!("/api/v1/actions?cause={id}")).await,
+            None => Self::get("/api/v1/actions/recent").await,
+        }
+    }
+
     async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError> {
         let path = format!("/api/v1/agents/{capsule_id}");
         let response = Request::delete(&path)

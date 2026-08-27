@@ -528,6 +528,29 @@ pub struct ExecutionAttempt {
     pub ended_at: Option<OffsetDateTime>,
 }
 
+/// One proposal after Action1 has evaluated, criticized, and decided it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionRecord {
+    /// The lifecycle identity and requested operation.
+    pub proposal: ActionProposal,
+    /// Every criticism that ran.
+    pub checks: Vec<CriticismCheck>,
+    /// The policy decision.
+    pub decision: AuthorizationDecision,
+    /// Present only for a granted decision with a first-executor adapter.
+    pub permit_id: Option<Uuid>,
+    /// Durable boundary crossed before the first Body effect may begin.
+    #[serde(default)]
+    pub execution_started: Option<ExecutionStarted>,
+    /// What was carried out, once something has been.
+    #[serde(default)]
+    pub attempt: Option<ExecutionAttempt>,
+    /// What the host independently saw afterwards, once it has looked.
+    #[serde(default)]
+    pub outcome: Option<ActionOutcome>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

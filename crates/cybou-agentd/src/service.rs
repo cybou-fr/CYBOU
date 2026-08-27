@@ -82,6 +82,11 @@ pub trait Launcher: Send + Sync {
         prepared: PreparedLaunch,
         registry: Arc<Mutex<SessionRegistry>>,
     ) -> Result<(), String>;
+
+    /// Return the catalogue of operator-approved profiles and host readiness.
+    fn offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, String> {
+        Ok(cybou_protocol::agent::AgentOffersResponse::default())
+    }
 }
 
 /// What the surface needs in order to end a session on the host.
@@ -149,6 +154,23 @@ impl Agent1Service {
 impl Agent1Service {
     async fn ready(&self) -> bool {
         true
+    }
+
+    /// Return the catalogue of offered profiles and runtime readiness.
+    async fn offers(&self) -> fdo::Result<Vec<u8>> {
+        let response = match &self.launch {
+            Some((capacity, launcher)) => {
+                let mut res = launcher.offers().map_err(fdo::Error::Failed)?;
+                res.capacity_bounded = capacity.is_bounded();
+                res
+            }
+            None => cybou_protocol::agent::AgentOffersResponse {
+                profiles: Vec::new(),
+                capacity_bounded: false,
+                provider_connected: false,
+            },
+        };
+        cybou_fabric::encode(&response).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 
     /// Launch one agent under an operator-approved profile.

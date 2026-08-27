@@ -360,7 +360,7 @@ async fn bring_up(
     announce(session, plan);
 
     match &selection.prompt {
-        Some(prompt) => ask(plan, &capsule, prompt).await,
+        Some(prompt) => ask(plan, &capsule, prompt, session).await,
         None => status_of(&capsule),
     }
 }
@@ -401,7 +401,19 @@ fn agent_entrypoint(plan: &SessionPlan) -> Result<Vec<String>, String> {
 ///
 /// The deadline is what remains of the lease, not a constant. A turn cut short by a number in this
 /// file would be a second clock beside the one a person actually granted.
-async fn ask(plan: &SessionPlan, capsule: &[String], prompt: &str) -> Result<bool, String> {
+async fn ask(
+    plan: &SessionPlan,
+    capsule: &[String],
+    prompt: &str,
+    session: &mut Session,
+) -> Result<bool, String> {
+    session.set_task(cybou_protocol::agent::AgentTaskView {
+        prompt: prompt.to_owned(),
+        phase: "Running task".to_owned(),
+        result: None,
+        refused_permissions: Vec::new(),
+    });
+
     let remaining = plan.expires_at - OffsetDateTime::now_utc();
     let remaining = StdDuration::try_from(remaining)
         .map_err(|_| "the lease has no time left to ask anything in".to_owned())?;
@@ -430,6 +442,14 @@ async fn ask(plan: &SessionPlan, capsule: &[String], prompt: &str) -> Result<boo
         eprintln!("session {} refused a request to {wanted}", plan.instance);
     }
     println!("session {} turn ended: {}", plan.instance, turn.stop_reason);
+
+    session.set_task(cybou_protocol::agent::AgentTaskView {
+        prompt: prompt.to_owned(),
+        phase: format!("Completed ({})", turn.stop_reason),
+        result: Some(turn.message.clone()),
+        refused_permissions: turn.refused_permissions.clone(),
+    });
+
     Ok(turn.ended_by_the_agent())
 }
 
@@ -870,6 +890,16 @@ impl cybou_agentd::service::Launcher for HostLauncher {
         tokio::spawn(run_owned_launch(prepared, registry));
         Ok(())
     }
+
+    fn offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, String> {
+        let catalogue = fs::read(CATALOGUE)
+            .ok()
+            .and_then(|bytes| ProfileCatalogue::read(&bytes).ok())
+            .unwrap_or_default();
+        let provider_connected = fs::read("/etc/cybou/provider.env").is_ok()
+            || fs::read("/etc/cybou/litellm-master-key").is_ok();
+        Ok(catalogue.to_response(true, provider_connected))
+    }
 }
 
 /// Carry out an admitted Agent1 launch while the owner continues answering its bus surface.
@@ -880,6 +910,14 @@ async fn run_owned_launch(
 ) {
     let capsule_id = prepared.plan.lease.grant().capsule_id;
     let mut session = Session::launching(capsule_id, prepared.plan.lease.issued_at());
+    if let Some(prompt) = prepared.prompt.as_str().into() {
+        session.set_task(cybou_protocol::agent::AgentTaskView {
+            prompt: prompt.to_string(),
+            phase: "Starting".to_owned(),
+            result: None,
+            refused_permissions: Vec::new(),
+        });
+    }
     let selection = Selection {
         prompt: Some(prepared.prompt),
         ..Selection::default()
@@ -900,6 +938,14 @@ async fn run_owned_launch(
         },
     )
     .await;
+
+    if let Some(task) = session.task().cloned() {
+        if let Ok(mut held) = registry.lock()
+            && let Some(live) = held.get_mut(capsule_id)
+        {
+            live.session.set_task(task);
+        }
+    }
 
     let end = match result {
         Ok(true) => SessionEnd::AgentFinished,

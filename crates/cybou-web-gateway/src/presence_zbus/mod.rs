@@ -286,6 +286,17 @@ impl PresenceSource for ZbusPresenceSource {
         Self::insight(self).await
     }
 
+    async fn actions_for_cause(
+        &self,
+        cause_id: uuid::Uuid,
+    ) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+        Self::actions_for_cause(self, cause_id).await
+    }
+
+    async fn recent_actions(&self) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+        Self::recent_actions(self).await
+    }
+
     async fn wait_for_change(&self) -> Result<(), GatewayError> {
         self.changed
             .lock()

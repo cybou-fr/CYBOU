@@ -3,6 +3,7 @@
 
 //! HTTP route definitions and handlers for CYBOU Web Gateway.
 
+pub mod actions;
 pub mod agents;
 pub mod auth;
 pub mod disclosure;
@@ -14,7 +15,8 @@ pub mod snapshot;
 
 use axum::http::StatusCode;
 
-pub use agents::{agents_handler, launch_agent_handler, stop_agent_handler};
+pub use actions::{actions_handler, recent_actions_handler};
+pub use agents::{agent_offers_handler, agents_handler, launch_agent_handler, stop_agent_handler};
 pub use auth::{login_handler, logout_handler, session_handler};
 pub use disclosure::disclosure_handler;
 pub use events::events_handler;

@@ -108,6 +108,19 @@ pub trait PresenceSource: Send + Sync + 'static {
     async fn insight(&self) -> cybou_web_contracts::InsightProjection {
         crate::insight::unread()
     }
+
+    /// Return action records associated with one finding cause.
+    async fn actions_for_cause(
+        &self,
+        _cause_id: uuid::Uuid,
+    ) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+        Vec::new()
+    }
+
+    /// Return recent action records held by Action1.
+    async fn recent_actions(&self) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+        Vec::new()
+    }
 }
 
 /// Failure response safe to expose at the browser boundary.

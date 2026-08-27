@@ -131,6 +131,75 @@ pub struct SessionView {
     pub hosts: Vec<String>,
     /// The units a person can look up in a service manager.
     pub units: Vec<String>,
+    /// Task state, progress and result, if any prompt was supplied.
+    #[serde(default)]
+    pub task: Option<AgentTaskView>,
+}
+
+/// One model an operator approved for an agent profile.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferedModelView {
+    /// Model class (e.g. "Free", "Fast", "Strong").
+    pub class: String,
+    /// Whether this model requires zero spending.
+    pub zero_cost: bool,
+    /// Spending cap in currency units / tokens if capped.
+    pub spend_limit: Option<u64>,
+}
+
+/// One profile an operator approved on this host, as a caller may choose between them.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferedProfileView {
+    /// Unique profile identifier.
+    pub id: String,
+    /// Which agents may run under these bounds (e.g. ["opencode"]).
+    pub agents: Vec<String>,
+    /// Permitted workspace directory roots (e.g. ["/projects"]).
+    pub workspace_roots: Vec<String>,
+    /// Memory ceiling in mebibytes.
+    pub memory_mib: u32,
+    /// CPU ceiling.
+    pub cpus: u32,
+    /// Process ceiling.
+    pub tasks_max: u32,
+    /// Maximum session lifetime in seconds.
+    pub lifetime_seconds: i64,
+    /// Permitted network egress hosts.
+    pub hosts: Vec<String>,
+    /// Available model classes and spend policies.
+    pub models: Vec<OfferedModelView>,
+    /// Whether execution inside capsule is allowed.
+    pub may_execute: bool,
+}
+
+/// The catalogue of offered agent profiles and readiness of the host agent runtime.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentOffersResponse {
+    /// Operator-approved profiles.
+    pub profiles: Vec<OfferedProfileView>,
+    /// Whether the host capacity allows launches.
+    pub capacity_bounded: bool,
+    /// Whether at least one model provider is configured.
+    pub provider_connected: bool,
+}
+
+/// Current task state and execution result of an agent session.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentTaskView {
+    /// The prompt or task given to the agent.
+    pub prompt: String,
+    /// Current phase or progress description.
+    pub phase: String,
+    /// The final answer or summary produced by the agent.
+    #[serde(default)]
+    pub result: Option<String>,
+    /// Any boundary requests refused by the capsule runtime during execution.
+    #[serde(default)]
+    pub refused_permissions: Vec<String>,
 }
 
 impl SessionView {
@@ -227,6 +296,7 @@ mod tests {
             tasks_max: 512,
             hosts: vec!["github.com".to_owned()],
             units: vec!["cybou-capsule-x.service".to_owned()],
+            task: None,
         }
     }
 

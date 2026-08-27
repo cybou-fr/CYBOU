@@ -753,6 +753,118 @@ pub struct ShellExecResponse {
     pub cwd: String,
 }
 
+/// One criticism check result behind an action proposal.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CriticismCheckProjection {
+    /// Evaluation rule identifier.
+    pub rule_id: String,
+    /// Human-readable rule description.
+    pub description: String,
+    /// Whether the check passed.
+    pub passed: bool,
+    /// Diagnostic objection or note if check failed.
+    pub objection: Option<String>,
+}
+
+/// Durable boundary record before an action mutation touches the host.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionStartedProjection {
+    /// Stable execution identity.
+    pub attempt_id: Uuid,
+    /// Proposal identity.
+    pub proposal_id: Uuid,
+    /// Authorized operation name.
+    pub operation: String,
+    /// Target resource affected.
+    pub target_resource: String,
+    /// RFC 3339 start timestamp.
+    pub started_at: String,
+}
+
+/// Report from the executor following execution attempt.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionAttemptProjection {
+    /// Execution identity.
+    pub attempt_id: Uuid,
+    /// Proposal identity.
+    pub proposal_id: Uuid,
+    /// Operation name.
+    pub operation: String,
+    /// Target resource.
+    pub target_resource: String,
+    /// Status report: completed, failed, refused, did-not-finish.
+    pub report: String,
+    /// Reason if failed or refused.
+    pub reason: Option<String>,
+    /// RFC 3339 completion instant.
+    pub ended_at: Option<String>,
+}
+
+/// Observed relief and re-observation verdict after an action.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionOutcomeProjection {
+    /// Outcome identity.
+    pub outcome_id: Uuid,
+    /// Proposal identity.
+    pub proposal_id: Uuid,
+    /// Relief verdict: relieved, still-present, worse, not-established.
+    pub relief: String,
+    /// Agreement between executor claim and telemetry observation: agree, disagree, not-comparable.
+    pub agreement: String,
+    /// Disagreement detail if any.
+    pub disagreement: Option<String>,
+    /// Observed metric reading before the action.
+    pub observation_before: Option<f64>,
+    /// Observed metric reading after the action.
+    pub observation_after: Option<f64>,
+    /// RFC 3339 conclusion instant.
+    pub concluded_at: String,
+}
+
+/// One proposal after Action1 has evaluated, decided, executed, and re-observed it.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionRecordProjection {
+    /// Proposal identity.
+    pub proposal_id: Uuid,
+    /// Associated telemetry insight/cause identity, if any.
+    pub cause_id: Option<Uuid>,
+    /// Proposer description.
+    pub proposer: String,
+    /// High-level communicative intent.
+    pub intent: String,
+    /// Operation verb (e.g. "service.restart").
+    pub operation: String,
+    /// Target resource (e.g. "systemd:demo-api.service").
+    pub target_resource: String,
+    /// Risk level: low, medium, high, critical.
+    pub risk_level: String,
+    /// Whether the action is reversible.
+    pub reversible: bool,
+    /// RFC 3339 proposal instant.
+    pub proposed_at: String,
+    /// Criticism checks evaluated.
+    pub checks: Vec<CriticismCheckProjection>,
+    /// Policy authorization verdict: granted, requires-confirmation, denied.
+    pub verdict: String,
+    /// Verdict reason or explanation.
+    pub verdict_reason: Option<String>,
+    /// Durable execution started boundary, if claimed.
+    pub execution_started: Option<ExecutionStartedProjection>,
+    /// Execution attempt report, if completed.
+    pub attempt: Option<ExecutionAttemptProjection>,
+    /// Independent outcome observation, if concluded.
+    pub outcome: Option<ActionOutcomeProjection>,
+}
+
+pub use cybou_protocol::agent::{
+    AgentOffersResponse, AgentTaskView, OfferedModelView, OfferedProfileView,
+};
+
 #[cfg(test)]
 mod tests {
     use super::{

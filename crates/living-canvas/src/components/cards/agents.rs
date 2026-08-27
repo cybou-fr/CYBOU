@@ -206,6 +206,59 @@ fn session_line(
         }
     });
 
+    let task_view = session.task.as_ref().map(|task| {
+        let result_view = task.result.as_ref().map(|res| {
+            view! {
+                <details class="agent-task-result" open=true>
+                    <summary>"Result / Response"</summary>
+                    <pre class="agent-result-text">{res.clone()}</pre>
+                </details>
+            }
+        });
+        let refused_view = (!task.refused_permissions.is_empty()).then(|| {
+            view! {
+                <div class="agent-task-refused">
+                    <small class="refused-label">"Refused Permissions:"</small>
+                    {task.refused_permissions.iter().map(|p| view! { <code class="refused-item">{p.clone()}</code> }).collect_view()}
+                </div>
+            }
+        });
+        view! {
+            <div class="agent-task-block">
+                <div class="agent-task-meta">
+                    <span class="prompt-label">"Prompt:"</span>
+                    <b class="task-prompt">{task.prompt.clone()}</b>
+                    <small class="task-phase-badge">{task.phase.clone()}</small>
+                </div>
+                {result_view}
+                {refused_view}
+            </div>
+        }
+    });
+
+    let layout_ctx = use_context::<RwSignal<crate::DesktopLayout>>();
+    let inspect_btn = layout_ctx.map(|lay| {
+        view! {
+            <button
+                type="button"
+                class="agent-inspect-files"
+                title="Browse workspace in File Manager"
+                on:click=move |_| {
+                    let card = crate::CardId::FileManager(0);
+                    if !lay.get().contains_card(card) {
+                        lay.update(|l| l.open_card(card, 380.0, 320.0));
+                    } else if lay.get().presentation(card).collapsed {
+                        lay.update(|l| l.set_collapsed(card, false));
+                    }
+                    lay.update(|l| l.bring_forward(card));
+                    lay.get_untracked().save();
+                }
+            >
+                "Browse files"
+            </button>
+        }
+    });
+
     view! {
         <div class="agent-line">
             <span class="agent-head">
@@ -216,6 +269,7 @@ fn session_line(
             </span>
             <span class="agent-workspace">
                 <code>{session.workspace.clone()}</code>
+                {inspect_btn}
             </span>
             <span class="agent-grant">
                 <small class="agent-ceilings">{ceilings}</small>
@@ -235,6 +289,7 @@ fn session_line(
                     )}
             </span>
             {because.map(|because| view! { <small class="agent-because">{because}</small> })}
+            {task_view}
             <div class="agent-units">
                 {session
                     .units
@@ -251,6 +306,7 @@ fn session_line(
 pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let sessions = move || sessions_of(runtime);
     let label = move || headline(sessions().as_ref());
+    let offers = RwSignal::new(None::<cybou_protocol::agent::AgentOffersResponse>);
     let profile = RwSignal::new(String::new());
     let agent = RwSignal::new("opencode".to_owned());
     let workspace = RwSignal::new(String::new());
@@ -266,7 +322,34 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let submit_mounted = Arc::clone(&mounted);
     let refresh_mounted = Arc::clone(&mounted);
 
-    let submit = move |_| {
+    let offers_mounted = Arc::clone(&mounted);
+    Effect::new(move |_| {
+        let mounted = Arc::clone(&offers_mounted);
+        spawn_local(async move {
+            if let Ok(res) = GatewayMindClient.agent_offers().await {
+                if mounted.load(Ordering::Acquire) {
+                    if let Some(first_profile) = res.profiles.first() {
+                        if profile.get_untracked().is_empty() {
+                            profile.set(first_profile.id.clone());
+                        }
+                        if workspace.get_untracked().is_empty() {
+                            if let Some(first_ws) = first_profile.workspace_roots.first() {
+                                workspace.set(first_ws.clone());
+                            }
+                        }
+                        if model.get_untracked().is_empty() {
+                            if let Some(first_model) = first_profile.models.first() {
+                                model.set(first_model.class.clone());
+                            }
+                        }
+                    }
+                    offers.set(Some(res));
+                }
+            }
+        });
+    });
+
+    let submit = Callback::new(move |()| {
         if submitting.get_untracked() {
             return;
         }
@@ -300,11 +383,6 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                     });
                     submitting.set(false);
 
-                    // Agent1 is the owner of every later transition. Refresh while this launch is
-                    // live so `launching`, `running`, a newly observed spend, and disappearance
-                    // after teardown are never replaced by the optimistic receipt above. Bounded
-                    // to five minutes: long sessions keep their last truthful view and can be
-                    // refreshed explicitly without turning one click into permanent polling.
                     for _ in 0..300 {
                         async_sleep(1_000).await;
                         if !mounted.load(Ordering::Acquire) {
@@ -338,9 +416,9 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                 }
             }
         });
-    };
+    });
 
-    let refresh = move |_| {
+    let refresh = Callback::new(move |()| {
         let mounted = Arc::clone(&refresh_mounted);
         launch_error.set(None);
         spawn_local(async move {
@@ -360,7 +438,7 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                 }
             }
         });
-    };
+    });
     let list_mounted = Arc::clone(&mounted);
 
     view! {
@@ -368,43 +446,148 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
             <div class="agents-headline">
                 <b>{label}</b>
             </div>
-            <div class="agent-launch-form">
-                <input
-                    aria-label="Profile"
-                    placeholder="Profile"
-                    prop:value=move || profile.get()
-                    on:input=move |event| profile.set(event_target_value(&event))
-                />
-                <input
-                    aria-label="Agent"
-                    placeholder="Agent"
-                    prop:value=move || agent.get()
-                    on:input=move |event| agent.set(event_target_value(&event))
-                />
-                <input
-                    aria-label="Workspace"
-                    placeholder="Workspace"
-                    prop:value=move || workspace.get()
-                    on:input=move |event| workspace.set(event_target_value(&event))
-                />
-                <input
-                    aria-label="Model class"
-                    placeholder="Model class"
-                    prop:value=move || model.get()
-                    on:input=move |event| model.set(event_target_value(&event))
-                />
-                <textarea
-                    aria-label="Initial prompt"
-                    placeholder="What should the agent do?"
-                    prop:value=move || prompt.get()
-                    on:input=move |event| prompt.set(event_target_value(&event))
-                />
-                <button type="button" on:click=submit disabled=move || submitting.get()>
-                    {move || if submitting.get() { "Launching…" } else { "Launch agent" }}
-                </button>
-                <button type="button" on:click=refresh>"Refresh sessions"</button>
-                {move || launch_error.get().map(|error| view! { <small class="agent-launch-error">{error}</small> })}
-            </div>
+
+            {move || {
+                let off = offers.get();
+                match off {
+                    Some(ref o) if o.profiles.is_empty() => view! {
+                        <div class="agent-setup-required">
+                            <b>"Setup Required"</b>
+                            <p>"No agent profiles configured. Place an operator profile in <code>/etc/cybou/agent-profiles.json</code>."</p>
+                        </div>
+                    }.into_any(),
+                    Some(ref o) => {
+                        let selected_profile = o.profiles.iter().find(|p| p.id == profile.get()).or_else(|| o.profiles.first());
+                        let available_workspaces = selected_profile.map(|p| p.workspace_roots.clone()).unwrap_or_default();
+                        let available_models = selected_profile.map(|p| p.models.clone()).unwrap_or_default();
+                        let may_exec = selected_profile.map(|p| p.may_execute).unwrap_or(false);
+
+                        view! {
+                            <div class="agent-launch-form">
+                                <div class="agent-selector-row">
+                                    <div class="agent-tile selected">
+                                        <b>"OpenCode"</b>
+                                        <small>"Sandboxed ACP coding agent"</small>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <label>"Profile:"</label>
+                                    <select
+                                        prop:value=move || profile.get()
+                                        on:change=move |event| {
+                                            let val = event_target_value(&event);
+                                            profile.set(val.clone());
+                                            if let Some(ref o) = offers.get_untracked() {
+                                                if let Some(p) = o.profiles.iter().find(|pr| pr.id == val) {
+                                                    if let Some(ws) = p.workspace_roots.first() {
+                                                        workspace.set(ws.clone());
+                                                    }
+                                                    if let Some(m) = p.models.first() {
+                                                        model.set(m.class.clone());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    >
+                                        {o.profiles.iter().map(|p| {
+                                            let id = p.id.clone();
+                                            view! { <option value=id.clone()>{id.clone()}</option> }
+                                        }).collect_view()}
+                                    </select>
+                                </div>
+
+                                <div class="form-row">
+                                    <label>"Workspace:"</label>
+                                    {if available_workspaces.len() <= 1 {
+                                        view! {
+                                            <input
+                                                aria-label="Workspace"
+                                                placeholder="/srv/workspace"
+                                                prop:value=move || workspace.get()
+                                                on:input=move |event| workspace.set(event_target_value(&event))
+                                            />
+                                        }.into_any()
+                                    } else {
+                                        view! {
+                                            <select
+                                                prop:value=move || workspace.get()
+                                                on:change=move |event| workspace.set(event_target_value(&event))
+                                            >
+                                                {available_workspaces.into_iter().map(|w| {
+                                                    view! { <option value=w.clone()>{w.clone()}</option> }
+                                                }).collect_view()}
+                                            </select>
+                                        }.into_any()
+                                    }}
+                                </div>
+
+                                <div class="form-row model-row">
+                                    <label>"Model:"</label>
+                                    <div class="model-pills">
+                                        {available_models.into_iter().map(|m| {
+                                            let class = m.class.clone();
+                                            let class_click = m.class.clone();
+                                            let is_selected = move || model.get() == class;
+                                            let cost_label = if m.zero_cost { "zero-cost" } else { "metered" };
+                                            view! {
+                                                <button
+                                                    type="button"
+                                                    class=move || format!("model-pill {}", if is_selected() { "selected" } else { "" })
+                                                    on:click=move |_| model.set(class_click.clone())
+                                                >
+                                                    <b>{m.class}</b>
+                                                    <small>{cost_label}</small>
+                                                </button>
+                                            }
+                                        }).collect_view()}
+                                    </div>
+                                </div>
+
+                                <div class="autonomy-badges">
+                                    <span class="badge">
+                                        {format!("Command execution: {}", if may_exec { "Allowed" } else { "Restricted" })}
+                                    </span>
+                                </div>
+
+                                <textarea
+                                    aria-label="Initial prompt"
+                                    placeholder="What should the agent do in this workspace?"
+                                    prop:value=move || prompt.get()
+                                    on:input=move |event| prompt.set(event_target_value(&event))
+                                />
+                                <button type="button" class="launch-button" on:click=move |_| submit.run(()) disabled=move || submitting.get()>
+                                    {move || if submitting.get() { "Launching…" } else { "Launch Agent" }}
+                                </button>
+                                <button type="button" class="refresh-button" on:click=move |_| refresh.run(())>"Refresh"</button>
+                                {move || launch_error.get().map(|error| view! { <small class="agent-launch-error">{error}</small> })}
+                            </div>
+                        }.into_any()
+                    }
+                    None => view! {
+                        <div class="agent-launch-form">
+                            <input
+                                aria-label="Profile"
+                                placeholder="Profile"
+                                prop:value=move || profile.get()
+                                on:input=move |event| profile.set(event_target_value(&event))
+                            />
+                            <textarea
+                                aria-label="Initial prompt"
+                                placeholder="What should the agent do?"
+                                prop:value=move || prompt.get()
+                                on:input=move |event| prompt.set(event_target_value(&event))
+                            />
+                            <button type="button" on:click=move |_| submit.run(()) disabled=move || submitting.get()>
+                                {move || if submitting.get() { "Launching…" } else { "Launch agent" }}
+                            </button>
+                            <button type="button" on:click=move |_| refresh.run(())>"Refresh"</button>
+                            {move || launch_error.get().map(|error| view! { <small class="agent-launch-error">{error}</small> })}
+                        </div>
+                    }.into_any()
+                }
+            }}
+
             <div class="agent-list">
                 {move || {
                     let mounted = Arc::clone(&list_mounted);
@@ -436,6 +619,7 @@ pub fn AgentsCard(
     resizing: RwSignal<Option<ResizeState>>,
     runtime: RwSignal<RuntimeState>,
 ) -> impl IntoView {
+    provide_context(layout);
     let collapsed = move || {
         let sessions = sessions_of(runtime);
         let label = headline(sessions.as_ref());

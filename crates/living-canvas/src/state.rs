@@ -168,7 +168,205 @@ pub fn first_command_match(query: &str) -> Option<&'static str> {
         ("perception", "perception host observation"),
         ("context", "context association concepts context1"),
         ("shell", "shell terminal body capability"),
+        ("insight", "insight telemetry machine health findings status"),
+        ("agents", "agents agent1 launch opencode task"),
     ]
     .into_iter()
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))
+}
+
+/// Deterministic Ask CYBOU answer structure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AskCybouAnswer {
+    /// Short high-level answer headline.
+    pub headline: String,
+    /// Detailed factual response.
+    pub detail: String,
+    /// Optional button / panel link label and target CardId.
+    pub target: Option<(&'static str, crate::CardId)>,
+}
+
+/// Deterministically answer operator questions about host health, actions, and agents.
+#[must_use]
+pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
+    let q = query.trim().to_ascii_lowercase();
+    if q.is_empty() || q.len() < 3 {
+        return None;
+    }
+
+    // Health / What is wrong? / Status
+    if q.contains("wrong")
+        || q.contains("problem")
+        || q.contains("issue")
+        || q.contains("status")
+        || q.contains("health")
+        || q.contains("сервер")
+        || q.contains("что с")
+        || q.contains("проблем")
+    {
+        return match state {
+            RuntimeState::Ready {
+                insight: Some(insight),
+                ..
+            } => {
+                let finding_count = insight.findings.len();
+                if finding_count > 0 {
+                    let first_finding = &insight.findings[0];
+                    let target_name = first_finding
+                        .about
+                        .as_deref()
+                        .unwrap_or(first_finding.finding.as_str());
+                    Some(AskCybouAnswer {
+                        headline: format!("{finding_count} issue(s) detected"),
+                        detail: format!(
+                            "{target_name}: {}. CYBOU self-healing is monitoring or remediating.",
+                            first_finding.means
+                        ),
+                        target: Some(("View in System Insight", crate::CardId::Insight)),
+                    })
+                } else {
+                    Some(AskCybouAnswer {
+                        headline: "Everything is healthy".to_string(),
+                        detail: "All watched metrics, services, and system capabilities are operating within normal baseline limits.".to_string(),
+                        target: Some(("Open System Insight", crate::CardId::Insight)),
+                    })
+                }
+            }
+            RuntimeState::Ready { .. } => Some(AskCybouAnswer {
+                headline: "System telemetry is active".to_string(),
+                detail: "Mind is watching host observations and capabilities.".to_string(),
+                target: Some(("Open System Insight", crate::CardId::Insight)),
+            }),
+            _ => None,
+        };
+    }
+
+    // What did you fix? / Remediation / Actions
+    if q.contains("fix")
+        || q.contains("repar")
+        || q.contains("remediat")
+        || q.contains("action")
+        || q.contains("исправ")
+        || q.contains("почин")
+        || q.contains("сделал")
+    {
+        return match state {
+            RuntimeState::Ready {
+                insight: Some(insight),
+                ..
+            } => {
+                if let Some(first_finding) = insight.findings.first() {
+                    let target_name = first_finding
+                        .about
+                        .as_deref()
+                        .unwrap_or(first_finding.finding.as_str());
+                    if let Some(ref offer) = first_finding.offers.first() {
+                        Some(AskCybouAnswer {
+                            headline: "Remediation Active".to_string(),
+                            detail: format!(
+                                "Remedy: {} for {} (policy verdict: {})",
+                                offer.operation, target_name, offer.verdict
+                            ),
+                            target: Some(("View System Insight", crate::CardId::Insight)),
+                        })
+                    } else {
+                        Some(AskCybouAnswer {
+                            headline: "No pending remediation needed".to_string(),
+                            detail: "No active self-healing action required for current findings."
+                                .to_string(),
+                            target: Some(("View System Insight", crate::CardId::Insight)),
+                        })
+                    }
+                } else {
+                    Some(AskCybouAnswer {
+                        headline: "All systems operating normally".to_string(),
+                        detail: "Standing remediation policies are armed and ready to execute upon detection."
+                            .to_string(),
+                        target: Some(("View System Insight", crate::CardId::Insight)),
+                    })
+                }
+            }
+            _ => None,
+        };
+    }
+
+    // Agents / Tasks / Running
+    if q.contains("agent")
+        || q.contains("opencode")
+        || q.contains("task")
+        || q.contains("running")
+        || q.contains("агент")
+        || q.contains("задач")
+        || q.contains("работает")
+    {
+        return match state {
+            RuntimeState::Ready {
+                agents: Some(sessions),
+                ..
+            } => {
+                let live: Vec<_> = sessions.iter().filter(|s| s.is_live()).collect();
+                if !live.is_empty() {
+                    let first = &live[0];
+                    let task_desc = first
+                        .task
+                        .as_ref()
+                        .map_or("unspecified task", |t| t.prompt.as_str());
+                    let spend_desc = match first.spend {
+                        Some(cybou_protocol::agent::SpendView::Capped {
+                            limit,
+                            spent: Some(spent),
+                        }) => format!("{spent} / {limit} units"),
+                        Some(cybou_protocol::agent::SpendView::Capped { limit, .. }) => {
+                            format!("limit {limit}")
+                        }
+                        Some(cybou_protocol::agent::SpendView::ZeroCost { .. }) => {
+                            "zero-cost".to_string()
+                        }
+                        None => "unmetered".to_string(),
+                    };
+                    Some(AskCybouAnswer {
+                        headline: format!("{} agent session(s) active", live.len()),
+                        detail: format!(
+                            "{} running in {} (\"{task_desc}\"). Spend: {spend_desc}.",
+                            first.agent,
+                            first.workspace
+                        ),
+                        target: Some(("Open Agents", crate::CardId::Agents)),
+                    })
+                } else {
+                    Some(AskCybouAnswer {
+                        headline: "No agents currently running".to_string(),
+                        detail:
+                            "Agent runtime is idle. Ready to launch sandboxed OpenCode agents."
+                                .to_string(),
+                        target: Some(("Launch Agent", crate::CardId::Agents)),
+                    })
+                }
+            }
+            RuntimeState::Ready { .. } => Some(AskCybouAnswer {
+                headline: "Agent runtime ready".to_string(),
+                detail: "Sandboxed capsules with bounded memory, CPU, and network reaches."
+                    .to_string(),
+                target: Some(("Open Agents", crate::CardId::Agents)),
+            }),
+            _ => None,
+        };
+    }
+
+    // Reach / Security / Boundary
+    if q.contains("reach")
+        || q.contains("network")
+        || q.contains("bound")
+        || q.contains("secur")
+        || q.contains("доступ")
+        || q.contains("границ")
+    {
+        return Some(AskCybouAnswer {
+            headline: "Strict Capsule Isolation".to_string(),
+            detail: "Agents operate inside Linux namespaces with cgroups ceilings and egress firewall whitelists. No agent can escape its bounded capsule.".to_string(),
+            target: Some(("Inspect Agents", crate::CardId::Agents)),
+        });
+    }
+
+    None
 }

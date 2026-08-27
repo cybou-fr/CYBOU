@@ -122,6 +122,23 @@ pub trait MindClient {
         request: &cybou_protocol::agent::LaunchRequest,
     ) -> Result<cybou_protocol::agent::SessionView, ClientError>;
 
+    /// Return operator-approved profile offers and launch readiness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError::GatewayRequest`] when Agent1 is unavailable.
+    async fn agent_offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError>;
+
+    /// Return action records matching the optional cause query.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError::GatewayRequest`] when Action1 is unavailable.
+    async fn actions(
+        &self,
+        cause_id: Option<uuid::Uuid>,
+    ) -> Result<Vec<cybou_web_contracts::ActionRecordProjection>, ClientError>;
+
     /// Ask the agent runtime owner to end one session and confirm its teardown.
     ///
     /// # Errors
@@ -176,6 +193,8 @@ pub struct MockMindClient {
     disclosure: Option<DisclosureProjection>,
     insight: Option<cybou_web_contracts::InsightProjection>,
     agents: Option<Vec<cybou_protocol::agent::SessionView>>,
+    agent_offers: Option<cybou_protocol::agent::AgentOffersResponse>,
+    actions: Option<Vec<cybou_web_contracts::ActionRecordProjection>>,
 }
 
 impl MockMindClient {
@@ -189,6 +208,8 @@ impl MockMindClient {
             disclosure: None,
             insight: None,
             agents: None,
+            agent_offers: None,
+            actions: None,
         }
     }
 
@@ -230,6 +251,26 @@ impl MockMindClient {
         self
     }
 
+    /// Attach agent offers to a mock client.
+    #[must_use]
+    pub fn with_agent_offers(
+        mut self,
+        offers: cybou_protocol::agent::AgentOffersResponse,
+    ) -> Self {
+        self.agent_offers = Some(offers);
+        self
+    }
+
+    /// Attach action records to a mock client.
+    #[must_use]
+    pub fn with_actions(
+        mut self,
+        actions: Vec<cybou_web_contracts::ActionRecordProjection>,
+    ) -> Self {
+        self.actions = Some(actions);
+        self
+    }
+
     /// Load the repository's nominal W0 fixture pair.
     ///
     /// # Errors
@@ -246,7 +287,36 @@ impl MockMindClient {
         .map_err(|error| ClientError::InvalidFixture(error.to_string()))?;
         let mind = serde_json::from_str(include_str!("../../../fixtures/web/v1/mind-nominal.json"))
             .map_err(|error| ClientError::InvalidFixture(error.to_string()))?;
-        Ok(Self::new(session, snapshot).with_mind(mind))
+        let offers = cybou_protocol::agent::AgentOffersResponse {
+            profiles: vec![cybou_protocol::agent::OfferedProfileView {
+                id: "sandboxed-autonomous".to_owned(),
+                agents: vec!["opencode".to_owned()],
+                workspace_roots: vec!["/srv/workspace".to_owned()],
+                memory_mib: 4096,
+                cpus: 2,
+                tasks_max: 64,
+                lifetime_seconds: 14400,
+                hosts: vec!["github.com".to_owned(), "registry.npmjs.org".to_owned()],
+                models: vec![
+                    cybou_protocol::agent::OfferedModelView {
+                        class: "Strong".to_owned(),
+                        zero_cost: false,
+                        spend_limit: Some(100),
+                    },
+                    cybou_protocol::agent::OfferedModelView {
+                        class: "Fast".to_owned(),
+                        zero_cost: true,
+                        spend_limit: None,
+                    },
+                ],
+                may_execute: true,
+            }],
+            capacity_bounded: true,
+            provider_connected: true,
+        };
+        Ok(Self::new(session, snapshot)
+            .with_mind(mind)
+            .with_agent_offers(offers))
     }
 }
 
@@ -297,6 +367,17 @@ impl MindClient for MockMindClient {
         Err(ClientError::GatewayRequest(
             "mock client launches no agent sessions".into(),
         ))
+    }
+
+    async fn agent_offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError> {
+        Ok(self.agent_offers.clone().unwrap_or_default())
+    }
+
+    async fn actions(
+        &self,
+        _cause_id: Option<uuid::Uuid>,
+    ) -> Result<Vec<cybou_web_contracts::ActionRecordProjection>, ClientError> {
+        Ok(self.actions.clone().unwrap_or_default())
     }
 
     async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError> {

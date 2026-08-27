@@ -155,6 +155,7 @@ pub fn of(session: &Session, plan: &SessionPlan, ledger: Ledger) -> SessionView 
         tasks_max: grant.budget.tasks_max,
         hosts: grant.network.hosts.clone(),
         units: units(plan),
+        task: session.task().cloned(),
     }
 }
 

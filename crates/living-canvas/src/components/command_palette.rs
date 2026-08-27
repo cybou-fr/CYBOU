@@ -32,6 +32,8 @@ pub fn CommandPalette(
     command_input: NodeRef<leptos::html::Input>,
     set_zoom: WriteSignal<f64>,
     set_pan: WriteSignal<(f64, f64)>,
+    #[prop(default = RwSignal::new(crate::state::RuntimeState::Loading))]
+    runtime: RwSignal<crate::state::RuntimeState>,
 ) -> impl IntoView {
     let select_from_command = move |panel: &'static str| {
         // A named panel is always a system card, and a system card is a singleton, so its key
@@ -41,10 +43,56 @@ pub fn CommandPalette(
         set_command_query.set(String::new());
     };
 
+    let ask_answer = move || crate::state::ask_cybou(&command_query.get(), &runtime.get());
+
     view! {
         <section class="command-palette" aria-label="Action launcher">
             <Show when=move || command_open.get()>
                 <nav class="command-menu" aria-label="Command palette actions">
+                    {move || {
+                        ask_answer().map(|ans| {
+                            let target_click = ans.target;
+                            view! {
+                                <div class="ask-cybou-card">
+                                    <div class="ask-cybou-header">
+                                        <Sparkles size=14 />
+                                        <b>"Ask CYBOU"</b>
+                                        <span class="ask-cybou-headline">{ans.headline}</span>
+                                    </div>
+                                    <p class="ask-cybou-detail">{ans.detail}</p>
+                                    {target_click.map(|(label, card)| {
+                                        view! {
+                                            <button
+                                                type="button"
+                                                class="ask-cybou-action-btn"
+                                                on:click=move |_| {
+                                                    set_selected.set(Some(DesktopItemId::Card(card)));
+                                                    if !layout.get().contains_card(card) {
+                                                        layout.update(|l| l.open_card(card, 380.0, 480.0));
+                                                    } else if layout.get().presentation(card).collapsed {
+                                                        layout.update(|l| l.set_collapsed(card, false));
+                                                    }
+                                                    layout.update(|l| l.bring_forward(card));
+                                                    set_command_open.set(false);
+                                                    set_command_query.set(String::new());
+                                                }
+                                            >
+                                                {label}
+                                            </button>
+                                        }
+                                    })}
+                                </div>
+                            }
+                        })
+                    }}
+                    <button
+                        class:hidden=move || !command_matches(&command_query.get(), "insight telemetry machine health findings why status")
+                        on:click=move |_| select_from_command("insight")
+                    ><Sparkles size=15 /><span><b>"Open System Insight"</b><i>"Telemetry1 host health & self-healing"</i></span></button>
+                    <button
+                        class:hidden=move || !command_matches(&command_query.get(), "agents agent1 launch opencode task autonomous")
+                        on:click=move |_| select_from_command("agents")
+                    ><ListChecks size=15 /><span><b>"Open Agents"</b><i>"Agent1 bounded capsule runtime"</i></span></button>
                     <button
                         class:hidden=move || !command_matches(&command_query.get(), "capabilities health dependencies")
                         on:click=move |_| select_from_command("capabilities")
@@ -291,6 +339,12 @@ pub fn CommandPalette(
                                 layout.get_untracked().save();
                                 set_command_open.set(false);
                                 set_command_query.set(String::new());
+                            } else if command_matches(&q, "insight") || command_matches(&q, "status") || command_matches(&q, "health") || command_matches(&q, "why") {
+                                event.prevent_default();
+                                select_from_command("insight");
+                            } else if command_matches(&q, "agents") || command_matches(&q, "launch") || command_matches(&q, "opencode") {
+                                event.prevent_default();
+                                select_from_command("agents");
                             }
                         } else if event.key() == "Escape" {
                             set_command_open.set(false);

@@ -106,6 +106,7 @@ pub struct Session {
     state: SessionState,
     started_at: OffsetDateTime,
     ended_at: Option<OffsetDateTime>,
+    task: Option<cybou_protocol::agent::AgentTaskView>,
 }
 
 impl Session {
@@ -117,7 +118,19 @@ impl Session {
             state: SessionState::Launching,
             started_at: at,
             ended_at: None,
+            task: None,
         }
+    }
+
+    /// Set the current agent task state.
+    pub fn set_task(&mut self, task: cybou_protocol::agent::AgentTaskView) {
+        self.task = Some(task);
+    }
+
+    /// The current agent task state, if one was provided.
+    #[must_use]
+    pub const fn task(&self) -> Option<&cybou_protocol::agent::AgentTaskView> {
+        self.task.as_ref()
     }
 
     /// Which capsule this session is.

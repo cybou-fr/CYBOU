@@ -325,6 +325,7 @@ pub fn App() -> impl IntoView {
                 command_input=command_input
                 set_zoom=set_zoom
                 set_pan=set_pan
+                runtime=runtime
             />
 
             <AuthModal open=auth_modal_open />

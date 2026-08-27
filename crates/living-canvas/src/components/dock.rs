@@ -9,8 +9,8 @@ use wasm_bindgen::{JsCast, closure::Closure};
 
 use crate::instant_label;
 use crate::{
-    CardId, DesktopItemId, DesktopLayout,
-    components::icons::{IconFile, IconFolder, IconShield, IconTerminal},
+    ArrangementMode, CardId, DesktopItemId, DesktopLayout,
+    components::icons::{IconFolder, IconHome, IconLayers, IconShield, IconTerminal},
     state::RuntimeState,
 };
 
@@ -95,17 +95,55 @@ pub fn DesktopDock(
     view! {
         <footer class="desktop-dock" aria-label="Desktop Card Shelf and Taskbar">
             <div class="dock-apps">
-                <button class="dock-item" class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "shell")) title="Shell" on:click=move |_| open_or_focus(CardId::Shell(0), 400.0, 160.0)>
-                    <IconTerminal size=18 />
-                    <span class="dock-tooltip">"Shell"</span>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "insight"))
+                    title="Home / System Overview"
+                    on:click=move |_| {
+                        layout.update(|l| l.apply_arrangement(ArrangementMode::Home, None));
+                        open_or_focus(CardId::Insight, 380.0, 480.0);
+                    }
+                >
+                    <IconHome size=18 />
+                    <span class="dock-tooltip">"Home"</span>
                 </button>
-                <button class="dock-item" class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "files")) title="File Manager" on:click=move |_| open_or_focus(CardId::FileManager(0), 380.0, 120.0)>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "agents"))
+                    title="Agents"
+                    on:click=move |_| open_or_focus(CardId::Agents, 460.0, 480.0)
+                >
+                    <lucide_leptos::UsersRound size=18 />
+                    <span class="dock-tooltip">"Agents"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "files"))
+                    title="File Manager"
+                    on:click=move |_| open_or_focus(CardId::FileManager(0), 380.0, 320.0)
+                >
                     <IconFolder size=18 />
                     <span class="dock-tooltip">"Files"</span>
                 </button>
-                <button class="dock-item" class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "journal-feed")) title="Event Stream" on:click=move |_| open_or_focus(CardId::JournalFeed(0), 420.0, 150.0)>
-                    <IconFile size=18 />
-                    <span class="dock-tooltip">"Events"</span>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "shell"))
+                    title="Shell"
+                    on:click=move |_| open_or_focus(CardId::Shell(0), 400.0, 240.0)
+                >
+                    <IconTerminal size=18 />
+                    <span class="dock-tooltip">"Shell"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    title="Mind Explorer"
+                    on:click=move |_| {
+                        layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, None));
+                        open_or_focus(CardId::Context, 380.0, 360.0);
+                    }
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Mind"</span>
                 </button>
             </div>
 

@@ -145,7 +145,6 @@ pub fn InsightContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                 <summary>"What it would say"</summary>
                 <pre>{said}</pre>
             </details>
-            <span class="panel-link">"Nothing here can be carried out"</span>
         </div>
     }
 }
@@ -174,37 +173,60 @@ fn FindingRow(finding: FindingProjection) -> impl IntoView {
                         // The observation beside what is ordinary for this host. A number without
                         // its baseline is a number a reader has to take on faith.
                         let baseline = crate::heading::baseline_line(&reading);
+                        let why = crate::heading::why_explanation(reading.observed, reading.ordinary, reading.spread);
                         view! {
-                            <span class="reading-line">
-                                <code>{reading.subject}</code>
-                                <b>{format!("{:.2}", reading.observed)}</b>
-                                <small>{baseline}</small>
-                            </span>
+                            <div class="reading-block">
+                                <span class="reading-line">
+                                    <code>{reading.subject}</code>
+                                    <b>{format!("{:.2}", reading.observed)}</b>
+                                    <small>{baseline}</small>
+                                </span>
+                                <small class="reading-why">{why}</small>
+                            </div>
                         }
                     })
                     .collect_view()}
             </div>
 
             <Show when=move || has_offers>
-                <span class="offer-label">"Could offer"</span>
+                <span class="offer-label">"Self-Healing Actions"</span>
             </Show>
             <div class="offer-list">
                 {offers
                     .into_iter()
                     .map(|offer| {
                         let undo = if offer.reversible { "reversible" } else { "cannot be undone" };
-                        // What it would act on. Absent rather than drawn as `systemd:<unit>`, which
-                        // reads as a badly formatted unit name rather than as this host saying it
-                        // does not know which unit it means.
                         let target = crate::heading::offer_target(&offer);
+                        let timeline = crate::heading::self_healing_timeline(&offer.verdict, false, false);
                         view! {
-                            <span class="offer-line">
-                                <code>{offer.operation}</code>
-                                <small class="offer-target">{target}</small>
-                                <small class="offer-risk">{offer.risk}</small>
-                                <small class="offer-undo">{undo}</small>
-                                <small class="offer-verdict">{verdict_text(&offer.verdict)}</small>
-                            </span>
+                            <div class="offer-item">
+                                <span class="offer-line">
+                                    <code>{offer.operation}</code>
+                                    <small class="offer-target">{target}</small>
+                                    <small class="offer-risk">{offer.risk}</small>
+                                    <small class="offer-undo">{undo}</small>
+                                    <small class="offer-verdict">{verdict_text(&offer.verdict)}</small>
+                                </span>
+                                <div class="self-healing-timeline">
+                                    {timeline
+                                        .into_iter()
+                                        .map(|stage| {
+                                            let class = if stage.completed {
+                                                "stage-completed"
+                                            } else if stage.active {
+                                                "stage-active"
+                                            } else {
+                                                "stage-pending"
+                                            };
+                                            view! {
+                                                <span class=format!("timeline-stage {class}")>
+                                                    {stage.name}
+                                                </span>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </div>
+                            </div>
                         }
                     })
                     .collect_view()}

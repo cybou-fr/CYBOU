@@ -13,7 +13,6 @@ use cybou_protocol::{
     telemetry::SystemInsight,
 };
 use cybou_remediation::{Operation, StandingPolicy, authorize, criticise, propose};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -26,36 +25,7 @@ pub mod service;
 /// How long an authorization remains a claimable capability.
 const PERMIT_LIFETIME: Duration = Duration::seconds(60);
 
-/// One proposal after Action1 has criticised and decided it.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ActionRecord {
-    /// The lifecycle identity and requested operation.
-    pub proposal: ActionProposal,
-    /// Every criticism that ran.
-    pub checks: Vec<CriticismCheck>,
-    /// The policy decision.
-    pub decision: AuthorizationDecision,
-    /// Present only for a granted decision with a first-executor adapter.
-    pub permit_id: Option<Uuid>,
-    /// Durable boundary crossed before the first Body effect may begin.
-    #[serde(default)]
-    pub execution_started: Option<ExecutionStarted>,
-    /// What was carried out, once something has been.
-    ///
-    /// Absent is a real answer and a common one: a decision nobody acted on is a decision nobody
-    /// acted on, and filling this in with an attempt that did not happen would answer *was it done*
-    /// with a guess.
-    #[serde(default)]
-    pub attempt: Option<ExecutionAttempt>,
-    /// What the host independently saw afterwards, once it has looked.
-    ///
-    /// Separate from the attempt on purpose. What a thing says about itself and what the readings
-    /// say afterwards are two accounts, and the whole value of re-observation is that they can
-    /// disagree — folding them together would delete the disagreement.
-    #[serde(default)]
-    pub outcome: Option<ActionOutcome>,
-}
+pub use cybou_protocol::action::ActionRecord;
 
 /// A refusal at the action boundary.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -316,6 +286,37 @@ impl ActionCore {
             })
             .cloned()
             .map(recover_interrupted)
+    }
+
+    /// All retained records for one cause finding, sorted newest first.
+    #[must_use]
+    pub fn records_for_cause(&self, cause_id: Uuid) -> Vec<ActionRecord> {
+        let Ok(records) = self.records.lock() else {
+            return Vec::new();
+        };
+        let mut list: Vec<ActionRecord> = records
+            .values()
+            .filter(|record| record.proposal.cause_id == Some(cause_id))
+            .cloned()
+            .map(recover_interrupted)
+            .collect();
+        list.sort_by(|a, b| b.proposal.proposed_at.cmp(&a.proposal.proposed_at));
+        list
+    }
+
+    /// Every retained lifecycle record, newest first.
+    #[must_use]
+    pub fn recent_records(&self) -> Vec<ActionRecord> {
+        let Ok(records) = self.records.lock() else {
+            return Vec::new();
+        };
+        let mut list: Vec<ActionRecord> = records
+            .values()
+            .cloned()
+            .map(recover_interrupted)
+            .collect();
+        list.sort_by(|a, b| b.proposal.proposed_at.cmp(&a.proposal.proposed_at));
+        list
     }
 
     /// Seed this owner with lifecycle records read back from the Journal.

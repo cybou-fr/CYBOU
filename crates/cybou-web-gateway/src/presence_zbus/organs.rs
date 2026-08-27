@@ -421,4 +421,144 @@ impl ZbusPresenceSource {
             },
         }
     }
+
+    /// All lifecycle records associated with one finding cause.
+    pub(super) async fn actions_for_cause(
+        &self,
+        cause_id: uuid::Uuid,
+    ) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+        let Some(encoded) = self
+            .read_with::<Vec<u8>, (String,)>(
+                cybou_fabric::ACTION,
+                "RecordsForCause",
+                &(cause_id.to_string(),),
+            )
+            .await
+        else {
+            return Vec::new();
+        };
+        let Ok(records) = ciborium::from_reader::<Vec<cybou_protocol::action::ActionRecord>, _>(
+            encoded.as_slice(),
+        ) else {
+            return Vec::new();
+        };
+        records.iter().map(project_action_record).collect()
+    }
+
+    /// Recent lifecycle records held by Action1.
+    pub(super) async fn recent_actions(&self) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+        let Some(encoded) = self
+            .read::<Vec<u8>>(cybou_fabric::ACTION, "RecentRecords")
+            .await
+        else {
+            return Vec::new();
+        };
+        let Ok(records) = ciborium::from_reader::<Vec<cybou_protocol::action::ActionRecord>, _>(
+            encoded.as_slice(),
+        ) else {
+            return Vec::new();
+        };
+        records.iter().map(project_action_record).collect()
+    }
+}
+
+/// Project one ActionRecord into its web contract representation.
+#[must_use]
+pub fn project_action_record(
+    record: &cybou_protocol::action::ActionRecord,
+) -> cybou_web_contracts::ActionRecordProjection {
+    use cybou_protocol::action::{
+        Agreement, AttemptReport, AuthorizationVerdict, RiskLevel,
+    };
+    use time::format_description::well_known::Rfc3339;
+
+    cybou_web_contracts::ActionRecordProjection {
+        proposal_id: record.proposal.proposal_id,
+        cause_id: record.proposal.cause_id,
+        proposer: record.proposal.proposed_by.describe(),
+        intent: record.proposal.intent.clone(),
+        operation: record.proposal.operation.clone(),
+        target_resource: record.proposal.target_resource.clone(),
+        risk_level: match record.proposal.risk_level {
+            RiskLevel::Low => "low".to_owned(),
+            RiskLevel::Medium => "medium".to_owned(),
+            RiskLevel::High => "high".to_owned(),
+            RiskLevel::Critical => "critical".to_owned(),
+        },
+        reversible: record.proposal.reversible,
+        proposed_at: record
+            .proposal
+            .proposed_at
+            .format(&Rfc3339)
+            .unwrap_or_default(),
+        checks: record
+            .checks
+            .iter()
+            .map(|c| cybou_web_contracts::CriticismCheckProjection {
+                rule_id: c.rule_id.clone(),
+                description: c.description.clone(),
+                passed: c.passed,
+                objection: c.objection.clone(),
+            })
+            .collect(),
+        verdict: match &record.decision.verdict {
+            AuthorizationVerdict::Granted => "granted".to_owned(),
+            AuthorizationVerdict::RequiresUserConfirmation { .. } => {
+                "requires-confirmation".to_owned()
+            }
+            AuthorizationVerdict::Denied { .. } => "denied".to_owned(),
+        },
+        verdict_reason: match &record.decision.verdict {
+            AuthorizationVerdict::Granted => None,
+            AuthorizationVerdict::RequiresUserConfirmation { prompt } => Some(prompt.clone()),
+            AuthorizationVerdict::Denied { reason } => Some(reason.clone()),
+        },
+        execution_started: record
+            .execution_started
+            .as_ref()
+            .map(|s| cybou_web_contracts::ExecutionStartedProjection {
+                attempt_id: s.attempt_id,
+                proposal_id: s.proposal_id,
+                operation: s.operation.clone(),
+                target_resource: s.target_resource.clone(),
+                started_at: s.started_at.format(&Rfc3339).unwrap_or_default(),
+            }),
+        attempt: record
+            .attempt
+            .as_ref()
+            .map(|a| cybou_web_contracts::ExecutionAttemptProjection {
+                attempt_id: a.attempt_id,
+                proposal_id: a.proposal_id,
+                operation: a.operation.clone(),
+                target_resource: a.target_resource.clone(),
+                report: a.report.name().to_owned(),
+                reason: match &a.report {
+                    AttemptReport::Failed { because } | AttemptReport::Refused { because } => {
+                        Some(because.clone())
+                    }
+                    _ => None,
+                },
+                ended_at: a.ended_at.and_then(|t| t.format(&Rfc3339).ok()),
+            }),
+        outcome: record
+            .outcome
+            .as_ref()
+            .map(|o| cybou_web_contracts::ActionOutcomeProjection {
+                outcome_id: o.outcome_id,
+                proposal_id: o.proposal_id,
+                relief: o.observed.name().to_owned(),
+                agreement: match &o.agreement {
+                    Agreement::Agree => "agree".to_owned(),
+                    Agreement::Disagree { .. } => "disagree".to_owned(),
+                    Agreement::NotComparable => "not-comparable".to_owned(),
+                },
+                disagreement: match &o.agreement {
+                    Agreement::Disagree { about } => Some(about.clone()),
+                    _ => None,
+                },
+                observation_before: None,
+                observation_after: None,
+                concluded_at: o.concluded_at.format(&Rfc3339).unwrap_or_default(),
+            }),
+    }
 }

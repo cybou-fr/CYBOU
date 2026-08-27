@@ -194,6 +194,50 @@ impl ProfileCatalogue {
             .collect()
     }
 
+    /// Convert to the protocol offers response.
+    #[must_use]
+    pub fn to_response(
+        &self,
+        capacity_bounded: bool,
+        provider_connected: bool,
+    ) -> cybou_protocol::agent::AgentOffersResponse {
+        cybou_protocol::agent::AgentOffersResponse {
+            profiles: self
+                .profiles
+                .iter()
+                .map(|p| cybou_protocol::agent::OfferedProfileView {
+                    id: p.id.clone(),
+                    agents: p.agents.clone(),
+                    workspace_roots: p
+                        .workspace_roots
+                        .iter()
+                        .map(|w| w.display().to_string())
+                        .collect(),
+                    memory_mib: p.memory_mib,
+                    cpus: p.cpus,
+                    tasks_max: p.tasks_max,
+                    lifetime_seconds: p.lifetime_seconds,
+                    hosts: p.hosts.clone(),
+                    models: p
+                        .models
+                        .iter()
+                        .map(|m| cybou_protocol::agent::OfferedModelView {
+                            class: m.class.clone(),
+                            zero_cost: matches!(m.spend, cybou_capsule::SpendPolicy::ZeroCostOnly),
+                            spend_limit: match m.spend {
+                                cybou_capsule::SpendPolicy::Capped(limit) => Some(limit),
+                                cybou_capsule::SpendPolicy::ZeroCostOnly => None,
+                            },
+                        })
+                        .collect(),
+                    may_execute: p.may_execute,
+                })
+                .collect(),
+            capacity_bounded,
+            provider_connected,
+        }
+    }
+
     /// Turn one request into the exact bounds an operator approved for it.
     ///
     /// # Errors
