@@ -101,6 +101,16 @@ pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoV
                         title="Close card"
                         aria-label="Close card"
                         on:click=move |_| {
+                            if matches!(card, CardId::Editor(_)) {
+                                let editor = tool_states.editor(card);
+                                let has_unsaved = editor.tabs.get_untracked().iter().any(|tab| {
+                                    tab.dirty || tab.conflict.is_some()
+                                });
+                                if has_unsaved {
+                                    editor.card_close_open.set(true);
+                                    return;
+                                }
+                            }
                             layout.update(|current| {
                                 current.close_card(card);
                             });

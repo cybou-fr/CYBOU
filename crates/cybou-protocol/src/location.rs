@@ -13,6 +13,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "target")]
 pub enum LocationRef {
+    /// Editor-local draft that has not been bound to any filesystem owner.
+    Draft {
+        /// Identity within the owning editor state.
+        draft_id: String,
+    },
     /// Standard host user directory or file (e.g. `/home/user/...`).
     HostUserPath(String),
     /// Privileged system configuration file (e.g. `/etc/nginx/nginx.conf`).
@@ -46,6 +51,7 @@ impl LocationRef {
     #[must_use]
     pub fn display_path(&self) -> String {
         match self {
+            Self::Draft { draft_id } => format!("draft://{draft_id}"),
             Self::HostUserPath(p) | Self::SystemConfigPath(p) => p.clone(),
             Self::AgentWorkspace {
                 capsule_id,
@@ -67,7 +73,8 @@ impl LocationRef {
     pub fn as_host_path(&self) -> Option<&str> {
         match self {
             Self::HostUserPath(p) | Self::SystemConfigPath(p) => Some(p.as_str()),
-            Self::AgentWorkspace { .. }
+            Self::Draft { .. }
+            | Self::AgentWorkspace { .. }
             | Self::SafeShellJail { .. }
             | Self::BackupSnapshot { .. } => None,
         }
@@ -84,25 +91,36 @@ impl LocationRef {
     pub fn is_read_only(&self) -> bool {
         matches!(self, Self::BackupSnapshot { .. })
     }
-
-    /// Create a new `LocationRef` by detecting if a path is privileged system path.
-    #[must_use]
-    pub fn from_path(path: impl Into<String>) -> Self {
-        let p = path.into();
-        if p.starts_with("/etc/")
-            || p.starts_with("/usr/")
-            || p.starts_with("/lib/")
-            || p.starts_with("/boot/")
-        {
-            Self::SystemConfigPath(p)
-        } else {
-            Self::HostUserPath(p)
-        }
-    }
 }
 
 impl Default for LocationRef {
     fn default() -> Self {
-        Self::HostUserPath("/".to_owned())
+        Self::Draft {
+            draft_id: "untitled".to_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LocationRef;
+
+    #[test]
+    fn a_jail_path_never_becomes_a_host_authority_domain() {
+        let location = LocationRef::SafeShellJail {
+            session_id: "seat-1".to_string(),
+            path: "/etc/example.conf".to_string(),
+        };
+
+        assert_eq!(location.as_host_path(), None);
+        assert!(!location.requires_action_authorization());
+        assert_eq!(location.display_path(), "jail://seat-1//etc/example.conf");
+    }
+
+    #[test]
+    fn an_unbound_draft_claims_no_host_path() {
+        let draft = LocationRef::default();
+        assert_eq!(draft.as_host_path(), None);
+        assert_eq!(draft.display_path(), "draft://untitled");
     }
 }

@@ -36,7 +36,7 @@ pub fn DeckTabs(
             >
                 <For
                     each=move || cards.get()
-                    key=|c| c.key().to_string()
+                    key=|c| c.instance_key()
                     children=move |c| {
                         let is_active = move || active_card.get() == c;
                         let card_label = c.title();

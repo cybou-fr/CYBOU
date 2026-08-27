@@ -3,7 +3,7 @@
 
 //! Universal Entity Inspector tool card component (ADR-0046 §5).
 
-use cybou_protocol::SubjectRef;
+use cybou_protocol::{EpistemicPresentation, SubjectRef};
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::{
         card_frame::CardFrame,
-        icons::{IconLayers, IconRefresh, IconShield, IconTerminal},
+        icons::{IconLayers, IconRefresh, IconShield},
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
@@ -37,6 +37,16 @@ pub fn InspectorContent(
     let state = expect_context::<ToolCardStates>().inspector(CardId::Inspector(instance));
     let target = state.target_subject;
     let status_msg = state.status_msg;
+
+    // No owner-backed SubjectProjection resolver is connected yet. Keep this explicit so the
+    // Inspector cannot accidentally present a selected reference as observed system state.
+    let inspection_state = EpistemicPresentation::<()>::Unavailable {
+        reason: "No authoritative inspection projection is connected for this subject.".to_string(),
+    };
+    let inspection_reason = StoredValue::new(match inspection_state {
+        EpistemicPresentation::Unavailable { reason } => reason,
+        _ => unreachable!("the prototype Inspector has no projection source"),
+    });
 
     // Default subject if none set: Host Mind / System
     let active_subject = move || {
@@ -107,16 +117,16 @@ pub fn InspectorContent(
                     <div class="inspector-section-title">"Operational State"</div>
                     <div class="inspector-grid">
                         <div class="inspector-row">
-                            <span class="lbl">"Health Status"</span>
-                            <span class="val ok">"● Active / Healthy"</span>
+                            <span class="lbl">"Inspection State"</span>
+                            <span class="val">"Unavailable"</span>
                         </div>
                         <div class="inspector-row">
-                            <span class="lbl">"Governance Boundary"</span>
-                            <span class="val">"Action1 / Zone 1"</span>
+                            <span class="lbl">"Reason"</span>
+                            <span class="val">{move || inspection_reason.get_value()}</span>
                         </div>
                         <div class="inspector-row">
                             <span class="lbl">"Last Observed"</span>
-                            <span class="val">"Just now (Live)"</span>
+                            <span class="val">"Unknown — no observation received"</span>
                         </div>
                     </div>
                 </div>
@@ -127,13 +137,8 @@ pub fn InspectorContent(
                     <div class="inspector-relations-list">
                         <div class="relation-item">
                             <IconLayers size=12 />
-                            <span class="rel-name">"Network listener"</span>
-                            <span class="rel-target">":443 (HTTPS)"</span>
-                        </div>
-                        <div class="relation-item">
-                            <IconTerminal size=12 />
-                            <span class="rel-name">"Log Stream"</span>
-                            <span class="rel-target">"journalctl -u caddy"</span>
+                            <span class="rel-name">"Unavailable"</span>
+                            <span class="rel-target">"Relations have not been loaded"</span>
                         </div>
                     </div>
                 </div>
@@ -142,14 +147,14 @@ pub fn InspectorContent(
                 <div class="inspector-actions">
                     <button
                         class="inspector-btn"
-                        on:click=move |_| status_msg.set(Some("Telemetry stream opened in background.".to_string()))
+                        on:click=move |_| status_msg.set(Some("Telemetry watch unavailable — no subject projection resolver is connected.".to_string()))
                     >
                         <IconRefresh size=12 />
                         "Watch Telemetry"
                     </button>
                     <button
                         class="inspector-btn primary"
-                        on:click=move |_| status_msg.set(Some("Action proposal created for operator review.".to_string()))
+                        on:click=move |_| status_msg.set(Some("Action proposal unavailable — Inspector actions are not connected to Action1.".to_string()))
                     >
                         "Propose Action"
                     </button>

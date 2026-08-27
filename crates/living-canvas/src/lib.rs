@@ -5,8 +5,8 @@
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
-    DirectoryListingProjection, DisclosureProjection, FileContentProjection, MindProjection,
-    SessionProjection, ShellExecResponse, SnapshotProjection,
+    DirectoryListingProjection, DisclosureProjection, FileContentProjection, FileWriteProjection,
+    FileWriteRequest, MindProjection, SessionProjection, ShellExecResponse, SnapshotProjection,
 };
 use thiserror::Error;
 
@@ -60,6 +60,9 @@ pub enum ClientError {
     /// The same-origin gateway request or typed response failed.
     #[error("gateway request failed: {0}")]
     GatewayRequest(String),
+    /// A conditional file write was based on content that is no longer current.
+    #[error("file changed since this editor read it")]
+    FileChangedSinceRead,
 }
 
 /// Only data boundary used by the frontend. Browser code never receives D-Bus or native handles.
@@ -170,6 +173,12 @@ pub trait MindClient {
     ///
     /// Returns [`ClientError`] when the path names nothing readable, or the gateway refuses.
     async fn read_text_file(&self, path: &str) -> Result<FileContentProjection, ClientError>;
+
+    /// Conditionally replace a file previously read through the bounded gateway.
+    async fn write_text_file(
+        &self,
+        request: &FileWriteRequest,
+    ) -> Result<FileWriteProjection, ClientError>;
 
     /// End one of the caller's shells, because the card standing in it was closed.
     ///
@@ -431,6 +440,15 @@ impl MindClient for MockMindClient {
         )))
     }
 
+    async fn write_text_file(
+        &self,
+        _request: &FileWriteRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock file writes are unavailable".to_string(),
+        ))
+    }
+
     async fn close_shell(&self, _instance: u32) -> Result<(), ClientError> {
         Ok(())
     }
@@ -519,5 +537,55 @@ mod tests {
                 .projection_version,
             42
         );
+    }
+
+    #[test]
+    fn inspector_source_contains_no_unbacked_operational_success_claims() {
+        let source = include_str!("components/cards/inspector.rs");
+        let forbidden_claims = [
+            ["Active /", " Healthy"].concat(),
+            ["Just now", " (Live)"].concat(),
+            ["Telemetry stream", " opened"].concat(),
+            ["Action proposal", " created"].concat(),
+        ];
+
+        for forbidden in forbidden_claims {
+            assert!(
+                !source.contains(&forbidden),
+                "Inspector must not present an unbacked claim: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn editor_source_contains_no_unbacked_persistence_success_claims() {
+        let source = include_str!("components/cards/editor.rs");
+        let forbidden_claims = [
+            ["Saved file", " successfully"].concat(),
+            ["proposal submitted", " for authorization"].concat(),
+        ];
+
+        for forbidden in forbidden_claims {
+            assert!(
+                !source.contains(&forbidden),
+                "Editor must not present an unbacked persistence claim: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn diff_source_contains_no_unbacked_commit_claims() {
+        let source = include_str!("components/cards/diff.rs");
+        let forbidden_claims = [
+            ["queued for", " commit"].concat(),
+            ["changes accepted", " and"].concat(),
+        ];
+
+        for forbidden in forbidden_claims {
+            assert!(
+                !source.to_ascii_lowercase().contains(&forbidden),
+                "Diff Viewer must not present an unbacked commit claim: {forbidden}"
+            );
+        }
     }
 }

@@ -3,7 +3,7 @@
 
 [package]
 name = "cybou-web-gateway"
-description = "Bounded read-only browser boundary for Cybou Presence"
+description = "Bounded browser boundary for Cybou Presence and governed desktop capabilities"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

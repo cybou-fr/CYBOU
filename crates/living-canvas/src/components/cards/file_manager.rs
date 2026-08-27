@@ -41,6 +41,9 @@ pub fn FileManagerContent(
     let (entries, set_entries) = (state.entries, state.entries);
     let (selected_file, set_selected_file) = (state.selected_file, state.selected_file);
     let (file_content, set_file_content) = (state.file_content, state.file_content);
+    let (selected_location, set_selected_location) =
+        (state.selected_location, state.selected_location);
+    let (selected_sha256, set_selected_sha256) = (state.selected_sha256, state.selected_sha256);
     let (loading, set_loading) = (state.loading, state.loading);
     let (error_msg, set_error_msg) = (state.error_msg, state.error_msg);
     let (was_read, set_was_read) = (state.read, state.read);
@@ -49,6 +52,8 @@ pub fn FileManagerContent(
         set_loading.set(true);
         set_error_msg.set(None);
         set_selected_file.set(None);
+        set_selected_location.set(None);
+        set_selected_sha256.set(None);
         let target_p = path.clone();
         set_current_path.set(path);
         spawn_local(async move {
@@ -105,10 +110,14 @@ pub fn FileManagerContent(
             match GatewayMindClient.read_text_file(&p).await {
                 Ok(content) => {
                     set_loading.set(false);
+                    set_selected_location.set(Some(content.location));
+                    set_selected_sha256.set(Some(content.content_sha256));
                     set_file_content.set(content.text);
                 }
                 Err(err) => {
                     set_loading.set(false);
+                    set_selected_location.set(None);
+                    set_selected_sha256.set(None);
                     set_file_content.set(err.to_string());
                 }
             }
@@ -229,12 +238,6 @@ pub fn FileManagerContent(
                                             let tool_states = expect_context::<ToolCardStates>();
                                             let editor_state = tool_states.editor(CardId::Editor(0));
                                             let filename = selected_file.get().unwrap_or_default();
-                                            let cur = current_path.get();
-                                            let full_path = if cur == "/" {
-                                                format!("/{filename}")
-                                            } else {
-                                                format!("{cur}/{filename}")
-                                            };
                                             let lang = if filename.ends_with(".rs") {
                                                 "rust"
                                             } else if filename.ends_with(".toml") {
@@ -247,28 +250,32 @@ pub fn FileManagerContent(
                                                 "text"
                                             };
                                             let text = file_content.get();
-                                            let tab = crate::tool_state::EditorTab {
-                                                name: filename,
-                                                location: cybou_protocol::LocationRef::from_path(&full_path),
-                                                content: text.clone(),
-                                                original_content: text,
-                                                dirty: false,
-                                                line: 1,
-                                                col: 1,
-                                                language: lang.to_string(),
-                                                read_only: false,
+                                            let Some(location) = selected_location.get() else {
+                                                set_error_msg.set(Some("Editor open refused — the gateway supplied no authority-domain reference for this file.".to_string()));
+                                                return;
                                             };
-                                            editor_state.tabs.update(|tabs| {
-                                                if let Some(pos) = tabs.iter().position(|t| t.location == tab.location) {
-                                                    editor_state.active_tab_index.set(pos);
-                                                } else {
-                                                    tabs.push(tab);
-                                                    editor_state.active_tab_index.set(tabs.len().saturating_sub(1));
-                                                }
-                                            });
+                                            let Some(expected_sha256) = selected_sha256.get() else {
+                                                set_error_msg.set(Some("Editor open refused — the gateway supplied no content version for this file.".to_string()));
+                                                return;
+                                            };
+                                            let mut tab = crate::tool_state::EditorTab::from_location(location, text, expected_sha256);
+                                            tab.name = filename;
+                                            tab.language = lang.to_string();
+                                            let admission = editor_state.admit_file(tab);
+                                            editor_state.status_msg.set(Some(match admission {
+                                                crate::tool_state::EditorTabAdmission::FocusedExisting =>
+                                                    "Existing editor buffer focused; the File Manager preview did not replace its local contents.".to_string(),
+                                                crate::tool_state::EditorTabAdmission::ReplacedPristineDraft =>
+                                                    "File opened in the initial editor tab.".to_string(),
+                                                crate::tool_state::EditorTabAdmission::Added =>
+                                                    "File opened in a new editor tab.".to_string(),
+                                            }));
                                             if let Some(l) = use_context::<RwSignal<DesktopLayout>>() {
                                                 l.update(|layout| layout.open_card(CardId::Editor(0), 400.0, 180.0));
                                                 l.get_untracked().save();
+                                            }
+                                            if let Some(select) = use_context::<WriteSignal<Option<DesktopItemId>>>() {
+                                                select.set(Some(DesktopItemId::Card(CardId::Editor(0))));
                                             }
                                         }
                                     >

@@ -5,19 +5,49 @@
 
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
+use leptos::task::spawn_local;
 use std::sync::Arc;
 use web_sys::{MouseEvent, PointerEvent};
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout,
+    CardId, ClientError, DesktopItemId, DesktopLayout, GatewayMindClient, MindClient,
     components::{
         card_frame::CardFrame,
         icons::{IconFile, IconShield},
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
-    tool_state::{EditorTab, ToolCardStates},
+    tool_state::{EditorTab, FileConflict, ToolCardStates},
 };
+
+fn open_conflict_diff(
+    tab: EditorTab,
+    tool_states: ToolCardStates,
+    layout: RwSignal<DesktopLayout>,
+    set_selected: WriteSignal<Option<DesktopItemId>>,
+) {
+    let Some(conflict) = tab.conflict else {
+        return;
+    };
+    let diff_card = CardId::Diff(0);
+    let diff = tool_states.diff(diff_card);
+    diff.title.set(format!(
+        "Concurrent changes — {}",
+        tab.location.display_path()
+    ));
+    diff.original_label
+        .set("Current server version".to_string());
+    diff.proposed_label.set("Unsaved editor buffer".to_string());
+    diff.original_content.set(conflict.server_content);
+    diff.proposed_content.set(tab.content);
+    diff.status_msg.set(Some(
+        "Read-only comparison. Resolve the conflict explicitly in the editor; no file has been changed."
+            .to_string(),
+    ));
+    layout.update(|desktop| desktop.open_card(diff_card, 860.0, 180.0));
+    layout.get_untracked().save();
+    set_selected.set(Some(DesktopItemId::Card(diff_card)));
+}
 
 /// Text Editor content component with multi-tab buffers and Action1 authority gating.
 #[component]
@@ -38,7 +68,14 @@ pub fn EditorContent(
     let active_tab_index = state.active_tab_index;
     let markdown_preview = state.markdown_preview;
     let save_proposal_open = state.save_proposal_open;
+    let conflict_discard_open = state.conflict_discard_open;
+    let pending_close_tab = state.pending_close_tab;
+    let next_draft_number = state.next_draft_number;
+    let card_close_open = state.card_close_open;
     let status_msg = state.status_msg;
+    let layout = expect_context::<RwSignal<DesktopLayout>>();
+    let set_selected = expect_context::<WriteSignal<Option<DesktopItemId>>>();
+    let tool_states = expect_context::<ToolCardStates>();
 
     let active_tab = move || {
         let all_tabs = tabs.get();
@@ -49,31 +86,63 @@ pub fn EditorContent(
             .unwrap_or_else(EditorTab::untitled)
     };
 
+    let show_conflict_diff = move || {
+        open_conflict_diff(active_tab(), tool_states, layout, set_selected);
+    };
+
     let update_current_content = move |new_content: String| {
         let idx = active_tab_index.get();
         tabs.update(|all| {
             if let Some(tab) = all.get_mut(idx) {
-                tab.dirty = tab.content != new_content;
                 tab.content = new_content;
+                tab.dirty = tab.content != tab.original_content;
             }
         });
     };
 
     let add_tab = move || {
+        let number = next_draft_number.get_untracked();
+        next_draft_number.update(|next| *next = next.saturating_add(1));
         tabs.update(|all| {
-            all.push(EditorTab::untitled());
+            all.push(EditorTab::draft(number));
         });
         active_tab_index.set(tabs.get().len().saturating_sub(1));
     };
 
-    let close_tab = move |idx: usize| {
+    let discard_tab = move |idx: usize| {
+        let previous_active = active_tab_index.get_untracked();
+        let replacement_number = next_draft_number.get_untracked();
         tabs.update(|all| {
             if all.len() > 1 {
                 all.remove(idx);
+            } else {
+                all[0] = EditorTab::draft(replacement_number);
+                next_draft_number.update(|next| *next = next.saturating_add(1));
             }
         });
-        if active_tab_index.get() >= tabs.get().len() {
-            active_tab_index.set(tabs.get().len().saturating_sub(1));
+        let remaining = tabs.get_untracked().len();
+        let next_active = if remaining == 1 {
+            0
+        } else if idx < previous_active {
+            previous_active - 1
+        } else if idx == previous_active {
+            idx.min(remaining - 1)
+        } else {
+            previous_active
+        };
+        active_tab_index.set(next_active);
+        pending_close_tab.set(None);
+    };
+
+    let close_tab = move |idx: usize| {
+        let requires_confirmation = tabs
+            .get_untracked()
+            .get(idx)
+            .is_some_and(|tab| tab.dirty || tab.conflict.is_some());
+        if requires_confirmation {
+            pending_close_tab.set(Some(idx));
+        } else {
+            discard_tab(idx);
         }
     };
 
@@ -81,15 +150,99 @@ pub fn EditorContent(
         let tab = active_tab();
         if tab.location.requires_action_authorization() {
             save_proposal_open.set(true);
-        } else {
-            tabs.update(|all| {
-                let idx = active_tab_index.get();
-                if let Some(t) = all.get_mut(idx) {
-                    t.original_content = t.content.clone();
-                    t.dirty = false;
+        } else if matches!(
+            tab.location,
+            cybou_protocol::LocationRef::SafeShellJail { .. }
+        ) {
+            let Some(expected_sha256) = tab.expected_sha256.clone() else {
+                status_msg.set(Some(
+                    "Save refused — this buffer has no server-established content version."
+                        .to_string(),
+                ));
+                return;
+            };
+            let idx = active_tab_index.get();
+            let request = cybou_web_contracts::FileWriteRequest {
+                location: tab.location,
+                expected_sha256,
+                text: tab.content.clone(),
+            };
+            status_msg.set(Some("Saving…".to_string()));
+            spawn_local(async move {
+                match GatewayMindClient.write_text_file(&request).await {
+                    Ok(saved) => {
+                        let written_text = request.text;
+                        tabs.update(|all| {
+                            if let Some(current) = all.get_mut(idx) {
+                                current.original_content = written_text.clone();
+                                current.dirty = current.content != written_text;
+                                current.expected_sha256 = Some(saved.content_sha256);
+                                current.conflict = None;
+                            }
+                        });
+                        let changed_while_saving = tabs
+                            .get_untracked()
+                            .get(idx)
+                            .is_some_and(|current| current.dirty);
+                        status_msg.set(Some(if changed_while_saving {
+                            format!(
+                                "Saved and verified ({} bytes); newer buffer changes remain unsaved.",
+                                saved.size_bytes
+                            )
+                        } else {
+                            format!("Saved and verified ({} bytes).", saved.size_bytes)
+                        }));
+                    }
+                    Err(ClientError::FileChangedSinceRead) => {
+                        let cybou_protocol::LocationRef::SafeShellJail { path, .. } =
+                            &request.location
+                        else {
+                            unreachable!("this save branch accepts only SafeShellJail locations");
+                        };
+                        match GatewayMindClient.read_text_file(path).await {
+                            Ok(fresh) if fresh.location == request.location => {
+                                tabs.update(|all| {
+                                    if let Some(current) = all.get_mut(idx) {
+                                        current.conflict = Some(FileConflict {
+                                            server_content: fresh.text,
+                                            server_sha256: fresh.content_sha256,
+                                        });
+                                    }
+                                });
+                                if let Some(conflicted_tab) =
+                                    tabs.get_untracked().get(idx).cloned()
+                                {
+                                    open_conflict_diff(
+                                        conflicted_tab,
+                                        tool_states,
+                                        layout,
+                                        set_selected,
+                                    );
+                                }
+                                status_msg.set(Some(
+                                    "Save stopped because the file changed on the server. The unsaved buffer is preserved and a verified comparison is open."
+                                        .to_string(),
+                                ));
+                            }
+                            Ok(_) => status_msg.set(Some(
+                                "Save stopped because the file changed. The follow-up read returned a different authority reference, so no comparison was opened; the editor buffer remains unsaved."
+                                    .to_string(),
+                            )),
+                            Err(error) => status_msg.set(Some(format!(
+                                "Save stopped because the file changed, and its current version could not be read: {error}. The editor buffer remains unsaved."
+                            ))),
+                        }
+                    }
+                    Err(error) => status_msg.set(Some(format!(
+                        "Save failed — {error}. The editor buffer remains unsaved."
+                    ))),
                 }
             });
-            status_msg.set(Some("Saved file successfully.".to_string()));
+        } else {
+            status_msg.set(Some(
+                "Save unavailable for this location domain. Changes remain only in this open editor buffer."
+                    .to_string(),
+            ));
         }
     };
 
@@ -169,7 +322,7 @@ pub fn EditorContent(
                         }}
                         <button
                             class="editor-action-btn primary"
-                            disabled=move || !active_tab().dirty
+                            disabled=move || !active_tab().dirty || active_tab().conflict.is_some()
                             on:click=move |_| trigger_save()
                         >
                             "Save"
@@ -190,6 +343,42 @@ pub fn EditorContent(
                         view! { <span/> }.into_any()
                     }
                 }}
+
+                <Show when=move || active_tab().conflict.is_some()>
+                    <div class="editor-authority-banner system">
+                        <span class="badge">"Write conflict"</span>
+                        <span>"The server changed after this tab was opened. Save is paused until you choose a base version."</span>
+                        <button class="editor-action-btn" on:click=move |_| show_conflict_diff()>
+                            "Refresh comparison"
+                        </button>
+                        <button
+                            class="editor-action-btn"
+                            on:click=move |_| {
+                                let idx = active_tab_index.get();
+                                tabs.update(|all| {
+                                    if let Some(tab) = all.get_mut(idx)
+                                        && let Some(conflict) = tab.conflict.take()
+                                    {
+                                        tab.expected_sha256 = Some(conflict.server_sha256);
+                                        tab.dirty = tab.content != conflict.server_content;
+                                    }
+                                });
+                                status_msg.set(Some(
+                                    "Reviewed server version accepted as the next save base. The local buffer is still unsaved; Save will use a new conditional write."
+                                        .to_string(),
+                                ));
+                            }
+                        >
+                            "Keep buffer · use reviewed base"
+                        </button>
+                        <button
+                            class="editor-action-btn"
+                            on:click=move |_| conflict_discard_open.set(true)
+                        >
+                            "Use server version"
+                        </button>
+                    </div>
+                </Show>
 
                 <div class="editor-workspace" class:split-view=move || markdown_preview.get()>
                     <div class="editor-code-container">
@@ -234,7 +423,7 @@ pub fn EditorContent(
                                 <code>{move || active_tab().location.display_path()}</code>
                             </p>
                             <p class="modal-notice">
-                                "CYBOU requires an Action1 FileWrite proposal with operator authorization before committing this change to disk."
+                                "CYBOU requires an Action1 FileWrite proposal with operator authorization before committing this change to disk. This proposal path is not connected yet."
                             </p>
                             <div class="editor-modal-actions">
                                 <button class="editor-btn-secondary" on:click=move |_| save_proposal_open.set(false)>
@@ -244,10 +433,98 @@ pub fn EditorContent(
                                     class="editor-btn-primary"
                                     on:click=move |_| {
                                         save_proposal_open.set(false);
-                                        status_msg.set(Some("Action1 proposal submitted for authorization.".to_string()));
+                                        status_msg.set(Some("Action1 save unavailable — no proposal was submitted. Changes remain only in this open editor buffer.".to_string()));
                                     }
                                 >
-                                    "Request Action1 Save"
+                                    "Acknowledge"
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Show>
+
+                <Show when=move || conflict_discard_open.get()>
+                    <div class="editor-modal-overlay">
+                        <div class="editor-modal-card">
+                            <h3>"Discard Local Buffer?"</h3>
+                            <p>"Replace this tab with the verified server version. Unsaved local changes in this tab cannot be recovered by CYBOU."</p>
+                            <div class="editor-modal-actions">
+                                <button class="editor-btn-secondary" on:click=move |_| conflict_discard_open.set(false)>
+                                    "Cancel"
+                                </button>
+                                <button
+                                    class="editor-btn-primary"
+                                    on:click=move |_| {
+                                        let idx = active_tab_index.get();
+                                        tabs.update(|all| {
+                                            if let Some(tab) = all.get_mut(idx)
+                                                && let Some(conflict) = tab.conflict.take()
+                                            {
+                                                tab.content = conflict.server_content.clone();
+                                                tab.original_content = conflict.server_content;
+                                                tab.expected_sha256 = Some(conflict.server_sha256);
+                                                tab.dirty = false;
+                                            }
+                                        });
+                                        conflict_discard_open.set(false);
+                                        status_msg.set(Some("Verified server version loaded; local unsaved changes were discarded by explicit confirmation.".to_string()));
+                                    }
+                                >
+                                    "Discard Local Changes"
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Show>
+
+                <Show when=move || pending_close_tab.get().is_some()>
+                    <div class="editor-modal-overlay">
+                        <div class="editor-modal-card">
+                            <h3>"Close Unsaved Tab?"</h3>
+                            <p>
+                                "Closing "
+                                <code>{move || pending_close_tab.get().and_then(|idx| tabs.get().get(idx).map(|tab| tab.name.clone())).unwrap_or_else(|| "this tab".to_string())}</code>
+                                " will permanently discard its local buffer. No file will be changed."
+                            </p>
+                            <div class="editor-modal-actions">
+                                <button class="editor-btn-secondary" on:click=move |_| pending_close_tab.set(None)>
+                                    "Keep Editing"
+                                </button>
+                                <button
+                                    class="editor-btn-primary"
+                                    on:click=move |_| {
+                                        if let Some(idx) = pending_close_tab.get_untracked() {
+                                            discard_tab(idx);
+                                            status_msg.set(Some("Unsaved tab closed by explicit confirmation; no file was changed.".to_string()));
+                                        }
+                                    }
+                                >
+                                    "Discard and Close"
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Show>
+
+                <Show when=move || card_close_open.get()>
+                    <div class="editor-modal-overlay">
+                        <div class="editor-modal-card">
+                            <h3>"Close Editor With Unsaved Buffers?"</h3>
+                            <p>"This editor contains unsaved or unresolved tabs. Closing the panel permanently discards every local buffer in it; no file will be changed."</p>
+                            <div class="editor-modal-actions">
+                                <button class="editor-btn-secondary" on:click=move |_| card_close_open.set(false)>
+                                    "Keep Editor Open"
+                                </button>
+                                <button
+                                    class="editor-btn-primary"
+                                    on:click=move |_| {
+                                        let card = CardId::Editor(instance);
+                                        layout.update(|desktop| desktop.close_card(card));
+                                        layout.get_untracked().save();
+                                        tool_states.forget(card);
+                                    }
+                                >
+                                    "Discard All and Close"
                                 </button>
                             </div>
                         </div>
@@ -278,7 +555,7 @@ pub fn EditorCard(
         view! {
             <div class="card-collapsed-summary">
                 <b>"Text Editor"</b>
-                <span>"Ready"</span>
+                <span>"Draft only"</span>
             </div>
         }
         .into_any()

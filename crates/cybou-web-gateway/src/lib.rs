@@ -44,6 +44,7 @@ use routes::{
     events_handler, insight_handler, launch_agent_handler, list_directory_handler, login_handler,
     logout_handler, mind_handler, read_file_handler, recent_actions_handler, session_handler,
     shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler,
+    write_file_handler,
 };
 use state::GatewayState;
 
@@ -185,6 +186,7 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/shell/close", post(shell_close_handler))
         .route("/api/v1/files/list", post(list_directory_handler))
         .route("/api/v1/files/read", post(read_file_handler))
+        .route("/api/v1/files/write", post(write_file_handler))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -1261,6 +1263,97 @@ mod tests {
             serde_json::from_slice(&body).expect("file content");
         assert_eq!(content.text, "hello");
         assert_eq!(content.size_bytes, 5);
+        assert_eq!(
+            content.content_sha256,
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
+        assert!(matches!(
+            content.location,
+            cybou_protocol::LocationRef::SafeShellJail { ref session_id, ref path }
+                if session_id.starts_with("session-") && path == "/welcome.txt"
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_file_write_requires_the_version_read_and_returns_verified_state() {
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        std::fs::write(sandbox.path().join("welcome.txt"), "hello").expect("a file");
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let read = files_post(&app, "/api/v1/files/read", &cookie, "/welcome.txt").await;
+        let body = axum::body::to_bytes(read.into_body(), 64 * 1024)
+            .await
+            .expect("read body");
+        let content: cybou_web_contracts::FileContentProjection =
+            serde_json::from_slice(&body).expect("file content");
+        let request = cybou_web_contracts::FileWriteRequest {
+            location: content.location,
+            expected_sha256: content.content_sha256,
+            text: "updated".to_string(),
+        };
+        let payload = serde_json::to_vec(&request).expect("write request");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/files/write")
+                    .header("content-type", "application/json")
+                    .header("cookie", &cookie)
+                    .body(Body::from(payload))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("write body");
+        let saved: cybou_web_contracts::FileWriteProjection =
+            serde_json::from_slice(&body).expect("write result");
+        assert_eq!(saved.size_bytes, 7);
+        assert_eq!(
+            std::fs::read_to_string(sandbox.path().join("welcome.txt")).expect("saved file"),
+            "updated"
+        );
+
+        let stale_payload = serde_json::to_vec(&request).expect("stale write request");
+        let stale = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/files/write")
+                    .header("content-type", "application/json")
+                    .header("cookie", &cookie)
+                    .body(Body::from(stale_payload))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        assert_eq!(stale.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn a_system_spelled_path_inside_the_jail_remains_a_jail_location() {
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        std::fs::create_dir_all(sandbox.path().join("etc")).expect("jail etc directory");
+        std::fs::write(sandbox.path().join("etc/example.conf"), "demo").expect("jail file");
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let response = files_post(&app, "/api/v1/files/read", &cookie, "/etc/example.conf").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let content: cybou_web_contracts::FileContentProjection =
+            serde_json::from_slice(&body).expect("file content");
+
+        assert!(matches!(
+            content.location,
+            cybou_protocol::LocationRef::SafeShellJail { ref path, .. }
+                if path == "/etc/example.conf"
+        ));
     }
 
     #[tokio::test]

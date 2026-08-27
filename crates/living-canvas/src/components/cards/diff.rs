@@ -86,19 +86,8 @@ pub fn DiffContent(
                         <span class="diff-title">{move || title.get()}</span>
                     </div>
 
-                    <div class="diff-actions">
-                        <button
-                            class="diff-btn secondary"
-                            on:click=move |_| status_msg.set(Some("Proposed changes rejected.".to_string()))
-                        >
-                            "Reject"
-                        </button>
-                        <button
-                            class="diff-btn primary"
-                            on:click=move |_| status_msg.set(Some("Changes accepted and queued for commit.".to_string()))
-                        >
-                            "Accept"
-                        </button>
+                    <div class="diff-actions" aria-label="Read-only comparison">
+                        <span class="diff-btn secondary">"Review only · no write action"</span>
                     </div>
                 </div>
 

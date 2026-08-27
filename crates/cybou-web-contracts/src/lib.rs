@@ -3,7 +3,7 @@
 
 //! Explicit versioned contract between Living Canvas and `cybou-web-gateway`.
 
-use cybou_protocol::{CapabilityState, KnowledgeState, SchemaVersion};
+use cybou_protocol::{CapabilityState, KnowledgeState, LocationRef, SchemaVersion};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -675,6 +675,9 @@ pub const FILE_LISTING_MAX_ENTRIES: usize = 512;
 /// How many bytes of a file one read carries.
 pub const FILE_READ_MAX_BYTES: usize = 256 * 1024;
 
+/// How many UTF-8 bytes one bounded sandbox write accepts.
+pub const FILE_WRITE_MAX_BYTES: usize = 256 * 1024;
+
 /// Which path in the sandbox a request is about.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -726,9 +729,42 @@ pub struct FileContentProjection {
     pub schema_version: SchemaVersion,
     /// The file that was read.
     pub path: String,
+    /// Owner-issued authority-domain reference for the file that was actually read.
+    ///
+    /// The browser must carry this value into another panel rather than deriving authority from
+    /// the spelling of [`Self::path`].
+    pub location: LocationRef,
     /// Its text.
     pub text: String,
     /// How large the file is on disk.
+    pub size_bytes: u64,
+    /// Lowercase SHA-256 of the exact bytes returned in [`Self::text`].
+    pub content_sha256: String,
+}
+
+/// Conditional write of a previously read file.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileWriteRequest {
+    /// Owner-issued location returned by the read being edited.
+    pub location: LocationRef,
+    /// SHA-256 observed when the editor buffer was opened or last saved.
+    pub expected_sha256: String,
+    /// Complete replacement UTF-8 content.
+    pub text: String,
+}
+
+/// Verified result of one conditional file write.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileWriteProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// Location that was written and then re-read.
+    pub location: LocationRef,
+    /// SHA-256 established by the post-write re-read.
+    pub content_sha256: String,
+    /// Verified byte size after the write.
     pub size_bytes: u64,
 }
 
@@ -871,8 +907,8 @@ pub use cybou_protocol::agent::{
 #[cfg(test)]
 mod tests {
     use super::{
-        CommitmentsProjection, MindProjection, SessionMode, SessionProjection, SnapshotProjection,
-        WEB_SCHEMA_V1,
+        CommitmentsProjection, FileContentProjection, LocationRef, MindProjection, SessionMode,
+        SessionProjection, SnapshotProjection, WEB_SCHEMA_V1,
     };
 
     const SESSION_FIXTURE: &str = include_str!("../../../fixtures/web/v1/session-local.json");
@@ -939,5 +975,30 @@ mod tests {
             assert_eq!(schema["additionalProperties"], false);
             assert_eq!(schema["properties"]["schemaVersion"]["const"], 1);
         }
+    }
+
+    #[test]
+    fn file_content_keeps_the_owner_issued_authority_domain() {
+        let projection = FileContentProjection {
+            schema_version: WEB_SCHEMA_V1,
+            path: "/etc/example.conf".to_string(),
+            location: LocationRef::SafeShellJail {
+                session_id: "seat-1".to_string(),
+                path: "/etc/example.conf".to_string(),
+            },
+            text: "demo".to_string(),
+            size_bytes: 4,
+            content_sha256: "2a97516c354b68848cdbd8f54a226a0a848a850a1c904e3cacd9d91f2571a4bf"
+                .to_string(),
+        };
+
+        let encoded = serde_json::to_string(&projection).expect("encode file projection");
+        let decoded: FileContentProjection =
+            serde_json::from_str(&encoded).expect("decode file projection");
+        assert_eq!(decoded, projection);
+        assert!(matches!(
+            decoded.location,
+            LocationRef::SafeShellJail { .. }
+        ));
     }
 }

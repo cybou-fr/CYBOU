@@ -104,6 +104,32 @@ impl CardId {
         }
     }
 
+    /// Stable key for this exact card instance.
+    ///
+    /// [`Self::key`] intentionally identifies a card type for legacy routes. Dynamic cards must
+    /// use this key anywhere identity affects reconciliation, persistence, or membership.
+    #[must_use]
+    pub fn instance_key(self) -> String {
+        match self {
+            Self::Shell(instance)
+            | Self::FileManager(instance)
+            | Self::JournalFeed(instance)
+            | Self::Editor(instance)
+            | Self::Diff(instance)
+            | Self::Inspector(instance) => format!("{}:{instance}", self.key()),
+            _ => self.key().to_string(),
+        }
+    }
+
+    /// Whether a persisted identity names this exact instance.
+    ///
+    /// Type-only keys remain readable for layouts created before instance keys existed. New
+    /// dynamic memberships must be written with [`Self::instance_key`].
+    #[must_use]
+    pub fn matches_persisted_key(self, persisted: &str) -> bool {
+        persisted == self.instance_key() || (!persisted.contains(':') && persisted == self.key())
+    }
+
     /// Human-readable title of the card.
     #[must_use]
     pub const fn title(self) -> &'static str {
@@ -691,5 +717,19 @@ mod tests {
         let clamped = geom.clamp_size((320.0, 100.0), (400.0, 120.0));
         assert_eq!(clamped.width, 320.0);
         assert_eq!(clamped.height, 120.0);
+    }
+
+    #[test]
+    fn dynamic_card_instance_keys_do_not_alias() {
+        assert_eq!(CardId::Editor(7).instance_key(), "editor:7");
+        assert_ne!(
+            CardId::Editor(7).instance_key(),
+            CardId::Editor(8).instance_key()
+        );
+        assert_ne!(
+            CardId::FileManager(7).instance_key(),
+            CardId::Editor(7).instance_key()
+        );
+        assert_eq!(CardId::Identity.instance_key(), "identity");
     }
 }

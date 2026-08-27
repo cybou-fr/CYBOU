@@ -95,7 +95,7 @@ pub fn OutlineContent(
                 <div class="outline-tree">
                     <For
                         each=move || layout_sig.get().cards
-                        key=|card| card.id.key().to_string()
+                        key=|card| card.id.instance_key()
                         children=move |card| {
                             let cid = card.id;
                             let title = card.id.title();

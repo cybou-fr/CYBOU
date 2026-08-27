@@ -1171,6 +1171,7 @@ name = "cybou-protocol"
 version = "0.1.0"
 dependencies = [
  "ciborium",
+ "percent-encoding",
  "serde",
  "serde_json",
  "sha2 0.11.0",

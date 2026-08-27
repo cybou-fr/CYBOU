@@ -6,10 +6,13 @@
 //! Enforces strict directory confinement so that Shell commands or ephemeral tool capabilities
 //! can never escape the designated sandbox boundary (`JailFs`).
 
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use thiserror::Error;
+
+static TEMP_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// Error returned by sandboxed filesystem operations.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -231,6 +234,56 @@ impl JailFs {
             .map_err(|e| JailError::Io(e.to_string()))?;
         file.flush().map_err(|e| JailError::Io(e.to_string()))?;
         Ok(())
+    }
+
+    /// Replace a sandboxed file through a same-directory temporary file and atomic rename.
+    ///
+    /// The target is never truncated before every replacement byte has been written and synced.
+    /// This operation is intended for the Linux gateway deployment, where same-filesystem rename
+    /// replaces the destination atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JailError`] on boundary, size, temporary-file, sync, or rename failure.
+    pub fn replace_bytes_atomic(
+        &self,
+        virtual_path: &str,
+        data: &[u8],
+        max_bytes: usize,
+    ) -> Result<(), JailError> {
+        if data.len() > max_bytes {
+            return Err(JailError::SizeLimitExceeded {
+                max_bytes,
+                actual_bytes: data.len(),
+            });
+        }
+        let target = self.resolve(virtual_path)?;
+        let parent = target
+            .parent()
+            .ok_or_else(|| JailError::InvalidPath(virtual_path.to_string()))?;
+        fs::create_dir_all(parent).map_err(|error| JailError::Io(error.to_string()))?;
+        let sequence = TEMP_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let temporary = parent.join(format!(
+            ".cybou-write-{}-{sequence}.tmp",
+            std::process::id()
+        ));
+
+        let result = (|| {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)
+                .map_err(|error| JailError::Io(error.to_string()))?;
+            file.write_all(data)
+                .map_err(|error| JailError::Io(error.to_string()))?;
+            file.sync_all()
+                .map_err(|error| JailError::Io(error.to_string()))?;
+            fs::rename(&temporary, &target).map_err(|error| JailError::Io(error.to_string()))
+        })();
+        if result.is_err() {
+            drop(fs::remove_file(&temporary));
+        }
+        result
     }
 
     /// List directory contents within the sandbox.

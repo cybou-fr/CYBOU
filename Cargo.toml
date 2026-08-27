@@ -74,6 +74,7 @@ ciborium = "0.2.2"
 http-body-util = "0.1.5"
 hyper = { version = "1.11.0", features = ["http1", "server"] }
 hyper-util = { version = "0.1.20", features = ["tokio"] }
+percent-encoding = "2.3.2"
 futures-core = "0.3.31"
 futures-util = "0.3.34"
 thiserror = "2.0.20"

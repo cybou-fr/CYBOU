@@ -20,7 +20,7 @@ pub use agents::{agent_offers_handler, agents_handler, launch_agent_handler, sto
 pub use auth::{login_handler, logout_handler, session_handler};
 pub use disclosure::disclosure_handler;
 pub use events::events_handler;
-pub use files::{list_directory_handler, read_file_handler};
+pub use files::{list_directory_handler, read_file_handler, write_file_handler};
 pub use insight::insight_handler;
 pub use shell::{shell_close_handler, shell_exec_handler};
 pub use snapshot::{mind_handler, snapshot_handler};

@@ -6,8 +6,8 @@
 use async_trait::async_trait;
 use cybou_web_contracts::{
     DirectoryListingProjection, DisclosureProjection, FileContentProjection, FilePathRequest,
-    MindProjection, SessionProjection, ShellCloseRequest, ShellExecRequest, ShellExecResponse,
-    SnapshotProjection,
+    FileWriteProjection, FileWriteRequest, MindProjection, SessionProjection, ShellCloseRequest,
+    ShellExecRequest, ShellExecResponse, SnapshotProjection,
 };
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
@@ -145,6 +145,31 @@ impl MindClient for GatewayMindClient {
 
     async fn read_text_file(&self, path: &str) -> Result<FileContentProjection, ClientError> {
         Self::post_path("/api/v1/files/read", path).await
+    }
+
+    async fn write_text_file(
+        &self,
+        request: &FileWriteRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        let response = Request::post("/api/v1/files/write")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if response.status() == 409 {
+            return Err(ClientError::FileChangedSinceRead);
+        }
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/files/write returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
     async fn close_shell(&self, instance: u32) -> Result<(), ClientError> {

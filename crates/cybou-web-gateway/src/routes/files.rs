@@ -19,15 +19,42 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use cybou_jailfs::JailError;
+use cybou_protocol::LocationRef;
 use cybou_web_contracts::{
     DirectoryEntryProjection, DirectoryListingProjection, FILE_LISTING_MAX_ENTRIES,
-    FILE_READ_MAX_BYTES, FileContentProjection, FilePathRequest, WEB_SCHEMA_V1,
+    FILE_READ_MAX_BYTES, FILE_WRITE_MAX_BYTES, FileContentProjection, FilePathRequest,
+    FileWriteProjection, FileWriteRequest, WEB_SCHEMA_V1,
 };
+use sha2::{Digest as _, Sha256};
+use std::sync::{Mutex, PoisonError};
 
 use crate::state::{ErrorBody, GatewayState};
 
 /// One typed refusal.
 type Refusal = (StatusCode, Json<ErrorBody>);
+
+/// Serializes compare-and-replace writes so two gateway requests cannot both win one version.
+static FILE_WRITES: Mutex<()> = Mutex::new(());
+
+/// Mint a non-authorizing reference to a path established inside this request's jail.
+///
+/// The scope distinguishes the local desktop from authenticated browser seats without exposing a
+/// bearer token. Route authorization is still performed from the request session on every call;
+/// this reference is identity and authority-domain evidence, not a transferable capability.
+fn jail_location(owner: &crate::shells::ShellOwner, path: String) -> LocationRef {
+    let session_id = match owner {
+        crate::shells::ShellOwner::LocalDesktop { .. } => "local-desktop".to_string(),
+        crate::shells::ShellOwner::Session { session, .. } => {
+            let mut id = String::from("session-");
+            for byte in &session[..8] {
+                use std::fmt::Write as _;
+                let _ = write!(id, "{byte:02x}");
+            }
+            id
+        }
+    };
+    LocationRef::SafeShellJail { session_id, path }
+}
 
 /// The refusal a caller who holds no seat receives.
 ///
@@ -69,6 +96,27 @@ fn boundary(error: &JailError) -> Refusal {
     )
 }
 
+fn sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::with_capacity(64), |mut output, byte| {
+            use std::fmt::Write as _;
+            let _ = write!(output, "{byte:02x}");
+            output
+        })
+}
+
+fn conflict() -> Refusal {
+    (
+        StatusCode::CONFLICT,
+        Json(ErrorBody {
+            schema_version: WEB_SCHEMA_V1,
+            error: "fileChangedSinceRead",
+            retryable: false,
+        }),
+    )
+}
+
 /// List one directory inside the sandbox.
 ///
 /// # Errors
@@ -79,9 +127,7 @@ pub async fn list_directory_handler(
     headers: HeaderMap,
     Json(payload): Json<FilePathRequest>,
 ) -> Result<Json<DirectoryListingProjection>, Refusal> {
-    if state.shell_seat(&headers).is_none() {
-        return Err(no_seat());
-    }
+    state.shell_seat(&headers).ok_or_else(no_seat)?;
 
     let entries = state
         .files
@@ -118,9 +164,7 @@ pub async fn read_file_handler(
     headers: HeaderMap,
     Json(payload): Json<FilePathRequest>,
 ) -> Result<Json<FileContentProjection>, Refusal> {
-    if state.shell_seat(&headers).is_none() {
-        return Err(no_seat());
-    }
+    let owner = state.shell_seat(&headers).ok_or_else(no_seat)?;
 
     // The size is read before the bytes so a file too large to serve can still say how large it is.
     // Answering "cannot show this" without saying what was too big is a refusal a person cannot act
@@ -139,8 +183,67 @@ pub async fn read_file_handler(
 
     Ok(Json(FileContentProjection {
         schema_version: WEB_SCHEMA_V1,
-        path: payload.path,
+        path: payload.path.clone(),
+        location: jail_location(&owner, payload.path),
+        content_sha256: sha256(text.as_bytes()),
         text,
         size_bytes,
+    }))
+}
+
+/// Conditionally replace one UTF-8 file inside the request owner's sandbox.
+///
+/// # Errors
+///
+/// Returns a governed refusal when the request has no private seat, the
+/// location was not issued for that seat, the payload exceeds the write
+/// limit, the expected digest is stale, or the sandbox cannot atomically
+/// replace and verify the file.
+pub async fn write_file_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<FileWriteRequest>,
+) -> Result<Json<FileWriteProjection>, Refusal> {
+    let owner = state.shell_seat(&headers).ok_or_else(no_seat)?;
+    let LocationRef::SafeShellJail { path, .. } = &payload.location else {
+        return Err(no_seat());
+    };
+    if jail_location(&owner, path.clone()) != payload.location {
+        return Err(no_seat());
+    }
+    if payload.text.len() > FILE_WRITE_MAX_BYTES {
+        return Err(boundary(&JailError::SizeLimitExceeded {
+            max_bytes: FILE_WRITE_MAX_BYTES,
+            actual_bytes: payload.text.len(),
+        }));
+    }
+
+    let _write_guard = FILE_WRITES.lock().unwrap_or_else(PoisonError::into_inner);
+    let current = state
+        .files
+        .read_to_string(path, FILE_READ_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+    if sha256(current.as_bytes()) != payload.expected_sha256 {
+        return Err(conflict());
+    }
+    state
+        .files
+        .replace_bytes_atomic(path, payload.text.as_bytes(), FILE_WRITE_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+    let verified = state
+        .files
+        .read_to_string(path, FILE_READ_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+    if verified != payload.text {
+        return Err(boundary(&JailError::Io(
+            "post-write verification failed".to_string(),
+        )));
+    }
+
+    Ok(Json(FileWriteProjection {
+        schema_version: WEB_SCHEMA_V1,
+        location: payload.location,
+        content_sha256: sha256(verified.as_bytes()),
+        size_bytes: u64::try_from(verified.len()).unwrap_or(u64::MAX),
     }))
 }

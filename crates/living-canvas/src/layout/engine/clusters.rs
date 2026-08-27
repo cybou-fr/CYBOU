@@ -35,7 +35,12 @@ impl DesktopLayout {
         let matching_cards: Vec<_> = self
             .cards
             .iter()
-            .filter(|card| cluster.card_keys.iter().any(|k| *k == card.id.key()))
+            .filter(|card| {
+                cluster
+                    .card_keys
+                    .iter()
+                    .any(|key| card.id.matches_persisted_key(key))
+            })
             .collect();
 
         if matching_cards.is_empty() {

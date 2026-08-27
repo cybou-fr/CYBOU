@@ -7,7 +7,7 @@ use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use wasm_bindgen::{JsCast, closure::Closure};
-use web_sys::KeyboardEvent;
+use web_sys::{BeforeUnloadEvent, KeyboardEvent};
 
 use living_canvas::{
     CameraHistory, ClientError, DesktopLayout, DesktopViewMode, GatewayMindClient, LayoutHistory,
@@ -48,14 +48,88 @@ pub fn App() -> impl IntoView {
     // Built here so every tool card's state is owned by the root rather than by whichever mount
     // happens to be showing it. Collapsing a card, switching a deck tab, or docking a card all
     // unmount its content; none of them are a person discarding what they had done.
-    provide_context(ToolCardStates::new());
+    let tool_states = ToolCardStates::new();
+    provide_context(tool_states);
     let layout = RwSignal::new(load_layout());
+    provide_context(layout);
+    provide_context(set_selected);
     let history = RwSignal::new(LayoutHistory::new());
     let camera_history = RwSignal::new(CameraHistory::new());
     let dragging = RwSignal::new(None::<DragState>);
     let resizing = RwSignal::new(None::<ResizeState>);
     let snap_guides = RwSignal::new(Vec::<SnapGuide>::new());
     let runtime = RwSignal::new(RuntimeState::Loading);
+
+    let open_deep_link = move |hash: &str| {
+        let Ok(subject) = cybou_protocol::SubjectRef::from_deep_link_hash(hash) else {
+            return;
+        };
+        let inspector = living_canvas::CardId::Inspector(0);
+        tool_states
+            .inspector(inspector)
+            .target_subject
+            .set(Some(subject));
+        layout.update(|desktop| desktop.open_card(inspector, 380.0, 150.0));
+        layout.get_untracked().save();
+        set_selected.set(Some(living_canvas::DesktopItemId::Card(inspector)));
+    };
+
+    #[cfg(target_arch = "wasm32")]
+    if let Some(window) = web_sys::window() {
+        if let Ok(hash) = window.location().hash() {
+            open_deep_link(&hash);
+        }
+        let listener_window = window.clone();
+        let on_hash_change = Closure::<dyn FnMut()>::new(move || {
+            if let Ok(hash) = listener_window.location().hash() {
+                open_deep_link(&hash);
+            }
+        });
+        let _ = window.add_event_listener_with_callback(
+            "hashchange",
+            on_hash_change.as_ref().unchecked_ref(),
+        );
+        let installed = StoredValue::new_local(Some((window, on_hash_change)));
+        on_cleanup(move || {
+            installed.update_value(|held| {
+                if let Some((window, handler)) = held.take() {
+                    let _ = window.remove_event_listener_with_callback(
+                        "hashchange",
+                        handler.as_ref().unchecked_ref(),
+                    );
+                }
+            });
+        });
+    }
+
+    // Editor contents are deliberately not copied into localStorage: that would turn private file
+    // content into an ungoverned durable browser cache. Until user-scoped server draft persistence
+    // exists, make navigation honest and interrupt accidental loss of browser-only buffers.
+    #[cfg(target_arch = "wasm32")]
+    if let Some(window) = web_sys::window() {
+        let on_before_unload =
+            Closure::<dyn FnMut(BeforeUnloadEvent)>::new(move |event: BeforeUnloadEvent| {
+                if tool_states.has_unsaved_editor_buffers() {
+                    event.prevent_default();
+                    event.set_return_value("Unsaved CYBOU editor buffers will be lost.");
+                }
+            });
+        let _ = window.add_event_listener_with_callback(
+            "beforeunload",
+            on_before_unload.as_ref().unchecked_ref(),
+        );
+        let installed = StoredValue::new_local(Some((window, on_before_unload)));
+        on_cleanup(move || {
+            installed.update_value(|held| {
+                if let Some((window, handler)) = held.take() {
+                    let _ = window.remove_event_listener_with_callback(
+                        "beforeunload",
+                        handler.as_ref().unchecked_ref(),
+                    );
+                }
+            });
+        });
+    }
 
     // Initial gateway bootstrap
     spawn_local(async move {

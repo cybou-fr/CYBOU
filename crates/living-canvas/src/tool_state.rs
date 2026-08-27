@@ -27,6 +27,15 @@ use leptos::reactive::owner::{Owner, StoredValue};
 
 use crate::CardId;
 
+/// Server version observed after a conditional editor save was refused as stale.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FileConflict {
+    /// Current verified server text.
+    pub server_content: String,
+    /// Digest of that server text, usable only after an explicit resolution choice.
+    pub server_sha256: String,
+}
+
 /// The greeting a Shell card shows before anyone has typed anything.
 const SHELL_BANNER: &str = "Bounded, read-only. Type 'help' to see what this shell can do.\n";
 
@@ -78,6 +87,10 @@ pub struct FileManagerSignals {
     pub selected_file: RwSignal<Option<String>>,
     /// Those contents.
     pub file_content: RwSignal<String>,
+    /// Owner-issued reference for the selected file, if its read succeeded.
+    pub selected_location: RwSignal<Option<cybou_protocol::LocationRef>>,
+    /// Content version established by the successful read.
+    pub selected_sha256: RwSignal<Option<String>>,
     /// Whether a read is in flight.
     pub loading: RwSignal<bool>,
     /// What went wrong with the last read, if anything.
@@ -94,6 +107,8 @@ impl FileManagerSignals {
             entries: RwSignal::new(Vec::new()),
             selected_file: RwSignal::new(None),
             file_content: RwSignal::new(String::new()),
+            selected_location: RwSignal::new(None),
+            selected_sha256: RwSignal::new(None),
             loading: RwSignal::new(false),
             error_msg: RwSignal::new(None),
             read: RwSignal::new(false),
@@ -122,17 +137,27 @@ pub struct EditorTab {
     pub language: String,
     /// Read-only protection mode.
     pub read_only: bool,
+    /// Last server-established content version, absent for unbound drafts.
+    pub expected_sha256: Option<String>,
+    /// Current server version discovered after a stale write, if unresolved.
+    pub conflict: Option<FileConflict>,
 }
 
 impl EditorTab {
     /// Create a new empty untitled buffer.
     #[must_use]
     pub fn untitled() -> Self {
+        Self::draft(1)
+    }
+
+    /// Create a distinct empty draft buffer within one editor instance.
+    #[must_use]
+    pub fn draft(number: u32) -> Self {
         Self {
-            name: "untitled.txt".to_string(),
-            location: cybou_protocol::LocationRef::HostUserPath(
-                "/home/cybou/untitled.txt".to_string(),
-            ),
+            name: format!("untitled-{number}.txt"),
+            location: cybou_protocol::LocationRef::Draft {
+                draft_id: format!("untitled-{number}"),
+            },
             content: String::new(),
             original_content: String::new(),
             dirty: false,
@@ -140,13 +165,20 @@ impl EditorTab {
             col: 1,
             language: "text".to_string(),
             read_only: false,
+            expected_sha256: None,
+            conflict: None,
         }
     }
 
-    /// Create a buffer from an existing file path and content.
+    /// Create a buffer from an owner-issued location and content.
     #[must_use]
-    pub fn from_file(path: &str, content: String) -> Self {
-        let name = path.rsplit('/').next().unwrap_or(path).to_string();
+    pub fn from_location(
+        location: cybou_protocol::LocationRef,
+        content: String,
+        expected_sha256: String,
+    ) -> Self {
+        let path = location.display_path();
+        let name = path.rsplit('/').next().unwrap_or(&path).to_string();
         let ext = name.rsplit('.').next().unwrap_or("");
         let language = match ext {
             "rs" => "rust",
@@ -165,7 +197,6 @@ impl EditorTab {
         }
         .to_string();
 
-        let location = cybou_protocol::LocationRef::from_path(path);
         let read_only = location.is_read_only();
 
         Self {
@@ -178,6 +209,8 @@ impl EditorTab {
             col: 1,
             language,
             read_only,
+            expected_sha256: Some(expected_sha256),
+            conflict: None,
         }
     }
 }
@@ -197,6 +230,25 @@ pub struct EditorSignals {
     pub markdown_preview: RwSignal<bool>,
     /// Whether the Action1 Diff/Save confirmation modal is open.
     pub save_proposal_open: RwSignal<bool>,
+    /// Whether discarding the local buffer for a conflict is awaiting confirmation.
+    pub conflict_discard_open: RwSignal<bool>,
+    /// Tab awaiting explicit confirmation before its unsaved buffer is discarded.
+    pub pending_close_tab: RwSignal<Option<usize>>,
+    /// Next editor-local draft identity.
+    pub next_draft_number: RwSignal<u32>,
+    /// Whether closing the whole editor with unsaved buffers awaits confirmation.
+    pub card_close_open: RwSignal<bool>,
+}
+
+/// What admitting a file into an editor did.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EditorTabAdmission {
+    /// The same owner-issued location was already open and was only focused.
+    FocusedExisting,
+    /// The initial pristine draft was replaced by the file.
+    ReplacedPristineDraft,
+    /// The file was added as another tab.
+    Added,
 }
 
 impl EditorSignals {
@@ -208,7 +260,42 @@ impl EditorSignals {
             status_msg: RwSignal::new(None),
             markdown_preview: RwSignal::new(false),
             save_proposal_open: RwSignal::new(false),
+            conflict_discard_open: RwSignal::new(false),
+            pending_close_tab: RwSignal::new(None),
+            next_draft_number: RwSignal::new(2),
+            card_close_open: RwSignal::new(false),
         }
+    }
+
+    /// Focus an already-open location or admit it without replacing local work.
+    pub fn admit_file(&self, tab: EditorTab) -> EditorTabAdmission {
+        let mut admission = EditorTabAdmission::Added;
+        self.tabs.update(|tabs| {
+            if let Some(position) = tabs
+                .iter()
+                .position(|existing| existing.location == tab.location)
+            {
+                self.active_tab_index.set(position);
+                admission = EditorTabAdmission::FocusedExisting;
+                return;
+            }
+
+            if tabs.len() == 1
+                && matches!(tabs[0].location, cybou_protocol::LocationRef::Draft { .. })
+                && !tabs[0].dirty
+                && tabs[0].conflict.is_none()
+                && tabs[0].content.is_empty()
+            {
+                tabs[0] = tab;
+                self.active_tab_index.set(0);
+                admission = EditorTabAdmission::ReplacedPristineDraft;
+                return;
+            }
+
+            tabs.push(tab);
+            self.active_tab_index.set(tabs.len().saturating_sub(1));
+        });
+        admission
     }
 }
 
@@ -365,6 +452,20 @@ impl ToolCardStates {
             held.insert(card, created);
         });
         created
+    }
+
+    /// Whether any editor instance holds changes that exist only in browser memory.
+    #[must_use]
+    pub fn has_unsaved_editor_buffers(&self) -> bool {
+        self.editors.with_value(|editors| {
+            editors.values().any(|editor| {
+                editor
+                    .tabs
+                    .get_untracked()
+                    .iter()
+                    .any(|tab| tab.dirty || tab.conflict.is_some())
+            })
+        })
     }
 
     /// Forget everything a card had done, because the card itself is gone.

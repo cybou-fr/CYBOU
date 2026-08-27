@@ -4,7 +4,48 @@
 //! Strongly-typed subject references for spatial desktop entities (ADR-0046).
 
 use crate::location::LocationRef;
+use percent_encoding::{NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Why a desktop deep link could not become a complete subject reference.
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum SubjectDeepLinkError {
+    /// The fragment is not a CYBOU entity route.
+    #[error("not a CYBOU subject deep link")]
+    InvalidRoute,
+    /// A percent-encoded segment is not valid UTF-8 or is structurally unsafe.
+    #[error("deep-link segment is invalid")]
+    InvalidSegment,
+    /// The route names an entity whose complete authority or metadata must be resolved by an owner.
+    #[error("this subject kind requires an owner-backed resolver")]
+    OwnerResolutionRequired,
+}
+
+fn encoded_segment(value: &str) -> String {
+    utf8_percent_encode(value, NON_ALPHANUMERIC).to_string()
+}
+
+fn decoded_segment(value: &str) -> Result<String, SubjectDeepLinkError> {
+    decoded_segment_with_slash(value, false)
+}
+
+fn decoded_segment_with_slash(
+    value: &str,
+    allow_slash: bool,
+) -> Result<String, SubjectDeepLinkError> {
+    let decoded = percent_decode_str(value)
+        .decode_utf8()
+        .map_err(|_| SubjectDeepLinkError::InvalidSegment)?;
+    if decoded.is_empty()
+        || decoded
+            .chars()
+            .any(|ch| ch.is_control() || (!allow_slash && ch == '/') || ch == '\\')
+    {
+        return Err(SubjectDeepLinkError::InvalidSegment);
+    }
+    Ok(decoded.into_owned())
+}
 
 /// Strongly-typed subject reference for entities displayed, connected, or dragged on the Living Canvas.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -163,7 +204,7 @@ impl SubjectRef {
     #[must_use]
     pub fn deep_link_hash(&self) -> String {
         match self {
-            Self::Service { name, .. } => format!("/#/service/{name}"),
+            Self::Service { name, .. } => format!("/#/service/{}", encoded_segment(name)),
             Self::Process { pid, .. } => format!("/#/process/{pid}"),
             Self::File { location } => format!("/#/file{}", location.display_path()),
             Self::Agent { capsule_id, .. } => format!("/#/agent/{capsule_id}"),
@@ -172,18 +213,69 @@ impl SubjectRef {
                 folder,
                 message_id,
             } => {
-                format!("/#/mail/{account_id}/{folder}/{message_id}")
+                format!(
+                    "/#/mail/{}/{}/{}",
+                    encoded_segment(account_id),
+                    encoded_segment(folder),
+                    encoded_segment(message_id)
+                )
             }
             Self::CalendarEvent {
                 account_id,
                 event_id,
             } => {
-                format!("/#/calendar/{account_id}/{event_id}")
+                format!(
+                    "/#/calendar/{}/{}",
+                    encoded_segment(account_id),
+                    encoded_segment(event_id)
+                )
             }
             Self::Certificate { domain, .. } => format!("/#/certificate/{domain}"),
             Self::Filesystem { mount_point, .. } => format!("/#/filesystem{mount_point}"),
-            Self::Package { name, .. } => format!("/#/package/{name}"),
+            Self::Package { name, .. } => format!("/#/package/{}", encoded_segment(name)),
             Self::Anchor { anchor_id, .. } => format!("/#/anchor/{anchor_id}"),
+        }
+    }
+
+    /// Parse a browser hash into a complete subject where the URL carries enough information.
+    ///
+    /// File, process, agent, certificate, filesystem, and anchor links deliberately require an
+    /// owner-backed resolver: their public URL does not contain enough metadata or authority to
+    /// construct a truthful [`SubjectRef`] in the browser.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SubjectDeepLinkError`] for malformed routes, unsafe encoding, unsupported subject
+    /// kinds, or identity-only routes that require an owner lookup.
+    pub fn from_deep_link_hash(hash: &str) -> Result<Self, SubjectDeepLinkError> {
+        let route = hash
+            .strip_prefix("/#/")
+            .or_else(|| hash.strip_prefix("#/"))
+            .ok_or(SubjectDeepLinkError::InvalidRoute)?;
+        let parts = route.split('/').collect::<Vec<_>>();
+        match parts.as_slice() {
+            ["service", name] => Ok(Self::Service {
+                name: decoded_segment(name)?,
+                node_id: None,
+            }),
+            ["package", name] => Ok(Self::Package {
+                name: decoded_segment(name)?,
+                installed_version: None,
+            }),
+            ["mail", account_id, folder, message_id] => Ok(Self::MailMessage {
+                account_id: decoded_segment(account_id)?,
+                folder: decoded_segment_with_slash(folder, true)?,
+                message_id: decoded_segment(message_id)?,
+            }),
+            ["calendar", account_id, event_id] => Ok(Self::CalendarEvent {
+                account_id: decoded_segment(account_id)?,
+                event_id: decoded_segment(event_id)?,
+            }),
+            [
+                "file" | "process" | "agent" | "certificate" | "filesystem" | "anchor",
+                ..,
+            ] => Err(SubjectDeepLinkError::OwnerResolutionRequired),
+            _ => Err(SubjectDeepLinkError::InvalidRoute),
         }
     }
 }
@@ -252,7 +344,55 @@ mod tests {
         assert_eq!(service.display_title(), "nginx.service");
         assert_eq!(service.kind_name(), "Service");
         assert_eq!(service.uri(), "cybou://service/nginx.service");
-        assert_eq!(service.deep_link_hash(), "/#/service/nginx.service");
+        assert_eq!(service.deep_link_hash(), "/#/service/nginx%2Eservice");
+        assert_eq!(
+            SubjectRef::from_deep_link_hash("#/service/nginx%2Eservice"),
+            Ok(service)
+        );
+    }
+
+    #[test]
+    fn deep_links_decode_complete_subjects_without_inventing_metadata() {
+        let calendar = SubjectRef::CalendarEvent {
+            account_id: "work@example.test".to_string(),
+            event_id: "event 42".to_string(),
+        };
+        assert_eq!(
+            SubjectRef::from_deep_link_hash(&calendar.deep_link_hash()),
+            Ok(calendar)
+        );
+        let mail = SubjectRef::MailMessage {
+            account_id: "work".to_string(),
+            folder: "Archive/2026".to_string(),
+            message_id: "message 7".to_string(),
+        };
+        assert_eq!(
+            SubjectRef::from_deep_link_hash(&mail.deep_link_hash()),
+            Ok(mail)
+        );
+        assert_eq!(
+            SubjectRef::from_deep_link_hash("#/package/cybou%2Dagentd"),
+            Ok(SubjectRef::Package {
+                name: "cybou-agentd".to_string(),
+                installed_version: None,
+            })
+        );
+    }
+
+    #[test]
+    fn authority_bearing_and_unsafe_deep_links_are_not_browser_minted() {
+        assert_eq!(
+            SubjectRef::from_deep_link_hash("#/file/etc/passwd"),
+            Err(SubjectDeepLinkError::OwnerResolutionRequired)
+        );
+        assert_eq!(
+            SubjectRef::from_deep_link_hash("#/service/%2E%2E%2Fetc"),
+            Err(SubjectDeepLinkError::InvalidSegment)
+        );
+        assert_eq!(
+            SubjectRef::from_deep_link_hash("#/service/%FF"),
+            Err(SubjectDeepLinkError::InvalidSegment)
+        );
     }
 
     #[test]
