@@ -13,8 +13,8 @@ use crate::{
         cards::{
             AgentsCard, AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
             DiffCard, DisclosureCard, EditorCard, FileManagerCard, IdentityCard, InsightCard,
-            JournalCard, JournalFeedCard, LifecycleCard, PerceptionCard, SelfModelCard,
-            SessionCard, ShellCard,
+            InspectorCard, JournalCard, JournalFeedCard, LifecycleCard, OutlineCard,
+            PerceptionCard, SelfModelCard, SessionCard, ShellCard,
         },
         deck::DeckContainerView,
         relations::RelationshipsLayer,
@@ -105,7 +105,7 @@ pub fn CanvasViewport(
                 move_resize(event, layout, resizing);
             }
             on:pointerup=move |_| {
-                if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
+                if let Some((_start_x, _start_y, init_px, init_py)) = panning.get() {
                     let cur_px = pan.get_untracked().0;
                     let cur_py = pan.get_untracked().1;
                     if (cur_px - init_px).abs() > 15.0 || (cur_py - init_py).abs() > 15.0 {
@@ -246,6 +246,16 @@ pub fn CanvasViewport(
                     <DiffCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
                 }
             />
+            <For
+                each=move || inspector_instances(&layout.get())
+                key=|instance| *instance
+                children=move |instance| view! {
+                    <InspectorCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
+                }
+            />
+            <Show when=move || outline_open(&layout.get())>
+                <OutlineCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing _auth_modal_open=auth_modal_open _runtime=runtime />
+            </Show>
 
             <For
                 each=move || layout.get().decks
@@ -314,6 +324,23 @@ fn diff_instances(layout: &DesktopLayout) -> Vec<u32> {
             _ => None,
         })
         .collect()
+}
+
+/// The Universal Inspector cards this layout holds, by instance.
+fn inspector_instances(layout: &DesktopLayout) -> Vec<u32> {
+    layout
+        .cards
+        .iter()
+        .filter_map(|card| match card.id {
+            CardId::Inspector(instance) => Some(instance),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether the Canvas Outline card is currently in layout.
+fn outline_open(layout: &DesktopLayout) -> bool {
+    layout.cards.iter().any(|card| card.id == CardId::Outline)
 }
 
 /// The event-stream cards this layout holds, by instance.

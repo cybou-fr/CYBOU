@@ -300,7 +300,7 @@ impl ActionCore {
             .cloned()
             .map(recover_interrupted)
             .collect();
-        list.sort_by(|a, b| b.proposal.proposed_at.cmp(&a.proposal.proposed_at));
+        list.sort_by_key(|b| std::cmp::Reverse(b.proposal.proposed_at));
         list
     }
 
@@ -310,12 +310,9 @@ impl ActionCore {
         let Ok(records) = self.records.lock() else {
             return Vec::new();
         };
-        let mut list: Vec<ActionRecord> = records
-            .values()
-            .cloned()
-            .map(recover_interrupted)
-            .collect();
-        list.sort_by(|a, b| b.proposal.proposed_at.cmp(&a.proposal.proposed_at));
+        let mut list: Vec<ActionRecord> =
+            records.values().cloned().map(recover_interrupted).collect();
+        list.sort_by_key(|b| std::cmp::Reverse(b.proposal.proposed_at));
         list
     }
 

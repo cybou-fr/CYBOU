@@ -129,7 +129,11 @@ pub struct SelfHealingStage {
 
 /// Compute the self-healing timeline stages from authorization and execution status.
 #[must_use]
-pub fn self_healing_timeline(verdict: &str, executed: bool, relieved: bool) -> Vec<SelfHealingStage> {
+pub fn self_healing_timeline(
+    verdict: &str,
+    executed: bool,
+    relieved: bool,
+) -> Vec<SelfHealingStage> {
     let decided = verdict == "granted" || verdict.contains("pre-authorized");
     vec![
         SelfHealingStage {

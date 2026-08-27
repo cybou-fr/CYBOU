@@ -77,7 +77,10 @@ pub async fn agents_handler(
 pub async fn agent_offers_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Result<Json<cybou_protocol::agent::AgentOffersResponse>, (StatusCode, Json<crate::state::ErrorBody>)> {
+) -> Result<
+    Json<cybou_protocol::agent::AgentOffersResponse>,
+    (StatusCode, Json<crate::state::ErrorBody>),
+> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }

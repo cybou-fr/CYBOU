@@ -148,14 +148,14 @@ async fn consider(
         // after a restart. The durable record is what survives; the map is a cache of it. Without
         // this the guarantee is only that it cannot act twice during one uninterrupted process, and
         // a crash must not be able to cause a second restart of a service.
-        if !handled.contains_key(&finding.insight_id) {
+        if let std::collections::hash_map::Entry::Vacant(e) = handled.entry(finding.insight_id) {
             match episode_for(system, finding.insight_id).await {
                 Ok(Some(already)) => {
                     println!(
                         "[cybou-remediationd] Remembering the episode already carried out for {}",
                         finding.finding.name()
                     );
-                    handled.insert(finding.insight_id, already);
+                    e.insert(already);
                 }
                 Ok(None) => {}
                 Err(why) => {

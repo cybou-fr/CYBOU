@@ -428,11 +428,7 @@ impl ZbusPresenceSource {
         cause_id: uuid::Uuid,
     ) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
         let encoded = self
-            .read_with::<Vec<u8>, (String,)>(
-                ACTION,
-                "RecordsForCause",
-                &(cause_id.to_string(),),
-            )
+            .read_with::<Vec<u8>, (String,)>(ACTION, "RecordsForCause", &(cause_id.to_string(),))
             .await?;
         let records: Vec<cybou_protocol::action::ActionRecord> = decode(&encoded)
             .or_else(|_| ciborium::from_reader(encoded.as_slice()))
@@ -441,10 +437,10 @@ impl ZbusPresenceSource {
     }
 
     /// Recent lifecycle records held by Action1.
-    pub(super) async fn recent_actions(&self) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
-        let encoded = self
-            .read::<Vec<u8>>(ACTION, "RecentRecords")
-            .await?;
+    pub(super) async fn recent_actions(
+        &self,
+    ) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
+        let encoded = self.read::<Vec<u8>>(ACTION, "RecentRecords").await?;
         let records: Vec<cybou_protocol::action::ActionRecord> = decode(&encoded)
             .or_else(|_| ciborium::from_reader(encoded.as_slice()))
             .ok()?;
@@ -452,14 +448,12 @@ impl ZbusPresenceSource {
     }
 }
 
-/// Project one ActionRecord into its web contract representation.
+/// Project one `ActionRecord` into its web contract representation.
 #[must_use]
 pub fn project_action_record(
     record: &cybou_protocol::action::ActionRecord,
 ) -> cybou_web_contracts::ActionRecordProjection {
-    use cybou_protocol::action::{
-        Agreement, AttemptReport, AuthorizationVerdict, RiskLevel,
-    };
+    use cybou_protocol::action::{Agreement, AttemptReport, AuthorizationVerdict, RiskLevel};
     use time::format_description::well_known::Rfc3339;
 
     cybou_web_contracts::ActionRecordProjection {
@@ -503,16 +497,15 @@ pub fn project_action_record(
             AuthorizationVerdict::RequiresUserConfirmation { prompt } => Some(prompt.clone()),
             AuthorizationVerdict::Denied { reason } => Some(reason.clone()),
         },
-        execution_started: record
-            .execution_started
-            .as_ref()
-            .map(|s| cybou_web_contracts::ExecutionStartedProjection {
+        execution_started: record.execution_started.as_ref().map(|s| {
+            cybou_web_contracts::ExecutionStartedProjection {
                 attempt_id: s.attempt_id,
                 proposal_id: s.proposal_id,
                 operation: s.operation.clone(),
                 target_resource: s.target_resource.clone(),
                 started_at: s.started_at.format(&Rfc3339).unwrap_or_default(),
-            }),
+            }
+        }),
         attempt: record
             .attempt
             .as_ref()

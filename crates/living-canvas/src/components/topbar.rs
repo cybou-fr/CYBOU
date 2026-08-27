@@ -8,7 +8,7 @@ use leptos::prelude::*;
 use lucide_leptos::{Ellipsis, FolderOpen, Link, ListChecks, Sparkles};
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout, LayoutHistory, CameraHistory,
+    CameraHistory, CardId, DesktopItemId, DesktopLayout, LayoutHistory,
     components::icons::{
         IconArrowLeft, IconArrowRight, IconLayers, IconPin, IconRedo, IconRefresh, IconUndo,
     },

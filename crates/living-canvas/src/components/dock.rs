@@ -154,6 +154,24 @@ pub fn DesktopDock(
                 </button>
                 <button
                     class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "inspector"))
+                    title="Universal Inspector"
+                    on:click=move |_| open_or_focus(CardId::Inspector(0), 380.0, 480.0)
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Inspector"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "outline"))
+                    title="Canvas Outline"
+                    on:click=move |_| open_or_focus(CardId::Outline, 300.0, 460.0)
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Outline"</span>
+                </button>
+                <button
+                    class="dock-item"
                     title="Mind Explorer"
                     on:click=move |_| {
                         layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, None));

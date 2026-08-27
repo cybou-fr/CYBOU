@@ -62,10 +62,12 @@ impl CameraHistory {
 
     /// Record a significant camera transition.
     pub fn record(&mut self, state: CameraState) {
-        if let Some(last) = self.past.last() {
-            if last.is_close_to(&state) {
-                return;
-            }
+        if self
+            .past
+            .last()
+            .is_some_and(|last| last.is_close_to(&state))
+        {
+            return;
         }
         if self.past.len() >= self.max_entries {
             self.past.remove(0);
@@ -110,7 +112,11 @@ pub fn apply_camera_back(
     zoom: ReadSignal<f64>,
     set_zoom: WriteSignal<f64>,
 ) -> bool {
-    let current = CameraState::new(pan.get_untracked().0, pan.get_untracked().1, zoom.get_untracked());
+    let current = CameraState::new(
+        pan.get_untracked().0,
+        pan.get_untracked().1,
+        zoom.get_untracked(),
+    );
     let mut restored = None;
     camera_history.update(|h| {
         restored = h.back(current);
@@ -133,7 +139,11 @@ pub fn apply_camera_forward(
     zoom: ReadSignal<f64>,
     set_zoom: WriteSignal<f64>,
 ) -> bool {
-    let current = CameraState::new(pan.get_untracked().0, pan.get_untracked().1, zoom.get_untracked());
+    let current = CameraState::new(
+        pan.get_untracked().0,
+        pan.get_untracked().1,
+        zoom.get_untracked(),
+    );
     let mut restored = None;
     camera_history.update(|h| {
         restored = h.forward(current);

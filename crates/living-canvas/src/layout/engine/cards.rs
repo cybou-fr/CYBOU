@@ -72,7 +72,11 @@ impl DesktopLayout {
     }
 
     /// Set panel representation tier (Standard, Glance, Expanded) for a card.
-    pub fn set_representation(&mut self, id: CardId, representation: crate::card::PanelRepresentation) {
+    pub fn set_representation(
+        &mut self,
+        id: CardId,
+        representation: crate::card::PanelRepresentation,
+    ) {
         if let Some(card) = self.card_mut(id) {
             card.presentation.representation = representation;
         }

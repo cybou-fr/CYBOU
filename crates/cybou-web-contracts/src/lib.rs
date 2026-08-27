@@ -76,7 +76,7 @@ pub struct SessionProjection {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FindingProjection {
-    /// Canonical identity of the causal SystemInsight (matches ActionProposal.cause_id).
+    /// Canonical identity of the causal `SystemInsight` (matches `ActionProposal.cause_id`).
     #[serde(default)]
     pub id: Option<Uuid>,
     /// The finding, in the frozen vocabulary.

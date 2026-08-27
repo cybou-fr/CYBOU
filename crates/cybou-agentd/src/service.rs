@@ -70,6 +70,10 @@ pub struct PreparedLaunch {
 /// D-Bus owner's admission and lifecycle decisions without starting service-manager units.
 pub trait Launcher: Send + Sync {
     /// Resolve the caller's selection only through operator-approved profiles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string if profile resolution or boundary admission fails.
     fn prepare(
         &self,
         request: &LaunchRequest,
@@ -77,6 +81,10 @@ pub trait Launcher: Send + Sync {
     ) -> Result<PreparedLaunch, String>;
 
     /// Begin the already-admitted launch and arrange its lifecycle updates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string if process spawning or capsule initialization fails.
     fn start(
         &self,
         prepared: PreparedLaunch,
@@ -84,6 +92,10 @@ pub trait Launcher: Send + Sync {
     ) -> Result<(), String>;
 
     /// Return the catalogue of operator-approved profiles and host readiness.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string if profile catalogues cannot be read.
     fn offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, String> {
         Ok(cybou_protocol::agent::AgentOffersResponse::default())
     }

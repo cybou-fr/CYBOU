@@ -11,7 +11,8 @@ use leptos::task::spawn_local;
 use crate::{
     CardId, DesktopItemId, DesktopLayout, DesktopViewMode, GatewayMindClient, MindClient,
     components::icons::{
-        IconClose, IconExternalLink, IconLayers, IconMaximize, IconMinimize, IconPin, IconResizeGrip,
+        IconClose, IconExternalLink, IconLayers, IconMaximize, IconMinimize, IconPin,
+        IconResizeGrip,
     },
     interaction::{ResizeState, start_deck_resize, start_resize},
     tool_state::ToolCardStates,

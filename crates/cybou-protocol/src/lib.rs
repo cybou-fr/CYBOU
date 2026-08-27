@@ -33,10 +33,12 @@ pub mod meaning;
 pub mod model;
 pub mod promotion;
 pub mod security;
+pub mod subject;
 pub mod telemetry;
 
 pub use admission::Kind;
 pub use location::LocationRef;
+pub use subject::{EpistemicPresentation, SubjectRef};
 
 /// Canonical Qt-compatible UTC wall-clock spelling: whole milliseconds since the Unix epoch.
 ///

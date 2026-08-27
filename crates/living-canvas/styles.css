@@ -2421,4 +2421,246 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   color: var(--accent);
 }
 
+/* --- Universal Inspector (ADR-0046 §5) ----------------------------------------------------- */
+.inspector-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0d131c;
+  padding: 12px;
+  gap: 12px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.inspector-quick-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.inspector-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(154, 167, 184, 0.18);
+  border-radius: 12px;
+  font-size: 10px;
+  padding: 3px 8px;
+  color: #dfe8ed;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.inspector-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.inspector-header {
+  background: rgba(15, 23, 35, 0.8);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inspector-badge {
+  align-self: flex-start;
+  background: rgba(112, 225, 200, 0.15);
+  color: #70e1c8;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.inspector-title {
+  margin: 0;
+  font-size: 14px;
+  color: #fff;
+  font-weight: 600;
+}
+.inspector-uri {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  word-break: break-all;
+}
+.inspector-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inspector-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.inspector-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(9, 14, 21, 0.6);
+  border-radius: 6px;
+  padding: 8px;
+}
+.inspector-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.inspector-row .lbl {
+  color: var(--muted);
+}
+.inspector-row .val {
+  color: #dfe8ed;
+  font-weight: 500;
+}
+.inspector-row .val.ok {
+  color: #4ade80;
+}
+.inspector-relations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.relation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 5px;
+  font-size: 11px;
+}
+.rel-name {
+  color: var(--muted);
+}
+.rel-target {
+  color: #93c5fd;
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+.inspector-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.inspector-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  color: #dfe8ed;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.inspector-btn.primary {
+  background: var(--accent);
+  color: #061118;
+  font-weight: 600;
+  border: none;
+}
+.inspector-status {
+  font-size: 11px;
+  color: var(--accent);
+  padding: 4px 8px;
+  background: rgba(112, 225, 200, 0.08);
+  border-radius: 4px;
+}
+
+/* --- Canvas Outline (ADR-0046 §22, §29) --------------------------------------------------- */
+.outline-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0d131c;
+  padding: 12px;
+  gap: 12px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.outline-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  border-bottom: 1px solid rgba(154, 167, 184, 0.16);
+  padding-bottom: 8px;
+}
+.outline-title {
+  color: #dfe8ed;
+}
+.outline-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.outline-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.outline-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.outline-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #dfe8ed;
+  cursor: pointer;
+  user-select: none;
+}
+.outline-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.outline-icon {
+  color: var(--accent);
+  font-size: 12px;
+}
+.outline-name {
+  font-weight: 500;
+}
+.outline-badge {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.outline-pos {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+.outline-item.cluster, .cluster {
+  border-left: 2px solid #70e1c8;
+}
+.outline-item.deck, .deck {
+  border-left: 2px solid #a855f7;
+}
+.outline-item.card, .card {
+  border-left: 2px solid rgba(154, 167, 184, 0.4);
+}
+
+
+
 

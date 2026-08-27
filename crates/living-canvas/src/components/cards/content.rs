@@ -12,9 +12,10 @@ use crate::{
         capabilities::CapabilitiesContent, commitments::CommitmentsContent,
         context::ContextContent, diff::DiffContent, disclosure::DisclosureContent,
         editor::EditorContent, file_manager::FileManagerContent, identity::IdentityContent,
-        insight::InsightContent, journal::JournalContent, journal_feed::JournalFeedContent,
-        lifecycle::LifecycleContent, perception::PerceptionContent, self_model::SelfModelContent,
-        session::SessionContent, shell::ShellContent,
+        insight::InsightContent, inspector::InspectorContent, journal::JournalContent,
+        journal_feed::JournalFeedContent, lifecycle::LifecycleContent, outline::OutlineContent,
+        perception::PerceptionContent, self_model::SelfModelContent, session::SessionContent,
+        shell::ShellContent,
     },
     state::RuntimeState,
 };
@@ -63,6 +64,11 @@ pub fn CardContent(
             view! { <DiffContent runtime=runtime auth_modal_open=auth instance=instance /> }
                 .into_any()
         }
+        CardId::Inspector(instance) => {
+            view! { <InspectorContent runtime=runtime auth_modal_open=auth instance=instance /> }
+                .into_any()
+        }
+        CardId::Outline => view! { <OutlineContent /> }.into_any(),
         CardId::JournalFeed(_) => view! { <JournalFeedContent /> }.into_any(),
     }
 }

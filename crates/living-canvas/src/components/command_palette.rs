@@ -32,8 +32,9 @@ pub fn CommandPalette(
     command_input: NodeRef<leptos::html::Input>,
     set_zoom: WriteSignal<f64>,
     set_pan: WriteSignal<(f64, f64)>,
-    #[prop(default = RwSignal::new(crate::state::RuntimeState::Loading))]
-    runtime: RwSignal<crate::state::RuntimeState>,
+    #[prop(default = RwSignal::new(crate::state::RuntimeState::Loading))] runtime: RwSignal<
+        crate::state::RuntimeState,
+    >,
 ) -> impl IntoView {
     let select_from_command = move |panel: &'static str| {
         // A named panel is always a system card, and a system card is a singleton, so its key
@@ -169,6 +170,22 @@ pub fn CommandPalette(
                             select_from_command("diff");
                         }
                     ><IconExternalLink size=15 /><span><b>"Open Diff Viewer"</b><i>"Inspect and review changes"</i></span></button>
+                    <button
+                        class:hidden=move || !command_matches(&command_query.get(), "inspector inspect service entity process details")
+                        on:click=move |_| {
+                            layout.update(|l| l.open_card(CardId::Inspector(0), 380.0, 150.0));
+                            layout.get_untracked().save();
+                            select_from_command("inspector");
+                        }
+                    ><IconExternalLink size=15 /><span><b>"Open Universal Inspector"</b><i>"Deep entity state & relations"</i></span></button>
+                    <button
+                        class:hidden=move || !command_matches(&command_query.get(), "outline tree hierarchy accessibility navigation")
+                        on:click=move |_| {
+                            layout.update(|l| l.open_card(CardId::Outline, 320.0, 120.0));
+                            layout.get_untracked().save();
+                            select_from_command("outline");
+                        }
+                    ><IconExternalLink size=15 /><span><b>"Open Canvas Outline"</b><i>"Workspace hierarchy & tree view"</i></span></button>
                     <button
                         class:hidden=move || !command_matches(&command_query.get(), "events feed live stream sse journal")
                         on:click=move |_| {

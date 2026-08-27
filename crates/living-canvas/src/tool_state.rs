@@ -130,7 +130,9 @@ impl EditorTab {
     pub fn untitled() -> Self {
         Self {
             name: "untitled.txt".to_string(),
-            location: cybou_protocol::LocationRef::HostUserPath("/home/cybou/untitled.txt".to_string()),
+            location: cybou_protocol::LocationRef::HostUserPath(
+                "/home/cybou/untitled.txt".to_string(),
+            ),
             content: String::new(),
             original_content: String::new(),
             dirty: false,
@@ -160,7 +162,8 @@ impl EditorTab {
             "html" | "htm" => "html",
             "css" => "css",
             _ => "text",
-        }.to_string();
+        }
+        .to_string();
 
         let location = cybou_protocol::LocationRef::from_path(path);
         let read_only = location.is_read_only();
@@ -242,6 +245,24 @@ impl DiffSignals {
     }
 }
 
+/// One Universal Inspector card's interactive state.
+#[derive(Clone, Copy)]
+pub struct InspectorSignals {
+    /// Active subject being inspected.
+    pub target_subject: RwSignal<Option<cybou_protocol::SubjectRef>>,
+    /// Status message or last action output.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl InspectorSignals {
+    fn new() -> Self {
+        Self {
+            target_subject: RwSignal::new(None),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
 /// The interactive state of every tool card on this desktop.
 ///
 /// Provided once at the root and read from context by the cards. It is `Copy` so a card can hold it
@@ -254,6 +275,7 @@ pub struct ToolCardStates {
     file_managers: StoredValue<HashMap<CardId, FileManagerSignals>>,
     editors: StoredValue<HashMap<CardId, EditorSignals>>,
     diffs: StoredValue<HashMap<CardId, DiffSignals>>,
+    inspectors: StoredValue<HashMap<CardId, InspectorSignals>>,
 }
 
 impl ToolCardStates {
@@ -267,6 +289,7 @@ impl ToolCardStates {
             file_managers: StoredValue::new(HashMap::new()),
             editors: StoredValue::new(HashMap::new()),
             diffs: StoredValue::new(HashMap::new()),
+            inspectors: StoredValue::new(HashMap::new()),
         }
     }
 
@@ -304,10 +327,7 @@ impl ToolCardStates {
     /// This Text Editor card's state, creating it the first time the card is shown.
     #[must_use]
     pub fn editor(&self, card: CardId) -> EditorSignals {
-        if let Some(existing) = self
-            .editors
-            .with_value(|held| held.get(&card).copied())
-        {
+        if let Some(existing) = self.editors.with_value(|held| held.get(&card).copied()) {
             return existing;
         }
         let created = self
@@ -322,16 +342,26 @@ impl ToolCardStates {
     /// This Diff Viewer card's state, creating it the first time the card is shown.
     #[must_use]
     pub fn diff(&self, card: CardId) -> DiffSignals {
-        if let Some(existing) = self
-            .diffs
-            .with_value(|held| held.get(&card).copied())
-        {
+        if let Some(existing) = self.diffs.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self.owner.with_value(|owner| owner.with(DiffSignals::new));
+        self.diffs.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Inspector card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn inspector(&self, card: CardId) -> InspectorSignals {
+        if let Some(existing) = self.inspectors.with_value(|held| held.get(&card).copied()) {
             return existing;
         }
         let created = self
             .owner
-            .with_value(|owner| owner.with(DiffSignals::new));
-        self.diffs.update_value(|held| {
+            .with_value(|owner| owner.with(InspectorSignals::new));
+        self.inspectors.update_value(|held| {
             held.insert(card, created);
         });
         created
@@ -349,6 +379,9 @@ impl ToolCardStates {
             held.remove(&card);
         });
         self.diffs.update_value(|held| {
+            held.remove(&card);
+        });
+        self.inspectors.update_value(|held| {
             held.remove(&card);
         });
     }

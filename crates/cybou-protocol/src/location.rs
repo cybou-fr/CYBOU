@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Typed authority domain and workspace location reference.
 ///
 /// Distinguishes between standard user files, privileged system files requiring
-/// Action1 FileWrite proposals, isolated agent capsule sandboxes, bounded demo jails,
+/// Action1 `FileWrite` proposals, isolated agent capsule sandboxes, bounded demo jails,
 /// and immutable backup snapshots.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "target")]
@@ -16,7 +16,7 @@ pub enum LocationRef {
     /// Standard host user directory or file (e.g. `/home/user/...`).
     HostUserPath(String),
     /// Privileged system configuration file (e.g. `/etc/nginx/nginx.conf`).
-    /// Direct browser writes are forbidden; saves must route through Action1 FileWrite proposals.
+    /// Direct browser writes are forbidden; saves must route through Action1 `FileWrite` proposals.
     SystemConfigPath(String),
     /// Ephemeral isolated agent capsule sandbox.
     AgentWorkspace {
@@ -47,7 +47,10 @@ impl LocationRef {
     pub fn display_path(&self) -> String {
         match self {
             Self::HostUserPath(p) | Self::SystemConfigPath(p) => p.clone(),
-            Self::AgentWorkspace { capsule_id, relative_path } => {
+            Self::AgentWorkspace {
+                capsule_id,
+                relative_path,
+            } => {
                 format!("agent://{capsule_id}/{relative_path}")
             }
             Self::SafeShellJail { session_id, path } => {
@@ -64,11 +67,13 @@ impl LocationRef {
     pub fn as_host_path(&self) -> Option<&str> {
         match self {
             Self::HostUserPath(p) | Self::SystemConfigPath(p) => Some(p.as_str()),
-            Self::AgentWorkspace { .. } | Self::SafeShellJail { .. } | Self::BackupSnapshot { .. } => None,
+            Self::AgentWorkspace { .. }
+            | Self::SafeShellJail { .. }
+            | Self::BackupSnapshot { .. } => None,
         }
     }
 
-    /// Whether saving modifications to this location requires an Action1 FileWrite proposal.
+    /// Whether saving modifications to this location requires an Action1 `FileWrite` proposal.
     #[must_use]
     pub fn requires_action_authorization(&self) -> bool {
         matches!(self, Self::SystemConfigPath(_))
@@ -80,11 +85,15 @@ impl LocationRef {
         matches!(self, Self::BackupSnapshot { .. })
     }
 
-    /// Create a new LocationRef by detecting if a path is privileged system path.
+    /// Create a new `LocationRef` by detecting if a path is privileged system path.
     #[must_use]
     pub fn from_path(path: impl Into<String>) -> Self {
         let p = path.into();
-        if p.starts_with("/etc/") || p.starts_with("/usr/") || p.starts_with("/lib/") || p.starts_with("/boot/") {
+        if p.starts_with("/etc/")
+            || p.starts_with("/usr/")
+            || p.starts_with("/lib/")
+            || p.starts_with("/boot/")
+        {
             Self::SystemConfigPath(p)
         } else {
             Self::HostUserPath(p)

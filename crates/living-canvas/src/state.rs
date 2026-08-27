@@ -172,7 +172,10 @@ pub fn first_command_match(query: &str) -> Option<&'static str> {
         ("perception", "perception host observation"),
         ("context", "context association concepts context1"),
         ("shell", "shell terminal body capability"),
-        ("insight", "insight telemetry machine health findings status"),
+        (
+            "insight",
+            "insight telemetry machine health findings status",
+        ),
         ("agents", "agents agent1 launch opencode task"),
     ]
     .into_iter()
@@ -363,8 +366,7 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                         headline: format!("{} agent session(s) active", live.len()),
                         detail: format!(
                             "{} running in {} (\"{task_desc}\"). Spend: {spend_desc}.",
-                            first.agent,
-                            first.workspace
+                            first.agent, first.workspace
                         ),
                         target: Some(("Open Agents", crate::CardId::Agents)),
                     })
@@ -381,7 +383,9 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                     } else {
                         Some(AskCybouAnswer {
                             headline: "No agents currently running".to_string(),
-                            detail: "Agent runtime is idle. Ready to launch sandboxed OpenCode agents.".to_string(),
+                            detail:
+                                "Agent runtime is idle. Ready to launch sandboxed OpenCode agents."
+                                    .to_string(),
                             target: Some(("Launch Agent", crate::CardId::Agents)),
                         })
                     }
@@ -389,7 +393,9 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
             }
             RuntimeState::Ready { agents: None, .. } => Some(AskCybouAnswer {
                 headline: "Agent runtime unreachable".to_string(),
-                detail: "I could not reach Agent1. I cannot establish whether any agents are running.".to_string(),
+                detail:
+                    "I could not reach Agent1. I cannot establish whether any agents are running."
+                        .to_string(),
                 target: Some(("Open Agents", crate::CardId::Agents)),
             }),
             _ => None,

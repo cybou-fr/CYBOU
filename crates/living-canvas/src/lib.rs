@@ -36,14 +36,14 @@ pub use deck::DeckInstance;
 #[cfg(target_arch = "wasm32")]
 pub use gateway_client::GatewayMindClient;
 pub use instant::{instant_label, time_label};
-#[cfg(target_arch = "wasm32")]
-pub use layout::{apply_camera_back, apply_camera_forward};
 pub use layout::{
     ArrangementMode, CameraHistory, CameraState, DesktopCluster, DesktopItem, DesktopItemId,
     DesktopLayout, DesktopViewMode, LayoutHistory, MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH,
-    MinimapProjection, PlacementResolver, Rect, SnapGuide, SnapResult, UsableViewport, pan_centring,
-    selected_rect, selected_z, visible_desktop_rect,
+    MinimapProjection, PlacementResolver, Rect, SnapGuide, SnapResult, UsableViewport,
+    pan_centring, selected_rect, selected_z, visible_desktop_rect,
 };
+#[cfg(target_arch = "wasm32")]
+pub use layout::{apply_camera_back, apply_camera_forward};
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -131,7 +131,8 @@ pub trait MindClient {
     /// # Errors
     ///
     /// Returns [`ClientError::GatewayRequest`] when Agent1 is unavailable.
-    async fn agent_offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError>;
+    async fn agent_offers(&self)
+    -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError>;
 
     /// Return action records matching the optional cause query.
     ///
@@ -257,10 +258,7 @@ impl MockMindClient {
 
     /// Attach agent offers to a mock client.
     #[must_use]
-    pub fn with_agent_offers(
-        mut self,
-        offers: cybou_protocol::agent::AgentOffersResponse,
-    ) -> Self {
+    pub fn with_agent_offers(mut self, offers: cybou_protocol::agent::AgentOffersResponse) -> Self {
         self.agent_offers = Some(offers);
         self
     }
@@ -376,7 +374,9 @@ impl MindClient for MockMindClient {
         ))
     }
 
-    async fn agent_offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError> {
+    async fn agent_offers(
+        &self,
+    ) -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError> {
         Ok(self.agent_offers.clone().unwrap_or_default())
     }
 

@@ -242,31 +242,26 @@ impl ZbusPresenceSource {
                 args,
             )
             .await
+            && let Ok(body) = reply.body().deserialize()
         {
-            if let Ok(body) = reply.body().deserialize() {
-                return Some(body);
-            }
+            return Some(body);
         }
 
         // On production Linux deployments, Action1 is on the system bus so the root executor can
         // authenticate with it. If the session bus call failed and the target is Action1, try system bus.
         if endpoint.service == cybou_fabric::ACTION.service {
-            if let Ok(system) = zbus::Connection::system().await {
-                if let Ok(reply) = system
-                    .call_method(
-                        Some(endpoint.service),
-                        endpoint.object_path,
-                        Some(endpoint.interface),
-                        method,
-                        args,
-                    )
-                    .await
-                {
-                    if let Ok(body) = reply.body().deserialize() {
-                        return Some(body);
-                    }
-                }
-            }
+            let system = zbus::Connection::system().await.ok()?;
+            let reply = system
+                .call_method(
+                    Some(endpoint.service),
+                    endpoint.object_path,
+                    Some(endpoint.interface),
+                    method,
+                    args,
+                )
+                .await
+                .ok()?;
+            return reply.body().deserialize().ok();
         }
 
         None

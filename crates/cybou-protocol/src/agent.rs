@@ -154,9 +154,9 @@ pub struct OfferedModelView {
 pub struct OfferedProfileView {
     /// Unique profile identifier.
     pub id: String,
-    /// Which agents may run under these bounds (e.g. ["opencode"]).
+    /// Which agents may run under these bounds (e.g. [`opencode`]).
     pub agents: Vec<String>,
-    /// Permitted workspace directory roots (e.g. ["/projects"]).
+    /// Permitted workspace directory roots (e.g. [`/projects`]).
     pub workspace_roots: Vec<String>,
     /// Memory ceiling in mebibytes.
     pub memory_mib: u32,

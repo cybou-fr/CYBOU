@@ -43,7 +43,10 @@ pub fn EditorContent(
     let active_tab = move || {
         let all_tabs = tabs.get();
         let idx = active_tab_index.get();
-        all_tabs.get(idx).cloned().unwrap_or_else(EditorTab::untitled)
+        all_tabs
+            .get(idx)
+            .cloned()
+            .unwrap_or_else(EditorTab::untitled)
     };
 
     let update_current_content = move |new_content: String| {

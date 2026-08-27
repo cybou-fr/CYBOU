@@ -51,6 +51,10 @@ pub enum CardId {
     Editor(u32),
     /// Universal diff inspector and review panel (ADR-0045).
     Diff(u32),
+    /// Universal contextual entity inspector panel (ADR-0046 §5).
+    Inspector(u32),
+    /// Canvas Outline non-spatial accessibility tree view (ADR-0046 §22, §29).
+    Outline,
 }
 
 impl CardId {
@@ -95,6 +99,8 @@ impl CardId {
             Self::JournalFeed(_) => "journal-feed",
             Self::Editor(_) => "editor",
             Self::Diff(_) => "diff",
+            Self::Inspector(_) => "inspector",
+            Self::Outline => "outline",
         }
     }
 
@@ -121,6 +127,8 @@ impl CardId {
             Self::JournalFeed(_) => "Event Stream",
             Self::Editor(_) => "Text Editor",
             Self::Diff(_) => "Diff Viewer",
+            Self::Inspector(_) => "Universal Inspector",
+            Self::Outline => "Canvas Outline",
         }
     }
 
@@ -147,6 +155,8 @@ impl CardId {
             "journal-feed" => Some(Self::JournalFeed(0)),
             "editor" => Some(Self::Editor(0)),
             "diff" => Some(Self::Diff(0)),
+            "inspector" => Some(Self::Inspector(0)),
+            "outline" => Some(Self::Outline),
             _ => None,
         }
     }
@@ -414,6 +424,30 @@ impl CardId {
                 default_size: (640.0, 440.0),
                 min_size: (400.0, 260.0),
                 max_size: (1600.0, 1100.0),
+            },
+            Self::Inspector(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (380.0, 480.0),
+                min_size: (280.0, 320.0),
+                max_size: (800.0, 900.0),
+            },
+            Self::Outline => CardSpec {
+                kind: CardKind::Tool,
+                singleton: true,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (300.0, 460.0),
+                min_size: (220.0, 300.0),
+                max_size: (600.0, 800.0),
             },
         }
     }

@@ -290,7 +290,17 @@ async fn launch(selection: &Selection) -> Result<(), String> {
 
     // From here on every path ends in teardown, including the ones that fail. A launch that gave up
     // halfway and returned would leave a live gateway holding a bearer for a session nobody watches.
-    match bring_up(&plan, &spec, &programs, selection, &mut session, || {}, |_| {}).await {
+    match bring_up(
+        &plan,
+        &spec,
+        &programs,
+        selection,
+        &mut session,
+        || {},
+        |_| {},
+    )
+    .await
+    {
         Ok(true) => session.begin_ending(SessionEnd::AgentFinished),
         Ok(false) => session.begin_ending(SessionEnd::Failed(
             "the agent exited with a failure".to_owned(),
@@ -997,12 +1007,11 @@ async fn run_owned_launch(
     )
     .await;
 
-    if let Some(task) = session.task().cloned() {
-        if let Ok(mut held) = registry.lock()
-            && let Some(live) = held.get_mut(capsule_id)
-        {
-            live.session.set_task(task);
-        }
+    if let Some(task) = session.task().cloned()
+        && let Ok(mut held) = registry.lock()
+        && let Some(live) = held.get_mut(capsule_id)
+    {
+        live.session.set_task(task);
     }
 
     let end = match result {

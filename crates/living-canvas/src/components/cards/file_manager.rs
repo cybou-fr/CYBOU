@@ -221,7 +221,60 @@ pub fn FileManagerContent(
                         <aside class="fm-preview">
                             <header class="fm-preview-header">
                                  <span><IconFile size=12 /> " " {move || selected_file.get().unwrap_or_default()}</span>
-                                <div class="fm-preview-actions">
+                                 <div class="fm-preview-actions">
+                                    <button
+                                        class="fm-btn"
+                                        title="Open file in Text Editor"
+                                        on:click=move |_| {
+                                            let tool_states = expect_context::<ToolCardStates>();
+                                            let editor_state = tool_states.editor(CardId::Editor(0));
+                                            let filename = selected_file.get().unwrap_or_default();
+                                            let cur = current_path.get();
+                                            let full_path = if cur == "/" {
+                                                format!("/{filename}")
+                                            } else {
+                                                format!("{cur}/{filename}")
+                                            };
+                                            let lang = if filename.ends_with(".rs") {
+                                                "rust"
+                                            } else if filename.ends_with(".toml") {
+                                                "toml"
+                                            } else if filename.ends_with(".json") {
+                                                "json"
+                                            } else if filename.ends_with(".md") {
+                                                "markdown"
+                                            } else {
+                                                "text"
+                                            };
+                                            let text = file_content.get();
+                                            let tab = crate::tool_state::EditorTab {
+                                                name: filename,
+                                                location: cybou_protocol::LocationRef::from_path(&full_path),
+                                                content: text.clone(),
+                                                original_content: text,
+                                                dirty: false,
+                                                line: 1,
+                                                col: 1,
+                                                language: lang.to_string(),
+                                                read_only: false,
+                                            };
+                                            editor_state.tabs.update(|tabs| {
+                                                if let Some(pos) = tabs.iter().position(|t| t.location == tab.location) {
+                                                    editor_state.active_tab_index.set(pos);
+                                                } else {
+                                                    tabs.push(tab);
+                                                    editor_state.active_tab_index.set(tabs.len().saturating_sub(1));
+                                                }
+                                            });
+                                            if let Some(l) = use_context::<RwSignal<DesktopLayout>>() {
+                                                l.update(|layout| layout.open_card(CardId::Editor(0), 400.0, 180.0));
+                                                l.get_untracked().save();
+                                            }
+                                        }
+                                    >
+                                        <IconFile size=12 />
+                                        <span>"Edit"</span>
+                                    </button>
                                     <button
                                         class="fm-btn"
                                         title="Copy file text to clipboard"

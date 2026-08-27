@@ -137,8 +137,7 @@ impl Action1Service {
 
     /// Every retained lifecycle record held by Action1, newest first.
     async fn recent_records(&self) -> fdo::Result<Vec<u8>> {
-        encode(&self.core.recent_records())
-            .map_err(|error| fdo::Error::Failed(error.to_string()))
+        encode(&self.core.recent_records()).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
 
     async fn claim_permit(&self, permit_id: String) -> fdo::Result<Vec<u8>> {
