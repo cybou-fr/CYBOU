@@ -44,6 +44,7 @@ SPDX-License-Identifier: MIT
 | [0043](ADR-0043-model-gateway-for-external-agents.md) | A Model Gateway for External Agents | Proposed |
 | [0044](ADR-0044-cybou-spatial-desktop-architecture.md) | CYBOU Spatial Desktop Architecture: Infinite Canvas, Panel 2.0, Clusters, Semantic Zoom, Typed Relations, and Non-Cognitive Presentation Invariants | Proposed |
 | [0045](ADR-0045-cybou-core-desktop-pack-and-workspace-primitives.md) | CYBOU Core Desktop Pack: Universal Workspace Primitives, Text Editor, Diff Engine, Files 2.0, Mail & Personal Core, System Control Center, and Authority Domains | Proposed |
+| [0046](ADR-0046-cybou-spatial-desktop-operating-model.md) | CYBOU Spatial Desktop Operating Model: Full Lifecycle, SubjectRef Primitives, System Inspection, Universal Search, Epistemic State Machine, Background Operations, and Resilience Acceptance Gates (SD1–SD15) | Proposed |
 
 Numbers have gaps, and the gaps are deliberate. An ADR whose decision no longer constrains how Cybou
 may be designed is deleted rather than kept as an entry nobody should read — the number stays retired
@@ -67,12 +68,12 @@ code already enforces leaves the record contradicting itself. These do not:
   became Accepted.
 - **0032 Layered Lifelong Learning**, **0033 Learned Artifact Governance**, **0034 Governed Agents
   and Tools**, **0035 Governed Model Brokerage**, **0036 Autonomous Security**, **0042 Agent
-  Capsules**, **0043 Model Gateway**, **0044 CYBOU Spatial Desktop Architecture** and **0045 CYBOU
-  Core Desktop Pack** describe boundaries that deliberately precede their implementation. Writing
-  them first is the point: they exist so the code can be reviewed against explicit invariants rather
-  than the invariants being reconstructed afterwards from whatever the code turned out to do. 0031
-  was in this group until 2026-08-24, when the meaning boundary it asked for was finished in both
-  directions and it became Accepted.
+  Capsules**, **0043 Model Gateway**, **0044 CYBOU Spatial Desktop Architecture**, **0045 CYBOU
+  Core Desktop Pack**, and **0046 CYBOU Spatial Desktop Operating Model** describe boundaries that
+  deliberately precede their implementation. Writing them first is the point: they exist so the code
+  can be reviewed against explicit invariants rather than the invariants being reconstructed afterwards
+  from whatever the code turned out to do. 0031 was in this group until 2026-08-24, when the meaning
+  boundary it asked for was finished in both directions and it became Accepted.
 
   0042 and 0043 are the newest of these and the largest. They rest partly on facts about an external
   ecosystem — a protocol, a registry, a multi-provider proxy — recorded with the date they were

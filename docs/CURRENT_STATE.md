@@ -911,6 +911,17 @@ the cause belongs to the episode; an owner lookup failure grants nothing. A comp
 finding is still present remains completed evidence and is not silently retried after either daemon
 restarts.
 
+## Living Canvas and Spatial Desktop Operating Model
+
+The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md), [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md), [ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md), [ADR-0045](adr/ADR-0045-cybou-core-desktop-pack-and-workspace-primitives.md), [ADR-0046](adr/ADR-0046-cybou-spatial-desktop-operating-model.md)) operates as a spatial operating system compiled in Rust/WASM (Leptos):
+
+- **Infinite Canvas & Spatial Decks**: 2D infinite workspace featuring pan, zoom, snapping guides, Deck merging/splitting, monotonic z-indexing, and local presentation history (undo/redo).
+- **Workspace Primitives & LocationRef**: Typed filesystem authority domains (`HostUserPath`, `SystemConfigPath`, `AgentWorkspace`, `SafeShellJail`, `BackupSnapshot`). Direct mutation of privileged paths (`/etc/...`) is strictly prohibited and routes exclusively through Action1 FileWrite proposals.
+- **Core Desktop Pack**: Multi-tab Text Editor with live Markdown preview, standalone Universal Diff Viewer, sandboxed File Manager, and bounded Safe Shell.
+- **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
+- **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. All interactions use typed subject references (`SubjectRef`).
+- **Resilience Acceptance Gates (SD1–SD15)**: Strict invariants ensuring offline state honesty, crash isolation, zero raw secret exposure in browser memory, and untrusted hostile-content sandboxing.
+
 ## Current gates
 
 Every one of these runs on Debian 13 and in CI, and all pass:
