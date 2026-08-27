@@ -7,6 +7,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::{CardId, DesktopItemId, DesktopLayout, layout::model::DesktopItem};
 
+/// Visibility filter for canvas relationship edges (ADR-0044).
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RelationVisibility {
+    /// Hide all relationship edges.
+    Off,
+    /// Show edges connected to the selected item (default).
+    #[default]
+    Selected,
+    /// Show edges in the immediate 1-hop neighborhood of selected item.
+    Neighborhood,
+    /// Show all semantic edges across the entire canvas.
+    All,
+}
+
 /// Semantic relationship classification between mind capabilities.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -20,22 +35,21 @@ pub enum RelationshipKind {
     /// Introspective guidance and attention biasing (`SelfModel` -> `Attention`).
     Guides,
     /// Empirical observation updating propositions (`Perception` -> `Beliefs`).
-    ///
-    /// The direction was `Beliefs` -> `Perception` until 2026-08-22, which contradicted this line
-    /// and the wiring it describes: `perceptiond` observes the host and submits to Event1, and
-    /// `epistemicd` forms beliefs keyed by the subject of each observation. Nothing flows the other
-    /// way. It mattered little while these edges only drew a line; they now decide where a card is
-    /// placed, so a reversed edge became a reversed desktop.
     Updates,
     /// Associative priming of focal workspace (`Context` -> `Attention`).
     Primes,
     /// Supplying a projection across a boundary, and recording what was withheld.
-    ///
-    /// The organs named here are the ones the gateway's disclosure bookkeeping actually counts:
-    /// `Intention1` withholds obligations entirely, and `Epistemic1` and `Context1` each supply or
-    /// withhold per item. No other organ contributes to a `ContextDisclosed`, so no other organ
-    /// has this edge.
     Discloses,
+    /// Telemetry stream sampling and health supervision (`Perception` -> `Insight`).
+    Monitors,
+    /// Ingestion of raw journal events into live timeline feed (`Journal` -> `JournalFeed`).
+    Feeds,
+    /// Security, capabilities authorization, and rate policy governance (`Capabilities` -> `Agents`).
+    Governs,
+    /// Runtime performance and probe telemetry instrumentation (`Insight` -> `Shell`).
+    Instruments,
+    /// Goal orchestration dispatching commands to sandbox executor (`Agents` -> `Shell`).
+    Executes,
 }
 
 /// A directional semantic dependency edge between two cards.
@@ -76,6 +90,13 @@ impl DesktopRelationshipGraph {
                 amber: false,
             },
             Relationship {
+                from: CardId::Capabilities,
+                to: CardId::Agents,
+                kind: RelationshipKind::Governs,
+                label: "governs",
+                amber: false,
+            },
+            Relationship {
                 from: CardId::Lifecycle,
                 to: CardId::Commitments,
                 kind: RelationshipKind::Suspends,
@@ -94,6 +115,13 @@ impl DesktopRelationshipGraph {
                 to: CardId::Beliefs,
                 kind: RelationshipKind::Updates,
                 label: "updates",
+                amber: false,
+            },
+            Relationship {
+                from: CardId::Perception,
+                to: CardId::Insight,
+                kind: RelationshipKind::Monitors,
+                label: "monitors",
                 amber: false,
             },
             Relationship {

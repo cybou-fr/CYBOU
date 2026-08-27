@@ -28,7 +28,9 @@ pub use model::{
     ArrangementMode, DesktopItem, DesktopItemId, DesktopViewMode, Rect, UsableViewport,
 };
 pub use placement::PlacementResolver;
-pub use relations::{DesktopRelationshipGraph, Relationship, RelationshipKind};
+pub use relations::{
+    DesktopRelationshipGraph, RelationVisibility, Relationship, RelationshipKind,
+};
 pub use selection::{selected_rect, selected_z};
 pub use snap::{SnapGuide, SnapResult, compute_snap};
 

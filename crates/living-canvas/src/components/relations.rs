@@ -51,22 +51,31 @@ pub fn RelationshipEdge(
 pub fn RelationshipsLayer(
     layout: RwSignal<DesktopLayout>,
     selected: ReadSignal<Option<DesktopItemId>>,
+    #[prop(optional)] visibility: Option<ReadSignal<crate::layout::relations::RelationVisibility>>,
 ) -> impl IntoView {
     let relationships = DesktopRelationshipGraph::canonical();
+    let vis = move || {
+        visibility
+            .map(|v| v.get())
+            .unwrap_or(crate::layout::relations::RelationVisibility::Selected)
+    };
+
     view! {
-        <svg class="relationships" aria-hidden="true">
-            {relationships.iter().map(|rel: &Relationship| {
-                view! {
-                    <RelationshipEdge
-                        layout=layout
-                        selected=selected
-                        from=rel.from
-                        to=rel.to
-                        label=rel.label
-                        amber=rel.amber
-                    />
-                }
-            }).collect_view()}
-        </svg>
+        <Show when=move || vis() != crate::layout::relations::RelationVisibility::Off>
+            <svg class="relationships" aria-hidden="true">
+                {relationships.iter().map(|rel: &Relationship| {
+                    view! {
+                        <RelationshipEdge
+                            layout=layout
+                            selected=selected
+                            from=rel.from
+                            to=rel.to
+                            label=rel.label
+                            amber=rel.amber
+                        />
+                    }
+                }).collect_view()}
+            </svg>
+        </Show>
     }
 }
