@@ -426,39 +426,29 @@ impl ZbusPresenceSource {
     pub(super) async fn actions_for_cause(
         &self,
         cause_id: uuid::Uuid,
-    ) -> Vec<cybou_web_contracts::ActionRecordProjection> {
-        let Some(encoded) = self
+    ) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
+        let encoded = self
             .read_with::<Vec<u8>, (String,)>(
                 cybou_fabric::ACTION,
                 "RecordsForCause",
                 &(cause_id.to_string(),),
             )
-            .await
-        else {
-            return Vec::new();
-        };
-        let Ok(records) = ciborium::from_reader::<Vec<cybou_protocol::action::ActionRecord>, _>(
+            .await?;
+        let records = ciborium::from_reader::<Vec<cybou_protocol::action::ActionRecord>, _>(
             encoded.as_slice(),
-        ) else {
-            return Vec::new();
-        };
-        records.iter().map(project_action_record).collect()
+        ).ok()?;
+        Some(records.iter().map(project_action_record).collect())
     }
 
     /// Recent lifecycle records held by Action1.
-    pub(super) async fn recent_actions(&self) -> Vec<cybou_web_contracts::ActionRecordProjection> {
-        let Some(encoded) = self
+    pub(super) async fn recent_actions(&self) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
+        let encoded = self
             .read::<Vec<u8>>(cybou_fabric::ACTION, "RecentRecords")
-            .await
-        else {
-            return Vec::new();
-        };
-        let Ok(records) = ciborium::from_reader::<Vec<cybou_protocol::action::ActionRecord>, _>(
+            .await?;
+        let records = ciborium::from_reader::<Vec<cybou_protocol::action::ActionRecord>, _>(
             encoded.as_slice(),
-        ) else {
-            return Vec::new();
-        };
-        records.iter().map(project_action_record).collect()
+        ).ok()?;
+        Some(records.iter().map(project_action_record).collect())
     }
 }
 

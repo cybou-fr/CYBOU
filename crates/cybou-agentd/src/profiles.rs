@@ -198,9 +198,12 @@ impl ProfileCatalogue {
     #[must_use]
     pub fn to_response(
         &self,
-        capacity_bounded: bool,
-        provider_connected: bool,
+        profiles_state: &str,
+        capacity_state: &str,
+        provider_state: &str,
     ) -> cybou_protocol::agent::AgentOffersResponse {
+        let capacity_bounded = capacity_state == "ready" || capacity_state == "zero-capacity";
+        let provider_connected = provider_state == "ready";
         cybou_protocol::agent::AgentOffersResponse {
             profiles: self
                 .profiles
@@ -233,6 +236,9 @@ impl ProfileCatalogue {
                     may_execute: p.may_execute,
                 })
                 .collect(),
+            profiles_state: profiles_state.to_owned(),
+            capacity_state: capacity_state.to_owned(),
+            provider_state: provider_state.to_owned(),
             capacity_bounded,
             provider_connected,
         }

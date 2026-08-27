@@ -311,6 +311,9 @@ impl MockMindClient {
                 ],
                 may_execute: true,
             }],
+            profiles_state: "ready".to_owned(),
+            capacity_state: "ready".to_owned(),
+            provider_state: "ready".to_owned(),
             capacity_bounded: true,
             provider_connected: true,
         };

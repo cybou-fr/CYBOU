@@ -450,12 +450,49 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
             {move || {
                 let off = offers.get();
                 match off {
-                    Some(ref o) if o.profiles.is_empty() => view! {
-                        <div class="agent-setup-required">
-                            <b>"Setup Required"</b>
-                            <p>"No agent profiles configured. Place an operator profile in <code>/etc/cybou/agent-profiles.json</code>."</p>
-                        </div>
-                    }.into_any(),
+                    Some(ref o) if o.profiles.is_empty() || o.profiles_state != "ready" || o.capacity_state != "ready" => {
+                        let profile_diag = match o.profiles_state.as_str() {
+                            "ready" => None,
+                            "invalid" => Some("Profile catalogue has syntax errors in /etc/cybou/agent-profiles.json"),
+                            "unreadable" => Some("Cannot read /etc/cybou/agent-profiles.json (check file permissions)"),
+                            _ => Some("No agent profiles configured. Place an operator profile in /etc/cybou/agent-profiles.json"),
+                        };
+                        let capacity_diag = match o.capacity_state.as_str() {
+                            "ready" => None,
+                            "zero-capacity" => Some("Host capacity is 0 concurrent sessions in /etc/cybou/agent-capacity.json (increase maxSessions)"),
+                            "unbounded" => Some("Host capacity is unbounded (refused by safety policy in /etc/cybou/agent-capacity.json)"),
+                            _ => Some("Host capacity is not configured in /etc/cybou/agent-capacity.json"),
+                        };
+                        let provider_diag = match o.provider_state.as_str() {
+                            "ready" => None,
+                            _ => Some("Model provider endpoint is unconfigured (CYBOU_LITELLM_BASE_URL in /etc/cybou/provider.env)"),
+                        };
+
+                        view! {
+                            <div class="agent-setup-required">
+                                <b>"Agent Runtime Setup Required"</b>
+                                {profile_diag.map(|msg| view! {
+                                    <div class="diag-item diag-warning">
+                                        <code>"profiles"</code>
+                                        <span>{msg}</span>
+                                    </div>
+                                })}
+                                {capacity_diag.map(|msg| view! {
+                                    <div class="diag-item diag-warning">
+                                        <code>"capacity"</code>
+                                        <span>{msg}</span>
+                                    </div>
+                                })}
+                                {provider_diag.map(|msg| view! {
+                                    <div class="diag-item diag-info">
+                                        <code>"provider"</code>
+                                        <span>{msg}</span>
+                                    </div>
+                                })}
+                                <button type="button" class="refresh-button" on:click=move |_| refresh.run(())>"Refresh Readiness"</button>
+                            </div>
+                        }.into_any()
+                    }
                     Some(ref o) => {
                         let selected_profile = o.profiles.iter().find(|p| p.id == profile.get()).or_else(|| o.profiles.first());
                         let available_workspaces = selected_profile.map(|p| p.workspace_roots.clone()).unwrap_or_default();

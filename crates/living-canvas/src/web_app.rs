@@ -84,6 +84,8 @@ pub fn App() -> impl IntoView {
         let disclosure = client.disclosure().await.ok();
         let insight = client.insight().await.ok();
         let agents = client.agents().await.ok();
+        let actions = client.actions(None).await.ok();
+        let agent_offers = client.agent_offers().await.ok();
         runtime.set(match result {
             Ok((session, snapshot)) => RuntimeState::Ready {
                 mode: session.mode,
@@ -93,6 +95,8 @@ pub fn App() -> impl IntoView {
                 disclosure,
                 insight,
                 agents,
+                actions,
+                agent_offers,
             },
             Err(error) => RuntimeState::Error(error.to_string()),
         });
@@ -101,7 +105,7 @@ pub fn App() -> impl IntoView {
     // Managed SSE live stream subscription
     let subscription = StoredValue::new(DesktopRuntimeSubscription::subscribe(runtime));
     on_cleanup(move || {
-        drop(subscription);
+        subscription.dispose();
     });
 
     // Global workspace keyboard shortcuts

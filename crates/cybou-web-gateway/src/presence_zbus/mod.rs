@@ -289,11 +289,11 @@ impl PresenceSource for ZbusPresenceSource {
     async fn actions_for_cause(
         &self,
         cause_id: uuid::Uuid,
-    ) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+    ) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
         Self::actions_for_cause(self, cause_id).await
     }
 
-    async fn recent_actions(&self) -> Vec<cybou_web_contracts::ActionRecordProjection> {
+    async fn recent_actions(&self) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
         Self::recent_actions(self).await
     }
 

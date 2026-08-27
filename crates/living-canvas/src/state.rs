@@ -43,6 +43,10 @@ pub enum RuntimeState {
         /// are drawn differently on purpose: on a host where the agent runtime is not installed at
         /// all, a card that showed the second would be telling somebody their agents had stopped.
         agents: Option<Vec<cybou_protocol::agent::SessionView>>,
+        /// Action records held by Action1.
+        actions: Option<Vec<cybou_web_contracts::ActionRecordProjection>>,
+        /// Agent launch offers and runtime readiness.
+        agent_offers: Option<cybou_protocol::agent::AgentOffersResponse>,
     },
     /// Connection or protocol error.
     Error(String),
@@ -175,8 +179,8 @@ pub fn first_command_match(query: &str) -> Option<&'static str> {
     .find_map(|(panel, label)| command_matches(query, label).then_some(panel))
 }
 
-/// Deterministic Ask CYBOU answer structure.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// A deterministic answer produced by the Ask CYBOU engine.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AskCybouAnswer {
     /// Short high-level answer headline.
     pub headline: String,
@@ -209,6 +213,30 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                 insight: Some(insight),
                 ..
             } => {
+                if insight.knowledge != KnowledgeState::Known {
+                    return Some(AskCybouAnswer {
+                        headline: "Observations converging".to_string(),
+                        detail: "Telemetry observations are currently converging and establishing baseline metrics.".to_string(),
+                        target: Some(("Open System Insight", crate::CardId::Insight)),
+                    });
+                }
+                if !insight.watched_enough {
+                    return Some(AskCybouAnswer {
+                        headline: "Baseline establishing".to_string(),
+                        detail: "Telemetry has not observed enough baseline history yet to establish normal limits.".to_string(),
+                        target: Some(("Open System Insight", crate::CardId::Insight)),
+                    });
+                }
+                if !insight.unobserved.is_empty() {
+                    return Some(AskCybouAnswer {
+                        headline: format!("{} unobserved resource(s)", insight.unobserved.len()),
+                        detail: format!(
+                            "Some declared resources could not be read: {}.",
+                            insight.unobserved.join(", ")
+                        ),
+                        target: Some(("View System Insight", crate::CardId::Insight)),
+                    });
+                }
                 let finding_count = insight.findings.len();
                 if finding_count > 0 {
                     let first_finding = &insight.findings[0];
@@ -226,15 +254,20 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                     })
                 } else {
                     Some(AskCybouAnswer {
-                        headline: "Everything is healthy".to_string(),
-                        detail: "All watched metrics, services, and system capabilities are operating within normal baseline limits.".to_string(),
+                        headline: "All watched systems are healthy".to_string(),
+                        detail: format!(
+                            "All {} watched metrics, services, and system capabilities are operating within ordinary baseline limits.",
+                            insight.watched.len()
+                        ),
                         target: Some(("Open System Insight", crate::CardId::Insight)),
                     })
                 }
             }
-            RuntimeState::Ready { .. } => Some(AskCybouAnswer {
-                headline: "System telemetry is active".to_string(),
-                detail: "Mind is watching host observations and capabilities.".to_string(),
+            RuntimeState::Ready {
+                insight: None, ..
+            } => Some(AskCybouAnswer {
+                headline: "System insight unavailable".to_string(),
+                detail: "I could not read System Insight. I cannot establish whether the host is healthy right now.".to_string(),
                 target: Some(("Open System Insight", crate::CardId::Insight)),
             }),
             _ => None,
@@ -252,40 +285,33 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
     {
         return match state {
             RuntimeState::Ready {
-                insight: Some(insight),
+                actions: Some(actions),
                 ..
             } => {
-                if let Some(first_finding) = insight.findings.first() {
-                    let target_name = first_finding
-                        .about
-                        .as_deref()
-                        .unwrap_or(first_finding.finding.as_str());
-                    if let Some(ref offer) = first_finding.offers.first() {
-                        Some(AskCybouAnswer {
-                            headline: "Remediation Active".to_string(),
-                            detail: format!(
-                                "Remedy: {} for {} (policy verdict: {})",
-                                offer.operation, target_name, offer.verdict
-                            ),
-                            target: Some(("View System Insight", crate::CardId::Insight)),
-                        })
-                    } else {
-                        Some(AskCybouAnswer {
-                            headline: "No pending remediation needed".to_string(),
-                            detail: "No active self-healing action required for current findings."
-                                .to_string(),
-                            target: Some(("View System Insight", crate::CardId::Insight)),
-                        })
-                    }
-                } else {
+                if actions.is_empty() {
                     Some(AskCybouAnswer {
-                        headline: "All systems operating normally".to_string(),
-                        detail: "Standing remediation policies are armed and ready to execute upon detection."
-                            .to_string(),
+                        headline: "No autonomous actions executed".to_string(),
+                        detail: "No remediation actions have been executed recently. Standing self-healing policies are armed.".to_string(),
+                        target: Some(("View System Insight", crate::CardId::Insight)),
+                    })
+                } else {
+                    let first = &actions[0];
+                    let relief_desc = first.outcome.as_ref().map_or("in-progress", |o| o.relief.as_str());
+                    Some(AskCybouAnswer {
+                        headline: format!("{} autonomous action(s) recorded", actions.len()),
+                        detail: format!(
+                            "Most recent: {} on {} (policy verdict: {}, outcome: {}).",
+                            first.operation, first.target_resource, first.verdict, relief_desc
+                        ),
                         target: Some(("View System Insight", crate::CardId::Insight)),
                     })
                 }
             }
+            RuntimeState::Ready { actions: None, .. } => Some(AskCybouAnswer {
+                headline: "Action history unavailable".to_string(),
+                detail: "Action1 authorization service could not be reached. Cannot establish past remediation history.".to_string(),
+                target: Some(("View System Insight", crate::CardId::Insight)),
+            }),
             _ => None,
         };
     }
@@ -302,6 +328,7 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
         return match state {
             RuntimeState::Ready {
                 agents: Some(sessions),
+                agent_offers,
                 ..
             } => {
                 let live: Vec<_> = sessions.iter().filter(|s| s.is_live()).collect();
@@ -319,10 +346,18 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                         Some(cybou_protocol::agent::SpendView::Capped { limit, .. }) => {
                             format!("limit {limit}")
                         }
+                        Some(cybou_protocol::agent::SpendView::ZeroCost { spent: Some(spent) })
+                            if spent > 0 =>
+                        {
+                            format!("{spent} charged (zero-cost policy)")
+                        }
                         Some(cybou_protocol::agent::SpendView::ZeroCost { .. }) => {
                             "zero-cost".to_string()
                         }
-                        None => "unmetered".to_string(),
+                        None => match &first.model_class {
+                            Some(m) => format!("model {m}, spending not read"),
+                            None => "no model granted".to_string(),
+                        },
                     };
                     Some(AskCybouAnswer {
                         headline: format!("{} agent session(s) active", live.len()),
@@ -334,19 +369,27 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                         target: Some(("Open Agents", crate::CardId::Agents)),
                     })
                 } else {
-                    Some(AskCybouAnswer {
-                        headline: "No agents currently running".to_string(),
-                        detail:
-                            "Agent runtime is idle. Ready to launch sandboxed OpenCode agents."
-                                .to_string(),
-                        target: Some(("Launch Agent", crate::CardId::Agents)),
-                    })
+                    let setup_required = agent_offers.as_ref().map_or(false, |o| {
+                        o.profiles_state != "ready" || o.capacity_state != "ready"
+                    });
+                    if setup_required {
+                        Some(AskCybouAnswer {
+                            headline: "No agents running (Setup required)".to_string(),
+                            detail: "Agent runtime is idle and requires operator profile and capacity configuration before launch.".to_string(),
+                            target: Some(("Open Agents", crate::CardId::Agents)),
+                        })
+                    } else {
+                        Some(AskCybouAnswer {
+                            headline: "No agents currently running".to_string(),
+                            detail: "Agent runtime is idle. Ready to launch sandboxed OpenCode agents.".to_string(),
+                            target: Some(("Launch Agent", crate::CardId::Agents)),
+                        })
+                    }
                 }
             }
-            RuntimeState::Ready { .. } => Some(AskCybouAnswer {
-                headline: "Agent runtime ready".to_string(),
-                detail: "Sandboxed capsules with bounded memory, CPU, and network reaches."
-                    .to_string(),
+            RuntimeState::Ready { agents: None, .. } => Some(AskCybouAnswer {
+                headline: "Agent runtime unreachable".to_string(),
+                detail: "I could not reach Agent1. I cannot establish whether any agents are running.".to_string(),
                 target: Some(("Open Agents", crate::CardId::Agents)),
             }),
             _ => None,
@@ -362,8 +405,8 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
         || q.contains("границ")
     {
         return Some(AskCybouAnswer {
-            headline: "Strict Capsule Isolation".to_string(),
-            detail: "Agents operate inside Linux namespaces with cgroups ceilings and egress firewall whitelists. No agent can escape its bounded capsule.".to_string(),
+            headline: "Technically Enforced Capsule Isolation".to_string(),
+            detail: "CYBOU enforces capsule boundaries using Linux user namespaces, Landlock filesystem restrictions, cgroup resource limits, and network egress brokers.".to_string(),
             target: Some(("Inspect Agents", crate::CardId::Agents)),
         });
     }

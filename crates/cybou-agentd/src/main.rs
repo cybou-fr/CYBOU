@@ -290,7 +290,7 @@ async fn launch(selection: &Selection) -> Result<(), String> {
 
     // From here on every path ends in teardown, including the ones that fail. A launch that gave up
     // halfway and returned would leave a live gateway holding a bearer for a session nobody watches.
-    match bring_up(&plan, &spec, &programs, selection, &mut session, || {}).await {
+    match bring_up(&plan, &spec, &programs, selection, &mut session, || {}, |_| {}).await {
         Ok(true) => session.begin_ending(SessionEnd::AgentFinished),
         Ok(false) => session.begin_ending(SessionEnd::Failed(
             "the agent exited with a failure".to_owned(),
@@ -329,6 +329,7 @@ async fn bring_up(
     selection: &Selection,
     session: &mut Session,
     on_running: impl FnOnce(),
+    on_task_update: impl Fn(cybou_protocol::agent::AgentTaskView),
 ) -> Result<bool, String> {
     write_session_files(plan)?;
 
@@ -360,7 +361,7 @@ async fn bring_up(
     announce(session, plan);
 
     match &selection.prompt {
-        Some(prompt) => ask(plan, &capsule, prompt, session).await,
+        Some(prompt) => ask(plan, &capsule, prompt, session, on_task_update).await,
         None => status_of(&capsule),
     }
 }
@@ -406,13 +407,16 @@ async fn ask(
     capsule: &[String],
     prompt: &str,
     session: &mut Session,
+    on_task_update: impl Fn(cybou_protocol::agent::AgentTaskView),
 ) -> Result<bool, String> {
-    session.set_task(cybou_protocol::agent::AgentTaskView {
+    let running_task = cybou_protocol::agent::AgentTaskView {
         prompt: prompt.to_owned(),
         phase: "Running task".to_owned(),
         result: None,
         refused_permissions: Vec::new(),
-    });
+    };
+    session.set_task(running_task.clone());
+    on_task_update(running_task);
 
     let remaining = plan.expires_at - OffsetDateTime::now_utc();
     let remaining = StdDuration::try_from(remaining)
@@ -443,12 +447,14 @@ async fn ask(
     }
     println!("session {} turn ended: {}", plan.instance, turn.stop_reason);
 
-    session.set_task(cybou_protocol::agent::AgentTaskView {
+    let completed_task = cybou_protocol::agent::AgentTaskView {
         prompt: prompt.to_owned(),
         phase: format!("Completed ({})", turn.stop_reason),
         result: Some(turn.message.clone()),
         refused_permissions: turn.refused_permissions.clone(),
-    });
+    };
+    session.set_task(completed_task.clone());
+    on_task_update(completed_task);
 
     Ok(turn.ended_by_the_agent())
 }
@@ -892,13 +898,51 @@ impl cybou_agentd::service::Launcher for HostLauncher {
     }
 
     fn offers(&self) -> Result<cybou_protocol::agent::AgentOffersResponse, String> {
-        let catalogue = fs::read(CATALOGUE)
-            .ok()
-            .and_then(|bytes| ProfileCatalogue::read(&bytes).ok())
-            .unwrap_or_default();
-        let provider_connected = fs::read("/etc/cybou/provider.env").is_ok()
-            || fs::read("/etc/cybou/litellm-master-key").is_ok();
-        Ok(catalogue.to_response(true, provider_connected))
+        let (catalogue, profiles_state) = match fs::read(CATALOGUE) {
+            Ok(bytes) => match ProfileCatalogue::read(&bytes) {
+                Ok(cat) if cat.profiles.is_empty() => (cat, "not-configured".to_string()),
+                Ok(cat) => (cat, "ready".to_string()),
+                Err(_) => (ProfileCatalogue::default(), "invalid".to_string()),
+            },
+            Err(_) => (ProfileCatalogue::default(), "not-configured".to_string()),
+        };
+
+        let capacity_state = match fs::read("/etc/cybou/agent-capacity.json") {
+            Ok(bytes) => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct Cap {
+                    max_sessions: u32,
+                }
+                match serde_json::from_slice::<Cap>(&bytes) {
+                    Ok(cap) if cap.max_sessions == 0 => "zero-capacity".to_string(),
+                    Ok(_) => "ready".to_string(),
+                    Err(_) => "invalid".to_string(),
+                }
+            }
+            Err(_) => "not-configured".to_string(),
+        };
+
+        let provider_state = match fs::read_to_string("/etc/cybou/provider.env") {
+            Ok(content) => {
+                let has_base = content.lines().any(|line| {
+                    let trimmed = line.trim();
+                    if let Some((k, v)) = trimmed.split_once('=') {
+                        k.trim() == "CYBOU_LITELLM_BASE_URL" && !v.trim().is_empty()
+                    } else {
+                        false
+                    }
+                });
+                if has_base {
+                    "ready".to_string()
+                } else {
+                    "not-configured".to_string()
+                }
+            }
+            Err(_) => "not-configured".to_string(),
+        };
+
+        Ok(catalogue.to_response(&profiles_state, &capacity_state, &provider_state))
     }
 }
 
@@ -911,18 +955,25 @@ async fn run_owned_launch(
     let capsule_id = prepared.plan.lease.grant().capsule_id;
     let mut session = Session::launching(capsule_id, prepared.plan.lease.issued_at());
     if let Some(prompt) = prepared.prompt.as_str().into() {
-        session.set_task(cybou_protocol::agent::AgentTaskView {
+        let initial_task = cybou_protocol::agent::AgentTaskView {
             prompt: prompt.to_string(),
             phase: "Starting".to_owned(),
             result: None,
             refused_permissions: Vec::new(),
-        });
+        };
+        session.set_task(initial_task.clone());
+        if let Ok(mut held) = registry.lock()
+            && let Some(live) = held.get_mut(capsule_id)
+        {
+            live.session.set_task(initial_task);
+        }
     }
     let selection = Selection {
         prompt: Some(prepared.prompt),
         ..Selection::default()
     };
     let running_registry = Arc::clone(&registry);
+    let task_registry = Arc::clone(&registry);
     let result = bring_up(
         &prepared.plan,
         &prepared.spec,
@@ -934,6 +985,13 @@ async fn run_owned_launch(
                 && let Some(live) = held.get_mut(capsule_id)
             {
                 let _ = live.session.running();
+            }
+        },
+        move |task| {
+            if let Ok(mut held) = task_registry.lock()
+                && let Some(live) = held.get_mut(capsule_id)
+            {
+                live.session.set_task(task);
             }
         },
     )

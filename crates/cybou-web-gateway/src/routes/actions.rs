@@ -44,7 +44,17 @@ pub async fn actions_handler(
         Some(cause_id) => state.presence.actions_for_cause(cause_id).await,
         None => state.presence.recent_actions().await,
     };
-    Ok(Json(records))
+    match records {
+        Some(records) => Ok(Json(records)),
+        None => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(crate::state::ErrorBody {
+                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                error: "action1Unavailable",
+                retryable: true,
+            }),
+        )),
+    }
 }
 
 /// Return recent action lifecycle records.
@@ -52,6 +62,7 @@ pub async fn actions_handler(
 /// # Errors
 ///
 /// Refuses with `401` when sign-in is required and no session exists.
+/// Returns `503` when Action1 is unavailable.
 pub async fn recent_actions_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -59,5 +70,15 @@ pub async fn recent_actions_handler(
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
-    Ok(Json(state.presence.recent_actions().await))
+    match state.presence.recent_actions().await {
+        Some(records) => Ok(Json(records)),
+        None => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(crate::state::ErrorBody {
+                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                error: "action1Unavailable",
+                retryable: true,
+            }),
+        )),
+    }
 }

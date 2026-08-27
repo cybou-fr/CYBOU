@@ -274,6 +274,7 @@ mod tests {
 
     fn finding(about: Option<&str>) -> cybou_web_contracts::FindingProjection {
         cybou_web_contracts::FindingProjection {
+            id: None,
             finding: "certificate.expiring".to_owned(),
             about: about.map(ToOwned::to_owned),
             means: "a watched certificate is close to expiry, or past it".to_owned(),

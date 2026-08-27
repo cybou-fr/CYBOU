@@ -166,6 +166,9 @@ impl Agent1Service {
             }
             None => cybou_protocol::agent::AgentOffersResponse {
                 profiles: Vec::new(),
+                profiles_state: "not-configured".to_owned(),
+                capacity_state: "not-configured".to_owned(),
+                provider_state: "not-configured".to_owned(),
                 capacity_bounded: false,
                 provider_connected: false,
             },

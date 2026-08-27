@@ -155,6 +155,7 @@ pub fn unread() -> InsightProjection {
 /// One finding, with its readings and what could be offered about it.
 fn finding(insight: &SystemInsight, now: OffsetDateTime) -> FindingProjection {
     FindingProjection {
+        id: Some(insight.insight_id),
         finding: insight.finding.name().to_owned(),
         // The thing itself, not the kind of thing. Without it two findings about two certificates
         // are two identical rows.

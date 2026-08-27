@@ -137,7 +137,7 @@ pub fn InsightContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                 <For
                     each=findings
                     key=|(index, finding)| format!("{index}:{}", finding.finding)
-                    children=move |(_, finding)| view! { <FindingRow finding=finding /> }
+                    children=move |(_, finding)| view! { <FindingRow finding=finding runtime=runtime /> }
                 />
             </div>
 
@@ -151,12 +151,41 @@ pub fn InsightContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
 
 /// One finding, its readings, and what could be offered about it.
 #[component]
-fn FindingRow(finding: FindingProjection) -> impl IntoView {
+fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let since = instant_label(&finding.since);
     let strength = finding.strength.clone();
     let readings = finding.readings.clone();
     let offers = finding.offers.clone();
     let has_offers = !offers.is_empty();
+
+    let finding_id = finding.id;
+    let action_state = move || {
+        if let RuntimeState::Ready {
+            actions: Some(records),
+            ..
+        } = runtime.get()
+        {
+            if let Some(fid) = finding_id {
+                if let Some(record) = records.iter().find(|r| r.cause_id == Some(fid)) {
+                    let exec = record.execution_started.is_some() || record.attempt.is_some();
+                    let rel = record
+                        .outcome
+                        .as_ref()
+                        .map_or(false, |o| o.relief == "relieved");
+                    let still = record
+                        .outcome
+                        .as_ref()
+                        .map_or(false, |o| o.relief == "still-present");
+                    let unest = record
+                        .outcome
+                        .as_ref()
+                        .map_or(false, |o| o.relief == "not-established");
+                    return (exec, rel, still, unest);
+                }
+            }
+        }
+        (false, false, false, false)
+    };
 
     view! {
         <div class="finding-line">
@@ -197,7 +226,8 @@ fn FindingRow(finding: FindingProjection) -> impl IntoView {
                     .map(|offer| {
                         let undo = if offer.reversible { "reversible" } else { "cannot be undone" };
                         let target = crate::heading::offer_target(&offer);
-                        let timeline = crate::heading::self_healing_timeline(&offer.verdict, false, false);
+                        let (executed, relieved, still_present, outcome_unestablished) = action_state();
+                        let timeline = crate::heading::self_healing_timeline(&offer.verdict, executed, relieved);
                         view! {
                             <div class="offer-item">
                                 <span class="offer-line">
@@ -226,6 +256,12 @@ fn FindingRow(finding: FindingProjection) -> impl IntoView {
                                         })
                                         .collect_view()}
                                 </div>
+                                <Show when=move || still_present>
+                                    <div class="timeline-outcome-warning">"Remedy completed, but condition remains present"</div>
+                                </Show>
+                                <Show when=move || outcome_unestablished>
+                                    <div class="timeline-outcome-warning">"Outcome could not be established independently"</div>
+                                </Show>
                             </div>
                         }
                     })

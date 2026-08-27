@@ -180,9 +180,18 @@ pub struct OfferedProfileView {
 pub struct AgentOffersResponse {
     /// Operator-approved profiles.
     pub profiles: Vec<OfferedProfileView>,
-    /// Whether the host capacity allows launches.
+    /// State of profile catalogue ("ready", "not-configured", "invalid", "unreadable").
+    #[serde(default)]
+    pub profiles_state: String,
+    /// State of host capacity ("ready", "zero-capacity", "unbounded", "unreadable").
+    #[serde(default)]
+    pub capacity_state: String,
+    /// State of model provider connection ("ready", "not-configured", "unreachable").
+    #[serde(default)]
+    pub provider_state: String,
+    /// Legacy compatibility boolean.
     pub capacity_bounded: bool,
-    /// Whether at least one model provider is configured.
+    /// Legacy compatibility boolean.
     pub provider_connected: bool,
 }
 
