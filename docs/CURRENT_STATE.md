@@ -794,23 +794,23 @@ Recorded provenance is bounded, and a record says by arithmetic when it is a sam
 exceeds the length. The count is optional, because a record written before the field existed cannot
 say how many sources there were, and that is not zero.
 
-## Desktop
+## Desktop (CYBOU Spatial Desktop)
 
 One Rust/WebAssembly frontend — Living Canvas — served to browsers and, as a target, to a
-Chromium/Wayland session. The browser is a renderer and an untrusted client: it talks only to the
+Chromium/Wayland session ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md), [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md), [ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md)). The browser is a renderer and an untrusted client: it talks only to the
 gateway and never becomes a Mind owner, D-Bus peer, or authority.
 
-Fourteen singleton system cards and dynamic tool cards. Arrangement supports both the canonical **Home / Operator** view (System Insight, Agents, and Recent Activity) and the relational **Mind Explorer** view. Every class the components render has a rule, checked by
-`scripts/validate-desktop-styles.py`; interaction is exercised in real Chromium. See
-[desktop and browser gate](evidence/desktop-browser-gate.md).
+CYBOU Desktop is an infinite spatial presence map of host reality, rejecting classical window managers and tabbed page-routed SPAs:
+- **Panels & Decks**: Fourteen singleton system cards and dynamic tool cards (code: `Card`, UX: `Panel`), with tabbed grouping inside decks (`role="tablist"`).
+- **Presentation Modes**: Supports both the canonical **Home / Operator** mode (System Insight, Agents, Recent Activity, Forecast) and the relational **Mind Explorer** substrate mode.
+- **System Insight**: Renders the 5-stage self-healing lifecycle (`Detected → Decided → Acting → Re-observed → Relieved`) and comparative baseline explanations (`Why?`), strictly matching durable `ActionRecord` projections from `Action1`.
+- **Agents Runtime**: Reads canonical `SessionView` records and structured `AgentOffersResponse` (`profiles_state`, `capacity_state`, `provider_state`) from `Agent1` through the gateway. When unconfigured, it displays multi-dimensional setup readiness diagnostics. When configured, it offers guided profile, workspace, model class, and autonomy boundary selections, alongside live task prompt, real-time execution phase tracking, agent result response, and direct File Manager workspace inspection.
+- **Ask CYBOU & Command Palette**: Provides instant deterministic query resolution across host findings, remediation actions, running agents, and isolation boundaries with strict epistemic truthfulness.
+- **Spatial Architecture v2 ([ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md))**: Defines the formal blueprint for Panel 2.0 representations (`Glance`, `Standard`, `Expanded`, `Focus`), semantic clusters, semantic zoom / level-of-detail, canvas anchors, camera history, typed relations, contextual spawning, and non-cognitive layout invariants across milestones SD0–SD14.
+
+Every class the components render has a rule, checked by `scripts/validate-desktop-styles.py`; interaction is exercised in real Chromium. See [desktop and browser gate](evidence/desktop-browser-gate.md).
 
 A stranger is served the sign-in view and nothing else where the deployment says so.
-
-The **System Insight** card renders the 5-stage self-healing lifecycle (`Detected → Decided → Acting → Re-observed → Relieved`) and comparative baseline explanations (`Why?`), matching durable `ActionRecord` projections from `Action1`.
-
-The **Agents** card reads canonical `SessionView` values and `Agent1.Offers` from `Agent1` through the gateway. When unconfigured, it displays an actionable setup readiness banner. When configured, it offers guided profile, workspace, model class, and autonomy boundary selections, alongside live task prompt, execution phase, agent result response, and direct File Manager inspection.
-
-The **Command Palette** and **Ask CYBOU** provide instant deterministic query resolution across host findings, remediation actions, running agents, and isolation boundaries.
 
 ## Agent runtime
 
