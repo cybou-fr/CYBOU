@@ -232,7 +232,8 @@ impl ZbusPresenceSource {
         T: serde::de::DeserializeOwned + zbus::zvariant::Type,
         A: serde::Serialize + zbus::zvariant::DynamicType,
     {
-        self.connection
+        if let Ok(reply) = self
+            .connection
             .call_method(
                 Some(endpoint.service),
                 endpoint.object_path,
@@ -241,10 +242,34 @@ impl ZbusPresenceSource {
                 args,
             )
             .await
-            .ok()?
-            .body()
-            .deserialize()
-            .ok()
+        {
+            if let Ok(body) = reply.body().deserialize() {
+                return Some(body);
+            }
+        }
+
+        // On production Linux deployments, Action1 is on the system bus so the root executor can
+        // authenticate with it. If the session bus call failed and the target is Action1, try system bus.
+        if endpoint.service == cybou_fabric::ACTION.service {
+            if let Ok(system) = zbus::Connection::system().await {
+                if let Ok(reply) = system
+                    .call_method(
+                        Some(endpoint.service),
+                        endpoint.object_path,
+                        Some(endpoint.interface),
+                        method,
+                        args,
+                    )
+                    .await
+                {
+                    if let Ok(body) = reply.body().deserialize() {
+                        return Some(body);
+                    }
+                }
+            }
+        }
+
+        None
     }
 }
 
