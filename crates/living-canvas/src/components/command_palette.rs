@@ -18,6 +18,346 @@ use crate::{
     state::command_matches,
 };
 
+/// High-level category for desktop commands.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PaletteCategory {
+    /// Sandboxed and desktop tools
+    Tools,
+    /// Cognitive mind organs
+    Organs,
+    /// Spatial desktop layout actions
+    Layout,
+    /// Security & session actions
+    Session,
+}
+
+impl PaletteCategory {
+    /// Category display title.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Tools => "Tools & Applications",
+            Self::Organs => "Cognitive Organs",
+            Self::Layout => "Canvas & Layout",
+            Self::Session => "Session & Auth",
+        }
+    }
+}
+
+/// Action item displayed in the command palette.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PaletteAction {
+    /// Unique identifier for dispatch.
+    pub id: &'static str,
+    /// Grouping category.
+    pub category: PaletteCategory,
+    /// Primary title.
+    pub title: &'static str,
+    /// Explanatory subtitle.
+    pub subtitle: &'static str,
+    /// Keywords for fuzzy search matching.
+    pub keywords: &'static str,
+    /// Keyboard shortcut hint, if any.
+    pub shortcut: Option<&'static str>,
+    /// Icon kind string.
+    pub icon_kind: &'static str,
+}
+
+const ALL_PALETTE_ACTIONS: &[PaletteAction] = &[
+    // Tools & Apps
+    PaletteAction {
+        id: "shell",
+        category: PaletteCategory::Tools,
+        title: "Open Shell",
+        subtitle: "A bounded, read-only shell",
+        keywords: "shell terminal bash command zone3 body exec",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    PaletteAction {
+        id: "files",
+        category: PaletteCategory::Tools,
+        title: "Open File Manager",
+        subtitle: "Browse files, read-only sandbox",
+        keywords: "files file manager storage browse read-only directory breadcrumbs",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    PaletteAction {
+        id: "editor",
+        category: PaletteCategory::Tools,
+        title: "Open Text Editor",
+        subtitle: "Code and configuration editor with drafts",
+        keywords: "editor text code write config edit buffer markdown",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    PaletteAction {
+        id: "diff",
+        category: PaletteCategory::Tools,
+        title: "Open Diff Viewer",
+        subtitle: "Inspect and review changes",
+        keywords: "diff compare review changes patch side-by-side",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    PaletteAction {
+        id: "inspector",
+        category: PaletteCategory::Tools,
+        title: "Open Universal Inspector",
+        subtitle: "Deep entity state & relations",
+        keywords: "inspector inspect service entity process details subject",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    PaletteAction {
+        id: "outline",
+        category: PaletteCategory::Tools,
+        title: "Open Canvas Outline",
+        subtitle: "Workspace hierarchy & tree view",
+        keywords: "outline tree hierarchy accessibility navigation deck",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    PaletteAction {
+        id: "journal-feed",
+        category: PaletteCategory::Tools,
+        title: "Open Event Stream",
+        subtitle: "Real-time Journal SSE stream",
+        keywords: "events feed live stream sse journal",
+        shortcut: None,
+        icon_kind: "external",
+    },
+    // Cognitive Organs
+    PaletteAction {
+        id: "insight",
+        category: PaletteCategory::Organs,
+        title: "Open System Insight",
+        subtitle: "Telemetry1 host health & self-healing",
+        keywords: "insight telemetry machine health findings why status",
+        shortcut: None,
+        icon_kind: "sparkles",
+    },
+    PaletteAction {
+        id: "agents",
+        category: PaletteCategory::Organs,
+        title: "Open Agents",
+        subtitle: "Agent1 bounded capsule runtime",
+        keywords: "agents agent1 launch opencode task autonomous capsules",
+        shortcut: None,
+        icon_kind: "list",
+    },
+    PaletteAction {
+        id: "capabilities",
+        category: PaletteCategory::Organs,
+        title: "Open Capabilities",
+        subtitle: "Health1 capability dependencies",
+        keywords: "capabilities health dependencies system",
+        shortcut: None,
+        icon_kind: "sparkles",
+    },
+    PaletteAction {
+        id: "identity",
+        category: PaletteCategory::Organs,
+        title: "Open Identity",
+        subtitle: "Identity1 subject continuity",
+        keywords: "identity subject continuity provenance seat",
+        shortcut: None,
+        icon_kind: "pin",
+    },
+    PaletteAction {
+        id: "session",
+        category: PaletteCategory::Organs,
+        title: "Open Session",
+        subtitle: "Gateway trust and session mode",
+        keywords: "session trust gateway authentication mode pam",
+        shortcut: None,
+        icon_kind: "pin",
+    },
+    PaletteAction {
+        id: "journal",
+        category: PaletteCategory::Organs,
+        title: "Open Journal",
+        subtitle: "Event1 canonical event log",
+        keywords: "journal contributions causal integrity event1 history",
+        shortcut: None,
+        icon_kind: "link",
+    },
+    PaletteAction {
+        id: "lifecycle",
+        category: PaletteCategory::Organs,
+        title: "Open Lifecycle",
+        subtitle: "Lifecycle1 sleep and wake state",
+        keywords: "lifecycle sleep wake consolidation idle",
+        shortcut: None,
+        icon_kind: "sparkles",
+    },
+    PaletteAction {
+        id: "commitments",
+        category: PaletteCategory::Organs,
+        title: "Open Commitments",
+        subtitle: "Intention1 open obligations",
+        keywords: "commitments obligations intention1 tasks",
+        shortcut: None,
+        icon_kind: "list",
+    },
+    PaletteAction {
+        id: "self",
+        category: PaletteCategory::Organs,
+        title: "Open Self-Model",
+        subtitle: "Self1 autobiographical narration",
+        keywords: "self assessment autobiographical narration self1",
+        shortcut: None,
+        icon_kind: "sparkles",
+    },
+    PaletteAction {
+        id: "attention",
+        category: PaletteCategory::Organs,
+        title: "Open Attention",
+        subtitle: "Workspace1 attention focus",
+        keywords: "attention focus global workspace theory workspace1",
+        shortcut: None,
+        icon_kind: "sparkles",
+    },
+    PaletteAction {
+        id: "beliefs",
+        category: PaletteCategory::Organs,
+        title: "Open Beliefs",
+        subtitle: "Epistemic1 derived propositions",
+        keywords: "beliefs epistemic1 validity propositions facts",
+        shortcut: None,
+        icon_kind: "sparkles",
+    },
+    PaletteAction {
+        id: "perception",
+        category: PaletteCategory::Organs,
+        title: "Open Perception",
+        subtitle: "Perception1 host facts",
+        keywords: "perception observations host perception1 sensors",
+        shortcut: None,
+        icon_kind: "link",
+    },
+    PaletteAction {
+        id: "context",
+        category: PaletteCategory::Organs,
+        title: "Open Context",
+        subtitle: "Context1 associative graph",
+        keywords: "context association concepts context1 nodes",
+        shortcut: None,
+        icon_kind: "link",
+    },
+    // Canvas & Layout Actions
+    PaletteAction {
+        id: "fit-all",
+        category: PaletteCategory::Layout,
+        title: "Fit All to Viewport",
+        subtitle: "Center and scale entire canvas",
+        keywords: "fit all zoom viewport center bounds",
+        shortcut: Some("Ctrl+0"),
+        icon_kind: "maximize",
+    },
+    PaletteAction {
+        id: "undo",
+        category: PaletteCategory::Layout,
+        title: "Undo Layout Change",
+        subtitle: "Revert position or deck state",
+        keywords: "undo layout revert previous",
+        shortcut: Some("Ctrl+Z"),
+        icon_kind: "undo",
+    },
+    PaletteAction {
+        id: "redo",
+        category: PaletteCategory::Layout,
+        title: "Redo Layout Change",
+        subtitle: "Re-apply position or deck state",
+        keywords: "redo layout forward next",
+        shortcut: Some("Ctrl+Y"),
+        icon_kind: "redo",
+    },
+    PaletteAction {
+        id: "arrange-home",
+        category: PaletteCategory::Layout,
+        title: "Arrange: Home",
+        subtitle: "Canonical workspace overview",
+        keywords: "arrange home canonical default layout overview",
+        shortcut: None,
+        icon_kind: "refresh",
+    },
+    PaletteAction {
+        id: "arrange-grid",
+        category: PaletteCategory::Layout,
+        title: "Arrange: Grid",
+        subtitle: "Structured multi-track lanes",
+        keywords: "arrange grid structured columns lanes",
+        shortcut: None,
+        icon_kind: "grid",
+    },
+    PaletteAction {
+        id: "arrange-compact",
+        category: PaletteCategory::Layout,
+        title: "Arrange: Compact",
+        subtitle: "Dense obstacle-free packing",
+        keywords: "arrange compact packing fit dense",
+        shortcut: None,
+        icon_kind: "minimize",
+    },
+    PaletteAction {
+        id: "arrange-relations",
+        category: PaletteCategory::Layout,
+        title: "Arrange: Relations",
+        subtitle: "Mind causal organ graph flow",
+        keywords: "arrange relations causal flow graph",
+        shortcut: None,
+        icon_kind: "link",
+    },
+    PaletteAction {
+        id: "group-mind-core",
+        category: PaletteCategory::Layout,
+        title: "Create Deck: Mind Core",
+        subtitle: "Group Identity and Session into tabbed deck",
+        keywords: "group mind core deck cards merge",
+        shortcut: None,
+        icon_kind: "layers",
+    },
+    PaletteAction {
+        id: "reset-desktop",
+        category: PaletteCategory::Layout,
+        title: "Reset Desktop Layout",
+        subtitle: "Restore default positions and clear custom decks",
+        keywords: "reset layout desktop restore initial",
+        shortcut: None,
+        icon_kind: "refresh",
+    },
+    // Session Actions
+    PaletteAction {
+        id: "auth-modal",
+        category: PaletteCategory::Session,
+        title: "Authenticate / Sign in",
+        subtitle: "Unlock full capabilities with Linux PAM",
+        keywords: "auth sign in login pam credentials password",
+        shortcut: None,
+        icon_kind: "pin",
+    },
+];
+
+fn render_icon(kind: &'static str) -> AnyView {
+    match kind {
+        "sparkles" => view! { <Sparkles size=15 /> }.into_any(),
+        "list" => view! { <ListChecks size=15 /> }.into_any(),
+        "pin" => view! { <IconPin size=15 /> }.into_any(),
+        "link" => view! { <Link size=15 /> }.into_any(),
+        "external" => view! { <IconExternalLink size=15 /> }.into_any(),
+        "layers" => view! { <IconLayers size=15 /> }.into_any(),
+        "undo" => view! { <IconUndo size=15 /> }.into_any(),
+        "redo" => view! { <IconRedo size=15 /> }.into_any(),
+        "refresh" => view! { <IconRefresh size=15 /> }.into_any(),
+        "grid" => view! { <IconGrid size=15 /> }.into_any(),
+        "minimize" => view! { <IconMinimize size=15 /> }.into_any(),
+        "maximize" => view! { <IconMaximize size=15 /> }.into_any(),
+        _ => view! { <Sparkles size=15 /> }.into_any(),
+    }
+}
+
 /// Command palette modal and shortcut launcher.
 #[component]
 pub fn CommandPalette(
@@ -36,12 +376,130 @@ pub fn CommandPalette(
         crate::state::RuntimeState,
     >,
 ) -> impl IntoView {
-    let select_from_command = move |panel: &'static str| {
-        // A named panel is always a system card, and a system card is a singleton, so its key
-        // does identify it. Tool cards are never reached this way.
-        set_selected.set(CardId::from_key(panel).map(DesktopItemId::Card));
+    let selected_index = RwSignal::new(0usize);
+
+    let filtered_actions = Memo::new(move |_| {
+        let q = command_query.get();
+        if q.trim().is_empty() {
+            ALL_PALETTE_ACTIONS.to_vec()
+        } else {
+            ALL_PALETTE_ACTIONS
+                .iter()
+                .copied()
+                .filter(|action| {
+                    let search_target = format!("{} {} {}", action.title, action.subtitle, action.keywords);
+                    command_matches(&q, &search_target)
+                })
+                .collect::<Vec<_>>()
+        }
+    });
+
+    let focus_or_open_card = move |card: CardId, default_w: f64, default_h: f64| {
+        set_selected.set(Some(DesktopItemId::Card(card)));
+        if !layout.get().contains_card(card) {
+            layout.update(|l| l.open_card(card, default_w, default_h));
+        } else if layout.get().presentation(card).collapsed {
+            layout.update(|l| l.set_collapsed(card, false));
+        }
+        layout.update(|l| l.bring_forward(card));
+        layout.get_untracked().save();
         set_command_open.set(false);
         set_command_query.set(String::new());
+    };
+
+    let execute_action = move |action_id: &'static str| {
+        match action_id {
+            "shell" => focus_or_open_card(CardId::Shell(0), 400.0, 160.0),
+            "files" => focus_or_open_card(CardId::FileManager(0), 380.0, 120.0),
+            "editor" => focus_or_open_card(CardId::Editor(0), 400.0, 140.0),
+            "diff" => focus_or_open_card(CardId::Diff(0), 420.0, 160.0),
+            "inspector" => focus_or_open_card(CardId::Inspector(0), 380.0, 150.0),
+            "outline" => focus_or_open_card(CardId::Outline, 320.0, 120.0),
+            "journal-feed" => focus_or_open_card(CardId::JournalFeed(0), 420.0, 150.0),
+            "auth-modal" => {
+                auth_modal_open.set(true);
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "undo" => {
+                apply_undo(history, layout);
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "redo" => {
+                apply_redo(history, layout);
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "arrange-home" => {
+                history.update(|h| h.push(layout.get_untracked()));
+                layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
+                layout.get_untracked().save();
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "arrange-grid" => {
+                history.update(|h| h.push(layout.get_untracked()));
+                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
+                layout.get_untracked().save();
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "arrange-compact" => {
+                history.update(|h| h.push(layout.get_untracked()));
+                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
+                layout.get_untracked().save();
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "arrange-relations" => {
+                history.update(|h| h.push(layout.get_untracked()));
+                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport())));
+                layout.get_untracked().save();
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "fit-all" => {
+                if let Some(bbox) = layout.get_untracked().bounding_rect() {
+                    let (w, h) = (
+                        web_sys::window().and_then(|w| w.inner_width().ok()).and_then(|v| v.as_f64()).unwrap_or(1440.0),
+                        web_sys::window().and_then(|w| w.inner_height().ok()).and_then(|v| v.as_f64()).unwrap_or(900.0),
+                    );
+                    let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
+                    set_zoom.set(z);
+                    set_pan.set((px, py));
+                } else {
+                    set_zoom.set(1.0);
+                    set_pan.set((0.0, 0.0));
+                }
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "group-mind-core" => {
+                history.update(|h| h.push(layout.get_untracked()));
+                layout.update(|l| {
+                    let _ = l.create_deck("Mind Core", vec![CardId::Identity, CardId::Session], 70.0, 50.0);
+                });
+                layout.get_untracked().save();
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            "reset-desktop" => {
+                history.update(|h| h.push(layout.get_untracked()));
+                layout.update(|l| l.reset_desktop(None));
+                layout.get_untracked().save();
+                set_command_open.set(false);
+                set_command_query.set(String::new());
+            }
+            organ_key => {
+                if let Some(card) = CardId::from_key(organ_key) {
+                    focus_or_open_card(card, 380.0, 480.0);
+                } else {
+                    set_command_open.set(false);
+                    set_command_query.set(String::new());
+                }
+            }
+        }
     };
 
     let ask_answer = move || crate::state::ask_cybou(&command_query.get(), &runtime.get());
@@ -66,17 +524,7 @@ pub fn CommandPalette(
                                             <button
                                                 type="button"
                                                 class="ask-cybou-action-btn"
-                                                on:click=move |_| {
-                                                    set_selected.set(Some(DesktopItemId::Card(card)));
-                                                    if !layout.get().contains_card(card) {
-                                                        layout.update(|l| l.open_card(card, 380.0, 480.0));
-                                                    } else if layout.get().presentation(card).collapsed {
-                                                        layout.update(|l| l.set_collapsed(card, false));
-                                                    }
-                                                    layout.update(|l| l.bring_forward(card));
-                                                    set_command_open.set(false);
-                                                    set_command_query.set(String::new());
-                                                }
+                                                on:click=move |_| focus_or_open_card(card, 380.0, 480.0)
                                             >
                                                 {label}
                                             </button>
@@ -86,219 +534,42 @@ pub fn CommandPalette(
                             }
                         })
                     }}
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "insight telemetry machine health findings why status")
-                        on:click=move |_| select_from_command("insight")
-                    ><Sparkles size=15 /><span><b>"Open System Insight"</b><i>"Telemetry1 host health & self-healing"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "agents agent1 launch opencode task autonomous")
-                        on:click=move |_| select_from_command("agents")
-                    ><ListChecks size=15 /><span><b>"Open Agents"</b><i>"Agent1 bounded capsule runtime"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "capabilities health dependencies")
-                        on:click=move |_| select_from_command("capabilities")
-                    ><Sparkles size=15 /><span><b>"Open Capabilities"</b><i>"Health1 capability dependencies"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "identity subject continuity provenance")
-                        on:click=move |_| select_from_command("identity")
-                    ><IconPin size=15 /><span><b>"Open Identity"</b><i>"Identity1 subject continuity"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "session trust gateway authentication mode")
-                        on:click=move |_| select_from_command("session")
-                    ><IconPin size=15 /><span><b>"Open Session"</b><i>"Gateway trust and session mode"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "journal contributions causal integrity event1")
-                        on:click=move |_| select_from_command("journal")
-                    ><Link size=15 /><span><b>"Open Journal"</b><i>"Event1 canonical event log"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "lifecycle sleep wake consolidation")
-                        on:click=move |_| select_from_command("lifecycle")
-                    ><Sparkles size=15 /><span><b>"Open Lifecycle"</b><i>"Lifecycle1 sleep and wake state"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "commitments obligations intention1")
-                        on:click=move |_| select_from_command("commitments")
-                    ><ListChecks size=15 /><span><b>"Open Commitments"</b><i>"Intention1 open obligations"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "self assessment autobiographical narration self1")
-                        on:click=move |_| select_from_command("self")
-                    ><Sparkles size=15 /><span><b>"Open Self-Model"</b><i>"Self1 autobiographical narration"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "attention focus global workspace theory workspace1")
-                        on:click=move |_| select_from_command("attention")
-                    ><Sparkles size=15 /><span><b>"Open Attention"</b><i>"Workspace1 attention focus"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "beliefs epistemic1 validity propositions")
-                        on:click=move |_| select_from_command("beliefs")
-                    ><Sparkles size=15 /><span><b>"Open Beliefs"</b><i>"Epistemic1 derived propositions"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "perception observations host perception1")
-                        on:click=move |_| select_from_command("perception")
-                    ><Link size=15 /><span><b>"Open Perception"</b><i>"Perception1 host facts"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "context association concepts context1")
-                        on:click=move |_| select_from_command("context")
-                    ><Link size=15 /><span><b>"Open Context"</b><i>"Context1 associative graph"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "shell terminal bash command zone3 body")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::Shell(0), 400.0, 160.0));
-                            layout.get_untracked().save();
-                            select_from_command("shell");
+
+                    <Show
+                        when=move || !filtered_actions.get().is_empty()
+                        fallback=move || view! {
+                            <div class="command-empty-state">
+                                <span>"No matching actions found."</span>
+                                <small>"Try searching for 'editor', 'shell', 'arrange', or 'agents'."</small>
+                            </div>
                         }
-                    ><IconExternalLink size=15 /><span><b>"Open Shell"</b><i>"A bounded, read-only shell"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "files file manager storage browse read-only")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::FileManager(0), 380.0, 120.0));
-                            layout.get_untracked().save();
-                            select_from_command("files");
-                        }
-                    ><IconExternalLink size=15 /><span><b>"Open File Manager"</b><i>"Browse files, read-only"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "editor text code write config edit")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::Editor(0), 400.0, 140.0));
-                            layout.get_untracked().save();
-                            select_from_command("editor");
-                        }
-                    ><IconExternalLink size=15 /><span><b>"Open Text Editor"</b><i>"Code and configuration editor"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "diff compare review changes patch")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::Diff(0), 420.0, 160.0));
-                            layout.get_untracked().save();
-                            select_from_command("diff");
-                        }
-                    ><IconExternalLink size=15 /><span><b>"Open Diff Viewer"</b><i>"Inspect and review changes"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "inspector inspect service entity process details")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::Inspector(0), 380.0, 150.0));
-                            layout.get_untracked().save();
-                            select_from_command("inspector");
-                        }
-                    ><IconExternalLink size=15 /><span><b>"Open Universal Inspector"</b><i>"Deep entity state & relations"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "outline tree hierarchy accessibility navigation")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::Outline, 320.0, 120.0));
-                            layout.get_untracked().save();
-                            select_from_command("outline");
-                        }
-                    ><IconExternalLink size=15 /><span><b>"Open Canvas Outline"</b><i>"Workspace hierarchy & tree view"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "events feed live stream sse journal")
-                        on:click=move |_| {
-                            layout.update(|l| l.open_card(CardId::JournalFeed(0), 420.0, 150.0));
-                            layout.get_untracked().save();
-                            select_from_command("journal-feed");
-                        }
-                    ><IconExternalLink size=15 /><span><b>"Open Event Stream"</b><i>"Real-time Journal SSE stream"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "auth sign in login pam")
-                        on:click=move |_| {
-                            auth_modal_open.set(true);
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconPin size=15 /><span><b>"Authenticate / Sign in"</b><i>"Linux PAM credentials"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "group mind deck cards")
-                        on:click=move |_| {
-                            history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| {
-                                let _ = l.create_deck("Mind Core", vec![CardId::Identity, CardId::Session], 70.0, 50.0);
-                            });
-                            layout.get_untracked().save();
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconLayers size=15 /><span><b>"Create Deck: Mind Core"</b><i>"Group Identity and Session"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "undo layout revert")
-                        on:click=move |_| {
-                            apply_undo(history, layout);
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconUndo size=15 /><span><b>"Undo Layout Change"</b><i>"Revert position or deck state"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "redo layout forward")
-                        on:click=move |_| {
-                            apply_redo(history, layout);
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconRedo size=15 /><span><b>"Redo Layout Change"</b><i>"Re-apply position or deck state"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "arrange home canonical default")
-                        on:click=move |_| {
-                            history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
-                            layout.get_untracked().save();
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconRefresh size=15 /><span><b>"Arrange: Home"</b><i>"Canonical workspace overview"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "arrange grid structured columns")
-                        on:click=move |_| {
-                            history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
-                            layout.get_untracked().save();
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconGrid size=15 /><span><b>"Arrange: Grid"</b><i>"Structured multi-track lanes"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "arrange compact packing fit")
-                        on:click=move |_| {
-                            history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
-                            layout.get_untracked().save();
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconMinimize size=15 /><span><b>"Arrange: Compact"</b><i>"Dense packing"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "arrange relations causal")
-                        on:click=move |_| {
-                            history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport())));
-                            layout.get_untracked().save();
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><Link size=15 /><span><b>"Arrange: Relations"</b><i>"Mind organ graph"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "fit all zoom viewport center")
-                        on:click=move |_| {
-                            if let Some(bbox) = layout.get_untracked().bounding_rect() {
-                                let (w, h) = (
-                                    web_sys::window().and_then(|w| w.inner_width().ok()).and_then(|v| v.as_f64()).unwrap_or(1440.0),
-                                    web_sys::window().and_then(|w| w.inner_height().ok()).and_then(|v| v.as_f64()).unwrap_or(900.0),
-                                );
-                                let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
-                                set_zoom.set(z);
-                                set_pan.set((px, py));
-                            } else {
-                                set_zoom.set(1.0);
-                                set_pan.set((0.0, 0.0));
+                    >
+                        <For
+                            each=move || filtered_actions.get().into_iter().enumerate()
+                            key=|(_, action)| action.id
+                            children=move |(idx, action)| {
+                                let action_id = action.id;
+                                let is_active = move || selected_index.get() == idx;
+                                view! {
+                                    <button
+                                        type="button"
+                                        class:active=is_active
+                                        on:click=move |_| execute_action(action_id)
+                                        on:mouseenter=move |_| selected_index.set(idx)
+                                    >
+                                        {render_icon(action.icon_kind)}
+                                        <span>
+                                            <b>{action.title}</b>
+                                            <i>{action.subtitle}</i>
+                                        </span>
+                                        {action.shortcut.map(|sc| view! {
+                                            <kbd class="command-shortcut-chip">{sc}</kbd>
+                                        })}
+                                    </button>
+                                }
                             }
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconMaximize size=15 /><span><b>"Fit All to Viewport"</b><i>"Ctrl+0 · Center and scale canvas"</i></span></button>
-                    <button
-                        class:hidden=move || !command_matches(&command_query.get(), "reset layout")
-                        on:click=move |_| {
-                            history.update(|h| h.push(layout.get_untracked()));
-                            layout.update(|l| l.reset_desktop(None));
-                            layout.get_untracked().save();
-                            set_command_open.set(false);
-                            set_command_query.set(String::new());
-                        }
-                    ><IconRefresh size=15 /><span><b>"Reset Desktop Layout"</b><i>"Canonical Home coordinates"</i></span></button>
+                        />
+                    </Show>
                 </nav>
             </Show>
 
@@ -307,79 +578,39 @@ pub fn CommandPalette(
                 <input
                     node_ref=command_input
                     type="search"
-                    placeholder="Search or act…"
+                    placeholder="Search or act… (↑↓ to navigate, Enter to run)"
                     prop:value=move || command_query.get()
                     on:focus=move |_| set_command_open.set(true)
-                    on:input=move |event| set_command_query.set(event_target_value(&event))
+                    on:input=move |event| {
+                        set_command_query.set(event_target_value(&event));
+                        selected_index.set(0);
+                    }
                     on:keydown=move |event: KeyboardEvent| {
-                        if event.key() == "Enter" {
-                            let q = command_query.get();
-                            if command_matches(&q, "undo") {
-                                event.prevent_default();
-                                apply_undo(history, layout);
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "redo") {
-                                event.prevent_default();
-                                apply_redo(history, layout);
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "arrange home") {
-                                event.prevent_default();
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
-                                layout.get_untracked().save();
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "arrange grid") {
-                                event.prevent_default();
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
-                                layout.get_untracked().save();
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "arrange compact") {
-                                event.prevent_default();
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
-                                layout.get_untracked().save();
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "arrange relations") {
-                                event.prevent_default();
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport())));
-                                layout.get_untracked().save();
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "fit all") {
-                                event.prevent_default();
-                                if let Some(bbox) = layout.get_untracked().bounding_rect() {
-                                    let (w, h) = (
-                                        web_sys::window().and_then(|w| w.inner_width().ok()).and_then(|v| v.as_f64()).unwrap_or(1440.0),
-                                        web_sys::window().and_then(|w| w.inner_height().ok()).and_then(|v| v.as_f64()).unwrap_or(900.0),
-                                    );
-                                    let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
-                                    set_zoom.set(z);
-                                    set_pan.set((px, py));
-                                }
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "reset layout") || command_matches(&q, "reset desktop") {
-                                event.prevent_default();
-                                history.update(|h| h.push(layout.get_untracked()));
-                                layout.update(|l| l.reset_desktop(None));
-                                layout.get_untracked().save();
-                                set_command_open.set(false);
-                                set_command_query.set(String::new());
-                            } else if command_matches(&q, "insight") || command_matches(&q, "status") || command_matches(&q, "health") || command_matches(&q, "why") {
-                                event.prevent_default();
-                                select_from_command("insight");
-                            } else if command_matches(&q, "agents") || command_matches(&q, "launch") || command_matches(&q, "opencode") {
-                                event.prevent_default();
-                                select_from_command("agents");
+                        let key = event.key();
+                        if key == "ArrowDown" {
+                            event.prevent_default();
+                            let len = filtered_actions.get().len();
+                            if len > 0 {
+                                selected_index.update(|i| *i = (*i + 1) % len);
                             }
-                        } else if event.key() == "Escape" {
+                        } else if key == "ArrowUp" {
+                            event.prevent_default();
+                            let len = filtered_actions.get().len();
+                            if len > 0 {
+                                selected_index.update(|i| *i = if *i == 0 { len - 1 } else { *i - 1 });
+                            }
+                        } else if key == "Enter" {
+                            event.prevent_default();
+                            let actions = filtered_actions.get();
+                            let idx = selected_index.get();
+                            if let Some(action) = actions.get(idx) {
+                                execute_action(action.id);
+                            } else if let Some(ans) = ask_answer() {
+                                if let Some((_, card)) = ans.target {
+                                    focus_or_open_card(card, 380.0, 480.0);
+                                }
+                            }
+                        } else if key == "Escape" {
                             set_command_open.set(false);
                         }
                     }
