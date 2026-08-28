@@ -486,11 +486,11 @@ pub fn FileManagerContent(
                                             };
                                             let text = file_content.get();
                                             let Some(location) = selected_location.get() else {
-                                                set_error_msg.set(Some("Editor open refused — the gateway supplied no authority-domain reference for this file.".to_string()));
+                                                error_msg.set(Some("Editor open refused — the gateway supplied no authority-domain reference for this file.".to_string()));
                                                 return;
                                             };
                                             let Some(expected_sha256) = selected_sha256.get() else {
-                                                set_error_msg.set(Some("Editor open refused — the gateway supplied no content version for this file.".to_string()));
+                                                error_msg.set(Some("Editor open refused — the gateway supplied no content version for this file.".to_string()));
                                                 return;
                                             };
                                             let mut tab = crate::tool_state::EditorTab::from_location(location, text, expected_sha256);

@@ -11,9 +11,10 @@ use web_sys::{KeyboardEvent, PointerEvent};
 
 use crate::{
     CardId, DesktopItemId, DesktopLayout, GatewayMindClient, MindClient,
+    ansi::AnsiOutput,
     components::{
         card_frame::CardFrame,
-        icons::{IconShield, IconTerminal},
+        icons::{IconCopy, IconShield, IconTerminal},
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
@@ -24,6 +25,8 @@ const SHELL_AUTOCOMPLETE: &[&str] = &[
     "cat", "cd", "clear", "date", "du", "echo", "file", "find", "grep", "head", "help", "ls",
     "pwd", "stat", "tail", "wc",
 ];
+
+const SHELL_QUICK_COMMANDS: &[&str] = &["help", "ls -la", "pwd", "date", "du -h", "stat ."];
 
 /// Interactive Shell domain content presentation.
 #[component]
@@ -63,9 +66,8 @@ pub fn ShellContent(
         }
     };
 
-    let submit_command = move || {
-        let cmd = input_val.get();
-        let trimmed = cmd.trim();
+    let run_command_str = move |cmd_str: String| {
+        let trimmed = cmd_str.trim().to_string();
         if trimmed.is_empty() {
             return;
         }
@@ -76,19 +78,19 @@ pub fn ShellContent(
             set_temp_draft.set(String::new());
             return;
         }
-        let cmd_str = trimmed.to_string();
         set_cmd_history.update(|h| {
-            if h.last() != Some(&cmd_str) {
-                h.push(cmd_str.clone());
+            if h.last() != Some(&trimmed) {
+                h.push(trimmed.clone());
             }
         });
         set_history_idx.set(None);
         set_temp_draft.set(String::new());
         set_running.set(true);
         set_input_val.set(String::new());
+        let to_exec = trimmed.clone();
         spawn_local(async move {
             let client = GatewayMindClient;
-            match client.execute_shell(&cmd_str, instance).await {
+            match client.execute_shell(&to_exec, instance).await {
                 Ok(resp) => {
                     let text = if !resp.stdout.is_empty() {
                         resp.stdout
@@ -98,15 +100,37 @@ pub fn ShellContent(
                         String::new()
                     };
                     set_cwd.set(resp.cwd);
-                    set_history.update(|h| h.push((cmd_str, text, resp.exit_code)));
+                    set_history.update(|h| h.push((to_exec, text, resp.exit_code)));
                 }
                 Err(e) => {
-                    set_history.update(|h| h.push((cmd_str, format!("Error: {e}\n"), 1)));
+                    set_history.update(|h| h.push((to_exec, format!("Error: {e}\n"), 1)));
                 }
             }
             set_running.set(false);
             scroll_output_to_bottom();
         });
+    };
+
+    let submit_command = move || {
+        let cmd = input_val.get();
+        run_command_str(cmd);
+    };
+
+    let copy_entire_session = move || {
+        let entries = history.get();
+        let mut full_log = String::new();
+        for (cmd, out, _) in entries {
+            full_log.push_str("› ");
+            full_log.push_str(&cmd);
+            full_log.push('\n');
+            full_log.push_str(&out);
+            if !out.ends_with('\n') {
+                full_log.push('\n');
+            }
+        }
+        if let Some(window) = web_sys::window() {
+            let _ = window.navigator().clipboard().write_text(&full_log);
+        }
     };
 
     view! {
@@ -130,19 +154,116 @@ pub fn ShellContent(
                     }
                 }
             >
+                // Terminal Top Toolbar
+                <div class="shell-topbar">
+                    <div class="shell-topbar-left">
+                        <span class="shell-cwd-chip" title="Current working directory">
+                            {move || format!("cwd: {}", cwd.get())}
+                        </span>
+                        <span
+                            class="shell-status-badge"
+                            class:running=move || running.get()
+                        >
+                            {move || if running.get() { "running" } else { "ready" }}
+                        </span>
+                    </div>
+                    <div class="shell-topbar-actions">
+                        <button
+                            class="shell-action-btn"
+                            title="Copy entire session to clipboard"
+                            disabled=move || history.get().is_empty()
+                            on:click=move |e: web_sys::MouseEvent| {
+                                e.stop_propagation();
+                                copy_entire_session();
+                            }
+                        >
+                            <IconCopy size=11 />
+                            <span>"Copy All"</span>
+                        </button>
+                        <button
+                            class="shell-action-btn"
+                            title="Clear terminal history"
+                            disabled=move || history.get().is_empty()
+                            on:click=move |e: web_sys::MouseEvent| {
+                                e.stop_propagation();
+                                set_history.set(Vec::new());
+                                set_history_idx.set(None);
+                            }
+                        >
+                            <span>"Clear"</span>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="shell-output" node_ref=output_ref>
+                    <Show when=move || history.get().is_empty()>
+                        <div class="shell-welcome-banner">
+                            <div class="shell-welcome-title">"CYBOU Safe Shell"</div>
+                            <div class="shell-welcome-desc">"Bounded execution sandbox. Click a quick command or type below:"</div>
+                            <div class="shell-chips-container">
+                                <For
+                                    each=move || SHELL_QUICK_COMMANDS.to_vec()
+                                    key=|cmd| cmd.to_string()
+                                    children=move |cmd| {
+                                        let cmd_str = cmd.to_string();
+                                        let cmd_click = cmd.to_string();
+                                        view! {
+                                            <button
+                                                class="shell-chip"
+                                                on:click=move |e: web_sys::MouseEvent| {
+                                                    e.stop_propagation();
+                                                    run_command_str(cmd_click.clone());
+                                                }
+                                            >
+                                                {cmd_str}
+                                            </button>
+                                        }
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </Show>
+
                     <For
                         each=move || history.get()
                         key=|(cmd, out, code)| format!("{cmd}-{out}-{code}")
                         children=move |(cmd, out, code)| {
+                            let out_copy = out.clone();
                             view! {
                                 <div class="shell-entry">
                                     {if !cmd.is_empty() {
-                                        view! { <div class="shell-cmd-echo"><span class="shell-prompt-char">"›"</span>" "{cmd}</div> }.into_any()
+                                        view! {
+                                            <div class="shell-entry-header">
+                                                <div class="shell-cmd-echo">
+                                                    <span class="shell-prompt-char">"›"</span>" "{cmd}
+                                                </div>
+                                                <div class="shell-entry-meta">
+                                                    <span
+                                                        class="shell-exit-badge"
+                                                        class:error=move || code != 0
+                                                        title=if code == 0 { "Success".to_string() } else { format!("Exit status {code}") }
+                                                    >
+                                                        {if code == 0 { "0".to_string() } else { format!("exit {code}") }}
+                                                    </span>
+                                                    <button
+                                                        class="shell-entry-copy-btn"
+                                                        title="Copy command output"
+                                                        on:click=move |e: web_sys::MouseEvent| {
+                                                            e.stop_propagation();
+                                                            if let Some(window) = web_sys::window() {
+                                                                let _ = window.navigator().clipboard().write_text(&out_copy);
+                                                            }
+                                                        }
+                                                    >
+                                                        <IconCopy size=10 />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }.into_any()
                                     } else {
-                                        ().into_any()
+                                        view! { <span/> }.into_any()
                                     }}
-                                    <pre class="shell-out-text" class:error=move || code != 0>{out}</pre>
+                                    <AnsiOutput content=Signal::derive(move || out.clone()) is_error=code != 0 />
                                 </div>
                             }
                         }
