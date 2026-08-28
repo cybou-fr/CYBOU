@@ -5,13 +5,14 @@
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use lucide_leptos::{Activity, Check, Copy, FileText, Pause, Play, Search, Trash2, X};
 use std::sync::Arc;
 use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{EventSource, MessageEvent, PointerEvent};
 
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
-    components::{card_frame::CardFrame, icons::IconFile},
+    components::card_frame::CardFrame,
     interaction::{DragState, ResizeState},
 };
 
@@ -90,7 +91,11 @@ pub fn JournalFeedContent() -> impl IntoView {
         let list = events.get();
         list.into_iter()
             .filter(|(time, topic, desc, payload)| {
-                let matches_filter = if f == "all" { true } else { topic.contains(&f) };
+                let matches_filter = if f == "all" {
+                    true
+                } else {
+                    topic.to_lowercase().contains(&f.to_lowercase())
+                };
                 let matches_search = if q.is_empty() {
                     true
                 } else {
@@ -116,36 +121,119 @@ pub fn JournalFeedContent() -> impl IntoView {
         });
     };
 
+    let total_events = move || events.get().len();
+
     view! {
         <div class="jf-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+            // Top Toolbar
             <div class="jf-toolbar">
                 <div class="jf-filter-group">
-                    <button class="jf-filter-btn" class:active=move || filter.get() == "all" on:click=move |_| set_filter.set("all".into())>"All"</button>
-                    <button class="jf-filter-btn" class:active=move || filter.get() == "snapshot" on:click=move |_| set_filter.set("snapshot".into())>"Snapshot"</button>
-                </div>
-                <input
-                    type="text"
-                    class="jf-search-input"
-                    placeholder="Filter events…"
-                    prop:value=search_query
-                    on:input=move |e| set_search_query.set(event_target_value(&e))
-                />
-                <div class="jf-actions">
-                    <button class="jf-action-btn" on:click=move |_| set_is_paused.update(|p| *p = !*p)>
-                        {move || if is_paused.get() { "▶ Resume" } else { "⏸ Pause" }}
+                    <button
+                        type="button"
+                        class="jf-filter-btn"
+                        class:active=move || filter.get() == "all"
+                        on:click=move |_| set_filter.set("all".into())
+                    >
+                        "All"
                     </button>
-                    <button class="jf-action-btn" on:click=move |_| set_events.set(Vec::new())>"Clear"</button>
+                    <button
+                        type="button"
+                        class="jf-filter-btn"
+                        class:active=move || filter.get() == "snapshot"
+                        on:click=move |_| set_filter.set("snapshot".into())
+                    >
+                        "Snapshot"
+                    </button>
+                    <button
+                        type="button"
+                        class="jf-filter-btn"
+                        class:active=move || filter.get() == "system"
+                        on:click=move |_| set_filter.set("system".into())
+                    >
+                        "System"
+                    </button>
+                    <button
+                        type="button"
+                        class="jf-filter-btn"
+                        class:active=move || filter.get() == "agent"
+                        on:click=move |_| set_filter.set("agent".into())
+                    >
+                        "Agents"
+                    </button>
+                </div>
+
+                <div class="jf-actions">
+                    <button
+                        type="button"
+                        class="jf-action-btn"
+                        class:paused=move || is_paused.get()
+                        on:click=move |_| set_is_paused.update(|p| *p = !*p)
+                    >
+                        {move || if is_paused.get() {
+                            view! { <Play size=12 /> <span>"Resume"</span> }.into_any()
+                        } else {
+                            view! { <Pause size=12 /> <span>"Pause"</span> }.into_any()
+                        }}
+                    </button>
+                    <button
+                        type="button"
+                        class="jf-action-btn"
+                        title="Clear event buffer"
+                        on:click=move |_| set_events.set(Vec::new())
+                    >
+                        <Trash2 size=12 />
+                        <span>"Clear"</span>
+                    </button>
                 </div>
             </div>
 
+            // Search Bar & Stream Status
+            <div class="jf-search-row">
+                <div class="jf-search-input-wrap">
+                    <Search size=12 />
+                    <input
+                        type="text"
+                        class="jf-search-input"
+                        placeholder="Search topics, timestamps, payloads…"
+                        prop:value=search_query
+                        on:input=move |e| set_search_query.set(event_target_value(&e))
+                    />
+                    <Show when=move || !search_query.get().is_empty()>
+                        <button
+                            type="button"
+                            class="jf-clear-search-btn"
+                            title="Clear search"
+                            on:click=move |_| set_search_query.set(String::new())
+                        >
+                            <X size=11 />
+                        </button>
+                    </Show>
+                </div>
+                <div class="jf-stream-stats">
+                    <span
+                        class="jf-status-pill"
+                        class:streaming=move || !is_paused.get()
+                        class:paused=move || is_paused.get()
+                    >
+                        {move || if is_paused.get() { "⏸ Paused" } else { "● Live" }}
+                    </span>
+                    <span class="jf-count-pill">{move || format!("{} events", total_events())}</span>
+                </div>
+            </div>
+
+            // Integrity Banner
             <div class="jf-hash-banner">
                 <span><b>"Integrity State:"</b> <code>"Live Event1 Projection"</code></span>
                 <span class="jf-integrity-pill unverified">"Integrity details unavailable"</span>
             </div>
 
+            // Event Stream List
             <div class="jf-stream-list">
                 <Show when=move || events.get().is_empty()>
-                    <div class="jf-empty">"Listening for live events from gateway…"</div>
+                    <div class="jf-empty">
+                        <Activity size=20 />
+                        <span>"Listening for live events from gateway…"</span>
+                    </div>
                 </Show>
                 <For
                     each=filtered_events
@@ -155,9 +243,13 @@ pub fn JournalFeedContent() -> impl IntoView {
                         let top = topic.clone();
                         let d = desc.clone();
                         let pl = payload.clone();
+                        let is_selected = move || {
+                            selected_event.get().as_ref().map_or(false, |ev| ev.0 == t && ev.1 == top)
+                        };
                         view! {
                             <div
                                 class="jf-event-row"
+                                class:selected=is_selected
                                 title="Click to inspect event payload"
                                 on:click=move |_| {
                                     set_selected_event.set(Some((t.clone(), top.clone(), d.clone(), pl.clone())));
@@ -172,15 +264,17 @@ pub fn JournalFeedContent() -> impl IntoView {
                 />
             </div>
 
+            // Event Inspector Drawer
             <Show when=move || selected_event.get().is_some()>
                 <aside class="jf-inspector">
                     <header class="jf-insp-header">
                         <div class="jf-insp-title">
-                            <IconFile size=12 />
+                            <FileText size=12 />
                             <span><b>{move || selected_event.get().unwrap().1}</b> " · " {move || selected_event.get().unwrap().0}</span>
                         </div>
                         <div class="jf-insp-actions">
                             <button
+                                type="button"
                                 class="fm-btn"
                                 on:click=move |_| {
                                     if let Some(ev) = selected_event.get() {
@@ -188,9 +282,20 @@ pub fn JournalFeedContent() -> impl IntoView {
                                     }
                                 }
                             >
-                                {move || if copied.get() { "Copied!" } else { "Copy JSON" }}
+                                {move || if copied.get() {
+                                    view! { <Check size=11 /> <span>"Copied!"</span> }.into_any()
+                                } else {
+                                    view! { <Copy size=11 /> <span>"Copy JSON"</span> }.into_any()
+                                }}
                             </button>
-                            <button class="fm-btn" on:click=move |_| set_selected_event.set(None)>"×"</button>
+                            <button
+                                type="button"
+                                class="fm-btn"
+                                title="Close inspector"
+                                on:click=move |_| set_selected_event.set(None)
+                            >
+                                <X size=12 />
+                            </button>
                         </div>
                     </header>
                     <pre class="jf-json-view">
@@ -245,7 +350,7 @@ pub fn JournalFeedCard(
             dragging=dragging
             resizing=resizing
             kicker_title="Event Stream"
-            kicker_icon=Arc::new(|| view! { <IconFile size=14 /> }.into_any())
+            kicker_icon=Arc::new(|| view! { <Activity size=14 /> }.into_any())
             collapsed_summary=Arc::new(collapsed)
         >
             <JournalFeedContent />
