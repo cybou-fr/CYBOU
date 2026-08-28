@@ -387,7 +387,8 @@ pub fn CommandPalette(
                 .iter()
                 .copied()
                 .filter(|action| {
-                    let search_target = format!("{} {} {}", action.title, action.subtitle, action.keywords);
+                    let search_target =
+                        format!("{} {} {}", action.title, action.subtitle, action.keywords);
                     command_matches(&q, &search_target)
                 })
                 .collect::<Vec<_>>()
@@ -407,97 +408,109 @@ pub fn CommandPalette(
         set_command_query.set(String::new());
     };
 
-    let execute_action = move |action_id: &'static str| {
-        match action_id {
-            "shell" => focus_or_open_card(CardId::Shell(0), 400.0, 160.0),
-            "files" => focus_or_open_card(CardId::FileManager(0), 380.0, 120.0),
-            "editor" => focus_or_open_card(CardId::Editor(0), 400.0, 140.0),
-            "diff" => focus_or_open_card(CardId::Diff(0), 420.0, 160.0),
-            "inspector" => focus_or_open_card(CardId::Inspector(0), 380.0, 150.0),
-            "outline" => focus_or_open_card(CardId::Outline, 320.0, 120.0),
-            "journal-feed" => focus_or_open_card(CardId::JournalFeed(0), 420.0, 150.0),
-            "auth-modal" => {
-                auth_modal_open.set(true);
+    let execute_action = move |action_id: &'static str| match action_id {
+        "shell" => focus_or_open_card(CardId::Shell(0), 400.0, 160.0),
+        "files" => focus_or_open_card(CardId::FileManager(0), 380.0, 120.0),
+        "editor" => focus_or_open_card(CardId::Editor(0), 400.0, 140.0),
+        "diff" => focus_or_open_card(CardId::Diff(0), 420.0, 160.0),
+        "inspector" => focus_or_open_card(CardId::Inspector(0), 380.0, 150.0),
+        "outline" => focus_or_open_card(CardId::Outline, 320.0, 120.0),
+        "journal-feed" => focus_or_open_card(CardId::JournalFeed(0), 420.0, 150.0),
+        "auth-modal" => {
+            auth_modal_open.set(true);
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "undo" => {
+            apply_undo(history, layout);
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "redo" => {
+            apply_redo(history, layout);
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "arrange-home" => {
+            history.update(|h| h.push(layout.get_untracked()));
+            layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
+            layout.get_untracked().save();
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "arrange-grid" => {
+            history.update(|h| h.push(layout.get_untracked()));
+            layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
+            layout.get_untracked().save();
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "arrange-compact" => {
+            history.update(|h| h.push(layout.get_untracked()));
+            layout
+                .update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
+            layout.get_untracked().save();
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "arrange-relations" => {
+            history.update(|h| h.push(layout.get_untracked()));
+            layout.update(|l| {
+                l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport()))
+            });
+            layout.get_untracked().save();
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "fit-all" => {
+            if let Some(bbox) = layout.get_untracked().bounding_rect() {
+                let (w, h) = (
+                    web_sys::window()
+                        .and_then(|w| w.inner_width().ok())
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(1440.0),
+                    web_sys::window()
+                        .and_then(|w| w.inner_height().ok())
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(900.0),
+                );
+                let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
+                set_zoom.set(z);
+                set_pan.set((px, py));
+            } else {
+                set_zoom.set(1.0);
+                set_pan.set((0.0, 0.0));
+            }
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "group-mind-core" => {
+            history.update(|h| h.push(layout.get_untracked()));
+            layout.update(|l| {
+                let _ = l.create_deck(
+                    "Mind Core",
+                    vec![CardId::Identity, CardId::Session],
+                    70.0,
+                    50.0,
+                );
+            });
+            layout.get_untracked().save();
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        "reset-desktop" => {
+            history.update(|h| h.push(layout.get_untracked()));
+            layout.update(|l| l.reset_desktop(None));
+            layout.get_untracked().save();
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        organ_key => {
+            if let Some(card) = CardId::from_key(organ_key) {
+                focus_or_open_card(card, 380.0, 480.0);
+            } else {
                 set_command_open.set(false);
                 set_command_query.set(String::new());
-            }
-            "undo" => {
-                apply_undo(history, layout);
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "redo" => {
-                apply_redo(history, layout);
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "arrange-home" => {
-                history.update(|h| h.push(layout.get_untracked()));
-                layout.update(|l| l.apply_arrangement(ArrangementMode::Home, Some(usable_viewport())));
-                layout.get_untracked().save();
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "arrange-grid" => {
-                history.update(|h| h.push(layout.get_untracked()));
-                layout.update(|l| l.apply_arrangement(ArrangementMode::Grid, Some(usable_viewport())));
-                layout.get_untracked().save();
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "arrange-compact" => {
-                history.update(|h| h.push(layout.get_untracked()));
-                layout.update(|l| l.apply_arrangement(ArrangementMode::Compact, Some(usable_viewport())));
-                layout.get_untracked().save();
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "arrange-relations" => {
-                history.update(|h| h.push(layout.get_untracked()));
-                layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport())));
-                layout.get_untracked().save();
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "fit-all" => {
-                if let Some(bbox) = layout.get_untracked().bounding_rect() {
-                    let (w, h) = (
-                        web_sys::window().and_then(|w| w.inner_width().ok()).and_then(|v| v.as_f64()).unwrap_or(1440.0),
-                        web_sys::window().and_then(|w| w.inner_height().ok()).and_then(|v| v.as_f64()).unwrap_or(900.0),
-                    );
-                    let (z, (px, py)) = DesktopLayout::fit_to_viewport(bbox, w, h, 60.0);
-                    set_zoom.set(z);
-                    set_pan.set((px, py));
-                } else {
-                    set_zoom.set(1.0);
-                    set_pan.set((0.0, 0.0));
-                }
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "group-mind-core" => {
-                history.update(|h| h.push(layout.get_untracked()));
-                layout.update(|l| {
-                    let _ = l.create_deck("Mind Core", vec![CardId::Identity, CardId::Session], 70.0, 50.0);
-                });
-                layout.get_untracked().save();
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            "reset-desktop" => {
-                history.update(|h| h.push(layout.get_untracked()));
-                layout.update(|l| l.reset_desktop(None));
-                layout.get_untracked().save();
-                set_command_open.set(false);
-                set_command_query.set(String::new());
-            }
-            organ_key => {
-                if let Some(card) = CardId::from_key(organ_key) {
-                    focus_or_open_card(card, 380.0, 480.0);
-                } else {
-                    set_command_open.set(false);
-                    set_command_query.set(String::new());
-                }
             }
         }
     };
