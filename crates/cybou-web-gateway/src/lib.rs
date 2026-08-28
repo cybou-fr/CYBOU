@@ -147,6 +147,13 @@ pub(crate) fn router_in_sandbox(
 
     let jail = cybou_jailfs::JailFs::new(sandbox_path).expect("initialize gateway sandbox jail");
     let shells = Arc::new(shells::Shells::new(jail.clone()));
+    #[cfg(test)]
+    let drafts = Arc::new(crate::routes::UserDraftStore::new());
+    #[cfg(not(test))]
+    let drafts = Arc::new(
+        crate::routes::UserDraftStore::open(&crate::routes::draft_database_path(sandbox_path))
+            .expect("initialize private draft database"),
+    );
 
     let state = GatewayState {
         presence,
@@ -164,10 +171,7 @@ pub(crate) fn router_in_sandbox(
         },
         shells,
         files: jail,
-        drafts: Arc::new(
-            crate::routes::UserDraftStore::open(&crate::routes::draft_database_path(sandbox_path))
-                .expect("initialize private draft database"),
-        ),
+        drafts,
     };
 
     let app = Router::new()
@@ -1306,6 +1310,13 @@ mod tests {
 
         assert!(!listing.truncated);
         assert_eq!(listing.total_entries, 2);
+        assert!(
+            listing
+                .entries
+                .iter()
+                .all(|entry| entry.name != ".cybou-private"),
+            "private operational state must never appear inside the user-visible jail"
+        );
         // Directories first, then by name — the order the sandbox sorted them in.
         assert!(listing.entries[0].is_dir);
         assert_eq!(listing.entries[0].name, "somewhere");
