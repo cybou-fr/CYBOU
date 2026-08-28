@@ -248,7 +248,7 @@ impl DesktopLayout {
         let Some(anchor) = self.anchors.iter_mut().find(|anchor| anchor.id == id) else {
             return false;
         };
-        anchor.name = name.to_owned();
+        name.clone_into(&mut anchor.name);
         true
     }
 

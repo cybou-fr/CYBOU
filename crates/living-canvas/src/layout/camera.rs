@@ -328,6 +328,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn camera_easing_is_bounded_and_reaches_both_endpoints() {
         assert_eq!(camera_ease(-1.0), 0.0);
         assert_eq!(camera_ease(0.0), 0.0);

@@ -22,7 +22,7 @@ pub use auth::{login_handler, logout_handler, session_handler};
 pub use disclosure::disclosure_handler;
 pub use drafts::{
     UserDraftStore, delete_draft_handler, draft_database_path, list_drafts_handler,
-    save_draft_handler,
+    save_draft_handler, validate_draft_database_isolation,
 };
 pub use events::events_handler;
 pub use files::{

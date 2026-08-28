@@ -717,6 +717,7 @@ mod tests {
             tasks_max: 512,
             hosts: vec!["github.com".to_owned()],
             units: vec!["cybou-capsule-x.service".to_owned()],
+            task: None,
         }
     }
 

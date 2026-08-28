@@ -2348,6 +2348,21 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   border-radius: 6px;
   cursor: pointer;
 }
+.editor-save-as-path {
+  width: 100%;
+  background: #04090e;
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.editor-save-as-path:focus {
+  border-color: var(--accent);
+  outline: none;
+}
 
 /* --- Diff Viewer (ADR-0045) --------------------------------------------------------------- */
 .diff-body {
@@ -2458,6 +2473,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   color: var(--muted);
   font-size: 10px;
   user-select: none;
+}
+.diff-num.old, .old {
+  color: rgba(154, 167, 184, 0.45);
+}
+.diff-num.new, .new {
+  color: rgba(154, 167, 184, 0.45);
 }
 .diff-prefix {
   width: 14px;
@@ -2753,6 +2774,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--muted);
+}
+.outline-item.anchor, .anchor {
+  border-left: 2px solid #38bdf8;
 }
 .outline-item.cluster, .cluster {
   border-left: 2px solid #70e1c8;

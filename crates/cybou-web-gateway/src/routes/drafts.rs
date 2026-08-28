@@ -47,6 +47,60 @@ pub fn draft_database_path(sandbox_path: &Path) -> std::path::PathBuf {
     }
 }
 
+/// Validate that the draft database path does not reside inside the user-visible sandbox jail.
+///
+/// # Errors
+///
+/// Returns an error message if the draft database is positioned within the jail root.
+pub fn validate_draft_database_isolation(
+    db_path: &Path,
+    sandbox_path: &Path,
+) -> Result<(), String> {
+    let canonical_sandbox = sandbox_path.canonicalize().map_err(|e| {
+        format!(
+            "failed to canonicalize sandbox path {}: {e}",
+            sandbox_path.display()
+        )
+    })?;
+
+    let canonical_db = if db_path.exists() {
+        db_path.canonicalize().map_err(|e| {
+            format!(
+                "failed to canonicalize draft database path {}: {e}",
+                db_path.display()
+            )
+        })?
+    } else {
+        let mut curr = db_path.to_path_buf();
+        while !curr.exists() {
+            if let Some(parent) = curr.parent() {
+                curr = parent.to_path_buf();
+            } else {
+                break;
+            }
+        }
+        if curr.exists() {
+            let canonical_parent = curr
+                .canonicalize()
+                .map_err(|e| format!("failed to canonicalize draft database ancestor: {e}"))?;
+            let relative = db_path.strip_prefix(&curr).unwrap_or(db_path);
+            canonical_parent.join(relative)
+        } else {
+            db_path.to_path_buf()
+        }
+    };
+
+    if canonical_db.starts_with(&canonical_sandbox) {
+        return Err(format!(
+            "Configuration refusal: draft database path ({}) is located inside the file sandbox jail ({}). Draft state must remain isolated outside the user-visible filesystem jail.",
+            canonical_db.display(),
+            canonical_sandbox.display(),
+        ));
+    }
+
+    Ok(())
+}
+
 /// Maximum UTF-8 bytes accepted for one draft identifier.
 pub const DRAFT_MAX_ID_BYTES: usize = 128;
 /// Maximum UTF-8 bytes accepted for one draft title.
@@ -365,10 +419,15 @@ pub async fn list_drafts_handler(
     headers: HeaderMap,
 ) -> Result<Json<UserDraftListProjection>, Refusal> {
     let principal = authenticated_principal(&state, &headers).ok_or_else(no_seat)?;
-    let drafts = state.drafts.list(&principal).map_err(draft_refusal)?;
+    let drafts = state.drafts.clone();
+    let principal_for_task = principal.clone();
+    let drafts_list = tokio::task::spawn_blocking(move || drafts.list(&principal_for_task))
+        .await
+        .map_err(|_| draft_refusal(DraftStoreError::StorageUnavailable))?
+        .map_err(draft_refusal)?;
     Ok(Json(UserDraftListProjection {
         schema_version: WEB_SCHEMA_V1,
-        drafts,
+        drafts: drafts_list,
     }))
 }
 
@@ -396,9 +455,12 @@ pub async fn save_draft_handler(
         updated_at_utc: now,
     };
 
-    state
-        .drafts
-        .save(&principal, &draft)
+    let drafts = state.drafts.clone();
+    let draft_for_task = draft.clone();
+    let principal_for_task = principal.clone();
+    tokio::task::spawn_blocking(move || drafts.save(&principal_for_task, &draft_for_task))
+        .await
+        .map_err(|_| draft_refusal(DraftStoreError::StorageUnavailable))?
         .map_err(draft_refusal)?;
     Ok(Json(draft))
 }
@@ -414,9 +476,12 @@ pub async fn delete_draft_handler(
     Json(payload): Json<UserDraftDeleteRequest>,
 ) -> Result<StatusCode, Refusal> {
     let principal = authenticated_principal(&state, &headers).ok_or_else(no_seat)?;
-    state
-        .drafts
-        .delete(&principal, &payload.draft_id)
+    let drafts = state.drafts.clone();
+    let principal_for_task = principal.clone();
+    let draft_id = payload.draft_id.clone();
+    tokio::task::spawn_blocking(move || drafts.delete(&principal_for_task, &draft_id))
+        .await
+        .map_err(|_| draft_refusal(DraftStoreError::StorageUnavailable))?
         .map_err(draft_refusal)?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -530,5 +595,23 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body.error, "draftLimitReached");
         assert!(!body.retryable);
+    }
+
+    #[test]
+    fn draft_database_cannot_reside_within_sandbox_jail() {
+        let sandbox_dir = tempfile::tempdir().expect("sandbox dir");
+        let outside_dir = tempfile::tempdir().expect("outside dir");
+
+        let inside_db = sandbox_dir.path().join("sub/drafts.sqlite3");
+        assert!(
+            validate_draft_database_isolation(&inside_db, sandbox_dir.path()).is_err(),
+            "draft DB inside sandbox jail must be refused"
+        );
+
+        let outside_db = outside_dir.path().join("cybou/drafts.sqlite3");
+        assert!(
+            validate_draft_database_isolation(&outside_db, sandbox_dir.path()).is_ok(),
+            "draft DB outside sandbox jail must be accepted"
+        );
     }
 }

@@ -145,6 +145,8 @@ pub struct EditorTab {
     pub expected_sha256: Option<String>,
     /// Current server version discovered after a stale write, if unresolved.
     pub conflict: Option<FileConflict>,
+    /// Monotonic debounce generation for server-side draft autosave on this tab.
+    pub autosave_generation: u64,
 }
 
 impl EditorTab {
@@ -164,6 +166,7 @@ impl EditorTab {
         tab.original_content = draft.content;
         tab.dirty = true;
         tab.recovered_unsaved = true;
+        tab.autosave_generation = 0;
         if tab.expected_sha256.as_deref() == Some("") {
             tab.expected_sha256 = None;
         }
@@ -187,6 +190,7 @@ impl EditorTab {
         tab.content = draft.content;
         tab.dirty = true;
         tab.recovered_unsaved = true;
+        tab.autosave_generation = 0;
         if base_changed {
             tab.conflict = Some(FileConflict {
                 server_content: current.text,
@@ -221,6 +225,7 @@ impl EditorTab {
             read_only: false,
             expected_sha256: None,
             conflict: None,
+            autosave_generation: 0,
         }
     }
 
@@ -267,6 +272,7 @@ impl EditorTab {
             read_only,
             expected_sha256: Some(expected_sha256),
             conflict: None,
+            autosave_generation: 0,
         }
     }
 }
@@ -533,6 +539,32 @@ impl ToolCardStates {
         })
     }
 
+    /// Restore recovered drafts into the primary editor state independently of DOM mounting.
+    pub fn restore_drafts(&self, restored: Vec<EditorTab>) -> usize {
+        let editor = self.editor(CardId::Editor(0));
+        let conflicts = restored.iter().filter(|tab| tab.conflict.is_some()).count();
+        editor.tabs.update(|all| {
+            let pristine = all.len() == 1 && !all[0].dirty && all[0].content.is_empty();
+            let to_restore = restored
+                .into_iter()
+                .filter(|draft| !all.iter().any(|tab| tab.recovery_id == draft.recovery_id))
+                .collect::<Vec<_>>();
+            if pristine && !to_restore.is_empty() {
+                *all = to_restore;
+            } else {
+                all.extend(to_restore);
+            }
+        });
+        editor.status_msg.set(Some(if conflicts == 0 {
+            "Recovered durable editor drafts with current authority.".to_string()
+        } else {
+            format!(
+                "Recovered durable editor drafts; {conflicts} changed on the server and require conflict review."
+            )
+        }));
+        conflicts
+    }
+
     /// Forget everything a card had done, because the card itself is gone.
     pub fn forget(&self, card: CardId) {
         self.shells.update_value(|held| {
@@ -586,5 +618,22 @@ mod tests {
             tab.expected_sha256.as_deref(),
             Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         );
+    }
+
+    #[test]
+    fn each_tab_tracks_its_own_autosave_generation() {
+        let mut tab_a = EditorTab::draft(1);
+        let mut tab_b = EditorTab::draft(2);
+
+        assert_eq!(tab_a.autosave_generation, 0);
+        assert_eq!(tab_b.autosave_generation, 0);
+
+        tab_a.autosave_generation += 1;
+        assert_eq!(tab_a.autosave_generation, 1);
+        assert_eq!(tab_b.autosave_generation, 0);
+
+        tab_b.autosave_generation += 1;
+        assert_eq!(tab_a.autosave_generation, 1);
+        assert_eq!(tab_b.autosave_generation, 1);
     }
 }

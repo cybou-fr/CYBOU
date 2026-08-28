@@ -74,59 +74,11 @@ pub fn EditorContent(
     let next_draft_number = state.next_draft_number;
     let card_close_open = state.card_close_open;
     let status_msg = state.status_msg;
-    let autosave_generation = state.autosave_generation;
     let save_as_open = state.save_as_open;
     let save_as_path = state.save_as_path;
     let layout = expect_context::<RwSignal<DesktopLayout>>();
     let set_selected = expect_context::<WriteSignal<Option<DesktopItemId>>>();
     let tool_states = expect_context::<ToolCardStates>();
-
-    if instance == 0 {
-        spawn_local(async move {
-            if let Ok(recovered) = GatewayMindClient.drafts().await
-                && !recovered.drafts.is_empty()
-            {
-                let mut restored = Vec::with_capacity(recovered.drafts.len());
-                for draft in recovered.drafts {
-                    let current_path = match &draft.base_location {
-                        Some(cybou_protocol::LocationRef::SafeShellJail { path, .. }) => {
-                            Some(path.clone())
-                        }
-                        _ => None,
-                    };
-                    let tab = if let Some(path) = current_path {
-                        match GatewayMindClient.read_text_file(&path).await {
-                            Ok(current) => EditorTab::from_recovery_against_file(draft, current),
-                            Err(_) => EditorTab::from_recovery(draft),
-                        }
-                    } else {
-                        EditorTab::from_recovery(draft)
-                    };
-                    restored.push(tab);
-                }
-                let conflicts = restored.iter().filter(|tab| tab.conflict.is_some()).count();
-                tabs.update(|all| {
-                    let pristine = all.len() == 1 && !all[0].dirty && all[0].content.is_empty();
-                    let restored = restored
-                        .into_iter()
-                        .filter(|draft| !all.iter().any(|tab| tab.recovery_id == draft.recovery_id))
-                        .collect::<Vec<_>>();
-                    if pristine && !restored.is_empty() {
-                        *all = restored;
-                    } else {
-                        all.extend(restored);
-                    }
-                });
-                status_msg.set(Some(if conflicts == 0 {
-                    "Recovered durable editor drafts with current authority.".to_string()
-                } else {
-                    format!(
-                        "Recovered durable editor drafts; {conflicts} changed on the server and require conflict review."
-                    )
-                }));
-            }
-        });
-    }
 
     let active_tab = move || {
         let all_tabs = tabs.get();
@@ -143,21 +95,23 @@ pub fn EditorContent(
 
     let update_current_content = move |new_content: String| {
         let idx = active_tab_index.get();
+        let mut generation = 0;
+        let mut recovery_id = String::new();
         tabs.update(|all| {
             if let Some(tab) = all.get_mut(idx) {
                 tab.content = new_content;
                 tab.dirty = tab.recovered_unsaved || tab.content != tab.original_content;
+                tab.autosave_generation = tab.autosave_generation.saturating_add(1);
+                generation = tab.autosave_generation;
+                recovery_id = tab.recovery_id.clone();
             }
         });
-        autosave_generation.update(|generation| *generation = generation.saturating_add(1));
-        let generation = autosave_generation.get_untracked();
-        let snapshot = tabs.get_untracked().get(idx).cloned();
         spawn_local(async move {
             TimeoutFuture::new(750).await;
-            if autosave_generation.get_untracked() != generation {
-                return;
-            }
-            let Some(tab) = snapshot.filter(|tab| tab.dirty) else {
+            let current_tab = tabs.get_untracked().get(idx).cloned();
+            let Some(tab) = current_tab.filter(|tab| {
+                tab.recovery_id == recovery_id && tab.autosave_generation == generation && tab.dirty
+            }) else {
                 return;
             };
             let base_location =
@@ -279,7 +233,25 @@ pub fn EditorContent(
                         } else {
                             format!("Saved and verified ({} bytes).", saved.size_bytes)
                         }));
-                        let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+                        if changed_while_saving {
+                            if let Some(tab) = tabs.get_untracked().get(idx).cloned() {
+                                let base_location = (!matches!(
+                                    tab.location,
+                                    cybou_protocol::LocationRef::Draft { .. }
+                                ))
+                                .then_some(tab.location);
+                                let save_request = UserDraftSaveRequest {
+                                    draft_id: tab.recovery_id,
+                                    title: tab.name,
+                                    content: tab.content,
+                                    base_location,
+                                    base_sha256: tab.expected_sha256,
+                                };
+                                let _ = GatewayMindClient.save_draft(&save_request).await;
+                            }
+                        } else {
+                            let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+                        }
                     }
                     Err(ClientError::FileChangedSinceRead) => {
                         let cybou_protocol::LocationRef::SafeShellJail { path, .. } =
@@ -366,11 +338,37 @@ pub fn EditorContent(
                     });
                     save_as_open.set(false);
                     save_as_path.set(String::new());
-                    status_msg.set(Some(format!(
-                        "Created and verified ({} bytes).",
-                        created.size_bytes
-                    )));
-                    let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+                    let changed_while_saving = tabs
+                        .get_untracked()
+                        .get(idx)
+                        .is_some_and(|current| current.dirty);
+                    status_msg.set(Some(if changed_while_saving {
+                        format!(
+                            "Created and verified ({} bytes); newer buffer changes remain unsaved.",
+                            created.size_bytes
+                        )
+                    } else {
+                        format!("Created and verified ({} bytes).", created.size_bytes)
+                    }));
+                    if changed_while_saving {
+                        if let Some(tab) = tabs.get_untracked().get(idx).cloned() {
+                            let base_location = (!matches!(
+                                tab.location,
+                                cybou_protocol::LocationRef::Draft { .. }
+                            ))
+                            .then_some(tab.location);
+                            let save_request = UserDraftSaveRequest {
+                                draft_id: tab.recovery_id,
+                                title: tab.name,
+                                content: tab.content,
+                                base_location,
+                                base_sha256: tab.expected_sha256,
+                            };
+                            let _ = GatewayMindClient.save_draft(&save_request).await;
+                        }
+                    } else {
+                        let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+                    }
                 }
                 Err(ClientError::FileAlreadyExists) => status_msg.set(Some(
                     "Save As stopped — that file already exists. Choose another path.".to_string(),

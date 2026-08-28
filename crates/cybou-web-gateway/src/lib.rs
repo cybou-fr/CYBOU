@@ -150,10 +150,15 @@ pub(crate) fn router_in_sandbox(
     #[cfg(test)]
     let drafts = Arc::new(crate::routes::UserDraftStore::new());
     #[cfg(not(test))]
-    let drafts = Arc::new(
-        crate::routes::UserDraftStore::open(&crate::routes::draft_database_path(sandbox_path))
-            .expect("initialize private draft database"),
-    );
+    let drafts = {
+        let db_path = crate::routes::draft_database_path(sandbox_path);
+        crate::routes::validate_draft_database_isolation(&db_path, sandbox_path)
+            .expect("draft database isolation invariant violated");
+        Arc::new(
+            crate::routes::UserDraftStore::open(&db_path)
+                .expect("initialize private draft database"),
+        )
+    };
 
     let state = GatewayState {
         presence,

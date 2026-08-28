@@ -96,6 +96,7 @@ fn coarse_edits(old_len: usize, new_len: usize) -> Vec<Edit> {
         .collect()
 }
 
+#[allow(clippy::many_single_char_names)]
 fn myers_edits(old: &[&str], new: &[&str]) -> Option<Vec<Edit>> {
     let n = isize::try_from(old.len()).ok()?;
     let m = isize::try_from(new.len()).ok()?;

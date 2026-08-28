@@ -18,7 +18,7 @@ use living_canvas::{
     },
     interaction::{DragState, ResizeState, apply_redo, apply_undo, selection_actions_style},
     state::{DesktopRuntimeSubscription, RuntimeState},
-    tool_state::ToolCardStates,
+    tool_state::{EditorTab, ToolCardStates},
 };
 
 fn load_layout() -> DesktopLayout {
@@ -192,17 +192,47 @@ pub fn App() -> impl IntoView {
         let actions = client.actions(None).await.ok();
         let agent_offers = client.agent_offers().await.ok();
         runtime.set(match result {
-            Ok((session, snapshot)) => RuntimeState::Ready {
-                mode: session.mode,
-                session,
-                snapshot,
-                mind,
-                disclosure,
-                insight,
-                agents,
-                actions,
-                agent_offers,
-            },
+            Ok((session, snapshot)) => {
+                let ready_state = RuntimeState::Ready {
+                    mode: session.mode,
+                    session,
+                    snapshot,
+                    mind,
+                    disclosure,
+                    insight,
+                    agents,
+                    actions,
+                    agent_offers,
+                };
+                spawn_local(async move {
+                    if let Ok(recovered) = client.drafts().await
+                        && !recovered.drafts.is_empty()
+                    {
+                        let mut restored = Vec::with_capacity(recovered.drafts.len());
+                        for draft in recovered.drafts {
+                            let current_path = match &draft.base_location {
+                                Some(cybou_protocol::LocationRef::SafeShellJail {
+                                    path, ..
+                                }) => Some(path.clone()),
+                                _ => None,
+                            };
+                            let tab = if let Some(path) = current_path {
+                                match client.read_text_file(&path).await {
+                                    Ok(current) => {
+                                        EditorTab::from_recovery_against_file(draft, current)
+                                    }
+                                    Err(_) => EditorTab::from_recovery(draft),
+                                }
+                            } else {
+                                EditorTab::from_recovery(draft)
+                            };
+                            restored.push(tab);
+                        }
+                        tool_states.restore_drafts(restored);
+                    }
+                });
+                ready_state
+            }
             Err(error) => RuntimeState::Error(error.to_string()),
         });
     });
@@ -232,9 +262,7 @@ pub fn App() -> impl IntoView {
                 return;
             }
 
-            if (event.ctrl_key() || event.meta_key())
-                && event.key().eq_ignore_ascii_case("z")
-            {
+            if (event.ctrl_key() || event.meta_key()) && event.key().eq_ignore_ascii_case("z") {
                 event.prevent_default();
                 if event.shift_key() {
                     apply_redo(history, layout);
