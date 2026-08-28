@@ -3282,12 +3282,64 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .outline-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   font-weight: 600;
   color: #fff;
   border-bottom: 1px solid rgba(154, 167, 184, 0.16);
   padding-bottom: 8px;
+}
+.outline-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.outline-stats-bar {
+  display: flex;
+  gap: 4px;
+}
+.outline-stat-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(154, 167, 184, 0.15);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  color: var(--muted);
+}
+.outline-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #090e15;
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--muted);
+}
+.outline-search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-size: 11px;
+  outline: 0;
+}
+.outline-search-input::placeholder {
+  color: #64748b;
+}
+.outline-clear-btn {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.outline-clear-btn:hover {
+  color: #fff;
 }
 .outline-title {
   color: #dfe8ed;
@@ -3371,9 +3423,57 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .outline-item:hover {
   background: rgba(255, 255, 255, 0.06);
 }
+.outline-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  opacity: 0;
+}
+.outline-item:hover .outline-card-actions {
+  opacity: 1;
+}
+.outline-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.outline-action-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.outline-action-btn.danger {
+  color: #ff8f8f;
+}
+.outline-action-btn.danger:hover {
+  background: rgba(255, 100, 100, 0.2);
+  color: #ff5555;
+}
+.outline-action-btn.split {
+  width: auto;
+  padding: 0 5px;
+  font-size: 10px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+.outline-action-btn.split:hover {
+  background: rgba(168, 85, 247, 0.3);
+  color: #e9d5ff;
+}
 .outline-icon {
   color: var(--accent);
   font-size: 12px;
+  display: flex;
+  align-items: center;
 }
 .outline-name {
   font-weight: 500;
