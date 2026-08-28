@@ -247,6 +247,31 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
+    async fn create_file(
+        &self,
+        request: &cybou_web_contracts::FileCreateRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        let response = Request::post("/api/v1/files/create")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if response.status() == 409 {
+            return Err(ClientError::FileAlreadyExists);
+        }
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/files/create returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
     async fn close_shell(&self, instance: u32) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/shell/close")
             .json(&ShellCloseRequest { instance })

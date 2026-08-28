@@ -185,6 +185,16 @@ pub trait MindClient {
         request: &FileWriteRequest,
     ) -> Result<FileWriteProjection, ClientError>;
 
+    /// Exclusively create a new UTF-8 file inside the sandbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when creation is refused or fails.
+    async fn create_file(
+        &self,
+        request: &cybou_web_contracts::FileCreateRequest,
+    ) -> Result<FileWriteProjection, ClientError>;
+
     /// End one of the caller's shells, because the card standing in it was closed.
     ///
     /// # Errors
@@ -451,6 +461,15 @@ impl MindClient for MockMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         Err(ClientError::ProjectionUnavailable(
             "mock file writes are unavailable".to_string(),
+        ))
+    }
+
+    async fn create_file(
+        &self,
+        _request: &cybou_web_contracts::FileCreateRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock file creation is unavailable".to_string(),
         ))
     }
 

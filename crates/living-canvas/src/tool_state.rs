@@ -76,7 +76,19 @@ impl ShellSignals {
     }
 }
 
-/// One File Manager card's interactive state.
+/// Sorting mode for directory listings.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FileSortMode {
+    /// Sort alphabetically by name.
+    #[default]
+    Name,
+    /// Sort by size in bytes.
+    Size,
+    /// Sort by entry type (folders vs files).
+    Kind,
+}
+
+/// One File Manager card's reactive state signals.
 #[derive(Clone, Copy)]
 pub struct FileManagerSignals {
     /// The directory being looked at.
@@ -97,6 +109,18 @@ pub struct FileManagerSignals {
     pub error_msg: RwSignal<Option<String>>,
     /// Whether this directory has ever been read.
     pub read: RwSignal<bool>,
+    /// Instant search/filter query in current directory.
+    pub filter_query: RwSignal<String>,
+    /// Active sorting mode.
+    pub sort_by: RwSignal<FileSortMode>,
+    /// Whether sorting direction is ascending.
+    pub sort_ascending: RwSignal<bool>,
+    /// Whether the create file modal is open.
+    pub create_modal_open: RwSignal<bool>,
+    /// Target name of the new file to create.
+    pub create_name: RwSignal<String>,
+    /// Error message for file creation failure.
+    pub create_error: RwSignal<Option<String>>,
 }
 
 impl FileManagerSignals {
@@ -112,6 +136,12 @@ impl FileManagerSignals {
             loading: RwSignal::new(false),
             error_msg: RwSignal::new(None),
             read: RwSignal::new(false),
+            filter_query: RwSignal::new(String::new()),
+            sort_by: RwSignal::new(FileSortMode::Name),
+            sort_ascending: RwSignal::new(true),
+            create_modal_open: RwSignal::new(false),
+            create_name: RwSignal::new(String::new()),
+            create_error: RwSignal::new(None),
         }
     }
 }
@@ -688,6 +718,74 @@ pub fn replace_all_matches(
     (result, count)
 }
 
+/// Format file size into human-readable representation.
+#[must_use]
+pub fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * 1024;
+    const GB: u64 = 1024 * 1024 * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+/// Parse a filesystem path into hierarchical breadcrumbs (label, target_path).
+#[must_use]
+pub fn parse_path_breadcrumbs(path: &str) -> Vec<(&str, String)> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() || trimmed == "/" {
+        return vec![("root", "/".to_string())];
+    }
+    let mut crumbs = vec![("root", "/".to_string())];
+    let segments: Vec<&str> = trimmed.split('/').filter(|s| !s.is_empty()).collect();
+    let mut accumulated = String::new();
+    for seg in segments {
+        accumulated.push('/');
+        accumulated.push_str(seg);
+        crumbs.push((seg, accumulated.clone()));
+    }
+    crumbs
+}
+
+/// Sort directory entries by the selected mode with folders placed appropriately.
+pub fn sort_directory_entries(
+    entries: &mut [(String, bool, u64)],
+    mode: FileSortMode,
+    ascending: bool,
+) {
+    entries.sort_by(|a, b| match mode {
+        FileSortMode::Name => match (a.1, b.1) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => {
+                let ord = a.0.to_lowercase().cmp(&b.0.to_lowercase());
+                if ascending { ord } else { ord.reverse() }
+            }
+        },
+        FileSortMode::Size => match (a.1, b.1) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => {
+                let ord = a.2.cmp(&b.2);
+                if ascending { ord } else { ord.reverse() }
+            }
+        },
+        FileSortMode::Kind => {
+            let ord =
+                b.1.cmp(&a.1)
+                    .then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+            if ascending { ord } else { ord.reverse() }
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -761,5 +859,55 @@ mod tests {
         let (replaced, count) = replace_all_matches(text, "rust", "Go", false);
         assert_eq!(count, 2);
         assert_eq!(replaced, "Go is great. I love Go.");
+    }
+
+    #[test]
+    fn formats_file_sizes_across_scales() {
+        assert_eq!(format_bytes(0), "0 B");
+        assert_eq!(format_bytes(512), "512 B");
+        assert_eq!(format_bytes(1024), "1.0 KB");
+        assert_eq!(format_bytes(1536), "1.5 KB");
+        assert_eq!(format_bytes(1024 * 1024), "1.0 MB");
+        assert_eq!(format_bytes(1024 * 1024 * 1024 * 2), "2.0 GB");
+    }
+
+    #[test]
+    fn parses_hierarchical_path_breadcrumbs() {
+        assert_eq!(parse_path_breadcrumbs("/"), vec![("root", "/".to_string())]);
+        assert_eq!(
+            parse_path_breadcrumbs("/docs"),
+            vec![("root", "/".to_string()), ("docs", "/docs".to_string())]
+        );
+        assert_eq!(
+            parse_path_breadcrumbs("/crates/living-canvas/src"),
+            vec![
+                ("root", "/".to_string()),
+                ("crates", "/crates".to_string()),
+                ("living-canvas", "/crates/living-canvas".to_string()),
+                ("src", "/crates/living-canvas/src".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn sorts_directory_entries_with_folders_first() {
+        let mut entries = vec![
+            ("zebra.txt".to_string(), false, 200),
+            ("alpha".to_string(), true, 0),
+            ("beta.rs".to_string(), false, 50),
+            ("docs".to_string(), true, 0),
+        ];
+
+        sort_directory_entries(&mut entries, FileSortMode::Name, true);
+        assert_eq!(
+            entries.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+            vec!["alpha", "docs", "beta.rs", "zebra.txt"]
+        );
+
+        sort_directory_entries(&mut entries, FileSortMode::Size, true);
+        assert_eq!(
+            entries.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+            vec!["alpha", "docs", "beta.rs", "zebra.txt"]
+        );
     }
 }
