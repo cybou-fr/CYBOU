@@ -970,6 +970,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-host-filesd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-jailfs",
+ "cybou-protocol",
+ "cybou-web-contracts",
+ "rustix",
+ "serde",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "cybou-identityd"
 version = "0.1.0"
 dependencies = [
@@ -1318,6 +1333,7 @@ dependencies = [
  "ciborium",
  "cybou-epistemicd",
  "cybou-fabric",
+ "cybou-host-filesd",
  "cybou-jailfs",
  "cybou-meaning",
  "cybou-perception",

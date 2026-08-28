@@ -150,7 +150,7 @@ impl CardId {
             Self::Agents => "Agents",
             Self::Shell(_) => "Shell",
             Self::FileManager(_) => "File Manager",
-            Self::JournalFeed(_) => "Event Stream",
+            Self::JournalFeed(_) => "Presence Stream",
             Self::Editor(_) => "Text Editor",
             Self::Diff(_) => "Diff Viewer",
             Self::Inspector(_) => "Universal Inspector",

@@ -44,6 +44,8 @@ pub fn FileManagerContent(
     let selected_location = state.selected_location;
     let selected_sha256 = state.selected_sha256;
     let loading = state.loading;
+    let directory_request_generation = state.directory_request_generation;
+    let file_request_generation = state.file_request_generation;
     let error_msg = state.error_msg;
     let was_read = state.read;
     let filter_query = state.filter_query;
@@ -54,6 +56,10 @@ pub fn FileManagerContent(
     let create_error = state.create_error;
 
     let load_dir = move |path: String| {
+        directory_request_generation
+            .update(|generation| *generation = generation.saturating_add(1));
+        let generation = directory_request_generation.get_untracked();
+        file_request_generation.update(|generation| *generation = generation.saturating_add(1));
         loading.set(true);
         error_msg.set(None);
         selected_file.set(None);
@@ -64,6 +70,9 @@ pub fn FileManagerContent(
         spawn_local(async move {
             match GatewayMindClient.list_directory(&target_p).await {
                 Ok(listing) => {
+                    if directory_request_generation.get_untracked() != generation {
+                        return;
+                    }
                     loading.set(false);
                     was_read.set(true);
                     if listing.truncated {
@@ -84,6 +93,9 @@ pub fn FileManagerContent(
                     );
                 }
                 Err(err) => {
+                    if directory_request_generation.get_untracked() != generation {
+                        return;
+                    }
                     loading.set(false);
                     // Not read, so the panel keeps saying it has not read rather than reporting an
                     // empty directory it never saw.
@@ -104,6 +116,8 @@ pub fn FileManagerContent(
     });
 
     let view_file = move |name: String| {
+        file_request_generation.update(|generation| *generation = generation.saturating_add(1));
+        let generation = file_request_generation.get_untracked();
         selected_file.set(Some(name.clone()));
         loading.set(true);
         let p = if current_path.get() == "/" {
@@ -114,12 +128,18 @@ pub fn FileManagerContent(
         spawn_local(async move {
             match GatewayMindClient.read_text_file(&p).await {
                 Ok(content) => {
+                    if file_request_generation.get_untracked() != generation {
+                        return;
+                    }
                     loading.set(false);
                     selected_location.set(Some(content.location));
                     selected_sha256.set(Some(content.content_sha256));
                     file_content.set(content.text);
                 }
                 Err(err) => {
+                    if file_request_generation.get_untracked() != generation {
+                        return;
+                    }
                     loading.set(false);
                     selected_location.set(None);
                     selected_sha256.set(None);

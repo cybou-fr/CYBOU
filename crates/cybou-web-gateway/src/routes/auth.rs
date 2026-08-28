@@ -38,14 +38,13 @@ pub async fn login_handler(
     State(state): State<GatewayState>,
     Json(request): Json<LoginRequest>,
 ) -> impl IntoResponse {
-    let authenticated = match &state.verifier {
+    let verified = match &state.verifier {
         Some(verifier) => verifier.verify(&request.username, &request.password).await,
-        None => false,
+        None => None,
     };
-    let username = request.username.clone();
     drop(request);
 
-    if !authenticated {
+    let Some(account) = verified else {
         return (
             StatusCode::UNAUTHORIZED,
             Json(LoginOutcome {
@@ -53,9 +52,12 @@ pub async fn login_handler(
             }),
         )
             .into_response();
-    }
+    };
 
-    let Some(token) = state.sessions.begin(&username, OffsetDateTime::now_utc()) else {
+    let Some(token) = state
+        .sessions
+        .begin_verified(&account, OffsetDateTime::now_utc())
+    else {
         // Authentication succeeded and the session did not. Saying so plainly, and retryably, is
         // the only honest answer: the alternative was a token that was not unpredictable.
         return (

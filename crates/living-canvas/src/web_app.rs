@@ -95,10 +95,9 @@ pub fn App() -> impl IntoView {
             return;
         };
         let inspector = living_canvas::CardId::Inspector(0);
-        tool_states
-            .inspector(inspector)
-            .target_subject
-            .set(Some(subject));
+        let inspector_state = tool_states.inspector(inspector);
+        inspector_state.subject_query.set(None);
+        inspector_state.target_subject.set(Some(subject));
         layout.update(|desktop| desktop.open_card(inspector, 380.0, 150.0));
         layout.get_untracked().save();
         set_selected.set(Some(living_canvas::DesktopItemId::Card(inspector)));

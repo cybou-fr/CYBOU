@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# One instance per explicitly admitted Linux account:
+#   systemctl enable --now cybou-host-filesd@alice.service
+#
+# The process never has gateway group authority. systemd creates a private per-UID runtime
+# directory, the owner binds there as itself, then the two '+' post-start operations expose only
+# that directory and socket to the gateway group. The user can disrupt or replace their own socket
+# because they own its directory; that changes only answers for their own authenticated UID.
+
+[Unit]
+Description=Cybou HostUserPath owner for %i
+Documentation=https://github.com/cybou-fr/CYBOU
+After=cybou-authd.service
+
+[Service]
+Type=simple
+User=%i
+RuntimeDirectory=cybou-host-files/%U
+RuntimeDirectoryMode=0700
+Environment=CYBOU_HOST_FILES_HOME=%h
+Environment=CYBOU_HOST_FILES_SOCKET=/run/cybou-host-files/%U/owner.sock
+ExecStart=/usr/libexec/cybou/cybou-host-filesd
+
+# These commands retain the service manager's filesystem privilege, not the user's process
+# credentials. Traversal and connection are granted to the gateway group only after bind.
+ExecStartPost=+/usr/bin/chgrp cybou /run/cybou-host-files/%U /run/cybou-host-files/%U/owner.sock
+ExecStartPost=+/usr/bin/chmod 0710 /run/cybou-host-files/%U
+ExecStartPost=+/usr/bin/chmod 0660 /run/cybou-host-files/%U/owner.sock
+
+Restart=on-failure
+RestartSec=1
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

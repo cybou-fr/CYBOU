@@ -16,6 +16,7 @@ axum.workspace = true
 ciborium.workspace = true
 cybou-fabric = { path = "../cybou-fabric" }
 cybou-jailfs = { path = "../cybou-jailfs" }
+cybou-host-filesd = { path = "../cybou-host-filesd" }
 # The gateway is where telemetry, meaning and the authorization gate meet. None of the three reads
 # the others; putting the join here is what keeps that true.
 cybou-meaning = { path = "../cybou-meaning" }

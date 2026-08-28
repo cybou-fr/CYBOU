@@ -9,7 +9,7 @@
 use async_trait::async_trait;
 use serde::Serialize;
 
-use crate::access::CredentialVerifier;
+use crate::access::{CredentialVerifier, VerifiedAccount};
 
 /// A verifier that asks the privileged helper over its unix socket.
 pub struct HelperVerifier {
@@ -36,33 +36,39 @@ struct Ask<'a> {
 
 #[async_trait]
 impl CredentialVerifier for HelperVerifier {
-    async fn verify(&self, username: &str, password: &str) -> bool {
+    async fn verify(&self, username: &str, password: &str) -> Option<VerifiedAccount> {
         use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
         let Ok(mut stream) = tokio::net::UnixStream::connect(&self.socket_path).await else {
             // A helper that is not there cannot vouch for anybody, and not knowing is not a reason
             // to let someone in.
-            return false;
+            return None;
         };
 
         let mut encoded = Vec::new();
         if ciborium::into_writer(&Ask { username, password }, &mut encoded).is_err() {
-            return false;
+            return None;
         }
         if stream.write_all(&encoded).await.is_err() {
-            return false;
+            return None;
         }
         // The helper reads to end of stream, so the write side has to close before it will answer.
         if stream.shutdown().await.is_err() {
-            return false;
+            return None;
         }
 
         let mut answer = Vec::new();
         if stream.read_to_end(&mut answer).await.is_err() {
-            return false;
+            return None;
         }
-        ciborium::from_reader::<Answer, _>(answer.as_slice())
-            .is_ok_and(|answer| answer.authenticated)
+        let answer = ciborium::from_reader::<Answer, _>(answer.as_slice()).ok()?;
+        let uid = answer.authenticated.then_some(answer.uid).flatten()?;
+        let home = answer.authenticated.then_some(answer.home).flatten()?;
+        (std::path::Path::new(&home).is_absolute()).then(|| VerifiedAccount {
+            username: username.to_owned(),
+            uid,
+            home,
+        })
     }
 }
 
@@ -70,6 +76,8 @@ impl CredentialVerifier for HelperVerifier {
 #[serde(rename_all = "camelCase")]
 struct Answer {
     authenticated: bool,
+    uid: Option<u32>,
+    home: Option<String>,
 }
 
 /// Records disclosures by submitting them to Event1.
@@ -94,6 +102,6 @@ mod tests {
     #[tokio::test]
     async fn a_helper_that_is_not_there_vouches_for_nobody() {
         let verifier = HelperVerifier::at("/nonexistent/cybou-auth.sock");
-        assert!(!verifier.verify("alice", "hunter2").await);
+        assert!(verifier.verify("alice", "hunter2").await.is_none());
     }
 }

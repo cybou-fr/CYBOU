@@ -721,6 +721,22 @@ pub struct DirectoryListingProjection {
     pub truncated: bool,
 }
 
+/// Directory listing issued by the authenticated user's filesystem owner.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostDirectoryListingProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// Owner-issued authority-domain reference for the directory actually read.
+    pub location: LocationRef,
+    /// Entries returned within the ordinary listing bound.
+    pub entries: Vec<DirectoryEntryProjection>,
+    /// Total entries established by the owner.
+    pub total_entries: u32,
+    /// Whether the bounded response omitted entries.
+    pub truncated: bool,
+}
+
 /// What a file held when it was read.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

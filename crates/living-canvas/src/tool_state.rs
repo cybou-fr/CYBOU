@@ -105,6 +105,10 @@ pub struct FileManagerSignals {
     pub selected_sha256: RwSignal<Option<String>>,
     /// Whether a read is in flight.
     pub loading: RwSignal<bool>,
+    /// Monotonic identity of the latest directory request.
+    pub directory_request_generation: RwSignal<u64>,
+    /// Monotonic identity of the latest file preview request.
+    pub file_request_generation: RwSignal<u64>,
     /// What went wrong with the last read, if anything.
     pub error_msg: RwSignal<Option<String>>,
     /// Whether this directory has ever been read.
@@ -134,6 +138,8 @@ impl FileManagerSignals {
             selected_location: RwSignal::new(None),
             selected_sha256: RwSignal::new(None),
             loading: RwSignal::new(false),
+            directory_request_generation: RwSignal::new(0),
+            file_request_generation: RwSignal::new(0),
             error_msg: RwSignal::new(None),
             read: RwSignal::new(false),
             filter_query: RwSignal::new(String::new()),
@@ -456,6 +462,8 @@ impl DiffSignals {
 pub struct InspectorSignals {
     /// Active subject being inspected.
     pub target_subject: RwSignal<Option<cybou_protocol::SubjectRef>>,
+    /// User selection awaiting an owner-backed resolution.
+    pub subject_query: RwSignal<Option<cybou_protocol::SubjectQuery>>,
     /// Status message or last action output.
     pub status_msg: RwSignal<Option<String>>,
 }
@@ -464,6 +472,7 @@ impl InspectorSignals {
     fn new() -> Self {
         Self {
             target_subject: RwSignal::new(None),
+            subject_query: RwSignal::new(None),
             status_msg: RwSignal::new(None),
         }
     }
@@ -639,15 +648,17 @@ impl Default for ToolCardStates {
     }
 }
 
-/// Compute 1-indexed (line, column) for a given character offset within a text string.
+/// Compute 1-indexed (line, column) for a browser UTF-16 code-unit offset.
 #[must_use]
-pub fn calculate_line_column(text: &str, char_offset: usize) -> (usize, usize) {
+pub fn calculate_line_column(text: &str, utf16_offset: usize) -> (usize, usize) {
     let mut line = 1;
     let mut col = 1;
-    for (i, ch) in text.chars().enumerate() {
-        if i >= char_offset {
+    let mut consumed = 0;
+    for ch in text.chars() {
+        if consumed >= utf16_offset {
             break;
         }
+        consumed += ch.len_utf16();
         if ch == '\n' {
             line += 1;
             col = 1;
@@ -656,6 +667,42 @@ pub fn calculate_line_column(text: &str, char_offset: usize) -> (usize, usize) {
         }
     }
     (line, col)
+}
+
+/// Convert Rust character offsets to the UTF-16 offsets expected by textarea selection APIs.
+#[must_use]
+pub fn char_range_to_utf16(text: &str, start: usize, end: usize) -> (usize, usize) {
+    let mut utf16 = 0;
+    let mut utf16_start = 0;
+    let mut utf16_end = 0;
+    for (index, ch) in text.chars().enumerate() {
+        if index == start {
+            utf16_start = utf16;
+        }
+        if index == end {
+            utf16_end = utf16;
+            return (utf16_start, utf16_end);
+        }
+        utf16 += ch.len_utf16();
+    }
+    if start == text.chars().count() {
+        utf16_start = utf16;
+    }
+    if end >= text.chars().count() {
+        utf16_end = utf16;
+    }
+    (utf16_start, utf16_end)
+}
+
+/// Preserve both output channels while making their provenance explicit when both contain data.
+#[must_use]
+pub fn merge_shell_output(stdout: &str, stderr: &str) -> String {
+    match (stdout.is_empty(), stderr.is_empty()) {
+        (false, true) => stdout.to_string(),
+        (true, false) => stderr.to_string(),
+        (true, true) => String::new(),
+        (false, false) => format!("[stdout]\n{stdout}\n[stderr]\n{stderr}"),
+    }
 }
 
 /// Find all non-overlapping match character start and end offsets in text.
@@ -841,6 +888,23 @@ mod tests {
         assert_eq!(calculate_line_column(text, 11), (2, 6));
         assert_eq!(calculate_line_column(text, 12), (3, 1));
         assert_eq!(calculate_line_column(text, 17), (3, 6));
+
+        let emoji = "A😀B\n𝄞C";
+        assert_eq!(calculate_line_column(emoji, 3), (1, 3));
+        assert_eq!(calculate_line_column(emoji, 4), (1, 4));
+        assert_eq!(calculate_line_column(emoji, 5), (2, 1));
+        assert_eq!(calculate_line_column(emoji, 7), (2, 2));
+        assert_eq!(char_range_to_utf16(emoji, 1, 3), (1, 4));
+    }
+
+    #[test]
+    fn shell_output_never_drops_stderr_when_stdout_exists() {
+        assert_eq!(merge_shell_output("ok\n", ""), "ok\n");
+        assert_eq!(merge_shell_output("", "warning\n"), "warning\n");
+        assert_eq!(
+            merge_shell_output("ok\n", "warning\n"),
+            "[stdout]\nok\n\n[stderr]\nwarning\n"
+        );
     }
 
     #[test]

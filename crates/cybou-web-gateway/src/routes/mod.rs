@@ -10,6 +10,7 @@ pub mod disclosure;
 pub mod drafts;
 pub mod events;
 pub mod files;
+pub mod host_files;
 pub mod insight;
 pub mod shell;
 pub mod snapshot;
@@ -28,6 +29,7 @@ pub use events::events_handler;
 pub use files::{
     create_file_handler, list_directory_handler, read_file_handler, write_file_handler,
 };
+pub use host_files::{list_host_directory_handler, read_host_file_handler};
 pub use insight::insight_handler;
 pub use shell::{shell_close_handler, shell_exec_handler};
 pub use snapshot::{mind_handler, snapshot_handler};

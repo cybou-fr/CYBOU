@@ -149,6 +149,8 @@ pub fn EditorContent(
 
     let focus_match = move |start: usize, end: usize| {
         if let Some(textarea) = textarea_ref.get_untracked() {
+            let content = active_tab().content;
+            let (start, end) = crate::tool_state::char_range_to_utf16(&content, start, end);
             let _ = textarea.focus();
             let _ = textarea.set_selection_range(start as u32, end as u32);
         }

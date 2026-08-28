@@ -24,6 +24,8 @@ pub mod auth_socket;
 pub mod disclose;
 pub mod fixture;
 #[cfg(target_os = "linux")]
+pub mod host_files_socket;
+#[cfg(target_os = "linux")]
 pub mod insight;
 pub mod presence_zbus;
 pub mod redact;
@@ -31,7 +33,9 @@ pub mod routes;
 pub mod shells;
 pub mod state;
 
-pub use access::{CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions};
+pub use access::{
+    CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions, VerifiedAccount,
+};
 pub use disclose::Disclosures;
 pub use shells::{SHELL_IDLE_LIFETIME, ShellOwner, Shells, sandbox_root};
 pub use state::{
@@ -42,10 +46,10 @@ pub use state::{
 use routes::{
     actions_handler, agent_offers_handler, agents_handler, api_not_found, create_file_handler,
     delete_draft_handler, disclosure_handler, events_handler, insight_handler,
-    launch_agent_handler, list_directory_handler, list_drafts_handler, login_handler,
-    logout_handler, mind_handler, read_file_handler, recent_actions_handler, save_draft_handler,
-    session_handler, shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler,
-    write_file_handler,
+    launch_agent_handler, list_directory_handler, list_drafts_handler, list_host_directory_handler,
+    login_handler, logout_handler, mind_handler, read_file_handler, read_host_file_handler,
+    recent_actions_handler, save_draft_handler, session_handler, shell_close_handler,
+    shell_exec_handler, snapshot_handler, stop_agent_handler, write_file_handler,
 };
 use state::GatewayState;
 
@@ -176,6 +180,7 @@ pub(crate) fn router_in_sandbox(
         },
         shells,
         files: jail,
+        host_user_files: host_user_files_source(),
         drafts,
     };
 
@@ -202,6 +207,8 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/files/read", post(read_file_handler))
         .route("/api/v1/files/write", post(write_file_handler))
         .route("/api/v1/files/create", post(create_file_handler))
+        .route("/api/v1/host-files/list", post(list_host_directory_handler))
+        .route("/api/v1/host-files/read", post(read_host_file_handler))
         .route("/api/v1/drafts", get(list_drafts_handler))
         .route("/api/v1/drafts/save", post(save_draft_handler))
         .route("/api/v1/drafts/delete", post(delete_draft_handler))
@@ -232,6 +239,20 @@ pub(crate) fn router_in_sandbox(
         ),
         None => app,
     }
+}
+
+#[cfg(all(target_os = "linux", not(test)))]
+fn host_user_files_source() -> Option<Arc<dyn state::HostUserFileSource>> {
+    std::env::var_os("CYBOU_HOST_FILES_SOCKET_DIR").map(|directory| {
+        Arc::new(host_files_socket::SocketHostUserFiles::in_directory(
+            directory,
+        )) as Arc<dyn state::HostUserFileSource>
+    })
+}
+
+#[cfg(any(not(target_os = "linux"), test))]
+fn host_user_files_source() -> Option<Arc<dyn state::HostUserFileSource>> {
+    None
 }
 
 #[cfg(test)]
@@ -571,8 +592,12 @@ mod tests {
 
     #[async_trait]
     impl CredentialVerifier for OneAccount {
-        async fn verify(&self, username: &str, password: &str) -> bool {
-            username == "alice" && password == "hunter2"
+        async fn verify(&self, username: &str, password: &str) -> Option<crate::VerifiedAccount> {
+            (username == "alice" && password == "hunter2").then(|| crate::VerifiedAccount {
+                username: username.to_owned(),
+                uid: 1000,
+                home: "/home/alice".to_owned(),
+            })
         }
     }
 

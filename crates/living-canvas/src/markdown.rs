@@ -4,7 +4,7 @@
 //! A lightweight, zero-unsafe Markdown parser and Leptos renderer for Living Canvas.
 //!
 //! Converts Markdown text into structured DOM elements directly without string-based
-//! `innerHTML` insertion, guaranteeing memory and XSS safety in the desktop preview pane.
+//! `innerHTML` insertion. Link destinations are restricted to explicitly supported schemes.
 
 #[cfg(target_arch = "wasm32")]
 use leptos::prelude::*;
@@ -65,6 +65,22 @@ pub enum MdInline {
         /// Target URL destination.
         url: String,
     },
+}
+
+/// Return a link destination only when its scheme is explicitly safe for desktop navigation.
+#[must_use]
+pub fn allowed_link_url(url: &str) -> Option<&str> {
+    let trimmed = url.trim();
+    let scheme = trimmed.split_once(':')?.0;
+    if scheme.eq_ignore_ascii_case("https")
+        || scheme.eq_ignore_ascii_case("http")
+        || scheme.eq_ignore_ascii_case("mailto")
+        || scheme.eq_ignore_ascii_case("cybou")
+    {
+        Some(trimmed)
+    } else {
+        None
+    }
 }
 
 /// Parse a raw Markdown document into a sequence of block elements.
@@ -408,16 +424,15 @@ fn render_inlines(inlines: Vec<MdInline>) -> impl IntoView {
                 MdInline::Italic(t) => view! { <em class="md-italic">{t}</em> }.into_any(),
                 MdInline::Code(t) => view! { <code class="md-inline-code">{t}</code> }.into_any(),
                 MdInline::Link { text, url } => {
-                    view! {
-                        <a
-                            class="md-link"
-                            href=url
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            {text}
-                        </a>
-                    }.into_any()
+                    if let Some(url) = allowed_link_url(&url) {
+                        view! {
+                            <a class="md-link" href=url.to_owned() target="_blank" rel="noopener noreferrer">
+                                {text}
+                            </a>
+                        }.into_any()
+                    } else {
+                        view! { <span class="md-link-blocked" title="Blocked unsafe link">{text}</span> }.into_any()
+                    }
                 }
             }
         }).collect::<Vec<_>>()}
@@ -602,5 +617,24 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn only_explicit_link_schemes_are_allowed() {
+        assert_eq!(
+            allowed_link_url("https://cybou.org"),
+            Some("https://cybou.org")
+        );
+        assert_eq!(
+            allowed_link_url("MAILTO:user@example.test"),
+            Some("MAILTO:user@example.test")
+        );
+        assert_eq!(
+            allowed_link_url("cybou:subject/agent"),
+            Some("cybou:subject/agent")
+        );
+        assert_eq!(allowed_link_url("javascript:alert(1)"), None);
+        assert_eq!(allowed_link_url("data:text/html,boom"), None);
+        assert_eq!(allowed_link_url("//example.test/path"), None);
     }
 }

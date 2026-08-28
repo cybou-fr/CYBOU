@@ -48,11 +48,13 @@ every route reads it, so a route added later cannot forget: filtering is not som
 
 A reader who signs in with a Linux account is served the unfiltered projection instead. The gateway
 never checks the password itself — that means reading the shadow database, which it must not be able
-to do. It asks `cybou-authd` over the socket named by `CYBOU_AUTH_SOCKET`, and receives one bit.
+to do. It asks `cybou-authd` over the socket named by `CYBOU_AUTH_SOCKET`. Failure reveals one
+indistinguishable bit; success also returns the UID and home required to address that account's
+unprivileged filesystem owner.
 
-`cybou-authd` is the only Cybou process that runs as root. Its whole vocabulary is a name and a
-secret in, a yes or no out: it cannot be asked to read a file, run a command, or say anything about
-an account beyond whether it accepted that password. A failed attempt is answered identically
+`cybou-authd` is the only Cybou process that runs as root. Its vocabulary is a name and secret in,
+then either an indistinguishable refusal or the authenticated account's UID/home out. It cannot be
+asked to read a file or run a command. A failed attempt is answered identically
 whether the account is wrong, the password is wrong, or the account is not permitted, so the socket
 is not a way to enumerate the host. The socket is group-owned by `cybou`, so only the gateway can
 attempt a password at all; failures are held 750ms before answering.
@@ -72,6 +74,20 @@ A session is a cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, eight hours, no 
 held in memory so restarting the gateway ends every one. A missing, expired or invented cookie is
 served the public projection rather than refused: a public surface that answered 401 to strangers
 would stop being a public surface.
+
+Authenticated access to a user's home is a separate capability. Install
+`cybou-host-filesd@.service`, set `CYBOU_HOST_FILES_SOCKET_DIR=/run/cybou-host-files` on the web
+gateway, and explicitly enable an owner only for admitted accounts:
+
+```bash
+sudo systemctl enable --now cybou-host-filesd@alice.service
+```
+
+The instance runs as `alice`, refuses root, and owns only that account's home. Its socket is
+`/run/cybou-host-files/<uid>/owner.sock`; systemd grants the `cybou` gateway group traversal and
+connect access only after the owner has bound it. If the instance or configuration is absent, the
+host-file routes return `hostUserFilesystemUnavailable` rather than reading the home as the gateway
+service account.
 
 This replaced a tripwire that refused to start at all whenever the Journal held anything above
 ordinary. It fired correctly on 2026-08-20, on the first sentence spoken to `Meaning1`, and took the
@@ -128,5 +144,5 @@ start the same runtime without turning absent policy into permission.
 - Public access is unauthenticated by decision, behind TLS, and shows live Mind state with
   everything above ordinary withheld. Signing in with an account in `cybou-access` reaches the rest.
 - `cybou-authd` runs as root and is the only process that does. Its socket is group-owned by
-  `cybou`; it answers one bit and never says why an attempt failed.
+  `cybou`; failures answer one bit and never say why an attempt failed.
 - No record is kept of who read what.

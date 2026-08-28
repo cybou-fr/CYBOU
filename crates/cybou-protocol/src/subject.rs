@@ -22,6 +22,51 @@ pub enum SubjectDeepLinkError {
     OwnerResolutionRequired,
 }
 
+/// An identity-shaped lookup request that has not been resolved by an authoritative owner.
+///
+/// Unlike [`SubjectRef`], this type carries no claim that an entity exists and cannot assign file
+/// authority, agent metadata, installed versions, or other owner-established attributes.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "identifier", rename_all = "kebab-case")]
+pub enum SubjectQuery {
+    /// Lookup a systemd unit by its user-supplied name.
+    Service(String),
+    /// Lookup a file by a user-supplied path without assigning a [`LocationRef`] domain.
+    File(String),
+    /// Lookup an agent capsule by an identity string.
+    Agent(String),
+    /// Lookup an installed package by name.
+    Package(String),
+    /// Lookup a spatial anchor by identity.
+    Anchor(String),
+}
+
+impl SubjectQuery {
+    /// Category name suitable for an unresolved-query UI badge.
+    #[must_use]
+    pub const fn kind_name(&self) -> &'static str {
+        match self {
+            Self::Service(_) => "Service query",
+            Self::File(_) => "File query",
+            Self::Agent(_) => "Agent query",
+            Self::Package(_) => "Package query",
+            Self::Anchor(_) => "Anchor query",
+        }
+    }
+
+    /// Identifier exactly as supplied for owner resolution.
+    #[must_use]
+    pub fn identifier(&self) -> &str {
+        match self {
+            Self::Service(value)
+            | Self::File(value)
+            | Self::Agent(value)
+            | Self::Package(value)
+            | Self::Anchor(value) => value,
+        }
+    }
+}
+
 fn encoded_segment(value: &str) -> String {
     utf8_percent_encode(value, NON_ALPHANUMERIC).to_string()
 }
@@ -349,6 +394,21 @@ mod tests {
             SubjectRef::from_deep_link_hash("#/service/nginx%2Eservice"),
             Ok(service)
         );
+    }
+
+    #[test]
+    fn subject_queries_carry_identity_without_owner_claims() {
+        let file = SubjectQuery::File("/etc/hosts".to_string());
+        assert_eq!(file.kind_name(), "File query");
+        assert_eq!(file.identifier(), "/etc/hosts");
+        assert_eq!(
+            serde_json::to_value(file).expect("query serializes"),
+            serde_json::json!({"kind": "file", "identifier": "/etc/hosts"})
+        );
+
+        let agent = SubjectQuery::Agent("candidate-capsule".to_string());
+        assert_eq!(agent.kind_name(), "Agent query");
+        assert_eq!(agent.identifier(), "candidate-capsule");
     }
 
     #[test]

@@ -5,9 +5,8 @@
 //!
 //! Checking a password against `/etc/shadow` needs privilege the gateway must not have. Rather
 //! than give it that privilege, the check lives in a separate process whose whole vocabulary is the
-//! two types below: a name and a secret in, a yes or no out. It cannot be asked to read a file,
-//! run a command, or say anything about an account beyond whether that account accepted that
-//! password.
+//! two types below: a name and a secret in, then either one indistinguishable refusal or the
+//! authenticated account's numeric identity. It cannot be asked to read a file or run a command.
 //!
 //! Nothing here logs, stores or returns the secret. It exists in memory for the length of one call
 //! and is overwritten when the request is dropped.
@@ -52,7 +51,8 @@ impl Drop for Request {
     }
 }
 
-/// The helper's whole answer.
+/// The helper's whole answer. Failed attempts remain one indistinguishable bit; UID and home are
+/// returned only after the account has proved ownership of the password.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Answer {
     /// Whether the account accepted the secret and is entitled to reach Cybou.
@@ -61,6 +61,12 @@ pub struct Answer {
     /// in the group — would let anyone with the socket enumerate accounts, and the caller has
     /// nothing to do differently in any of those cases.
     pub authenticated: bool,
+    /// Numeric identity established from the account database after successful authentication.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uid: Option<u32>,
+    /// Home directory established alongside [`Self::uid`]. Never present on failure.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Option<String>,
 }
 
 /// The largest request the helper will read.
@@ -310,6 +316,8 @@ mod tests {
             ciborium::into_writer(
                 &Answer {
                     authenticated: false,
+                    uid: None,
+                    home: None,
                 },
                 &mut buffer,
             )

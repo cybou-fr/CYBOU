@@ -3,10 +3,10 @@
 
 //! Universal Entity Inspector tool card component (ADR-0046 §5).
 
-use cybou_protocol::{EpistemicPresentation, LocationRef, SubjectRef};
+use cybou_protocol::{EpistemicPresentation, SubjectQuery};
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
-use lucide_leptos::{Check, Copy, ExternalLink, Layers, RefreshCw, Shield, Terminal};
+use lucide_leptos::{Check, Copy, Layers, RefreshCw, Shield};
 use std::sync::Arc;
 use web_sys::{KeyboardEvent, PointerEvent};
 
@@ -51,6 +51,7 @@ pub fn InspectorContent(
 
     let state = expect_context::<ToolCardStates>().inspector(CardId::Inspector(instance));
     let target = state.target_subject;
+    let subject_query = state.subject_query;
     let status_msg = state.status_msg;
 
     let active_category = RwSignal::new(PresetCategory::Services);
@@ -73,46 +74,12 @@ pub fn InspectorContent(
         _ => unreachable!("the prototype Inspector has no projection source"),
     });
 
-    // Default subject if none set: Host Mind / System
-    let active_subject = move || {
-        target.get().unwrap_or_else(|| SubjectRef::Service {
-            name: "cybou-mind.target".to_string(),
-            node_id: None,
-        })
-    };
-
-    let select_service = move |name: &str| {
-        target.set(Some(SubjectRef::Service {
-            name: name.to_string(),
-            node_id: None,
-        }));
-    };
-
-    let select_file = move |path: &str| {
-        target.set(Some(SubjectRef::File {
-            location: LocationRef::SystemConfigPath(path.to_string()),
-        }));
-    };
-
-    let select_agent = move |capsule_id: &str, agent_type: &str| {
-        target.set(Some(SubjectRef::Agent {
-            capsule_id: capsule_id.to_string(),
-            agent_type: agent_type.to_string(),
-        }));
-    };
-
-    let select_package = move |name: &str, ver: &str| {
-        target.set(Some(SubjectRef::Package {
-            name: name.to_string(),
-            installed_version: Some(ver.to_string()),
-        }));
-    };
-
-    let select_anchor = move |anchor_id: &str, label: &str| {
-        target.set(Some(SubjectRef::Anchor {
-            anchor_id: anchor_id.to_string(),
-            label: label.to_string(),
-        }));
+    let select_query = move |query: SubjectQuery| {
+        target.set(None);
+        subject_query.set(Some(query));
+        status_msg.set(Some(
+            "Subject query recorded; authoritative owner resolution is unavailable.".to_string(),
+        ));
     };
 
     let apply_custom_subject = move || {
@@ -122,14 +89,15 @@ pub fn InspectorContent(
             return;
         }
         let kind = custom_kind.get();
-        match kind.as_str() {
-            "service" => select_service(trimmed),
-            "file" => select_file(trimmed),
-            "agent" => select_agent(trimmed, "OpenCode"),
-            "package" => select_package(trimmed, "latest"),
-            "anchor" => select_anchor(trimmed, trimmed),
-            _ => select_service(trimmed),
-        }
+        let identifier = trimmed.to_string();
+        select_query(match kind.as_str() {
+            "service" => SubjectQuery::Service(identifier),
+            "file" => SubjectQuery::File(identifier),
+            "agent" => SubjectQuery::Agent(identifier),
+            "package" => SubjectQuery::Package(identifier),
+            "anchor" => SubjectQuery::Anchor(identifier),
+            _ => SubjectQuery::Service(identifier),
+        });
         custom_input.set(String::new());
     };
 
@@ -147,8 +115,35 @@ pub fn InspectorContent(
     };
 
     let subject_json = move || {
-        let subj = active_subject();
-        serde_json::to_string_pretty(&subj).unwrap_or_else(|_| "{}".to_string())
+        if let Some(subject) = target.get() {
+            serde_json::to_string_pretty(&subject).unwrap_or_else(|_| "{}".to_string())
+        } else if let Some(query) = subject_query.get() {
+            serde_json::to_string_pretty(&query).unwrap_or_else(|_| "{}".to_string())
+        } else {
+            "{}".to_string()
+        }
+    };
+
+    let selected_kind = move || {
+        target.get().map_or_else(
+            || {
+                subject_query
+                    .get()
+                    .map_or("No subject", |query| query.kind_name())
+            },
+            |subject| subject.kind_name(),
+        )
+    };
+    let selected_title = move || {
+        target.get().map_or_else(
+            || {
+                subject_query.get().map_or_else(
+                    || "Choose a subject".to_string(),
+                    |query| query.identifier().to_string(),
+                )
+            },
+            |subject| subject.display_title(),
+        )
     };
 
     view! {
@@ -205,30 +200,29 @@ pub fn InspectorContent(
                     {move || match active_category.get() {
                         PresetCategory::Services => view! {
                             <div class="inspector-chips-group">
-                                <button class="inspector-chip" on:click=move |_| select_service("cybou-mind.target")>"cybou-mind.target"</button>
-                                <button class="inspector-chip" on:click=move |_| select_service("caddy.service")>"caddy.service"</button>
-                                <button class="inspector-chip" on:click=move |_| select_service("systemd-journald.service")>"journald.service"</button>
-                                <button class="inspector-chip" on:click=move |_| select_service("ssh.service")>"ssh.service"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::Service("cybou-mind.target".into()))>"cybou-mind.target"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::Service("caddy.service".into()))>"caddy.service"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::Service("systemd-journald.service".into()))>"journald.service"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::Service("ssh.service".into()))>"ssh.service"</button>
                             </div>
                         }.into_any(),
                         PresetCategory::Files => view! {
                             <div class="inspector-chips-group">
-                                <button class="inspector-chip" on:click=move |_| select_file("/etc/caddy/Caddyfile")>"/etc/caddy/Caddyfile"</button>
-                                <button class="inspector-chip" on:click=move |_| select_file("/etc/cybou/config.toml")>"/etc/cybou/config.toml"</button>
-                                <button class="inspector-chip" on:click=move |_| select_file("/etc/hosts")>"/etc/hosts"</button>
-                                <button class="inspector-chip" on:click=move |_| select_file("/var/log/syslog")>"/var/log/syslog"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::File("/etc/caddy/Caddyfile".into()))>"/etc/caddy/Caddyfile"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::File("/etc/cybou/config.toml".into()))>"/etc/cybou/config.toml"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::File("/etc/hosts".into()))>"/etc/hosts"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::File("/var/log/syslog".into()))>"/var/log/syslog"</button>
                             </div>
                         }.into_any(),
                         PresetCategory::Agents => view! {
                             <div class="inspector-chips-group">
-                                <button class="inspector-chip" on:click=move |_| select_agent("capsule-opencode-01", "OpenCode")>"capsule-opencode-01"</button>
-                                <button class="inspector-chip" on:click=move |_| select_agent("capsule-research-02", "Researcher")>"capsule-research-02"</button>
+                                <span>"Enter an owner-issued capsule ID below; no agent identities are assumed."</span>
                             </div>
                         }.into_any(),
                         PresetCategory::System => view! {
                             <div class="inspector-chips-group">
-                                <button class="inspector-chip" on:click=move |_| select_package("cybou-mind", "0.1.0")>"Package: cybou-mind"</button>
-                                <button class="inspector-chip" on:click=move |_| select_anchor("home", "Home Viewport")>"Anchor: Home"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::Package("cybou-mind".into()))>"Package query: cybou-mind"</button>
+                                <button class="inspector-chip" on:click=move |_| select_query(SubjectQuery::Anchor("home".into()))>"Anchor query: home"</button>
                             </div>
                         }.into_any(),
                     }}
@@ -265,18 +259,30 @@ pub fn InspectorContent(
                 // Main Subject Header
                 <div class="inspector-header">
                     <div class="inspector-header-top">
-                        <div class="inspector-badge">{move || active_subject().kind_name()}</div>
-                        <h3 class="inspector-title">{move || active_subject().display_title()}</h3>
+                        <div class="inspector-badge">{selected_kind}</div>
+                        <h3 class="inspector-title">{selected_title}</h3>
                     </div>
 
                     // URI & Deep Link
-                    <div class="inspector-uri-row">
-                        <code class="inspector-uri">{move || active_subject().uri()}</code>
+                    <Show
+                        when=move || target.get().is_some()
+                        fallback=move || view! {
+                            <div class="inspector-uri-row">
+                                <code class="inspector-uri">"Unresolved query — no canonical URI"</code>
+                            </div>
+                        }
+                    >
+                      <div class="inspector-uri-row">
+                        <code class="inspector-uri">{move || target.get().map_or_else(String::new, |subject| subject.uri())}</code>
                         <button
                             type="button"
                             class="inspector-copy-btn"
-                            title="Copy Canonical URI"
-                            on:click=move |_| copy_text_to_clipboard(active_subject().uri(), copied_uri)
+                            title="Copy owner-resolved canonical URI"
+                            on:click=move |_| {
+                                if let Some(subject) = target.get() {
+                                    copy_text_to_clipboard(subject.uri(), copied_uri);
+                                }
+                            }
                         >
                             {move || if copied_uri.get() {
                                 view! { <Check size=12 /> <span>"Copied"</span> }.into_any()
@@ -288,7 +294,11 @@ pub fn InspectorContent(
                             type="button"
                             class="inspector-copy-btn"
                             title="Copy Deep Link"
-                            on:click=move |_| copy_text_to_clipboard(active_subject().deep_link_hash(), copied_hash)
+                            on:click=move |_| {
+                                if let Some(subject) = target.get() {
+                                    copy_text_to_clipboard(subject.deep_link_hash(), copied_hash);
+                                }
+                            }
                         >
                             {move || if copied_hash.get() {
                                 view! { <Check size=12 /> <span>"Copied"</span> }.into_any()
@@ -296,7 +306,8 @@ pub fn InspectorContent(
                                 view! { <Copy size=12 /> <span>"Hash"</span> }.into_any()
                             }}
                         </button>
-                    </div>
+                      </div>
+                    </Show>
                 </div>
 
                 // View Tabs
@@ -336,15 +347,15 @@ pub fn InspectorContent(
                                 <div class="inspector-grid">
                                     <div class="inspector-row">
                                         <span class="lbl">"Kind"</span>
-                                        <span class="val">{move || active_subject().kind_name()}</span>
+                                        <span class="val">{selected_kind}</span>
                                     </div>
                                     <div class="inspector-row">
                                         <span class="lbl">"Identifier"</span>
-                                        <span class="val">{move || active_subject().display_title()}</span>
+                                        <span class="val">{selected_title}</span>
                                     </div>
                                     <div class="inspector-row">
-                                        <span class="lbl">"Deep Link Route"</span>
-                                        <span class="val">{move || active_subject().deep_link_hash()}</span>
+                                        <span class="lbl">"Resolution State"</span>
+                                        <span class="val">{move || if target.get().is_some() { "Owner-resolved reference" } else { "Unresolved query" }}</span>
                                     </div>
                                     <div class="inspector-row">
                                         <span class="lbl">"Inspection State"</span>
@@ -364,7 +375,7 @@ pub fn InspectorContent(
                         InspectorTab::RawSpec => view! {
                             <div class="inspector-section">
                                 <div class="inspector-spec-header">
-                                    <span class="inspector-section-title">"Canonical SubjectRef JSON"</span>
+                                    <span class="inspector-section-title">{move || if target.get().is_some() { "Canonical SubjectRef JSON" } else { "Unresolved SubjectQuery JSON" }}</span>
                                     <button
                                         type="button"
                                         class="inspector-copy-btn"

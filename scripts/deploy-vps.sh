@@ -31,6 +31,7 @@ cybou_ssh "
     cybou-eventd
     cybou-identityd
     cybou-healthd
+    cybou-host-filesd
     cybou-intentiond
     cybou-predictord
     cybou-perceptiond
@@ -161,6 +162,7 @@ cybou_ssh "
   # The helper is a system service because it is the one thing here that needs root. Its socket is
   # group-owned by cybou, so only the gateway can attempt a password.
   sudo install -m 0644 systemd/system/cybou-authd.service \
+    systemd/system/cybou-host-filesd@.service \
     systemd/system/cybou-executord.service systemd/system/cybou-agent-gateway@.service \
     /etc/systemd/system/
   # The session owner writes the lease and the launch file here; systemd reads them back as root
@@ -222,6 +224,11 @@ cybou_ssh "
   sudo systemctl reload dbus.service
   sudo systemctl enable --now cybou-authd.service
   sudo systemctl restart cybou-authd.service
+  # HostUserPath is an explicit per-account capability. The demo account is the only account this
+  # deployment provisions, so it is the only owner instance enabled here. Additional admitted
+  # accounts require an equally explicit enable by the operator.
+  sudo systemctl enable --now cybou-host-filesd@demo.service
+  sudo systemctl restart cybou-host-filesd@demo.service
 
   # The shared secret this replaced is removed rather than left lying about. A second way in that
   # nobody maintains is how a temporary arrangement outlives the reason for it.

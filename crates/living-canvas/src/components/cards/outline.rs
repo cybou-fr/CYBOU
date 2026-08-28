@@ -4,18 +4,16 @@
 //! Canvas Outline non-spatial accessibility tree view and navigator (ADR-0046 §22, §29).
 
 use leptos::prelude::*;
-use lucide_leptos::{
-    Anchor, Box, Check, ChevronDown, ChevronRight, Layers, Maximize2, Minimize2, Search, Split,
-    Trash2, X,
-};
+use lucide_leptos::{Anchor, Box, Layers, Maximize2, Minimize2, Search, Split, Trash2, X};
 use std::sync::Arc;
 use web_sys::{MouseEvent, PointerEvent};
 
 use crate::{
     CardId, DesktopItemId, DesktopLayout, Rect,
-    components::card_frame::CardFrame,
+    components::{card_controls::request_close_card, card_frame::CardFrame},
     interaction::{DragState, ResizeState},
     state::RuntimeState,
+    tool_state::ToolCardStates,
 };
 
 fn viewport_dimensions() -> (f64, f64) {
@@ -47,6 +45,7 @@ pub fn OutlineContent(
         .or_else(use_context::<RwSignal<DesktopLayout>>)
         .unwrap_or_else(|| RwSignal::new(DesktopLayout::default()));
     let select_fn = set_selected.or_else(use_context::<WriteSignal<Option<DesktopItemId>>>);
+    let tool_states = expect_context::<ToolCardStates>();
 
     let pan = use_context::<ReadSignal<(f64, f64)>>();
     let set_pan = use_context::<WriteSignal<(f64, f64)>>();
@@ -100,10 +99,7 @@ pub fn OutlineContent(
 
     let close_card = move |card_id: CardId, e: MouseEvent| {
         e.stop_propagation();
-        layout_sig.update(|l| {
-            let _ = l.close_card(card_id);
-        });
-        layout_sig.get_untracked().save();
+        request_close_card(card_id, layout_sig, tool_states);
     };
 
     let focus_deck = move |deck_id: String| {
@@ -127,7 +123,7 @@ pub fn OutlineContent(
     let split_deck = move |deck_id: String, e: MouseEvent| {
         e.stop_propagation();
         layout_sig.update(|l| {
-            let _ = l.split_deck(&deck_id);
+            l.dissolve_deck(&deck_id);
         });
         layout_sig.get_untracked().save();
     };
@@ -177,7 +173,6 @@ pub fn OutlineContent(
 
     let cards_count = move || layout_sig.get().cards.len();
     let decks_count = move || layout_sig.get().decks.len();
-    let clusters_count = move || layout_sig.get().clusters.len();
     let anchors_count = move || layout_sig.get().anchors.len();
 
     let matches_filter = move |text: &str| {
@@ -229,7 +224,7 @@ pub fn OutlineContent(
                     <For
                         each=move || {
                             let cards = layout_sig.get().cards;
-                            cards.into_iter().filter(|c| matches_filter(&c.id.title()) || matches_filter(c.id.kind_str())).collect::<Vec<_>>()
+                            cards.into_iter().filter(|c| matches_filter(&c.id.title()) || matches_filter(c.id.key())).collect::<Vec<_>>()
                         }
                         key=|card| card.id.instance_key()
                         children=move |card| {

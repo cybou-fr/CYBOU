@@ -42,7 +42,7 @@ uuid = { workspace = true, features = ["js"] }
 gloo-net = "0.6.0"
 gloo-timers = { version = "0.3.0", features = ["futures"] }
 leptos = { version = "0.8.15", features = ["csr"] }
-lucide-leptos = { version = "3.23.0", features = ["account", "files", "layout", "multimedia", "navigation", "security", "text"] }
+lucide-leptos = { version = "3.23.0", features = ["account", "arrows", "development", "files", "layout", "multimedia", "navigation", "notifications", "security", "shapes", "text"] }
 # Keep the generated bindings aligned with the exact CLI shipped by pinned nixpkgs-26.05.
 js-sys = "=0.3.103"
 wasm-bindgen = "=0.2.126"

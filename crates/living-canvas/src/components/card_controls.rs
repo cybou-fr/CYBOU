@@ -18,6 +18,39 @@ use crate::{
     tool_state::ToolCardStates,
 };
 
+/// Route every user-initiated card close through the same editor and shell lifecycle policy.
+pub fn request_close_card(
+    card: CardId,
+    layout: RwSignal<DesktopLayout>,
+    tool_states: ToolCardStates,
+) {
+    if matches!(card, CardId::Editor(_)) {
+        let editor = tool_states.editor(card);
+        let has_unsaved = editor
+            .tabs
+            .get_untracked()
+            .iter()
+            .any(|tab| tab.dirty || tab.conflict.is_some());
+        if has_unsaved {
+            editor.card_close_open.set(true);
+            return;
+        }
+    }
+
+    layout.update(|current| {
+        current.close_card(card);
+    });
+    // Closing is the one action that really is a person finished with the card. Everything else
+    // that unmounts it deliberately preserves its tool state.
+    tool_states.forget(card);
+    if let CardId::Shell(instance) = card {
+        spawn_local(async move {
+            let _ = GatewayMindClient.close_shell(instance).await;
+        });
+    }
+    layout.get_untracked().save();
+}
+
 /// Card header window management controls (Pin, Representation, Focus, Collapse/Expand, Close/Detach).
 #[component]
 pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoView {
@@ -101,32 +134,7 @@ pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoV
                         title="Close card"
                         aria-label="Close card"
                         on:click=move |_| {
-                            if matches!(card, CardId::Editor(_)) {
-                                let editor = tool_states.editor(card);
-                                let has_unsaved = editor.tabs.get_untracked().iter().any(|tab| {
-                                    tab.dirty || tab.conflict.is_some()
-                                });
-                                if has_unsaved {
-                                    editor.card_close_open.set(true);
-                                    return;
-                                }
-                            }
-                            layout.update(|current| {
-                                current.close_card(card);
-                            });
-                            // Closing is the one action that really is a person finished with the
-                            // card. Everything else that unmounts it — collapsing, switching a deck
-                            // tab, docking — deliberately does not reach here.
-                            tool_states.forget(card);
-                            // The shell behind it goes too. Left standing, it would still be in the
-                            // directory this card was in, and the next card opened at the same
-                            // number would show `/` and then jump there on the first command.
-                            if let CardId::Shell(instance) = card {
-                                spawn_local(async move {
-                                    let _ = GatewayMindClient.close_shell(instance).await;
-                                });
-                            }
-                            layout.get_untracked().save();
+                            request_close_card(card, layout, tool_states);
                         }
                     >
                         <IconClose size=12 />

@@ -4,10 +4,9 @@
 //! Who a reader is, and how long the answer lasts.
 //!
 //! The gateway never sees `/etc/shadow` and never learns whether an account exists. It hands a
-//! name and a secret to `cybou-authd` over a socket only its own user can open, and receives one
-//! bit back. Everything else here is about what happens after that bit is `true`: a session that
-//! expires, lives only in this process, and is named in the reply so the page can say who it
-//! belongs to.
+//! name and a secret to `cybou-authd` over a socket only its own user can open. On success the
+//! helper returns the account's UID and home authority; on failure it returns no identity. The
+//! session expires, lives only in this process, and exposes only the account name to the page.
 
 use std::{
     collections::HashMap,
@@ -73,14 +72,25 @@ impl Drop for LoginRequest {
     }
 }
 
-/// Something that can say whether an account accepts a secret.
+/// Identity established by the privileged account owner after authentication.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedAccount {
+    /// Canonical Linux account name that accepted the secret.
+    pub username: String,
+    /// Numeric identity under which per-user operations must execute.
+    pub uid: u32,
+    /// Owner-established home directory for the account.
+    pub home: String,
+}
+
+/// Something that can authenticate an account and establish its host identity.
 ///
 /// A trait so the gateway's own tests can run without a PAM stack or a privileged helper. The
 /// implementation that matters talks to `cybou-authd`; a test one answers from a table.
 #[async_trait]
 pub trait CredentialVerifier: Send + Sync {
-    /// Whether this account, with this secret, may reach Cybou.
-    async fn verify(&self, username: &str, password: &str) -> bool;
+    /// The owner-established identity, only when this secret authenticates it.
+    async fn verify(&self, username: &str, password: &str) -> Option<VerifiedAccount>;
 }
 
 /// One authenticated reader.
@@ -88,6 +98,10 @@ pub trait CredentialVerifier: Send + Sync {
 pub struct Session {
     /// The Linux account this session belongs to.
     pub username: String,
+    /// Numeric Linux identity established by the privileged helper.
+    pub uid: Option<u32>,
+    /// Home authority root established by the privileged helper.
+    pub home: Option<String>,
     /// When it stops being valid.
     pub expires_at: OffsetDateTime,
 }
@@ -110,6 +124,26 @@ impl Sessions {
     /// alternative to refusing here is issuing a predictable token, and a session nobody can get
     /// is a far smaller failure than a session anybody can guess.
     pub fn begin(&self, username: &str, now: OffsetDateTime) -> Option<String> {
+        self.begin_inner(username, None, None, now)
+    }
+
+    /// Begin a session carrying the host identity established by the account owner.
+    pub fn begin_verified(&self, account: &VerifiedAccount, now: OffsetDateTime) -> Option<String> {
+        self.begin_inner(
+            &account.username,
+            Some(account.uid),
+            Some(account.home.clone()),
+            now,
+        )
+    }
+
+    fn begin_inner(
+        &self,
+        username: &str,
+        uid: Option<u32>,
+        home: Option<String>,
+        now: OffsetDateTime,
+    ) -> Option<String> {
         let mut bytes = [0_u8; SESSION_TOKEN_BYTES];
         getrandom::getrandom(&mut bytes).ok()?;
         let token = bytes.iter().fold(
@@ -129,6 +163,8 @@ impl Sessions {
             digest(&token),
             Session {
                 username: username.to_owned(),
+                uid,
+                home,
                 expires_at: now + SESSION_LIFETIME,
             },
         );
@@ -215,6 +251,22 @@ mod tests {
         let token = sessions.begin("alice", at(0)).expect("a token");
         sessions.end(&token);
         assert!(sessions.resolve(&token, at(1)).is_none());
+    }
+
+    #[test]
+    fn a_verified_session_keeps_the_owner_established_identity() {
+        let sessions = Sessions::default();
+        let account = VerifiedAccount {
+            username: "alice".to_owned(),
+            uid: 1000,
+            home: "/home/alice".to_owned(),
+        };
+        let token = sessions.begin_verified(&account, at(0)).expect("a token");
+
+        let session = sessions.resolve(&token, at(1)).expect("a session");
+        assert_eq!(session.username, "alice");
+        assert_eq!(session.uid, Some(1000));
+        assert_eq!(session.home.as_deref(), Some("/home/alice"));
     }
 
     #[test]

@@ -38,7 +38,7 @@ pub mod telemetry;
 
 pub use admission::Kind;
 pub use location::LocationRef;
-pub use subject::{EpistemicPresentation, SubjectRef};
+pub use subject::{EpistemicPresentation, SubjectQuery, SubjectRef};
 
 /// Canonical Qt-compatible UTC wall-clock spelling: whole milliseconds since the Unix epoch.
 ///

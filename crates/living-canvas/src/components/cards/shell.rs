@@ -92,13 +92,7 @@ pub fn ShellContent(
             let client = GatewayMindClient;
             match client.execute_shell(&to_exec, instance).await {
                 Ok(resp) => {
-                    let text = if !resp.stdout.is_empty() {
-                        resp.stdout
-                    } else if !resp.stderr.is_empty() {
-                        resp.stderr
-                    } else {
-                        String::new()
-                    };
+                    let text = crate::tool_state::merge_shell_output(&resp.stdout, &resp.stderr);
                     set_cwd.set(resp.cwd);
                     set_history.update(|h| h.push((to_exec, text, resp.exit_code)));
                 }

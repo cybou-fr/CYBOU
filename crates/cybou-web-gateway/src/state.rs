@@ -195,8 +195,30 @@ pub struct GatewayState {
     pub shells: Arc<Shells>,
     /// The sandbox itself, for surfaces that read it as structure rather than through a shell.
     pub files: cybou_jailfs::JailFs,
+    /// Optional per-user filesystem owner. The gateway itself must never impersonate a PAM user.
+    pub host_user_files: Option<Arc<dyn HostUserFileSource>>,
     /// User drafts storage for safe recovery.
     pub drafts: Arc<crate::routes::UserDraftStore>,
+}
+
+/// Owner boundary for filesystem operations that must execute as the authenticated Linux user.
+#[async_trait]
+pub trait HostUserFileSource: Send + Sync {
+    /// List a directory inside the named user's home authority domain.
+    async fn list_directory(
+        &self,
+        uid: u32,
+        home: &str,
+        path: &str,
+    ) -> Result<cybou_web_contracts::HostDirectoryListingProjection, GatewayError>;
+
+    /// Read a bounded UTF-8 file and return an owner-issued `HostUserPath` reference.
+    async fn read_file(
+        &self,
+        uid: u32,
+        home: &str,
+        path: &str,
+    ) -> Result<cybou_web_contracts::FileContentProjection, GatewayError>;
 }
 
 impl GatewayState {

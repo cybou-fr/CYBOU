@@ -267,8 +267,9 @@ does.
 
 A reader signs in with a Linux account. The gateway never checks the password — that needs the
 shadow database, which it must not be able to read — so it asks `cybou-authd`, the one process that
-runs as root, over a socket only the gateway's user can open, and receives one bit. Membership in
-`cybou-access` is the grant and `usermod -L` is the revocation. A missing, expired or invented
+runs as root, over a socket only the gateway's user can open. Failure remains one indistinguishable
+bit; success also carries the UID and home needed to address an unprivileged per-user owner.
+Membership in `cybou-access` is the grant and `usermod -L` is the revocation. A missing, expired or invented
 session is served the public projection rather than refused, because a public surface that answered
 401 to strangers would stop being a public surface.
 

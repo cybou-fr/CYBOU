@@ -5,8 +5,9 @@
 //!
 //! It runs as root because PAM needs that to read the shadow database, and everything about it is
 //! arranged so that being root buys an attacker as little as possible. It speaks one message type,
-//! answers one bit, listens on a socket only the gateway's user can open, refuses accounts outside
-//! one group, and never writes what it was told.
+//! gives no detail on refusal, listens on a socket only the gateway's user can open, refuses
+//! accounts outside one group, and never writes what it was told. A successful answer also carries
+//! the UID and home needed to address that user's unprivileged filesystem owner.
 
 #[cfg(not(unix))]
 fn main() {
@@ -84,10 +85,15 @@ mod unix {
                 let Ok(_permit) = attempts.acquire().await else {
                     return;
                 };
-                let authenticated = decide(request, &throttle).await;
+                let account = decide(request, &throttle).await;
 
                 let mut encoded = Vec::new();
-                if ciborium::into_writer(&Answer { authenticated }, &mut encoded).is_ok() {
+                let answer = Answer {
+                    authenticated: account.is_some(),
+                    uid: account.as_ref().map(|account| account.uid),
+                    home: account.map(|account| account.home),
+                };
+                if ciborium::into_writer(&answer, &mut encoded).is_ok() {
                     let _ = stream.write_all(&encoded).await;
                 }
                 let _ = stream.shutdown().await;
@@ -100,7 +106,12 @@ mod unix {
     /// Every path that answers `false` leaves through the same delay, so the reason for a refusal
     /// — no name, an account outside the group, a wrong password — is not readable from how long
     /// the answer took.
-    async fn decide(request: Request, throttle: &Throttle) -> bool {
+    struct AccountIdentity {
+        uid: u32,
+        home: String,
+    }
+
+    async fn decide(request: Request, throttle: &Throttle) -> Option<AccountIdentity> {
         let username = request.username.clone();
 
         if username.is_empty()
@@ -109,7 +120,7 @@ mod unix {
             || !in_access_group(&username)
         {
             refuse(throttle, &username).await;
-            return false;
+            return None;
         }
 
         let password = request.password.clone();
@@ -124,13 +135,37 @@ mod unix {
         .await
         .unwrap_or(false);
 
-        if authenticated {
+        if authenticated && let Some(account) = account_identity(&username) {
             throttle.record_success(&username);
-            true
+            Some(account)
         } else {
             refuse(throttle, &username).await;
-            false
+            None
         }
+    }
+
+    fn account_identity(username: &str) -> Option<AccountIdentity> {
+        let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
+        passwd.lines().find_map(|line| {
+            let mut fields = line.split(':');
+            let (Some(name), Some(_), Some(uid), Some(_), Some(_), Some(home)) = (
+                fields.next(),
+                fields.next(),
+                fields.next(),
+                fields.next(),
+                fields.next(),
+                fields.next(),
+            ) else {
+                return None;
+            };
+            if name != username || !home.starts_with('/') || home.chars().any(char::is_control) {
+                return None;
+            }
+            Some(AccountIdentity {
+                uid: uid.parse().ok()?,
+                home: home.to_string(),
+            })
+        })
     }
 
     /// Hold a failed attempt for what this account currently owes, then count it.

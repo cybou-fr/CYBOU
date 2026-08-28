@@ -17,6 +17,7 @@ members = [
     "crates/cybou-executord",
     "crates/cybou-fabric",
     "crates/cybou-healthd",
+    "crates/cybou-host-filesd",
     "crates/cybou-identityd",
     "crates/cybou-intentiond",
     "crates/cybou-jailfs",
