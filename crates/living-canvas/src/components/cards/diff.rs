@@ -16,6 +16,7 @@ use crate::{
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
+    text_diff::{DiffLineKind, build_text_diff},
     tool_state::ToolCardStates,
 };
 
@@ -41,30 +42,8 @@ pub fn DiffContent(
     let proposed_content = state.proposed_content;
     let status_msg = state.status_msg;
 
-    let compute_diff_lines = move || {
-        let orig = original_content.get();
-        let prop = proposed_content.get();
-        let orig_lines: Vec<&str> = orig.lines().collect();
-        let prop_lines: Vec<&str> = prop.lines().collect();
-
-        let mut lines = Vec::new();
-        let max_len = orig_lines.len().max(prop_lines.len());
-        for i in 0..max_len {
-            let o = orig_lines.get(i).copied().unwrap_or("");
-            let p = prop_lines.get(i).copied().unwrap_or("");
-            if o == p {
-                lines.push(("ctx", o.to_string(), i + 1));
-            } else {
-                if !o.is_empty() {
-                    lines.push(("del", o.to_string(), i + 1));
-                }
-                if !p.is_empty() {
-                    lines.push(("add", p.to_string(), i + 1));
-                }
-            }
-        }
-        lines
-    };
+    let computed_diff =
+        Memo::new(move |_| build_text_diff(&original_content.get(), &proposed_content.get()));
 
     view! {
         <Show
@@ -100,29 +79,48 @@ pub fn DiffContent(
                 // Diff Lines Viewer
                 <div class="diff-viewer-content">
                     <div class="diff-table">
+                        <Show when=move || computed_diff.get().hunks.is_empty()>
+                            <div class="diff-empty">"No line changes"</div>
+                        </Show>
                         <For
-                            each=compute_diff_lines
-                            key=|(kind, content, idx)| format!("{}-{}-{}", kind, idx, content)
-                            children=move |(kind, content, idx)| {
-                                let line_class = match kind {
-                                    "del" => "diff-line del",
-                                    "add" => "diff-line add",
-                                    _ => "diff-line ctx",
-                                };
-                                let prefix = match kind {
-                                    "del" => "-",
-                                    "add" => "+",
-                                    _ => " ",
-                                };
+                            each=move || computed_diff.get().hunks
+                            key=|hunk| (hunk.old_start, hunk.new_start)
+                            children=move |hunk| {
+                                let header = format!(
+                                    "@@ -{},{} +{},{} @@",
+                                    hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len
+                                );
                                 view! {
-                                    <div class=line_class>
-                                        <span class="diff-num">{idx}</span>
-                                        <span class="diff-prefix">{prefix}</span>
-                                        <span class="diff-code">{content}</span>
+                                    <div class="diff-hunk">
+                                        <div class="diff-hunk-header">{header}</div>
+                                        <For
+                                            each={move || hunk.lines.clone().into_iter().enumerate().collect::<Vec<_>>()}
+                                            key=|(index, line)| (*index, line.old_line, line.new_line)
+                                            children=move |(_, line)| {
+                                                let (line_class, prefix) = match line.kind {
+                                                    DiffLineKind::Delete => ("diff-line del", "-"),
+                                                    DiffLineKind::Add => ("diff-line add", "+"),
+                                                    DiffLineKind::Context => ("diff-line ctx", " "),
+                                                };
+                                                view! {
+                                                    <div class=line_class>
+                                                        <span class="diff-num old">{line.old_line.map(|n| n.to_string()).unwrap_or_default()}</span>
+                                                        <span class="diff-num new">{line.new_line.map(|n| n.to_string()).unwrap_or_default()}</span>
+                                                        <span class="diff-prefix">{prefix}</span>
+                                                        <span class="diff-code">{line.content}</span>
+                                                    </div>
+                                                }
+                                            }
+                                        />
                                     </div>
                                 }
                             }
                         />
+                        <Show when=move || computed_diff.get().used_fallback>
+                            <div class="diff-limit-note">
+                                "Comparison exceeded the bounded edit budget; showing a coarse replacement."
+                            </div>
+                        </Show>
                     </div>
                 </div>
 

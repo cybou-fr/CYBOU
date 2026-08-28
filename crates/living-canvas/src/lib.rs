@@ -22,6 +22,7 @@ pub mod components;
 pub mod interaction;
 #[cfg(target_arch = "wasm32")]
 pub mod state;
+pub mod text_diff;
 #[cfg(target_arch = "wasm32")]
 pub mod tool_state;
 
@@ -43,7 +44,7 @@ pub use layout::{
     UsableViewport, pan_centring, selected_rect, selected_z, visible_desktop_rect,
 };
 #[cfg(target_arch = "wasm32")]
-pub use layout::{apply_camera_back, apply_camera_fly_to, apply_camera_forward};
+pub use layout::{apply_camera_back, apply_camera_fly_to, apply_camera_forward, camera_center};
 
 /// Error returned by a typed Mind client operation.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -63,6 +64,9 @@ pub enum ClientError {
     /// A conditional file write was based on content that is no longer current.
     #[error("file changed since this editor read it")]
     FileChangedSinceRead,
+    /// Exclusive creation refused because the requested file already exists.
+    #[error("file already exists")]
+    FileAlreadyExists,
 }
 
 /// Only data boundary used by the frontend. Browser code never receives D-Bus or native handles.

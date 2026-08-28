@@ -5,9 +5,10 @@
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
-    DirectoryListingProjection, DisclosureProjection, FileContentProjection, FilePathRequest,
-    FileWriteProjection, FileWriteRequest, MindProjection, SessionProjection, ShellCloseRequest,
-    ShellExecRequest, ShellExecResponse, SnapshotProjection,
+    DirectoryListingProjection, DisclosureProjection, FileContentProjection, FileCreateRequest,
+    FilePathRequest, FileWriteProjection, FileWriteRequest, MindProjection, SessionProjection,
+    ShellCloseRequest, ShellExecRequest, ShellExecResponse, SnapshotProjection,
+    UserDraftDeleteRequest, UserDraftListProjection, UserDraftProjection, UserDraftSaveRequest,
 };
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
@@ -19,6 +20,80 @@ use crate::{ClientError, MindClient};
 pub struct GatewayMindClient;
 
 impl GatewayMindClient {
+    /// Exclusively create a new file inside the authenticated jail.
+    pub async fn create_text_file(
+        &self,
+        request: &FileCreateRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        let response = Request::post("/api/v1/files/create")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if response.status() == 409 {
+            return Err(ClientError::FileAlreadyExists);
+        }
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/files/create returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
+    /// List durable drafts for the authenticated principal.
+    pub async fn drafts(&self) -> Result<UserDraftListProjection, ClientError> {
+        Self::get("/api/v1/drafts").await
+    }
+
+    /// Persist one bounded editor recovery snapshot.
+    pub async fn save_draft(
+        &self,
+        request: &UserDraftSaveRequest,
+    ) -> Result<UserDraftProjection, ClientError> {
+        let response = Request::post("/api/v1/drafts/save")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/drafts/save returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
+    /// Delete one recovery snapshot after save or explicit discard.
+    pub async fn delete_draft(&self, draft_id: &str) -> Result<(), ClientError> {
+        let response = Request::post("/api/v1/drafts/delete")
+            .json(&UserDraftDeleteRequest {
+                draft_id: draft_id.to_owned(),
+            })
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if response.ok() {
+            Ok(())
+        } else {
+            Err(ClientError::GatewayRequest(format!(
+                "/api/v1/drafts/delete returned HTTP {}",
+                response.status()
+            )))
+        }
+    }
+
     /// Ask one route about one sandbox path, and decode its typed answer.
     async fn post_path<T: DeserializeOwned>(route: &str, path: &str) -> Result<T, ClientError> {
         let response = Request::post(route)

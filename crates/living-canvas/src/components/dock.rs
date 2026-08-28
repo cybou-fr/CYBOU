@@ -24,6 +24,11 @@ pub fn DesktopDock(
     runtime: RwSignal<RuntimeState>,
 ) -> impl IntoView {
     let (time_str, set_time_str) = signal(String::new());
+    let pan = use_context::<ReadSignal<(f64, f64)>>();
+    let set_pan = use_context::<WriteSignal<(f64, f64)>>();
+    let zoom = use_context::<ReadSignal<f64>>();
+    let set_zoom = use_context::<WriteSignal<f64>>();
+    let camera_history = use_context::<RwSignal<crate::CameraHistory>>();
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -90,6 +95,31 @@ pub fn DesktopDock(
         layout.update(|l| l.bring_forward(card_id));
         set_selected.set(Some(DesktopItemId::Card(card_id)));
         layout.get_untracked().save();
+    };
+
+    let focus_anchor = move |anchor_id: String| {
+        let current_layout = layout.get_untracked();
+        let Some(anchor) = current_layout
+            .anchors
+            .iter()
+            .find(|anchor| anchor.id == anchor_id)
+        else {
+            return;
+        };
+        if let (Some(pan), Some(set_pan), Some(zoom), Some(set_zoom)) =
+            (pan, set_pan, zoom, set_zoom)
+        {
+            crate::apply_camera_fly_to(
+                camera_history,
+                pan,
+                set_pan,
+                zoom,
+                set_zoom,
+                anchor.center_x,
+                anchor.center_y,
+                anchor.preferred_zoom,
+            );
+        }
     };
 
     view! {
@@ -182,6 +212,34 @@ pub fn DesktopDock(
                     <span class="dock-tooltip">"Mind"</span>
                 </button>
             </div>
+
+            <Show when=move || !layout.get().anchors.is_empty()>
+                <div class="dock-separator"></div>
+                <nav class="dock-anchors" aria-label="Spatial anchors">
+                    <For
+                        each={move || layout.get().anchors.into_iter().take(6).collect::<Vec<_>>()}
+                        key=|anchor| anchor.id.clone()
+                        children=move |anchor| {
+                            let anchor_id = anchor.id.clone();
+                            let name = anchor.name.clone();
+                            let title = anchor.name.clone();
+                            let aria_name = format!("Go to anchor {}", anchor.name);
+                            view! {
+                                <button
+                                    class="dock-anchor-pill"
+                                    type="button"
+                                    title=title
+                                    aria-label=aria_name
+                                    on:click=move |_| focus_anchor(anchor_id.clone())
+                                >
+                                    <span aria-hidden="true">"⚓"</span>
+                                    <span class="dock-anchor-name">{name}</span>
+                                </button>
+                            }
+                        }
+                    />
+                </nav>
+            </Show>
 
             <div class="dock-separator"></div>
 

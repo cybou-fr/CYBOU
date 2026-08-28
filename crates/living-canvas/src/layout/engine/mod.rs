@@ -208,6 +208,57 @@ impl DesktopLayout {
         from_v8(v8)
     }
 
+    /// Add a named camera anchor when its trimmed name is non-empty and unique.
+    pub fn add_anchor(&mut self, name: &str, center_x: f64, center_y: f64, zoom: f64) -> bool {
+        const MAX_ANCHORS: usize = 32;
+        let name = name.trim();
+        let normalized_name = name.to_lowercase();
+        if self.anchors.len() >= MAX_ANCHORS
+            || name.is_empty()
+            || self
+                .anchors
+                .iter()
+                .any(|anchor| anchor.name.to_lowercase() == normalized_name)
+        {
+            return false;
+        }
+
+        self.anchors.push(crate::layout::model::CanvasAnchor {
+            id: format!("anchor-{}", uuid::Uuid::new_v4()),
+            name: name.to_owned(),
+            center_x: center_x.clamp(0.0, 10000.0),
+            center_y: center_y.clamp(0.0, 10000.0),
+            preferred_zoom: zoom.clamp(0.4, 2.0),
+        });
+        true
+    }
+
+    /// Rename an existing camera anchor, rejecting empty and duplicate names.
+    pub fn rename_anchor(&mut self, id: &str, name: &str) -> bool {
+        let name = name.trim();
+        let normalized_name = name.to_lowercase();
+        if name.is_empty()
+            || self
+                .anchors
+                .iter()
+                .any(|anchor| anchor.id != id && anchor.name.to_lowercase() == normalized_name)
+        {
+            return false;
+        }
+        let Some(anchor) = self.anchors.iter_mut().find(|anchor| anchor.id == id) else {
+            return false;
+        };
+        anchor.name = name.to_owned();
+        true
+    }
+
+    /// Remove an existing camera anchor.
+    pub fn remove_anchor(&mut self, id: &str) -> bool {
+        let previous_len = self.anchors.len();
+        self.anchors.retain(|anchor| anchor.id != id);
+        self.anchors.len() != previous_len
+    }
+
     /// Validate all desktop layout invariants and normalize state:
     /// 1. Ensures all 11 Mind organ system cards are present (instantiating defaults if missing).
     /// 2. Clamps all card and deck dimensions to spec min/max bounds and reachable positions.
@@ -288,6 +339,17 @@ impl DesktopLayout {
         }
 
         // 6. Normalize canvas anchors
+        let mut anchor_ids = std::collections::HashSet::new();
+        let mut anchor_names = std::collections::HashSet::new();
+        self.anchors.retain_mut(|anchor| {
+            anchor.name = anchor.name.trim().to_owned();
+            let normalized_name = anchor.name.to_lowercase();
+            !anchor.id.trim().is_empty()
+                && !anchor.name.is_empty()
+                && anchor_ids.insert(anchor.id.clone())
+                && anchor_names.insert(normalized_name)
+        });
+        self.anchors.truncate(32);
         for anchor in &mut self.anchors {
             anchor.center_x = anchor.center_x.clamp(0.0, 10000.0);
             anchor.center_y = anchor.center_y.clamp(0.0, 10000.0);

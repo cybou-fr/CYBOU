@@ -164,7 +164,10 @@ pub(crate) fn router_in_sandbox(
         },
         shells,
         files: jail,
-        drafts: Arc::new(crate::routes::UserDraftStore::new()),
+        drafts: Arc::new(
+            crate::routes::UserDraftStore::open(&crate::routes::draft_database_path(sandbox_path))
+                .expect("initialize private draft database"),
+        ),
     };
 
     let app = Router::new()
@@ -241,7 +244,7 @@ mod tests {
     use cybou_protocol::{KnowledgeState, agent::LaunchRequest};
     use cybou_web_contracts::{
         DisclosureProjection, MindProjection, SessionMode, SessionProjection, ShellExecRequest,
-        ShellExecResponse, SnapshotProjection,
+        ShellExecResponse, SnapshotProjection, UserDraftListProjection,
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
@@ -673,6 +676,67 @@ mod tests {
             .expect("a response");
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(cursor_for(&app, Some(&cookie)).await, "public");
+    }
+
+    #[tokio::test]
+    async fn drafts_follow_the_authenticated_account_across_sessions() {
+        let app = guarded_router();
+        let first = sign_in(&app, "alice", "hunter2")
+            .await
+            .expect("first session");
+        let saved = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/drafts/save")
+                    .header("cookie", &first)
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"draftId":"recovery","title":"Recovery","content":"survives login","baseLocation":null,"baseSha256":null}"#,
+                    ))
+                    .expect("save request"),
+            )
+            .await
+            .expect("save response");
+        assert_eq!(saved.status(), StatusCode::OK);
+
+        let logged_out = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/logout")
+                    .header("cookie", &first)
+                    .body(Body::empty())
+                    .expect("logout request"),
+            )
+            .await
+            .expect("logout response");
+        assert_eq!(logged_out.status(), StatusCode::OK);
+
+        let second = sign_in(&app, "alice", "hunter2")
+            .await
+            .expect("second session");
+        let listed = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/drafts")
+                    .header("cookie", second)
+                    .body(Body::empty())
+                    .expect("list request"),
+            )
+            .await
+            .expect("list response");
+        assert_eq!(listed.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(listed.into_body(), 2 * 1024 * 1024)
+            .await
+            .expect("list body");
+        let projection: UserDraftListProjection =
+            serde_json::from_slice(&body).expect("draft list projection");
+        assert_eq!(projection.drafts.len(), 1);
+        assert_eq!(projection.drafts[0].draft_id, "recovery");
     }
 
     #[tokio::test]

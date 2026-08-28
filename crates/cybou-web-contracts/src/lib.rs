@@ -768,12 +768,12 @@ pub struct FileWriteProjection {
     pub size_bytes: u64,
 }
 
-/// Request to create a new file with exclusive creation semantics (O_CREAT | O_EXCL).
+/// Request to create a new file with exclusive creation semantics (`O_CREAT | O_EXCL`).
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileCreateRequest {
-    /// Owner-issued jail / target location where file will be created.
-    pub location: LocationRef,
+    /// Relative path requested inside the authenticated seat's jail.
+    pub path: String,
     /// Initial UTF-8 text content.
     pub text: String,
 }

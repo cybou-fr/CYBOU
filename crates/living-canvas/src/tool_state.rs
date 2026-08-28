@@ -119,6 +119,8 @@ impl FileManagerSignals {
 /// One open file buffer / tab in the Text Editor.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EditorTab {
+    /// Stable server-side recovery identity, independent of browser session.
+    pub recovery_id: String,
     /// File name / display label.
     pub name: String,
     /// Typed location reference and authority domain.
@@ -129,6 +131,8 @@ pub struct EditorTab {
     pub original_content: String,
     /// Whether the buffer contains unsaved changes.
     pub dirty: bool,
+    /// Whether this buffer came from recovery and remains unsaved even if text is unchanged.
+    pub recovered_unsaved: bool,
     /// Line number (1-indexed).
     pub line: usize,
     /// Column number (1-indexed).
@@ -144,6 +148,54 @@ pub struct EditorTab {
 }
 
 impl EditorTab {
+    /// Reconstruct an unsaved editor buffer from the principal's durable draft store.
+    #[must_use]
+    pub fn from_recovery(draft: cybou_web_contracts::UserDraftProjection) -> Self {
+        let location = cybou_protocol::LocationRef::Draft {
+            draft_id: draft.draft_id.clone(),
+        };
+        let mut tab = Self::from_location(
+            location,
+            draft.content.clone(),
+            draft.base_sha256.unwrap_or_default(),
+        );
+        tab.recovery_id = draft.draft_id;
+        tab.name = draft.title;
+        tab.original_content = draft.content;
+        tab.dirty = true;
+        tab.recovered_unsaved = true;
+        if tab.expected_sha256.as_deref() == Some("") {
+            tab.expected_sha256 = None;
+        }
+        tab
+    }
+
+    /// Restore a file-backed draft after the current owner re-mints its location and version.
+    #[must_use]
+    pub fn from_recovery_against_file(
+        draft: cybou_web_contracts::UserDraftProjection,
+        current: cybou_web_contracts::FileContentProjection,
+    ) -> Self {
+        let base_changed = draft.base_sha256.as_deref() != Some(current.content_sha256.as_str());
+        let mut tab = Self::from_location(
+            current.location,
+            current.text.clone(),
+            current.content_sha256.clone(),
+        );
+        tab.recovery_id = draft.draft_id;
+        tab.name = draft.title;
+        tab.content = draft.content;
+        tab.dirty = true;
+        tab.recovered_unsaved = true;
+        if base_changed {
+            tab.conflict = Some(FileConflict {
+                server_content: current.text,
+                server_sha256: current.content_sha256,
+            });
+        }
+        tab
+    }
+
     /// Create a new empty untitled buffer.
     #[must_use]
     pub fn untitled() -> Self {
@@ -154,6 +206,7 @@ impl EditorTab {
     #[must_use]
     pub fn draft(number: u32) -> Self {
         Self {
+            recovery_id: format!("editor-draft-{}", uuid::Uuid::new_v4()),
             name: format!("untitled-{number}.txt"),
             location: cybou_protocol::LocationRef::Draft {
                 draft_id: format!("untitled-{number}"),
@@ -161,6 +214,7 @@ impl EditorTab {
             content: String::new(),
             original_content: String::new(),
             dirty: false,
+            recovered_unsaved: false,
             line: 1,
             col: 1,
             language: "text".to_string(),
@@ -200,11 +254,13 @@ impl EditorTab {
         let read_only = location.is_read_only();
 
         Self {
+            recovery_id: format!("editor-file-{}", uuid::Uuid::new_v4()),
             name,
             location,
             content: content.clone(),
             original_content: content,
             dirty: false,
+            recovered_unsaved: false,
             line: 1,
             col: 1,
             language,
@@ -238,6 +294,12 @@ pub struct EditorSignals {
     pub next_draft_number: RwSignal<u32>,
     /// Whether closing the whole editor with unsaved buffers awaits confirmation.
     pub card_close_open: RwSignal<bool>,
+    /// Monotonic debounce generation for server-side draft autosave.
+    pub autosave_generation: RwSignal<u64>,
+    /// Whether the exclusive Save As dialog is open.
+    pub save_as_open: RwSignal<bool>,
+    /// Relative jail path currently entered in Save As.
+    pub save_as_path: RwSignal<String>,
 }
 
 /// What admitting a file into an editor did.
@@ -264,6 +326,9 @@ impl EditorSignals {
             pending_close_tab: RwSignal::new(None),
             next_draft_number: RwSignal::new(2),
             card_close_open: RwSignal::new(false),
+            autosave_generation: RwSignal::new(0),
+            save_as_open: RwSignal::new(false),
+            save_as_path: RwSignal::new(String::new()),
         }
     }
 
@@ -491,5 +556,35 @@ impl ToolCardStates {
 impl Default for ToolCardStates {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EditorTab;
+    use cybou_protocol::LocationRef;
+    use cybou_web_contracts::UserDraftProjection;
+
+    #[test]
+    fn recovered_file_buffer_stays_dirty_until_a_verified_save() {
+        let tab = EditorTab::from_recovery(UserDraftProjection {
+            draft_id: "recovery-id".into(),
+            title: "notes.txt".into(),
+            content: "unsaved recovery".into(),
+            base_location: Some(LocationRef::SafeShellJail {
+                session_id: "issued-seat".into(),
+                path: "notes.txt".into(),
+            }),
+            base_sha256: Some("a".repeat(64)),
+            updated_at_utc: "2026-08-28T00:00:00Z".into(),
+        });
+
+        assert_eq!(tab.recovery_id, "recovery-id");
+        assert!(tab.dirty);
+        assert!(tab.recovered_unsaved);
+        assert_eq!(
+            tab.expected_sha256.as_deref(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        );
     }
 }

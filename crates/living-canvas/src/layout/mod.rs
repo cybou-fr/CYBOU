@@ -16,7 +16,7 @@ pub mod snap;
 
 pub use camera::{CameraHistory, CameraState};
 #[cfg(target_arch = "wasm32")]
-pub use camera::{apply_camera_back, apply_camera_fly_to, apply_camera_forward};
+pub use camera::{apply_camera_back, apply_camera_fly_to, apply_camera_forward, camera_center};
 pub use engine::DesktopLayout;
 pub use history::LayoutHistory;
 pub use migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, PointV8, from_v8};
@@ -483,5 +483,31 @@ mod tests {
 
         assert!((center_x - 960.0).abs() < 1e-4);
         assert!((center_y - 540.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn anchor_mutations_enforce_unique_non_empty_names() {
+        let mut layout = DesktopLayout::new();
+        assert!(layout.add_anchor("  Home  ", 120.0, 240.0, 1.25));
+        assert_eq!(layout.anchors[0].name, "Home");
+        assert!(!layout.add_anchor("home", 0.0, 0.0, 1.0));
+        assert!(!layout.add_anchor("  ", 0.0, 0.0, 1.0));
+
+        let id = layout.anchors[0].id.clone();
+        assert!(layout.rename_anchor(&id, " Focus "));
+        assert_eq!(layout.anchors[0].name, "Focus");
+        assert!(layout.remove_anchor(&id));
+        assert!(layout.anchors.is_empty());
+        assert!(!layout.remove_anchor(&id));
+    }
+
+    #[test]
+    fn anchor_collection_is_bounded() {
+        let mut layout = DesktopLayout::new();
+        for index in 0..32 {
+            assert!(layout.add_anchor(&format!("Anchor {index}"), 0.0, 0.0, 1.0));
+        }
+        assert!(!layout.add_anchor("One too many", 0.0, 0.0, 1.0));
+        assert_eq!(layout.anchors.len(), 32);
     }
 }

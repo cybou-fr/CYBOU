@@ -84,6 +84,7 @@ fn boundary(error: &JailError) -> Refusal {
         JailError::SizeLimitExceeded { .. } => {
             (StatusCode::PAYLOAD_TOO_LARGE, "fileTooLarge", false)
         }
+        JailError::AlreadyExists(_) => (StatusCode::CONFLICT, "fileAlreadyExists", false),
         JailError::Io(_) => (StatusCode::BAD_GATEWAY, "sandboxUnreadable", true),
     };
     (
@@ -261,12 +262,7 @@ pub async fn create_file_handler(
     Json(payload): Json<FileCreateRequest>,
 ) -> Result<Json<FileWriteProjection>, Refusal> {
     let owner = state.shell_seat(&headers).ok_or_else(no_seat)?;
-    let LocationRef::SafeShellJail { path, .. } = &payload.location else {
-        return Err(no_seat());
-    };
-    if jail_location(&owner, path.clone()) != payload.location {
-        return Err(no_seat());
-    }
+    let location = jail_location(&owner, payload.path.clone());
     if payload.text.len() > FILE_WRITE_MAX_BYTES {
         return Err(boundary(&JailError::SizeLimitExceeded {
             max_bytes: FILE_WRITE_MAX_BYTES,
@@ -277,11 +273,11 @@ pub async fn create_file_handler(
     let _write_guard = FILE_WRITES.lock().unwrap_or_else(PoisonError::into_inner);
     state
         .files
-        .create_file_exclusive(path, payload.text.as_bytes(), FILE_WRITE_MAX_BYTES)
+        .create_file_exclusive(&payload.path, payload.text.as_bytes(), FILE_WRITE_MAX_BYTES)
         .map_err(|error| boundary(&error))?;
     let verified = state
         .files
-        .read_to_string(path, FILE_READ_MAX_BYTES)
+        .read_to_string(&payload.path, FILE_READ_MAX_BYTES)
         .map_err(|error| boundary(&error))?;
     if verified != payload.text {
         return Err(boundary(&JailError::Io(
@@ -291,8 +287,22 @@ pub async fn create_file_handler(
 
     Ok(Json(FileWriteProjection {
         schema_version: WEB_SCHEMA_V1,
-        location: payload.location,
+        location,
         content_sha256: sha256(verified.as_bytes()),
         size_bytes: u64::try_from(verified.len()).unwrap_or(u64::MAX),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn already_existing_file_is_a_non_retryable_conflict() {
+        let (status, Json(body)) = boundary(&JailError::AlreadyExists("notes.txt".into()));
+
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.error, "fileAlreadyExists");
+        assert!(!body.retryable);
+    }
 }

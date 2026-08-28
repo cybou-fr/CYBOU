@@ -13,6 +13,9 @@ description = "Bounded filesystem sandbox and path traversal protection for CYBO
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix.workspace = true
+
 [dev-dependencies]
 time.workspace = true
 

@@ -5,14 +5,33 @@
 
 use leptos::prelude::*;
 use std::sync::Arc;
-use web_sys::PointerEvent;
+use web_sys::{MouseEvent, PointerEvent};
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout, Rect,
     components::{card_frame::CardFrame, icons::IconLayers},
     interaction::{DragState, ResizeState},
     state::RuntimeState,
 };
+
+fn viewport_dimensions() -> (f64, f64) {
+    web_sys::window()
+        .map(|window| {
+            (
+                window
+                    .inner_width()
+                    .ok()
+                    .and_then(|value| value.as_f64())
+                    .unwrap_or(1440.0),
+                window
+                    .inner_height()
+                    .ok()
+                    .and_then(|value| value.as_f64())
+                    .unwrap_or(900.0),
+            )
+        })
+        .unwrap_or((1440.0, 900.0))
+}
 
 /// Canvas Outline content component listing clusters, cards, and anchors hierarchically.
 #[component]
@@ -30,6 +49,35 @@ pub fn OutlineContent(
     let zoom = use_context::<ReadSignal<f64>>();
     let set_zoom = use_context::<WriteSignal<f64>>();
     let camera_history = use_context::<RwSignal<crate::CameraHistory>>();
+    let anchor_name = RwSignal::new(String::new());
+    let anchor_error = RwSignal::new(None::<String>);
+
+    let save_current_view = move |_| {
+        let Some(pan) = pan else {
+            anchor_error.set(Some("Camera is unavailable".to_owned()));
+            return;
+        };
+        let Some(zoom) = zoom else {
+            anchor_error.set(Some("Camera is unavailable".to_owned()));
+            return;
+        };
+        let viewport = viewport_dimensions();
+        let center = crate::camera_center(pan.get_untracked(), zoom.get_untracked(), viewport);
+        let name = anchor_name.get_untracked();
+        let mut added = false;
+        layout_sig.update(|layout| {
+            added = layout.add_anchor(&name, center.0, center.1, zoom.get_untracked());
+            if added {
+                layout.save();
+            }
+        });
+        if added {
+            anchor_name.set(String::new());
+            anchor_error.set(None);
+        } else {
+            anchor_error.set(Some("Use a non-empty, unique name".to_owned()));
+        }
+    };
 
     let fly_to = move |cx: f64, cy: f64, target_zoom: f64| {
         if let (Some(p), Some(sp), Some(z), Some(sz)) = (pan, set_pan, zoom, set_zoom) {
@@ -37,12 +85,20 @@ pub fn OutlineContent(
         }
     };
 
+    let fit_and_fly = move |rect: Rect, maximum_zoom: f64| {
+        let viewport = viewport_dimensions();
+        let (target_zoom, _) = DesktopLayout::fit_to_viewport(rect, viewport.0, viewport.1, 60.0);
+        fly_to(
+            rect.x + rect.width / 2.0,
+            rect.y + rect.height / 2.0,
+            target_zoom.min(maximum_zoom),
+        );
+    };
+
     let focus_card = move |card_id: CardId| {
         let current_layout = layout_sig.get_untracked();
         let geom = current_layout.geometry(card_id);
-        let cx = geom.x + geom.width / 2.0;
-        let cy = geom.y + geom.height / 2.0;
-        fly_to(cx, cy, 1.0);
+        fit_and_fly(Rect::new(geom.x, geom.y, geom.width, geom.height), 1.0);
         if let Some(sel) = select_fn {
             sel.set(Some(DesktopItemId::Card(card_id)));
         }
@@ -51,9 +107,15 @@ pub fn OutlineContent(
     let focus_deck = move |deck_id: String| {
         let current_layout = layout_sig.get_untracked();
         if let Some(deck) = current_layout.decks.iter().find(|d| d.id == deck_id) {
-            let cx = deck.geometry.x + deck.geometry.width / 2.0;
-            let cy = deck.geometry.y + deck.geometry.height / 2.0;
-            fly_to(cx, cy, 1.0);
+            fit_and_fly(
+                Rect::new(
+                    deck.geometry.x,
+                    deck.geometry.y,
+                    deck.geometry.width,
+                    deck.geometry.height,
+                ),
+                1.0,
+            );
         }
         if let Some(sel) = select_fn {
             sel.set(Some(DesktopItemId::Deck(deck_id)));
@@ -64,9 +126,7 @@ pub fn OutlineContent(
         let current_layout = layout_sig.get_untracked();
         if let Some(cluster) = current_layout.clusters.iter().find(|c| c.id == cluster_id) {
             if let Some(rect) = current_layout.cluster_rect(cluster) {
-                let cx = rect.x + rect.width / 2.0;
-                let cy = rect.y + rect.height / 2.0;
-                fly_to(cx, cy, 0.85);
+                fit_and_fly(rect, 1.2);
             }
         }
     };
@@ -88,6 +148,31 @@ pub fn OutlineContent(
             // Anchors Tree
             <div class="outline-section">
                 <div class="outline-section-label">"Spatial Anchors"</div>
+                <div class="outline-anchor-create">
+                    <input
+                        class="outline-anchor-input"
+                        aria-label="New anchor name"
+                        placeholder="Anchor name"
+                        prop:value=move || anchor_name.get()
+                        on:input=move |event| {
+                            anchor_name.set(event_target_value(&event));
+                            anchor_error.set(None);
+                        }
+                    />
+                    <button
+                        class="outline-anchor-add"
+                        type="button"
+                        title="Save current viewport as anchor"
+                        on:click=save_current_view
+                    >
+                        "+"
+                    </button>
+                </div>
+                <Show when=move || anchor_error.get().is_some()>
+                    <div class="outline-anchor-error" role="alert">
+                        {move || anchor_error.get().unwrap_or_default()}
+                    </div>
+                </Show>
                 <div class="outline-tree">
                     <For
                         each=move || layout_sig.get().anchors
@@ -95,12 +180,65 @@ pub fn OutlineContent(
                         children=move |anchor| {
                             let aclick = anchor.id.clone();
                             let title = anchor.name.clone();
+                            let rename_id = anchor.id.clone();
+                            let rename_title = anchor.name.clone();
+                            let delete_id = anchor.id.clone();
                             let (cx, cy) = (anchor.center_x, anchor.center_y);
                             view! {
                                 <div class="outline-item anchor" on:click=move |_| focus_anchor(aclick.clone())>
                                     <span class="outline-icon">"⚓"</span>
                                     <span class="outline-name">{title}</span>
                                     <span class="outline-pos">{format!("({:.0}, {:.0})", cx, cy)}</span>
+                                    <button
+                                        class="outline-anchor-action"
+                                        type="button"
+                                        title="Rename anchor"
+                                        aria-label="Rename anchor"
+                                        on:click=move |event: MouseEvent| {
+                                            event.stop_propagation();
+                                            let proposed = web_sys::window()
+                                                .and_then(|window| {
+                                                    window
+                                                        .prompt_with_message_and_default(
+                                                            "Rename anchor",
+                                                            &rename_title,
+                                                        )
+                                                        .ok()
+                                                        .flatten()
+                                                });
+                                            if let Some(name) = proposed {
+                                                let mut renamed = false;
+                                                layout_sig.update(|layout| {
+                                                    renamed = layout.rename_anchor(&rename_id, &name);
+                                                    if renamed {
+                                                        layout.save();
+                                                    }
+                                                });
+                                                anchor_error.set((!renamed).then(|| {
+                                                    "Use a non-empty, unique name".to_owned()
+                                                }));
+                                            }
+                                        }
+                                    >
+                                        "✎"
+                                    </button>
+                                    <button
+                                        class="outline-anchor-action danger"
+                                        type="button"
+                                        title="Delete anchor"
+                                        aria-label="Delete anchor"
+                                        on:click=move |event: MouseEvent| {
+                                            event.stop_propagation();
+                                            layout_sig.update(|layout| {
+                                                if layout.remove_anchor(&delete_id) {
+                                                    layout.save();
+                                                }
+                                            });
+                                            anchor_error.set(None);
+                                        }
+                                    >
+                                        "×"
+                                    </button>
                                 </div>
                             }
                         }

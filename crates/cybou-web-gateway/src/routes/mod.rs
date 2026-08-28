@@ -20,7 +20,10 @@ pub use actions::{actions_handler, recent_actions_handler};
 pub use agents::{agent_offers_handler, agents_handler, launch_agent_handler, stop_agent_handler};
 pub use auth::{login_handler, logout_handler, session_handler};
 pub use disclosure::disclosure_handler;
-pub use drafts::{UserDraftStore, delete_draft_handler, list_drafts_handler, save_draft_handler};
+pub use drafts::{
+    UserDraftStore, delete_draft_handler, draft_database_path, list_drafts_handler,
+    save_draft_handler,
+};
 pub use events::events_handler;
 pub use files::{
     create_file_handler, list_directory_handler, read_file_handler, write_file_handler,

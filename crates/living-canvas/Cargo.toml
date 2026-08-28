@@ -40,6 +40,7 @@ console_error_panic_hook = "0.1.7"
 # it refuses to compile until a randomness source is named, so enable the browser one here.
 uuid = { workspace = true, features = ["js"] }
 gloo-net = "0.6.0"
+gloo-timers = { version = "0.3.0", features = ["futures"] }
 leptos = { version = "0.8.15", features = ["csr"] }
 lucide-leptos = { version = "3.23.0", features = ["account", "files", "layout", "multimedia", "navigation", "security", "text"] }
 # Keep the generated bindings aligned with the exact CLI shipped by pinned nixpkgs-26.05.
@@ -57,6 +58,7 @@ web-sys = { version = "=0.3.103", features = [
     "KeyboardEvent",
     "Location",
     "MessageEvent",
+    "MediaQueryList",
     "Navigator",
     # For the browser interaction gate, which counts the cards a mount actually drew.
     "NodeList",
