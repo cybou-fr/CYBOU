@@ -55,6 +55,7 @@ web-sys = { version = "=0.3.103", features = [
     "EventSource",
     "EventTarget",
     "HtmlElement",
+    "HtmlTextAreaElement",
     "KeyboardEvent",
     "Location",
     "MessageEvent",

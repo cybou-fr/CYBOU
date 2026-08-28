@@ -2254,6 +2254,208 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   color: #a7f3d0;
   white-space: pre-wrap;
 }
+
+/* Search and Replace overlay in Editor */
+.editor-search-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(13, 23, 34, 0.95);
+  border-bottom: 1px solid rgba(154, 167, 184, 0.2);
+  backdrop-filter: blur(8px);
+}
+.editor-search-row,
+.editor-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.editor-search-toggle-replace {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.editor-search-toggle-replace:hover {
+  color: #fff;
+}
+.editor-search-input,
+.editor-replace-input {
+  flex: 1;
+  background: rgba(4, 9, 14, 0.8);
+  border: 1px solid rgba(154, 167, 184, 0.25);
+  border-radius: 4px;
+  padding: 3px 8px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+}
+.editor-search-input:focus,
+.editor-replace-input:focus {
+  border-color: var(--accent);
+}
+.editor-search-count {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 48px;
+  text-align: center;
+}
+.editor-search-btn,
+.editor-replace-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.editor-search-btn:hover:not(:disabled),
+.editor-replace-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.editor-search-btn.active {
+  background: rgba(112, 225, 200, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.editor-search-btn.close {
+  color: #f87171;
+}
+.editor-search-btn:disabled,
+.editor-replace-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Markdown Preview Typography */
+.md-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.md-empty {
+  color: var(--muted);
+  font-style: italic;
+  padding: 8px;
+}
+.md-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.md-h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f8fafc;
+  border-bottom: 1px solid rgba(154, 167, 184, 0.2);
+  padding-bottom: 4px;
+  margin: 0;
+}
+.md-h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f1f5f9;
+  border-bottom: 1px solid rgba(154, 167, 184, 0.15);
+  padding-bottom: 2px;
+  margin: 0;
+}
+.md-h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+}
+.md-h4, .md-h5, .md-h6 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin: 0;
+}
+.md-para {
+  margin: 0;
+  color: #cbd5e1;
+}
+.md-bold {
+  font-weight: 700;
+  color: #f8fafc;
+}
+.md-italic {
+  font-style: italic;
+}
+.md-inline-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #70e1c8;
+}
+.md-code-container {
+  background: rgba(4, 9, 14, 0.85);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.md-code-lang {
+  padding: 2px 8px;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(154, 167, 184, 0.1);
+}
+.md-code-block {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #a7f3d0;
+  overflow-x: auto;
+  white-space: pre;
+}
+.md-quote {
+  margin: 0;
+  padding: 4px 10px;
+  border-left: 3px solid #70e1c8;
+  background: rgba(112, 225, 200, 0.05);
+  color: #94a3b8;
+}
+.md-quote p {
+  margin: 0;
+}
+.md-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.md-list.ordered, .ordered {
+  list-style-type: decimal;
+}
+.md-list.unordered, .unordered {
+  list-style-type: disc;
+}
+.md-hr {
+  border: none;
+  border-top: 1px solid rgba(154, 167, 184, 0.2);
+  margin: 8px 0;
+}
+.md-link {
+  color: #38bdf8;
+  text-decoration: underline;
+}
 .editor-status-bar {
   display: flex;
   justify-content: space-between;

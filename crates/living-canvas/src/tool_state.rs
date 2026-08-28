@@ -306,6 +306,18 @@ pub struct EditorSignals {
     pub save_as_open: RwSignal<bool>,
     /// Relative jail path currently entered in Save As.
     pub save_as_path: RwSignal<String>,
+    /// Whether in-editor Search/Replace bar is visible.
+    pub search_open: RwSignal<bool>,
+    /// Whether replace mode is expanded in the search bar.
+    pub replace_mode: RwSignal<bool>,
+    /// Current search query string.
+    pub search_query: RwSignal<String>,
+    /// Current replace string.
+    pub replace_query: RwSignal<String>,
+    /// Whether search query matching is case-sensitive.
+    pub search_case_sensitive: RwSignal<bool>,
+    /// 0-indexed index of active highlighted match.
+    pub search_match_index: RwSignal<usize>,
 }
 
 /// What admitting a file into an editor did.
@@ -335,6 +347,12 @@ impl EditorSignals {
             autosave_generation: RwSignal::new(0),
             save_as_open: RwSignal::new(false),
             save_as_path: RwSignal::new(String::new()),
+            search_open: RwSignal::new(false),
+            replace_mode: RwSignal::new(false),
+            search_query: RwSignal::new(String::new()),
+            replace_query: RwSignal::new(String::new()),
+            search_case_sensitive: RwSignal::new(false),
+            search_match_index: RwSignal::new(0),
         }
     }
 
@@ -591,9 +609,88 @@ impl Default for ToolCardStates {
     }
 }
 
+/// Compute 1-indexed (line, column) for a given character offset within a text string.
+#[must_use]
+pub fn calculate_line_column(text: &str, char_offset: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut col = 1;
+    for (i, ch) in text.chars().enumerate() {
+        if i >= char_offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}
+
+/// Find all non-overlapping match character start and end offsets in text.
+#[must_use]
+pub fn find_matches(text: &str, query: &str, case_sensitive: bool) -> Vec<(usize, usize)> {
+    if query.is_empty() || text.is_empty() {
+        return Vec::new();
+    }
+    let mut matches = Vec::new();
+    let text_chars: Vec<char> = text.chars().collect();
+    let query_chars: Vec<char> = query.chars().collect();
+
+    if query_chars.is_empty() || text_chars.len() < query_chars.len() {
+        return matches;
+    }
+
+    let mut start_char = 0;
+    while start_char + query_chars.len() <= text_chars.len() {
+        let matches_here = if case_sensitive {
+            text_chars[start_char..start_char + query_chars.len()] == query_chars[..]
+        } else {
+            text_chars[start_char..start_char + query_chars.len()]
+                .iter()
+                .zip(query_chars.iter())
+                .all(|(a, b)| a.to_lowercase().eq(b.to_lowercase()))
+        };
+
+        if matches_here {
+            matches.push((start_char, start_char + query_chars.len()));
+            start_char += query_chars.len();
+        } else {
+            start_char += 1;
+        }
+    }
+    matches
+}
+
+/// Replace all occurrences of query in text with replacement string.
+#[must_use]
+pub fn replace_all_matches(
+    text: &str,
+    query: &str,
+    replacement: &str,
+    case_sensitive: bool,
+) -> (String, usize) {
+    let matches = find_matches(text, query, case_sensitive);
+    if matches.is_empty() {
+        return (text.to_string(), 0);
+    }
+    let count = matches.len();
+    let text_chars: Vec<char> = text.chars().collect();
+    let mut result = String::new();
+    let mut last_idx = 0;
+    for (start, end) in matches {
+        result.extend(&text_chars[last_idx..start]);
+        result.push_str(replacement);
+        last_idx = end;
+    }
+    result.extend(&text_chars[last_idx..]);
+    (result, count)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::EditorTab;
+    use super::*;
     use cybou_protocol::LocationRef;
     use cybou_web_contracts::UserDraftProjection;
 
@@ -635,5 +732,34 @@ mod tests {
         tab_b.autosave_generation += 1;
         assert_eq!(tab_a.autosave_generation, 1);
         assert_eq!(tab_b.autosave_generation, 1);
+    }
+
+    #[test]
+    fn calculates_line_and_column_positions() {
+        let text = "hello\nworld\ncybou";
+        assert_eq!(calculate_line_column(text, 0), (1, 1));
+        assert_eq!(calculate_line_column(text, 5), (1, 6));
+        assert_eq!(calculate_line_column(text, 6), (2, 1));
+        assert_eq!(calculate_line_column(text, 11), (2, 6));
+        assert_eq!(calculate_line_column(text, 12), (3, 1));
+        assert_eq!(calculate_line_column(text, 17), (3, 6));
+    }
+
+    #[test]
+    fn finds_matches_with_and_without_case_sensitivity() {
+        let text = "Cybou system cybou desktop CYBOU";
+        let insensitive = find_matches(text, "cybou", false);
+        assert_eq!(insensitive, vec![(0, 5), (13, 18), (27, 32)]);
+
+        let sensitive = find_matches(text, "cybou", true);
+        assert_eq!(sensitive, vec![(13, 18)]);
+    }
+
+    #[test]
+    fn replaces_all_matching_occurrences() {
+        let text = "Rust is great. I love rust.";
+        let (replaced, count) = replace_all_matches(text, "rust", "Go", false);
+        assert_eq!(count, 2);
+        assert_eq!(replaced, "Go is great. I love Go.");
     }
 }

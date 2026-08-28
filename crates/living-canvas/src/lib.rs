@@ -15,6 +15,7 @@ pub mod deck;
 pub mod heading;
 pub mod instant;
 pub mod layout;
+pub mod markdown;
 
 #[cfg(target_arch = "wasm32")]
 pub mod components;

@@ -8,7 +8,8 @@ use gloo_timers::future::TimeoutFuture;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use std::sync::Arc;
-use web_sys::{MouseEvent, PointerEvent};
+use wasm_bindgen::JsCast;
+use web_sys::{HtmlTextAreaElement, KeyboardEvent, MouseEvent, PointerEvent};
 
 use crate::{
     CardId, ClientError, DesktopItemId, DesktopLayout, GatewayMindClient, MindClient,
@@ -17,8 +18,9 @@ use crate::{
         icons::{IconFile, IconShield},
     },
     interaction::{DragState, ResizeState},
+    markdown::MarkdownPreview,
     state::RuntimeState,
-    tool_state::{EditorTab, FileConflict, ToolCardStates},
+    tool_state::{EditorTab, FileConflict, ToolCardStates, calculate_line_column},
 };
 
 fn open_conflict_diff(
@@ -76,6 +78,14 @@ pub fn EditorContent(
     let status_msg = state.status_msg;
     let save_as_open = state.save_as_open;
     let save_as_path = state.save_as_path;
+    let search_open = state.search_open;
+    let replace_mode = state.replace_mode;
+    let search_query = state.search_query;
+    let replace_query = state.replace_query;
+    let search_case_sensitive = state.search_case_sensitive;
+    let search_match_index = state.search_match_index;
+
+    let textarea_ref = NodeRef::<leptos::html::Textarea>::new();
     let layout = expect_context::<RwSignal<DesktopLayout>>();
     let set_selected = expect_context::<WriteSignal<Option<DesktopItemId>>>();
     let tool_states = expect_context::<ToolCardStates>();
@@ -128,6 +138,100 @@ pub fn EditorContent(
                 status_msg.set(Some(format!("Draft recovery autosave failed — {error}.")));
             }
         });
+    };
+
+    let current_matches = move || {
+        let q = search_query.get();
+        let cs = search_case_sensitive.get();
+        let content = active_tab().content;
+        crate::tool_state::find_matches(&content, &q, cs)
+    };
+
+    let focus_match = move |start: usize, end: usize| {
+        if let Some(textarea) = textarea_ref.get_untracked() {
+            let _ = textarea.focus();
+            let _ = textarea.set_selection_range(start as u32, end as u32);
+        }
+    };
+
+    let go_next_match = move || {
+        let matches = current_matches();
+        if matches.is_empty() {
+            return;
+        }
+        let next_idx = (search_match_index.get() + 1) % matches.len();
+        search_match_index.set(next_idx);
+        let (start, end) = matches[next_idx];
+        focus_match(start, end);
+    };
+
+    let go_prev_match = move || {
+        let matches = current_matches();
+        if matches.is_empty() {
+            return;
+        }
+        let cur = search_match_index.get();
+        let prev_idx = if cur == 0 {
+            matches.len().saturating_sub(1)
+        } else {
+            cur - 1
+        };
+        search_match_index.set(prev_idx);
+        let (start, end) = matches[prev_idx];
+        focus_match(start, end);
+    };
+
+    let trigger_replace_one = move || {
+        let matches = current_matches();
+        if matches.is_empty() {
+            return;
+        }
+        let idx = search_match_index
+            .get()
+            .min(matches.len().saturating_sub(1));
+        let (start, end) = matches[idx];
+        let tab = active_tab();
+        let chars: Vec<char> = tab.content.chars().collect();
+        if start <= chars.len() && end <= chars.len() {
+            let mut new_content = String::new();
+            new_content.extend(&chars[..start]);
+            new_content.push_str(&replace_query.get());
+            new_content.extend(&chars[end..]);
+            update_current_content(new_content);
+        }
+    };
+
+    let trigger_replace_all = move || {
+        let tab = active_tab();
+        let (new_content, count) = crate::tool_state::replace_all_matches(
+            &tab.content,
+            &search_query.get(),
+            &replace_query.get(),
+            search_case_sensitive.get(),
+        );
+        if count > 0 {
+            update_current_content(new_content);
+            status_msg.set(Some(format!("Replaced {count} occurrence(s).")));
+        }
+    };
+
+    let update_cursor_position = move |e: &web_sys::Event| {
+        if let Some(target) = e.target() {
+            if let Ok(textarea) = target.dyn_into::<HtmlTextAreaElement>() {
+                if let Ok(Some(start)) = textarea.selection_start() {
+                    let char_offset = start as usize;
+                    let active_content = active_tab().content;
+                    let (line, col) = calculate_line_column(&active_content, char_offset);
+                    let idx = active_tab_index.get();
+                    tabs.update(|all| {
+                        if let Some(tab) = all.get_mut(idx) {
+                            tab.line = line;
+                            tab.col = col;
+                        }
+                    });
+                }
+            }
+        }
     };
 
     let add_tab = move || {
@@ -392,7 +496,28 @@ pub fn EditorContent(
                 </div>
             }
         >
-            <div class="editor-body" on:pointerdown=move |e: PointerEvent| e.stop_propagation()>
+            <div
+                class="editor-body"
+                on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                on:keydown=move |e: KeyboardEvent| {
+                    if (e.ctrl_key() || e.meta_key()) && e.key().eq_ignore_ascii_case("f") {
+                        e.prevent_default();
+                        search_open.set(true);
+                        replace_mode.set(false);
+                    } else if (e.ctrl_key() || e.meta_key()) && e.key().eq_ignore_ascii_case("h") {
+                        e.prevent_default();
+                        search_open.set(true);
+                        replace_mode.set(true);
+                    } else if (e.ctrl_key() || e.meta_key()) && e.key().eq_ignore_ascii_case("s") {
+                        e.prevent_default();
+                        if matches!(active_tab().location, cybou_protocol::LocationRef::Draft { .. }) {
+                            save_as_open.set(true);
+                        } else {
+                            trigger_save();
+                        }
+                    }
+                }
+            >
                 <div class="editor-tab-bar">
                     <div class="editor-tabs">
                         <For
@@ -438,6 +563,16 @@ pub fn EditorContent(
                     </div>
 
                     <div class="editor-actions">
+                        <button
+                            class="editor-action-btn"
+                            class:active=move || search_open.get()
+                            title="Find & Replace (Ctrl+F / Ctrl+H)"
+                            on:click=move |_| {
+                                search_open.update(|o| *o = !*o);
+                            }
+                        >
+                            "Find"
+                        </button>
                         {move || {
                             let tab = active_tab();
                             if tab.language == "markdown" {
@@ -522,13 +657,129 @@ pub fn EditorContent(
 
                 <div class="editor-workspace" class:split-view=move || markdown_preview.get()>
                     <div class="editor-code-container">
+                        <Show when=move || search_open.get()>
+                            <div class="editor-search-bar">
+                                <div class="editor-search-row">
+                                    <button
+                                        class="editor-search-toggle-replace"
+                                        title="Toggle Replace"
+                                        on:click=move |_| replace_mode.update(|m| *m = !*m)
+                                    >
+                                        {move || if replace_mode.get() { "▾" } else { "▸" }}
+                                    </button>
+                                    <input
+                                        type="text"
+                                        class="editor-search-input"
+                                        placeholder="Find in document…"
+                                        prop:value=move || search_query.get()
+                                        on:input=move |e| {
+                                            search_query.set(event_target_value(&e));
+                                            search_match_index.set(0);
+                                        }
+                                        on:keydown=move |e: KeyboardEvent| {
+                                            if e.key() == "Enter" {
+                                                if e.shift_key() {
+                                                    go_prev_match();
+                                                } else {
+                                                    go_next_match();
+                                                }
+                                            } else if e.key() == "Escape" {
+                                                search_open.set(false);
+                                            }
+                                        }
+                                    />
+                                    <span class="editor-search-count">
+                                        {move || {
+                                            let matches = current_matches();
+                                            if search_query.get().is_empty() {
+                                                "No search".to_string()
+                                            } else if matches.is_empty() {
+                                                "0 matches".to_string()
+                                            } else {
+                                                format!("{} of {}", search_match_index.get() + 1, matches.len())
+                                            }
+                                        }}
+                                    </span>
+                                    <button
+                                        class="editor-search-btn"
+                                        title="Previous Match (Shift+Enter)"
+                                        disabled=move || current_matches().is_empty()
+                                        on:click=move |_| go_prev_match()
+                                    >
+                                        "↑"
+                                    </button>
+                                    <button
+                                        class="editor-search-btn"
+                                        title="Next Match (Enter)"
+                                        disabled=move || current_matches().is_empty()
+                                        on:click=move |_| go_next_match()
+                                    >
+                                        "↓"
+                                    </button>
+                                    <button
+                                        class="editor-search-btn"
+                                        class:active=move || search_case_sensitive.get()
+                                        title="Match Case"
+                                        on:click=move |_| search_case_sensitive.update(|c| *c = !*c)
+                                    >
+                                        "Aa"
+                                    </button>
+                                    <button
+                                        class="editor-search-btn close"
+                                        title="Close (Esc)"
+                                        on:click=move |_| search_open.set(false)
+                                    >
+                                        "×"
+                                    </button>
+                                </div>
+
+                                <Show when=move || replace_mode.get()>
+                                    <div class="editor-replace-row">
+                                        <input
+                                            type="text"
+                                            class="editor-replace-input"
+                                            placeholder="Replace with…"
+                                            prop:value=move || replace_query.get()
+                                            on:input=move |e| replace_query.set(event_target_value(&e))
+                                            on:keydown=move |e: KeyboardEvent| {
+                                                if e.key() == "Enter" {
+                                                    trigger_replace_one();
+                                                } else if e.key() == "Escape" {
+                                                    search_open.set(false);
+                                                }
+                                            }
+                                        />
+                                        <button
+                                            class="editor-replace-btn"
+                                            disabled=move || current_matches().is_empty()
+                                            on:click=move |_| trigger_replace_one()
+                                        >
+                                            "Replace"
+                                        </button>
+                                        <button
+                                            class="editor-replace-btn"
+                                            disabled=move || current_matches().is_empty()
+                                            on:click=move |_| trigger_replace_all()
+                                        >
+                                            "Replace All"
+                                        </button>
+                                    </div>
+                                </Show>
+                            </div>
+                        </Show>
                         <textarea
                             class="editor-textarea"
+                            node_ref=textarea_ref
                             spellcheck="false"
                             prop:value=move || active_tab().content
                             on:input=move |e| {
-                                update_current_content(event_target_value(&e));
+                                let val = event_target_value(&e);
+                                update_current_content(val);
+                                update_cursor_position(&e.clone().into());
                             }
+                            on:click=move |e| update_cursor_position(&e.clone().into())
+                            on:keyup=move |e| update_cursor_position(&e.clone().into())
+                            on:select=move |e| update_cursor_position(&e.clone().into())
                         />
                     </div>
 
@@ -536,7 +787,7 @@ pub fn EditorContent(
                         <div class="editor-preview-container">
                             <div class="editor-preview-header">"Markdown Preview"</div>
                             <div class="editor-preview-content">
-                                <pre class="editor-preview-raw">{move || active_tab().content}</pre>
+                                <MarkdownPreview content=Signal::derive(move || active_tab().content) />
                             </div>
                         </div>
                     </Show>
@@ -544,7 +795,7 @@ pub fn EditorContent(
 
                 <div class="editor-status-bar">
                     <div class="editor-status-left">
-                        <span>"Ln 1, Col 1"</span>
+                        <span>{move || format!("Ln {}, Col {}", active_tab().line, active_tab().col)}</span>
                         <span>"UTF-8"</span>
                         <span>"LF"</span>
                         <span class="editor-lang-badge">{move || active_tab().language}</span>
