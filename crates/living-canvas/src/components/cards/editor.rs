@@ -3,7 +3,9 @@
 
 //! Text and configuration editor tool card component (ADR-0045).
 
-use cybou_web_contracts::{SessionMode, UserDraftSaveRequest};
+use cybou_web_contracts::{
+    HostFileCreateRequest, HostFileWriteRequest, SessionMode, UserDraftSaveRequest,
+};
 use gloo_timers::future::TimeoutFuture;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -295,6 +297,104 @@ pub fn EditorContent(
         let tab = active_tab();
         if tab.location.requires_action_authorization() {
             save_proposal_open.set(true);
+        } else if let cybou_protocol::LocationRef::HostUserPath(ref path) = tab.location {
+            let Some(expected_sha256) = tab.expected_sha256.clone() else {
+                status_msg.set(Some(
+                    "Save refused — this buffer has no server-established content version."
+                        .to_string(),
+                ));
+                return;
+            };
+            let idx = active_tab_index.get();
+            let host_req = HostFileWriteRequest {
+                path: path.clone(),
+                text: tab.content.clone(),
+                expected_sha256: Some(expected_sha256),
+            };
+            let path_for_async = path.clone();
+            let recovery_id = tab.recovery_id;
+            status_msg.set(Some("Saving to Home storage…".to_string()));
+            spawn_local(async move {
+                match GatewayMindClient.host_write_file(&host_req).await {
+                    Ok(saved) => {
+                        let written_text = host_req.text;
+                        tabs.update(|all| {
+                            if let Some(current) = all.get_mut(idx) {
+                                current.original_content = written_text.clone();
+                                current.recovered_unsaved = false;
+                                current.dirty = current.content != written_text;
+                                current.expected_sha256 = Some(saved.content_sha256);
+                                current.conflict = None;
+                            }
+                        });
+                        let changed_while_saving = tabs
+                            .get_untracked()
+                            .get(idx)
+                            .is_some_and(|current| current.dirty);
+                        status_msg.set(Some(if changed_while_saving {
+                            format!(
+                                "Saved to Home ({} bytes); newer buffer changes remain unsaved.",
+                                saved.size_bytes
+                            )
+                        } else {
+                            format!("Saved to Home ({} bytes).", saved.size_bytes)
+                        }));
+                        if changed_while_saving {
+                            if let Some(tab) = tabs.get_untracked().get(idx).cloned() {
+                                let base_location = (!matches!(
+                                    tab.location,
+                                    cybou_protocol::LocationRef::Draft { .. }
+                                ))
+                                .then_some(tab.location);
+                                let save_request = UserDraftSaveRequest {
+                                    draft_id: tab.recovery_id,
+                                    title: tab.name,
+                                    content: tab.content,
+                                    base_location,
+                                    base_sha256: tab.expected_sha256,
+                                };
+                                let _ = GatewayMindClient.save_draft(&save_request).await;
+                            }
+                        } else {
+                            let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+                        }
+                    }
+                    Err(ClientError::FileChangedSinceRead) => {
+                        match GatewayMindClient.host_read_file(&path_for_async).await {
+                            Ok(fresh) => {
+                                tabs.update(|all| {
+                                    if let Some(current) = all.get_mut(idx) {
+                                        current.conflict = Some(FileConflict {
+                                            server_content: fresh.text,
+                                            server_sha256: fresh.content_sha256,
+                                        });
+                                    }
+                                });
+                                if let Some(conflicted_tab) =
+                                    tabs.get_untracked().get(idx).cloned()
+                                {
+                                    open_conflict_diff(
+                                        conflicted_tab,
+                                        tool_states,
+                                        layout,
+                                        set_selected,
+                                    );
+                                }
+                                status_msg.set(Some(
+                                    "Save stopped because the file changed on the host. An unsaved buffer diff is open."
+                                        .to_string(),
+                                ));
+                            }
+                            Err(error) => status_msg.set(Some(format!(
+                                "Save stopped because the file changed, but reload failed: {error}."
+                            ))),
+                        }
+                    }
+                    Err(error) => status_msg.set(Some(format!(
+                        "Save failed — {error}. The editor buffer remains unsaved."
+                    ))),
+                }
+            });
         } else if matches!(
             tab.location,
             cybou_protocol::LocationRef::SafeShellJail { .. }
@@ -415,73 +515,107 @@ pub fn EditorContent(
     let trigger_save_as = move || {
         let path = save_as_path.get_untracked();
         if path.trim().is_empty() {
-            status_msg.set(Some("Save As requires a relative jail path.".to_string()));
+            status_msg.set(Some("Save As requires a relative jail path or absolute user path.".to_string()));
             return;
         }
         let idx = active_tab_index.get_untracked();
         let tab = active_tab();
         let recovery_id = tab.recovery_id.clone();
-        let request = cybou_web_contracts::FileCreateRequest {
-            path: path.clone(),
-            text: tab.content.clone(),
-        };
+        let is_host_path = path.starts_with('/') || path.starts_with('~');
+
         status_msg.set(Some("Creating file exclusively…".to_string()));
         spawn_local(async move {
-            match GatewayMindClient.create_text_file(&request).await {
-                Ok(created) => {
-                    tabs.update(|all| {
-                        if let Some(current) = all.get_mut(idx)
-                            && current.recovery_id == recovery_id
-                        {
-                            current.name = path.rsplit('/').next().unwrap_or(&path).to_string();
-                            current.location = created.location;
-                            current.original_content = request.text.clone();
-                            current.expected_sha256 = Some(created.content_sha256);
-                            current.recovered_unsaved = false;
-                            current.dirty = current.content != request.text;
-                            current.conflict = None;
-                        }
-                    });
-                    save_as_open.set(false);
-                    save_as_path.set(String::new());
-                    let changed_while_saving = tabs
-                        .get_untracked()
-                        .get(idx)
-                        .is_some_and(|current| current.dirty);
-                    status_msg.set(Some(if changed_while_saving {
-                        format!(
-                            "Created and verified ({} bytes); newer buffer changes remain unsaved.",
-                            created.size_bytes
-                        )
-                    } else {
-                        format!("Created and verified ({} bytes).", created.size_bytes)
-                    }));
-                    if changed_while_saving {
-                        if let Some(tab) = tabs.get_untracked().get(idx).cloned() {
-                            let base_location = (!matches!(
-                                tab.location,
-                                cybou_protocol::LocationRef::Draft { .. }
-                            ))
-                            .then_some(tab.location);
-                            let save_request = UserDraftSaveRequest {
-                                draft_id: tab.recovery_id,
-                                title: tab.name,
-                                content: tab.content,
-                                base_location,
-                                base_sha256: tab.expected_sha256,
-                            };
-                            let _ = GatewayMindClient.save_draft(&save_request).await;
-                        }
-                    } else {
-                        let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+            if is_host_path {
+                let req = HostFileCreateRequest {
+                    path: path.clone(),
+                    text: tab.content.clone(),
+                    exclusive: true,
+                };
+                match GatewayMindClient.host_create_file(&req).await {
+                    Ok(created) => {
+                        tabs.update(|all| {
+                            if let Some(current) = all.get_mut(idx)
+                                && current.recovery_id == recovery_id
+                            {
+                                current.name = path.rsplit('/').next().unwrap_or(&path).to_string();
+                                current.location = created.location;
+                                current.original_content = req.text.clone();
+                                current.expected_sha256 = Some(created.content_sha256);
+                                current.recovered_unsaved = false;
+                                current.dirty = current.content != req.text;
+                                current.conflict = None;
+                            }
+                        });
+                        save_as_open.set(false);
+                        save_as_path.set(String::new());
+                        status_msg.set(Some(format!("Created and verified on Home ({} bytes).", created.size_bytes)));
+                    }
+                    Err(err) => {
+                        status_msg.set(Some(format!("Save As failed: {err}")));
                     }
                 }
-                Err(ClientError::FileAlreadyExists) => status_msg.set(Some(
-                    "Save As stopped — that file already exists. Choose another path.".to_string(),
-                )),
-                Err(error) => status_msg.set(Some(format!(
-                    "Save As failed — {error}. The editor buffer remains recoverable."
-                ))),
+            } else {
+                let request = cybou_web_contracts::FileCreateRequest {
+                    path: path.clone(),
+                    text: tab.content.clone(),
+                };
+                match GatewayMindClient.create_text_file(&request).await {
+                    Ok(created) => {
+                        tabs.update(|all| {
+                            if let Some(current) = all.get_mut(idx)
+                                && current.recovery_id == recovery_id
+                            {
+                                current.name = path.rsplit('/').next().unwrap_or(&path).to_string();
+                                current.location = created.location;
+                                current.original_content = request.text.clone();
+                                current.expected_sha256 = Some(created.content_sha256);
+                                current.recovered_unsaved = false;
+                                current.dirty = current.content != request.text;
+                                current.conflict = None;
+                            }
+                        });
+                        save_as_open.set(false);
+                        save_as_path.set(String::new());
+                        let changed_while_saving = tabs
+                            .get_untracked()
+                            .get(idx)
+                            .is_some_and(|current| current.dirty);
+                        status_msg.set(Some(if changed_while_saving {
+                            format!(
+                                "Created and verified ({} bytes); newer buffer changes remain unsaved.",
+                                created.size_bytes
+                            )
+                        } else {
+                            format!("Created and verified ({} bytes).", created.size_bytes)
+                        }));
+                        if changed_while_saving {
+                            if let Some(tab) = tabs.get_untracked().get(idx).cloned() {
+                                let base_location = (!matches!(
+                                    tab.location,
+                                    cybou_protocol::LocationRef::Draft { .. }
+                                ))
+                                .then_some(tab.location);
+                                let save_request = UserDraftSaveRequest {
+                                    draft_id: tab.recovery_id,
+                                    title: tab.name,
+                                    content: tab.content,
+                                    base_location,
+                                    base_sha256: tab.expected_sha256,
+                                };
+                                let _ = GatewayMindClient.save_draft(&save_request).await;
+                            }
+                        } else {
+                            let _ = GatewayMindClient.delete_draft(&recovery_id).await;
+                        }
+                    }
+                    Err(ClientError::FileAlreadyExists) => {
+                        status_msg.set(Some(
+                            "Save As failed: file already exists. Choose a different name or path."
+                                .to_string(),
+                        ));
+                    }
+                    Err(error) => status_msg.set(Some(format!("Save As failed: {error}."))),
+                }
             }
         });
     };

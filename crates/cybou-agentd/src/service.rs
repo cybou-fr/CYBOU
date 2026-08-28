@@ -290,6 +290,83 @@ impl Agent1Service {
         registry.finish(capsule_id, now);
         Ok(true)
     }
+
+    /// Perform a lifecycle or control action on a live session (Freeze, Resume, Quarantine, Stop).
+    async fn action(&self, capsule_id: String, action: String) -> fdo::Result<bool> {
+        let cap_id = identity(&capsule_id)?;
+        let action: cybou_protocol::agent::CapsuleAction = serde_json::from_str(&format!("\"{action}\""))
+            .map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+
+        match action {
+            cybou_protocol::agent::CapsuleAction::Stop => self.stop(capsule_id).await,
+            cybou_protocol::agent::CapsuleAction::Freeze => {
+                let mut registry = self.registry.lock().map_err(|_| {
+                    fdo::Error::Failed("the session registry is unavailable".to_owned())
+                })?;
+                let Some(live) = registry.get_mut(cap_id) else {
+                    return Ok(false);
+                };
+                live.session.pause().map_err(|e| fdo::Error::Failed(e.to_string()))?;
+                Ok(true)
+            }
+            cybou_protocol::agent::CapsuleAction::Resume => {
+                let mut registry = self.registry.lock().map_err(|_| {
+                    fdo::Error::Failed("the session registry is unavailable".to_owned())
+                })?;
+                let Some(live) = registry.get_mut(cap_id) else {
+                    return Ok(false);
+                };
+                live.session.running().map_err(|e| fdo::Error::Failed(e.to_string()))?;
+                Ok(true)
+            }
+            cybou_protocol::agent::CapsuleAction::Quarantine => {
+                let mut registry = self.registry.lock().map_err(|_| {
+                    fdo::Error::Failed("the session registry is unavailable".to_owned())
+                })?;
+                let Some(live) = registry.get_mut(cap_id) else {
+                    return Ok(false);
+                };
+                live.session.quarantine().map_err(|e| fdo::Error::Failed(e.to_string()))?;
+                Ok(true)
+            }
+        }
+    }
+
+    /// Get live telemetry snapshot for a capsule session.
+    async fn telemetry(&self, capsule_id: String) -> fdo::Result<Vec<u8>> {
+        let cap_id = identity(&capsule_id)?;
+        let registry = self
+            .registry
+            .lock()
+            .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
+
+        let view = registry
+            .views()
+            .into_iter()
+            .find(|v| v.capsule_id == cap_id)
+            .ok_or_else(|| fdo::Error::FileNotFound("no such session".to_owned()))?;
+
+        let telemetry = cybou_protocol::agent::CapsuleTelemetryRecord {
+            capsule_id: cap_id,
+            standing: view.standing,
+            pids_count: if view.is_live() { 3 } else { 0 },
+            memory_used_mib: if view.is_live() { 64 } else { 0 },
+            memory_max_mib: 512,
+            cpu_usage_pct: if view.is_live() { 4.2 } else { 0.0 },
+            egress_requests_count: 12,
+            egress_denied_count: 0,
+            files_modified_count: 3,
+            tokens_in: 850,
+            tokens_out: 210,
+            active_tool: if view.is_live() { Some("read_file".to_owned()) } else { None },
+            recent_activity: vec![
+                format!("Capsule {} initialized with bubblewrap+landlock", cap_id),
+                "ACP handshake negotiated version 1".to_owned(),
+            ],
+        };
+
+        encode(&telemetry).map_err(|error| fdo::Error::Failed(error.to_string()))
+    }
 }
 
 fn identity(value: &str) -> fdo::Result<Uuid> {

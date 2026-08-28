@@ -53,6 +53,48 @@ pub enum CardId {
     Diff(u32),
     /// Universal contextual entity inspector panel (ADR-0046 §5).
     Inspector(u32),
+    /// Server-owned background operations and tasks monitor.
+    Operations(u32),
+    /// Real-time attention, evidence, system, and agent notifications center.
+    Notifications(u32),
+    /// System services and daemons manager.
+    Services(u32),
+    /// Operating system processes manager.
+    Processes(u32),
+    /// Hardware telemetry and resource monitor.
+    Monitor(u32),
+    /// System and journald log viewer.
+    SystemLogs(u32),
+    /// Btrfs storage subvolumes and point-in-time snapshots manager.
+    Storage(u32),
+    /// Network interfaces, Wi-Fi, and VPN tunnels manager.
+    Network(u32),
+    /// Software package repository search and installation manager.
+    Packages(u32),
+    /// Governed system and kernel updates manager.
+    Updates(u32),
+    /// User accounts, PAM profile, and SSH authorized keys settings.
+    UserSettings(u32),
+    /// System sandboxing policy (Landlock, Bubblewrap, Seccomp) and security audit log.
+    Security(u32),
+    /// Automated Borg deduplicating backups and snapshot archives.
+    Backup(u32),
+    /// Personal electronic mail client.
+    Mail(u32),
+    /// Personal calendar and cognitive event scheduler.
+    Calendar(u32),
+    /// Personal Markdown knowledge notes with cognitive subject links.
+    Notes(u32),
+    /// Personal address book and subject contacts directory.
+    Contacts(u32),
+    /// Deep unified Cognitive Graph & causal DAG explorer.
+    CognitiveGraph(u32),
+    /// Canonical Event1 chronological journal viewer.
+    EventJournal(u32),
+    /// Deterministic Meaning1 natural language interpreter and qualified dialogue assistant.
+    Meaning(u32),
+    /// Lifelong learning candidate evaluation, artifact lineages, and capability governance.
+    Learning(u32),
     /// Canvas Outline non-spatial accessibility tree view (ADR-0046 §22, §29).
     Outline,
 }
@@ -100,6 +142,27 @@ impl CardId {
             Self::Editor(_) => "editor",
             Self::Diff(_) => "diff",
             Self::Inspector(_) => "inspector",
+            Self::Operations(_) => "operations",
+            Self::Notifications(_) => "notifications",
+            Self::Services(_) => "services",
+            Self::Processes(_) => "processes",
+            Self::Monitor(_) => "monitor",
+            Self::SystemLogs(_) => "system-logs",
+            Self::Storage(_) => "storage",
+            Self::Network(_) => "network",
+            Self::Packages(_) => "packages",
+            Self::Updates(_) => "updates",
+            Self::UserSettings(_) => "user-settings",
+            Self::Security(_) => "security",
+            Self::Backup(_) => "backup",
+            Self::Mail(_) => "mail",
+            Self::Calendar(_) => "calendar",
+            Self::Notes(_) => "notes",
+            Self::Contacts(_) => "contacts",
+            Self::CognitiveGraph(_) => "cognitive-graph",
+            Self::EventJournal(_) => "event-journal",
+            Self::Meaning(_) => "meaning",
+            Self::Learning(_) => "learning",
             Self::Outline => "outline",
         }
     }
@@ -116,7 +179,28 @@ impl CardId {
             | Self::JournalFeed(instance)
             | Self::Editor(instance)
             | Self::Diff(instance)
-            | Self::Inspector(instance) => format!("{}:{instance}", self.key()),
+            | Self::Inspector(instance)
+            | Self::Operations(instance)
+            | Self::Notifications(instance)
+            | Self::Services(instance)
+            | Self::Processes(instance)
+            | Self::Monitor(instance)
+            | Self::SystemLogs(instance)
+            | Self::Storage(instance)
+            | Self::Network(instance)
+            | Self::Packages(instance)
+            | Self::Updates(instance)
+            | Self::UserSettings(instance)
+            | Self::Security(instance)
+            | Self::Backup(instance)
+            | Self::Mail(instance)
+            | Self::Calendar(instance)
+            | Self::Notes(instance)
+            | Self::Contacts(instance)
+            | Self::CognitiveGraph(instance)
+            | Self::EventJournal(instance)
+            | Self::Meaning(instance)
+            | Self::Learning(instance) => format!("{}:{instance}", self.key()),
             _ => self.key().to_string(),
         }
     }
@@ -154,6 +238,27 @@ impl CardId {
             Self::Editor(_) => "Text Editor",
             Self::Diff(_) => "Diff Viewer",
             Self::Inspector(_) => "Universal Inspector",
+            Self::Operations(_) => "Operations",
+            Self::Notifications(_) => "Notifications",
+            Self::Services(_) => "Services",
+            Self::Processes(_) => "Processes",
+            Self::Monitor(_) => "System Monitor",
+            Self::SystemLogs(_) => "System Logs",
+            Self::Storage(_) => "Storage & Snapshots",
+            Self::Network(_) => "Network Connections",
+            Self::Packages(_) => "Package Manager",
+            Self::Updates(_) => "System Updates",
+            Self::UserSettings(_) => "Users & SSH Keys",
+            Self::Security(_) => "Security & Sandboxing",
+            Self::Backup(_) => "Backup & Vault",
+            Self::Mail(_) => "Mail & Messages",
+            Self::Calendar(_) => "Calendar & Schedule",
+            Self::Notes(_) => "Notes & Ideas",
+            Self::Contacts(_) => "Contacts Directory",
+            Self::CognitiveGraph(_) => "Cognitive Graph & Causal DAG",
+            Self::EventJournal(_) => "Canonical Event1 Journal",
+            Self::Meaning(_) => "Meaning & Dialogue Assistant",
+            Self::Learning(_) => "Lifelong Learning & Governance",
             Self::Outline => "Canvas Outline",
         }
     }
@@ -182,6 +287,27 @@ impl CardId {
             "editor" => Some(Self::Editor(0)),
             "diff" => Some(Self::Diff(0)),
             "inspector" => Some(Self::Inspector(0)),
+            "operations" => Some(Self::Operations(0)),
+            "notifications" => Some(Self::Notifications(0)),
+            "services" => Some(Self::Services(0)),
+            "processes" => Some(Self::Processes(0)),
+            "monitor" => Some(Self::Monitor(0)),
+            "system-logs" => Some(Self::SystemLogs(0)),
+            "storage" => Some(Self::Storage(0)),
+            "network" => Some(Self::Network(0)),
+            "packages" => Some(Self::Packages(0)),
+            "updates" => Some(Self::Updates(0)),
+            "user-settings" | "users" => Some(Self::UserSettings(0)),
+            "security" => Some(Self::Security(0)),
+            "backup" => Some(Self::Backup(0)),
+            "mail" => Some(Self::Mail(0)),
+            "calendar" => Some(Self::Calendar(0)),
+            "notes" => Some(Self::Notes(0)),
+            "contacts" => Some(Self::Contacts(0)),
+            "cognitive-graph" | "cognitive" => Some(Self::CognitiveGraph(0)),
+            "event-journal" => Some(Self::EventJournal(0)),
+            "meaning" | "assistant" | "dialogue" => Some(Self::Meaning(0)),
+            "learning" | "skills" | "adaptation" => Some(Self::Learning(0)),
             "outline" => Some(Self::Outline),
             _ => None,
         }
@@ -463,6 +589,258 @@ impl CardId {
                 min_size: (280.0, 320.0),
                 max_size: (800.0, 900.0),
             },
+            Self::Operations(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 420.0),
+                min_size: (360.0, 260.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Notifications(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (520.0, 440.0),
+                min_size: (340.0, 260.0),
+                max_size: (1000.0, 900.0),
+            },
+            Self::Services(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (580.0, 420.0),
+                min_size: (360.0, 260.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Processes(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (600.0, 440.0),
+                min_size: (380.0, 260.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Monitor(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 460.0),
+                min_size: (380.0, 300.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::SystemLogs(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (600.0, 420.0),
+                min_size: (380.0, 260.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Storage(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (580.0, 440.0),
+                min_size: (380.0, 280.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Network(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 420.0),
+                min_size: (360.0, 260.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Packages(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (600.0, 460.0),
+                min_size: (380.0, 280.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Updates(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 420.0),
+                min_size: (360.0, 260.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::UserSettings(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (580.0, 440.0),
+                min_size: (380.0, 280.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Security(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 440.0),
+                min_size: (360.0, 280.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Backup(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (580.0, 460.0),
+                min_size: (380.0, 280.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Mail(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (640.0, 480.0),
+                min_size: (400.0, 300.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Calendar(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (600.0, 460.0),
+                min_size: (380.0, 280.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Notes(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (580.0, 460.0),
+                min_size: (360.0, 280.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::Contacts(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (560.0, 440.0),
+                min_size: (360.0, 280.0),
+                max_size: (1200.0, 900.0),
+            },
+            Self::CognitiveGraph(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (680.0, 500.0),
+                min_size: (420.0, 320.0),
+                max_size: (1600.0, 1200.0),
+            },
+            Self::EventJournal(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (640.0, 460.0),
+                min_size: (380.0, 280.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Meaning(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (600.0, 480.0),
+                min_size: (380.0, 280.0),
+                max_size: (1400.0, 1000.0),
+            },
+            Self::Learning(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                default_size: (620.0, 480.0),
+                min_size: (380.0, 280.0),
+                max_size: (1400.0, 1000.0),
+            },
             Self::Outline => CardSpec {
                 kind: CardKind::Tool,
                 singleton: true,
@@ -730,6 +1108,15 @@ mod tests {
             CardId::FileManager(7).instance_key(),
             CardId::Editor(7).instance_key()
         );
+        assert_eq!(CardId::UserSettings(2).instance_key(), "user-settings:2");
+        assert_eq!(CardId::Security(3).instance_key(), "security:3");
+        assert_eq!(CardId::Backup(4).instance_key(), "backup:4");
+        assert_eq!(CardId::Mail(5).instance_key(), "mail:5");
+        assert_eq!(CardId::Calendar(6).instance_key(), "calendar:6");
+        assert_eq!(CardId::Notes(7).instance_key(), "notes:7");
+        assert_eq!(CardId::Contacts(8).instance_key(), "contacts:8");
+        assert_eq!(CardId::CognitiveGraph(9).instance_key(), "cognitive-graph:9");
+        assert_eq!(CardId::EventJournal(10).instance_key(), "event-journal:10");
         assert_eq!(CardId::Identity.instance_key(), "identity");
     }
 }

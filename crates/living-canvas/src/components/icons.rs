@@ -228,3 +228,137 @@ pub fn IconCopy(#[prop(default = 13)] size: u32) -> impl IntoView {
         </svg>
     }
 }
+
+#[component]
+pub fn IconSearch(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconTrash(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconEdit(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconBot(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="14" x="3" y="6" rx="2"></rect>
+            <line x1="12" y1="2" x2="12" y2="6"></line>
+            <line x1="8" y1="12" x2="8" y2="12.01"></line>
+            <line x1="16" y1="12" x2="16" y2="12.01"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconPlus(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconFolderPlus(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+            <line x1="12" y1="10" x2="12" y2="16"></line>
+            <line x1="9" y1="13" x2="15" y2="13"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconBell(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconActivity(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconCheckCircle(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconAlertTriangle(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconAlertCircle(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconInfo(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+    }
+}
+
+#[component]
+pub fn IconStop(#[prop(default = 13)] size: u32) -> impl IntoView {
+    view! {
+        <svg width=size.to_string() height=size.to_string() viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        </svg>
+    }
+}

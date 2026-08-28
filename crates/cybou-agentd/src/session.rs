@@ -70,6 +70,10 @@ pub enum SessionState {
     Launching,
     /// The agent is up and working inside its capsule.
     Running,
+    /// The capsule is paused / frozen.
+    Paused,
+    /// The capsule is quarantined.
+    Quarantined,
     /// The ending has begun: the reason is fixed and teardown is under way.
     Ending(SessionEnd),
     /// Teardown finished.
@@ -175,10 +179,39 @@ impl Session {
     /// and recording it as one would show a person a live agent that no longer has a capsule.
     pub fn running(&mut self) -> Result<(), CannotTransition> {
         match &self.state {
-            SessionState::Launching | SessionState::Running => {
+            SessionState::Launching | SessionState::Running | SessionState::Paused | SessionState::Quarantined => {
                 self.state = SessionState::Running;
                 Ok(())
             }
+            SessionState::Ending(end) | SessionState::Ended(end) => {
+                Err(CannotTransition::AlreadyEnding(end.clone()))
+            }
+        }
+    }
+
+    /// Pause / freeze the capsule processes.
+    pub fn pause(&mut self) -> Result<(), CannotTransition> {
+        match &self.state {
+            SessionState::Launching | SessionState::Running => {
+                self.state = SessionState::Paused;
+                Ok(())
+            }
+            SessionState::Paused => Ok(()),
+            SessionState::Quarantined => Ok(()),
+            SessionState::Ending(end) | SessionState::Ended(end) => {
+                Err(CannotTransition::AlreadyEnding(end.clone()))
+            }
+        }
+    }
+
+    /// Quarantine the capsule (freeze and isolate).
+    pub fn quarantine(&mut self) -> Result<(), CannotTransition> {
+        match &self.state {
+            SessionState::Launching | SessionState::Running | SessionState::Paused => {
+                self.state = SessionState::Quarantined;
+                Ok(())
+            }
+            SessionState::Quarantined => Ok(()),
             SessionState::Ending(end) | SessionState::Ended(end) => {
                 Err(CannotTransition::AlreadyEnding(end.clone()))
             }
@@ -191,7 +224,7 @@ impl Session {
     /// began the ending, so a caller can run teardown exactly once without tracking that separately.
     pub fn begin_ending(&mut self, reason: SessionEnd) -> bool {
         match self.state {
-            SessionState::Launching | SessionState::Running => {
+            SessionState::Launching | SessionState::Running | SessionState::Paused | SessionState::Quarantined => {
                 self.state = SessionState::Ending(reason);
                 true
             }
@@ -207,7 +240,7 @@ impl Session {
     pub fn finish_ending(&mut self, at: OffsetDateTime) {
         let reason = match &self.state {
             SessionState::Ending(reason) | SessionState::Ended(reason) => reason.clone(),
-            SessionState::Launching | SessionState::Running => {
+            SessionState::Launching | SessionState::Running | SessionState::Paused | SessionState::Quarantined => {
                 SessionEnd::Failed("teardown ran with no recorded reason".to_owned())
             }
         };

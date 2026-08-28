@@ -24,6 +24,7 @@ pub mod observation;
 // that the corresponding behaviour exists.
 pub mod action;
 pub mod agent;
+pub mod cognitive;
 pub mod disclosure;
 pub mod epistemic;
 pub mod governance;
@@ -31,9 +32,13 @@ pub mod learning;
 pub mod location;
 pub mod meaning;
 pub mod model;
+pub mod notification;
+pub mod operation;
+pub mod personal;
 pub mod promotion;
 pub mod security;
 pub mod subject;
+pub mod system;
 pub mod telemetry;
 
 pub use admission::Kind;

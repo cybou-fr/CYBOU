@@ -138,6 +138,18 @@ pub enum GatewayError {
     /// A resume cursor is malformed or exceeds the bounded header budget.
     #[error("event resume cursor is invalid")]
     InvalidCursor,
+    /// Resource was not found.
+    #[error("resource not found")]
+    NotFound,
+    /// Conflicting state or resource already modified.
+    #[error("resource conflict")]
+    Conflict,
+    /// Operation or action was refused.
+    #[error("operation refused")]
+    Refused,
+    /// Internal failure.
+    #[error("internal gateway error")]
+    Internal,
 }
 
 /// Error payload serialised to HTTP responses.
@@ -161,6 +173,10 @@ impl IntoResponse for GatewayError {
                 (StatusCode::BAD_GATEWAY, "invalidPresenceProjection", false)
             }
             Self::InvalidCursor => (StatusCode::BAD_REQUEST, "invalidEventCursor", false),
+            Self::NotFound => (StatusCode::NOT_FOUND, "notFound", false),
+            Self::Conflict => (StatusCode::CONFLICT, "conflict", false),
+            Self::Refused => (StatusCode::FORBIDDEN, "refused", false),
+            Self::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internalError", false),
         };
         (
             status,
@@ -199,6 +215,20 @@ pub struct GatewayState {
     pub host_user_files: Option<Arc<dyn HostUserFileSource>>,
     /// User drafts storage for safe recovery.
     pub drafts: Arc<crate::routes::UserDraftStore>,
+    /// Server operations and task progress manager.
+    pub operations: Arc<crate::operations_hub::OperationsHub>,
+    /// Reactive desktop notifications hub.
+    pub notifications: Arc<crate::notifications_hub::NotificationsHub>,
+    /// System services, processes, hardware telemetry, and log substrate.
+    pub system: Arc<crate::system_hub::SystemHub>,
+    /// Personal desktop pack (Mail, Calendar, Notes, Contacts).
+    pub personal: Arc<crate::personal_hub::PersonalHub>,
+    /// Deep Cognitive Graph & Canonical Event1 Journal.
+    pub cognitive: Arc<crate::cognitive_hub::CognitiveHub>,
+    /// Deterministic language interpretation, dialogue memory, and realization.
+    pub meaning: Arc<crate::meaning_hub::MeaningHub>,
+    /// Lifelong learning candidate evaluation, artifact lineages, and capability governance.
+    pub learning: Arc<crate::learning_hub::LearningHub>,
 }
 
 /// Owner boundary for filesystem operations that must execute as the authenticated Linux user.
@@ -219,6 +249,62 @@ pub trait HostUserFileSource: Send + Sync {
         home: &str,
         path: &str,
     ) -> Result<cybou_web_contracts::FileContentProjection, GatewayError>;
+
+    /// Conditionally write an existing file.
+    async fn write_file(
+        &self,
+        uid: u32,
+        home: &str,
+        path: &str,
+        expected_sha256: Option<String>,
+        text: &str,
+    ) -> Result<cybou_web_contracts::FileWriteProjection, GatewayError>;
+
+    /// Create a new file in user's home.
+    async fn create_file(
+        &self,
+        uid: u32,
+        home: &str,
+        path: &str,
+        text: &str,
+        exclusive: bool,
+    ) -> Result<cybou_web_contracts::FileWriteProjection, GatewayError>;
+
+    /// Create a directory in user's home.
+    async fn create_directory(
+        &self,
+        uid: u32,
+        home: &str,
+        path: &str,
+        recursive: bool,
+    ) -> Result<(), GatewayError>;
+
+    /// Rename or move a path in user's home.
+    async fn rename_path(
+        &self,
+        uid: u32,
+        home: &str,
+        from_path: &str,
+        to_path: &str,
+    ) -> Result<(), GatewayError>;
+
+    /// Delete a path in user's home.
+    async fn delete_path(
+        &self,
+        uid: u32,
+        home: &str,
+        path: &str,
+        recursive: bool,
+    ) -> Result<(), GatewayError>;
+
+    /// Copy a path in user's home.
+    async fn copy_path(
+        &self,
+        uid: u32,
+        home: &str,
+        from_path: &str,
+        to_path: &str,
+    ) -> Result<(), GatewayError>;
 }
 
 impl GatewayState {

@@ -91,6 +91,8 @@ pub enum FileSortMode {
 /// One File Manager card's reactive state signals.
 #[derive(Clone, Copy)]
 pub struct FileManagerSignals {
+    /// Active location category in sidebar.
+    pub active_category: RwSignal<cybou_web_contracts::LocationCategory>,
     /// The directory being looked at.
     pub current_path: RwSignal<String>,
     /// What that directory held when it was last read.
@@ -111,6 +113,8 @@ pub struct FileManagerSignals {
     pub file_request_generation: RwSignal<u64>,
     /// What went wrong with the last read, if anything.
     pub error_msg: RwSignal<Option<String>>,
+    /// Success / action toast message.
+    pub action_message: RwSignal<Option<String>>,
     /// Whether this directory has ever been read.
     pub read: RwSignal<bool>,
     /// Instant search/filter query in current directory.
@@ -125,12 +129,27 @@ pub struct FileManagerSignals {
     pub create_name: RwSignal<String>,
     /// Error message for file creation failure.
     pub create_error: RwSignal<Option<String>>,
+    /// Whether create directory modal is open.
+    pub create_dir_modal_open: RwSignal<bool>,
+    /// Target name of the new directory to create.
+    pub create_dir_name: RwSignal<String>,
+    /// Whether rename modal is open.
+    pub rename_modal_open: RwSignal<bool>,
+    /// Target item to rename.
+    pub rename_target: RwSignal<Option<String>>,
+    /// New name for renamed item.
+    pub rename_new_name: RwSignal<String>,
+    /// Whether delete confirmation modal is open.
+    pub delete_modal_open: RwSignal<bool>,
+    /// Target item to delete (name, is_dir).
+    pub delete_target: RwSignal<Option<(String, bool)>>,
 }
 
 impl FileManagerSignals {
     /// A File Manager that has read nothing.
     fn new() -> Self {
         Self {
+            active_category: RwSignal::new(cybou_web_contracts::LocationCategory::Home),
             current_path: RwSignal::new("/".to_owned()),
             entries: RwSignal::new(Vec::new()),
             selected_file: RwSignal::new(None),
@@ -141,6 +160,7 @@ impl FileManagerSignals {
             directory_request_generation: RwSignal::new(0),
             file_request_generation: RwSignal::new(0),
             error_msg: RwSignal::new(None),
+            action_message: RwSignal::new(None),
             read: RwSignal::new(false),
             filter_query: RwSignal::new(String::new()),
             sort_by: RwSignal::new(FileSortMode::Name),
@@ -148,6 +168,13 @@ impl FileManagerSignals {
             create_modal_open: RwSignal::new(false),
             create_name: RwSignal::new(String::new()),
             create_error: RwSignal::new(None),
+            create_dir_modal_open: RwSignal::new(false),
+            create_dir_name: RwSignal::new(String::new()),
+            rename_modal_open: RwSignal::new(false),
+            rename_target: RwSignal::new(None),
+            rename_new_name: RwSignal::new(String::new()),
+            delete_modal_open: RwSignal::new(false),
+            delete_target: RwSignal::new(None),
         }
     }
 }
@@ -478,6 +505,666 @@ impl InspectorSignals {
     }
 }
 
+/// One Operations Manager card's interactive state.
+#[derive(Clone, Copy)]
+pub struct OperationsSignals {
+    /// Active and historical operations list.
+    pub operations: RwSignal<Vec<cybou_protocol::operation::OperationRecord>>,
+    /// Currently inspected operation ID.
+    pub selected_op_id: RwSignal<Option<uuid::Uuid>>,
+    /// Execution log lines for the selected operation.
+    pub selected_logs: RwSignal<Vec<cybou_protocol::operation::OperationLogEntry>>,
+    /// Category/status filter.
+    pub filter_status: RwSignal<Option<String>>,
+    /// Whether a background fetch is running.
+    pub loading: RwSignal<bool>,
+    /// Status message or error toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl OperationsSignals {
+    fn new() -> Self {
+        Self {
+            operations: RwSignal::new(Vec::new()),
+            selected_op_id: RwSignal::new(None),
+            selected_logs: RwSignal::new(Vec::new()),
+            filter_status: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Notifications Center card's interactive state.
+#[derive(Clone, Copy)]
+pub struct NotificationsSignals {
+    /// Notifications list.
+    pub notifications: RwSignal<Vec<cybou_protocol::notification::NotificationItem>>,
+    /// Selected category filter.
+    pub selected_category: RwSignal<Option<cybou_protocol::notification::NotificationCategory>>,
+    /// Search filter text.
+    pub search_query: RwSignal<String>,
+    /// Unread count.
+    pub unread_count: RwSignal<usize>,
+    /// Attention/critical count.
+    pub attention_count: RwSignal<usize>,
+    /// Whether a background fetch is running.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl NotificationsSignals {
+    fn new() -> Self {
+        Self {
+            notifications: RwSignal::new(Vec::new()),
+            selected_category: RwSignal::new(None),
+            search_query: RwSignal::new(String::new()),
+            unread_count: RwSignal::new(0),
+            attention_count: RwSignal::new(0),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Services Manager card's interactive state.
+#[derive(Clone, Copy)]
+pub struct ServicesSignals {
+    /// Listed system services.
+    pub services: RwSignal<Vec<cybou_protocol::system::ServiceRecord>>,
+    /// Currently selected service name.
+    pub selected_service: RwSignal<Option<String>>,
+    /// State filter (`Active`, `Failed`, etc.).
+    pub filter_state: RwSignal<Option<cybou_protocol::system::ServiceState>>,
+    /// Search filter string.
+    pub search_query: RwSignal<String>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl ServicesSignals {
+    fn new() -> Self {
+        Self {
+            services: RwSignal::new(Vec::new()),
+            selected_service: RwSignal::new(None),
+            filter_state: RwSignal::new(None),
+            search_query: RwSignal::new(String::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Process Manager card's interactive state.
+#[derive(Clone, Copy)]
+pub struct ProcessesSignals {
+    /// Listed operating system processes.
+    pub processes: RwSignal<Vec<cybou_protocol::system::ProcessRecord>>,
+    /// Selected Process ID.
+    pub selected_pid: RwSignal<Option<u32>>,
+    /// Search filter string.
+    pub search_query: RwSignal<String>,
+    /// Sort column (e.g. `cpu`, `memory`, `pid`, `name`).
+    pub sort_by: RwSignal<String>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl ProcessesSignals {
+    fn new() -> Self {
+        Self {
+            processes: RwSignal::new(Vec::new()),
+            selected_pid: RwSignal::new(None),
+            search_query: RwSignal::new(String::new()),
+            sort_by: RwSignal::new("cpu".to_owned()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Hardware Telemetry & System Monitor card's interactive state.
+#[derive(Clone, Copy)]
+pub struct MonitorSignals {
+    /// Latest monitor projection snapshot.
+    pub monitor: RwSignal<Option<cybou_web_contracts::SystemMonitorProjection>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Periodic auto-refresh toggle.
+    pub auto_refresh: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl MonitorSignals {
+    fn new() -> Self {
+        Self {
+            monitor: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            auto_refresh: RwSignal::new(true),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One System Log Viewer card's interactive state.
+#[derive(Clone, Copy)]
+pub struct SystemLogsSignals {
+    /// Log records feed.
+    pub logs: RwSignal<Vec<cybou_protocol::system::SystemLogEntry>>,
+    /// Unit filter.
+    pub selected_unit: RwSignal<Option<String>>,
+    /// Severity level filter.
+    pub selected_severity: RwSignal<Option<String>>,
+    /// Search filter text.
+    pub search_query: RwSignal<String>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl SystemLogsSignals {
+    fn new() -> Self {
+        Self {
+            logs: RwSignal::new(Vec::new()),
+            selected_unit: RwSignal::new(None),
+            selected_severity: RwSignal::new(None),
+            search_query: RwSignal::new(String::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Storage & Snapshots card's interactive state.
+#[derive(Clone, Copy)]
+pub struct StorageSignals {
+    /// Storage pool & snapshots projection.
+    pub storage: RwSignal<Option<cybou_web_contracts::StorageProjection>>,
+    /// Currently selected subvolume path.
+    pub selected_subvolume: RwSignal<Option<String>>,
+    /// Input field for new snapshot name.
+    pub new_snap_name: RwSignal<String>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl StorageSignals {
+    fn new() -> Self {
+        Self {
+            storage: RwSignal::new(None),
+            selected_subvolume: RwSignal::new(Some("@home".to_owned())),
+            new_snap_name: RwSignal::new(String::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Network Connections card's interactive state.
+#[derive(Clone, Copy)]
+pub struct NetworkSignals {
+    /// Network connections list.
+    pub connections: RwSignal<Vec<cybou_protocol::system::NetworkConnectionRecord>>,
+    /// Selected connection ID.
+    pub selected_conn: RwSignal<Option<String>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl NetworkSignals {
+    fn new() -> Self {
+        Self {
+            connections: RwSignal::new(Vec::new()),
+            selected_conn: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Package Manager card's interactive state.
+#[derive(Clone, Copy)]
+pub struct PackagesSignals {
+    /// Available & installed packages list.
+    pub packages: RwSignal<Vec<cybou_protocol::system::PackageRecord>>,
+    /// Active filter tab (`all`, `installed`, `upgradable`).
+    pub active_tab: RwSignal<String>,
+    /// Search query string.
+    pub search_query: RwSignal<String>,
+    /// Selected package name.
+    pub selected_package: RwSignal<Option<String>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl PackagesSignals {
+    fn new() -> Self {
+        Self {
+            packages: RwSignal::new(Vec::new()),
+            active_tab: RwSignal::new("installed".to_owned()),
+            search_query: RwSignal::new(String::new()),
+            selected_package: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One System Updates card's interactive state.
+#[derive(Clone, Copy)]
+pub struct UpdatesSignals {
+    /// System updates projection.
+    pub updates: RwSignal<Option<cybou_web_contracts::SystemUpdatesProjection>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl UpdatesSignals {
+    fn new() -> Self {
+        Self {
+            updates: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Users & SSH Keys card's interactive state.
+#[derive(Clone, Copy)]
+pub struct UserSettingsSignals {
+    /// User accounts.
+    pub users: RwSignal<Vec<cybou_protocol::system::UserAccountRecord>>,
+    /// Authorized SSH keys.
+    pub ssh_keys: RwSignal<Vec<cybou_protocol::system::SshKeyRecord>>,
+    /// New user username input.
+    pub new_user_name: RwSignal<String>,
+    /// New user full name input.
+    pub new_full_name: RwSignal<String>,
+    /// New user admin checkbox.
+    pub new_is_admin: RwSignal<bool>,
+    /// New SSH key label input.
+    pub new_key_name: RwSignal<String>,
+    /// New SSH public key content.
+    pub new_public_key: RwSignal<String>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl UserSettingsSignals {
+    fn new() -> Self {
+        Self {
+            users: RwSignal::new(Vec::new()),
+            ssh_keys: RwSignal::new(Vec::new()),
+            new_user_name: RwSignal::new(String::new()),
+            new_full_name: RwSignal::new(String::new()),
+            new_is_admin: RwSignal::new(false),
+            new_key_name: RwSignal::new(String::new()),
+            new_public_key: RwSignal::new(String::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Security Policy & Audit card's interactive state.
+#[derive(Clone, Copy)]
+pub struct SecuritySignals {
+    /// Security policy rules.
+    pub policy: RwSignal<Option<cybou_protocol::system::SecurityPolicyRecord>>,
+    /// Recent security audit logs.
+    pub audit_log: RwSignal<Vec<cybou_protocol::system::SecurityAuditEntry>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl SecuritySignals {
+    fn new() -> Self {
+        Self {
+            policy: RwSignal::new(None),
+            audit_log: RwSignal::new(Vec::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Backup & Vault card's interactive state.
+#[derive(Clone, Copy)]
+pub struct BackupSignals {
+    /// Backup repository, archives, and schedule projection.
+    pub backup_settings: RwSignal<Option<cybou_web_contracts::BackupSettingsProjection>>,
+    /// Input for manual snapshot label.
+    pub new_backup_name: RwSignal<String>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl BackupSignals {
+    fn new() -> Self {
+        Self {
+            backup_settings: RwSignal::new(None),
+            new_backup_name: RwSignal::new(String::new()),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Mail & Messages card's interactive state.
+#[derive(Clone, Copy)]
+pub struct MailSignals {
+    /// Mail projection.
+    pub mail: RwSignal<Option<cybou_web_contracts::MailProjection>>,
+    /// Selected message to read.
+    pub selected_message: RwSignal<Option<cybou_protocol::personal::MailMessageRecord>>,
+    /// Compose recipient input.
+    pub compose_to: RwSignal<String>,
+    /// Compose subject input.
+    pub compose_subject: RwSignal<String>,
+    /// Compose body input.
+    pub compose_body: RwSignal<String>,
+    /// Whether the compose modal / pane is active.
+    pub is_composing: RwSignal<bool>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl MailSignals {
+    fn new() -> Self {
+        Self {
+            mail: RwSignal::new(None),
+            selected_message: RwSignal::new(None),
+            compose_to: RwSignal::new(String::new()),
+            compose_subject: RwSignal::new(String::new()),
+            compose_body: RwSignal::new(String::new()),
+            is_composing: RwSignal::new(false),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Calendar & Schedule card's interactive state.
+#[derive(Clone, Copy)]
+pub struct CalendarSignals {
+    /// Calendar projection.
+    pub calendar: RwSignal<Option<cybou_web_contracts::CalendarProjection>>,
+    /// New event title input.
+    pub new_title: RwSignal<String>,
+    /// New event description input.
+    pub new_desc: RwSignal<String>,
+    /// New event start time input.
+    pub new_start: RwSignal<String>,
+    /// New event end time input.
+    pub new_end: RwSignal<String>,
+    /// New event color category input.
+    pub new_color: RwSignal<String>,
+    /// Whether the create modal / pane is open.
+    pub is_creating: RwSignal<bool>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl CalendarSignals {
+    fn new() -> Self {
+        Self {
+            calendar: RwSignal::new(None),
+            new_title: RwSignal::new(String::new()),
+            new_desc: RwSignal::new(String::new()),
+            new_start: RwSignal::new("2026-08-29T10:00:00Z".to_owned()),
+            new_end: RwSignal::new("2026-08-29T11:00:00Z".to_owned()),
+            new_color: RwSignal::new("indigo".to_owned()),
+            is_creating: RwSignal::new(false),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Notes & Ideas card's interactive state.
+#[derive(Clone, Copy)]
+pub struct NotesSignals {
+    /// Notes list.
+    pub notes: RwSignal<Vec<cybou_protocol::personal::NoteRecord>>,
+    /// Currently selected / edited note ID.
+    pub selected_note_id: RwSignal<Option<String>>,
+    /// Active edit title.
+    pub edit_title: RwSignal<String>,
+    /// Active edit markdown content.
+    pub edit_content: RwSignal<String>,
+    /// Active edit comma-separated tags.
+    pub edit_tags: RwSignal<String>,
+    /// Active edit pin status.
+    pub edit_pinned: RwSignal<bool>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl NotesSignals {
+    fn new() -> Self {
+        Self {
+            notes: RwSignal::new(Vec::new()),
+            selected_note_id: RwSignal::new(None),
+            edit_title: RwSignal::new(String::new()),
+            edit_content: RwSignal::new(String::new()),
+            edit_tags: RwSignal::new(String::new()),
+            edit_pinned: RwSignal::new(false),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Contacts Directory card's interactive state.
+#[derive(Clone, Copy)]
+pub struct ContactsSignals {
+    /// Contacts list.
+    pub contacts: RwSignal<Vec<cybou_protocol::personal::ContactRecord>>,
+    /// Currently selected contact to inspect.
+    pub selected_contact: RwSignal<Option<cybou_protocol::personal::ContactRecord>>,
+    /// New contact name input.
+    pub new_name: RwSignal<String>,
+    /// New contact email input.
+    pub new_email: RwSignal<String>,
+    /// New contact role input.
+    pub new_role: RwSignal<String>,
+    /// New contact organization input.
+    pub new_org: RwSignal<String>,
+    /// New contact tags input.
+    pub new_tags: RwSignal<String>,
+    /// New contact notes input.
+    pub new_notes: RwSignal<String>,
+    /// Whether create modal / pane is open.
+    pub is_creating: RwSignal<bool>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl ContactsSignals {
+    fn new() -> Self {
+        Self {
+            contacts: RwSignal::new(Vec::new()),
+            selected_contact: RwSignal::new(None),
+            new_name: RwSignal::new(String::new()),
+            new_email: RwSignal::new(String::new()),
+            new_role: RwSignal::new(String::new()),
+            new_org: RwSignal::new(String::new()),
+            new_tags: RwSignal::new(String::new()),
+            new_notes: RwSignal::new(String::new()),
+            is_creating: RwSignal::new(false),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Cognitive Graph & Causal DAG card's interactive state.
+#[derive(Clone, Copy)]
+pub struct CognitiveGraphSignals {
+    /// Graph projection.
+    pub graph: RwSignal<Option<cybou_web_contracts::CognitiveGraphProjection>>,
+    /// Text filter for nodes.
+    pub search_query: RwSignal<String>,
+    /// Currently focused or inspected node ID.
+    pub selected_node_id: RwSignal<Option<String>>,
+    /// Selected node category filter (e.g. Agent, Service, Finding).
+    pub type_filter: RwSignal<Option<String>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl CognitiveGraphSignals {
+    fn new() -> Self {
+        Self {
+            graph: RwSignal::new(None),
+            search_query: RwSignal::new(String::new()),
+            selected_node_id: RwSignal::new(None),
+            type_filter: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Canonical Event1 Journal card's interactive state.
+#[derive(Clone, Copy)]
+pub struct EventJournalSignals {
+    /// Journal entries projection.
+    pub journal: RwSignal<Option<cybou_web_contracts::EventJournalProjection>>,
+    /// Filter by originating organ.
+    pub organ_filter: RwSignal<Option<String>>,
+    /// Text search query.
+    pub search_query: RwSignal<String>,
+    /// Selected event ID to inspect.
+    pub selected_entry_id: RwSignal<Option<String>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl EventJournalSignals {
+    fn new() -> Self {
+        Self {
+            journal: RwSignal::new(None),
+            organ_filter: RwSignal::new(None),
+            search_query: RwSignal::new(String::new()),
+            selected_entry_id: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Meaning & Dialogue Assistant card's interactive state.
+#[derive(Clone, Copy)]
+pub struct MeaningSignals {
+    /// Natural language input query.
+    pub query: RwSignal<String>,
+    /// Selected realization language ("en", "ru", "de", "fr").
+    pub language: RwSignal<String>,
+    /// Semantic interpretation and response projection.
+    pub projection: RwSignal<Option<cybou_web_contracts::MeaningInterpretProjection>>,
+    /// Active dialogue memory projection.
+    pub memory: RwSignal<Option<cybou_web_contracts::DialogueMemoryProjection>>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl MeaningSignals {
+    fn new() -> Self {
+        Self {
+            query: RwSignal::new(String::new()),
+            language: RwSignal::new("en".to_string()),
+            projection: RwSignal::new(None),
+            memory: RwSignal::new(None),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
+/// One Lifelong Learning & Governance card's interactive state.
+#[derive(Clone, Copy)]
+pub struct LearningSignals {
+    /// Active learning candidates.
+    pub candidates: RwSignal<Vec<cybou_protocol::learning::LearningCandidate>>,
+    /// Selected learning layer filter (None = All).
+    pub layer_filter: RwSignal<Option<String>>,
+    /// Promoted durable artifacts.
+    pub artifacts: RwSignal<Vec<cybou_protocol::learning::LearnedArtifactLineage>>,
+    /// Active task scopes & capability grants.
+    pub scopes: RwSignal<Vec<cybou_protocol::governance::TaskScope>>,
+    /// Currently inspected candidate evaluation result.
+    pub evaluation: RwSignal<Option<cybou_web_contracts::CandidateEvaluationProjection>>,
+    /// Selected candidate ID.
+    pub selected_candidate_id: RwSignal<Option<uuid::Uuid>>,
+    /// New candidate proposal layer input.
+    pub new_layer: RwSignal<String>,
+    /// New candidate proposal generalization input.
+    pub new_generalization: RwSignal<String>,
+    /// New candidate proposal scope input.
+    pub new_scope: RwSignal<String>,
+    /// Whether proposal drawer/form is open.
+    pub is_proposing: RwSignal<bool>,
+    /// Background fetch in flight.
+    pub loading: RwSignal<bool>,
+    /// Status message or toast.
+    pub status_msg: RwSignal<Option<String>>,
+}
+
+impl LearningSignals {
+    fn new() -> Self {
+        Self {
+            candidates: RwSignal::new(Vec::new()),
+            layer_filter: RwSignal::new(None),
+            artifacts: RwSignal::new(Vec::new()),
+            scopes: RwSignal::new(Vec::new()),
+            evaluation: RwSignal::new(None),
+            selected_candidate_id: RwSignal::new(None),
+            new_layer: RwSignal::new("procedural".to_string()),
+            new_generalization: RwSignal::new(String::new()),
+            new_scope: RwSignal::new(String::new()),
+            is_proposing: RwSignal::new(false),
+            loading: RwSignal::new(false),
+            status_msg: RwSignal::new(None),
+        }
+    }
+}
+
 /// The interactive state of every tool card on this desktop.
 ///
 /// Provided once at the root and read from context by the cards. It is `Copy` so a card can hold it
@@ -491,6 +1178,27 @@ pub struct ToolCardStates {
     editors: StoredValue<HashMap<CardId, EditorSignals>>,
     diffs: StoredValue<HashMap<CardId, DiffSignals>>,
     inspectors: StoredValue<HashMap<CardId, InspectorSignals>>,
+    operations: StoredValue<HashMap<CardId, OperationsSignals>>,
+    notifications: StoredValue<HashMap<CardId, NotificationsSignals>>,
+    services: StoredValue<HashMap<CardId, ServicesSignals>>,
+    processes: StoredValue<HashMap<CardId, ProcessesSignals>>,
+    monitors: StoredValue<HashMap<CardId, MonitorSignals>>,
+    system_logs: StoredValue<HashMap<CardId, SystemLogsSignals>>,
+    storage: StoredValue<HashMap<CardId, StorageSignals>>,
+    networks: StoredValue<HashMap<CardId, NetworkSignals>>,
+    packages: StoredValue<HashMap<CardId, PackagesSignals>>,
+    updates: StoredValue<HashMap<CardId, UpdatesSignals>>,
+    user_settings: StoredValue<HashMap<CardId, UserSettingsSignals>>,
+    security: StoredValue<HashMap<CardId, SecuritySignals>>,
+    backups: StoredValue<HashMap<CardId, BackupSignals>>,
+    mails: StoredValue<HashMap<CardId, MailSignals>>,
+    calendars: StoredValue<HashMap<CardId, CalendarSignals>>,
+    notes: StoredValue<HashMap<CardId, NotesSignals>>,
+    contacts: StoredValue<HashMap<CardId, ContactsSignals>>,
+    cognitive_graphs: StoredValue<HashMap<CardId, CognitiveGraphSignals>>,
+    event_journals: StoredValue<HashMap<CardId, EventJournalSignals>>,
+    meanings: StoredValue<HashMap<CardId, MeaningSignals>>,
+    learnings: StoredValue<HashMap<CardId, LearningSignals>>,
 }
 
 impl ToolCardStates {
@@ -505,6 +1213,27 @@ impl ToolCardStates {
             editors: StoredValue::new(HashMap::new()),
             diffs: StoredValue::new(HashMap::new()),
             inspectors: StoredValue::new(HashMap::new()),
+            operations: StoredValue::new(HashMap::new()),
+            notifications: StoredValue::new(HashMap::new()),
+            services: StoredValue::new(HashMap::new()),
+            processes: StoredValue::new(HashMap::new()),
+            monitors: StoredValue::new(HashMap::new()),
+            system_logs: StoredValue::new(HashMap::new()),
+            storage: StoredValue::new(HashMap::new()),
+            networks: StoredValue::new(HashMap::new()),
+            packages: StoredValue::new(HashMap::new()),
+            updates: StoredValue::new(HashMap::new()),
+            user_settings: StoredValue::new(HashMap::new()),
+            security: StoredValue::new(HashMap::new()),
+            backups: StoredValue::new(HashMap::new()),
+            mails: StoredValue::new(HashMap::new()),
+            calendars: StoredValue::new(HashMap::new()),
+            notes: StoredValue::new(HashMap::new()),
+            contacts: StoredValue::new(HashMap::new()),
+            cognitive_graphs: StoredValue::new(HashMap::new()),
+            event_journals: StoredValue::new(HashMap::new()),
+            meanings: StoredValue::new(HashMap::new()),
+            learnings: StoredValue::new(HashMap::new()),
         }
     }
 
@@ -582,6 +1311,321 @@ impl ToolCardStates {
         created
     }
 
+    /// This Operations Manager card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn operations(&self, card: CardId) -> OperationsSignals {
+        if let Some(existing) = self.operations.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(OperationsSignals::new));
+        self.operations.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Notifications Center card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn notifications(&self, card: CardId) -> NotificationsSignals {
+        if let Some(existing) = self.notifications.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(NotificationsSignals::new));
+        self.notifications.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Services Manager card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn services(&self, card: CardId) -> ServicesSignals {
+        if let Some(existing) = self.services.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(ServicesSignals::new));
+        self.services.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Process Manager card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn processes(&self, card: CardId) -> ProcessesSignals {
+        if let Some(existing) = self.processes.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(ProcessesSignals::new));
+        self.processes.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This System Monitor card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn monitor(&self, card: CardId) -> MonitorSignals {
+        if let Some(existing) = self.monitors.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(MonitorSignals::new));
+        self.monitors.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This System Log Viewer card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn system_logs(&self, card: CardId) -> SystemLogsSignals {
+        if let Some(existing) = self.system_logs.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(SystemLogsSignals::new));
+        self.system_logs.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Storage & Snapshots card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn storage(&self, card: CardId) -> StorageSignals {
+        if let Some(existing) = self.storage.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(StorageSignals::new));
+        self.storage.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Network Connections card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn network(&self, card: CardId) -> NetworkSignals {
+        if let Some(existing) = self.networks.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(NetworkSignals::new));
+        self.networks.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Package Manager card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn packages(&self, card: CardId) -> PackagesSignals {
+        if let Some(existing) = self.packages.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(PackagesSignals::new));
+        self.packages.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This System Updates card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn updates(&self, card: CardId) -> UpdatesSignals {
+        if let Some(existing) = self.updates.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(UpdatesSignals::new));
+        self.updates.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Users & SSH Keys card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn user_settings(&self, card: CardId) -> UserSettingsSignals {
+        if let Some(existing) = self.user_settings.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(UserSettingsSignals::new));
+        self.user_settings.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Security Policy & Audit card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn security(&self, card: CardId) -> SecuritySignals {
+        if let Some(existing) = self.security.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(SecuritySignals::new));
+        self.security.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Backup & Vault card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn backup(&self, card: CardId) -> BackupSignals {
+        if let Some(existing) = self.backups.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(BackupSignals::new));
+        self.backups.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Mail & Messages card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn mail(&self, card: CardId) -> MailSignals {
+        if let Some(existing) = self.mails.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(MailSignals::new));
+        self.mails.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Calendar & Schedule card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn calendar(&self, card: CardId) -> CalendarSignals {
+        if let Some(existing) = self.calendars.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(CalendarSignals::new));
+        self.calendars.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Notes & Ideas card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn notes(&self, card: CardId) -> NotesSignals {
+        if let Some(existing) = self.notes.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(NotesSignals::new));
+        self.notes.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Contacts Directory card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn contacts(&self, card: CardId) -> ContactsSignals {
+        if let Some(existing) = self.contacts.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(ContactsSignals::new));
+        self.contacts.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Cognitive Graph & Causal DAG card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn cognitive_graph(&self, card: CardId) -> CognitiveGraphSignals {
+        if let Some(existing) = self.cognitive_graphs.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(CognitiveGraphSignals::new));
+        self.cognitive_graphs.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Canonical Event1 Journal card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn event_journal(&self, card: CardId) -> EventJournalSignals {
+        if let Some(existing) = self.event_journals.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(EventJournalSignals::new));
+        self.event_journals.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Meaning & Dialogue Assistant card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn meaning(&self, card: CardId) -> MeaningSignals {
+        if let Some(existing) = self.meanings.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(MeaningSignals::new));
+        self.meanings.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Lifelong Learning & Governance card's state, creating it the first time the card is shown.
+    #[must_use]
+    pub fn learning(&self, card: CardId) -> LearningSignals {
+        if let Some(existing) = self.learnings.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(LearningSignals::new));
+        self.learnings.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
     /// Whether any editor instance holds changes that exist only in browser memory.
     #[must_use]
     pub fn has_unsaved_editor_buffers(&self) -> bool {
@@ -637,6 +1681,12 @@ impl ToolCardStates {
             held.remove(&card);
         });
         self.inspectors.update_value(|held| {
+            held.remove(&card);
+        });
+        self.meanings.update_value(|held| {
+            held.remove(&card);
+        });
+        self.learnings.update_value(|held| {
             held.remove(&card);
         });
     }

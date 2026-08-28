@@ -58,6 +58,10 @@ pub enum Standing {
     Launching,
     /// The agent is working inside its capsule.
     Running,
+    /// The capsule is frozen (cgroup freeze) / paused.
+    Paused,
+    /// The capsule is quarantined (frozen + network/model egress revoked).
+    Quarantined,
     /// The ending has begun.
     Ending,
     /// It is over.
@@ -215,7 +219,10 @@ impl SessionView {
     /// Whether a person would consider this session live.
     #[must_use]
     pub const fn is_live(&self) -> bool {
-        matches!(self.standing, Standing::Launching | Standing::Running)
+        matches!(
+            self.standing,
+            Standing::Launching | Standing::Running | Standing::Paused | Standing::Quarantined
+        )
     }
 
     /// How long is left at `now`, never negative.
@@ -232,6 +239,52 @@ impl SessionView {
     pub fn uptime(&self, now: OffsetDateTime) -> Duration {
         (self.ended_at.unwrap_or(now) - self.started_at).max(Duration::ZERO)
     }
+}
+
+/// Action command requested on an active or live capsule session.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CapsuleAction {
+    /// Freeze the cgroup processes.
+    Freeze,
+    /// Thaw/resume frozen processes.
+    Resume,
+    /// Freeze cgroup and revoke model/network egress leases.
+    Quarantine,
+    /// Terminate and release capsule resources.
+    Stop,
+}
+
+/// Fine-grained live telemetry snapshot from within an agent capsule's boundary.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapsuleTelemetryRecord {
+    /// Target capsule UUID.
+    pub capsule_id: Uuid,
+    /// Current standing of the capsule.
+    pub standing: Standing,
+    /// Total process count currently active in cgroup.
+    pub pids_count: u32,
+    /// Memory used in megabytes.
+    pub memory_used_mib: u64,
+    /// Memory ceiling in megabytes.
+    pub memory_max_mib: u64,
+    /// CPU usage percentage in [0.0, 100.0].
+    pub cpu_usage_pct: f32,
+    /// Number of network egress requests mediated.
+    pub egress_requests_count: u64,
+    /// Number of denied network egress attempts.
+    pub egress_denied_count: u64,
+    /// Number of files modified in the workspace.
+    pub files_modified_count: u64,
+    /// Input prompt tokens consumed.
+    pub tokens_in: u64,
+    /// Output completion tokens generated.
+    pub tokens_out: u64,
+    /// Currently executing tool name or thought turn, if any.
+    pub active_tool: Option<String>,
+    /// Recent security and activity events.
+    pub recent_activity: Vec<String>,
 }
 
 #[cfg(test)]

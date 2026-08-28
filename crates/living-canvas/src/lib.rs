@@ -6,7 +6,10 @@
 use async_trait::async_trait;
 use cybou_web_contracts::{
     DirectoryListingProjection, DisclosureProjection, FileContentProjection, FileWriteProjection,
-    FileWriteRequest, MindProjection, SessionProjection, ShellExecResponse, SnapshotProjection,
+    FileWriteRequest, HostDirectoryCreateRequest, HostDirectoryListingProjection,
+    HostFileCreateRequest, HostFileWriteRequest, HostPathCopyRequest, HostPathDeleteRequest,
+    HostPathRenameRequest, MindProjection, SessionProjection, ShellExecResponse,
+    SnapshotProjection,
 };
 use thiserror::Error;
 
@@ -161,6 +164,19 @@ pub trait MindClient {
     /// teardown cannot be confirmed, or Agent1 is unavailable.
     async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError>;
 
+    /// Perform a lifecycle or boundary control action (Freeze, Resume, Quarantine, Stop) on a live capsule.
+    async fn control_agent(
+        &self,
+        capsule_id: uuid::Uuid,
+        action: cybou_protocol::agent::CapsuleAction,
+    ) -> Result<(), ClientError>;
+
+    /// Retrieve live fine-grained telemetry for an active capsule session.
+    async fn agent_telemetry(
+        &self,
+        capsule_id: uuid::Uuid,
+    ) -> Result<cybou_web_contracts::CapsuleTelemetryProjection, ClientError>;
+
     /// Execute a bounded Shell capability inside the Body host sandbox.
     ///
     /// # Errors
@@ -195,6 +211,195 @@ pub trait MindClient {
         &self,
         request: &cybou_web_contracts::FileCreateRequest,
     ) -> Result<FileWriteProjection, ClientError>;
+
+    /// List a directory in the user's home authority domain.
+    async fn host_list_directory(
+        &self,
+        path: &str,
+    ) -> Result<HostDirectoryListingProjection, ClientError>;
+
+    /// Read a file from the user's home authority domain.
+    async fn host_read_file(&self, path: &str) -> Result<FileContentProjection, ClientError>;
+
+    /// Write a file to the user's home authority domain.
+    async fn host_write_file(
+        &self,
+        request: &HostFileWriteRequest,
+    ) -> Result<FileWriteProjection, ClientError>;
+
+    /// Create a new file in the user's home authority domain.
+    async fn host_create_file(
+        &self,
+        request: &HostFileCreateRequest,
+    ) -> Result<FileWriteProjection, ClientError>;
+
+    /// Create a directory in the user's home authority domain.
+    async fn host_create_directory(
+        &self,
+        request: &HostDirectoryCreateRequest,
+    ) -> Result<(), ClientError>;
+
+    /// Rename or move a path in the user's home authority domain.
+    async fn host_rename_path(&self, request: &HostPathRenameRequest) -> Result<(), ClientError>;
+
+    /// Delete a path in the user's home authority domain.
+    async fn host_delete_path(&self, request: &HostPathDeleteRequest) -> Result<(), ClientError>;
+
+    /// Copy a path in the user's home authority domain.
+    async fn host_copy_path(&self, request: &HostPathCopyRequest) -> Result<(), ClientError>;
+
+    /// List active and historical server operations.
+    async fn list_operations(&self) -> Result<cybou_web_contracts::OperationsListProjection, ClientError>;
+
+    /// Get execution logs for a specific operation.
+    async fn get_operation_logs(&self, id: uuid::Uuid) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError>;
+
+    /// Cancel a running server operation.
+    async fn cancel_operation(&self, id: uuid::Uuid, reason: Option<String>) -> Result<(), ClientError>;
+
+    /// List desktop notifications.
+    async fn list_notifications(&self) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError>;
+
+    /// Dismiss one or all notifications.
+    async fn dismiss_notifications(&self, id: Option<uuid::Uuid>, dismiss_all: bool) -> Result<(), ClientError>;
+
+    /// Trigger an interactive notification action.
+    async fn execute_notification_action(&self, id: uuid::Uuid, action_id: &str) -> Result<String, ClientError>;
+
+    /// List system services and daemons.
+    async fn list_services(&self) -> Result<cybou_web_contracts::ServicesListProjection, ClientError>;
+
+    /// Execute a state action on a system service.
+    async fn execute_service_action(&self, name: &str, action: cybou_protocol::system::ServiceAction) -> Result<String, ClientError>;
+
+    /// List active operating system processes.
+    async fn list_processes(&self) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError>;
+
+    /// Deliver a signal to an operating system process.
+    async fn send_process_signal(&self, pid: u32, signal: cybou_protocol::system::ProcessSignal) -> Result<String, ClientError>;
+
+    /// Get current hardware telemetry & resource monitor metrics.
+    async fn get_system_monitor(&self) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError>;
+
+    /// Query system log entries.
+    async fn get_system_logs(&self, query: &cybou_web_contracts::SystemLogsQueryRequest) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError>;
+
+    /// List Btrfs subvolumes and snapshots.
+    async fn get_storage(&self) -> Result<cybou_web_contracts::StorageProjection, ClientError>;
+
+    /// Create a point-in-time filesystem snapshot.
+    async fn create_snapshot(&self, subvolume: &str, name: &str, readonly: bool) -> Result<cybou_protocol::system::SnapshotRecord, ClientError>;
+
+    /// Restore a filesystem snapshot.
+    async fn restore_snapshot(&self, snapshot_id: &str) -> Result<String, ClientError>;
+
+    /// List network interfaces and connections.
+    async fn get_network(&self) -> Result<cybou_web_contracts::NetworkProjection, ClientError>;
+
+    /// Connect or disconnect a network profile.
+    async fn connect_network(&self, connection_id: &str, activate: bool) -> Result<String, ClientError>;
+
+    /// List software packages.
+    async fn get_packages(&self) -> Result<cybou_web_contracts::PackagesProjection, ClientError>;
+
+    /// Execute a package operation (install/upgrade/remove).
+    async fn execute_package_action(&self, name: &str, action: cybou_protocol::system::PackageActionKind) -> Result<String, ClientError>;
+
+    /// Get system update status summary.
+    async fn get_system_updates(&self) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError>;
+
+    /// Apply pending system updates.
+    async fn apply_system_updates(&self, package_names: Option<Vec<String>>) -> Result<String, ClientError>;
+
+    /// Get user accounts and authorized SSH keys.
+    async fn get_users_settings(&self) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError>;
+
+    /// Create a new local user account.
+    async fn create_user(&self, username: &str, full_name: &str, is_admin: bool) -> Result<cybou_protocol::system::UserAccountRecord, ClientError>;
+
+    /// Add an authorized SSH public key.
+    async fn add_ssh_key(&self, name: &str, public_key: &str) -> Result<cybou_protocol::system::SshKeyRecord, ClientError>;
+
+    /// Delete an authorized SSH public key.
+    async fn delete_ssh_key(&self, key_id: &str) -> Result<String, ClientError>;
+
+    /// Get security policy and audit log.
+    async fn get_security_settings(&self) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError>;
+
+    /// Update security sandboxing policy.
+    async fn update_security_policy(&self, req: cybou_web_contracts::UpdateSecurityPolicyRequest) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError>;
+
+    /// Get Borg/Btrfs backup repository settings and archives.
+    async fn get_backup_settings(&self) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError>;
+
+    /// Trigger an immediate backup snapshot.
+    async fn trigger_backup(&self, name: Option<String>) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError>;
+
+    /// Restore a backup archive.
+    async fn restore_archive(&self, archive_id: &str, target_path: Option<String>) -> Result<String, ClientError>;
+
+    /// Update automated backup schedule.
+    async fn update_backup_schedule(&self, req: cybou_web_contracts::UpdateBackupScheduleRequest) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError>;
+
+    /// Get personal email messages and accounts.
+    async fn get_mail(&self, account_id: Option<String>, folder: Option<cybou_protocol::personal::MailFolderKind>) -> Result<cybou_web_contracts::MailProjection, ClientError>;
+
+    /// Compose and send a new email.
+    async fn send_mail(&self, req: cybou_web_contracts::SendMailRequest) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError>;
+
+    /// Get personal calendar events.
+    async fn get_calendar(&self) -> Result<cybou_web_contracts::CalendarProjection, ClientError>;
+
+    /// Create a new calendar event.
+    async fn create_calendar_event(&self, req: cybou_web_contracts::CreateCalendarEventRequest) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError>;
+
+    /// Get personal notes.
+    async fn get_notes(&self) -> Result<cybou_web_contracts::NotesProjection, ClientError>;
+
+    /// Create a new personal note.
+    async fn create_note(&self, req: cybou_web_contracts::CreateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError>;
+
+    /// Update an existing personal note.
+    async fn update_note(&self, req: cybou_web_contracts::UpdateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError>;
+
+    /// Get address book contacts.
+    async fn get_contacts(&self) -> Result<cybou_web_contracts::ContactsProjection, ClientError>;
+
+    /// Create a new address book contact.
+    async fn create_contact(&self, req: cybou_web_contracts::CreateContactRequest) -> Result<cybou_protocol::personal::ContactRecord, ClientError>;
+
+    /// Retrieve the deep unified Cognitive Graph.
+    async fn get_cognitive_graph(&self, focus: Option<String>) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError>;
+
+    /// Query subgraphs and causal relations in the Cognitive Graph.
+    async fn query_cognitive_graph(&self, req: cybou_web_contracts::CognitiveQueryRequest) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError>;
+
+    /// Retrieve the canonical Event1 chronological journal.
+    async fn get_event_journal(&self, limit: Option<usize>, offset: Option<usize>) -> Result<cybou_web_contracts::EventJournalProjection, ClientError>;
+
+    /// Interpret a natural language query into a typed cognitive act and realize a qualified response.
+    async fn interpret_meaning(&self, req: &cybou_web_contracts::MeaningInterpretRequest) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError>;
+
+    /// Retrieve active dialogue memory status and referents.
+    async fn get_dialogue_memory(&self) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError>;
+
+    /// Retrieve active learning candidates.
+    async fn get_learning_candidates(&self, layer: Option<String>) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError>;
+
+    /// Propose a new learning candidate.
+    async fn propose_learning_candidate(&self, req: &cybou_web_contracts::ProposeLearningCandidateRequest) -> Result<cybou_protocol::learning::LearningCandidate, ClientError>;
+
+    /// Evaluate a candidate against demonstrated episodic outcomes and promotion criteria.
+    async fn evaluate_learning_candidate(&self, candidate_id: uuid::Uuid, req: Option<&cybou_web_contracts::EvaluateCandidateRequest>) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError>;
+
+    /// Retrieve promoted durable artifacts and lineages.
+    async fn get_learned_artifacts(&self) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError>;
+
+    /// Revoke or deprecate a promoted artifact.
+    async fn revoke_learned_artifact(&self, artifact_id: uuid::Uuid, reason: &str) -> Result<(), ClientError>;
+
+    /// Retrieve active task scopes and capability grants.
+    async fn get_governance_scopes(&self) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError>;
 
     /// End one of the caller's shells, because the card standing in it was closed.
     ///
@@ -418,6 +623,38 @@ impl MindClient for MockMindClient {
         )))
     }
 
+    async fn control_agent(
+        &self,
+        _capsule_id: uuid::Uuid,
+        _action: cybou_protocol::agent::CapsuleAction,
+    ) -> Result<(), ClientError> {
+        Ok(())
+    }
+
+    async fn agent_telemetry(
+        &self,
+        capsule_id: uuid::Uuid,
+    ) -> Result<cybou_web_contracts::CapsuleTelemetryProjection, ClientError> {
+        Ok(cybou_web_contracts::CapsuleTelemetryProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            telemetry: cybou_protocol::agent::CapsuleTelemetryRecord {
+                capsule_id,
+                standing: cybou_protocol::agent::Standing::Running,
+                pids_count: 3,
+                memory_used_mib: 64,
+                memory_max_mib: 512,
+                cpu_usage_pct: 2.5,
+                egress_requests_count: 8,
+                egress_denied_count: 0,
+                files_modified_count: 2,
+                tokens_in: 600,
+                tokens_out: 180,
+                active_tool: Some("read_file".to_string()),
+                recent_activity: vec!["Capsule boundary verified".to_string()],
+            },
+        })
+    }
+
     async fn disclosure(&self) -> Result<DisclosureProjection, ClientError> {
         // A mock that was given none reports a delivery that has not happened, rather than
         // inventing an empty one — the two are different facts to the surface that shows them.
@@ -472,6 +709,602 @@ impl MindClient for MockMindClient {
         Err(ClientError::ProjectionUnavailable(
             "mock file creation is unavailable".to_string(),
         ))
+    }
+
+    async fn host_list_directory(
+        &self,
+        path: &str,
+    ) -> Result<HostDirectoryListingProjection, ClientError> {
+        Err(ClientError::GatewayRequest(format!(
+            "mock client holds no host filesystem to list {path} in"
+        )))
+    }
+
+    async fn host_read_file(&self, path: &str) -> Result<FileContentProjection, ClientError> {
+        Err(ClientError::GatewayRequest(format!(
+            "mock client holds no host filesystem to read {path} from"
+        )))
+    }
+
+    async fn host_write_file(
+        &self,
+        _request: &HostFileWriteRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock host file writes are unavailable".to_string(),
+        ))
+    }
+
+    async fn host_create_file(
+        &self,
+        _request: &HostFileCreateRequest,
+    ) -> Result<FileWriteProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock host file creation is unavailable".to_string(),
+        ))
+    }
+
+    async fn host_create_directory(
+        &self,
+        _request: &HostDirectoryCreateRequest,
+    ) -> Result<(), ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock host directory creation is unavailable".to_string(),
+        ))
+    }
+
+    async fn host_rename_path(&self, _request: &HostPathRenameRequest) -> Result<(), ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock host path rename is unavailable".to_string(),
+        ))
+    }
+
+    async fn host_delete_path(&self, _request: &HostPathDeleteRequest) -> Result<(), ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock host path delete is unavailable".to_string(),
+        ))
+    }
+
+    async fn host_copy_path(&self, _request: &HostPathCopyRequest) -> Result<(), ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock host path copy is unavailable".to_string(),
+        ))
+    }
+
+    async fn list_operations(&self) -> Result<cybou_web_contracts::OperationsListProjection, ClientError> {
+        Ok(cybou_web_contracts::OperationsListProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            active_count: 0,
+            operations: Vec::new(),
+        })
+    }
+
+    async fn get_operation_logs(&self, id: uuid::Uuid) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError> {
+        Ok(cybou_web_contracts::OperationLogsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            operation_id: id,
+            logs: Vec::new(),
+        })
+    }
+
+    async fn cancel_operation(&self, _id: uuid::Uuid, _reason: Option<String>) -> Result<(), ClientError> {
+        Ok(())
+    }
+
+    async fn list_notifications(&self) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError> {
+        Ok(cybou_web_contracts::NotificationsListProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            unread_count: 0,
+            attention_count: 0,
+            notifications: Vec::new(),
+        })
+    }
+
+    async fn dismiss_notifications(&self, _id: Option<uuid::Uuid>, _dismiss_all: bool) -> Result<(), ClientError> {
+        Ok(())
+    }
+
+    async fn execute_notification_action(&self, _id: uuid::Uuid, _action_id: &str) -> Result<String, ClientError> {
+        Ok("mock action executed".to_owned())
+    }
+
+    async fn list_services(&self) -> Result<cybou_web_contracts::ServicesListProjection, ClientError> {
+        Ok(cybou_web_contracts::ServicesListProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            active_count: 0,
+            failed_count: 0,
+            services: Vec::new(),
+        })
+    }
+
+    async fn execute_service_action(&self, name: &str, _action: cybou_protocol::system::ServiceAction) -> Result<String, ClientError> {
+        Ok(format!("Mock executed action on {name}"))
+    }
+
+    async fn list_processes(&self) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError> {
+        Ok(cybou_web_contracts::ProcessesListProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            total_count: 0,
+            total_cpu_percent: 0.0,
+            total_memory_bytes: 0,
+            processes: Vec::new(),
+        })
+    }
+
+    async fn send_process_signal(&self, pid: u32, _signal: cybou_protocol::system::ProcessSignal) -> Result<String, ClientError> {
+        Ok(format!("Mock sent signal to PID {pid}"))
+    }
+
+    async fn get_system_monitor(&self) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError> {
+        Ok(cybou_web_contracts::SystemMonitorProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            hostname: "mock-host".to_owned(),
+            os_release: "Linux Mock".to_owned(),
+            uptime_seconds: 1000,
+            load_avg: [0.1, 0.1, 0.1],
+            total_cpu_percent: 5.0,
+            cores: Vec::new(),
+            memory_total_bytes: 8_000_000_000,
+            memory_used_bytes: 2_000_000_000,
+            memory_free_bytes: 6_000_000_000,
+            swap_total_bytes: 2_000_000_000,
+            swap_used_bytes: 0,
+            disk_partitions: Vec::new(),
+            network_interfaces: Vec::new(),
+        })
+    }
+
+    async fn get_system_logs(&self, _query: &cybou_web_contracts::SystemLogsQueryRequest) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError> {
+        Ok(cybou_web_contracts::SystemLogsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            logs: Vec::new(),
+        })
+    }
+
+    async fn get_storage(&self) -> Result<cybou_web_contracts::StorageProjection, ClientError> {
+        Ok(cybou_web_contracts::StorageProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            subvolumes: Vec::new(),
+            snapshots: Vec::new(),
+            total_space_bytes: 1_000_000_000_000,
+            free_space_bytes: 500_000_000_000,
+        })
+    }
+
+    async fn create_snapshot(&self, subvolume: &str, name: &str, readonly: bool) -> Result<cybou_protocol::system::SnapshotRecord, ClientError> {
+        Ok(cybou_protocol::system::SnapshotRecord {
+            id: "mock-snap-01".to_owned(),
+            subvolume_path: subvolume.to_owned(),
+            name: name.to_owned(),
+            timestamp: "2026-08-28T22:00:00Z".to_owned(),
+            size_bytes: 100_000_000,
+            readonly,
+        })
+    }
+
+    async fn restore_snapshot(&self, snapshot_id: &str) -> Result<String, ClientError> {
+        Ok(format!("Mock restored snapshot {snapshot_id}"))
+    }
+
+    async fn get_network(&self) -> Result<cybou_web_contracts::NetworkProjection, ClientError> {
+        Ok(cybou_web_contracts::NetworkProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            connections: Vec::new(),
+        })
+    }
+
+    async fn connect_network(&self, connection_id: &str, activate: bool) -> Result<String, ClientError> {
+        Ok(format!("Mock network {connection_id} activate={activate}"))
+    }
+
+    async fn get_packages(&self) -> Result<cybou_web_contracts::PackagesProjection, ClientError> {
+        Ok(cybou_web_contracts::PackagesProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            installed_count: 0,
+            upgradable_count: 0,
+            packages: Vec::new(),
+        })
+    }
+
+    async fn execute_package_action(&self, name: &str, action: cybou_protocol::system::PackageActionKind) -> Result<String, ClientError> {
+        Ok(format!("Mock package action on {name}: {action:?}"))
+    }
+
+    async fn get_system_updates(&self) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError> {
+        Ok(cybou_web_contracts::SystemUpdatesProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            summary: cybou_protocol::system::SystemUpdatesSummary {
+                pending_count: 0,
+                security_updates_count: 0,
+                kernel_update: false,
+                reboot_required: false,
+                total_download_bytes: 0,
+                packages: Vec::new(),
+            },
+        })
+    }
+
+    async fn apply_system_updates(&self, _package_names: Option<Vec<String>>) -> Result<String, ClientError> {
+        Ok("Mock applied system updates".to_owned())
+    }
+
+    async fn get_users_settings(&self) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError> {
+        Ok(cybou_web_contracts::UsersSettingsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            users: Vec::new(),
+            ssh_keys: Vec::new(),
+        })
+    }
+
+    async fn create_user(&self, username: &str, full_name: &str, is_admin: bool) -> Result<cybou_protocol::system::UserAccountRecord, ClientError> {
+        Ok(cybou_protocol::system::UserAccountRecord {
+            uid: 1001,
+            username: username.to_owned(),
+            full_name: full_name.to_owned(),
+            home_dir: format!("/home/{username}"),
+            shell: "/bin/bash".to_owned(),
+            groups: vec![username.to_owned()],
+            is_admin,
+            is_locked: false,
+        })
+    }
+
+    async fn add_ssh_key(&self, name: &str, public_key: &str) -> Result<cybou_protocol::system::SshKeyRecord, ClientError> {
+        Ok(cybou_protocol::system::SshKeyRecord {
+            id: "mock-key-01".to_owned(),
+            name: name.to_owned(),
+            fingerprint: "SHA256:mockfp".to_owned(),
+            key_type: "ssh-ed25519".to_owned(),
+            public_key: public_key.to_owned(),
+            created_at: "2026-08-28T22:00:00Z".to_owned(),
+        })
+    }
+
+    async fn delete_ssh_key(&self, key_id: &str) -> Result<String, ClientError> {
+        Ok(format!("Mock deleted SSH key {key_id}"))
+    }
+
+    async fn get_security_settings(&self) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError> {
+        Ok(cybou_web_contracts::SecuritySettingsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            policy: cybou_protocol::system::SecurityPolicyRecord {
+                landlock_enabled: true,
+                bubblewrap_enabled: true,
+                apparmor_enforcing: true,
+                seccomp_strict: true,
+                egress_firewall_strict: true,
+            },
+            audit_log: Vec::new(),
+        })
+    }
+
+    async fn update_security_policy(&self, req: cybou_web_contracts::UpdateSecurityPolicyRequest) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError> {
+        Ok(cybou_protocol::system::SecurityPolicyRecord {
+            landlock_enabled: req.landlock_enabled,
+            bubblewrap_enabled: req.bubblewrap_enabled,
+            apparmor_enforcing: req.apparmor_enforcing,
+            seccomp_strict: req.seccomp_strict,
+            egress_firewall_strict: req.egress_firewall_strict,
+        })
+    }
+
+    async fn get_backup_settings(&self) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError> {
+        Ok(cybou_web_contracts::BackupSettingsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            repository: cybou_protocol::system::BackupRepositoryRecord {
+                id: "mock-repo".to_owned(),
+                name: "Mock Vault".to_owned(),
+                destination: "/var/backups".to_owned(),
+                encryption: "repokey".to_owned(),
+                last_backup_time: None,
+                total_archives: 0,
+                total_size_bytes: 0,
+            },
+            archives: Vec::new(),
+            schedule: cybou_protocol::system::BackupScheduleRecord {
+                enabled: true,
+                frequency: "daily".to_owned(),
+                retention_daily: 7,
+                retention_weekly: 4,
+                retention_monthly: 12,
+            },
+        })
+    }
+
+    async fn trigger_backup(&self, name: Option<String>) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError> {
+        Ok(cybou_protocol::system::BackupArchiveRecord {
+            id: "mock-arch-01".to_owned(),
+            name: name.unwrap_or_else(|| "backup".to_owned()),
+            timestamp: "2026-08-28T22:00:00Z".to_owned(),
+            size_bytes: 1_000_000_000,
+            duration_seconds: 10,
+        })
+    }
+
+    async fn restore_archive(&self, archive_id: &str, _target_path: Option<String>) -> Result<String, ClientError> {
+        Ok(format!("Mock restored archive {archive_id}"))
+    }
+
+    async fn update_backup_schedule(&self, req: cybou_web_contracts::UpdateBackupScheduleRequest) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError> {
+        Ok(cybou_protocol::system::BackupScheduleRecord {
+            enabled: req.enabled,
+            frequency: req.frequency,
+            retention_daily: req.retention_daily,
+            retention_weekly: req.retention_weekly,
+            retention_monthly: req.retention_monthly,
+        })
+    }
+
+    async fn get_mail(&self, account_id: Option<String>, folder: Option<cybou_protocol::personal::MailFolderKind>) -> Result<cybou_web_contracts::MailProjection, ClientError> {
+        Ok(cybou_web_contracts::MailProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            accounts: Vec::new(),
+            messages: Vec::new(),
+            active_account_id: account_id.unwrap_or_default(),
+            active_folder: folder.unwrap_or(cybou_protocol::personal::MailFolderKind::Inbox),
+        })
+    }
+
+    async fn send_mail(&self, req: cybou_web_contracts::SendMailRequest) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError> {
+        Ok(cybou_protocol::personal::MailMessageRecord {
+            id: "mock-msg-01".to_owned(),
+            account_id: req.account_id,
+            folder: cybou_protocol::personal::MailFolderKind::Sent,
+            from: "mock@cybou.local".to_owned(),
+            to: req.to,
+            subject: req.subject,
+            preview: req.body.clone(),
+            body: req.body,
+            timestamp: "2026-08-28T23:00:00Z".to_owned(),
+            is_unread: false,
+            is_starred: false,
+            referenced_subject: req.referenced_subject,
+        })
+    }
+
+    async fn get_calendar(&self) -> Result<cybou_web_contracts::CalendarProjection, ClientError> {
+        Ok(cybou_web_contracts::CalendarProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            events: Vec::new(),
+        })
+    }
+
+    async fn create_calendar_event(&self, req: cybou_web_contracts::CreateCalendarEventRequest) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError> {
+        Ok(cybou_protocol::personal::CalendarEventRecord {
+            id: "mock-evt-01".to_owned(),
+            title: req.title,
+            description: req.description,
+            start_time: req.start_time,
+            end_time: req.end_time,
+            is_all_day: req.is_all_day,
+            location: req.location,
+            attendees: req.attendees,
+            color_category: req.color_category,
+            referenced_subject: req.referenced_subject,
+        })
+    }
+
+    async fn get_notes(&self) -> Result<cybou_web_contracts::NotesProjection, ClientError> {
+        Ok(cybou_web_contracts::NotesProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            notes: Vec::new(),
+        })
+    }
+
+    async fn create_note(&self, req: cybou_web_contracts::CreateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
+        Ok(cybou_protocol::personal::NoteRecord {
+            id: "mock-note-01".to_owned(),
+            title: req.title,
+            content_markdown: req.content_markdown,
+            tags: req.tags,
+            updated_at: "2026-08-28T23:00:00Z".to_owned(),
+            is_pinned: req.is_pinned,
+            referenced_subject: req.referenced_subject,
+        })
+    }
+
+    async fn update_note(&self, req: cybou_web_contracts::UpdateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
+        Ok(cybou_protocol::personal::NoteRecord {
+            id: req.id,
+            title: req.title,
+            content_markdown: req.content_markdown,
+            tags: req.tags,
+            updated_at: "2026-08-28T23:00:00Z".to_owned(),
+            is_pinned: req.is_pinned,
+            referenced_subject: None,
+        })
+    }
+
+    async fn get_contacts(&self) -> Result<cybou_web_contracts::ContactsProjection, ClientError> {
+        Ok(cybou_web_contracts::ContactsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            contacts: Vec::new(),
+        })
+    }
+
+    async fn create_contact(&self, req: cybou_web_contracts::CreateContactRequest) -> Result<cybou_protocol::personal::ContactRecord, ClientError> {
+        Ok(cybou_protocol::personal::ContactRecord {
+            id: "mock-cnt-01".to_owned(),
+            name: req.name,
+            email: req.email,
+            role: req.role,
+            organization: req.organization,
+            phone: req.phone,
+            tags: req.tags,
+            notes: req.notes,
+            referenced_subject: req.referenced_subject,
+        })
+    }
+
+    async fn get_cognitive_graph(&self, focus: Option<String>) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
+        Ok(cybou_web_contracts::CognitiveGraphProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            graph: cybou_protocol::cognitive::CognitiveGraphRecord {
+                nodes: Vec::new(),
+                edges: Vec::new(),
+            },
+            focus_node_id: focus,
+        })
+    }
+
+    async fn query_cognitive_graph(&self, req: cybou_web_contracts::CognitiveQueryRequest) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
+        Ok(cybou_web_contracts::CognitiveGraphProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            graph: cybou_protocol::cognitive::CognitiveGraphRecord {
+                nodes: Vec::new(),
+                edges: Vec::new(),
+            },
+            focus_node_id: req.focus_id,
+        })
+    }
+
+    async fn get_event_journal(&self, _limit: Option<usize>, _offset: Option<usize>) -> Result<cybou_web_contracts::EventJournalProjection, ClientError> {
+        Ok(cybou_web_contracts::EventJournalProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            entries: Vec::new(),
+            total_count: 0,
+        })
+    }
+
+    async fn interpret_meaning(&self, req: &cybou_web_contracts::MeaningInterpretRequest) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError> {
+        let now = time::OffsetDateTime::now_utc();
+        Ok(cybou_web_contracts::MeaningInterpretProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            interpretation: cybou_protocol::meaning::MeaningInterpretation {
+                utterance: req.utterance.clone(),
+                primary_act: cybou_protocol::meaning::CognitiveAct {
+                    act_id: uuid::Uuid::new_v4(),
+                    kind: cybou_protocol::meaning::CognitiveActKind::Ask,
+                    subject: req.utterance.clone(),
+                    parameters: Vec::new(),
+                    source: "person".to_owned(),
+                    evidence: Vec::new(),
+                },
+                references: Vec::new(),
+                confidence: 0.9,
+                ambiguous: false,
+                derived_at: now,
+            },
+            response_plan: Some(cybou_protocol::meaning::ResponsePlan {
+                plan_id: uuid::Uuid::new_v4(),
+                intent: "mock_response".to_owned(),
+                key_points: vec![format!("Interpreted query '{}'", req.utterance)],
+                referenced_evidence: Vec::new(),
+                qualifications: Vec::new(),
+            }),
+            realization: Some(format!("Mock response to '{}'", req.utterance)),
+        })
+    }
+
+    async fn get_dialogue_memory(&self) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError> {
+        Ok(cybou_web_contracts::DialogueMemoryProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            current_turn: 1,
+            remembered_referents: vec!["system".to_owned(), "cybou-web-gateway".to_owned()],
+            turns_bound: 20,
+        })
+    }
+
+    async fn get_learning_candidates(&self, _layer: Option<String>) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError> {
+        let now = time::OffsetDateTime::now_utc();
+        Ok(cybou_web_contracts::LearningCandidatesProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            candidates: vec![
+                cybou_protocol::learning::LearningCandidate {
+                    candidate_id: uuid::Uuid::new_v4(),
+                    layer: cybou_protocol::learning::LearningLayer::Procedural,
+                    source_evidence: vec![uuid::Uuid::new_v4()],
+                    outcome_evidence: vec![uuid::Uuid::new_v4()],
+                    generalization: "Auto-reconnect D-Bus daemon on dropped connection".into(),
+                    scope: "service.dbus".into(),
+                    derivation_version: 1,
+                    created_at: now,
+                },
+            ],
+            total_count: 1,
+        })
+    }
+
+    async fn propose_learning_candidate(&self, req: &cybou_web_contracts::ProposeLearningCandidateRequest) -> Result<cybou_protocol::learning::LearningCandidate, ClientError> {
+        let now = time::OffsetDateTime::now_utc();
+        Ok(cybou_protocol::learning::LearningCandidate {
+            candidate_id: uuid::Uuid::new_v4(),
+            layer: req.layer,
+            source_evidence: req.source_evidence.clone(),
+            outcome_evidence: req.outcome_evidence.clone(),
+            generalization: req.generalization.clone(),
+            scope: req.scope.clone(),
+            derivation_version: 1,
+            created_at: now,
+        })
+    }
+
+    async fn evaluate_learning_candidate(&self, candidate_id: uuid::Uuid, _req: Option<&cybou_web_contracts::EvaluateCandidateRequest>) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
+        let now = time::OffsetDateTime::now_utc();
+        Ok(cybou_web_contracts::CandidateEvaluationProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            candidate_id,
+            promoted: Some(cybou_protocol::promotion::Promoted {
+                candidate_id,
+                layer: cybou_protocol::learning::LearningLayer::Procedural,
+                independent_episodes: 3,
+                success_rate: 1.0,
+            }),
+            refused: None,
+            artifact: Some(cybou_protocol::learning::LearnedArtifactLineage {
+                artifact_id: uuid::Uuid::new_v4(),
+                layer: cybou_protocol::learning::LearningLayer::Procedural,
+                status: cybou_protocol::learning::ArtifactStatus::Promoted,
+                contributing_candidates: vec![candidate_id],
+                source_evidence: vec![uuid::Uuid::new_v4()],
+                promoted_at: Some(now),
+                erasure_epoch: 1,
+            }),
+        })
+    }
+
+    async fn get_learned_artifacts(&self) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError> {
+        let now = time::OffsetDateTime::now_utc();
+        Ok(cybou_web_contracts::LearnedArtifactsProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            artifacts: vec![
+                cybou_protocol::learning::LearnedArtifactLineage {
+                    artifact_id: uuid::Uuid::new_v4(),
+                    layer: cybou_protocol::learning::LearningLayer::Procedural,
+                    status: cybou_protocol::learning::ArtifactStatus::Promoted,
+                    contributing_candidates: vec![uuid::Uuid::new_v4()],
+                    source_evidence: vec![uuid::Uuid::new_v4()],
+                    promoted_at: Some(now),
+                    erasure_epoch: 1,
+                },
+            ],
+            total_count: 1,
+        })
+    }
+
+    async fn revoke_learned_artifact(&self, _artifact_id: uuid::Uuid, _reason: &str) -> Result<(), ClientError> {
+        Ok(())
+    }
+
+    async fn get_governance_scopes(&self) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError> {
+        let now = time::OffsetDateTime::now_utc();
+        Ok(cybou_web_contracts::GovernanceScopesProjection {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            scopes: vec![
+                cybou_protocol::governance::TaskScope {
+                    actor_id: uuid::Uuid::new_v4(),
+                    kind: cybou_protocol::governance::ActorKind::Agent,
+                    intention_id: Some(uuid::Uuid::new_v4()),
+                    capabilities: vec!["fs.read".into(), "terminal.exec".into()],
+                    tool_grants: vec!["git.status".into()],
+                    network_destinations: vec!["localhost".into()],
+                    ttl_seconds: 3600,
+                    max_compute_ms: 60000,
+                    delegation_permitted: true,
+                    granted_at: now,
+                },
+            ],
+        })
     }
 
     async fn close_shell(&self, _instance: u32) -> Result<(), ClientError> {

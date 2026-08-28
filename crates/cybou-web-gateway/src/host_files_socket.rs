@@ -7,13 +7,15 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use cybou_host_filesd::{Request, Response};
-use cybou_web_contracts::{FileContentProjection, HostDirectoryListingProjection};
+use cybou_web_contracts::{
+    FileContentProjection, FileWriteProjection, HostDirectoryListingProjection,
+};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 use crate::state::{GatewayError, HostUserFileSource};
 
-const RESPONSE_MAX_BYTES: u64 = 512 * 1024;
-const ROUND_TRIP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const RESPONSE_MAX_BYTES: u64 = 1024 * 1024;
+const ROUND_TRIP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Per-UID Unix-socket client for host-user filesystem owners.
 pub struct SocketHostUserFiles {
@@ -83,7 +85,9 @@ impl HostUserFileSource for SocketHostUserFiles {
             .await?
         {
             Response::Directory(projection) => Ok(projection),
-            Response::File(_) => Err(GatewayError::InvalidProjection),
+            Response::File(_) | Response::Written(_) | Response::Success => {
+                Err(GatewayError::InvalidProjection)
+            }
             Response::Refused => Err(GatewayError::Unavailable),
         }
     }
@@ -104,8 +108,156 @@ impl HostUserFileSource for SocketHostUserFiles {
             .await?
         {
             Response::File(projection) => Ok(projection),
-            Response::Directory(_) => Err(GatewayError::InvalidProjection),
+            Response::Directory(_) | Response::Written(_) | Response::Success => {
+                Err(GatewayError::InvalidProjection)
+            }
             Response::Refused => Err(GatewayError::Unavailable),
+        }
+    }
+
+    async fn write_file(
+        &self,
+        uid: u32,
+        _home: &str,
+        path: &str,
+        expected_sha256: Option<String>,
+        text: &str,
+    ) -> Result<FileWriteProjection, GatewayError> {
+        match self
+            .ask(
+                uid,
+                &Request::WriteFile {
+                    path: path.to_owned(),
+                    expected_sha256,
+                    text: text.to_owned(),
+                },
+            )
+            .await?
+        {
+            Response::Written(projection) => Ok(projection),
+            Response::File(_) | Response::Directory(_) | Response::Success => {
+                Err(GatewayError::InvalidProjection)
+            }
+            Response::Refused => Err(GatewayError::Unavailable),
+        }
+    }
+
+    async fn create_file(
+        &self,
+        uid: u32,
+        _home: &str,
+        path: &str,
+        text: &str,
+        exclusive: bool,
+    ) -> Result<FileWriteProjection, GatewayError> {
+        match self
+            .ask(
+                uid,
+                &Request::CreateFile {
+                    path: path.to_owned(),
+                    text: text.to_owned(),
+                    exclusive,
+                },
+            )
+            .await?
+        {
+            Response::Written(projection) => Ok(projection),
+            Response::File(_) | Response::Directory(_) | Response::Success => {
+                Err(GatewayError::InvalidProjection)
+            }
+            Response::Refused => Err(GatewayError::Unavailable),
+        }
+    }
+
+    async fn create_directory(
+        &self,
+        uid: u32,
+        _home: &str,
+        path: &str,
+        recursive: bool,
+    ) -> Result<(), GatewayError> {
+        match self
+            .ask(
+                uid,
+                &Request::CreateDirectory {
+                    path: path.to_owned(),
+                    recursive,
+                },
+            )
+            .await?
+        {
+            Response::Success => Ok(()),
+            Response::Refused => Err(GatewayError::Unavailable),
+            _ => Err(GatewayError::InvalidProjection),
+        }
+    }
+
+    async fn rename_path(
+        &self,
+        uid: u32,
+        _home: &str,
+        from_path: &str,
+        to_path: &str,
+    ) -> Result<(), GatewayError> {
+        match self
+            .ask(
+                uid,
+                &Request::RenamePath {
+                    from_path: from_path.to_owned(),
+                    to_path: to_path.to_owned(),
+                },
+            )
+            .await?
+        {
+            Response::Success => Ok(()),
+            Response::Refused => Err(GatewayError::Unavailable),
+            _ => Err(GatewayError::InvalidProjection),
+        }
+    }
+
+    async fn delete_path(
+        &self,
+        uid: u32,
+        _home: &str,
+        path: &str,
+        recursive: bool,
+    ) -> Result<(), GatewayError> {
+        match self
+            .ask(
+                uid,
+                &Request::DeletePath {
+                    path: path.to_owned(),
+                    recursive,
+                },
+            )
+            .await?
+        {
+            Response::Success => Ok(()),
+            Response::Refused => Err(GatewayError::Unavailable),
+            _ => Err(GatewayError::InvalidProjection),
+        }
+    }
+
+    async fn copy_path(
+        &self,
+        uid: u32,
+        _home: &str,
+        from_path: &str,
+        to_path: &str,
+    ) -> Result<(), GatewayError> {
+        match self
+            .ask(
+                uid,
+                &Request::CopyPath {
+                    from_path: from_path.to_owned(),
+                    to_path: to_path.to_owned(),
+                },
+            )
+            .await?
+        {
+            Response::Success => Ok(()),
+            Response::Refused => Err(GatewayError::Unavailable),
+            _ => Err(GatewayError::InvalidProjection),
         }
     }
 }

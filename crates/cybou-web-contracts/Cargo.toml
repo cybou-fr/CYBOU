@@ -13,6 +13,7 @@ repository.workspace = true
 [dependencies]
 cybou-protocol = { path = "../cybou-protocol" }
 serde.workspace = true
+time.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]

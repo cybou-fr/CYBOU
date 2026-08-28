@@ -21,22 +21,43 @@ use uuid::Uuid;
 pub mod access;
 #[cfg(target_os = "linux")]
 pub mod auth_socket;
+/// Deep cross-subsystem Cognitive Graph & Canonical Event1 Journal provider.
+pub mod cognitive_hub;
 pub mod disclose;
 pub mod fixture;
 #[cfg(target_os = "linux")]
 pub mod host_files_socket;
-#[cfg(target_os = "linux")]
+/// Insight summaries.
 pub mod insight;
+/// Meaning and dialogue parsing engine.
+pub mod meaning_hub;
+/// Lifelong learning candidate evaluation, artifact lineages, and capability governance.
+pub mod learning_hub;
+/// Desktop notifications hub.
+pub mod notifications_hub;
+/// Long-running server operations manager.
+pub mod operations_hub;
+/// Personal pack (Mail, Calendar, Notes, Contacts).
+pub mod personal_hub;
+/// Real-time D-Bus presence subscription.
 pub mod presence_zbus;
+/// Sensitive information redaction.
 pub mod redact;
+/// HTTP route handlers.
 pub mod routes;
+/// Bounded sandboxed shell sessions.
 pub mod shells;
+/// Gateway application state.
 pub mod state;
+/// System services, processes, storage, network, and packages provider.
+pub mod system_hub;
 
 pub use access::{
     CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions, VerifiedAccount,
 };
 pub use disclose::Disclosures;
+pub use learning_hub as learning;
+pub use meaning_hub as meaning;
 pub use shells::{SHELL_IDLE_LIFETIME, ShellOwner, Shells, sandbox_root};
 pub use state::{
     Delivered, DisclosureSink, EVENT_POLL_INTERVAL, GatewayError, PresenceSource, SNAPSHOT_BUDGET,
@@ -44,12 +65,26 @@ pub use state::{
 };
 
 use routes::{
-    actions_handler, agent_offers_handler, agents_handler, api_not_found, create_file_handler,
-    delete_draft_handler, disclosure_handler, events_handler, insight_handler,
-    launch_agent_handler, list_directory_handler, list_drafts_handler, list_host_directory_handler,
-    login_handler, logout_handler, mind_handler, read_file_handler, read_host_file_handler,
-    recent_actions_handler, save_draft_handler, session_handler, shell_close_handler,
-    shell_exec_handler, snapshot_handler, stop_agent_handler, write_file_handler,
+    actions_handler, add_ssh_key, agent_offers_handler, agents_handler, api_not_found,
+    apply_system_updates, cancel_operation, capsule_action_handler, capsule_telemetry_handler,
+    connect_network, copy_host_path_handler, create_calendar_event, create_contact,
+    create_file_handler, create_host_directory_handler, create_host_file_handler, create_note,
+    create_snapshot, create_user, delete_draft_handler, delete_host_path_handler, delete_ssh_key,
+    dialogue_memory_handler, disclosure_handler, dismiss_notifications, events_handler,
+    execute_notification_action, execute_package_action, execute_service_action,
+    get_artifacts_handler, get_backup_settings, get_calendar, get_candidates_handler,
+    get_cognitive_graph, get_contacts, get_event_journal, get_governance_scopes_handler,
+    get_mail, get_network, get_notes, get_operation, get_operation_logs, get_packages,
+    get_security_settings, get_storage, get_system_logs, get_system_monitor, get_system_updates,
+    get_users_settings, insight_handler, interpret_handler, launch_agent_handler,
+    list_directory_handler, list_drafts_handler, list_host_directory_handler, list_notifications,
+    list_operations, list_processes, list_services, login_handler, logout_handler, mind_handler,
+    propose_candidate_handler, query_cognitive_graph, read_file_handler, read_host_file_handler,
+    recent_actions_handler, rename_host_path_handler, restore_archive, restore_snapshot,
+    revoke_artifact_handler, save_draft_handler, send_mail, send_process_signal, session_handler,
+    shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler, trigger_backup,
+    update_backup_schedule, update_note, update_security_policy, write_file_handler,
+    write_host_file_handler, evaluate_candidate_handler,
 };
 use state::GatewayState;
 
@@ -182,6 +217,13 @@ pub(crate) fn router_in_sandbox(
         files: jail,
         host_user_files: host_user_files_source(),
         drafts,
+        operations: Arc::new(crate::operations_hub::OperationsHub::new()),
+        notifications: Arc::new(crate::notifications_hub::NotificationsHub::new()),
+        system: Arc::new(crate::system_hub::SystemHub::new()),
+        personal: Arc::new(crate::personal_hub::PersonalHub::new()),
+        cognitive: Arc::new(crate::cognitive_hub::CognitiveHub::new()),
+        meaning: Arc::new(crate::meaning_hub::MeaningHub::new()),
+        learning: Arc::new(crate::learning_hub::LearningHub::new()),
     };
 
     let app = Router::new()
@@ -201,6 +243,8 @@ pub(crate) fn router_in_sandbox(
             get(agents_handler).post(launch_agent_handler),
         )
         .route("/api/v1/agents/{capsule_id}", delete(stop_agent_handler))
+        .route("/api/v1/agents/{capsule_id}/action", post(capsule_action_handler))
+        .route("/api/v1/agents/{capsule_id}/telemetry", get(capsule_telemetry_handler))
         .route("/api/v1/shell/exec", post(shell_exec_handler))
         .route("/api/v1/shell/close", post(shell_close_handler))
         .route("/api/v1/files/list", post(list_directory_handler))
@@ -209,9 +253,72 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/files/create", post(create_file_handler))
         .route("/api/v1/host-files/list", post(list_host_directory_handler))
         .route("/api/v1/host-files/read", post(read_host_file_handler))
+        .route("/api/v1/host-files/write", post(write_host_file_handler))
+        .route("/api/v1/host-files/create", post(create_host_file_handler))
+        .route("/api/v1/host-files/mkdir", post(create_host_directory_handler))
+        .route("/api/v1/host-files/rename", post(rename_host_path_handler))
+        .route("/api/v1/host-files/delete", post(delete_host_path_handler))
+        .route("/api/v1/host-files/copy", post(copy_host_path_handler))
         .route("/api/v1/drafts", get(list_drafts_handler))
         .route("/api/v1/drafts/save", post(save_draft_handler))
         .route("/api/v1/drafts/delete", post(delete_draft_handler))
+        .route("/api/v1/operations", get(list_operations))
+        .route("/api/v1/operations/{id}", get(get_operation))
+        .route("/api/v1/operations/{id}/logs", get(get_operation_logs))
+        .route("/api/v1/operations/cancel", post(cancel_operation))
+        .route("/api/v1/notifications", get(list_notifications))
+        .route("/api/v1/notifications/dismiss", post(dismiss_notifications))
+        .route("/api/v1/notifications/action", post(execute_notification_action))
+        .route("/api/v1/system/services", get(list_services))
+        .route("/api/v1/system/services/action", post(execute_service_action))
+        .route("/api/v1/system/processes", get(list_processes))
+        .route("/api/v1/system/processes/signal", post(send_process_signal))
+        .route("/api/v1/system/monitor", get(get_system_monitor))
+        .route("/api/v1/system/logs", get(get_system_logs))
+        .route("/api/v1/system/storage", get(get_storage))
+        .route("/api/v1/system/storage/snapshots", post(create_snapshot))
+        .route("/api/v1/system/storage/restore", post(restore_snapshot))
+        .route("/api/v1/system/network", get(get_network))
+        .route("/api/v1/system/network/connect", post(connect_network))
+        .route("/api/v1/system/packages", get(get_packages))
+        .route("/api/v1/system/packages/action", post(execute_package_action))
+        .route("/api/v1/system/updates", get(get_system_updates))
+        .route("/api/v1/system/updates/apply", post(apply_system_updates))
+        .route("/api/v1/system/users", get(get_users_settings).post(create_user))
+        .route("/api/v1/system/users/ssh-keys", post(add_ssh_key))
+        .route("/api/v1/system/users/ssh-keys/delete", post(delete_ssh_key))
+        .route("/api/v1/system/security", get(get_security_settings))
+        .route("/api/v1/system/security/policy", post(update_security_policy))
+        .route("/api/v1/system/backup", get(get_backup_settings))
+        .route("/api/v1/system/backup/trigger", post(trigger_backup))
+        .route("/api/v1/system/backup/restore", post(restore_archive))
+        .route("/api/v1/system/backup/schedule", post(update_backup_schedule))
+        .route("/api/v1/personal/mail", get(get_mail))
+        .route("/api/v1/personal/mail/send", post(send_mail))
+        .route("/api/v1/personal/calendar", get(get_calendar))
+        .route("/api/v1/personal/calendar/events", post(create_calendar_event))
+        .route("/api/v1/personal/notes", get(get_notes).post(create_note))
+        .route("/api/v1/personal/notes/update", post(update_note))
+        .route("/api/v1/personal/contacts", get(get_contacts).post(create_contact))
+        .route("/api/v1/cognitive/graph", get(get_cognitive_graph))
+        .route("/api/v1/cognitive/query", post(query_cognitive_graph))
+        .route("/api/v1/cognitive/journal", get(get_event_journal))
+        .route("/api/v1/meaning/interpret", post(interpret_handler))
+        .route("/api/v1/meaning/dialogue", get(dialogue_memory_handler))
+        .route(
+            "/api/v1/learning/candidates",
+            get(get_candidates_handler).post(propose_candidate_handler),
+        )
+        .route(
+            "/api/v1/learning/candidates/{candidate_id}/evaluate",
+            post(evaluate_candidate_handler),
+        )
+        .route("/api/v1/learning/artifacts", get(get_artifacts_handler))
+        .route(
+            "/api/v1/learning/artifacts/{artifact_id}/revoke",
+            post(revoke_artifact_handler),
+        )
+        .route("/api/v1/governance/scopes", get(get_governance_scopes_handler))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(

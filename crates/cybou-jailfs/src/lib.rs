@@ -729,6 +729,112 @@ impl JailFs {
         fs::create_dir_all(&path).map_err(|e| JailError::Io(e.to_string()))
     }
 
+    /// Create a single directory inside the sandbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JailError`] on traversal violation, existing target, or creation failure.
+    pub fn create_dir(&self, virtual_path: &str) -> Result<(), JailError> {
+        let path = self.resolve(virtual_path)?;
+        if path.exists() {
+            return Err(JailError::AlreadyExists(virtual_path.to_string()));
+        }
+        fs::create_dir(&path).map_err(|e| JailError::Io(e.to_string()))
+    }
+
+    /// Remove a file or directory within the sandbox.
+    ///
+    /// Refuses to remove the sandbox root.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JailError`] if the path does not exist, attempts to delete root, or I/O fails.
+    pub fn remove_path(&self, virtual_path: &str, recursive: bool) -> Result<(), JailError> {
+        let path = self.resolve(virtual_path)?;
+        if path == self.canonical_root {
+            return Err(JailError::TraversalAttempt(
+                "cannot delete jail root".to_string(),
+            ));
+        }
+        if !path.exists() {
+            return Err(JailError::NotFound(virtual_path.to_string()));
+        }
+        if path.is_dir() {
+            if recursive {
+                fs::remove_dir_all(&path).map_err(|e| JailError::Io(e.to_string()))?;
+            } else {
+                fs::remove_dir(&path).map_err(|e| JailError::Io(e.to_string()))?;
+            }
+        } else {
+            fs::remove_file(&path).map_err(|e| JailError::Io(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Rename or move a path within the sandbox.
+    ///
+    /// Refuses to move the sandbox root.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JailError`] on traversal attempt, missing source, or I/O failure.
+    pub fn rename_path(&self, from_virtual: &str, to_virtual: &str) -> Result<(), JailError> {
+        let from = self.resolve(from_virtual)?;
+        let to = self.resolve(to_virtual)?;
+        if from == self.canonical_root || to == self.canonical_root {
+            return Err(JailError::TraversalAttempt(
+                "cannot move jail root".to_string(),
+            ));
+        }
+        if !from.exists() {
+            return Err(JailError::NotFound(from_virtual.to_string()));
+        }
+        if let Some(parent) = to.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).map_err(|e| JailError::Io(e.to_string()))?;
+        }
+        fs::rename(&from, &to).map_err(|e| JailError::Io(e.to_string()))
+    }
+
+    /// Copy a file or directory tree within the sandbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JailError`] on traversal attempt, missing source, or I/O failure.
+    pub fn copy_path(&self, from_virtual: &str, to_virtual: &str) -> Result<(), JailError> {
+        let from = self.resolve(from_virtual)?;
+        let to = self.resolve(to_virtual)?;
+        if !from.exists() {
+            return Err(JailError::NotFound(from_virtual.to_string()));
+        }
+        if let Some(parent) = to.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).map_err(|e| JailError::Io(e.to_string()))?;
+        }
+        if from.is_dir() {
+            fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+                fs::create_dir_all(dst)?;
+                for entry in fs::read_dir(src)? {
+                    let entry = entry?;
+                    let ty = entry.file_type()?;
+                    let target = dst.join(entry.file_name());
+                    if ty.is_dir() {
+                        copy_dir_recursive(&entry.path(), &target)?;
+                    } else {
+                        fs::copy(entry.path(), target)?;
+                    }
+                }
+                Ok(())
+            }
+            copy_dir_recursive(&from, &to).map_err(|e| JailError::Io(e.to_string()))?;
+        } else {
+            fs::copy(&from, &to).map_err(|e| JailError::Io(e.to_string()))?;
+        }
+        Ok(())
+    }
+
     /// Check if a virtual path exists within the sandbox.
     #[must_use]
     pub fn exists(&self, virtual_path: &str) -> bool {

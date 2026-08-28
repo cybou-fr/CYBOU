@@ -39,6 +39,10 @@ pub enum SubjectQuery {
     Package(String),
     /// Lookup a spatial anchor by identity.
     Anchor(String),
+    /// Lookup an active or historical operation by ID.
+    Operation(String),
+    /// Lookup an operating system process by PID or name.
+    Process(String),
 }
 
 impl SubjectQuery {
@@ -51,6 +55,8 @@ impl SubjectQuery {
             Self::Agent(_) => "Agent query",
             Self::Package(_) => "Package query",
             Self::Anchor(_) => "Anchor query",
+            Self::Operation(_) => "Operation query",
+            Self::Process(_) => "Process query",
         }
     }
 
@@ -62,7 +68,9 @@ impl SubjectQuery {
             | Self::File(value)
             | Self::Agent(value)
             | Self::Package(value)
-            | Self::Anchor(value) => value,
+            | Self::Anchor(value)
+            | Self::Operation(value)
+            | Self::Process(value) => value,
         }
     }
 }
@@ -166,6 +174,15 @@ pub enum SubjectRef {
         /// Human-readable label.
         label: String,
     },
+    /// Server-owned background operation or long-running task.
+    Operation {
+        /// Operation identifier.
+        operation_id: String,
+        /// Operation kind.
+        kind: String,
+        /// Human-readable label or description.
+        label: String,
+    },
 }
 
 impl SubjectRef {
@@ -197,6 +214,7 @@ impl SubjectRef {
                 }
             }
             Self::Anchor { label, .. } => format!("Anchor: {label}"),
+            Self::Operation { label, .. } => format!("Op: {label}"),
         }
     }
 
@@ -214,6 +232,7 @@ impl SubjectRef {
             Self::Filesystem { .. } => "Filesystem",
             Self::Package { .. } => "Package",
             Self::Anchor { .. } => "Anchor",
+            Self::Operation { .. } => "Operation",
         }
     }
 
@@ -242,6 +261,7 @@ impl SubjectRef {
             Self::Filesystem { mount_point, .. } => format!("cybou://filesystem{mount_point}"),
             Self::Package { name, .. } => format!("cybou://package/{name}"),
             Self::Anchor { anchor_id, .. } => format!("cybou://anchor/{anchor_id}"),
+            Self::Operation { operation_id, .. } => format!("cybou://operation/{operation_id}"),
         }
     }
 
@@ -279,6 +299,7 @@ impl SubjectRef {
             Self::Filesystem { mount_point, .. } => format!("/#/filesystem{mount_point}"),
             Self::Package { name, .. } => format!("/#/package/{}", encoded_segment(name)),
             Self::Anchor { anchor_id, .. } => format!("/#/anchor/{anchor_id}"),
+            Self::Operation { operation_id, .. } => format!("/#/operation/{operation_id}"),
         }
     }
 
@@ -317,7 +338,7 @@ impl SubjectRef {
                 event_id: decoded_segment(event_id)?,
             }),
             [
-                "file" | "process" | "agent" | "certificate" | "filesystem" | "anchor",
+                "file" | "process" | "agent" | "certificate" | "filesystem" | "anchor" | "operation",
                 ..,
             ] => Err(SubjectDeepLinkError::OwnerResolutionRequired),
             _ => Err(SubjectDeepLinkError::InvalidRoute),

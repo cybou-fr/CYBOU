@@ -125,6 +125,156 @@ pub async fn read_host_file_handler(
     Ok(Json(projection))
 }
 
+/// Conditionally write an existing host file.
+pub async fn write_host_file_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<cybou_web_contracts::HostFileWriteRequest>,
+) -> Result<Json<cybou_web_contracts::FileWriteProjection>, Refusal> {
+    let session = state
+        .session_for(&headers)
+        .ok_or_else(GatewayState::sign_in_required)?;
+    let (Some(uid), Some(home)) = (session.uid, session.home.as_deref()) else {
+        return Err(unavailable());
+    };
+    if !is_inside_home(&payload.path, home) {
+        return Err(invalid_owner_projection());
+    }
+    let source = state.host_user_files.as_ref().ok_or_else(unavailable)?;
+    let projection = source
+        .write_file(
+            uid,
+            home,
+            &payload.path,
+            payload.expected_sha256,
+            &payload.text,
+        )
+        .await
+        .map_err(|_| unavailable())?;
+    if !is_matching_host_location(&projection.location, &payload.path) {
+        return Err(invalid_owner_projection());
+    }
+    Ok(Json(projection))
+}
+
+/// Create a new file in the user's home authority domain.
+pub async fn create_host_file_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<cybou_web_contracts::HostFileCreateRequest>,
+) -> Result<Json<cybou_web_contracts::FileWriteProjection>, Refusal> {
+    let session = state
+        .session_for(&headers)
+        .ok_or_else(GatewayState::sign_in_required)?;
+    let (Some(uid), Some(home)) = (session.uid, session.home.as_deref()) else {
+        return Err(unavailable());
+    };
+    if !is_inside_home(&payload.path, home) {
+        return Err(invalid_owner_projection());
+    }
+    let source = state.host_user_files.as_ref().ok_or_else(unavailable)?;
+    let projection = source
+        .create_file(uid, home, &payload.path, &payload.text, payload.exclusive)
+        .await
+        .map_err(|_| unavailable())?;
+    if !is_matching_host_location(&projection.location, &payload.path) {
+        return Err(invalid_owner_projection());
+    }
+    Ok(Json(projection))
+}
+
+/// Create a directory in the user's home authority domain.
+pub async fn create_host_directory_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<cybou_web_contracts::HostDirectoryCreateRequest>,
+) -> Result<StatusCode, Refusal> {
+    let session = state
+        .session_for(&headers)
+        .ok_or_else(GatewayState::sign_in_required)?;
+    let (Some(uid), Some(home)) = (session.uid, session.home.as_deref()) else {
+        return Err(unavailable());
+    };
+    if !is_inside_home(&payload.path, home) {
+        return Err(invalid_owner_projection());
+    }
+    let source = state.host_user_files.as_ref().ok_or_else(unavailable)?;
+    source
+        .create_directory(uid, home, &payload.path, payload.recursive)
+        .await
+        .map_err(|_| unavailable())?;
+    Ok(StatusCode::OK)
+}
+
+/// Rename or move a path in the user's home authority domain.
+pub async fn rename_host_path_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<cybou_web_contracts::HostPathRenameRequest>,
+) -> Result<StatusCode, Refusal> {
+    let session = state
+        .session_for(&headers)
+        .ok_or_else(GatewayState::sign_in_required)?;
+    let (Some(uid), Some(home)) = (session.uid, session.home.as_deref()) else {
+        return Err(unavailable());
+    };
+    if !is_inside_home(&payload.from_path, home) || !is_inside_home(&payload.to_path, home) {
+        return Err(invalid_owner_projection());
+    }
+    let source = state.host_user_files.as_ref().ok_or_else(unavailable)?;
+    source
+        .rename_path(uid, home, &payload.from_path, &payload.to_path)
+        .await
+        .map_err(|_| unavailable())?;
+    Ok(StatusCode::OK)
+}
+
+/// Delete a path in the user's home authority domain.
+pub async fn delete_host_path_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<cybou_web_contracts::HostPathDeleteRequest>,
+) -> Result<StatusCode, Refusal> {
+    let session = state
+        .session_for(&headers)
+        .ok_or_else(GatewayState::sign_in_required)?;
+    let (Some(uid), Some(home)) = (session.uid, session.home.as_deref()) else {
+        return Err(unavailable());
+    };
+    if !is_inside_home(&payload.path, home) {
+        return Err(invalid_owner_projection());
+    }
+    let source = state.host_user_files.as_ref().ok_or_else(unavailable)?;
+    source
+        .delete_path(uid, home, &payload.path, payload.recursive)
+        .await
+        .map_err(|_| unavailable())?;
+    Ok(StatusCode::OK)
+}
+
+/// Copy a path in the user's home authority domain.
+pub async fn copy_host_path_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<cybou_web_contracts::HostPathCopyRequest>,
+) -> Result<StatusCode, Refusal> {
+    let session = state
+        .session_for(&headers)
+        .ok_or_else(GatewayState::sign_in_required)?;
+    let (Some(uid), Some(home)) = (session.uid, session.home.as_deref()) else {
+        return Err(unavailable());
+    };
+    if !is_inside_home(&payload.from_path, home) || !is_inside_home(&payload.to_path, home) {
+        return Err(invalid_owner_projection());
+    }
+    let source = state.host_user_files.as_ref().ok_or_else(unavailable)?;
+    source
+        .copy_path(uid, home, &payload.from_path, &payload.to_path)
+        .await
+        .map_err(|_| unavailable())?;
+    Ok(StatusCode::OK)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

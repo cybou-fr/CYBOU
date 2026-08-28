@@ -125,6 +125,8 @@ pub fn of(session: &Session, plan: &SessionPlan, ledger: Ledger) -> SessionView 
     let (standing, ended_because) = match session.state() {
         SessionState::Launching => (Standing::Launching, None),
         SessionState::Running => (Standing::Running, None),
+        SessionState::Paused => (Standing::Paused, None),
+        SessionState::Quarantined => (Standing::Quarantined, Some("quarantined by operator policy".to_owned())),
         SessionState::Ending(end) => (Standing::Ending, Some(end.describe())),
         SessionState::Ended(end) => (Standing::Ended, Some(end.describe())),
     };

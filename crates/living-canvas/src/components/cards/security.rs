@@ -1,0 +1,217 @@
+// SPDX-FileCopyrightText: 2026 Cybou contributors
+// SPDX-License-Identifier: MIT
+
+//! Security Sandboxing Policy & Audit Log card component.
+
+use leptos::prelude::*;
+use crate::{
+    CardId,
+    components::icons::{IconCheckCircle, IconLayers, IconRefresh},
+    state::RuntimeState,
+    tool_state::ToolCardStates,
+};
+
+#[component]
+pub fn SecurityContent(card: CardId) -> impl IntoView {
+    let state = expect_context::<RuntimeState>();
+    let client = state.client;
+    let tool_states = expect_context::<ToolCardStates>();
+    let signals = tool_states.security(card);
+
+    let load_security = move || {
+        signals.loading.set(true);
+        leptos::task::spawn_local(async move {
+            match client.get_security_settings().await {
+                Ok(proj) => {
+                    signals.policy.set(Some(proj.policy));
+                    signals.audit_log.set(proj.audit_log);
+                    signals.status_msg.set(None);
+                }
+                Err(err) => {
+                    signals.status_msg.set(Some(format!("Failed to load security: {err}")));
+                }
+            }
+            signals.loading.set(false);
+        });
+    };
+
+    let toggle_policy = move |update_fn: Box<dyn FnOnce(&mut cybou_protocol::system::SecurityPolicyRecord)>| {
+        let mut cur = signals.policy.get().unwrap_or(cybou_protocol::system::SecurityPolicyRecord {
+            landlock_enabled: true,
+            bubblewrap_enabled: true,
+            apparmor_enforcing: true,
+            seccomp_strict: true,
+            egress_firewall_strict: true,
+        });
+        update_fn(&mut cur);
+        let req = cybou_web_contracts::UpdateSecurityPolicyRequest {
+            landlock_enabled: cur.landlock_enabled,
+            bubblewrap_enabled: cur.bubblewrap_enabled,
+            apparmor_enforcing: cur.apparmor_enforcing,
+            seccomp_strict: cur.seccomp_strict,
+            egress_firewall_strict: cur.egress_firewall_strict,
+        };
+        leptos::task::spawn_local(async move {
+            match client.update_security_policy(req).await {
+                Ok(pol) => {
+                    signals.policy.set(Some(pol));
+                    signals.status_msg.set(Some("Security policy successfully updated".to_owned()));
+                    load_security();
+                }
+                Err(err) => {
+                    signals.status_msg.set(Some(format!("Policy update failed: {err}")));
+                }
+            }
+        });
+    };
+
+    // Trigger initial load
+    Effect::new(move |_| {
+        load_security();
+    });
+
+    view! {
+        <div class="security-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
+            // Header
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 600; font-size: 13px;">"Security & Sandboxing Policy"</span>
+                </div>
+                <button
+                    style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    title="Refresh security status"
+                    on:click=move |_| load_security()
+                >
+                    <IconRefresh size=13 />
+                </button>
+            </div>
+
+            // Status message toast
+            {move || signals.status_msg.get().map(|msg| {
+                view! {
+                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                        <span>{msg}</span>
+                        <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
+                    </div>
+                }
+            })}
+
+            <div style="padding: 12px; display: flex; flex-direction: column; gap: 14px;">
+                // Policy Rules
+                {move || signals.policy.get().map(|pol| {
+                    let pol_l = pol.clone();
+                    let pol_b = pol.clone();
+                    let pol_a = pol.clone();
+                    let pol_s = pol.clone();
+                    let pol_e = pol.clone();
+
+                    view! {
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+                            <div style="font-weight: 600; font-size: 11px; margin-bottom: 2px;">"Kernel Confinement Subsystems"</div>
+
+                            // Landlock
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 4px; font-size: 11px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #f3f4f6;">"Landlock LSM"</div>
+                                    <div style="font-size: 10px; color: rgba(255,255,255,0.5);">"Unprivileged filesystem access restriction"</div>
+                                </div>
+                                <button
+                                    style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if pol_l.landlock_enabled { "rgba(34,197,94,0.2)" } else { "rgba(239,68,68,0.2)" }, if pol_l.landlock_enabled { "#4ade80" } else { "#f87171" })
+                                    on:click=move |_| toggle_policy(Box::new(|p| p.landlock_enabled = !p.landlock_enabled))
+                                >
+                                    {if pol_l.landlock_enabled { "ENFORCED" } else { "DISABLED" }}
+                                </button>
+                            </div>
+
+                            // Bubblewrap
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 4px; font-size: 11px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #f3f4f6;">"Bubblewrap Namespaces"</div>
+                                    <div style="font-size: 10px; color: rgba(255,255,255,0.5);">"Isolated user/mount/network namespace sandboxes"</div>
+                                </div>
+                                <button
+                                    style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if pol_b.bubblewrap_enabled { "rgba(34,197,94,0.2)" } else { "rgba(239,68,68,0.2)" }, if pol_b.bubblewrap_enabled { "#4ade80" } else { "#f87171" })
+                                    on:click=move |_| toggle_policy(Box::new(|p| p.bubblewrap_enabled = !p.bubblewrap_enabled))
+                                >
+                                    {if pol_b.bubblewrap_enabled { "ENFORCED" } else { "DISABLED" }}
+                                </button>
+                            </div>
+
+                            // AppArmor
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 4px; font-size: 11px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #f3f4f6;">"AppArmor LSM"</div>
+                                    <div style="font-size: 10px; color: rgba(255,255,255,0.5);">"Mandatory Access Control profile enforcement"</div>
+                                </div>
+                                <button
+                                    style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if pol_a.apparmor_enforcing { "rgba(34,197,94,0.2)" } else { "rgba(239,68,68,0.2)" }, if pol_a.apparmor_enforcing { "#4ade80" } else { "#f87171" })
+                                    on:click=move |_| toggle_policy(Box::new(|p| p.apparmor_enforcing = !p.apparmor_enforcing))
+                                >
+                                    {if pol_a.apparmor_enforcing { "ENFORCED" } else { "DISABLED" }}
+                                </button>
+                            </div>
+
+                            // Seccomp
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 4px; font-size: 11px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #f3f4f6;">"Strict Seccomp-BPF"</div>
+                                    <div style="font-size: 10px; color: rgba(255,255,255,0.5);">"Kernel syscall attack surface minimization"</div>
+                                </div>
+                                <button
+                                    style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if pol_s.seccomp_strict { "rgba(34,197,94,0.2)" } else { "rgba(239,68,68,0.2)" }, if pol_s.seccomp_strict { "#4ade80" } else { "#f87171" })
+                                    on:click=move |_| toggle_policy(Box::new(|p| p.seccomp_strict = !p.seccomp_strict))
+                                >
+                                    {if pol_s.seccomp_strict { "STRICT" } else { "PERMISSIVE" }}
+                                </button>
+                            </div>
+
+                            // Egress Firewall
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 8px 10px; border-radius: 4px; font-size: 11px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #f3f4f6;">"Governed Egress Firewall"</div>
+                                    <div style="font-size: 10px; color: rgba(255,255,255,0.5);">"Block all unauthorized outbound network requests"</div>
+                                </div>
+                                <button
+                                    style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if pol_e.egress_firewall_strict { "rgba(34,197,94,0.2)" } else { "rgba(239,68,68,0.2)" }, if pol_e.egress_firewall_strict { "#4ade80" } else { "#f87171" })
+                                    on:click=move |_| toggle_policy(Box::new(|p| p.egress_firewall_strict = !p.egress_firewall_strict))
+                                >
+                                    {if pol_e.egress_firewall_strict { "STRICT" } else { "PERMISSIVE" }}
+                                </button>
+                            </div>
+                        </div>
+                    }
+                })}
+
+                // Security Audit Log Events
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px;">
+                    <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">
+                        {move || format!("Security Audit Feed ({})", signals.audit_log.get().len())}
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        {move || signals.audit_log.get().into_iter().map(|entry| {
+                            let (bg_badge, fg_badge) = match entry.severity.as_str() {
+                                "warning" => ("rgba(245,158,11,0.2)", "#fbbf24"),
+                                "critical" => ("rgba(239,68,68,0.2)", "#f87171"),
+                                _ => ("rgba(99,102,241,0.2)", "#818cf8"),
+                            };
+
+                            view! {
+                                <div style="background: rgba(0,0,0,0.2); border-radius: 4px; padding: 8px 10px; font-size: 11px; display: flex; flex-direction: column; gap: 2px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span style=format!("background: {}; color: {}; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;", bg_badge, fg_badge)>
+                                                {entry.category.to_uppercase()}
+                                            </span>
+                                            <span style="font-weight: 600; color: #f3f4f6;">{entry.message}</span>
+                                        </div>
+                                        <span style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">{entry.timestamp}</span>
+                                    </div>
+                                </div>
+                            }
+                        }).collect::<Vec<_>>()}
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

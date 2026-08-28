@@ -10,7 +10,10 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use crate::instant_label;
 use crate::{
     ArrangementMode, CardId, DesktopItemId, DesktopLayout,
-    components::icons::{IconFile, IconFolder, IconHome, IconLayers, IconShield, IconTerminal},
+    components::icons::{
+        IconActivity, IconBell, IconFile, IconFolder, IconHome, IconLayers, IconShield,
+        IconTerminal,
+    },
     state::RuntimeState,
 };
 
@@ -190,6 +193,195 @@ pub fn DesktopDock(
                 >
                     <IconLayers size=18 />
                     <span class="dock-tooltip">"Inspector"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "operations"))
+                    title="Operations Monitor"
+                    on:click=move |_| open_or_focus(CardId::Operations(0), 560.0, 420.0)
+                >
+                    <IconActivity size=18 />
+                    <span class="dock-tooltip">"Operations"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notifications"))
+                    title="Notifications Center"
+                    on:click=move |_| open_or_focus(CardId::Notifications(0), 520.0, 440.0)
+                >
+                    <IconBell size=18 />
+                    <span class="dock-tooltip">"Notifications"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "services"))
+                    title="Services Manager"
+                    on:click=move |_| open_or_focus(CardId::Services(0), 580.0, 420.0)
+                >
+                    <IconRefresh size=18 />
+                    <span class="dock-tooltip">"Services"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "processes"))
+                    title="Process Manager"
+                    on:click=move |_| open_or_focus(CardId::Processes(0), 600.0, 440.0)
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Processes"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "monitor"))
+                    title="System Monitor"
+                    on:click=move |_| open_or_focus(CardId::Monitor(0), 560.0, 460.0)
+                >
+                    <IconActivity size=18 />
+                    <span class="dock-tooltip">"Monitor"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "system-logs"))
+                    title="System Logs"
+                    on:click=move |_| open_or_focus(CardId::SystemLogs(0), 600.0, 420.0)
+                >
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Logs"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "storage"))
+                    title="Storage & Snapshots"
+                    on:click=move |_| open_or_focus(CardId::Storage(0), 580.0, 440.0)
+                >
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Storage"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "network"))
+                    title="Network Connections"
+                    on:click=move |_| open_or_focus(CardId::Network(0), 560.0, 420.0)
+                >
+                    <IconActivity size=18 />
+                    <span class="dock-tooltip">"Network"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "packages"))
+                    title="Package Manager"
+                    on:click=move |_| open_or_focus(CardId::Packages(0), 600.0, 460.0)
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Packages"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "updates"))
+                    title="System Updates"
+                    on:click=move |_| open_or_focus(CardId::Updates(0), 560.0, 420.0)
+                >
+                    <IconRefresh size=18 />
+                    <span class="dock-tooltip">"Updates"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "user-settings"))
+                    title="Users & SSH Keys"
+                    on:click=move |_| open_or_focus(CardId::UserSettings(0), 580.0, 440.0)
+                >
+                    <IconSliders size=18 />
+                    <span class="dock-tooltip">"Users"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "security"))
+                    title="Security & Sandboxing"
+                    on:click=move |_| open_or_focus(CardId::Security(0), 560.0, 440.0)
+                >
+                    <IconLock size=18 />
+                    <span class="dock-tooltip">"Security"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "backup"))
+                    title="Backup Vault"
+                    on:click=move |_| open_or_focus(CardId::Backup(0), 580.0, 460.0)
+                >
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Backup"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "mail"))
+                    title="Mail & Messages"
+                    on:click=move |_| open_or_focus(CardId::Mail(0), 640.0, 480.0)
+                >
+                    <IconBell size=18 />
+                    <span class="dock-tooltip">"Mail"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "calendar"))
+                    title="Calendar & Schedule"
+                    on:click=move |_| open_or_focus(CardId::Calendar(0), 600.0, 460.0)
+                >
+                    <IconActivity size=18 />
+                    <span class="dock-tooltip">"Calendar"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notes"))
+                    title="Notes & Ideas"
+                    on:click=move |_| open_or_focus(CardId::Notes(0), 580.0, 460.0)
+                >
+                    <IconFile size=18 />
+                    <span class="dock-tooltip">"Notes"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "contacts"))
+                    title="Contacts Directory"
+                    on:click=move |_| open_or_focus(CardId::Contacts(0), 560.0, 440.0)
+                >
+                    <IconSliders size=18 />
+                    <span class="dock-tooltip">"Contacts"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "cognitive-graph"))
+                    title="Cognitive Graph & Causal DAG"
+                    on:click=move |_| open_or_focus(CardId::CognitiveGraph(0), 680.0, 500.0)
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Cognitive Graph"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "event-journal"))
+                    title="Canonical Event1 Journal"
+                    on:click=move |_| open_or_focus(CardId::EventJournal(0), 640.0, 460.0)
+                >
+                    <IconActivity size=18 />
+                    <span class="dock-tooltip">"Event Journal"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "meaning"))
+                    title="Meaning & Dialogue Assistant"
+                    on:click=move |_| open_or_focus(CardId::Meaning(0), 600.0, 480.0)
+                >
+                    <IconMessageSquare size=18 />
+                    <span class="dock-tooltip">"Meaning"</span>
+                </button>
+                <button
+                    class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "learning"))
+                    title="Lifelong Learning & Governance"
+                    on:click=move |_| open_or_focus(CardId::Learning(0), 620.0, 480.0)
+                >
+                    <IconLayers size=18 />
+                    <span class="dock-tooltip">"Learning"</span>
                 </button>
                 <button
                     class="dock-item"

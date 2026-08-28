@@ -92,6 +92,47 @@ fn request_stop(
                         }
                     });
                     error.set(Some(why.to_string()));
+fn request_stop(
+    runtime: RwSignal<RuntimeState>,
+    capsule_id: Uuid,
+    error: RwSignal<Option<String>>,
+    mounted: Arc<AtomicBool>,
+) {
+    request_action(
+        runtime,
+        capsule_id,
+        cybou_protocol::agent::CapsuleAction::Stop,
+        error,
+        mounted,
+    );
+}
+
+fn request_action(
+    runtime: RwSignal<RuntimeState>,
+    capsule_id: Uuid,
+    action: cybou_protocol::agent::CapsuleAction,
+    error: RwSignal<Option<String>>,
+    mounted: Arc<AtomicBool>,
+) {
+    error.set(None);
+    spawn_local(async move {
+        let result = GatewayMindClient.control_agent(capsule_id, action).await;
+        if !mounted.load(Ordering::Acquire) {
+            return;
+        }
+        match result {
+            Ok(()) => match GatewayMindClient.agents().await {
+                Ok(sessions) if mounted.load(Ordering::Acquire) => {
+                    replace_agents(runtime, sessions);
+                }
+                Ok(_) => {}
+                Err(why) => {
+                    runtime.update(|state| {
+                        if let RuntimeState::Ready { agents, .. } = state {
+                            *agents = None;
+                        }
+                    });
+                    error.set(Some(why.to_string()));
                 }
             },
             Err(why) => error.set(Some(why.to_string())),
@@ -129,6 +170,8 @@ const fn standing_text(standing: Standing) -> &'static str {
     match standing {
         Standing::Launching => "starting",
         Standing::Running => "running",
+        Standing::Paused => "paused / frozen",
+        Standing::Quarantined => "quarantined",
         Standing::Ending => "ending",
         Standing::Ended => "ended",
     }
@@ -192,17 +235,89 @@ fn session_line(
     let ended = session.ended_at.map(moment);
     let because = session.ended_because.clone();
     let capsule_id = session.capsule_id;
-    let stop = session.is_live().then(|| {
+    let controls = session.is_live().then(|| {
+        let mounted_pause = Arc::clone(&mounted);
+        let mounted_resume = Arc::clone(&mounted);
+        let mounted_quarantine = Arc::clone(&mounted);
+        let mounted_stop = Arc::clone(&mounted);
+
         view! {
-            <button
-                type="button"
-                class="agent-stop"
-                on:click=move |_| {
-                    request_stop(runtime, capsule_id, error, Arc::clone(&mounted));
-                }
-            >
-                "Stop"
-            </button>
+            <div class="agent-controls" style="display: inline-flex; gap: 4px; align-items: center;">
+                {match session.standing {
+                    Standing::Running => view! {
+                        <button
+                            type="button"
+                            class="agent-pause"
+                            style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            title="Freeze cgroup processes"
+                            on:click=move |_| {
+                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Freeze, error, Arc::clone(&mounted_pause));
+                            }
+                        >
+                            "Pause"
+                        </button>
+                        <button
+                            type="button"
+                            class="agent-quarantine"
+                            style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            title="Freeze & revoke network egress"
+                            on:click=move |_| {
+                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Quarantine, error, Arc::clone(&mounted_quarantine));
+                            }
+                        >
+                            "Quarantine"
+                        </button>
+                    }.into_any(),
+                    Standing::Paused => view! {
+                        <button
+                            type="button"
+                            class="agent-resume"
+                            style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            title="Thaw / resume cgroup processes"
+                            on:click=move |_| {
+                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Resume, error, Arc::clone(&mounted_resume));
+                            }
+                        >
+                            "Resume"
+                        </button>
+                        <button
+                            type="button"
+                            class="agent-quarantine"
+                            style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            title="Freeze & revoke network egress"
+                            on:click=move |_| {
+                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Quarantine, error, Arc::clone(&mounted_quarantine));
+                            }
+                        >
+                            "Quarantine"
+                        </button>
+                    }.into_any(),
+                    Standing::Quarantined => view! {
+                        <button
+                            type="button"
+                            class="agent-resume"
+                            style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            title="Release quarantine & resume"
+                            on:click=move |_| {
+                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Resume, error, Arc::clone(&mounted_resume));
+                            }
+                        >
+                            "Release"
+                        </button>
+                    }.into_any(),
+                    _ => view! { <span></span> }.into_any(),
+                }}
+                <button
+                    type="button"
+                    class="agent-stop"
+                    style="background: rgba(255, 255, 255, 0.08); color: inherit; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                    on:click=move |_| {
+                        request_stop(runtime, capsule_id, error, Arc::clone(&mounted_stop));
+                    }
+                >
+                    "Stop"
+                </button>
+            </div>
         }
     });
 
@@ -265,7 +380,7 @@ fn session_line(
                 <b>{session.agent.clone()}</b>
                 <small class="agent-standing">{standing}</small>
                 <small class="agent-profile">{session.profile.clone()}</small>
-                {stop}
+                {controls}
             </span>
             <span class="agent-workspace">
                 <code>{session.workspace.clone()}</code>
