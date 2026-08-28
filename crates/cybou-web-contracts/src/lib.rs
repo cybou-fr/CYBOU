@@ -768,12 +768,74 @@ pub struct FileWriteProjection {
     pub size_bytes: u64,
 }
 
+/// Request to create a new file with exclusive creation semantics (O_CREAT | O_EXCL).
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileCreateRequest {
+    /// Owner-issued jail / target location where file will be created.
+    pub location: LocationRef,
+    /// Initial UTF-8 text content.
+    pub text: String,
+}
+
 /// Request to end one of the caller's shells.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShellCloseRequest {
     /// Which of the caller's shells to end.
     pub instance: u32,
+}
+
+/// User-scoped draft descriptor persisted on gateway/server for safe recovery.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserDraftProjection {
+    /// Unique draft identifier.
+    pub draft_id: String,
+    /// Title or label of the draft.
+    pub title: String,
+    /// UTF-8 draft text content.
+    pub content: String,
+    /// Base filesystem location if this draft was opened from an existing file.
+    pub base_location: Option<LocationRef>,
+    /// Observed SHA-256 at the moment the draft was derived.
+    pub base_sha256: Option<String>,
+    /// UTC timestamp of last server-side update.
+    pub updated_at_utc: String,
+}
+
+/// Collection of user drafts returned by the gateway.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserDraftListProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// List of user-scoped drafts.
+    pub drafts: Vec<UserDraftProjection>,
+}
+
+/// Request to save or update a user draft.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserDraftSaveRequest {
+    /// Unique draft identifier.
+    pub draft_id: String,
+    /// Title or label of the draft.
+    pub title: String,
+    /// UTF-8 draft text content.
+    pub content: String,
+    /// Base filesystem location if this draft was opened from an existing file.
+    pub base_location: Option<LocationRef>,
+    /// Observed SHA-256 at the moment the draft was derived.
+    pub base_sha256: Option<String>,
+}
+
+/// Request to delete a user draft.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserDraftDeleteRequest {
+    /// Unique draft identifier to remove.
+    pub draft_id: String,
 }
 
 /// Typed response from executing a bounded Shell capability.

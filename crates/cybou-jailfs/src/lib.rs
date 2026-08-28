@@ -268,6 +268,10 @@ impl JailFs {
             std::process::id()
         ));
 
+        let existing_permissions = fs::symlink_metadata(&target)
+            .ok()
+            .map(|meta| meta.permissions());
+
         let result = (|| {
             let mut file = OpenOptions::new()
                 .write(true)
@@ -276,6 +280,25 @@ impl JailFs {
                 .map_err(|error| JailError::Io(error.to_string()))?;
             file.write_all(data)
                 .map_err(|error| JailError::Io(error.to_string()))?;
+
+            #[cfg(unix)]
+            if let Some(perms) = existing_permissions {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = perms.mode();
+                let mut temp_perms = file
+                    .metadata()
+                    .map_err(|error| JailError::Io(error.to_string()))?
+                    .permissions();
+                temp_perms.set_mode(mode);
+                file.set_permissions(temp_perms)
+                    .map_err(|error| JailError::Io(error.to_string()))?;
+            }
+
+            #[cfg(not(unix))]
+            if let Some(perms) = existing_permissions {
+                let _ = file.set_permissions(perms);
+            }
+
             file.sync_all()
                 .map_err(|error| JailError::Io(error.to_string()))?;
             fs::rename(&temporary, &target).map_err(|error| JailError::Io(error.to_string()))
@@ -284,6 +307,46 @@ impl JailFs {
             drop(fs::remove_file(&temporary));
         }
         result
+    }
+
+    /// Create a new file exclusively within the sandbox (`O_CREAT | O_EXCL`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JailError`] if the file already exists, exceeds limits, or if I/O fails.
+    pub fn create_file_exclusive(
+        &self,
+        virtual_path: &str,
+        data: &[u8],
+        max_bytes: usize,
+    ) -> Result<(), JailError> {
+        if data.len() > max_bytes {
+            return Err(JailError::SizeLimitExceeded {
+                max_bytes,
+                actual_bytes: data.len(),
+            });
+        }
+        let target = self.resolve(virtual_path)?;
+        if target.exists() {
+            return Err(JailError::Io(format!(
+                "file already exists: {virtual_path}"
+            )));
+        }
+        let parent = target
+            .parent()
+            .ok_or_else(|| JailError::InvalidPath(virtual_path.to_string()))?;
+        fs::create_dir_all(parent).map_err(|error| JailError::Io(error.to_string()))?;
+
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+            .map_err(|error| JailError::Io(error.to_string()))?;
+        file.write_all(data)
+            .map_err(|error| JailError::Io(error.to_string()))?;
+        file.sync_all()
+            .map_err(|error| JailError::Io(error.to_string()))?;
+        Ok(())
     }
 
     /// List directory contents within the sandbox.
@@ -441,6 +504,65 @@ mod tests {
         assert!(list[0].is_dir);
         assert_eq!(list[1].name, "file1.txt");
         assert!(!list[1].is_dir);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn atomic_replace_preserves_file_permissions() {
+        let (jail, dir) = test_jail();
+
+        let target_name = "script.sh";
+        jail.write_bytes(target_name, b"#!/bin/sh\necho initial", 1024)
+            .expect("initial write");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let resolved = jail.resolve(target_name).expect("resolve path");
+            let mut perms = fs::metadata(&resolved).expect("metadata").permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&resolved, perms).expect("set 0755");
+        }
+
+        // Atomically replace the contents
+        let new_content = b"#!/bin/sh\necho updated";
+        jail.replace_bytes_atomic(target_name, new_content, 1024)
+            .expect("atomic replace");
+
+        // Verify content updated
+        let read_back = jail.read_to_string(target_name, 1024).expect("read back");
+        assert_eq!(read_back, "#!/bin/sh\necho updated");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let resolved = jail.resolve(target_name).expect("resolve path");
+            let mode = fs::metadata(&resolved).expect("metadata").permissions().mode();
+            assert_eq!(mode & 0o777, 0o755, "mode should remain 0755 after atomic replace");
+        }
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn create_file_exclusive_fails_if_exists_and_succeeds_for_new() {
+        let (jail, dir) = test_jail();
+
+        let filename = "brand_new.txt";
+        let content = b"created exclusively";
+
+        jail.create_file_exclusive(filename, content, 1024)
+            .expect("create new file");
+
+        let read_back = jail.read_to_string(filename, 1024).expect("read new file");
+        assert_eq!(read_back, "created exclusively");
+
+        // Second creation must fail (O_EXCL semantics)
+        let err = jail
+            .create_file_exclusive(filename, b"duplicate", 1024)
+            .expect_err("must fail because file exists");
+        assert!(matches!(err, JailError::Io(_)));
 
         let _ = fs::remove_dir_all(dir);
     }

@@ -40,10 +40,11 @@ pub use state::{
 };
 
 use routes::{
-    actions_handler, agent_offers_handler, agents_handler, api_not_found, disclosure_handler,
-    events_handler, insight_handler, launch_agent_handler, list_directory_handler, login_handler,
-    logout_handler, mind_handler, read_file_handler, recent_actions_handler, session_handler,
-    shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler,
+    actions_handler, agent_offers_handler, agents_handler, api_not_found, create_file_handler,
+    delete_draft_handler, disclosure_handler, events_handler, insight_handler,
+    launch_agent_handler, list_directory_handler, list_drafts_handler, login_handler,
+    logout_handler, mind_handler, read_file_handler, recent_actions_handler, save_draft_handler,
+    session_handler, shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler,
     write_file_handler,
 };
 use state::GatewayState;
@@ -163,6 +164,7 @@ pub(crate) fn router_in_sandbox(
         },
         shells,
         files: jail,
+        drafts: Arc::new(crate::routes::UserDraftStore::new()),
     };
 
     let app = Router::new()
@@ -187,6 +189,10 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/files/list", post(list_directory_handler))
         .route("/api/v1/files/read", post(read_file_handler))
         .route("/api/v1/files/write", post(write_file_handler))
+        .route("/api/v1/files/create", post(create_file_handler))
+        .route("/api/v1/drafts", get(list_drafts_handler))
+        .route("/api/v1/drafts/save", post(save_draft_handler))
+        .route("/api/v1/drafts/delete", post(delete_draft_handler))
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(

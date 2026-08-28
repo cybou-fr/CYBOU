@@ -25,6 +25,31 @@ fn load_layout() -> DesktopLayout {
     DesktopLayout::load()
 }
 
+#[cfg(target_arch = "wasm32")]
+fn is_editing_target(event: &KeyboardEvent) -> bool {
+    if event.is_composing() {
+        return true;
+    }
+    if let Some(target) = event
+        .target()
+        .and_then(|t| t.dyn_into::<web_sys::HtmlElement>().ok())
+    {
+        let tag = target.tag_name().to_ascii_uppercase();
+        if tag == "TEXTAREA" || tag == "INPUT" || target.is_content_editable() {
+            return true;
+        }
+        if target
+            .closest(".editor-surface, .terminal-surface, [data-shortcut-scope='local']")
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return true;
+        }
+    }
+    false
+}
+
 /// Root Living Canvas Desktop Application component.
 #[allow(non_snake_case)]
 #[must_use]
@@ -53,8 +78,13 @@ pub fn App() -> impl IntoView {
     let layout = RwSignal::new(load_layout());
     provide_context(layout);
     provide_context(set_selected);
+    provide_context(pan);
+    provide_context(set_pan);
+    provide_context(zoom);
+    provide_context(set_zoom);
     let history = RwSignal::new(LayoutHistory::new());
     let camera_history = RwSignal::new(CameraHistory::new());
+    provide_context(camera_history);
     let dragging = RwSignal::new(None::<DragState>);
     let resizing = RwSignal::new(None::<ResizeState>);
     let snap_guides = RwSignal::new(Vec::<SnapGuide>::new());
@@ -194,7 +224,15 @@ pub fn App() -> impl IntoView {
                 if let Some(input) = command_input.get() {
                     let _ = input.focus();
                 }
-            } else if (event.ctrl_key() || event.meta_key())
+                return;
+            }
+
+            // Keyboard hierarchy: do not intercept local editor, terminal, or text-input shortcuts
+            if is_editing_target(&event) {
+                return;
+            }
+
+            if (event.ctrl_key() || event.meta_key())
                 && event.key().eq_ignore_ascii_case("z")
             {
                 event.prevent_default();

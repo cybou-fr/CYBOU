@@ -22,8 +22,8 @@ use cybou_jailfs::JailError;
 use cybou_protocol::LocationRef;
 use cybou_web_contracts::{
     DirectoryEntryProjection, DirectoryListingProjection, FILE_LISTING_MAX_ENTRIES,
-    FILE_READ_MAX_BYTES, FILE_WRITE_MAX_BYTES, FileContentProjection, FilePathRequest,
-    FileWriteProjection, FileWriteRequest, WEB_SCHEMA_V1,
+    FILE_READ_MAX_BYTES, FILE_WRITE_MAX_BYTES, FileContentProjection, FileCreateRequest,
+    FilePathRequest, FileWriteProjection, FileWriteRequest, WEB_SCHEMA_V1,
 };
 use sha2::{Digest as _, Sha256};
 use std::sync::{Mutex, PoisonError};
@@ -237,6 +237,55 @@ pub async fn write_file_handler(
     if verified != payload.text {
         return Err(boundary(&JailError::Io(
             "post-write verification failed".to_string(),
+        )));
+    }
+
+    Ok(Json(FileWriteProjection {
+        schema_version: WEB_SCHEMA_V1,
+        location: payload.location,
+        content_sha256: sha256(verified.as_bytes()),
+        size_bytes: u64::try_from(verified.len()).unwrap_or(u64::MAX),
+    }))
+}
+
+/// Exclusively create a new UTF-8 file inside the request owner's sandbox.
+///
+/// # Errors
+///
+/// Returns a governed refusal when the request has no private seat, the
+/// location was not issued for that seat, the payload exceeds the write
+/// limit, the file already exists, or the sandbox cannot create the file.
+pub async fn create_file_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<FileCreateRequest>,
+) -> Result<Json<FileWriteProjection>, Refusal> {
+    let owner = state.shell_seat(&headers).ok_or_else(no_seat)?;
+    let LocationRef::SafeShellJail { path, .. } = &payload.location else {
+        return Err(no_seat());
+    };
+    if jail_location(&owner, path.clone()) != payload.location {
+        return Err(no_seat());
+    }
+    if payload.text.len() > FILE_WRITE_MAX_BYTES {
+        return Err(boundary(&JailError::SizeLimitExceeded {
+            max_bytes: FILE_WRITE_MAX_BYTES,
+            actual_bytes: payload.text.len(),
+        }));
+    }
+
+    let _write_guard = FILE_WRITES.lock().unwrap_or_else(PoisonError::into_inner);
+    state
+        .files
+        .create_file_exclusive(path, payload.text.as_bytes(), FILE_WRITE_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+    let verified = state
+        .files
+        .read_to_string(path, FILE_READ_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+    if verified != payload.text {
+        return Err(boundary(&JailError::Io(
+            "post-creation verification failed".to_string(),
         )));
     }
 

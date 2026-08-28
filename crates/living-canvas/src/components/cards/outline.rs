@@ -25,15 +25,56 @@ pub fn OutlineContent(
         .unwrap_or_else(|| RwSignal::new(DesktopLayout::default()));
     let select_fn = set_selected.or_else(use_context::<WriteSignal<Option<DesktopItemId>>>);
 
+    let pan = use_context::<ReadSignal<(f64, f64)>>();
+    let set_pan = use_context::<WriteSignal<(f64, f64)>>();
+    let zoom = use_context::<ReadSignal<f64>>();
+    let set_zoom = use_context::<WriteSignal<f64>>();
+    let camera_history = use_context::<RwSignal<crate::CameraHistory>>();
+
+    let fly_to = move |cx: f64, cy: f64, target_zoom: f64| {
+        if let (Some(p), Some(sp), Some(z), Some(sz)) = (pan, set_pan, zoom, set_zoom) {
+            crate::apply_camera_fly_to(camera_history, p, sp, z, sz, cx, cy, target_zoom);
+        }
+    };
+
     let focus_card = move |card_id: CardId| {
+        let current_layout = layout_sig.get_untracked();
+        let geom = current_layout.geometry(card_id);
+        let cx = geom.x + geom.width / 2.0;
+        let cy = geom.y + geom.height / 2.0;
+        fly_to(cx, cy, 1.0);
         if let Some(sel) = select_fn {
             sel.set(Some(DesktopItemId::Card(card_id)));
         }
     };
 
     let focus_deck = move |deck_id: String| {
+        let current_layout = layout_sig.get_untracked();
+        if let Some(deck) = current_layout.decks.iter().find(|d| d.id == deck_id) {
+            let cx = deck.geometry.x + deck.geometry.width / 2.0;
+            let cy = deck.geometry.y + deck.geometry.height / 2.0;
+            fly_to(cx, cy, 1.0);
+        }
         if let Some(sel) = select_fn {
             sel.set(Some(DesktopItemId::Deck(deck_id)));
+        }
+    };
+
+    let focus_cluster = move |cluster_id: String| {
+        let current_layout = layout_sig.get_untracked();
+        if let Some(cluster) = current_layout.clusters.iter().find(|c| c.id == cluster_id) {
+            if let Some(rect) = current_layout.cluster_rect(cluster) {
+                let cx = rect.x + rect.width / 2.0;
+                let cy = rect.y + rect.height / 2.0;
+                fly_to(cx, cy, 0.85);
+            }
+        }
+    };
+
+    let focus_anchor = move |anchor_id: String| {
+        let current_layout = layout_sig.get_untracked();
+        if let Some(anchor) = current_layout.anchors.iter().find(|a| a.id == anchor_id) {
+            fly_to(anchor.center_x, anchor.center_y, anchor.preferred_zoom);
         }
     };
 
@@ -44,6 +85,29 @@ pub fn OutlineContent(
                 <span class="outline-title">"Workspace Hierarchy"</span>
             </div>
 
+            // Anchors Tree
+            <div class="outline-section">
+                <div class="outline-section-label">"Spatial Anchors"</div>
+                <div class="outline-tree">
+                    <For
+                        each=move || layout_sig.get().anchors
+                        key=|anchor| anchor.id.clone()
+                        children=move |anchor| {
+                            let aclick = anchor.id.clone();
+                            let title = anchor.name.clone();
+                            let (cx, cy) = (anchor.center_x, anchor.center_y);
+                            view! {
+                                <div class="outline-item anchor" on:click=move |_| focus_anchor(aclick.clone())>
+                                    <span class="outline-icon">"⚓"</span>
+                                    <span class="outline-name">{title}</span>
+                                    <span class="outline-pos">{format!("({:.0}, {:.0})", cx, cy)}</span>
+                                </div>
+                            }
+                        }
+                    />
+                </div>
+            </div>
+
             // Clusters Tree
             <div class="outline-section">
                 <div class="outline-section-label">"Spatial Clusters"</div>
@@ -52,10 +116,11 @@ pub fn OutlineContent(
                         each=move || layout_sig.get().clusters
                         key=|cluster| cluster.id.clone()
                         children=move |cluster| {
+                            let cclick = cluster.id.clone();
                             let member_count = cluster.card_keys.len();
                             let title = cluster.label.clone();
                             view! {
-                                <div class="outline-item cluster">
+                                <div class="outline-item cluster" on:click=move |_| focus_cluster(cclick.clone())>
                                     <span class="outline-icon">"⊞"</span>
                                     <span class="outline-name">{title}</span>
                                     <span class="outline-badge">{format!("{member_count} cards")}</span>

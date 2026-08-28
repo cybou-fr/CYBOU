@@ -195,6 +195,8 @@ pub struct GatewayState {
     pub shells: Arc<Shells>,
     /// The sandbox itself, for surfaces that read it as structure rather than through a shell.
     pub files: cybou_jailfs::JailFs,
+    /// User drafts storage for safe recovery.
+    pub drafts: Arc<crate::routes::UserDraftStore>,
 }
 
 impl GatewayState {

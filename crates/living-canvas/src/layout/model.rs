@@ -183,3 +183,23 @@ pub struct DesktopCluster {
 fn default_cluster_color() -> String {
     "cyan".to_string()
 }
+
+/// Named spatial camera landmark / bookmark on the infinite canvas (ADR-0044 §5).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CanvasAnchor {
+    /// Unique anchor identifier.
+    pub id: String,
+    /// Human-readable label / name.
+    pub name: String,
+    /// Canvas center X coordinate in pixels.
+    pub center_x: f64,
+    /// Canvas center Y coordinate in pixels.
+    pub center_y: f64,
+    /// Target viewport zoom level when navigating to this anchor.
+    #[serde(default = "default_anchor_zoom")]
+    pub preferred_zoom: f64,
+}
+
+fn default_anchor_zoom() -> f64 {
+    1.0
+}

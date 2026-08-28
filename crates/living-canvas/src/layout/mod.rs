@@ -16,7 +16,7 @@ pub mod snap;
 
 pub use camera::{CameraHistory, CameraState};
 #[cfg(target_arch = "wasm32")]
-pub use camera::{apply_camera_back, apply_camera_forward};
+pub use camera::{apply_camera_back, apply_camera_fly_to, apply_camera_forward};
 pub use engine::DesktopLayout;
 pub use history::LayoutHistory;
 pub use migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, PointV8, from_v8};
@@ -25,8 +25,8 @@ pub use minimap::{
     visible_desktop_rect,
 };
 pub use model::{
-    ArrangementMode, DesktopCluster, DesktopItem, DesktopItemId, DesktopViewMode, Rect,
-    UsableViewport,
+    ArrangementMode, CanvasAnchor, DesktopCluster, DesktopItem, DesktopItemId, DesktopViewMode,
+    Rect, UsableViewport,
 };
 pub use placement::PlacementResolver;
 pub use relations::{DesktopRelationshipGraph, RelationVisibility, Relationship, RelationshipKind};
@@ -37,7 +37,7 @@ pub use snap::{SnapGuide, SnapResult, compute_snap};
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
-    use crate::card::{CardGeometry, CardId, CardPresentation};
+    use crate::card::{CardGeometry, CardId, CardInstance, CardPresentation};
     use crate::deck::{DeckError, DeckInstance};
 
     #[test]
@@ -251,6 +251,39 @@ mod tests {
             assert!(c.geometry.y >= 0.0);
             assert!(c.geometry.width >= c.id.spec().min_size.0);
         }
+    }
+
+    #[test]
+    fn validate_and_normalize_migrates_legacy_cluster_keys_to_instances() {
+        let mut layout = DesktopLayout::default();
+        // Add dynamic cards
+        layout.cards.push(CardInstance {
+            id: CardId::Editor(0),
+            geometry: CardGeometry::new(100.0, 100.0, (400.0, 300.0), 1),
+            presentation: CardPresentation::default(),
+        });
+        layout.cards.push(CardInstance {
+            id: CardId::Editor(1),
+            geometry: CardGeometry::new(550.0, 100.0, (400.0, 300.0), 2),
+            presentation: CardPresentation::default(),
+        });
+
+        // Add a cluster using a legacy type key "editor"
+        layout.clusters.push(DesktopCluster {
+            id: "work".into(),
+            label: "Workspaces".into(),
+            color: "cyan".into(),
+            card_keys: vec!["editor".into(), "identity".into()],
+        });
+
+        layout.validate_and_normalize();
+
+        let cluster = &layout.clusters[0];
+        // "editor" should expand/migrate to ["editor:0", "editor:1"] and "identity" stays "identity"
+        assert!(cluster.card_keys.contains(&"editor:0".to_string()));
+        assert!(cluster.card_keys.contains(&"editor:1".to_string()));
+        assert!(!cluster.card_keys.contains(&"editor".to_string()));
+        assert!(cluster.card_keys.contains(&"identity".to_string()));
     }
 
     #[test]

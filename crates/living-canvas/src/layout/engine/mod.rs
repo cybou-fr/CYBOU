@@ -37,6 +37,9 @@ pub struct DesktopLayout {
     /// Optional semantic spatial clusters grouping related panels.
     #[serde(default)]
     pub clusters: Vec<crate::layout::model::DesktopCluster>,
+    /// Optional named spatial anchors / camera landmarks.
+    #[serde(default)]
+    pub anchors: Vec<crate::layout::model::CanvasAnchor>,
 }
 
 impl Default for DesktopLayout {
@@ -54,6 +57,7 @@ impl DesktopLayout {
             cards: Vec::new(),
             decks: Vec::new(),
             clusters: Vec::new(),
+            anchors: Vec::new(),
         }
     }
 
@@ -253,6 +257,42 @@ impl DesktopLayout {
 
         // 4. Normalize z-indices monotonically starting at 1
         self.normalize_z_indices();
+
+        // 5. Normalize cluster card keys to exact instance keys
+        for cluster in &mut self.clusters {
+            let mut normalized_keys = Vec::new();
+            for key in &cluster.card_keys {
+                if !key.contains(':') {
+                    let matching_instances: Vec<String> = self
+                        .cards
+                        .iter()
+                        .filter(|c| c.id.key() == key)
+                        .map(|c| c.id.instance_key())
+                        .collect();
+                    if matching_instances.is_empty() {
+                        if !normalized_keys.contains(key) {
+                            normalized_keys.push(key.clone());
+                        }
+                    } else {
+                        for inst in matching_instances {
+                            if !normalized_keys.contains(&inst) {
+                                normalized_keys.push(inst);
+                            }
+                        }
+                    }
+                } else if !normalized_keys.contains(key) {
+                    normalized_keys.push(key.clone());
+                }
+            }
+            cluster.card_keys = normalized_keys;
+        }
+
+        // 6. Normalize canvas anchors
+        for anchor in &mut self.anchors {
+            anchor.center_x = anchor.center_x.clamp(0.0, 10000.0);
+            anchor.center_y = anchor.center_y.clamp(0.0, 10000.0);
+            anchor.preferred_zoom = anchor.preferred_zoom.clamp(0.4, 2.0);
+        }
     }
 
     /// Normalize all z-indices monotonically starting from 1 (Invariant L14).

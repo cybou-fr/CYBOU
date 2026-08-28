@@ -157,6 +157,45 @@ pub fn apply_camera_forward(
     }
 }
 
+/// Fly camera to target center coordinates and zoom level, recording history.
+#[cfg(target_arch = "wasm32")]
+pub fn apply_camera_fly_to(
+    camera_history: Option<RwSignal<CameraHistory>>,
+    pan: ReadSignal<(f64, f64)>,
+    set_pan: WriteSignal<(f64, f64)>,
+    zoom: ReadSignal<f64>,
+    set_zoom: WriteSignal<f64>,
+    target_center_x: f64,
+    target_center_y: f64,
+    target_zoom: f64,
+) {
+    let current = CameraState::new(
+        pan.get_untracked().0,
+        pan.get_untracked().1,
+        zoom.get_untracked(),
+    );
+    if let Some(ch) = camera_history {
+        ch.update(|h| h.record(current));
+    }
+
+    let (w, h) = (
+        web_sys::window()
+            .and_then(|w| w.inner_width().ok())
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1440.0),
+        web_sys::window()
+            .and_then(|w| w.inner_height().ok())
+            .and_then(|v| v.as_f64())
+            .unwrap_or(900.0),
+    );
+
+    let new_pan_x = (w / 2.0) - (target_center_x * target_zoom);
+    let new_pan_y = (h / 2.0) - (target_center_y * target_zoom);
+
+    set_zoom.set(target_zoom);
+    set_pan.set((new_pan_x, new_pan_y));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
