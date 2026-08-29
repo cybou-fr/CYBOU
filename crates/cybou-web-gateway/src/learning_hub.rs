@@ -4,6 +4,7 @@
 //! Learning & Governance Hub: Manages layered lifelong learning candidates,
 //! deterministic promotion gates, durable artifact lineages, and task-scoped capability governance.
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 use cybou_protocol::learning::{
     ArtifactStatus, LearnedArtifactLineage, LearningCandidate, LearningLayer, PromotionGate,
@@ -17,11 +18,25 @@ use cybou_web_contracts::{
     LearningCandidatesProjection, ProposeLearningCandidateRequest, RevokeArtifactRequest,
     WEB_SCHEMA_V1,
 };
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct LearningStore {
+    #[serde(default)]
+    candidates: Vec<LearningCandidate>,
+    #[serde(default)]
+    demonstrations: Vec<(Uuid, Vec<DemonstratedOutcome>)>,
+    #[serde(default)]
+    artifacts: Vec<LearnedArtifactLineage>,
+    #[serde(default)]
+    scopes: Vec<TaskScope>,
+}
+
 /// Server-owned engine for candidate evaluation, artifact lineage, and capability grants.
 pub struct LearningHub {
+    store_path: Option<PathBuf>,
     candidates: Mutex<Vec<LearningCandidate>>,
     demonstrations: Mutex<Vec<(Uuid, Vec<DemonstratedOutcome>)>>,
     artifacts: Mutex<Vec<LearnedArtifactLineage>>,
@@ -35,14 +50,67 @@ impl Default for LearningHub {
 }
 
 impl LearningHub {
-    /// Create a new LearningHub initialized with empty state.
+    /// Create a new LearningHub initialized with default store path if available.
     #[must_use]
     pub fn new() -> Self {
+        let store_path = Self::default_store_path();
+        Self::with_optional_store(store_path)
+    }
+
+    /// Determine default store path from environment or Linux path.
+    #[must_use]
+    pub fn default_store_path() -> Option<PathBuf> {
+        if let Ok(path) = std::env::var("CYBOU_LEARNING_STORE") {
+            return Some(PathBuf::from(path));
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let candidate = PathBuf::from("/var/lib/cybou/learning-store.json");
+            if candidate.parent().is_some_and(|p| p.exists()) {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
+    /// Construct LearningHub with an optional backing store path.
+    #[must_use]
+    pub fn with_optional_store(store_path: Option<PathBuf>) -> Self {
+        let mut loaded = LearningStore::default();
+        if let Some(ref path) = store_path {
+            if let Ok(bytes) = std::fs::read(path) {
+                if let Ok(parsed) = serde_json::from_slice::<LearningStore>(&bytes) {
+                    loaded = parsed;
+                }
+            }
+        }
+
         Self {
-            candidates: Mutex::new(Vec::new()),
-            demonstrations: Mutex::new(Vec::new()),
-            artifacts: Mutex::new(Vec::new()),
-            scopes: Mutex::new(Vec::new()),
+            store_path,
+            candidates: Mutex::new(loaded.candidates),
+            demonstrations: Mutex::new(loaded.demonstrations),
+            artifacts: Mutex::new(loaded.artifacts),
+            scopes: Mutex::new(loaded.scopes),
+        }
+    }
+
+    fn persist(&self) {
+        let Some(ref path) = self.store_path else {
+            return;
+        };
+
+        let store = LearningStore {
+            candidates: self.candidates.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            demonstrations: self.demonstrations.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            artifacts: self.artifacts.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            scopes: self.scopes.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+        };
+
+        if let Ok(json_bytes) = serde_json::to_vec_pretty(&store) {
+            let tmp_path = path.with_extension("tmp");
+            if std::fs::write(&tmp_path, json_bytes).is_ok() {
+                let _ = std::fs::rename(tmp_path, path);
+            }
         }
     }
 
@@ -77,8 +145,11 @@ impl LearningHub {
             created_at: now,
         };
 
-        let mut candidates = self.candidates.lock().unwrap_or_else(|e| e.into_inner());
-        candidates.push(candidate.clone());
+        {
+            let mut candidates = self.candidates.lock().unwrap_or_else(|e| e.into_inner());
+            candidates.push(candidate.clone());
+        }
+        self.persist();
         candidate
     }
 
@@ -113,7 +184,7 @@ impl LearningHub {
             evaluation_passed: true,
         };
 
-        match evaluate_promotion(&candidate, &outcomes, &gate) {
+        let result = match evaluate_promotion(&candidate, &outcomes, &gate) {
             Ok(promoted) => {
                 let now = OffsetDateTime::now_utc();
                 let artifact_id = Uuid::new_v4();
@@ -130,8 +201,10 @@ impl LearningHub {
                     erasure_epoch: 1,
                 };
 
-                let mut artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
-                artifacts.push(artifact.clone());
+                {
+                    let mut artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
+                    artifacts.push(artifact.clone());
+                }
 
                 Ok(CandidateEvaluationProjection {
                     schema_version: WEB_SCHEMA_V1,
@@ -148,7 +221,10 @@ impl LearningHub {
                 refused: Some(refused),
                 artifact: None,
             }),
-        }
+        };
+
+        self.persist();
+        result
     }
 
     /// Retrieve list of promoted durable artifacts.
@@ -166,12 +242,17 @@ impl LearningHub {
     /// Revoke or deprecate a promoted artifact.
     pub fn revoke_artifact(&self, req: RevokeArtifactRequest) -> bool {
         let mut artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(art) = artifacts.iter_mut().find(|a| a.artifact_id == req.artifact_id) {
+        let revoked = if let Some(art) = artifacts.iter_mut().find(|a| a.artifact_id == req.artifact_id) {
             art.status = ArtifactStatus::Revoked;
             true
         } else {
             false
+        };
+        drop(artifacts);
+        if revoked {
+            self.persist();
         }
+        revoked
     }
 
     /// Retrieve active task-scoped capability grants and governance scopes.
@@ -181,5 +262,36 @@ impl LearningHub {
             schema_version: WEB_SCHEMA_V1,
             scopes: scopes.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn learning_hub_persists_and_reloads() {
+        let tmp_dir = std::env::temp_dir().join(format!("cybou_test_learning_{}", Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&tmp_dir);
+        let store_path = tmp_dir.join("learning.json");
+
+        let hub = LearningHub::with_optional_store(Some(store_path.clone()));
+        let candidate = hub.propose_candidate(ProposeLearningCandidateRequest {
+            layer: LearningLayer::Behavioral,
+            source_evidence: vec![],
+            outcome_evidence: vec![],
+            generalization: "Test generalization".to_owned(),
+            scope: "Test scope".to_owned(),
+        });
+
+        assert_eq!(hub.get_candidates(None).candidates.len(), 1);
+
+        // Reload
+        let reloaded = LearningHub::with_optional_store(Some(store_path));
+        let candidates = reloaded.get_candidates(None).candidates;
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].candidate_id, candidate.candidate_id);
+
+        let _ = std::fs::remove_dir_all(&tmp_dir);
     }
 }
