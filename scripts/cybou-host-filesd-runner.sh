@@ -33,4 +33,4 @@ export CYBOU_HOST_FILES_HOME="$USER_HOME"
 export CYBOU_HOST_FILES_SOCKET="/run/cybou-host-files/$USER_UID/owner.sock"
 
 # Execute daemon dropped to user
-exec runuser -u "$USER_NAME" -- /usr/libexec/cybou/cybou-host-filesd
+exec runuser -u "$USER_NAME" --preserve-environment -- /usr/libexec/cybou/cybou-host-filesd
