@@ -172,7 +172,7 @@ cybou_ssh "
   # root-only and never appears here.
   sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
   # What an operator has approved for agents to run under.
-  if [ ! -s /etc/cybou/agent-profiles.json ] || [ "$(sudo cat /etc/cybou/agent-profiles.json)" = "[]" ]; then
+  if [ ! -s /etc/cybou/agent-profiles.json ] || [ "\$(sudo cat /etc/cybou/agent-profiles.json 2>/dev/null)" = "[]" ]; then
     sudo tee /etc/cybou/agent-profiles.json >/dev/null << 'EOF_PROFILES'
 [
   {
@@ -299,6 +299,7 @@ EOF_PROFILES
   # Agent1 is deliberately outside Mind's target, but it is still a deployed runtime and must be
   # started explicitly. Enabling it independently preserves that ownership boundary across boots.
   sudo systemctl --user --machine=cybou@.host enable --now cybou-agentd.service
+  sudo systemctl --user --machine=cybou@.host restart cybou-agentd.service
   sudo systemctl --user --machine=cybou@.host --no-pager --full status cybou-mind.target || true
 
   # Start only after the lingering user manager has brought up Action1. If its system-bus name is
