@@ -224,14 +224,14 @@ cybou_ssh "
 ]
 EOF_PROFILES
   sudo chown root:cybou /etc/cybou/agent-profiles.json
-  sudo chmod 0640 /etc/cybou/agent-profiles.json
+  sudo chmod 0644 /etc/cybou/agent-profiles.json
 
   # Admission is a promise across every live session, not a per-process preflight.
   printf '%s\n' \
     '{"maxSessions":4,"memoryMib":4096,"cpus":3,"tasksMax":1024,"spendUnits":1000}' \
     | sudo tee /etc/cybou/agent-capacity.json >/dev/null
   sudo chown root:cybou /etc/cybou/agent-capacity.json
-  sudo chmod 0640 /etc/cybou/agent-capacity.json
+  sudo chmod 0644 /etc/cybou/agent-capacity.json
 
   # The one privileged step of a launch. Start and stop, that unit template, that user, nothing else.
   sudo install -d -m 0755 /etc/polkit-1/rules.d
