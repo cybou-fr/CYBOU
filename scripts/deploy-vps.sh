@@ -172,7 +172,7 @@ cybou_ssh "
   # root-only and never appears here.
   sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
   # What an operator has approved for agents to run under.
-  if [ ! -s /etc/cybou/agent-profiles.json ] || [ "\$(sudo cat /etc/cybou/agent-profiles.json 2>/dev/null)" = "[]" ]; then
+  if ! sudo test -s /etc/cybou/agent-profiles.json || sudo grep -q '^\\[\\]$' /etc/cybou/agent-profiles.json 2>/dev/null; then
     sudo tee /etc/cybou/agent-profiles.json >/dev/null << 'EOF_PROFILES'
 [
   {
