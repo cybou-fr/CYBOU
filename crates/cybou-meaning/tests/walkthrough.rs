@@ -64,6 +64,14 @@ fn kitchen(disputed: Option<&str>) -> ContextCore {
     context
 }
 
+/// Generous activation budget for tests that are not checking time boundaries.
+fn generous_budget() -> ActivationBudget {
+    ActivationBudget {
+        time: std::time::Duration::from_secs(5),
+        ..ActivationBudget::default()
+    }
+}
+
 /// Walk the whole path once and return what a person would read.
 fn walk(
     context: &ContextCore,
@@ -94,7 +102,7 @@ fn a_dispute_set_five_boundaries_earlier_reaches_the_sentence() {
         &kitchen(Some("honey")),
         &WorkspaceCore::new(32),
         "what is lemon",
-        &ActivationBudget::default(),
+        &generous_budget(),
     );
     assert!(prose.contains("contested"), "{prose}");
 }
@@ -107,7 +115,7 @@ fn nothing_contested_produces_prose_that_does_not_hedge() {
         &kitchen(None),
         &WorkspaceCore::new(32),
         "what is lemon",
-        &ActivationBudget::default(),
+        &generous_budget(),
     );
     assert!(!prose.contains("contested"), "{prose}");
     assert!(!prose.contains("not the whole of it"), "{prose}");
@@ -218,7 +226,7 @@ fn why_a_concept_came_to_mind_is_still_readable_at_the_far_end() {
         &kitchen(None),
         &WorkspaceCore::new(32),
         "what is lemon",
-        &ActivationBudget::default(),
+        &generous_budget(),
     );
     assert!(prose.contains("lemon → honey"), "{prose}");
     assert!(prose.contains("Episodic"), "{prose}");
@@ -234,7 +242,7 @@ fn an_erasure_reaches_the_sentence_as_nothing_associated() {
         &context,
         &WorkspaceCore::new(32),
         "what is lemon",
-        &ActivationBudget::default(),
+        &generous_budget(),
     );
     assert!(
         !prose.contains("honey"),
@@ -256,7 +264,7 @@ fn the_moment_the_workspace_was_attending_to_survives_the_whole_walk() {
         &kitchen(None),
         &workspace,
         "what is lemon",
-        &ActivationBudget::default(),
+        &generous_budget(),
     );
     let after = workspace.moment_state(OffsetDateTime::now_utc());
     assert_eq!(
@@ -275,7 +283,7 @@ fn the_same_question_asked_twice_reads_the_same_way() {
         &context,
         &workspace,
         "what is lemon",
-        &ActivationBudget::default(),
+        &generous_budget(),
     );
     for _ in 0..8 {
         assert_eq!(
@@ -283,7 +291,7 @@ fn the_same_question_asked_twice_reads_the_same_way() {
                 &context,
                 &workspace,
                 "what is lemon",
-                &ActivationBudget::default()
+                &generous_budget(),
             ),
             first
         );

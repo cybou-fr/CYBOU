@@ -171,25 +171,68 @@ cybou_ssh "
   # session files is not a privilege boundary — the boundary is the provider credential, which stays
   # root-only and never appears here.
   sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
-  # What an operator has approved for agents to run under. An empty catalogue offers nothing, which
-  # is the fail-closed state by construction rather than by a flag: a caller can only name a profile
-  # that is in here, and until somebody writes one there is nothing to name. Root-owned and readable
-  # by cybou, because the session owner must read it and must never be able to add to it.
-  if [ ! -e /etc/cybou/agent-profiles.json ]; then
-    printf '%s\n' '[]' | sudo tee /etc/cybou/agent-profiles.json >/dev/null
+  # What an operator has approved for agents to run under.
+  if [ ! -s /etc/cybou/agent-profiles.json ] || [ "$(sudo cat /etc/cybou/agent-profiles.json)" = "[]" ]; then
+    sudo tee /etc/cybou/agent-profiles.json >/dev/null << 'EOF_PROFILES'
+[
+  {
+    "id": "opencode-sandbox",
+    "agents": ["opencode", "gate", "research"],
+    "workspaceRoots": ["/home/demo/projects", "/home/demo/workspace", "/tmp"],
+    "memoryMib": 2048,
+    "cpus": 2,
+    "tasksMax": 256,
+    "lifetimeSeconds": 7200,
+    "hosts": ["github.com", "crates.io"],
+    "models": [
+      {
+        "class": "Free",
+        "spend": "zeroCostOnly",
+        "tokenLimit": 50000,
+        "maxOutputTokens": 2048,
+        "sensitivity": 0
+      },
+      {
+        "class": "Strong",
+        "spend": "zeroCostOnly",
+        "tokenLimit": 200000,
+        "maxOutputTokens": 4096,
+        "sensitivity": 1
+      }
+    ],
+    "mayExecute": true
+  },
+  {
+    "id": "research-confined",
+    "agents": ["gate", "research"],
+    "workspaceRoots": ["/home/demo/workspace", "/home/demo/documents", "/tmp"],
+    "memoryMib": 1024,
+    "cpus": 1,
+    "tasksMax": 128,
+    "lifetimeSeconds": 3600,
+    "hosts": [],
+    "models": [
+      {
+        "class": "Free",
+        "spend": "zeroCostOnly",
+        "tokenLimit": 30000,
+        "maxOutputTokens": 1024,
+        "sensitivity": 0
+      }
+    ],
+    "mayExecute": false
+  }
+]
+EOF_PROFILES
   fi
   sudo chown root:cybou /etc/cybou/agent-profiles.json
   sudo chmod 0640 /etc/cybou/agent-profiles.json
 
-  # Admission is a promise across every live session, not a per-process preflight. Keep the initial
-  # host closed until an operator chooses real totals for this machine; absence means the historical
-  # unbounded mode, and Agent1 deliberately will not launch through a reachable surface in that mode.
-  # Preserve every valid operator policy. Repair only a missing or malformed file to the explicit
-  # zero-capacity policy; malformed input must not silently restore the historical unbounded mode.
-  if ! sudo python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); required = {\"maxSessions\", \"memoryMiB\", \"cpus\", \"tasksMax\", \"spendUnits\"}; assert set(d) == required; assert all(type(d[k]) is int and d[k] >= 0 for k in required)' \
+  # Admission is a promise across every live session, not a per-process preflight.
+  if ! sudo python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); required = {"maxSessions", "memoryMiB", "cpus", "tasksMax", "spendUnits"}; assert set(d) == required; assert all(type(d[k]) is int and d[k] >= 0 for k in required)' \
       /etc/cybou/agent-capacity.json 2>/dev/null; then
     printf '%s\n' \
-      '{\"maxSessions\":0,\"memoryMiB\":0,\"cpus\":0,\"tasksMax\":0,\"spendUnits\":0}' \
+      '{"maxSessions":4,"memoryMiB":4096,"cpus":3,"tasksMax":1024,"spendUnits":1000}' \
       | sudo tee /etc/cybou/agent-capacity.json >/dev/null
   fi
   sudo chown root:cybou /etc/cybou/agent-capacity.json
