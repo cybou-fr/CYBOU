@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use lucide_leptos::Sparkles;
 use std::sync::Arc;
 
+use crate::MindClient;
 use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,

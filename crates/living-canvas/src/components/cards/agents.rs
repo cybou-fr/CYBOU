@@ -73,31 +73,6 @@ fn request_stop(
     error: RwSignal<Option<String>>,
     mounted: Arc<AtomicBool>,
 ) {
-    error.set(None);
-    spawn_local(async move {
-        let result = GatewayMindClient.stop_agent(capsule_id).await;
-        if !mounted.load(Ordering::Acquire) {
-            return;
-        }
-        match result {
-            Ok(()) => match GatewayMindClient.agents().await {
-                Ok(sessions) if mounted.load(Ordering::Acquire) => {
-                    replace_agents(runtime, sessions);
-                }
-                Ok(_) => {}
-                Err(why) => {
-                    runtime.update(|state| {
-                        if let RuntimeState::Ready { agents, .. } = state {
-                            *agents = None;
-                        }
-                    });
-                    error.set(Some(why.to_string()));
-fn request_stop(
-    runtime: RwSignal<RuntimeState>,
-    capsule_id: Uuid,
-    error: RwSignal<Option<String>>,
-    mounted: Arc<AtomicBool>,
-) {
     request_action(
         runtime,
         capsule_id,

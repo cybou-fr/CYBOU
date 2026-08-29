@@ -5,6 +5,7 @@
 
 use leptos::prelude::*;
 use crate::{
+    MindClient,
     CardId,
     components::icons::{IconCheckCircle, IconRefresh},
     state::RuntimeState,
@@ -13,8 +14,7 @@ use crate::{
 
 #[component]
 pub fn UpdatesContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.updates(card);
 
@@ -93,7 +93,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                         <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
                             <div>
                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                    <span style="font-weight: 700; font-size: 14px; color: if has_updates { "#fbbf24" } else { "#4ade80" };">
+                                    <span style={if has_updates { "font-weight: 700; font-size: 14px; color: #fbbf24;" } else { "font-weight: 700; font-size: 14px; color: #4ade80;" }}>
                                         {if has_updates {
                                             format!("{} Updates Pending", summary.pending_count)
                                         } else {

@@ -42,8 +42,8 @@ pub fn FileManagerContent(
     };
 
     let user_home_dir = move || match runtime.get() {
-        RuntimeState::Ready { session, .. } => {
-            session.home.unwrap_or_else(|| "/home/user".to_string())
+        RuntimeState::Ready { session, .. } if !session.consumer_id.is_empty() => {
+            format!("/home/{}", session.consumer_id)
         }
         _ => "/home/user".to_string(),
     };
@@ -983,27 +983,33 @@ pub fn FileManagerContent(
                                                 <span class="fm-item-name">{n}</span>
                                                 <span class="fm-item-size">{if is_dir { "dir".to_string() } else { crate::tool_state::format_bytes(size) }}</span>
                                                 <div class="fm-item-quick-actions" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
-                                                    <button
-                                                        class="fm-item-action-btn"
-                                                        title="Rename"
-                                                        on:click=move |_| {
-                                                            rename_target.set(Some(n_menu.clone()));
-                                                            rename_new_name.set(n_menu.clone());
-                                                            rename_modal_open.set(true);
+                                                    {
+                                                        let n_rename = n_menu.clone();
+                                                        let n_delete = n_menu.clone();
+                                                        view! {
+                                                            <button
+                                                                class="fm-item-action-btn"
+                                                                title="Rename"
+                                                                on:click=move |_| {
+                                                                    rename_target.set(Some(n_rename.clone()));
+                                                                    rename_new_name.set(n_rename.clone());
+                                                                    rename_modal_open.set(true);
+                                                                }
+                                                            >
+                                                                <IconEdit size=11 />
+                                                            </button>
+                                                            <button
+                                                                class="fm-item-action-btn danger"
+                                                                title="Delete"
+                                                                on:click=move |_| {
+                                                                    delete_target.set(Some((n_delete.clone(), is_dir)));
+                                                                    delete_modal_open.set(true);
+                                                                }
+                                                            >
+                                                                <IconTrash size=11 />
+                                                            </button>
                                                         }
-                                                    >
-                                                        <IconEdit size=11 />
-                                                    </button>
-                                                    <button
-                                                        class="fm-item-action-btn danger"
-                                                        title="Delete"
-                                                        on:click=move |_| {
-                                                            delete_target.set(Some((n_menu.clone(), is_dir)));
-                                                            delete_modal_open.set(true);
-                                                        }
-                                                    >
-                                                        <IconTrash size=11 />
-                                                    </button>
+                                                    }
                                                 </div>
                                             </div>
                                         }

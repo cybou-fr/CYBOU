@@ -5,6 +5,7 @@
 
 use leptos::prelude::*;
 use crate::{
+    MindClient,
     CardId,
     components::icons::{IconCheckCircle, IconFile, IconRefresh},
     state::RuntimeState,
@@ -13,8 +14,7 @@ use crate::{
 
 #[component]
 pub fn NotesContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.notes(card);
 
@@ -146,12 +146,13 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                 // Notes Sidebar List
                 <div style="width: 200px; border-right: 1px solid rgba(255,255,255,0.08); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.15);">
                     {move || signals.notes.get().into_iter().map(|n| {
-                        let n_clone = n.clone();
-                        let is_sel = move || signals.selected_note_id.get().as_ref() == Some(&n_clone.id);
+                        let n_sel = n.clone();
+                        let n_click = n.clone();
+                        let is_sel = move || signals.selected_note_id.get().as_ref() == Some(&n_sel.id);
                         view! {
                             <div
                                 style=move || format!("padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; background: {}; border: 1px solid {};", if is_sel() { "rgba(99, 102, 241, 0.2)" } else { "transparent" }, if is_sel() { "rgba(99, 102, 241, 0.4)" } else { "transparent" })
-                                on:click=move |_| select_note(n.clone())
+                                on:click=move |_| select_note(n_click.clone())
                             >
                                 <div style="font-weight: 600; color: #f3f4f6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                     {if n.is_pinned { "📌 " } else { "" }}

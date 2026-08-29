@@ -8,6 +8,7 @@ use cybou_protocol::system::ProcessSignal;
 use cybou_protocol::SubjectRef;
 
 use crate::{
+    MindClient,
     CardId,
     components::icons::{IconLayers, IconRefresh, IconStop},
     state::RuntimeState,
@@ -16,8 +17,7 @@ use crate::{
 
 #[component]
 pub fn ProcessesContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.processes(card);
 
@@ -215,7 +215,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                                     {name}
                                 </div>
                                 <span style="color: rgba(255,255,255,0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{p.user}</span>
-                                <span style="text-align: right; font-family: monospace; color: if p.cpu_percent > 2.0 { "#818cf8" } else { "inherit" }; font-weight: if p.cpu_percent > 2.0 { "600" } else { "normal" };">
+                                <span style={if p.cpu_percent > 2.0 { "text-align: right; font-family: monospace; color: #818cf8; font-weight: 600;" } else { "text-align: right; font-family: monospace; color: inherit; font-weight: normal;" }}>
                                     {format!("{:.1}%", p.cpu_percent)}
                                 </span>
                                 <span style="text-align: right; font-family: monospace; color: rgba(255,255,255,0.8);">

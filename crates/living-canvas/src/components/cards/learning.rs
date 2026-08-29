@@ -8,17 +8,16 @@
 
 use leptos::prelude::*;
 use crate::{
+    MindClient,
     CardId,
-    components::icons::{IconCheckCircle, IconLayers, IconPlus, IconRefresh, IconSliders},
-    state::RuntimeState,
+    components::icons::{IconCheckCircle, IconLayers, IconPlus, IconRefresh},
     tool_state::ToolCardStates,
 };
 use cybou_protocol::learning::LearningLayer;
 
 #[component]
 pub fn LearningContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.learning(card);
 
@@ -75,24 +74,24 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
     };
 
     let submit_proposal = move || {
-        let gen = signals.new_generalization.get();
+        let gen_text = signals.new_generalization.get();
         let scope = signals.new_scope.get();
-        if gen.trim().is_empty() || scope.trim().is_empty() {
+        if gen_text.trim().is_empty() || scope.trim().is_empty() {
             return;
         }
 
         let layer = match signals.new_layer.get().as_str() {
-            "behavioral" => LearningLayer::Behavioral,
-            "epistemic" => LearningLayer::Epistemic,
-            "neural" => LearningLayer::Neural,
-            _ => LearningLayer::Procedural,
+            "behavioral" => cybou_protocol::learning::LearningLayer::Behavioral,
+            "epistemic" => cybou_protocol::learning::LearningLayer::Epistemic,
+            "neural" => cybou_protocol::learning::LearningLayer::Neural,
+            _ => cybou_protocol::learning::LearningLayer::Procedural,
         };
 
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
             let req = cybou_web_contracts::ProposeLearningCandidateRequest {
                 layer,
-                generalization: gen,
+                generalization: gen_text,
                 scope,
                 source_evidence: vec![uuid::Uuid::new_v4()],
                 outcome_evidence: vec![uuid::Uuid::new_v4()],

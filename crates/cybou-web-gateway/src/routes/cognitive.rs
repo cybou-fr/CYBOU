@@ -18,6 +18,7 @@ use crate::state::{GatewayError, GatewayState};
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GraphQuery {
+    /// Focus subject identifier or domain prefix.
     pub focus: Option<String>,
 }
 
@@ -25,7 +26,9 @@ pub struct GraphQuery {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JournalQuery {
+    /// Maximum number of events to return.
     pub limit: Option<usize>,
+    /// Pagination offset.
     pub offset: Option<usize>,
 }
 

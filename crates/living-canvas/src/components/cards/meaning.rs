@@ -8,16 +8,16 @@
 
 use leptos::prelude::*;
 use crate::{
+    MindClient,
     CardId,
-    components::icons::{IconCheckCircle, IconMessageSquare, IconRefresh, IconSearch},
+    components::icons::{IconCheckCircle, IconBot, IconRefresh, IconSearch},
     state::RuntimeState,
     tool_state::ToolCardStates,
 };
 
 #[component]
 pub fn MeaningContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.meaning(card);
 
@@ -77,7 +77,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
             // Header
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <IconMessageSquare size=16 />
+                    <IconBot size=16 />
                     <span style="font-weight: 600; font-size: 13px;">"Meaning1 & Dialogue Assistant"</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -160,7 +160,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                 {move || match signals.projection.get() {
                     None => view! {
                         <div style="padding: 30px; text-align: center; color: rgba(255,255,255,0.4); font-size: 12px;">
-                            <IconMessageSquare size=28 />
+                            <IconBot size=28 />
                             <p style="margin-top: 8px;">"No active interpretation. Enter a natural language question or command above."</p>
                             <p style="font-size: 11px; color: rgba(255,255,255,0.3);">"Meaning1 deterministically maps language to typed Cognitive Acts without LLM guessing."</p>
                         </div>

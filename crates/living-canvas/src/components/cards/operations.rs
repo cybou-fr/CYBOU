@@ -8,6 +8,7 @@ use cybou_protocol::operation::{OperationRecord, OperationState};
 use uuid::Uuid;
 
 use crate::{
+    MindClient,
     CardId,
     components::icons::{
         IconActivity, IconAlertCircle, IconCheckCircle, IconClose, IconRefresh, IconStop,
@@ -18,8 +19,7 @@ use crate::{
 
 #[component]
 pub fn OperationsContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.operations(card);
 

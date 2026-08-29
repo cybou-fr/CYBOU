@@ -22,7 +22,9 @@ use crate::state::{GatewayError, GatewayState};
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailQuery {
+    /// Account identifier to filter messages by.
     pub account_id: Option<String>,
+    /// Mail folder filter (Inbox, Sent, Drafts, Trash, Archive).
     pub folder: Option<MailFolderKind>,
 }
 

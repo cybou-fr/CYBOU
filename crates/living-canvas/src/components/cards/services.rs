@@ -8,6 +8,7 @@ use cybou_protocol::system::{ServiceAction, ServiceState};
 use cybou_protocol::SubjectRef;
 
 use crate::{
+    MindClient,
     CardId,
     components::icons::{IconCheckCircle, IconClose, IconLayers, IconRefresh, IconStop},
     state::RuntimeState,
@@ -16,8 +17,7 @@ use crate::{
 
 #[component]
 pub fn ServicesContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.services(card);
 
@@ -232,7 +232,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                         "Restart"
                                     </button>
                                     {if is_active {
-                                        Some(view! {
+                                        view! {
                                             <button
                                                 style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #f87171; cursor: pointer;"
                                                 title="Stop service"
@@ -240,9 +240,9 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                             >
                                                 "Stop"
                                             </button>
-                                        })
+                                        }.into_any()
                                     } else {
-                                        Some(view! {
+                                        view! {
                                             <button
                                                 style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #4ade80; cursor: pointer;"
                                                 title="Start service"
@@ -250,7 +250,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                             >
                                                 "Start"
                                             </button>
-                                        })
+                                        }.into_any()
                                     }}
                                     <button
                                         style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: #818cf8; cursor: pointer; display: flex; align-items: center; gap: 4px;"

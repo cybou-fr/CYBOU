@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 use crate::{ClientError, MindClient};
 
 /// Same-origin browser client for the bounded gateway API.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct GatewayMindClient;
 
 impl GatewayMindClient {

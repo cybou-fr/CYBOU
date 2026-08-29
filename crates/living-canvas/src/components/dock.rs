@@ -11,8 +11,8 @@ use crate::instant_label;
 use crate::{
     ArrangementMode, CardId, DesktopItemId, DesktopLayout,
     components::icons::{
-        IconActivity, IconBell, IconFile, IconFolder, IconHome, IconLayers, IconShield,
-        IconTerminal,
+        IconActivity, IconBell, IconBot, IconFile, IconFolder, IconGrid, IconHome, IconLayers,
+        IconRefresh, IconShield, IconTerminal,
     },
     state::RuntimeState,
 };
@@ -290,7 +290,7 @@ pub fn DesktopDock(
                     title="Users & SSH Keys"
                     on:click=move |_| open_or_focus(CardId::UserSettings(0), 580.0, 440.0)
                 >
-                    <IconSliders size=18 />
+                    <IconGrid size=18 />
                     <span class="dock-tooltip">"Users"</span>
                 </button>
                 <button
@@ -299,7 +299,7 @@ pub fn DesktopDock(
                     title="Security & Sandboxing"
                     on:click=move |_| open_or_focus(CardId::Security(0), 560.0, 440.0)
                 >
-                    <IconLock size=18 />
+                    <IconShield size=18 />
                     <span class="dock-tooltip">"Security"</span>
                 </button>
                 <button
@@ -344,7 +344,7 @@ pub fn DesktopDock(
                     title="Contacts Directory"
                     on:click=move |_| open_or_focus(CardId::Contacts(0), 560.0, 440.0)
                 >
-                    <IconSliders size=18 />
+                    <IconGrid size=18 />
                     <span class="dock-tooltip">"Contacts"</span>
                 </button>
                 <button
@@ -371,7 +371,7 @@ pub fn DesktopDock(
                     title="Meaning & Dialogue Assistant"
                     on:click=move |_| open_or_focus(CardId::Meaning(0), 600.0, 480.0)
                 >
-                    <IconMessageSquare size=18 />
+                    <IconBot size=18 />
                     <span class="dock-tooltip">"Meaning"</span>
                 </button>
                 <button

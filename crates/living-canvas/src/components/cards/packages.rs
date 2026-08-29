@@ -8,6 +8,7 @@ use cybou_protocol::system::{PackageActionKind, PackageStatus};
 use cybou_protocol::SubjectRef;
 
 use crate::{
+    MindClient,
     CardId,
     components::icons::{IconLayers, IconRefresh},
     state::RuntimeState,
@@ -16,8 +17,7 @@ use crate::{
 
 #[component]
 pub fn PackagesContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.packages(card);
 
@@ -199,32 +199,32 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                 // Action Buttons
                                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                                     {if is_upgradable {
-                                        Some(view! {
+                                        view! {
                                             <button
                                                 style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #fbbf24; font-weight: 600; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Upgrade)
                                             >
                                                 "Upgrade"
                                             </button>
-                                        })
+                                        }.into_any()
                                     } else if is_installed {
-                                        Some(view! {
+                                        view! {
                                             <button
                                                 style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #f87171; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Remove)
                                             >
                                                 "Remove"
                                             </button>
-                                        })
+                                        }.into_any()
                                     } else {
-                                        Some(view! {
+                                        view! {
                                             <button
                                                 style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #4ade80; font-weight: 600; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Install)
                                             >
                                                 "Install"
                                             </button>
-                                        })
+                                        }.into_any()
                                     }}
 
                                     <button

@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use cybou_web_contracts::SystemLogsQueryRequest;
 
 use crate::{
+    MindClient,
     CardId,
     components::icons::IconRefresh,
     state::RuntimeState,
@@ -15,8 +16,7 @@ use crate::{
 
 #[component]
 pub fn SystemLogsContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.system_logs(card);
 

@@ -11,6 +11,7 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{Event, EventSource, MessageEvent, PointerEvent};
 
 use crate::{
+    MindClient,
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
     interaction::{DragState, ResizeState},

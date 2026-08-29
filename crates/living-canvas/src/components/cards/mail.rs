@@ -6,6 +6,7 @@
 use leptos::prelude::*;
 use cybou_protocol::personal::MailFolderKind;
 use crate::{
+    MindClient,
     CardId,
     components::icons::{IconCheckCircle, IconFile, IconRefresh},
     state::RuntimeState,
@@ -14,8 +15,7 @@ use crate::{
 
 #[component]
 pub fn MailContent(card: CardId) -> impl IntoView {
-    let state = expect_context::<RuntimeState>();
-    let client = state.client;
+    let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.mail(card);
 

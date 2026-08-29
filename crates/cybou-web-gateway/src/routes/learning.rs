@@ -20,8 +20,10 @@ use uuid::Uuid;
 
 use crate::state::GatewayState;
 
+/// Query parameters for filtering learning candidates.
 #[derive(Debug, Deserialize)]
 pub struct CandidateFilterQuery {
+    /// Optional learning layer name filter.
     pub layer: Option<String>,
 }
 
