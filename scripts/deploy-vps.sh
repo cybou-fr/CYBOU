@@ -100,6 +100,7 @@ cybou_ssh "
   # a unit that is present but not enabled is the honest way to ship a session for machines that do
   # have one.
   sudo install -m 0755 scripts/cybou-desktop-session.sh /usr/libexec/cybou/cybou-desktop-session.sh
+  sudo install -m 0755 scripts/cybou-host-filesd-runner.sh /usr/libexec/cybou/cybou-host-filesd-runner.sh
   sudo install -m 0755 scripts/cybou-action-policy.sh /usr/sbin/cybou-action-policy
 
   sudo getent group cybou >/dev/null || sudo groupadd --system cybou

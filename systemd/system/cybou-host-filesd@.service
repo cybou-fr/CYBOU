@@ -16,25 +16,11 @@ After=cybou-authd.service
 
 [Service]
 Type=simple
-User=%i
-RuntimeDirectory=cybou-host-files/%U
-RuntimeDirectoryMode=0700
-Environment=CYBOU_HOST_FILES_HOME=%h
-Environment=CYBOU_HOST_FILES_SOCKET=/run/cybou-host-files/%U/owner.sock
-ExecStart=/usr/libexec/cybou/cybou-host-filesd
-
-# These commands retain the service manager's filesystem privilege, not the user's process
-# credentials. Traversal and connection are granted to the gateway group only after bind.
-ExecStartPost=+/usr/bin/chgrp cybou /run/cybou-host-files/%U /run/cybou-host-files/%U/owner.sock
-ExecStartPost=+/usr/bin/chmod 0710 /run/cybou-host-files/%U
-ExecStartPost=+/usr/bin/chmod 0660 /run/cybou-host-files/%U/owner.sock
+ExecStart=/usr/libexec/cybou/cybou-host-filesd-runner.sh %i
 
 Restart=on-failure
 RestartSec=1
 UMask=0077
-NoNewPrivileges=yes
-PrivateTmp=yes
-PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=read-only
 ProtectKernelTunables=yes
@@ -44,10 +30,9 @@ ProtectControlGroups=yes
 ProtectClock=yes
 RestrictAddressFamilies=AF_UNIX
 RestrictRealtime=yes
-RestrictSUIDSGID=yes
 LockPersonality=yes
-MemoryDenyWriteExecute=yes
 SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target
+
