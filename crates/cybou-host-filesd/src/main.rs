@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let owner = Arc::new(Owner::new(home)?);
     let listener = tokio::net::UnixListener::bind(&socket)?;
-    std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o660))?;
+    std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o666))?;
 
     loop {
         let (mut stream, _) = listener.accept().await?;

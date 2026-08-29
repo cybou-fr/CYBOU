@@ -22,7 +22,7 @@ fi
 # Prepare per-UID runtime socket directory with group traversal for cybou
 mkdir -p "/run/cybou-host-files/$USER_UID"
 chown "$USER_NAME:cybou" "/run/cybou-host-files/$USER_UID"
-chmod 0750 "/run/cybou-host-files/$USER_UID"
+chmod 2750 "/run/cybou-host-files/$USER_UID"
 
 # Clean up stale dead socket if any
 if [ -S "/run/cybou-host-files/$USER_UID/owner.sock" ]; then
