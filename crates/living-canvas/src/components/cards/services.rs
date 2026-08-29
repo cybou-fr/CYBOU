@@ -10,8 +10,7 @@ use cybou_protocol::SubjectRef;
 use crate::{
     MindClient,
     CardId,
-    components::icons::{IconCheckCircle, IconClose, IconLayers, IconRefresh, IconStop},
-    state::RuntimeState,
+    components::icons::{IconLayers, IconRefresh},
     tool_state::ToolCardStates,
 };
 

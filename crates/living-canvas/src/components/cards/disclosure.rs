@@ -18,7 +18,6 @@ use lucide_leptos::EyeOff;
 use std::sync::Arc;
 
 use crate::{
-    MindClient,
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
     interaction::{DragState, ResizeState},

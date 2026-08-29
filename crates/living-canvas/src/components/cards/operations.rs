@@ -4,16 +4,15 @@
 //! Operations Manager card component for monitoring server-owned background tasks.
 
 use leptos::prelude::*;
-use cybou_protocol::operation::{OperationRecord, OperationState};
+use cybou_protocol::operation::OperationState;
 use uuid::Uuid;
 
 use crate::{
     MindClient,
     CardId,
     components::icons::{
-        IconActivity, IconAlertCircle, IconCheckCircle, IconClose, IconRefresh, IconStop,
+        IconActivity, IconRefresh, IconStop,
     },
-    state::RuntimeState,
     tool_state::ToolCardStates,
 };
 

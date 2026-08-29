@@ -4,12 +4,10 @@
 //! Personal Mail & Messages card component.
 
 use leptos::prelude::*;
-use cybou_protocol::personal::MailFolderKind;
 use crate::{
     MindClient,
     CardId,
-    components::icons::{IconCheckCircle, IconFile, IconRefresh},
-    state::RuntimeState,
+    components::icons::IconRefresh,
     tool_state::ToolCardStates,
 };
 

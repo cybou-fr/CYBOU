@@ -9,7 +9,6 @@ use lucide_leptos::Link;
 use std::sync::Arc;
 
 use crate::{
-    MindClient,
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
     interaction::{DragState, ResizeState},

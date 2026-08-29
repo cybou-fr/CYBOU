@@ -8,7 +8,6 @@ use leptos::prelude::*;
 use lucide_leptos::UsersRound;
 use std::sync::Arc;
 
-use crate::MindClient;
 use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,

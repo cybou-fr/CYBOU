@@ -6,7 +6,6 @@
 use leptos::prelude::*;
 
 use crate::{
-    MindClient,
     CardId,
     components::cards::{
         agents::AgentsContent, attention::AttentionContent, beliefs::BeliefsContent,

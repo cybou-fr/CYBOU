@@ -10,7 +10,6 @@ use crate::{
     MindClient,
     CardId,
     components::icons::IconRefresh,
-    state::RuntimeState,
     tool_state::ToolCardStates,
 };
 

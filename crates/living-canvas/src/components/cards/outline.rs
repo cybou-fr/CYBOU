@@ -9,7 +9,6 @@ use std::sync::Arc;
 use web_sys::{MouseEvent, PointerEvent};
 
 use crate::{
-    MindClient,
     CardId, DesktopItemId, DesktopLayout, Rect,
     components::{card_controls::request_close_card, card_frame::CardFrame},
     interaction::{DragState, ResizeState},

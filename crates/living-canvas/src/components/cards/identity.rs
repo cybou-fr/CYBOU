@@ -7,7 +7,6 @@ use leptos::prelude::*;
 use lucide_leptos::FileCheck;
 use std::sync::Arc;
 
-use crate::MindClient;
 use crate::instant_label;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,

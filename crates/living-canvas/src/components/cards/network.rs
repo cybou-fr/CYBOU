@@ -10,7 +10,6 @@ use crate::{
     MindClient,
     CardId,
     components::icons::{IconActivity, IconRefresh},
-    state::RuntimeState,
     tool_state::ToolCardStates,
 };
 
@@ -88,7 +87,7 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                     each=move || signals.connections.get()
                     key=|c| c.id.clone()
                     children=move |conn| {
-                        let conn_id = conn.id.clone();
+                        let _conn_id = conn.id.clone();
                         let conn_id_btn = conn.id.clone();
                         let is_active = conn.is_active;
                         let rx_mb = conn.rx_bytes / (1024 * 1024);

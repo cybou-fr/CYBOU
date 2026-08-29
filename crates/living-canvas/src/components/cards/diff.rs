@@ -9,7 +9,6 @@ use std::sync::Arc;
 use web_sys::PointerEvent;
 
 use crate::{
-    MindClient,
     CardId, DesktopItemId, DesktopLayout,
     components::{
         card_frame::CardFrame,

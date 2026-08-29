@@ -3,6 +3,8 @@
 
 //! Runtime-independent client boundary for Living Canvas.
 
+#![allow(missing_docs)]
+
 use async_trait::async_trait;
 use cybou_web_contracts::{
     DirectoryListingProjection, DisclosureProjection, FileContentProjection, FileWriteProjection,

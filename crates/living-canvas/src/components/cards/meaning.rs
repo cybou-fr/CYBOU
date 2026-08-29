@@ -10,8 +10,7 @@ use leptos::prelude::*;
 use crate::{
     MindClient,
     CardId,
-    components::icons::{IconCheckCircle, IconBot, IconRefresh, IconSearch},
-    state::RuntimeState,
+    components::icons::{IconBot, IconRefresh, IconSearch},
     tool_state::ToolCardStates,
 };
 

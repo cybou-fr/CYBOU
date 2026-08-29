@@ -4,17 +4,16 @@
 //! Notifications Center card component for desktop attention, evidence, system, and agent feeds.
 
 use leptos::prelude::*;
-use cybou_protocol::notification::{NotificationActionKind, NotificationCategory, NotificationSeverity};
+use cybou_protocol::notification::{NotificationCategory, NotificationSeverity};
 use uuid::Uuid;
 
 use crate::{
     MindClient,
     CardId,
     components::icons::{
-        IconAlertCircle, IconAlertTriangle, IconBell, IconBot, IconCheckCircle, IconClose,
-        IconInfo, IconRefresh, IconSearch,
+        IconAlertCircle, IconAlertTriangle, IconBell, IconClose,
+        IconInfo, IconRefresh,
     },
-    state::RuntimeState,
     tool_state::ToolCardStates,
 };
 
@@ -229,7 +228,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                             NotificationCategory::Operation => ("rgba(34, 197, 94, 0.2)", "#4ade80"),
                         };
 
-                        let (sev_border, sev_icon) = match notif.severity {
+                        let (sev_border, _sev_icon) = match notif.severity {
                             NotificationSeverity::Critical => ("#ef4444", view! { <IconAlertCircle size=14 /> }.into_any()),
                             NotificationSeverity::Warning => ("#f59e0b", view! { <IconAlertTriangle size=14 /> }.into_any()),
                             NotificationSeverity::Notice => ("#3b82f6", view! { <IconInfo size=14 /> }.into_any()),

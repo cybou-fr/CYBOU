@@ -10,10 +10,9 @@ use leptos::prelude::*;
 use crate::{
     MindClient,
     CardId,
-    components::icons::{IconCheckCircle, IconLayers, IconPlus, IconRefresh},
+    components::icons::{IconLayers, IconPlus, IconRefresh},
     tool_state::ToolCardStates,
 };
-use cybou_protocol::learning::LearningLayer;
 
 #[component]
 pub fn LearningContent(card: CardId) -> impl IntoView {
