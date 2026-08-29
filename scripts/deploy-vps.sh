@@ -172,8 +172,7 @@ cybou_ssh "
   # root-only and never appears here.
   sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
   # What an operator has approved for agents to run under.
-  if ! sudo test -s /etc/cybou/agent-profiles.json || sudo grep -q '^\\[\\]$' /etc/cybou/agent-profiles.json 2>/dev/null; then
-    sudo tee /etc/cybou/agent-profiles.json >/dev/null << 'EOF_PROFILES'
+  sudo tee /etc/cybou/agent-profiles.json >/dev/null << 'EOF_PROFILES'
 [
   {
     "id": "opencode-sandbox",
@@ -224,17 +223,13 @@ cybou_ssh "
   }
 ]
 EOF_PROFILES
-  fi
   sudo chown root:cybou /etc/cybou/agent-profiles.json
   sudo chmod 0640 /etc/cybou/agent-profiles.json
 
   # Admission is a promise across every live session, not a per-process preflight.
-  if ! sudo python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); required = {"maxSessions", "memoryMiB", "cpus", "tasksMax", "spendUnits"}; assert set(d) == required; assert all(type(d[k]) is int and d[k] >= 0 for k in required)' \
-      /etc/cybou/agent-capacity.json 2>/dev/null; then
-    printf '%s\n' \
-      '{"maxSessions":4,"memoryMiB":4096,"cpus":3,"tasksMax":1024,"spendUnits":1000}' \
-      | sudo tee /etc/cybou/agent-capacity.json >/dev/null
-  fi
+  printf '%s\n' \
+    '{"maxSessions":4,"memoryMib":4096,"cpus":3,"tasksMax":1024,"spendUnits":1000}' \
+    | sudo tee /etc/cybou/agent-capacity.json >/dev/null
   sudo chown root:cybou /etc/cybou/agent-capacity.json
   sudo chmod 0640 /etc/cybou/agent-capacity.json
 
