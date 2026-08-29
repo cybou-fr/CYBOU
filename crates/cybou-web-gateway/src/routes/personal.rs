@@ -117,21 +117,21 @@ mod tests {
 
         // Mail tests
         let mail = hub.get_mail(None, Some(MailFolderKind::Inbox));
-        assert!(!mail.accounts.is_empty());
-        assert!(!mail.messages.is_empty());
+        assert!(mail.accounts.is_empty());
+        assert!(mail.messages.is_empty());
 
         let sent = hub.send_mail(SendMailRequest {
-            account_id: mail.accounts[0].id.clone(),
+            account_id: "acc-1".to_owned(),
             to: vec!["colleague@cybou.local".to_owned()],
             subject: "Test Subject".to_owned(),
             body: "Test Body".to_owned(),
             referenced_subject: None,
         });
-        assert!(sent.is_ok());
+        assert!(sent.is_err());
 
         // Calendar tests
         let cal = hub.get_calendar();
-        assert!(!cal.events.is_empty());
+        assert!(cal.events.is_empty());
         let event = hub.create_calendar_event(CreateCalendarEventRequest {
             title: "Sprint Planning".to_owned(),
             description: "Plan Milestone 7".to_owned(),
@@ -144,10 +144,12 @@ mod tests {
             referenced_subject: None,
         });
         assert!(event.is_ok());
+        let cal_after = hub.get_calendar();
+        assert_eq!(cal_after.events.len(), 1);
 
         // Notes tests
         let notes = hub.get_notes();
-        assert!(!notes.notes.is_empty());
+        assert!(notes.notes.is_empty());
         let new_note = hub.create_note(CreateNoteRequest {
             title: "New Ideas".to_owned(),
             content_markdown: "Ideas list".to_owned(),
@@ -156,18 +158,21 @@ mod tests {
             referenced_subject: None,
         });
         assert!(new_note.is_ok());
+        let note_id = new_note.unwrap().id;
         let updated = hub.update_note(UpdateNoteRequest {
-            id: new_note.unwrap().id,
+            id: note_id,
             title: "Updated Ideas".to_owned(),
             content_markdown: "Updated ideas list".to_owned(),
             tags: vec!["ideas".to_owned(), "v2".to_owned()],
             is_pinned: true,
         });
         assert!(updated.is_ok());
+        let notes_after = hub.get_notes();
+        assert_eq!(notes_after.notes.len(), 1);
 
         // Contacts tests
         let contacts = hub.get_contacts();
-        assert!(!contacts.contacts.is_empty());
+        assert!(contacts.contacts.is_empty());
         let new_cnt = hub.create_contact(CreateContactRequest {
             name: "Alice Cooper".to_owned(),
             email: "alice@cybou.net".to_owned(),
@@ -179,5 +184,7 @@ mod tests {
             referenced_subject: None,
         });
         assert!(new_cnt.is_ok());
+        let contacts_after = hub.get_contacts();
+        assert_eq!(contacts_after.contacts.len(), 1);
     }
 }

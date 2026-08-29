@@ -59,6 +59,8 @@ pub async fn get_event_journal(
 #[cfg(test)]
 mod tests {
     use crate::cognitive_hub::CognitiveHub;
+    use cybou_protocol::cognitive::EventJournalEntry;
+    use cybou_protocol::epistemic::EpistemicStatus;
     use cybou_web_contracts::CognitiveQueryRequest;
 
     #[test]
@@ -66,8 +68,24 @@ mod tests {
         let hub = CognitiveHub::new();
 
         let graph = hub.get_graph(None);
-        assert!(!graph.graph.nodes.is_empty());
-        assert!(!graph.graph.edges.is_empty());
+        assert!(graph.graph.nodes.is_empty());
+
+        hub.record_event(EventJournalEntry {
+            event_id: "evt-001".to_owned(),
+            causation_id: None,
+            correlation_id: "corr-001".to_owned(),
+            origin_organ: "systemd".to_owned(),
+            event_type: "UnitActive".to_owned(),
+            summary: "Service started".to_owned(),
+            payload_preview: "{}".to_owned(),
+            timestamp: "2026-08-29T12:00:00Z".to_owned(),
+            subject: None,
+            epistemic_status: EpistemicStatus::Observed,
+        });
+
+        let journal = hub.get_journal(Some(10), None);
+        assert_eq!(journal.total_count, 1);
+        assert_eq!(journal.entries[0].event_id, "evt-001");
 
         let queried = hub.query_graph(CognitiveQueryRequest {
             query: "OpenCode".to_owned(),
@@ -75,10 +93,6 @@ mod tests {
             focus_id: None,
             max_depth: None,
         });
-        assert_eq!(queried.graph.nodes.len(), 1);
-
-        let journal = hub.get_journal(Some(10), None);
-        assert!(!journal.entries.is_empty());
-        assert!(journal.total_count >= 4);
+        assert!(queried.graph.nodes.is_empty());
     }
 }

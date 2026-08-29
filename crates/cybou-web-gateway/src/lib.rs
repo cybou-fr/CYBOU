@@ -51,6 +51,8 @@ pub mod shells;
 pub mod state;
 /// System services, processes, storage, network, and packages provider.
 pub mod system_hub;
+/// Grounded Linux /proc and hardware system reader.
+pub mod system_reader;
 
 pub use access::{
     CredentialVerifier, LoginOutcome, LoginRequest, Session, Sessions, VerifiedAccount,
@@ -87,6 +89,18 @@ use routes::{
     write_host_file_handler, evaluate_candidate_handler,
 };
 use state::GatewayState;
+
+async fn require_auth_middleware(
+    axum::extract::State(state): axum::extract::State<GatewayState>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if !state.may_read_mind(request.headers()) {
+        return GatewayState::sign_in_required().into_response();
+    }
+    next.run(request).await
+}
 
 /// Build the v1 router around a single source.
 pub fn router(presence: Arc<dyn PresenceSource>) -> Router {
@@ -226,10 +240,12 @@ pub(crate) fn router_in_sandbox(
         learning: Arc::new(crate::learning_hub::LearningHub::new()),
     };
 
-    let app = Router::new()
+    let public_routes = Router::new()
         .route("/api/v1/session", get(session_handler))
         .route("/api/v1/login", post(login_handler))
-        .route("/api/v1/logout", post(logout_handler))
+        .route("/api/v1/logout", post(logout_handler));
+
+    let protected_routes = Router::new()
         .route("/api/v1/snapshot", get(snapshot_handler))
         .route("/api/v1/mind", get(mind_handler))
         .route("/api/v1/events", get(events_handler))
@@ -319,6 +335,14 @@ pub(crate) fn router_in_sandbox(
             post(revoke_artifact_handler),
         )
         .route("/api/v1/governance/scopes", get(get_governance_scopes_handler))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            require_auth_middleware,
+        ));
+
+    let app = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
         .route("/api/{*path}", any(api_not_found))
         .with_state(state)
         .layer(SetResponseHeaderLayer::if_not_present(

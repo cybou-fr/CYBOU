@@ -46,23 +46,46 @@ pub async fn execute_notification_action(
 #[cfg(test)]
 mod tests {
     use crate::notifications_hub::NotificationsHub;
+    use cybou_protocol::notification::{
+        NotificationAction, NotificationActionKind, NotificationCategory, NotificationItem,
+        NotificationSeverity,
+    };
+    use time::OffsetDateTime;
+    use uuid::Uuid;
 
     #[test]
     fn notifications_hub_filters_and_dismisses() {
         let hub = NotificationsHub::new();
         let list = hub.list();
-        assert!(list.attention_count >= 1);
-        let first_notif = &list.notifications[0];
-        let notif_id = first_notif.id;
+        assert_eq!(list.notifications.len(), 0);
 
-        assert!(!first_notif.actions.is_empty());
-        let action_id = &first_notif.actions[0].id;
-
-        let result = hub.execute_action(notif_id, action_id);
-        assert!(result.is_ok());
+        let notif_id = Uuid::new_v4();
+        hub.push(NotificationItem {
+            id: notif_id,
+            category: NotificationCategory::Attention,
+            severity: NotificationSeverity::Warning,
+            title: "Test Warning".to_owned(),
+            body: "Attention needed".to_owned(),
+            subject: None,
+            created_at: OffsetDateTime::now_utc(),
+            read: false,
+            dismissed: false,
+            actions: vec![NotificationAction {
+                id: "dismiss".to_owned(),
+                label: "Dismiss".to_owned(),
+                kind: NotificationActionKind::Dismiss,
+                primary: true,
+            }],
+        });
 
         let after = hub.list();
-        let updated = after.notifications.iter().find(|n| n.id == notif_id).unwrap();
-        assert!(updated.read);
+        assert_eq!(after.attention_count, 1);
+
+        let result = hub.execute_action(notif_id, "dismiss");
+        assert!(result.is_ok());
+
+        let final_list = hub.list();
+        let updated = final_list.notifications.iter().find(|n| n.id == notif_id).unwrap();
+        assert!(updated.dismissed);
     }
 }

@@ -11,9 +11,7 @@ use cybou_protocol::learning::{
 use cybou_protocol::promotion::{
     DemonstratedOutcome, evaluate_promotion,
 };
-use cybou_protocol::governance::{
-    ActorKind, TaskScope,
-};
+use cybou_protocol::governance::TaskScope;
 use cybou_web_contracts::{
     CandidateEvaluationProjection, GovernanceScopesProjection, LearnedArtifactsProjection,
     LearningCandidatesProjection, ProposeLearningCandidateRequest, RevokeArtifactRequest,
@@ -37,155 +35,14 @@ impl Default for LearningHub {
 }
 
 impl LearningHub {
-    /// Create a new LearningHub initialized with nominal system candidates, artifacts, and scopes.
+    /// Create a new LearningHub initialized with empty state.
     #[must_use]
     pub fn new() -> Self {
-        let now = OffsetDateTime::now_utc();
-        let ev1 = Uuid::new_v4();
-        let ev2 = Uuid::new_v4();
-        let ev3 = Uuid::new_v4();
-        let ep1 = Uuid::new_v4();
-        let ep2 = Uuid::new_v4();
-        let ep3 = Uuid::new_v4();
-
-        let cand_procedural_id = Uuid::new_v4();
-        let cand_behavioral_id = Uuid::new_v4();
-        let cand_epistemic_id = Uuid::new_v4();
-        let cand_neural_id = Uuid::new_v4();
-
-        let candidates = vec![
-            LearningCandidate {
-                candidate_id: cand_procedural_id,
-                layer: LearningLayer::Procedural,
-                source_evidence: vec![ev1, ev2],
-                outcome_evidence: vec![ev3],
-                generalization: "Auto-reconnect D-Bus daemon when connection drop is detected with ECONNREFUSED".into(),
-                scope: "service.dbus".into(),
-                derivation_version: 1,
-                created_at: now,
-            },
-            LearningCandidate {
-                candidate_id: cand_behavioral_id,
-                layer: LearningLayer::Behavioral,
-                source_evidence: vec![ev1],
-                outcome_evidence: vec![ev2],
-                generalization: "Format telemetry as concise spatial badges when viewing Living Canvas overview".into(),
-                scope: "canvas.telemetry".into(),
-                derivation_version: 1,
-                created_at: now,
-            },
-            LearningCandidate {
-                candidate_id: cand_epistemic_id,
-                layer: LearningLayer::Epistemic,
-                source_evidence: vec![ev2],
-                outcome_evidence: vec![ev3],
-                generalization: "Classify Landlock confinement as strictly enforced when ABI version >= 3".into(),
-                scope: "security.landlock".into(),
-                derivation_version: 1,
-                created_at: now,
-            },
-            LearningCandidate {
-                candidate_id: cand_neural_id,
-                layer: LearningLayer::Neural,
-                source_evidence: vec![ev1, ev3],
-                outcome_evidence: vec![ev2],
-                generalization: "Low-rank LoRA parameter adaptation for fast local Rust AST lint reasoning".into(),
-                scope: "agent.opencode".into(),
-                derivation_version: 1,
-                created_at: now,
-            },
-        ];
-
-        let demonstrations = vec![
-            (
-                cand_procedural_id,
-                vec![
-                    DemonstratedOutcome {
-                        episode: ep1,
-                        outcome: ev1,
-                        succeeded: true,
-                    },
-                    DemonstratedOutcome {
-                        episode: ep2,
-                        outcome: ev2,
-                        succeeded: true,
-                    },
-                    DemonstratedOutcome {
-                        episode: ep3,
-                        outcome: ev3,
-                        succeeded: true,
-                    },
-                ],
-            ),
-            (
-                cand_behavioral_id,
-                vec![
-                    DemonstratedOutcome {
-                        episode: ep1,
-                        outcome: ev1,
-                        succeeded: true,
-                    },
-                    DemonstratedOutcome {
-                        episode: ep2,
-                        outcome: ev2,
-                        succeeded: true,
-                    },
-                ],
-            ),
-        ];
-
-        let art_id = Uuid::new_v4();
-        let artifacts = vec![LearnedArtifactLineage {
-            artifact_id: art_id,
-            layer: LearningLayer::Procedural,
-            status: ArtifactStatus::Promoted,
-            contributing_candidates: vec![cand_procedural_id],
-            source_evidence: vec![ev1, ev2, ev3],
-            promoted_at: Some(now),
-            erasure_epoch: 1,
-        }];
-
-        let scopes = vec![
-            TaskScope {
-                actor_id: Uuid::new_v4(),
-                kind: ActorKind::Agent,
-                intention_id: Some(Uuid::new_v4()),
-                capabilities: vec![
-                    "fs.read".into(),
-                    "fs.write".into(),
-                    "terminal.exec".into(),
-                    "model.query".into(),
-                ],
-                tool_grants: vec![
-                    "git.status".into(),
-                    "git.diff".into(),
-                    "cargo.check".into(),
-                ],
-                network_destinations: vec!["localhost".into(), "127.0.0.1".into()],
-                ttl_seconds: 7200,
-                max_compute_ms: 300_000,
-                delegation_permitted: true,
-                granted_at: now,
-            },
-            TaskScope {
-                actor_id: Uuid::new_v4(),
-                kind: ActorKind::Worker,
-                intention_id: Some(Uuid::new_v4()),
-                capabilities: vec!["fs.read".into()],
-                tool_grants: vec!["fs.read_file".into()],
-                network_destinations: Vec::new(),
-                ttl_seconds: 600,
-                max_compute_ms: 10_000,
-                delegation_permitted: false,
-                granted_at: now,
-            },
-        ];
-
         Self {
-            candidates: Mutex::new(candidates),
-            demonstrations: Mutex::new(demonstrations),
-            artifacts: Mutex::new(artifacts),
-            scopes: Mutex::new(scopes),
+            candidates: Mutex::new(Vec::new()),
+            demonstrations: Mutex::new(Vec::new()),
+            artifacts: Mutex::new(Vec::new()),
+            scopes: Mutex::new(Vec::new()),
         }
     }
 

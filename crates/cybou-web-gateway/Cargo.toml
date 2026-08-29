@@ -29,6 +29,7 @@ futures-core.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
 rusqlite.workspace = true
+rustix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

@@ -349,20 +349,17 @@ impl Agent1Service {
         let telemetry = cybou_protocol::agent::CapsuleTelemetryRecord {
             capsule_id: cap_id,
             standing: view.standing,
-            pids_count: if view.is_live() { 3 } else { 0 },
-            memory_used_mib: if view.is_live() { 64 } else { 0 },
+            pids_count: if view.is_live() { 1 } else { 0 },
+            memory_used_mib: 0,
             memory_max_mib: 512,
-            cpu_usage_pct: if view.is_live() { 4.2 } else { 0.0 },
-            egress_requests_count: 12,
+            cpu_usage_pct: 0.0,
+            egress_requests_count: 0,
             egress_denied_count: 0,
-            files_modified_count: 3,
-            tokens_in: 850,
-            tokens_out: 210,
-            active_tool: if view.is_live() { Some("read_file".to_owned()) } else { None },
-            recent_activity: vec![
-                format!("Capsule {} initialized with bubblewrap+landlock", cap_id),
-                "ACP handshake negotiated version 1".to_owned(),
-            ],
+            files_modified_count: 0,
+            tokens_in: 0,
+            tokens_out: 0,
+            active_tool: None,
+            recent_activity: Vec::new(),
         };
 
         encode(&telemetry).map_err(|error| fdo::Error::Failed(error.to_string()))

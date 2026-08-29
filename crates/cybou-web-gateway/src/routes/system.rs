@@ -251,80 +251,68 @@ mod tests {
     fn system_hub_manages_services_and_processes() {
         let hub = SystemHub::new();
         let svcs = hub.list_services();
-        assert!(svcs.active_count >= 1);
+        assert!(!svcs.services.is_empty());
 
+        // Privileged mutations must fail-closed requiring Action1
         let restart_res = hub.execute_service_action("cybou-web-gateway.service", ServiceAction::Restart);
-        assert!(restart_res.is_ok());
+        assert!(restart_res.is_err());
 
         let procs = hub.list_processes();
-        assert!(procs.total_count >= 1);
+        assert_eq!(procs.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
 
         let signal_res = hub.send_process_signal(1024, ProcessSignal::Terminate);
-        assert!(signal_res.is_ok());
-
-        // Killing PID 1 is refused
-        assert!(hub.send_process_signal(1, ProcessSignal::Kill).is_err());
+        assert!(signal_res.is_err());
 
         let mon = hub.get_monitor();
-        assert!(mon.memory_total_bytes > 0);
-        assert!(!mon.disk_partitions.is_empty());
+        assert_eq!(mon.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
 
         let storage = hub.get_storage();
-        assert!(!storage.subvolumes.is_empty());
+        assert_eq!(storage.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
         let snap = hub.create_snapshot("@home", "test-backup", true);
-        assert!(snap.is_ok());
-        let restore = hub.restore_snapshot(&snap.unwrap().id);
-        assert!(restore.is_ok());
+        assert!(snap.is_err());
 
         let network = hub.get_network();
-        assert!(!network.connections.is_empty());
+        assert_eq!(network.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
         let conn_res = hub.connect_network("conn-wg0", true);
-        assert!(conn_res.is_ok());
+        assert!(conn_res.is_err());
 
         let pkgs = hub.get_packages();
-        assert!(!pkgs.packages.is_empty());
+        assert_eq!(pkgs.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
         let pkg_res = hub.execute_package_action("borgbackup", PackageActionKind::Install);
-        assert!(pkg_res.is_ok());
+        assert!(pkg_res.is_err());
 
         let updates = hub.get_system_updates();
-        assert!(updates.summary.pending_count > 0);
+        assert_eq!(updates.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
         let update_res = hub.apply_system_updates(None);
-        assert!(update_res.is_ok());
+        assert!(update_res.is_err());
 
-        // Milestone 5 tests
         let users = hub.get_users_settings();
-        assert!(!users.users.is_empty());
+        assert_eq!(users.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
         let new_user = hub.create_user("bob", "Bob Smith", false);
-        assert!(new_user.is_ok());
-        let key = hub.add_ssh_key("laptop", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBOB...");
-        assert!(key.is_ok());
-        let del_key = hub.delete_ssh_key(&key.unwrap().id);
-        assert!(del_key.is_ok());
+        assert!(new_user.is_err());
 
         let sec = hub.get_security_settings();
         assert!(sec.policy.landlock_enabled);
-        let updated_sec = hub.update_security_policy(UpdateSecurityPolicyRequest {
+        let update_sec = hub.update_security_policy(UpdateSecurityPolicyRequest {
             landlock_enabled: true,
             bubblewrap_enabled: true,
             apparmor_enforcing: true,
             seccomp_strict: true,
             egress_firewall_strict: true,
         });
-        assert!(updated_sec.is_ok());
+        assert!(update_sec.is_err());
 
         let backup = hub.get_backup_settings();
-        assert!(!backup.archives.is_empty());
-        let manual_backup = hub.trigger_backup(Some("manual-test".to_owned()));
-        assert!(manual_backup.is_ok());
-        let restore_backup = hub.restore_archive(&manual_backup.unwrap().id, None);
-        assert!(restore_backup.is_ok());
-        let updated_sched = hub.update_backup_schedule(UpdateBackupScheduleRequest {
+        assert_eq!(backup.repository.destination, "/var/lib/cybou/backup-vault");
+        let trig = hub.trigger_backup(None);
+        assert!(trig.is_err());
+        let sched = hub.update_backup_schedule(UpdateBackupScheduleRequest {
             enabled: true,
-            frequency: "weekly".to_owned(),
-            retention_daily: 14,
-            retention_weekly: 8,
-            retention_monthly: 24,
+            frequency: "daily".to_owned(),
+            retention_daily: 7,
+            retention_weekly: 4,
+            retention_monthly: 6,
         });
-        assert!(updated_sched.is_ok());
+        assert!(sched.is_err());
     }
 }

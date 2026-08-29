@@ -357,25 +357,11 @@ pub async fn capsule_telemetry_handler(
         })),
         Err(why) => {
             eprintln!("[cybou-web-gateway] Agent1 Telemetry query failed: {why}");
-            // Fallback mock telemetry if session is active or disconnected
-            Ok(Json(cybou_web_contracts::CapsuleTelemetryProjection {
-                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-                telemetry: cybou_protocol::agent::CapsuleTelemetryRecord {
-                    capsule_id,
-                    standing: cybou_protocol::agent::Standing::Running,
-                    pids_count: 2,
-                    memory_used_mib: 48,
-                    memory_max_mib: 512,
-                    cpu_usage_pct: 1.5,
-                    egress_requests_count: 5,
-                    egress_denied_count: 0,
-                    files_modified_count: 1,
-                    tokens_in: 450,
-                    tokens_out: 120,
-                    active_tool: Some("inspect".to_string()),
-                    recent_activity: vec!["Capsule boundary active".to_string()],
-                },
-            }))
+            Err(agent_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "agentTelemetryUnavailable",
+                true,
+            ))
         }
     }
 }
