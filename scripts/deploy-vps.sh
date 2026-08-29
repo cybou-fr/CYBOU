@@ -172,66 +172,12 @@ cybou_ssh "
   # root-only and never appears here.
   sudo install -d -m 0700 -o cybou -g cybou /run/cybou-agent-leases
   # What an operator has approved for agents to run under.
-  sudo tee /etc/cybou/agent-profiles.json >/dev/null << 'EOF_PROFILES'
-[
-  {
-    "id": "opencode-sandbox",
-    "agents": ["opencode", "gate", "research"],
-    "workspaceRoots": ["/home/demo/projects", "/home/demo/workspace", "/tmp"],
-    "memoryMib": 2048,
-    "cpus": 2,
-    "tasksMax": 256,
-    "lifetimeSeconds": 7200,
-    "hosts": ["github.com", "crates.io"],
-    "models": [
-      {
-        "class": "Free",
-        "spend": "zeroCostOnly",
-        "tokenLimit": 50000,
-        "maxOutputTokens": 2048,
-        "sensitivity": 0
-      },
-      {
-        "class": "Strong",
-        "spend": "zeroCostOnly",
-        "tokenLimit": 200000,
-        "maxOutputTokens": 4096,
-        "sensitivity": 1
-      }
-    ],
-    "mayExecute": true
-  },
-  {
-    "id": "research-confined",
-    "agents": ["gate", "research"],
-    "workspaceRoots": ["/home/demo/workspace", "/home/demo/documents", "/tmp"],
-    "memoryMib": 1024,
-    "cpus": 1,
-    "tasksMax": 128,
-    "lifetimeSeconds": 3600,
-    "hosts": [],
-    "models": [
-      {
-        "class": "Free",
-        "spend": "zeroCostOnly",
-        "tokenLimit": 30000,
-        "maxOutputTokens": 1024,
-        "sensitivity": 0
-      }
-    ],
-    "mayExecute": false
-  }
-]
-EOF_PROFILES
+  sudo install -m 0644 debian/agent-profiles.json /etc/cybou/agent-profiles.json
   sudo chown root:cybou /etc/cybou/agent-profiles.json
-  sudo chmod 0644 /etc/cybou/agent-profiles.json
 
   # Admission is a promise across every live session, not a per-process preflight.
-  printf '%s\n' \
-    '{"maxSessions":4,"memoryMib":4096,"cpus":3,"tasksMax":1024,"spendUnits":1000}' \
-    | sudo tee /etc/cybou/agent-capacity.json >/dev/null
+  sudo install -m 0644 debian/agent-capacity.json /etc/cybou/agent-capacity.json
   sudo chown root:cybou /etc/cybou/agent-capacity.json
-  sudo chmod 0644 /etc/cybou/agent-capacity.json
 
   # The one privileged step of a launch. Start and stop, that unit template, that user, nothing else.
   sudo install -d -m 0755 /etc/polkit-1/rules.d

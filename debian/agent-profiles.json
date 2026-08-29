@@ -1,0 +1,69 @@
+[
+  {
+    "id": "opencode-sandbox",
+    "agents": [
+      "opencode",
+      "gate",
+      "research"
+    ],
+    "workspaceRoots": [
+      "/home/demo/projects",
+      "/home/demo/workspace",
+      "/tmp"
+    ],
+    "memoryMib": 2048,
+    "cpus": 2,
+    "tasksMax": 256,
+    "lifetimeSeconds": 7200,
+    "hosts": [
+      "github.com",
+      "crates.io"
+    ],
+    "models": [
+      {
+        "class": "Free",
+        "spend": "zeroCostOnly",
+        "tokenLimit": 50000,
+        "maxOutputTokens": 2048,
+        "sensitivity": 0
+      },
+      {
+        "class": "Strong",
+        "spend": {
+          "capped": 100
+        },
+        "tokenLimit": 200000,
+        "maxOutputTokens": 4096,
+        "sensitivity": 1
+      }
+    ],
+    "mayExecute": true
+  },
+  {
+    "id": "research-confined",
+    "agents": [
+      "gate",
+      "research"
+    ],
+    "workspaceRoots": [
+      "/home/demo/workspace",
+      "/home/demo/documents",
+      "/tmp"
+    ],
+    "memoryMib": 1024,
+    "cpus": 1,
+    "tasksMax": 128,
+    "lifetimeSeconds": 3600,
+    "hosts": [],
+    "models": [
+      {
+        "class": "Free",
+        "spend": "zeroCostOnly",
+        "tokenLimit": 30000,
+        "maxOutputTokens": 1024,
+        "sensitivity": 0
+      }
+    ],
+    "mayExecute": false
+  }
+]

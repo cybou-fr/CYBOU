@@ -1,0 +1,7 @@
+{
+  "maxSessions": 4,
+  "memoryMib": 4096,
+  "cpus": 3,
+  "tasksMax": 1024,
+  "spendUnits": 1000
+}
