@@ -109,13 +109,33 @@ impl SystemHub {
         system_reader::read_real_monitor()
     }
 
-    /// Read system and service logs.
-    #[must_use]
-    pub fn get_logs(&self, _query: SystemLogsQueryRequest) -> SystemLogsProjection {
-        SystemLogsProjection {
-            schema_version: WEB_SCHEMA_V1,
-            logs: Vec::new(),
-        }
+    /// Read the systemd journal.
+    ///
+    /// The severity filter is a closed set of syslog names. A name outside it is refused rather
+    /// than dropped: a filter that silently stopped filtering would answer "show me the errors"
+    /// with everything, and look like a quiet host.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a severity that is not one of the eight syslog names. A journal that could not be
+    /// read is not an error here: it is a projection that says why it is empty.
+    pub fn get_logs(
+        &self,
+        query: &SystemLogsQueryRequest,
+    ) -> Result<SystemLogsProjection, GatewayError> {
+        let priority = match query
+            .severity
+            .as_deref()
+            .map(str::trim)
+            .filter(|severity| !severity.is_empty())
+        {
+            Some(severity) => {
+                Some(system_reader::severity_priority(severity).ok_or(GatewayError::Refused)?)
+            }
+            None => None,
+        };
+
+        Ok(system_reader::read_journal(query, priority))
     }
 
     /// Get current storage and snapshot state.

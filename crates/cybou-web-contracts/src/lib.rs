@@ -1121,7 +1121,7 @@ pub struct NotificationsListProjection {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NotificationDismissRequest {
-    /// Specific notification ID to dismiss, or None if dismiss_all is true.
+    /// Specific notification ID to dismiss, or `None` if `dismiss_all` is true.
     pub notification_id: Option<uuid::Uuid>,
     /// Whether to dismiss all notifications.
     #[serde(default)]
@@ -1144,7 +1144,8 @@ pub struct NotificationActionRequest {
 
 pub use cybou_protocol::system::{
     CpuCoreStat, DiskPartitionInfo, NetworkInterfaceInfo, ProcessRecord, ProcessSignal,
-    ServiceAction, ServiceRecord, ServiceState, ServiceUnitType, SystemLogEntry,
+    LogsUnavailable, ServiceAction, ServiceRecord, ServiceState, ServiceUnitType,
+    SystemLogEntry,
 };
 
 /// Projection listing system service daemons.
@@ -1239,6 +1240,17 @@ pub struct SystemLogsProjection {
     pub schema_version: SchemaVersion,
     /// Log records in chronological order.
     pub logs: Vec<SystemLogEntry>,
+    /// Why the feed is empty, when the reason is not that the query matched nothing.
+    ///
+    /// `None` means the journal was read. An empty `logs` beside `None` is an honest "no entries
+    /// matched"; an empty `logs` beside `Some` is a machine this reader cannot hear.
+    pub unavailable: Option<LogsUnavailable>,
+    /// Whether this reader can see the whole system journal, or only its own account's.
+    ///
+    /// `journalctl` does not fail for a process outside the `systemd-journal` group: it quietly
+    /// narrows to that account's own entries. A feed that did not say so would answer "what is
+    /// this host doing" with one service's half of it and look complete.
+    pub system_journal_readable: bool,
 }
 
 /// Query parameters for searching system logs.
@@ -1428,12 +1440,13 @@ pub struct SecuritySettingsProjection {
 /// Request to update security confinement policies.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools, reason = "one field per kernel confinement mechanism")]
 pub struct UpdateSecurityPolicyRequest {
     /// Linux Landlock filesystem sandbox status.
     pub landlock_enabled: bool,
     /// Bubblewrap unprivileged user namespace isolation status.
     pub bubblewrap_enabled: bool,
-    /// AppArmor LSM enforcement status.
+    /// `AppArmor` LSM enforcement status.
     pub apparmor_enforcing: bool,
     /// Strict Seccomp BPF syscall filter status.
     pub seccomp_strict: bool,
@@ -2010,6 +2023,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines, reason = "one round trip per contract, in one place")]
     fn system_contracts_round_trip() {
         use super::{
             BackupArchiveRecord, BackupRepositoryRecord, BackupScheduleRecord,
@@ -2075,6 +2089,8 @@ mod tests {
                 message: "started gateway".to_string(),
                 pid: Some(1024),
             }],
+            unavailable: None,
+            system_journal_readable: true,
         };
         let encoded_logs = serde_json::to_string(&logs).expect("serialize logs");
         let decoded_logs: SystemLogsProjection =
@@ -2223,10 +2239,10 @@ mod tests {
                 message: "Landlock rules applied".to_string(),
             }],
         };
-        let encoded_sec = serde_json::to_string(&security).expect("serialize sec");
-        let decoded_sec: SecuritySettingsProjection =
-            serde_json::from_str(&encoded_sec).expect("deserialize sec");
-        assert_eq!(decoded_sec, security);
+        let encoded_security = serde_json::to_string(&security).expect("serialize security");
+        let decoded_security: SecuritySettingsProjection =
+            serde_json::from_str(&encoded_security).expect("deserialize security");
+        assert_eq!(decoded_security, security);
 
         let backup = BackupSettingsProjection {
             schema_version: WEB_SCHEMA_V1,

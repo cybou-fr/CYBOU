@@ -191,6 +191,39 @@ pub struct SystemLogEntry {
     pub pid: Option<u32>,
 }
 
+/// Why a log projection carries no entries, when the reason is not "there were none".
+///
+/// A viewer that draws an empty feed for a reader who is merely not permitted to see the journal
+/// reports silence on a machine that is talking. The distinction is on the wire so the card can
+/// say which of the two it is looking at.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LogsUnavailable {
+    /// This build is not running on Linux, so there is no journal to read.
+    NotLinux,
+    /// No `journalctl` was found on PATH.
+    ReaderMissing,
+    /// The reader ran and was refused: this process is not in `systemd-journal`.
+    ReaderRefused,
+    /// The reader could not be run, or exited for a reason that is not a refusal.
+    ReaderFailed,
+}
+
+impl LogsUnavailable {
+    /// One line an operator can act on.
+    #[must_use]
+    pub const fn explain(self) -> &'static str {
+        match self {
+            Self::NotLinux => "not a Linux host: there is no journal to read",
+            Self::ReaderMissing => "journalctl was not found on PATH",
+            Self::ReaderRefused => {
+                "the journal refused this reader: add the gateway account to the systemd-journal group"
+            }
+            Self::ReaderFailed => "the journal reader could not be run",
+        }
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 // Storage Substrate (Btrfs Subvolumes & Snapshots)
 // -------------------------------------------------------------------------------------------------
@@ -241,7 +274,7 @@ pub enum NetworkConnectionKind {
     Wifi,
     /// Tailscale Mesh VPN.
     Tailscale,
-    /// WireGuard Point-to-Point Tunnel.
+    /// `WireGuard` Point-to-Point Tunnel.
     Wireguard,
     /// Local Loopback.
     Loopback,
@@ -383,13 +416,18 @@ pub struct SshKeyRecord {
 }
 
 /// System sandboxing and confinement security policy.
+///
+/// Five independent switches rather than one state: each names a different kernel mechanism, and
+/// collapsing them into an enum would have to invent an order of severity between confinements
+/// that do not compare.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[allow(clippy::struct_excessive_bools, reason = "one field per kernel confinement mechanism")]
 pub struct SecurityPolicyRecord {
     /// Linux Landlock filesystem sandbox status.
     pub landlock_enabled: bool,
     /// Bubblewrap unprivileged user namespace isolation status.
     pub bubblewrap_enabled: bool,
-    /// AppArmor LSM enforcement status.
+    /// `AppArmor` LSM enforcement status.
     pub apparmor_enforcing: bool,
     /// Strict Seccomp BPF syscall filter status.
     pub seccomp_strict: bool,

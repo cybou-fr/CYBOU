@@ -35,6 +35,8 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
             match client.get_system_logs(&req).await {
                 Ok(proj) => {
                     signals.logs.set(proj.logs);
+                    signals.unavailable.set(proj.unavailable);
+                    signals.system_journal_readable.set(proj.system_journal_readable);
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
@@ -137,6 +139,17 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                 </div>
             </div>
 
+            // A reader outside the systemd-journal group is not refused; it is narrowed to its
+            // own account. Without this line the feed would look complete and be one service's
+            // half of the host.
+            {move || (!signals.system_journal_readable.get() && signals.unavailable.get().is_none()).then(|| {
+                view! {
+                    <div style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(245, 158, 11, 0.3); font-family: system-ui;">
+                        "Only this account's own journal is visible. Add the gateway account to the systemd-journal group to read the whole host."
+                    </div>
+                }
+            })}
+
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
@@ -181,10 +194,18 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                     }
                 />
 
+                // An empty feed is two different facts. A journal that answered and matched
+                // nothing is a quiet host; a journal this reader cannot hear is an unknown one,
+                // and drawing the first for the second is how a viewer reports silence on a
+                // machine that is talking.
                 {move || if signals.logs.get().is_empty() {
+                    let text = signals.unavailable.get().map_or_else(
+                        || "No log entries matching query.".to_owned(),
+                        |reason| format!("The journal was not read: {}.", reason.explain()),
+                    );
                     Some(view! {
                         <div style="text-align: center; color: rgba(255,255,255,0.4); padding: 32px 16px; font-size: 12px; font-family: system-ui;">
-                            "No log entries matching query."
+                            {text}
                         </div>
                     })
                 } else {

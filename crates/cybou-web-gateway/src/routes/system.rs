@@ -69,7 +69,7 @@ pub async fn get_system_logs(
     State(state): State<GatewayState>,
     Query(query): Query<SystemLogsQueryRequest>,
 ) -> Result<Json<SystemLogsProjection>, GatewayError> {
-    Ok(Json(state.system.get_logs(query)))
+    Ok(Json(state.system.get_logs(&query)?))
 }
 
 /// GET `/api/v1/system/storage`

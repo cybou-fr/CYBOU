@@ -13,7 +13,11 @@ use cybou_protocol::system::{
     CpuCoreStat, DiskPartitionInfo, NetworkInterfaceInfo, ProcessRecord,
     ServiceRecord, ServiceState, ServiceUnitType,
 };
-use cybou_web_contracts::{ProcessesListProjection, ServicesListProjection, SystemMonitorProjection, WEB_SCHEMA_V1};
+use cybou_protocol::system::LogsUnavailable;
+use cybou_web_contracts::{
+    ProcessesListProjection, ServicesListProjection, SystemLogsProjection,
+    SystemLogsQueryRequest, SystemMonitorProjection, WEB_SCHEMA_V1,
+};
 
 /// Reads real system monitor metrics from Linux /proc and /sys.
 #[must_use]
@@ -127,6 +131,250 @@ pub fn read_real_processes() -> ProcessesListProjection {
             total_memory_bytes: 0,
             processes: Vec::new(),
         }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Journal
+// -------------------------------------------------------------------------------------------------
+
+/// The most entries one read will ever return, whatever a caller asks for.
+const LOG_LIMIT_MAX: usize = 500;
+
+/// What a caller gets when it names no limit.
+const LOG_LIMIT_DEFAULT: usize = 200;
+
+/// How many entries are fetched per entry a search is allowed to keep.
+///
+/// A substring filter is applied here rather than handed to `journalctl --grep`, which takes a
+/// regular expression: a search box wired to a regex engine on the host is a way for a browser to
+/// choose how long the journal spends answering. The cost is that the filter runs after the fetch,
+/// so a search asks for more than it keeps.
+const LOG_SEARCH_OVERFETCH: usize = 10;
+
+/// The most entries a search will fetch before filtering, however many it was allowed to keep.
+const LOG_SEARCH_FETCH_MAX: usize = 5000;
+
+/// Syslog severity names, indexed by their numeric priority.
+const SEVERITY_NAMES: [&str; 8] = [
+    "emerg", "alert", "crit", "err", "warning", "notice", "info", "debug",
+];
+
+/// The numeric priority of a syslog severity name, if it is one.
+///
+/// The set is closed: a name outside it is a caller error rather than a filter that quietly
+/// matches everything.
+#[must_use]
+pub fn severity_priority(severity: &str) -> Option<u8> {
+    SEVERITY_NAMES
+        .iter()
+        .position(|name| *name == severity)
+        .and_then(|index| u8::try_from(index).ok())
+}
+
+/// The syslog severity name for a numeric priority.
+fn severity_name(priority: u8) -> &'static str {
+    SEVERITY_NAMES
+        .get(usize::from(priority))
+        .copied()
+        .unwrap_or("info")
+}
+
+/// An empty feed that says why it is empty.
+fn unavailable_logs(reason: LogsUnavailable) -> SystemLogsProjection {
+    SystemLogsProjection {
+        schema_version: WEB_SCHEMA_V1,
+        logs: Vec::new(),
+        unavailable: Some(reason),
+        system_journal_readable: false,
+    }
+}
+
+/// Reads the systemd journal, or says why it could not.
+///
+/// `priority` is a floor rather than an exact level: `err` means *this bad or worse*, which is
+/// `journalctl`'s own reading of `--priority` and the only one under which an "Errors" filter does
+/// not hide the emergencies above it.
+#[must_use]
+pub fn read_journal(query: &SystemLogsQueryRequest, priority: Option<u8>) -> SystemLogsProjection {
+    #[cfg(target_os = "linux")]
+    {
+        let limit = query
+            .limit
+            .unwrap_or(LOG_LIMIT_DEFAULT)
+            .clamp(1, LOG_LIMIT_MAX);
+        let search = query
+            .search
+            .as_deref()
+            .map(str::trim)
+            .filter(|needle| !needle.is_empty())
+            .map(str::to_lowercase);
+
+        // A filtered read keeps at most `limit`, so it has to look at more than `limit`.
+        let fetch = if search.is_some() {
+            limit
+                .saturating_mul(LOG_SEARCH_OVERFETCH)
+                .min(LOG_SEARCH_FETCH_MAX)
+        } else {
+            limit
+        };
+
+        let mut command = std::process::Command::new("journalctl");
+        command
+            .arg("--output=json")
+            .arg("--no-pager")
+            // Without this, journalctl elides long fields and the message a person opened the
+            // journal for arrives as a note saying it was too long.
+            .arg("--all")
+            .arg(format!("--lines={fetch}"));
+
+        // `--unit=VALUE` is one argv token, so a value beginning with `-` cannot become a second
+        // option, and there is no shell between here and the process for it to reach.
+        if let Some(unit) = query
+            .unit
+            .as_deref()
+            .map(str::trim)
+            .filter(|unit| !unit.is_empty())
+        {
+            command.arg(format!("--unit={unit}"));
+        }
+        if let Some(priority) = priority {
+            command.arg(format!("--priority={priority}"));
+        }
+
+        let output = match command.output() {
+            Ok(output) => output,
+            Err(error) => {
+                let reason = match error.kind() {
+                    std::io::ErrorKind::NotFound => LogsUnavailable::ReaderMissing,
+                    std::io::ErrorKind::PermissionDenied => LogsUnavailable::ReaderRefused,
+                    _ => LogsUnavailable::ReaderFailed,
+                };
+                return unavailable_logs(reason);
+            }
+        };
+
+        if !output.status.success() {
+            return unavailable_logs(LogsUnavailable::ReaderFailed);
+        }
+
+        let mut logs = Vec::new();
+        for line in output.stdout.split(|byte| *byte == b'\n') {
+            if line.is_empty() {
+                continue;
+            }
+            let Ok(record) = serde_json::from_slice::<serde_json::Value>(line) else {
+                continue;
+            };
+            let Some(entry) = journal_entry(&record) else {
+                continue;
+            };
+            if let Some(needle) = search.as_deref() {
+                let matched = entry.message.to_lowercase().contains(needle)
+                    || entry
+                        .unit
+                        .as_deref()
+                        .is_some_and(|unit| unit.to_lowercase().contains(needle));
+                if !matched {
+                    continue;
+                }
+            }
+            logs.push(entry);
+        }
+
+        // Over-fetching for a search collects the oldest matches too; the newest are the ones a
+        // person opened the viewer for.
+        if logs.len() > limit {
+            logs.drain(..logs.len() - limit);
+        }
+
+        SystemLogsProjection {
+            schema_version: WEB_SCHEMA_V1,
+            logs,
+            unavailable: None,
+            system_journal_readable: system_journal_readable(),
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (query, priority);
+        unavailable_logs(LogsUnavailable::NotLinux)
+    }
+}
+
+/// Whether the persistent or volatile system journal is readable by this process.
+///
+/// Asked of the filesystem rather than of `journalctl`'s stderr hint, which is prose and is
+/// translated. `journalctl` does not fail for a reader outside the `systemd-journal` group; it
+/// narrows to that account's own entries and says so only in a hint.
+#[cfg(target_os = "linux")]
+fn system_journal_readable() -> bool {
+    ["/var/log/journal", "/run/log/journal"]
+        .iter()
+        .any(|path| fs::read_dir(path).is_ok())
+}
+
+/// One journal record, or nothing if it carries no message.
+#[cfg(target_os = "linux")]
+fn journal_entry(record: &serde_json::Value) -> Option<cybou_protocol::system::SystemLogEntry> {
+    let message = journal_text(record.get("MESSAGE")?)?;
+
+    let timestamp = record
+        .get("__REALTIME_TIMESTAMP")
+        .and_then(journal_text)
+        .and_then(|raw| raw.parse::<i128>().ok())
+        .and_then(|micros| time::OffsetDateTime::from_unix_timestamp_nanos(micros * 1_000).ok())
+        .and_then(|instant| {
+            instant
+                .format(&time::format_description::well_known::Rfc3339)
+                .ok()
+        })
+        .unwrap_or_else(|| "unknown".to_owned());
+
+    let unit = record
+        .get("_SYSTEMD_UNIT")
+        .or_else(|| record.get("SYSLOG_IDENTIFIER"))
+        .and_then(journal_text);
+
+    let severity = record
+        .get("PRIORITY")
+        .and_then(journal_text)
+        .and_then(|raw| raw.parse::<u8>().ok())
+        .map_or("info", severity_name)
+        .to_owned();
+
+    let pid = record
+        .get("_PID")
+        .and_then(journal_text)
+        .and_then(|raw| raw.parse::<u32>().ok());
+
+    Some(cybou_protocol::system::SystemLogEntry {
+        timestamp,
+        unit,
+        severity,
+        message,
+        pid,
+    })
+}
+
+/// A journal field as text.
+///
+/// A field that is not valid UTF-8 arrives as an array of byte values rather than a string, so a
+/// reader that only handled strings would drop exactly the lines carrying something unusual.
+#[cfg(target_os = "linux")]
+fn journal_text(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(text) => Some(text.clone()),
+        serde_json::Value::Array(bytes) => {
+            let raw: Vec<u8> = bytes
+                .iter()
+                .filter_map(serde_json::Value::as_u64)
+                .filter_map(|byte| u8::try_from(byte).ok())
+                .collect();
+            Some(String::from_utf8_lossy(&raw).into_owned())
+        }
+        _ => None,
     }
 }
 
@@ -479,4 +727,136 @@ fn query_unit_status(name: &str) -> (ServiceState, String, Option<u32>, Option<u
     }
 
     (ServiceState::Inactive, "dead".to_owned(), None, None)
+}
+
+#[cfg(test)]
+mod journal_tests {
+    use super::{read_journal, severity_priority};
+    use cybou_web_contracts::SystemLogsQueryRequest;
+
+    fn query(limit: Option<usize>) -> SystemLogsQueryRequest {
+        SystemLogsQueryRequest {
+            unit: None,
+            severity: None,
+            search: None,
+            limit,
+        }
+    }
+
+    #[test]
+    fn severity_names_are_a_closed_set() {
+        assert_eq!(severity_priority("emerg"), Some(0));
+        assert_eq!(severity_priority("err"), Some(3));
+        assert_eq!(severity_priority("warning"), Some(4));
+        assert_eq!(severity_priority("debug"), Some(7));
+
+        // Not a syslog level, a level in the wrong case, and a level with whitespace on it are all
+        // caller errors. Answering `None` is what lets the hub refuse rather than quietly drop the
+        // filter and return everything under the label "Errors".
+        assert_eq!(severity_priority("critical"), None);
+        assert_eq!(severity_priority("ERR"), None);
+        assert_eq!(severity_priority(" err"), None);
+        assert_eq!(severity_priority(""), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_read_that_worked_names_no_reason_and_a_read_that_did_not_always_does() {
+        let projection = read_journal(&query(Some(3)), None);
+
+        // The invariant this whole field exists for: an empty feed is never silent about why.
+        if projection.unavailable.is_none() {
+            assert!(
+                projection.logs.len() <= 3,
+                "a limit of 3 returned {} entries",
+                projection.logs.len()
+            );
+            // Without this the assertion above passes on an empty feed, which is the exact failure
+            // it was written to catch. A host whose whole journal is readable has written to it.
+            if projection.system_journal_readable {
+                assert!(
+                    !projection.logs.is_empty(),
+                    "the system journal is readable and the reader returned nothing"
+                );
+            }
+        } else {
+            assert!(
+                projection.logs.is_empty(),
+                "a projection that says it could not read carried {} entries",
+                projection.logs.len()
+            );
+            assert!(!projection.system_journal_readable);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn every_entry_carries_a_severity_this_build_knows() {
+        let projection = read_journal(&query(Some(50)), None);
+
+        for entry in &projection.logs {
+            assert!(
+                severity_priority(&entry.severity).is_some(),
+                "entry carried severity {:?}, which is not a syslog level",
+                entry.severity
+            );
+            assert!(!entry.timestamp.is_empty());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_search_keeps_only_what_matches_it() {
+        let mut request = query(Some(20));
+        // A string no journal line contains, so the only honest answer is nothing at all. If the
+        // filter were handed to journalctl and dropped, this would come back full.
+        request.search = Some("zzz-no-line-contains-this-zzz".to_owned());
+        let projection = read_journal(&request, None);
+
+        assert!(
+            projection.logs.is_empty(),
+            "a search matching nothing returned {} entries",
+            projection.logs.len()
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_unit_beginning_with_a_dash_is_a_value_rather_than_an_option() {
+        let mut request = query(Some(5));
+        // `--unit=-x` is one argv token. If it were split into two, journalctl would read `-x` as
+        // an option and either fail or mean something nobody asked for.
+        request.unit = Some("-x".to_owned());
+        let projection = read_journal(&request, None);
+
+        // Either journalctl rejected the unit name, or it matched nothing. What must not happen is
+        // a full feed, which is what a mis-parsed argument would produce.
+        assert!(projection.logs.is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_field_that_is_not_utf8_arrives_as_bytes_and_is_still_read() {
+        let record = serde_json::json!({
+            "MESSAGE": [104, 105, 255],
+            "PRIORITY": "3",
+            "_PID": "42",
+            "_SYSTEMD_UNIT": "cybou-web-gateway.service",
+            "__REALTIME_TIMESTAMP": "1788047701250979",
+        });
+
+        let entry = super::journal_entry(&record).expect("a record with a message is an entry");
+        assert_eq!(entry.severity, "err");
+        assert_eq!(entry.pid, Some(42));
+        assert_eq!(entry.unit.as_deref(), Some("cybou-web-gateway.service"));
+        assert!(entry.message.starts_with("hi"));
+        assert!(entry.timestamp.starts_with("2026-"), "{}", entry.timestamp);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_record_with_no_message_is_not_an_entry() {
+        let record = serde_json::json!({ "PRIORITY": "6" });
+        assert!(super::journal_entry(&record).is_none());
+    }
 }

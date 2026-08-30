@@ -860,6 +860,8 @@ impl MindClient for MockMindClient {
         Ok(cybou_web_contracts::SystemLogsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             logs: Vec::new(),
+            unavailable: None,
+            system_journal_readable: true,
         })
     }
 

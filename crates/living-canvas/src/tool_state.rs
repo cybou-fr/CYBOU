@@ -667,6 +667,13 @@ pub struct SystemLogsSignals {
     pub loading: RwSignal<bool>,
     /// Status message or toast.
     pub status_msg: RwSignal<Option<String>>,
+    /// Why the feed is empty, when the reason is not that nothing matched.
+    pub unavailable: RwSignal<Option<cybou_protocol::system::LogsUnavailable>>,
+    /// Whether the server could see the whole system journal or only its own account's.
+    ///
+    /// Starts true so a card that has not asked yet draws no warning about a journal nobody has
+    /// read.
+    pub system_journal_readable: RwSignal<bool>,
 }
 
 impl SystemLogsSignals {
@@ -678,6 +685,8 @@ impl SystemLogsSignals {
             search_query: RwSignal::new(String::new()),
             loading: RwSignal::new(false),
             status_msg: RwSignal::new(None),
+            unavailable: RwSignal::new(None),
+            system_journal_readable: RwSignal::new(true),
         }
     }
 }

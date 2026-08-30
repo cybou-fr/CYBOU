@@ -922,6 +922,17 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
 - **Editor buffer safety**: Closing a dirty or conflicted tab requires explicit destructive confirmation and states that no file is changed. The same guard covers closing the entire Editor panel when any tab is dirty or conflicted. Closing the final clean tab replaces it with a new editor-local draft; every new draft has a distinct identity rather than aliasing every `untitled` buffer.
 - **Files → Editor admission**: Opening the same owner-issued `LocationRef` again focuses its existing tab and never replaces that tab's local contents. The first file replaces only a pristine empty draft; otherwise it opens in a new tab. The Editor panel is brought forward and selected.
 - **Refresh boundary & Draft Recovery**: Browser navigation, refresh, or tab closure triggers the platform's unload confirmation while any editor instance holds a dirty or conflicted buffer. File contents are strictly kept out of `localStorage`. Unsaved and file-backed editor buffers are debounced per-tab and persisted to a durable, user-scoped SQLite store outside the file jail (`$XDG_STATE_HOME/cybou/drafts.sqlite3`), partitioned by authenticated seat (`linux-account:<user>`). On desktop reload, drafts are restored at desktop bootstrap with server-established authority and verified against current file digests, discovering conflicts without trusting stale browser state.
+- **System journal**: `GET /api/v1/system/logs` reads the real systemd journal through `journalctl
+  --output=json`, with a unit filter, a syslog-severity floor, and a bounded substring search. The
+  search is applied here rather than handed to `--grep`, whose argument is a regular expression: a
+  search box wired to a regex engine on the host lets a browser choose how long the journal spends
+  answering. Severity is a closed set of the eight syslog names and an unrecognised one is refused,
+  because a filter that silently stopped filtering would answer *show me the errors* with
+  everything and look like a quiet host. An empty feed says which kind of empty it is: a journal
+  that matched nothing, or one this reader could not run, could not find, or was refused by. And
+  `journalctl` does not fail for a reader outside the `systemd-journal` group — it narrows to that
+  account's own entries — so the projection carries whether the whole system journal was visible,
+  and the card says so rather than drawing one service's half of the host as the whole of it.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **Command Palette & Omnibar Navigation**: Unified desktop action launcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>) with real-time fuzzy search, keyboard selection cycling (<kbd>↑</kbd>/<kbd>↓</kbd>), <kbd>Enter</kbd> execution, Ask CYBOU cognitive question answering, shortcut badges, and automatic uncollapse/bring-forward card focusing.
 - **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. `SubjectRef` is the canonical primitive for new cross-panel entity references; migration of existing interactions is incomplete.

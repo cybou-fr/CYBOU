@@ -147,7 +147,7 @@ pub struct CognitiveNodeRecord {
     pub epistemic_status: EpistemicStatus,
     /// Confidence metric (0.0 to 1.0).
     pub confidence: f64,
-    /// Optional underlying SubjectRef for desktop deep-linking.
+    /// Optional underlying `SubjectRef` for desktop deep-linking.
     pub subject: Option<SubjectRef>,
     /// Creation timestamp (ISO 8601).
     pub created_at: String,
@@ -241,7 +241,7 @@ pub struct EventJournalEntry {
     pub payload_preview: String,
     /// UTC timestamp (ISO 8601).
     pub timestamp: String,
-    /// Optional underlying SubjectRef.
+    /// Optional underlying `SubjectRef`.
     pub subject: Option<SubjectRef>,
     /// Epistemic validity standing.
     pub epistemic_status: EpistemicStatus,
