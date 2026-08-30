@@ -9,6 +9,12 @@ SPDX-License-Identifier: MIT
 
 Accepted
 
+> **Superseded in part by [ADR-0047](ADR-0047-interactive-terminal-under-the-authenticated-account.md).** The shell
+> boundary below — *Zone 3 (Shell) cannot execute arbitrary Zone 4 actions*, and the
+> `DemoReadOnly` profile as the only shell surface — no longer holds for an account an
+> operator has explicitly enabled a terminal for. Everything else here stands, and the
+> sandboxed shell remains what a deployment serves where no terminal has been enabled.
+
 ## Context
 
 ADR-0037 established a unified, web-first Presence architecture delivered via `cybou-web-gateway` as a Rust/WASM application. The initial implementation presented 11 hardcoded system panels in a fixed-coordinate layout schema (v8).
