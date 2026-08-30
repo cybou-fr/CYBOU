@@ -3718,3 +3718,219 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   pointer-events: none;
   white-space: pre;
 }
+
+/* --------------------------------------------------------------------------------------------
+   Panels that had a class and no rule.
+
+   Every one of these was reachable from the Dock and, until the generic frame landed, drew
+   nothing at all — so nobody saw that the class behind them had never been styled either. Their
+   layout is asserted inline, one panel at a time; this is that layout said once, so a panel is
+   laid out by its class rather than by whether somebody remembered to repeat the declaration.
+   -------------------------------------------------------------------------------------------- */
+.backup-panel,
+.calendar-panel,
+.cognitive-graph-panel,
+.contacts-panel,
+.event-journal-panel,
+.learning-panel,
+.mail-panel,
+.meaning-panel,
+.monitor-panel,
+.network-panel,
+.notes-panel,
+.notifications-panel,
+.operations-panel,
+.packages-panel,
+.processes-panel,
+.security-panel,
+.services-panel,
+.storage-panel,
+.system-logs-panel,
+.updates-panel,
+.user-settings-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  /* Without this a long list stretches the panel instead of scrolling inside it, and the card
+     grows past the edge it was resized to. */
+  min-height: 0;
+  color: var(--text-main, #e0e0e0);
+  background: var(--bg-card, #1e1e24);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* --------------------------------------------------------------------------------------------
+   File Manager sidebar and body.
+
+   These carried no inline style at all, so the panel had a sidebar in the markup and none on the
+   screen: the location list rendered as a stack of unstyled buttons above the file list.
+   -------------------------------------------------------------------------------------------- */
+.fm-shell-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.fm-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  width: 148px;
+  padding: 8px 6px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.fm-sidebar-title {
+  padding: 2px 6px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #94a3b8);
+}
+
+.fm-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fm-nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* The authority domain being read is the one thing in this panel that must never be ambiguous. */
+.fm-nav-item.active {
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.fm-main-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Shown on hover over a row, so a list of files is a list of files rather than a wall of
+   buttons — but always present for a keyboard, which cannot hover. */
+.fm-item-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+}
+
+.fm-item:hover .fm-item-quick-actions,
+.fm-item:focus-within .fm-item-quick-actions {
+  opacity: 1;
+}
+
+.fm-item-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted, #94a3b8);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fm-item-action-btn:hover {
+  color: var(--text-main, #e0e0e0);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.fm-item-action-btn.danger:hover {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.fm-action-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+  font-size: 11px;
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.fm-toast-close {
+  border: none;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------------------------
+   Hooks whose appearance is asserted inline. The rule carries the part that is shared, so the
+   class means something on its own.
+   -------------------------------------------------------------------------------------------- */
+.agent-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-pause,
+.agent-quarantine,
+.agent-resume {
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.ops-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.notif-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proc-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* --------------------------------------------------------------------------------------------
+   A link the Markdown renderer refused to make a link.
+
+   It had no rule, so a blocked `javascript:` or `data:` URL rendered as ordinary text: the one
+   case where a reader most needs to see that something was withheld looked identical to prose
+   nobody touched.
+   -------------------------------------------------------------------------------------------- */
+.md-link-blocked {
+  color: var(--text-muted, #94a3b8);
+  text-decoration: line-through;
+  text-decoration-color: rgba(248, 113, 113, 0.8);
+  cursor: not-allowed;
+}

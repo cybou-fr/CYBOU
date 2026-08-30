@@ -809,7 +809,7 @@ CYBOU Desktop is an infinite spatial presence map of host reality, rejecting cla
 - **Spatial Architecture v2 ([ADR-0044](adr/ADR-0044-cybou-spatial-desktop-architecture.md))**: Defines the formal blueprint for Panel 2.0 representations (`Glance`, `Standard`, `Expanded`, `Focus`), semantic clusters, semantic zoom / level-of-detail, canvas anchors, camera history, typed relations, contextual spawning, and non-cognitive layout invariants across milestones SD0–SD14.
 - **Core Desktop Pack & Universal Workspaces ([ADR-0045](adr/ADR-0045-cybou-core-desktop-pack-and-workspace-primitives.md))**: Defines the 3-tier desktop capability model (`Desktop Core`, `Personal Core`, `CYBOU-native Core`), `LocationRef` authority domains (`HostUserPath`, `SystemConfigPath`, `AgentWorkspace`, `SafeShellJail`, `BackupSnapshot`), Text Editor & Diff Engine with Action1 commit governance, Files 2.0 multi-panel management, Mail/Calendar/Notes zero-trust architecture, Control Center, Storage/Disks vs Files differentiation, and Dual Terminal execution across phases CP0–CP10.
 
-Every class the components render has a rule, checked by `scripts/validate-desktop-styles.py`; interaction is exercised in real Chromium. See [desktop and browser gate](evidence/desktop-browser-gate.md).
+Every class the components render has a rule, checked by `scripts/validate-desktop-styles.py` and true again since 2026-08-30, when the thirty-eight that had none were given one; interaction is exercised in real Chromium. See [desktop and browser gate](evidence/desktop-browser-gate.md).
 
 A stranger is served the sign-in view and nothing else where the deployment says so.
 
