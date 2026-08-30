@@ -14,6 +14,7 @@ use axum::{
 use cybou_web_contracts::{FILE_TRANSFER_MAX_BYTES, SessionProjection, WEB_SCHEMA_V1};
 use time::{Duration as TimeDuration, OffsetDateTime, format_description::well_known::Rfc3339};
 use tower_http::{
+    compression::Compression,
     services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
 };
@@ -380,9 +381,17 @@ pub(crate) fn router_in_sandbox(
         ));
 
     match web_root {
-        Some(root) => app.fallback_service(
+        // Compressed, and only here. The desktop is a WebAssembly module of about eight
+        // megabytes that gzips to two, and it was being served whole — four fifths of a cold load
+        // spent on bytes the person is waiting through before anything appears at all.
+        //
+        // Wrapped around the file service rather than layered on the router, which keeps it away
+        // from two paths where it would do harm rather than good: `/api/v1/events` is an event
+        // stream, and a compressor that buffers to fill a block is a stream that arrives late; and
+        // `/api/v1/terminal` is a socket upgrade, which has no body to compress at all.
+        Some(root) => app.fallback_service(Compression::new(
             ServeDir::new(&root).not_found_service(ServeFile::new(root.join("index.html"))),
-        ),
+        )),
         None => app,
     }
 }

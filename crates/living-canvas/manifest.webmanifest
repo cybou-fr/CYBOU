@@ -1,0 +1,28 @@
+{
+  "name": "Cybou Desktop",
+  "short_name": "Cybou",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#070A0E",
+  "theme_color": "#070A0E",
+  "description": "The Cybou spatial desktop: this host's own panels, agents and terminal, on one canvas.",
+  "categories": ["productivity", "utilities", "developer"],
+  "icons": [
+    {
+      "src": "/cybou-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/cybou-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

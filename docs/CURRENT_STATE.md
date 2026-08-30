@@ -1124,6 +1124,17 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   exemption cannot widen quietly. The check is per file, which is the whole of why it works — an
   earlier version asked whether the name was read anywhere in the crate, and since every card
   has a `status_msg` it passed on both defects it was written for.
+- **The desktop is installable, and it is no longer sent whole**: the frontend had no manifest,
+  no theme colour and no icon beyond a favicon, so a browser had nothing to install and painted
+  its own chrome from a default. It declares both colour schemes now, since the palette has a
+  light half, and ships a maskable icon — the aperture already fits the safe zone, so what the
+  variant adds is an opaque background, because a cropped icon has to be opaque to its own edges.
+  More consequentially, the gateway was serving 8 041 363 bytes of WebAssembly with no
+  compression at all: measured against a running gateway, the same module is 2 048 707 bytes
+  gzipped and 1 697 033 with Brotli, so four fifths of a cold load was bytes nobody needed to
+  send. Compression wraps the file service rather than the router, which keeps it off the two
+  paths where it would harm: `/api/v1/events` is an event stream that a compressor filling a
+  block would delay, and `/api/v1/terminal` is a socket upgrade with no body to compress.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned

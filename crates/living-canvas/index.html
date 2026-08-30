@@ -7,13 +7,23 @@ SPDX-License-Identifier: MIT
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <!-- Both, because the desktop has a light palette now and the browser paints its own chrome
+         from this before any stylesheet is parsed. Declaring only dark would flash a dark frame at
+         somebody whose system says light. -->
+    <meta name="color-scheme" content="dark light">
     <meta name="description" content="Cybou — an agent-native environment with a persistent cognitive control plane">
+    <!-- The colour behind the toolbar of an installed window, matched to the canvas so the frame
+         and the desktop are one surface rather than two. -->
+    <meta name="theme-color" content="#070A0E" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#EEF1F5" media="(prefers-color-scheme: light)">
     <title>Cybou</title>
     <link data-trunk rel="copy-file" href="../../docs/cybou_bg.png">
     <link data-trunk rel="copy-file" href="../../www/assets/cybou-mark.svg">
+    <link data-trunk rel="copy-file" href="../../www/assets/cybou-maskable.svg">
     <link data-trunk rel="copy-file" href="../../www/assets/favicon.svg">
+    <link data-trunk rel="copy-file" href="manifest.webmanifest">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link data-trunk rel="css" href="styles.css">
   </head>
   <body></body>

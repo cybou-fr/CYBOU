@@ -88,7 +88,9 @@ thiserror = "2.0.20"
 time = { version = "0.3.55", features = ["formatting", "parsing", "serde"] }
 tokio = { version = "1.53.1", features = ["macros", "net", "rt-multi-thread", "signal", "test-util", "time"] }
 tower = { version = "0.5.3", features = ["util"] }
-tower-http = { version = "0.7.0", features = ["fs", "set-header", "trace"] }
+# The desktop is 7.7 MB of WebAssembly and was served as 7.7 MB. Compression is not an
+# optimisation here; it is four fifths of what a person waits through before anything appears.
+tower-http = { version = "0.7.0", features = ["compression-br", "compression-gzip", "fs", "set-header", "trace"] }
 uuid = { version = "1.24.1", features = ["serde", "v4", "v5"] }
 url = { version = "2.5.8", features = ["serde"] }
 

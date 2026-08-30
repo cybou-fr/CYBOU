@@ -1,0 +1,21 @@
+<!--
+SPDX-FileCopyrightText: 2026 Cybou contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Maskable variant of the Cybou Aperture, for a home screen that crops icons to its own shape.
+
+Same geometry as cybou-mark.svg and deliberately not redrawn: the aperture's outer extent is
+radius 22 plus half of the 6-wide stroke, so 25 in a 64 box. The maskable safe zone is a circle of
+radius 40% of the icon, which is 25.6 — the mark already fits, and scaling it down to be safe would
+make it smaller than the specification says it is.
+
+What this variant adds is the background. A maskable icon is cropped, so it has to be opaque to its
+own edges; the transparent mark would be cropped against whatever the launcher happens to put
+behind it. The colour is the desktop's own, so the icon and the application it opens are the same
+thing.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" fill="#070A0E"/>
+  <path d="M52.1 23.05A22 22 0 1 1 40.95 11.9" stroke="#F2F5F8" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="4.5" fill="#70E1C8"/>
+</svg>
