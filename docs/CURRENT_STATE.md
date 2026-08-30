@@ -867,8 +867,23 @@ like a terminal that crashed, and the difference between *this host has no termi
 Linux account behind it — the local desktop seat holds none — is refused rather than given a guessed
 account, because the guess would be choosing whose shell somebody gets.
 
-**No browser draws one yet.** The desktop has no terminal emulator and no card that opens this
-socket, so the Safe Shell remains what it serves.
+The browser keeps a real screen rather than a span parser. `living_canvas::terminal` holds a grid
+of cells with a cursor, fed bytes and read back as rows, because the ANSI renderer beside it has
+no cursor and no memory of where anything was put: a carriage return, a backspace and every
+program that repaints come out of it as escape sequences flattened into a stream, which is the
+thing ADR-0047 says the Safe Shell already is. Colour is emitted as `var(--term-N, ...)` so a
+theme can override any of the 256 indexed colours, and a cell that set nothing carries no colour
+at all rather than a black this theme never chose. Bytes are fed as bytes: decoding to text first
+would lay replacement characters out as though a program had drawn them.
+
+The screen is proven where it can be, which is natively: cursor addressing puts a character where
+the escape sequence says, a carriage return overwrites rather than appends, a backspace removes,
+a resize changes both dimensions, and invalid UTF-8 does not derail the grid. Nothing is
+persisted, because a terminal buffer is the likeliest place for a password typed at a prompt to
+reach a browser profile: the scrollback is held in the tab and nowhere else.
+
+**No card opens the socket yet.** The screen and the transport both exist and nothing joins them,
+so the Safe Shell remains what the desktop serves.
 
 ## Agent runtime
 

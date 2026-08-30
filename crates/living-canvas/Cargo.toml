@@ -13,6 +13,10 @@ repository.workspace = true
 [dependencies]
 async-trait.workspace = true
 base64.workspace = true
+# The browser keeps a real screen — a grid with a cursor — rather than a span parser, because
+# ADR-0047 argues for a terminal by naming the programs that repaint. Pure data structures:
+# it brings `vte`, `itoa` and `unicode-width` and holds no capability of any kind.
+vt100 = "0.16.2"
 cybou-protocol = { path = "../cybou-protocol" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
 serde_json.workspace = true
