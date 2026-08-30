@@ -61,6 +61,12 @@ pub struct TerminalSignals {
     pub status: RwSignal<String>,
     /// Why there is no terminal, in prose a person can act on.
     pub refusal: RwSignal<Option<String>>,
+    /// The window size the host was last told about.
+    ///
+    /// Held so a measurement that changed nothing sends nothing: a resize frame reaches
+    /// `TIOCSWINSZ` and every program in the session gets `SIGWINCH`, which is not something to
+    /// deliver on a timer for a panel nobody moved.
+    pub window: RwSignal<(u16, u16)>,
 }
 
 impl TerminalSignals {
@@ -72,6 +78,10 @@ impl TerminalSignals {
             socket: RwSignal::new_local(None),
             status: RwSignal::new("Not connected".to_owned()),
             refusal: RwSignal::new(None),
+            window: RwSignal::new((
+                crate::terminal::DEFAULT_COLUMNS,
+                crate::terminal::DEFAULT_ROWS,
+            )),
         }
     }
 }

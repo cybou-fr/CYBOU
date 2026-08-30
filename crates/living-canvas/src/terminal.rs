@@ -27,6 +27,64 @@ use serde::{Deserialize, Serialize};
 /// not to `localStorage`, not to the draft store that carries editor buffers.
 pub const SCROLLBACK_LINES: usize = 1000;
 
+/// How many columns and rows fit in a panel of this size.
+///
+/// The whole of the resize decision, kept away from the browser so it can be checked. A terminal
+/// that never resized would leave every program laying out for eighty by twenty-four inside a panel
+/// somebody has since dragged to twice that: `top` would draw a quarter of the screen, and `vim`
+/// would leave the rest of it holding whatever was there before.
+///
+/// Clamped rather than trusted. A panel measured mid-animation, or before the browser has laid it
+/// out, reports zero or something enormous; both are sizes no program should be told it has, and
+/// the bounds are the protocol's so the host and the browser refuse the same ones.
+#[must_use]
+pub fn fitting_window(
+    panel_width: f64,
+    panel_height: f64,
+    cell_width: f64,
+    cell_height: f64,
+) -> (u16, u16) {
+    // A cell with no width is a font that has not loaded. Falling back keeps the terminal at a size
+    // programs understand instead of dividing by it.
+    if !(cell_width.is_finite() && cell_width > 0.0 && cell_height.is_finite() && cell_height > 0.0)
+    {
+        return (DEFAULT_COLUMNS, DEFAULT_ROWS);
+    }
+    if !(panel_width.is_finite() && panel_height.is_finite()) {
+        return (DEFAULT_COLUMNS, DEFAULT_ROWS);
+    }
+
+    let columns = (panel_width / cell_width).floor();
+    let rows = (panel_height / cell_height).floor();
+
+    // Bounded as a float first, so the bound is arithmetic rather than a cast that happens to
+    // land in range. A raw cast is where a very large panel would otherwise wrap into a very
+    // small terminal.
+    let clamp = |value: f64, most: u16| -> u16 {
+        let bounded = value.clamp(1.0, f64::from(most));
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "clamped into 1..=most on the line above, and most is a u16"
+        )]
+        let whole = bounded.trunc() as u16;
+        whole.clamp(1, most)
+    };
+
+    (
+        clamp(columns, cybou_protocol::terminal::MAX_COLUMNS),
+        clamp(rows, cybou_protocol::terminal::MAX_ROWS),
+    )
+}
+
+/// The size a terminal opens at, before anything has measured the panel.
+///
+/// The shape every program that draws still assumes when nothing tells it otherwise, and what a
+/// terminal falls back to when the panel cannot be measured at all.
+pub const DEFAULT_COLUMNS: u16 = 80;
+/// See [`DEFAULT_COLUMNS`].
+pub const DEFAULT_ROWS: u16 = 24;
+
 /// One character cell, as the screen holds it.
 ///
 /// Four independent attributes rather than one state. Bold, dim, underline and inverse are set by
@@ -272,6 +330,65 @@ pub fn cell_style(cell: &Cell) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_panel_is_measured_into_whole_cells() {
+        // Eight by sixteen is an ordinary monospace cell. Partial cells are dropped rather than
+        // rounded up, because a column a program draws into and the panel cannot show is a column
+        // that wraps.
+        assert_eq!(fitting_window(800.0, 400.0, 8.0, 16.0), (100, 25));
+        assert_eq!(fitting_window(807.0, 409.0, 8.0, 16.0), (100, 25));
+    }
+
+    #[test]
+    fn a_panel_nobody_has_laid_out_yet_does_not_become_a_zero_sized_terminal() {
+        // Zero columns is a browser that has not measured itself, and programs much older than
+        // this divide by it. One is the smallest a terminal may be told it is.
+        assert_eq!(fitting_window(0.0, 0.0, 8.0, 16.0), (1, 1));
+        assert_eq!(fitting_window(4.0, 4.0, 8.0, 16.0), (1, 1));
+    }
+
+    #[test]
+    fn a_font_that_has_not_loaded_leaves_the_terminal_at_a_size_programs_understand() {
+        // Rather than dividing by it.
+        assert_eq!(
+            fitting_window(800.0, 400.0, 0.0, 16.0),
+            (DEFAULT_COLUMNS, DEFAULT_ROWS)
+        );
+        assert_eq!(
+            fitting_window(800.0, 400.0, f64::NAN, 16.0),
+            (DEFAULT_COLUMNS, DEFAULT_ROWS)
+        );
+        assert_eq!(
+            fitting_window(f64::INFINITY, 400.0, 8.0, 16.0),
+            (DEFAULT_COLUMNS, DEFAULT_ROWS)
+        );
+    }
+
+    #[test]
+    fn an_enormous_panel_is_bounded_where_the_host_bounds_it() {
+        // The same numbers the owner refuses past, read from the protocol rather than restated, so
+        // the browser never asks for a window the host will reject.
+        let (columns, rows) = fitting_window(1_000_000.0, 1_000_000.0, 8.0, 16.0);
+        assert_eq!(columns, cybou_protocol::terminal::MAX_COLUMNS);
+        assert_eq!(rows, cybou_protocol::terminal::MAX_ROWS);
+        assert!(cybou_protocol::terminal::window_is_possible(columns, rows));
+    }
+
+    #[test]
+    fn every_size_this_produces_is_one_the_host_accepts() {
+        // The property behind the three tests above: whatever a panel measures, the frame that
+        // follows is never one the owner closes the session over.
+        for width in [0.0, 1.0, 13.0, 800.0, 5_000.0, 1_000_000.0] {
+            for height in [0.0, 1.0, 9.0, 400.0, 5_000.0, 1_000_000.0] {
+                let (columns, rows) = fitting_window(width, height, 8.0, 16.0);
+                assert!(
+                    cybou_protocol::terminal::window_is_possible(columns, rows),
+                    "{width}x{height} produced {columns}x{rows}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn a_control_key_is_a_byte_rather_than_a_letter() {

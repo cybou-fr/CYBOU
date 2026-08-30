@@ -15,18 +15,16 @@ use web_sys::{BinaryType, CloseEvent, KeyboardEvent, MessageEvent, WebSocket};
 
 use crate::{
     CardId,
-    terminal::{Cell, TerminalScreen, cell_style, key_to_bytes},
+    terminal::{Cell, TerminalScreen, cell_style, fitting_window, key_to_bytes},
     tool_state::ToolCardStates,
 };
 
-/// The size a terminal opens at, before anything has measured the panel.
+/// How often the panel is measured while somebody is dragging its edge.
 ///
-/// The shape every program that draws still assumes when nothing tells it otherwise. It is a
-/// starting point rather than a guess that sticks: the card sends a resize as soon as it knows
-/// better.
-const DEFAULT_COLUMNS: u16 = 80;
-/// See [`DEFAULT_COLUMNS`].
-const DEFAULT_ROWS: u16 = 24;
+/// A resize frame reaches `TIOCSWINSZ` and every program in the session gets `SIGWINCH`, so one per
+/// animation frame would be a drag that asks a shell to re-lay-out a hundred times. Slow enough to
+/// be cheap, fast enough that letting go feels immediate.
+const RESIZE_INTERVAL_MS: u32 = 150;
 
 /// One row, as a string, for a reader that only wants the text.
 #[must_use]
@@ -121,12 +119,13 @@ fn connect(signals: crate::tool_state::TerminalSignals) {
 
     let opened = socket.clone();
     let on_open = Closure::<dyn FnMut()>::new(move || {
+        // Whatever the panel already measured, rather than a constant this then corrects — a
+        // shell that drew its first prompt at eighty columns inside a wider panel would repaint
+        // once for no reason, in the one place a person is watching for the prompt.
+        let (columns, rows) = signals.window.get_untracked();
         send(
             &opened,
-            &cybou_web_contracts::TerminalFromGateway::Open {
-                columns: DEFAULT_COLUMNS,
-                rows: DEFAULT_ROWS,
-            },
+            &cybou_web_contracts::TerminalFromGateway::Open { columns, rows },
         );
     });
     socket.set_onopen(Some(on_open.as_ref().unchecked_ref()));
@@ -166,6 +165,48 @@ pub fn TerminalContent(
 ) -> impl IntoView {
     let states = expect_context::<ToolCardStates>();
     let signals = states.terminal(CardId::Terminal(instance));
+
+    let screen_ref: NodeRef<leptos::html::Div> = NodeRef::new();
+    let probe_ref: NodeRef<leptos::html::Span> = NodeRef::new();
+
+    // Measure the panel and tell both ends, when and only when the answer changed.
+    //
+    // On a timer rather than a resize observer: a card is resized by this desktop's own
+    // interaction code, which moves and sizes it without the element firing anything a browser
+    // calls a resize.
+    let measure = move || {
+        let (Some(screen), Some(probe)) = (screen_ref.get_untracked(), probe_ref.get_untracked())
+        else {
+            return;
+        };
+        let cell = probe.get_bounding_client_rect();
+        let window = fitting_window(
+            f64::from(screen.client_width()),
+            f64::from(screen.client_height()),
+            cell.width(),
+            cell.height(),
+        );
+        if window == signals.window.get_untracked() {
+            return;
+        }
+
+        let (columns, rows) = window;
+        signals.window.set(window);
+        // Both ends hear it: the host so programs re-lay-out, and the local screen so the grid
+        // drawn here is the grid they are drawing into.
+        signals.screen.update(|screen| screen.resize(columns, rows));
+        signals.generation.update(|generation| *generation += 1);
+        if let Some(socket) = signals.socket.get_untracked() {
+            send(
+                &socket,
+                &cybou_web_contracts::TerminalFromGateway::Resize { columns, rows },
+            );
+        }
+    };
+
+    Effect::new(move |_| {
+        gloo_timers::callback::Interval::new(RESIZE_INTERVAL_MS, measure).forget();
+    });
 
     let send_key = move |event: KeyboardEvent| {
         let Some(socket) = signals.socket.get_untracked() else {
@@ -216,11 +257,17 @@ pub fn TerminalContent(
 
             <div
                 class="terminal-screen"
+                node_ref=screen_ref
                 tabindex="0"
                 role="application"
                 aria-label="Interactive terminal. Keystrokes are sent to the host."
                 on:keydown=send_key
             >
+                // One cell, measured rather than assumed. A monospace cell's size comes from the
+                // font the browser actually resolved, which no constant here can know: it changes
+                // with the theme, the zoom level and whichever fallback the platform supplied.
+                <span class="terminal-probe" node_ref=probe_ref aria-hidden="true">"M"</span>
+
                 <For
                     each=rows
                     key=|row| row_text(row)

@@ -897,6 +897,18 @@ does not also copy a selection and Tab does not leave the panel while completing
 mapping is in the portable module beside the screen and is checked on the native target, because
 every one of those keys does nothing useful if it arrives as its own name.
 
+The panel is measured and both ends are told. A terminal fixed at eighty by twenty-four inside a
+panel somebody has dragged wider would have every program laying out for a screen that is not there:
+`top` drawing a quarter of it, `vim` leaving the rest holding whatever was underneath. One cell is
+measured rather than assumed, because a monospace cell's size comes from the font the browser
+actually resolved and changes with the theme, the zoom and the platform's fallback. The arithmetic is
+in the portable module and is checked natively, including that every size it can produce is one
+`window_is_possible` accepts — so the browser never asks for a window the owner would close the
+session over. It runs on a short timer rather than a resize observer, because a card is resized by
+this desktop's own interaction code without the element firing anything a browser calls a resize, and
+a measurement that changed nothing sends nothing: a resize frame reaches `TIOCSWINSZ` and every
+program in the session gets `SIGWINCH`.
+
 **No browser has driven one end to end.** The card compiles and its logic is covered natively;
 the socket, the keyboard and the grid have not been exercised in a real browser, because the
 browser gate needs `chromedriver` and this workspace has none installed. The vertical is built
