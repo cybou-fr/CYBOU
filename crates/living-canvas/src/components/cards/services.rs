@@ -110,20 +110,20 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
     };
 
     view! {
-        <div class="services-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="services-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif;">
             // Toolbar
-            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-weight: 600; font-size: 13px;">"System Services"</span>
-                        <span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
+                        <span style="background: var(--ok-fill); color: var(--ok); font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
                             {move || format!("{} Active", active_count())}
                         </span>
                         {move || {
                             let failed = failed_count();
                             if failed > 0 {
                                 Some(view! {
-                                    <span style="background: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
+                                    <span style="background: var(--danger-fill-strong); color: var(--danger); font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
                                         {format!("{} Failed", failed)}
                                     </span>
                                 })
@@ -134,7 +134,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                     </div>
 
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh services"
                         on:click=move |_| load_services()
                     >
@@ -148,7 +148,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: inherit; cursor: pointer;",
-                                if signals.filter_state.get().is_none() { "rgba(99, 102, 241, 0.3)" } else { "rgba(255,255,255,0.05)" }
+                                if signals.filter_state.get().is_none() { "var(--accent-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.filter_state.set(None)
                         >
@@ -156,8 +156,8 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         </button>
                         <button
                             style=move || format!(
-                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: #4ade80; cursor: pointer;",
-                                if signals.filter_state.get() == Some(ServiceState::Active) { "rgba(34, 197, 94, 0.3)" } else { "rgba(255,255,255,0.05)" }
+                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: var(--ok); cursor: pointer;",
+                                if signals.filter_state.get() == Some(ServiceState::Active) { "var(--ok-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.filter_state.set(Some(ServiceState::Active))
                         >
@@ -165,8 +165,8 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         </button>
                         <button
                             style=move || format!(
-                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: #f87171; cursor: pointer;",
-                                if signals.filter_state.get() == Some(ServiceState::Failed) { "rgba(239, 68, 68, 0.3)" } else { "rgba(255,255,255,0.05)" }
+                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: var(--danger); cursor: pointer;",
+                                if signals.filter_state.get() == Some(ServiceState::Failed) { "var(--danger-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.filter_state.set(Some(ServiceState::Failed))
                         >
@@ -179,7 +179,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         placeholder="Search services..."
                         prop:value=move || signals.search_query.get()
                         on:input=move |e| signals.search_query.set(event_target_value(&e))
-                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: inherit; width: 140px;"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: inherit; width: 140px;"
                     />
                 </div>
             </div>
@@ -187,7 +187,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -207,31 +207,31 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         let is_active = svc.state == ServiceState::Active;
 
                         let (badge_bg, badge_color) = match svc.state {
-                            ServiceState::Active => ("rgba(34, 197, 94, 0.2)", "#4ade80"),
-                            ServiceState::Failed => ("rgba(239, 68, 68, 0.2)", "#f87171"),
+                            ServiceState::Active => ("var(--ok-fill-strong)", "var(--ok)"),
+                            ServiceState::Failed => ("var(--danger-fill-strong)", "var(--danger)"),
                             ServiceState::Inactive => ("rgba(156, 163, 175, 0.2)", "#9ca3af"),
-                            _ => ("rgba(245, 158, 11, 0.2)", "#fbbf24"),
+                            _ => ("var(--caution-fill-strong)", "var(--caution)"),
                         };
 
                         view! {
                             <div
-                                style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;"
+                                style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;"
                             >
                                 <div style="flex: 1; min-width: 0;">
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
-                                        <span style="font-weight: 600; font-size: 12px; color: #f3f4f6; font-family: monospace;">
+                                        <span style="font-weight: 600; font-size: 12px; color: var(--text-bright); font-family: monospace;">
                                             {name}
                                         </span>
                                         <span style=format!("background: {badge_bg}; color: {badge_color}; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; text-transform: uppercase;")>
                                             {svc.state.label()}
                                         </span>
                                         {svc.main_pid.map(|pid| view! {
-                                            <span style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">
+                                            <span style="font-size: 10px; color: var(--text-faint); font-family: monospace;">
                                                 {format!("PID {pid}")}
                                             </span>
                                         })}
                                     </div>
-                                    <div style="font-size: 11px; color: rgba(255,255,255,0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 11px; color: var(--text-second); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                         {svc.description}
                                     </div>
                                 </div>
@@ -239,7 +239,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                 // Action buttons
                                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                                     <button
-                                        style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #e2e8f0; cursor: pointer;"
+                                        style="background: var(--fill-subtle); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #e2e8f0; cursor: pointer;"
                                         title="Restart service"
                                         on:click=move |_| trigger_action(name_restart.clone(), ServiceAction::Restart)
                                     >
@@ -248,7 +248,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                     {if is_active {
                                         view! {
                                             <button
-                                                style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #f87171; cursor: pointer;"
+                                                style="background: var(--danger-fill); border: 1px solid var(--danger-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--danger); cursor: pointer;"
                                                 title="Stop service"
                                                 on:click=move |_| trigger_action(name_stop.clone(), ServiceAction::Stop)
                                             >
@@ -258,7 +258,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                     } else {
                                         view! {
                                             <button
-                                                style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #4ade80; cursor: pointer;"
+                                                style="background: var(--ok-fill); border: 1px solid var(--ok-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--ok); cursor: pointer;"
                                                 title="Start service"
                                                 on:click=move |_| trigger_action(name_stop.clone(), ServiceAction::Start)
                                             >
@@ -267,7 +267,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                         }.into_any()
                                     }}
                                     <button
-                                        style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: #818cf8; cursor: pointer; display: flex; align-items: center; gap: 4px;"
+                                        style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: var(--accent-light); cursor: pointer; display: flex; align-items: center; gap: 4px;"
                                         title="Inspect in Universal Inspector"
                                         on:click=move |_| inspect_service(name_inspect.clone())
                                     >
@@ -281,7 +281,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
 
                 {move || if filtered_services().is_empty() {
                     Some(view! {
-                        <div style="text-align: center; color: rgba(255,255,255,0.4); padding: 32px 16px; font-size: 12px;">
+                        <div style="text-align: center; color: var(--text-faint); padding: 32px 16px; font-size: 12px;">
                             "No services matching filter."
                         </div>
                     })

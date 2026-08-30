@@ -106,15 +106,15 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
     };
 
     view! {
-        <div class="operations-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="operations-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif;">
             // Toolbar
-            <div class="ops-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div class="ops-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
                         <IconActivity size=15 />
                         "Operations Monitor"
                     </span>
-                    <span style="background: rgba(99, 102, 241, 0.2); color: #818cf8; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
+                    <span style="background: var(--accent-fill-strong); color: var(--accent-light); font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
                         {move || format!("{} active", active_count())}
                     </span>
                 </div>
@@ -144,7 +144,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                     </button>
 
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer; display: flex; align-items: center;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer; display: flex; align-items: center;"
                         title="Refresh operations"
                         on:click=move |_| load_operations()
                     >
@@ -156,7 +156,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
             // Status message / toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(239, 68, 68, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--danger-fill); color: #fca5a5; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--danger-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -166,7 +166,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
             // Main Split Layout: Operations list & Log Inspector
             <div style="display: flex; flex: 1; min-height: 0;">
                 // Left: Operations list
-                <div style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid rgba(255,255,255,0.06);">
+                <div style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--fill-subtle);">
                     <For
                         each=filtered_ops
                         key=|op| op.id
@@ -178,10 +178,10 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                             let cancellable = op.cancellable && !is_terminal;
 
                             let (badge_bg, badge_color, badge_text) = match &op.state {
-                                OperationState::Running => ("rgba(59, 130, 246, 0.2)", "#60a5fa", "Running"),
-                                OperationState::Queued => ("rgba(245, 158, 11, 0.2)", "#fbbf24", "Queued"),
-                                OperationState::Completed => ("rgba(34, 197, 94, 0.2)", "#4ade80", "Completed"),
-                                OperationState::Failed { .. } => ("rgba(239, 68, 68, 0.2)", "#f87171", "Failed"),
+                                OperationState::Running => ("var(--info-fill-strong)", "var(--info)", "Running"),
+                                OperationState::Queued => ("var(--caution-fill-strong)", "var(--caution)", "Queued"),
+                                OperationState::Completed => ("var(--ok-fill-strong)", "var(--ok)", "Completed"),
+                                OperationState::Failed { .. } => ("var(--danger-fill-strong)", "var(--danger)", "Failed"),
                                 OperationState::Cancelled => ("rgba(156, 163, 175, 0.2)", "#9ca3af", "Cancelled"),
                             };
 
@@ -190,8 +190,8 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                     class=move || if is_selected() { "op-card selected" } else { "op-card" }
                                     style=move || format!(
                                         "background: {}; border: 1px solid {}; border-radius: 6px; padding: 10px; cursor: pointer; transition: all 0.15s ease;",
-                                        if is_selected() { "rgba(99, 102, 241, 0.12)" } else { "rgba(255,255,255,0.03)" },
-                                        if is_selected() { "rgba(99, 102, 241, 0.4)" } else { "rgba(255,255,255,0.07)" }
+                                        if is_selected() { "rgba(99, 102, 241, 0.12)" } else { "var(--fill-faint)" },
+                                        if is_selected() { "var(--accent-line-strong)" } else { "rgba(255,255,255,0.07)" }
                                     )
                                     on:click=move |_| {
                                         signals.selected_op_id.set(Some(op_id));
@@ -200,10 +200,10 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                 >
                                     <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;">
                                         <div>
-                                            <div style="font-weight: 600; font-size: 12px; color: var(--text-main, #f3f4f6);">
+                                            <div style="font-weight: 600; font-size: 12px; color: var(--text-main);">
                                                 {op.label.clone()}
                                             </div>
-                                            <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px;">
+                                            <div style="font-size: 10px; color: var(--text-dim); margin-top: 2px;">
                                                 {op.kind.display_label()}
                                             </div>
                                         </div>
@@ -213,18 +213,18 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                     </div>
 
                                     // Progress bar
-                                    <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin: 6px 0;">
+                                    <div style="width: 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 6px 0;">
                                         <div
                                             style=format!(
                                                 "width: {}%; height: 100%; background: {}; transition: width 0.3s ease;",
                                                 percent,
-                                                if matches!(op.state, OperationState::Completed) { "#22c55e" } else { "#6366f1" }
+                                                if matches!(op.state, OperationState::Completed) { "#22c55e" } else { "var(--accent-solid)" }
                                             )
                                         ></div>
                                     </div>
 
                                     // Step info
-                                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: rgba(255,255,255,0.7);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-strong);">
                                         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">
                                             {op.progress.step.clone()}
                                         </span>
@@ -236,7 +236,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                         {if cancellable {
                                             Some(view! {
                                                 <button
-                                                    style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;"
+                                                    style="background: var(--danger-fill); color: var(--danger); border: 1px solid var(--danger-line); font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;"
                                                     on:click=move |e| {
                                                         e.stop_propagation();
                                                         cancel_op(op_id);
@@ -257,7 +257,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
 
                     {move || if filtered_ops().is_empty() {
                         Some(view! {
-                            <div style="text-align: center; color: rgba(255,255,255,0.4); padding: 32px 16px; font-size: 12px;">
+                            <div style="text-align: center; color: var(--text-faint); padding: 32px 16px; font-size: 12px;">
                                 "No operations matching filter."
                             </div>
                         })
@@ -267,11 +267,11 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                 </div>
 
                 // Right: Execution Log stream
-                <div style="flex: 1.2; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); font-family: monospace; font-size: 11px;">
-                    <div style="padding: 6px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; color: rgba(255,255,255,0.7);">"Execution Logs"</span>
+                <div style="flex: 1.2; display: flex; flex-direction: column; background: var(--bg-sunken-strong); font-family: monospace; font-size: 11px;">
+                    <div style="padding: 6px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--fill-subtle); display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: var(--text-strong);">"Execution Logs"</span>
                         {move || signals.selected_op_id.get().map(|id| view! {
-                            <span style="font-size: 10px; color: rgba(255,255,255,0.4);">{format!("id: {}", &id.to_string()[..8])}</span>
+                            <span style="font-size: 10px; color: var(--text-faint);">{format!("id: {}", &id.to_string()[..8])}</span>
                         })}
                     </div>
 
@@ -281,8 +281,8 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                             key=|log| format!("{}-{}", log.timestamp, log.text)
                             children=move |log| {
                                 let stream_color = match log.stream.as_str() {
-                                    "stderr" => "#f87171",
-                                    "system" => "#fbbf24",
+                                    "stderr" => "var(--danger)",
+                                    "system" => "var(--caution)",
                                     _ => "#9ca3af",
                                 };
                                 view! {

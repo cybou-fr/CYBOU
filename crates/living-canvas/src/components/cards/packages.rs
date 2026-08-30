@@ -93,13 +93,13 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
     };
 
     view! {
-        <div class="packages-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="packages-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif;">
             // Header & Tabs
-            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <span style="font-weight: 600; font-size: 13px;">"Software Packages"</span>
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh repositories"
                         on:click=move |_| load_packages()
                     >
@@ -113,7 +113,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: inherit; cursor: pointer;",
-                                if signals.active_tab.get() == "installed" { "rgba(99, 102, 241, 0.3)" } else { "rgba(255,255,255,0.05)" }
+                                if signals.active_tab.get() == "installed" { "var(--accent-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.active_tab.set("installed".to_owned())
                         >
@@ -121,8 +121,8 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                         </button>
                         <button
                             style=move || format!(
-                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: #fbbf24; cursor: pointer;",
-                                if signals.active_tab.get() == "upgradable" { "rgba(245, 158, 11, 0.3)" } else { "rgba(255,255,255,0.05)" }
+                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: var(--caution); cursor: pointer;",
+                                if signals.active_tab.get() == "upgradable" { "var(--caution-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.active_tab.set("upgradable".to_owned())
                         >
@@ -131,7 +131,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: inherit; cursor: pointer;",
-                                if signals.active_tab.get() == "all" { "rgba(99, 102, 241, 0.3)" } else { "rgba(255,255,255,0.05)" }
+                                if signals.active_tab.get() == "all" { "var(--accent-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.active_tab.set("all".to_owned())
                         >
@@ -144,7 +144,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                         placeholder="Search packages..."
                         prop:value=move || signals.search_query.get()
                         on:input=move |e| signals.search_query.set(event_target_value(&e))
-                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: inherit; width: 140px;"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: inherit; width: 140px;"
                     />
                 </div>
             </div>
@@ -152,7 +152,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -173,21 +173,21 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                         let is_upgradable = pkg.status == PackageStatus::Upgradable;
 
                         view! {
-                            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                            <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
                                 <div style="flex: 1; min-width: 0;">
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
-                                        <span style="font-weight: 600; font-size: 12px; color: #f3f4f6; font-family: monospace;">{name}</span>
-                                        <span style="background: rgba(255,255,255,0.06); font-size: 9px; padding: 1px 5px; border-radius: 3px; color: rgba(255,255,255,0.6);">
+                                        <span style="font-weight: 600; font-size: 12px; color: var(--text-bright); font-family: monospace;">{name}</span>
+                                        <span style="background: var(--fill-subtle); font-size: 9px; padding: 1px 5px; border-radius: 3px; color: var(--text-second);">
                                             {pkg.repository}
                                         </span>
                                         {if let Some(ref v) = pkg.installed_version {
-                                            view! { <span style="font-size: 10px; color: #4ade80; font-family: monospace;">{format!("v{v}")}</span> }.into_any()
+                                            view! { <span style="font-size: 10px; color: var(--ok); font-family: monospace;">{format!("v{v}")}</span> }.into_any()
                                         } else {
-                                            view! { <span style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">"not installed"</span> }.into_any()
+                                            view! { <span style="font-size: 10px; color: var(--text-faint); font-family: monospace;">"not installed"</span> }.into_any()
                                         }}
                                         {if is_upgradable {
                                             Some(view! {
-                                                <span style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700;">
+                                                <span style="background: var(--caution-fill-strong); color: var(--caution); font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700;">
                                                     {format!("upgrade to v{}", pkg.candidate_version.as_deref().unwrap_or("latest"))}
                                                 </span>
                                             })
@@ -195,7 +195,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                             None
                                         }}
                                     </div>
-                                    <div style="font-size: 11px; color: rgba(255,255,255,0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 11px; color: var(--text-second); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                         {pkg.description}
                                     </div>
                                 </div>
@@ -205,7 +205,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                     {if is_upgradable {
                                         view! {
                                             <button
-                                                style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #fbbf24; font-weight: 600; cursor: pointer;"
+                                                style="background: var(--caution-fill-strong); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--caution); font-weight: 600; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Upgrade)
                                             >
                                                 "Upgrade"
@@ -214,7 +214,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                     } else if is_installed {
                                         view! {
                                             <button
-                                                style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #f87171; cursor: pointer;"
+                                                style="background: var(--danger-fill); border: 1px solid var(--danger-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--danger); cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Remove)
                                             >
                                                 "Remove"
@@ -223,7 +223,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                     } else {
                                         view! {
                                             <button
-                                                style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #4ade80; font-weight: 600; cursor: pointer;"
+                                                style="background: var(--ok-fill-strong); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--ok); font-weight: 600; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Install)
                                             >
                                                 "Install"
@@ -232,7 +232,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                     }}
 
                                     <button
-                                        style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: #818cf8; cursor: pointer;"
+                                        style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: var(--accent-light); cursor: pointer;"
                                         title="Inspect in Universal Inspector"
                                         on:click=move |_| inspect_package(name_inspect.clone(), inst_ver.clone())
                                     >

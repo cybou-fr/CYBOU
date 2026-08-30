@@ -75,9 +75,9 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
     ];
 
     view! {
-        <div class="meaning-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
+        <div class="meaning-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconBot size=16 />
                     <span style="font-weight: 600; font-size: 13px;">"Meaning1 & Dialogue Assistant"</span>
@@ -86,7 +86,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                     <select
                         prop:value=move || signals.language.get()
                         on:change=move |e| signals.language.set(event_target_value(&e))
-                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 3px 6px; font-size: 11px; color: inherit;"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 6px; font-size: 11px; color: inherit;"
                     >
                         <option value="en">"English (EN)"</option>
                         <option value="ru">"Русский (RU)"</option>
@@ -94,7 +94,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                         <option value="fr">"Français (FR)"</option>
                     </select>
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh memory"
                         on:click=move |_| load_dialogue_memory()
                     >
@@ -106,7 +106,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(239, 68, 68, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--danger-fill); color: #fca5a5; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--danger-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -114,7 +114,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
             })}
 
             // Natural Language Query Input & Quick Chips
-            <div style="padding: 10px 12px; background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 8px;">
+            <div style="padding: 10px 12px; background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--fill-subtle); display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 6px;">
                     <input
                         type="text"
@@ -126,10 +126,10 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                                 submit_query();
                             }
                         }
-                        style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 7px 10px; font-size: 12px; color: inherit;"
+                        style="flex: 1; background: var(--bg-sunken-strong); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 7px 10px; font-size: 12px; color: inherit;"
                     />
                     <button
-                        style="background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;"
+                        style="background: #4f46e5; color: var(--text-pure); border: none; border-radius: 6px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;"
                         on:click=move |_| submit_query()
                     >
                         <IconSearch size=13 />
@@ -139,11 +139,11 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
 
                 // Quick presets
                 <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                    <small style="font-size: 10px; color: rgba(255,255,255,0.4); text-transform: uppercase; font-weight: 700;">"Quick Queries:"</small>
+                    <small style="font-size: 10px; color: var(--text-faint); text-transform: uppercase; font-weight: 700;">"Quick Queries:"</small>
                     {quick_queries.into_iter().map(|(q, lang)| {
                         view! {
                             <button
-                                style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 2px 8px; font-size: 10px; color: rgba(255,255,255,0.75); cursor: pointer;"
+                                style="background: var(--fill-faintest); border: 1px solid var(--fill-hover); border-radius: 12px; padding: 2px 8px; font-size: 10px; color: rgba(255,255,255,0.75); cursor: pointer;"
                                 on:click=move |_| {
                                     signals.query.set(q.to_string());
                                     signals.language.set(lang.to_string());
@@ -161,7 +161,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
             <div style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;">
                 {move || match signals.projection.get() {
                     None => view! {
-                        <div style="padding: 30px; text-align: center; color: rgba(255,255,255,0.4); font-size: 12px;">
+                        <div style="padding: 30px; text-align: center; color: var(--text-faint); font-size: 12px;">
                             <IconBot size=28 />
                             <p style="margin-top: 8px;">"No active interpretation. Enter a natural language question or command above."</p>
                             <p style="font-size: 11px; color: rgba(255,255,255,0.3);">"Meaning1 deterministically maps language to typed Cognitive Acts without LLM guessing."</p>
@@ -172,10 +172,10 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                         let act_kind_str = format!("{:?}", act.kind);
                         let plan_view = proj.response_plan.map(|plan| {
                             view! {
-                                <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">"Formulated Response Plan"</span>
-                                        <span style="font-size: 10px; font-family: monospace; color: #818cf8;">{plan.intent}</span>
+                                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-dim);">"Formulated Response Plan"</span>
+                                        <span style="font-size: 10px; font-family: monospace; color: var(--accent-light);">{plan.intent}</span>
                                     </div>
                                     <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: rgba(255,255,255,0.85); display: flex; flex-direction: column; gap: 3px;">
                                         {plan.key_points.into_iter().map(|pt| view! { <li>{pt}</li> }).collect_view()}
@@ -183,10 +183,10 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                                     {(!plan.qualifications.is_empty()).then(|| {
                                         view! {
                                             <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px;">
-                                                <small style="font-size: 10px; color: rgba(255,255,255,0.4);">"Qualifications:"</small>
+                                                <small style="font-size: 10px; color: var(--text-faint);">"Qualifications:"</small>
                                                 {plan.qualifications.into_iter().map(|q| {
                                                     view! {
-                                                        <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 1px 5px; font-size: 9px; font-weight: 600;">
+                                                        <span style="background: var(--caution-fill); color: var(--caution); border: 1px solid var(--caution-line); border-radius: 4px; padding: 1px 5px; font-size: 9px; font-weight: 600;">
                                                             {q.name()}
                                                         </span>
                                                     }
@@ -204,7 +204,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                                     <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #a5b4fc; margin-bottom: 4px;">
                                         "Realized Response (Deterministic)"
                                     </div>
-                                    <div style="font-size: 13px; line-height: 1.5; color: #ffffff;">
+                                    <div style="font-size: 13px; line-height: 1.5; color: var(--text-pure);">
                                         {text}
                                     </div>
                                 </div>
@@ -214,22 +214,22 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                         view! {
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 // Cognitive Act Summary Card
-                                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px;">
+                                <div style="background: var(--fill-faint); border: 1px solid var(--line); border-radius: 6px; padding: 10px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                                         <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span style="background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700;">
+                                            <span style="background: var(--accent-fill-strong); color: var(--accent-light); border: 1px solid var(--accent-line-strong); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700;">
                                                 {act_kind_str}
                                             </span>
                                             <span style="font-size: 13px; font-weight: 600;">{act.subject.clone()}</span>
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span style="font-size: 10px; color: rgba(255,255,255,0.5);">"Confidence:"</span>
+                                            <span style="font-size: 10px; color: var(--text-dim);">"Confidence:"</span>
                                             <span style="font-size: 11px; font-weight: 700; color: #34d399;">
                                                 {format!("{:.0}%", proj.interpretation.confidence * 100.0)}
                                             </span>
                                         </div>
                                     </div>
-                                    <div style="font-size: 11px; color: rgba(255,255,255,0.6);">
+                                    <div style="font-size: 11px; color: var(--text-second);">
                                         "Utterance: \"" {proj.interpretation.utterance} "\""
                                     </div>
                                 </div>
@@ -244,16 +244,16 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                 // Dialogue Memory Status
                 {move || signals.memory.get().map(|mem| {
                     view! {
-                        <div style="margin-top: auto; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.6);">
-                                <span>"Dialogue Turn: " <b style="color: #ffffff;">{mem.current_turn}</b></span>
+                        <div style="margin-top: auto; padding: 8px 10px; background: var(--bg-sunken-strong); border: 1px solid var(--fill-subtle); border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-second);">
+                                <span>"Dialogue Turn: " <b style="color: var(--text-pure);">{mem.current_turn}</b></span>
                                 <span>"·"</span>
-                                <span>"Referents Held: " <b style="color: #ffffff;">{mem.remembered_referents.len()}</b></span>
+                                <span>"Referents Held: " <b style="color: var(--text-pure);">{mem.remembered_referents.len()}</b></span>
                             </div>
                             <div style="display: flex; gap: 4px;">
                                 {mem.remembered_referents.into_iter().take(4).map(|ref_label| {
                                     view! {
-                                        <span style="background: rgba(255,255,255,0.06); border-radius: 3px; padding: 1px 4px; font-size: 9px; font-family: monospace;">
+                                        <span style="background: var(--fill-subtle); border-radius: 3px; padding: 1px 4px; font-size: 9px; font-family: monospace;">
                                             {ref_label}
                                         </span>
                                     }

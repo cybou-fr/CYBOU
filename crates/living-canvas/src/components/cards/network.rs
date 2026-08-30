@@ -58,15 +58,15 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="network-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
+        <div class="network-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconActivity size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"Network & VPN Connections"</span>
                 </div>
                 <button
-                    style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                     title="Refresh network"
                     on:click=move |_| load_network()
                 >
@@ -77,7 +77,7 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -105,14 +105,14 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                         };
 
                         view! {
-                            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+                            <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span style="font-weight: 600; font-size: 12px; color: #f3f4f6; font-family: monospace;">{conn.name}</span>
-                                        <span style="background: rgba(255,255,255,0.06); font-size: 9px; padding: 1px 5px; border-radius: 3px; color: rgba(255,255,255,0.6);">
+                                        <span style="font-weight: 600; font-size: 12px; color: var(--text-bright); font-family: monospace;">{conn.name}</span>
+                                        <span style="background: var(--fill-subtle); font-size: 9px; padding: 1px 5px; border-radius: 3px; color: var(--text-second);">
                                             {kind_label}
                                         </span>
-                                        <span style=format!("font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: {}; color: {};", if is_active { "rgba(34,197,94,0.2)" } else { "rgba(156,163,175,0.2)" }, if is_active { "#4ade80" } else { "#9ca3af" })>
+                                        <span style=format!("font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: {}; color: {};", if is_active { "var(--ok-fill-strong)" } else { "rgba(156,163,175,0.2)" }, if is_active { "var(--ok)" } else { "#9ca3af" })>
                                             {if is_active { "CONNECTED" } else { "DISCONNECTED" }}
                                         </span>
                                     </div>
@@ -120,8 +120,8 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                                     <button
                                         style=format!(
                                             "border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer; background: {}; color: {};",
-                                            if is_active { "rgba(239,68,68,0.2)" } else { "rgba(34,197,94,0.2)" },
-                                            if is_active { "#f87171" } else { "#4ade80" }
+                                            if is_active { "var(--danger-fill-strong)" } else { "var(--ok-fill-strong)" },
+                                            if is_active { "var(--danger)" } else { "var(--ok)" }
                                         )
                                         on:click=move |_| toggle_connect(conn_id_btn.clone(), !is_active)
                                     >
@@ -130,21 +130,21 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                                 </div>
 
                                 // Connection IP Details
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 10px; font-family: monospace; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 10px; font-family: monospace; color: var(--text-strong); background: var(--bg-sunken); padding: 6px 8px; border-radius: 4px;">
                                     <div>
-                                        <span style="color: rgba(255,255,255,0.4);">"IP: "</span>
+                                        <span style="color: var(--text-faint);">"IP: "</span>
                                         <span>{conn.ip_address.unwrap_or_else(|| "—".to_owned())}</span>
                                     </div>
                                     <div>
-                                        <span style="color: rgba(255,255,255,0.4);">"Gateway: "</span>
+                                        <span style="color: var(--text-faint);">"Gateway: "</span>
                                         <span>{conn.gateway.unwrap_or_else(|| "—".to_owned())}</span>
                                     </div>
                                     <div>
-                                        <span style="color: rgba(255,255,255,0.4);">"DNS: "</span>
+                                        <span style="color: var(--text-faint);">"DNS: "</span>
                                         <span>{if conn.dns.is_empty() { "—".to_owned() } else { conn.dns.join(", ") }}</span>
                                     </div>
                                     <div>
-                                        <span style="color: rgba(255,255,255,0.4);">"Traffic: "</span>
+                                        <span style="color: var(--text-faint);">"Traffic: "</span>
                                         <span>{format!("↓ {} MB  ↑ {} MB", rx_mb, tx_mb)}</span>
                                     </div>
                                 </div>

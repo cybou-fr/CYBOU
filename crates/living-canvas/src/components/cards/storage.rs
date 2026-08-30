@@ -88,15 +88,15 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="storage-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
+        <div class="storage-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconFile size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"Storage & Btrfs Snapshots"</span>
                 </div>
                 <button
-                    style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                     title="Refresh storage"
                     on:click=move |_| load_storage()
                 >
@@ -107,7 +107,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -123,18 +123,18 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                 view! {
                     <div style="padding: 12px; display: flex; flex-direction: column; gap: 14px;">
                         // Storage Pool Capacity
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px;">
+                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
                                 <span style="font-weight: 600;">"Btrfs Pool Capacity"</span>
                                 <span style="font-family: monospace; color: #38bdf8;">{format!("{:.0} / {:.0} GB ({:.1}%)", used_gb, total_gb, pct)}</span>
                             </div>
-                            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                            <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;">
                                 <div style=format!("width: {}%; height: 100%; background: #38bdf8; border-radius: 3px;", pct.min(100.0)) />
                             </div>
                         </div>
 
                         // Subvolumes
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px;">
+                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">"Subvolumes"</div>
                             <div style="display: flex; flex-direction: column; gap: 6px;">
                                 {st.subvolumes.into_iter().map(|sub| {
@@ -144,13 +144,13 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                                     view! {
                                         <div
                                             style=move || format!(
-                                                "background: {}; border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; cursor: pointer;",
-                                                if is_sel() { "rgba(99, 102, 241, 0.2)" } else { "rgba(0,0,0,0.2)" }
+                                                "background: {}; border: 1px solid var(--fill-faintest); border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; cursor: pointer;",
+                                                if is_sel() { "var(--accent-fill-strong)" } else { "var(--bg-sunken)" }
                                             )
                                             on:click=move |_| signals.selected_subvolume.set(Some(path.clone()))
                                         >
-                                            <span style="font-family: monospace; font-weight: 600; color: #f3f4f6;">{sub.path}</span>
-                                            <span style="font-size: 10px; color: rgba(255,255,255,0.5);">{format!("ID {}", sub.id)}</span>
+                                            <span style="font-family: monospace; font-weight: 600; color: var(--text-bright);">{sub.path}</span>
+                                            <span style="font-size: 10px; color: var(--text-dim);">{format!("ID {}", sub.id)}</span>
                                         </div>
                                     }
                                 }).collect::<Vec<_>>()}
@@ -158,7 +158,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Create Snapshot Section
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px;">
+                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">"Create Point-in-Time Snapshot"</div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <input
@@ -166,10 +166,10 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                                     placeholder="Snapshot label..."
                                     prop:value=move || signals.new_snap_name.get()
                                     on:input=move |e| signals.new_snap_name.set(event_target_value(&e))
-                                    style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
+                                    style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
                                 />
                                 <button
-                                    style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 4px; padding: 4px 10px; font-size: 11px; color: #c7d2fe; font-weight: 600; cursor: pointer;"
+                                    style="background: var(--accent-fill-strong); border: 1px solid var(--accent-line-strong); border-radius: 4px; padding: 4px 10px; font-size: 11px; color: var(--accent-text); font-weight: 600; cursor: pointer;"
                                     on:click=move |_| trigger_create_snapshot()
                                 >
                                     "Snapshot"
@@ -178,7 +178,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Snapshots List
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px;">
+                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">
                                 {format!("Snapshots ({})", st.snapshots.len())}
                             </div>
@@ -187,15 +187,15 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                                     let snap_id = snap.id.clone();
                                     let size_mb = snap.size_bytes / (1024 * 1024);
                                     view! {
-                                        <div style="background: rgba(0,0,0,0.2); border-radius: 4px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+                                        <div style="background: var(--bg-sunken); border-radius: 4px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
                                             <div>
-                                                <div style="font-weight: 600; color: #f3f4f6; margin-bottom: 2px;">{snap.name}</div>
-                                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">
+                                                <div style="font-weight: 600; color: var(--text-bright); margin-bottom: 2px;">{snap.name}</div>
+                                                <div style="font-size: 10px; color: var(--text-faint); font-family: monospace;">
                                                     {format!("{} • {} MB • {}", snap.subvolume_path, size_mb, snap.timestamp)}
                                                 </div>
                                             </div>
                                             <button
-                                                style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #fbbf24; cursor: pointer;"
+                                                style="background: var(--caution-fill); border: 1px solid var(--caution-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--caution); cursor: pointer;"
                                                 title="Restore snapshot"
                                                 on:click=move |_| trigger_restore_snapshot(snap_id.clone())
                                             >

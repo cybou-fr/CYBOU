@@ -43,6 +43,52 @@
   --term-13: #cba6f7;
   --term-14: #94e2d5;
   --term-15: #e6e9ef;
+
+  /* The panel palette. Named for what each colour is for:
+     `--fill-subtle` survives a decision to make it warmer, where `--white-06` would have
+     to be renamed or start lying. Each value is the literal that was written at the call
+     sites it replaced, so this commit changes nothing on screen. */
+  --fill-faint: rgba(255,255,255,0.03); /* a row stripe, or a card inside a card */
+  --fill-subtle: rgba(255,255,255,0.06); /* a button or chip at rest */
+  --fill-hover: rgba(255,255,255,0.1); /* the same thing under the pointer */
+  --line: rgba(255,255,255,0.08); /* a divider between two things */
+  --line-strong: rgba(255,255,255,0.14); /* a divider that is also an edge */
+  --bg-sunken: rgba(0,0,0,0.2); /* a toolbar, set into the panel */
+  --bg-sunken-strong: rgba(0,0,0,0.3); /* an input, set into the toolbar */
+  --text-faint: rgba(255,255,255,0.4); /* a label nobody reads twice */
+  --text-dim: rgba(255,255,255,0.5); /* secondary text */
+  --text-second: rgba(255,255,255,0.6); /* text beside the main text */
+  --text-bright: #f3f4f6; /* the brightest text on the panel */
+  --danger: #f87171; /* something that failed, or would destroy */
+  --caution: #fbbf24; /* something that needs attention and has not failed */
+  --ok: #4ade80; /* something that is working */
+  --info: #60a5fa; /* something to know */
+  --accent-text: #c7d2fe; /* text on an accented surface */
+  --accent-fill: rgba(99, 102, 241, 0.15); /* an accented surface */
+  --accent-line: rgba(99, 102, 241, 0.3); /* its edge */
+  --accent-solid: #6366f1; /* the accent itself */
+
+  /* Tinted surfaces. One shape repeated: a status colour at low alpha as a surface,
+     the same colour higher as its edge. Four families, so a theme changes the meaning
+     of "this failed" in one place rather than in ninety style attributes. */
+  --fill-faintest: rgba(255,255,255,0.05); /* a stripe quieter than --fill-faint */
+  --text-strong: rgba(255,255,255,0.7); /* text that has to be read */
+  --text-pure: #ffffff; /* the one text colour with no tint in it */
+  --accent-light: #818cf8; /* the accent, lightened for text on a dark panel */
+  --accent-fill-strong: rgba(99, 102, 241, 0.2); /* an accented surface under the pointer */
+  --accent-line-strong: rgba(99, 102, 241, 0.4); /* its edge, when it is also a control */
+  --danger-fill: rgba(239, 68, 68, 0.15); /* something that failed, as a surface */
+  --danger-fill-strong: rgba(239, 68, 68, 0.2); /* the same, under the pointer */
+  --danger-line: rgba(239, 68, 68, 0.3); /* its edge */
+  --caution-fill: rgba(245, 158, 11, 0.15); /* something that wants attention, as a surface */
+  --caution-fill-strong: rgba(245, 158, 11, 0.2); /* the same, under the pointer */
+  --caution-line: rgba(245, 158, 11, 0.3); /* its edge */
+  --ok-fill: rgba(34, 197, 94, 0.15); /* something that is working, as a surface */
+  --ok-fill-strong: rgba(34, 197, 94, 0.2); /* the same, under the pointer */
+  --ok-line: rgba(34, 197, 94, 0.3); /* its edge */
+  --info-fill: rgba(59, 130, 246, 0.15); /* something to know, as a surface */
+  --info-fill-strong: rgba(59, 130, 246, 0.2); /* the same, under the pointer */
+  --info-line: rgba(59, 130, 246, 0.3); /* its edge */
 }
 
 * { box-sizing: border-box; }
@@ -3961,4 +4007,72 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   text-decoration: line-through;
   text-decoration-color: rgba(248, 113, 113, 0.8);
   cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------------------------
+   A light desktop.
+
+   Only the tokens are redefined, which is the point of the previous commit and this one: the
+   panels are unchanged and 800-odd colour literals no longer have to be found and edited to make
+   this possible. Behind `prefers-color-scheme` and overridable by an explicit choice, because a
+   person who has set one has said something and the system preference is only a guess about them.
+   -------------------------------------------------------------------------------------------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color: #10151c;
+    background: #eef1f5;
+
+    --muted: #4a5768;
+    --surface: rgba(255, 255, 255, 0.9);
+    --border: rgba(16, 21, 28, 0.18);
+
+    --bg-card: #ffffff;
+    --text-main: #10151c;
+    --text-muted: #55606f;
+    --text-bright: #05080c;
+    --text-second: rgba(16, 21, 28, 0.72);
+    --text-dim: rgba(16, 21, 28, 0.58);
+    --text-faint: rgba(16, 21, 28, 0.45);
+
+    --fill-faint: rgba(16, 21, 28, 0.03);
+    --fill-subtle: rgba(16, 21, 28, 0.06);
+    --fill-hover: rgba(16, 21, 28, 0.1);
+    --line: rgba(16, 21, 28, 0.12);
+    --line-strong: rgba(16, 21, 28, 0.2);
+    --bg-sunken: rgba(16, 21, 28, 0.04);
+    --bg-sunken-strong: rgba(16, 21, 28, 0.07);
+
+    /* Kept legible on white rather than merely darker: the same hue at the same lightness on a
+       light panel is the one that disappears. */
+    --danger: #c0362c;
+    --caution: #8a5a00;
+    --ok: #1a7f45;
+    --info: #1f5fbf;
+    --accent-text: #2f3aa8;
+    --accent-fill: rgba(99, 102, 241, 0.12);
+    --accent-line: rgba(99, 102, 241, 0.35);
+
+    --fill-faintest: rgba(16, 21, 28, 0.02);
+    --text-strong: rgba(16, 21, 28, 0.82);
+    --text-pure: #000000;
+    --accent-light: #3b45c4;
+    --accent-fill-strong: rgba(99, 102, 241, 0.18);
+    --accent-line-strong: rgba(99, 102, 241, 0.5);
+    --danger-fill: rgba(192, 54, 44, 0.1);
+    --danger-fill-strong: rgba(192, 54, 44, 0.16);
+    --danger-line: rgba(192, 54, 44, 0.35);
+    --caution-fill: rgba(138, 90, 0, 0.1);
+    --caution-fill-strong: rgba(138, 90, 0, 0.16);
+    --caution-line: rgba(138, 90, 0, 0.35);
+    --ok-fill: rgba(26, 127, 69, 0.1);
+    --ok-fill-strong: rgba(26, 127, 69, 0.16);
+    --ok-line: rgba(26, 127, 69, 0.35);
+    --info-fill: rgba(31, 95, 191, 0.1);
+    --info-fill-strong: rgba(31, 95, 191, 0.16);
+    --info-line: rgba(31, 95, 191, 0.35);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }

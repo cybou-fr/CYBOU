@@ -121,21 +121,21 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="notes-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
+        <div class="notes-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"Notes & Knowledge Snippets"</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button
-                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                        style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
                         on:click=move |_| new_note()
                     >
                         "+ New Note"
                     </button>
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh notes"
                         on:click=move |_| load_notes()
                     >
@@ -147,7 +147,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -156,21 +156,21 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
 
             <div style="display: flex; flex: 1; overflow: hidden;">
                 // Notes Sidebar List
-                <div style="width: 200px; border-right: 1px solid rgba(255,255,255,0.08); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.15);">
+                <div style="width: 200px; border-right: 1px solid var(--line); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.15);">
                     {move || signals.notes.get().into_iter().map(|n| {
                         let n_sel = n.clone();
                         let n_click = n.clone();
                         let is_sel = move || signals.selected_note_id.get().as_ref() == Some(&n_sel.id);
                         view! {
                             <div
-                                style=move || format!("padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; background: {}; border: 1px solid {};", if is_sel() { "rgba(99, 102, 241, 0.2)" } else { "transparent" }, if is_sel() { "rgba(99, 102, 241, 0.4)" } else { "transparent" })
+                                style=move || format!("padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; background: {}; border: 1px solid {};", if is_sel() { "var(--accent-fill-strong)" } else { "transparent" }, if is_sel() { "var(--accent-line-strong)" } else { "transparent" })
                                 on:click=move |_| select_note(n_click.clone())
                             >
-                                <div style="font-weight: 600; color: #f3f4f6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <div style="font-weight: 600; color: var(--text-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                     {if n.is_pinned { "📌 " } else { "" }}
                                     {n.title}
                                 </div>
-                                <div style="font-size: 9px; color: rgba(255,255,255,0.4); margin-top: 2px;">
+                                <div style="font-size: 9px; color: var(--text-faint); margin-top: 2px;">
                                     {n.updated_at}
                                 </div>
                             </div>
@@ -186,7 +186,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                             placeholder="Note Title..."
                             prop:value=move || signals.edit_title.get()
                             on:input=move |e| signals.edit_title.set(event_target_value(&e))
-                            style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 8px; font-size: 12px; font-weight: 600; color: inherit;"
+                            style="flex: 1; background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 6px 8px; font-size: 12px; font-weight: 600; color: inherit;"
                         />
                         <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer;">
                             <input
@@ -203,19 +203,19 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                         placeholder="Tags (comma-separated, e.g. architecture, canvas)..."
                         prop:value=move || signals.edit_tags.get()
                         on:input=move |e| signals.edit_tags.set(event_target_value(&e))
-                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: rgba(255,255,255,0.8);"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: rgba(255,255,255,0.8);"
                     />
 
                     <textarea
                         placeholder="Write Markdown notes here..."
                         prop:value=move || signals.edit_content.get()
                         on:input=move |e| signals.edit_content.set(event_target_value(&e))
-                        style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 8px; font-size: 11px; font-family: monospace; color: inherit; resize: none;"
+                        style="flex: 1; background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 8px; font-size: 11px; font-family: monospace; color: inherit; resize: none;"
                     />
 
                     <div style="display: flex; justify-content: flex-end;">
                         <button
-                            style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                            style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
                             on:click=move |_| trigger_save()
                         >
                             "Save Note"

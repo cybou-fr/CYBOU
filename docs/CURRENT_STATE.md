@@ -1102,6 +1102,17 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   A card with no component of its own is now drawn by the generic frame, and which kinds have
   one is a question the card answers about itself, so it is checked on the native target rather
   than being a fact about a file somebody has to remember.
+- **The desktop has a palette rather than 886 colour literals**: colours were written into Rust
+  source at the call site, 886 of them against five tokens, and the two tokens components asked
+  for most — `--bg-card` and `--text-main` — were never defined at all, so every one of their
+  forty-three call sites drew its fallback. A fallback is exactly what a theme cannot change.
+  Forty tokens now carry what was repeated, named for what each colour is for rather than what
+  it is: `--fill-subtle` survives a decision to make it warmer, where `--white-06` would have to
+  be renamed or start lying. Each was set to the literal it replaced, so the change is invisible
+  on screen and 738 of the 886 literals are gone. A light desktop follows from redefining the
+  tokens under `prefers-color-scheme`, and is deliberately overridable by an explicit choice: a
+  person who has set one has said something, and the system preference is only a guess about
+  them. What remains in source is one-off colour, not repetition.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **Command Palette & Omnibar Navigation**: Unified desktop action launcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>) with real-time fuzzy search, keyboard selection cycling (<kbd>↑</kbd>/<kbd>↓</kbd>), <kbd>Enter</kbd> execution, Ask CYBOU cognitive question answering, shortcut badges, and automatic uncollapse/bring-forward card focusing.
 - **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. `SubjectRef` is the canonical primitive for new cross-panel entity references; migration of existing interactions is incomplete.

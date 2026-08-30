@@ -75,21 +75,21 @@ pub fn MailContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="mail-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
+        <div class="mail-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"Personal Mail & Messages"</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button
-                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                        style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
                         on:click=move |_| signals.is_composing.update(|c| *c = !*c)
                     >
                         {move || if signals.is_composing.get() { "Cancel" } else { "Compose" }}
                     </button>
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh mail"
                         on:click=move |_| load_mail()
                     >
@@ -101,7 +101,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -117,24 +117,24 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                             placeholder="To (comma separated emails)..."
                             prop:value=move || signals.compose_to.get()
                             on:input=move |e| signals.compose_to.set(event_target_value(&e))
-                            style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: inherit;"
+                            style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: inherit;"
                         />
                         <input
                             type="text"
                             placeholder="Subject..."
                             prop:value=move || signals.compose_subject.get()
                             on:input=move |e| signals.compose_subject.set(event_target_value(&e))
-                            style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: inherit;"
+                            style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: inherit;"
                         />
                         <textarea
                             placeholder="Message body (markdown supported)..."
                             prop:value=move || signals.compose_body.get()
                             on:input=move |e| signals.compose_body.set(event_target_value(&e))
                             rows="8"
-                            style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 8px; font-size: 11px; font-family: inherit; color: inherit; resize: vertical; flex: 1;"
+                            style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 8px; font-size: 11px; font-family: inherit; color: inherit; resize: vertical; flex: 1;"
                         />
                         <button
-                            style="align-self: flex-end; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                            style="align-self: flex-end; background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
                             on:click=move |_| trigger_send()
                         >
                             "Send Email"
@@ -151,15 +151,15 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                                     let msg_clone = msg.clone();
                                     view! {
                                         <div
-                                            style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 8px 10px; cursor: pointer; transition: background 0.15s ease;"
+                                            style="background: var(--bg-sunken); border: 1px solid var(--fill-subtle); border-radius: 4px; padding: 8px 10px; cursor: pointer; transition: background 0.15s ease;"
                                             on:click=move |_| signals.selected_message.set(Some(msg_clone.clone()))
                                         >
                                             <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
-                                                <span style="font-weight: 600; color: #f3f4f6;">{msg.from}</span>
-                                                <span style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">{msg.timestamp}</span>
+                                                <span style="font-weight: 600; color: var(--text-bright);">{msg.from}</span>
+                                                <span style="font-size: 10px; color: var(--text-faint); font-family: monospace;">{msg.timestamp}</span>
                                             </div>
-                                            <div style="font-weight: 600; font-size: 12px; color: #c7d2fe; margin-top: 2px;">{msg.subject}</div>
-                                            <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            <div style="font-weight: 600; font-size: 12px; color: var(--accent-text); margin-top: 2px;">{msg.subject}</div>
+                                            <div style="font-size: 10px; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                                 {msg.preview}
                                             </div>
                                         </div>
@@ -171,22 +171,22 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                         // Selected Message Detail Pane
                         {move || signals.selected_message.get().map(|msg| {
                             view! {
-                                <div style="flex: 1; border-left: 1px solid rgba(255,255,255,0.08); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.1);">
+                                <div style="flex: 1; border-left: 1px solid var(--line); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.1);">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                         <div>
-                                            <div style="font-weight: 700; font-size: 13px; color: #f3f4f6;">{msg.subject}</div>
-                                            <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 2px;">
+                                            <div style="font-weight: 700; font-size: 13px; color: var(--text-bright);">{msg.subject}</div>
+                                            <div style="font-size: 11px; color: var(--text-second); margin-top: 2px;">
                                                 {format!("From: {} • To: {}", msg.from, msg.to.join(", "))}
                                             </div>
                                         </div>
                                         <button
-                                            style="background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 12px;"
+                                            style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px;"
                                             on:click=move |_| signals.selected_message.set(None)
                                         >
                                             "✕"
                                         </button>
                                     </div>
-                                    <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; color: #e0e0e0;">
+                                    <div style="border-top: 1px solid var(--fill-subtle); padding-top: 8px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; color: var(--text-main);">
                                         {msg.body}
                                     </div>
                                 </div>

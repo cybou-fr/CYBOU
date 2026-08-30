@@ -104,16 +104,16 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
     };
 
     view! {
-        <div class="processes-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="processes-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif;">
             // Header summary
-            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-weight: 600; font-size: 13px;">"Process Manager"</span>
-                        <span style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 8px;">
+                        <span style="font-size: 11px; background: var(--fill-subtle); padding: 2px 6px; border-radius: 8px;">
                             {move || format!("{} Processes", signals.processes.get().len())}
                         </span>
-                        <span style="font-size: 11px; color: #818cf8; font-weight: 600;">
+                        <span style="font-size: 11px; color: var(--accent-light); font-weight: 600;">
                             {move || format!("CPU: {}", total_cpu())}
                         </span>
                         <span style="font-size: 11px; color: #38bdf8; font-weight: 600;">
@@ -122,7 +122,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                     </div>
 
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh processes"
                         on:click=move |_| load_processes()
                     >
@@ -133,11 +133,11 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                 // Search & Sort bar
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                     <div style="display: flex; gap: 4px; align-items: center;">
-                        <span style="font-size: 10px; color: rgba(255,255,255,0.5);">"Sort:"</span>
+                        <span style="font-size: 10px; color: var(--text-dim);">"Sort:"</span>
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 10px; padding: 2px 6px; border-radius: 4px; color: inherit; cursor: pointer;",
-                                if signals.sort_by.get() == "cpu" { "#6366f1" } else { "rgba(255,255,255,0.06)" }
+                                if signals.sort_by.get() == "cpu" { "var(--accent-solid)" } else { "var(--fill-subtle)" }
                             )
                             on:click=move |_| signals.sort_by.set("cpu".to_owned())
                         >
@@ -146,7 +146,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 10px; padding: 2px 6px; border-radius: 4px; color: inherit; cursor: pointer;",
-                                if signals.sort_by.get() == "memory" { "#6366f1" } else { "rgba(255,255,255,0.06)" }
+                                if signals.sort_by.get() == "memory" { "var(--accent-solid)" } else { "var(--fill-subtle)" }
                             )
                             on:click=move |_| signals.sort_by.set("memory".to_owned())
                         >
@@ -155,7 +155,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 10px; padding: 2px 6px; border-radius: 4px; color: inherit; cursor: pointer;",
-                                if signals.sort_by.get() == "pid" { "#6366f1" } else { "rgba(255,255,255,0.06)" }
+                                if signals.sort_by.get() == "pid" { "var(--accent-solid)" } else { "var(--fill-subtle)" }
                             )
                             on:click=move |_| signals.sort_by.set("pid".to_owned())
                         >
@@ -164,7 +164,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                         <button
                             style=move || format!(
                                 "background: {}; border: none; font-size: 10px; padding: 2px 6px; border-radius: 4px; color: inherit; cursor: pointer;",
-                                if signals.sort_by.get() == "name" { "#6366f1" } else { "rgba(255,255,255,0.06)" }
+                                if signals.sort_by.get() == "name" { "var(--accent-solid)" } else { "var(--fill-subtle)" }
                             )
                             on:click=move |_| signals.sort_by.set("name".to_owned())
                         >
@@ -177,7 +177,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                         placeholder="Filter processes..."
                         prop:value=move || signals.search_query.get()
                         on:input=move |e| signals.search_query.set(event_target_value(&e))
-                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: inherit; width: 130px;"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: inherit; width: 130px;"
                     />
                 </div>
             </div>
@@ -185,7 +185,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -193,7 +193,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
             })}
 
             // Process Table Header
-            <div style="display: grid; grid-template-columns: 60px 1fr 70px 75px 65px 90px; padding: 6px 12px; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase;">
+            <div style="display: grid; grid-template-columns: 60px 1fr 70px 75px 65px 90px; padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--text-faint); border-bottom: 1px solid var(--fill-faintest); text-transform: uppercase;">
                 <span>"PID"</span>
                 <span>"Process"</span>
                 <span>"User"</span>
@@ -215,15 +215,15 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
 
                         view! {
                             <div
-                                style="display: grid; grid-template-columns: 60px 1fr 70px 75px 65px 90px; align-items: center; padding: 6px 12px; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.1s ease;"
+                                style="display: grid; grid-template-columns: 60px 1fr 70px 75px 65px 90px; align-items: center; padding: 6px 12px; font-size: 11px; border-bottom: 1px solid var(--fill-faint); transition: background 0.1s ease;"
                                 class="proc-row"
                             >
-                                <span style="font-family: monospace; color: rgba(255,255,255,0.5);">{pid}</span>
-                                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #f3f4f6;" title=p.cmdline.clone()>
+                                <span style="font-family: monospace; color: var(--text-dim);">{pid}</span>
+                                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text-bright);" title=p.cmdline.clone()>
                                     {name}
                                 </div>
-                                <span style="color: rgba(255,255,255,0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{p.user}</span>
-                                <span style={if p.cpu_percent > 2.0 { "text-align: right; font-family: monospace; color: #818cf8; font-weight: 600;" } else { "text-align: right; font-family: monospace; color: inherit; font-weight: normal;" }}>
+                                <span style="color: var(--text-second); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{p.user}</span>
+                                <span style={if p.cpu_percent > 2.0 { "text-align: right; font-family: monospace; color: var(--accent-light); font-weight: 600;" } else { "text-align: right; font-family: monospace; color: inherit; font-weight: normal;" }}>
                                     {format!("{:.1}%", p.cpu_percent)}
                                 </span>
                                 <span style="text-align: right; font-family: monospace; color: rgba(255,255,255,0.8);">
@@ -231,14 +231,14 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                                 </span>
                                 <div style="display: flex; justify-content: flex-end; gap: 4px;">
                                     <button
-                                        style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 3px; padding: 2px 5px; font-size: 9px; color: #f87171; cursor: pointer;"
+                                        style="background: var(--danger-fill); border: 1px solid var(--danger-line); border-radius: 3px; padding: 2px 5px; font-size: 9px; color: var(--danger); cursor: pointer;"
                                         title="Send SIGTERM"
                                         on:click=move |_| send_signal(pid, ProcessSignal::Terminate)
                                     >
                                         "Term"
                                     </button>
                                     <button
-                                        style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 3px; padding: 2px 4px; font-size: 9px; color: #818cf8; cursor: pointer;"
+                                        style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 3px; padding: 2px 4px; font-size: 9px; color: var(--accent-light); cursor: pointer;"
                                         title="Inspect in Universal Inspector"
                                         on:click=move |_| inspect_process(pid, name_inspect.clone())
                                     >
@@ -252,7 +252,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
 
                 {move || if sorted_and_filtered().is_empty() {
                     Some(view! {
-                        <div style="text-align: center; color: rgba(255,255,255,0.4); padding: 32px 16px; font-size: 12px;">
+                        <div style="text-align: center; color: var(--text-faint); padding: 32px 16px; font-size: 12px;">
                             "No processes matching filter."
                         </div>
                     })

@@ -40,9 +40,9 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="event-journal-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
+        <div class="event-journal-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconLayers size=16 />
                     <span style="font-weight: 600; font-size: 13px;">"Canonical Event1 Journal"</span>
@@ -53,10 +53,10 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                         placeholder="Search event log..."
                         prop:value=move || signals.search_query.get()
                         on:input=move |e| signals.search_query.set(event_target_value(&e))
-                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; width: 140px;"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; width: 140px;"
                     />
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh journal"
                         on:click=move |_| load_journal()
                     >
@@ -68,7 +68,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -83,29 +83,29 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                         .filter(|e| q.is_empty() || e.summary.to_lowercase().contains(&q) || e.event_type.to_lowercase().contains(&q) || e.origin_organ.to_lowercase().contains(&q))
                         .map(|entry| {
                             let (badge_bg, badge_fg) = match entry.origin_organ.as_str() {
-                                "actiond" => ("rgba(99, 102, 241, 0.2)", "#818cf8"),
+                                "actiond" => ("var(--accent-fill-strong)", "var(--accent-light)"),
                                 "agentd" => ("rgba(236, 72, 153, 0.2)", "#f472b6"),
-                                "securityd" => ("rgba(239, 68, 68, 0.2)", "#f87171"),
+                                "securityd" => ("var(--danger-fill-strong)", "var(--danger)"),
                                 _ => ("rgba(16, 185, 129, 0.2)", "#34d399"),
                             };
 
                             view! {
-                                <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
+                                <div style="background: var(--bg-sunken); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
                                         <div style="display: flex; align-items: center; gap: 6px;">
                                             <span style=format!("font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: {}; color: {}; text-transform: uppercase;", badge_bg, badge_fg)>
                                                 {entry.origin_organ}
                                             </span>
-                                            <span style="font-weight: 700; color: #f3f4f6;">{entry.event_type}</span>
+                                            <span style="font-weight: 700; color: var(--text-bright);">{entry.event_type}</span>
                                         </div>
-                                        <span style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">
+                                        <span style="font-size: 10px; color: var(--text-faint); font-family: monospace;">
                                             {entry.timestamp}
                                         </span>
                                     </div>
-                                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 2px;">
+                                    <div style="font-size: 12px; color: var(--text-main); margin-top: 2px;">
                                         {entry.summary}
                                     </div>
-                                    <div style="font-size: 10px; font-family: monospace; color: rgba(255,255,255,0.5); background: rgba(0,0,0,0.25); padding: 4px 6px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 10px; font-family: monospace; color: var(--text-dim); background: rgba(0,0,0,0.25); padding: 4px 6px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                         {entry.payload_preview}
                                     </div>
                                 </div>

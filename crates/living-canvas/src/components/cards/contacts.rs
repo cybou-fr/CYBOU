@@ -94,9 +94,9 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="contacts-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
+        <div class="contacts-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"Contacts & Cognitive Subjects"</span>
                 </div>
@@ -108,7 +108,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                         {move || if signals.is_creating.get() { "Cancel" } else { "+ Contact" }}
                     </button>
                     <button
-                        style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                         title="Refresh contacts"
                         on:click=move |_| load_contacts()
                     >
@@ -120,7 +120,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -130,21 +130,21 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
             <div style="padding: 12px; display: flex; flex-direction: column; gap: 12px;">
                 // Create Contact Form
                 <Show when=move || signals.is_creating.get()>
-                    <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--fill-hover); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                         <div style="display: flex; gap: 6px;">
                             <input
                                 type="text"
                                 placeholder="Full Name..."
                                 prop:value=move || signals.new_name.get()
                                 on:input=move |e| signals.new_name.set(event_target_value(&e))
-                                style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
+                                style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
                             />
                             <input
                                 type="text"
                                 placeholder="Email..."
                                 prop:value=move || signals.new_email.get()
                                 on:input=move |e| signals.new_email.set(event_target_value(&e))
-                                style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
+                                style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
                             />
                         </div>
                         <div style="display: flex; gap: 6px;">
@@ -153,14 +153,14 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                                 placeholder="Role..."
                                 prop:value=move || signals.new_role.get()
                                 on:input=move |e| signals.new_role.set(event_target_value(&e))
-                                style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
+                                style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
                             />
                             <input
                                 type="text"
                                 placeholder="Organization..."
                                 prop:value=move || signals.new_org.get()
                                 on:input=move |e| signals.new_org.set(event_target_value(&e))
-                                style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
+                                style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; flex: 1;"
                             />
                         </div>
                         <input
@@ -168,7 +168,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                             placeholder="Tags (comma-separated)..."
                             prop:value=move || signals.new_tags.get()
                             on:input=move |e| signals.new_tags.set(event_target_value(&e))
-                            style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: inherit;"
+                            style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: inherit;"
                         />
                         <button
                             style="align-self: flex-end; background: #ec4899; border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
@@ -183,19 +183,19 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px;">
                     {move || signals.contacts.get().into_iter().map(|c| {
                         view! {
-                            <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
-                                <div style="font-weight: 700; font-size: 12px; color: #f3f4f6;">{c.name}</div>
+                            <div style="background: var(--bg-sunken); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
+                                <div style="font-weight: 700; font-size: 12px; color: var(--text-bright);">{c.name}</div>
                                 <div style="font-size: 10px; color: #c084fc;">
                                     {format!("{} • {}", c.role, c.organization)}
                                 </div>
-                                <div style="font-size: 10px; color: rgba(255,255,255,0.6); font-family: monospace;">
+                                <div style="font-size: 10px; color: var(--text-second); font-family: monospace;">
                                     {c.email}
                                 </div>
                                 {if !c.tags.is_empty() {
                                     view! {
                                         <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
                                             {c.tags.into_iter().map(|t| view! {
-                                                <span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7);">
+                                                <span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; background: var(--fill-subtle); color: var(--text-strong);">
                                                     {format!("#{t}")}
                                                 </span>
                                             }).collect::<Vec<_>>()}

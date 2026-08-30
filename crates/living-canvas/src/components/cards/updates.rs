@@ -54,15 +54,15 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="updates-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card, #1e1e24); color: var(--text-main, #e0e0e0); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
+        <div class="updates-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconRefresh size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"System & Kernel Updates"</span>
                 </div>
                 <button
-                    style="background: rgba(255,255,255,0.06); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
                     title="Check for updates"
                     on:click=move |_| load_updates()
                 >
@@ -73,7 +73,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
             // Status message toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.3); display: flex; justify-content: space-between;">
+                    <div style="background: var(--accent-fill); color: var(--accent-text); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--accent-line); display: flex; justify-content: space-between;">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>
@@ -88,10 +88,10 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                 view! {
                     <div style="padding: 12px; display: flex; flex-direction: column; gap: 14px;">
                         // Status Card
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
                             <div>
                                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                    <span style={if has_updates { "font-weight: 700; font-size: 14px; color: #fbbf24;" } else { "font-weight: 700; font-size: 14px; color: #4ade80;" }}>
+                                    <span style={if has_updates { "font-weight: 700; font-size: 14px; color: var(--caution);" } else { "font-weight: 700; font-size: 14px; color: var(--ok);" }}>
                                         {if has_updates {
                                             format!("{} Updates Pending", summary.pending_count)
                                         } else {
@@ -100,7 +100,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                                     </span>
                                     {if summary.security_updates_count > 0 {
                                         Some(view! {
-                                            <span style="background: rgba(239,68,68,0.2); color: #f87171; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;">
+                                            <span style="background: var(--danger-fill-strong); color: var(--danger); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;">
                                                 {format!("{} Security", summary.security_updates_count)}
                                             </span>
                                         })
@@ -117,7 +117,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                                         None
                                     }}
                                 </div>
-                                <div style="font-size: 11px; color: rgba(255,255,255,0.6);">
+                                <div style="font-size: 11px; color: var(--text-second);">
                                     {if has_updates {
                                         format!("Download payload: ~{} MB • Reboot required: {}", download_mb, if summary.reboot_required { "Yes" } else { "No" })
                                     } else {
@@ -129,7 +129,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                             {if has_updates {
                                 Some(view! {
                                     <button
-                                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 700; color: #fff; cursor: pointer; box-shadow: 0 2px 8px rgba(99,102,241,0.3);"
+                                        style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 700; color: #fff; cursor: pointer; box-shadow: 0 2px 8px var(--accent-line);"
                                         on:click=move |_| apply_all_updates()
                                     >
                                         "Apply All Updates"
@@ -144,14 +144,14 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                         {if has_updates {
                             Some(view! {
                                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                                    <div style="font-weight: 600; font-size: 11px; color: rgba(255,255,255,0.5);">"Pending Updates List"</div>
+                                    <div style="font-weight: 600; font-size: 11px; color: var(--text-dim);">"Pending Updates List"</div>
                                     {summary.packages.into_iter().map(|pkg| {
                                         let size_mb = pkg.download_size_bytes.unwrap_or(0) / (1024 * 1024);
                                         view! {
-                                            <div style="background: rgba(0,0,0,0.2); border-radius: 4px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+                                            <div style="background: var(--bg-sunken); border-radius: 4px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
                                                 <div>
-                                                    <div style="font-weight: 600; color: #f3f4f6; margin-bottom: 2px;">{pkg.name}</div>
-                                                    <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">
+                                                    <div style="font-weight: 600; color: var(--text-bright); margin-bottom: 2px;">{pkg.name}</div>
+                                                    <div style="font-size: 10px; color: var(--text-faint); font-family: monospace;">
                                                         {format!("v{} → v{} • {} MB • {}", pkg.installed_version.as_deref().unwrap_or("?"), pkg.candidate_version.as_deref().unwrap_or("latest"), size_mb, pkg.repository)}
                                                     </div>
                                                 </div>
