@@ -18,14 +18,62 @@ use crate::{
     components::{
         card_frame::CardFrame,
         icons::{
-            IconArrowLeft, IconBot, IconCopy, IconEdit, IconFile, IconFolder, IconFolderPlus,
-            IconHome, IconPlus, IconRefresh, IconSearch, IconShield, IconTrash,
+            IconArrowLeft, IconBot, IconCopy, IconDownload, IconEdit, IconFile, IconFolder,
+            IconFolderPlus, IconHome, IconPlus, IconRefresh, IconSearch, IconShield, IconTrash,
+            IconUpload,
         },
     },
     interaction::{DragState, ResizeState},
     state::RuntimeState,
     tool_state::ToolCardStates,
 };
+
+/// The bytes of a file the person picked.
+///
+/// `File` inherits `arrayBuffer` from `Blob`, and that promise is the only way to see the bytes:
+/// the browser hands out a handle, not the contents.
+async fn read_picked_file(file: &web_sys::File) -> Result<Vec<u8>, String> {
+    let buffer = wasm_bindgen_futures::JsFuture::from(file.array_buffer())
+        .await
+        .map_err(|_| "the browser would not read it".to_owned())?;
+
+    Ok(js_sys::Uint8Array::new(&buffer).to_vec())
+}
+
+/// Hand bytes to the browser to save, under a name.
+///
+/// The object URL is revoked immediately after the click. It is a reference into this document's
+/// memory, and one left behind holds the whole file for as long as the desktop is open — which,
+/// for a desktop, is until the person closes the tab.
+fn save_bytes_to_disk(file_name: &str, bytes: &[u8]) -> Result<(), String> {
+    use wasm_bindgen::JsCast as _;
+
+    let parts = js_sys::Array::new();
+    parts.push(&js_sys::Uint8Array::from(bytes).buffer());
+
+    let blob = web_sys::Blob::new_with_u8_array_sequence(&parts)
+        .map_err(|_| "the browser refused the contents".to_owned())?;
+    let url = web_sys::Url::create_object_url_with_blob(&blob)
+        .map_err(|_| "the browser refused to name the contents".to_owned())?;
+
+    let result = (|| {
+        let document = web_sys::window()
+            .and_then(|window| window.document())
+            .ok_or_else(|| "there is no document to save from".to_owned())?;
+        let anchor: web_sys::HtmlAnchorElement = document
+            .create_element("a")
+            .map_err(|_| "the browser refused a link".to_owned())?
+            .dyn_into()
+            .map_err(|_| "the browser refused a link".to_owned())?;
+        anchor.set_href(&url);
+        anchor.set_download(file_name);
+        anchor.click();
+        Ok(())
+    })();
+
+    let _ = web_sys::Url::revoke_object_url(&url);
+    result
+}
 
 /// File Manager domain content presentation.
 #[component]
@@ -267,6 +315,82 @@ pub fn FileManagerContent(
                 };
                 load_dir(parent);
             }
+        }
+    };
+
+    // Transfers exist for the sandbox only. The home and agent-workspace domains are served by
+    // their own owner, which carries bounded UTF-8 reads and no byte transfer, so a Download button
+    // there would be a button that always fails. It is absent rather than disabled-and-unexplained.
+    let transfers_available = move || active_category.get() == LocationCategory::Sandbox;
+
+    let upload_input: NodeRef<leptos::html::Input> = NodeRef::new();
+
+    let download_file = move |name: String| {
+        let cur = current_path.get_untracked();
+        let full_path = if cur == "/" {
+            format!("/{name}")
+        } else {
+            format!("{cur}/{name}")
+        };
+        action_message.set(Some(format!("Downloading {name}…")));
+
+        spawn_local(async move {
+            match GatewayMindClient.download_file(&full_path).await {
+                Ok(bytes) => match save_bytes_to_disk(&name, &bytes) {
+                    Ok(()) => action_message.set(Some(format!("Downloaded {name}"))),
+                    // The bytes arrived and the browser would not take them. Saying "downloaded"
+                    // here would be reporting the half that worked as the whole.
+                    Err(reason) => error_msg.set(Some(format!("{name} could not be saved: {reason}"))),
+                },
+                Err(err) => error_msg.set(Some(format!("{name} could not be read: {err}"))),
+            }
+        });
+    };
+
+    let upload_files = move |files: web_sys::FileList| {
+        let cur = current_path.get_untracked();
+
+        for index in 0..files.length() {
+            let Some(file) = files.get(index) else {
+                continue;
+            };
+            let name = file.name();
+            let full_path = if cur == "/" {
+                format!("/{name}")
+            } else {
+                format!("{cur}/{name}")
+            };
+            let reload_dir = cur.clone();
+
+            spawn_local(async move {
+                let bytes = match read_picked_file(&file).await {
+                    Ok(bytes) => bytes,
+                    Err(reason) => {
+                        error_msg.set(Some(format!("{name} could not be read: {reason}")));
+                        return;
+                    }
+                };
+
+                let request = cybou_web_contracts::FileUploadRequest {
+                    path: full_path,
+                    content_base64: {
+                        use base64::Engine as _;
+                        base64::engine::general_purpose::STANDARD.encode(&bytes)
+                    },
+                };
+                match GatewayMindClient.upload_file(&request).await {
+                    Ok(_) => {
+                        action_message.set(Some(format!("Uploaded {name}")));
+                        load_dir(reload_dir);
+                    }
+                    Err(crate::ClientError::FileAlreadyExists) => {
+                        error_msg.set(Some(format!(
+                            "{name} already exists here and was not replaced"
+                        )));
+                    }
+                    Err(err) => error_msg.set(Some(format!("{name} was not uploaded: {err}"))),
+                }
+            });
         }
     };
 
@@ -687,6 +811,36 @@ pub fn FileManagerContent(
                                     <IconFolderPlus size=12 />
                                     <span>"New Folder"</span>
                                 </button>
+                                <Show when=transfers_available>
+                                    <button
+                                        class="fm-btn"
+                                        title="Upload files into this folder"
+                                        on:click=move |_| {
+                                            if let Some(input) = upload_input.get() {
+                                                input.click();
+                                            }
+                                        }
+                                    >
+                                        <IconUpload size=12 />
+                                        <span>"Upload"</span>
+                                    </button>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        class="fm-upload-input"
+                                        node_ref=upload_input
+                                        on:change=move |event| {
+                                            let input: web_sys::HtmlInputElement = event_target(&event);
+                                            if let Some(files) = input.files() {
+                                                upload_files(files);
+                                            }
+                                            // Cleared so picking the same file twice fires change
+                                            // again. Without this a failed upload cannot be retried
+                                            // from the picker.
+                                            input.set_value("");
+                                        }
+                                    />
+                                </Show>
                             </div>
                         </div>
 
@@ -986,7 +1140,22 @@ pub fn FileManagerContent(
                                                     {
                                                         let n_rename = n_menu.clone();
                                                         let n_delete = n_menu.clone();
+                                                        let n_download = n_menu.clone();
                                                         view! {
+                                                            <Show when=move || !is_dir && transfers_available()>
+                                                                {
+                                                                    let n_download = n_download.clone();
+                                                                    view! {
+                                                                        <button
+                                                                            class="fm-item-action-btn"
+                                                                            title="Download"
+                                                                            on:click=move |_| download_file(n_download.clone())
+                                                                        >
+                                                                            <IconDownload size=11 />
+                                                                        </button>
+                                                                    }
+                                                                }
+                                                            </Show>
                                                             <button
                                                                 class="fm-item-action-btn"
                                                                 title="Rename"

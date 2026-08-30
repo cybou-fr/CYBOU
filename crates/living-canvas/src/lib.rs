@@ -214,6 +214,27 @@ pub trait MindClient {
         request: &cybou_web_contracts::FileCreateRequest,
     ) -> Result<FileWriteProjection, ClientError>;
 
+    /// Place one file into the sandbox, whatever its bytes are.
+    ///
+    /// Separate from [`Self::create_file`], which carries text. A file a person drops onto the
+    /// desktop is not necessarily text, and a desktop that could only accept what it could also
+    /// display would not be accepting files.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the upload is refused or fails.
+    async fn upload_file(
+        &self,
+        request: &cybou_web_contracts::FileUploadRequest,
+    ) -> Result<cybou_web_contracts::FileUploadProjection, ClientError>;
+
+    /// Fetch one file from the sandbox as bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the download is refused or fails.
+    async fn download_file(&self, path: &str) -> Result<Vec<u8>, ClientError>;
+
     /// List a directory in the user's home authority domain.
     async fn host_list_directory(
         &self,
@@ -710,6 +731,21 @@ impl MindClient for MockMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         Err(ClientError::ProjectionUnavailable(
             "mock file creation is unavailable".to_string(),
+        ))
+    }
+
+    async fn upload_file(
+        &self,
+        _request: &cybou_web_contracts::FileUploadRequest,
+    ) -> Result<cybou_web_contracts::FileUploadProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock file uploads are unavailable".to_string(),
+        ))
+    }
+
+    async fn download_file(&self, _path: &str) -> Result<Vec<u8>, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock file downloads are unavailable".to_string(),
         ))
     }
 

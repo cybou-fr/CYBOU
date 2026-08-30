@@ -678,6 +678,43 @@ pub const FILE_READ_MAX_BYTES: usize = 256 * 1024;
 /// How many UTF-8 bytes one bounded sandbox write accepts.
 pub const FILE_WRITE_MAX_BYTES: usize = 256 * 1024;
 
+/// How many bytes one file transfer carries, in either direction.
+///
+/// Larger than the text read and write bounds, because those exist to keep a projection small
+/// enough to hold in a panel and this one exists to move a file. It is still a bound: the gateway
+/// buffers a transfer whole, so an unbounded one is a way for a seat to spend the host's memory.
+pub const FILE_TRANSFER_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+/// A file placed into the sandbox by whoever holds the seat.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileUploadRequest {
+    /// Where to place it, interpreted inside the sandbox root and never outside it.
+    pub path: String,
+    /// The bytes, base64 with padding.
+    ///
+    /// Base64 rather than a raw body because every other route on this surface carries its path in
+    /// a JSON body, and a raw body would have to carry that path in a header or a query string
+    /// instead. A file name is the kind of thing that ends up in an access log.
+    pub content_base64: String,
+}
+
+/// What the sandbox holds after a file was placed in it.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileUploadProjection {
+    /// Web contract version.
+    pub schema_version: SchemaVersion,
+    /// Owner-issued authority-domain reference for the file that was created.
+    pub location: LocationRef,
+    /// The path it was created at, as the sandbox resolved it.
+    pub path: String,
+    /// Lowercase SHA-256 of the bytes the sandbox read back after writing.
+    pub content_sha256: String,
+    /// How large the file is on disk.
+    pub size_bytes: u64,
+}
+
 /// Which path in the sandbox a request is about.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

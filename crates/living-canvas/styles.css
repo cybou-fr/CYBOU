@@ -3590,3 +3590,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   border-left: 2px solid rgba(154, 167, 184, 0.4);
 }
 
+
+/* The picker is driven by the Upload button beside it; the native control is never the surface. */
+.fm-upload-input {
+  display: none;
+}

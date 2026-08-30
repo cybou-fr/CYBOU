@@ -7,10 +7,11 @@ use std::{path::PathBuf, sync::Arc};
 
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     http::{HeaderName, HeaderValue},
     routing::{any, delete, get, post},
 };
-use cybou_web_contracts::{SessionProjection, WEB_SCHEMA_V1};
+use cybou_web_contracts::{FILE_TRANSFER_MAX_BYTES, SessionProjection, WEB_SCHEMA_V1};
 use time::{Duration as TimeDuration, OffsetDateTime, format_description::well_known::Rfc3339};
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -72,7 +73,8 @@ use routes::{
     connect_network, copy_host_path_handler, create_calendar_event, create_contact,
     create_file_handler, create_host_directory_handler, create_host_file_handler, create_note,
     create_snapshot, create_user, delete_draft_handler, delete_host_path_handler, delete_ssh_key,
-    dialogue_memory_handler, disclosure_handler, dismiss_notifications, events_handler,
+    dialogue_memory_handler, disclosure_handler, dismiss_notifications, download_file_handler,
+    events_handler,
     execute_notification_action, execute_package_action, execute_service_action,
     get_artifacts_handler, get_backup_settings, get_calendar, get_candidates_handler,
     get_cognitive_graph, get_contacts, get_event_journal, get_governance_scopes_handler,
@@ -85,7 +87,8 @@ use routes::{
     recent_actions_handler, rename_host_path_handler, restore_archive, restore_snapshot,
     revoke_artifact_handler, save_draft_handler, send_mail, send_process_signal, session_handler,
     shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler, trigger_backup,
-    update_backup_schedule, update_note, update_security_policy, write_file_handler,
+    update_backup_schedule, update_note, update_security_policy, upload_file_handler,
+    write_file_handler,
     write_host_file_handler, evaluate_candidate_handler,
 };
 use state::GatewayState;
@@ -267,6 +270,15 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/files/read", post(read_file_handler))
         .route("/api/v1/files/write", post(write_file_handler))
         .route("/api/v1/files/create", post(create_file_handler))
+        .route("/api/v1/files/download", post(download_file_handler))
+        .route(
+            "/api/v1/files/upload",
+            post(upload_file_handler)
+                // A base64 body is four bytes per three, and axum's default cap is smaller
+                // than one transfer. Raised for this route alone: every other route on this
+                // surface carries a projection, and none of them should be able to grow.
+                .layer(DefaultBodyLimit::max(FILE_TRANSFER_MAX_BYTES / 3 * 4 + 1024)),
+        )
         .route("/api/v1/host-files/list", post(list_host_directory_handler))
         .route("/api/v1/host-files/read", post(read_host_file_handler))
         .route("/api/v1/host-files/write", post(write_host_file_handler))
@@ -1449,6 +1461,169 @@ mod tests {
             get_route(&app, "/api/v1/snapshot", None).await,
             StatusCode::OK
         );
+    }
+
+    /// Post an arbitrary JSON body to a sandbox route as whoever holds this cookie.
+    async fn files_post_body<T: serde::Serialize>(
+        app: &Router,
+        route: &str,
+        cookie: &str,
+        payload: &T,
+    ) -> axum::http::Response<Body> {
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(route)
+                    .header("content-type", "application/json")
+                    .header("cookie", cookie)
+                    .body(Body::from(serde_json::to_vec(payload).expect("serialize")))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response")
+    }
+
+    #[tokio::test]
+    async fn a_file_survives_the_round_trip_through_the_browser_byte_for_byte() {
+        // The bytes are deliberately not UTF-8 and deliberately contain a NUL. This is the whole
+        // reason the transfer routes exist beside the text ones: `read` refuses these, and a
+        // desktop that could only move files it could also display would not be moving files.
+        let payload: Vec<u8> = vec![0x89, b'P', b'N', b'G', 0x00, 0xFF, 0xFE, b'\n', 0x7F];
+
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let request = cybou_web_contracts::FileUploadRequest {
+            path: "/logo.png".to_owned(),
+            content_base64: {
+                use base64::Engine as _;
+                base64::engine::general_purpose::STANDARD.encode(&payload)
+            },
+        };
+        let response = files_post_body(&app, "/api/v1/files/upload", &cookie, &request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let uploaded: cybou_web_contracts::FileUploadProjection =
+            serde_json::from_slice(&body).expect("an upload projection");
+        assert_eq!(uploaded.size_bytes, payload.len() as u64);
+
+        // It is on disk where the sandbox says it is, and it is the same bytes.
+        assert_eq!(
+            std::fs::read(sandbox.path().join("logo.png")).expect("the file"),
+            payload
+        );
+
+        let response = files_post(&app, "/api/v1/files/download", &cookie, "/logo.png").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let disposition = response
+            .headers()
+            .get(axum::http::header::CONTENT_DISPOSITION)
+            .expect("a name to save under")
+            .to_str()
+            .expect("printable");
+        assert!(disposition.contains("logo.png"), "{disposition}");
+
+        let returned = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        assert_eq!(returned.as_ref(), payload.as_slice());
+    }
+
+    #[tokio::test]
+    async fn an_upload_never_silently_replaces_what_is_already_there() {
+        // A drop onto a directory names a destination. If a destination that already holds
+        // something were overwritten, losing a file and placing one would look identical.
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        std::fs::write(sandbox.path().join("notes.txt"), "the original").expect("a file");
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let request = cybou_web_contracts::FileUploadRequest {
+            path: "/notes.txt".to_owned(),
+            content_base64: {
+                use base64::Engine as _;
+                base64::engine::general_purpose::STANDARD.encode(b"the replacement")
+            },
+        };
+        let response = files_post_body(&app, "/api/v1/files/upload", &cookie, &request).await;
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            std::fs::read_to_string(sandbox.path().join("notes.txt")).expect("the file"),
+            "the original"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_upload_that_is_not_base64_is_refused_rather_than_written_as_whatever_decoded() {
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let request = cybou_web_contracts::FileUploadRequest {
+            path: "/broken.bin".to_owned(),
+            content_base64: "this is not base64!!".to_owned(),
+        };
+        let response = files_post_body(&app, "/api/v1/files/upload", &cookie, &request).await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert!(!sandbox.path().join("broken.bin").exists());
+    }
+
+    #[tokio::test]
+    async fn a_transfer_cannot_leave_the_sandbox_in_either_direction() {
+        let (app, sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        // Inside the sandbox by string prefix, outside it by meaning. This is where sandboxes
+        // actually fail.
+        let escape = "/somewhere/../../escaped.txt";
+
+        let request = cybou_web_contracts::FileUploadRequest {
+            path: escape.to_owned(),
+            content_base64: {
+                use base64::Engine as _;
+                base64::engine::general_purpose::STANDARD.encode(b"out")
+            },
+        };
+        let response = files_post_body(&app, "/api/v1/files/upload", &cookie, &request).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(
+            !sandbox
+                .path()
+                .parent()
+                .expect("a parent")
+                .join("escaped.txt")
+                .exists()
+        );
+
+        let response = files_post(&app, "/api/v1/files/download", &cookie, escape).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn a_transfer_without_a_seat_is_refused_in_both_directions() {
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+
+        let request = cybou_web_contracts::FileUploadRequest {
+            path: "/anything.bin".to_owned(),
+            content_base64: String::new(),
+        };
+        // Forbidden rather than unauthorized: this deployment opened its read-only surface
+        // deliberately, so the request is not anonymous by mistake. It reaches the handler and is
+        // refused there, by the same rule that refuses Shell execution — moving files is a Body
+        // capability, and a public preview holds none.
+        let response = files_post_body(&app, "/api/v1/files/upload", "", &request).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let refusal: serde_json::Value = serde_json::from_slice(&body).expect("a refusal");
+        assert_eq!(refusal["error"], "shellExecutionForbiddenInPublicPreview");
+
+        let response = files_post(&app, "/api/v1/files/download", "", "/anything.bin").await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

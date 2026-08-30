@@ -16,14 +16,17 @@
 use axum::{
     Json,
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
+    response::{IntoResponse, Response},
 };
+use base64::Engine as _;
 use cybou_jailfs::JailError;
 use cybou_protocol::LocationRef;
 use cybou_web_contracts::{
     DirectoryEntryProjection, DirectoryListingProjection, FILE_LISTING_MAX_ENTRIES,
-    FILE_READ_MAX_BYTES, FILE_WRITE_MAX_BYTES, FileContentProjection, FileCreateRequest,
-    FilePathRequest, FileWriteProjection, FileWriteRequest, WEB_SCHEMA_V1,
+    FILE_READ_MAX_BYTES, FILE_TRANSFER_MAX_BYTES, FILE_WRITE_MAX_BYTES, FileContentProjection,
+    FileCreateRequest, FilePathRequest, FileUploadProjection, FileUploadRequest,
+    FileWriteProjection, FileWriteRequest, WEB_SCHEMA_V1,
 };
 use sha2::{Digest as _, Sha256};
 use std::sync::{Mutex, PoisonError};
@@ -293,9 +296,226 @@ pub async fn create_file_handler(
     }))
 }
 
+/// The bytes a download hands back, and the name a browser should save them under.
+///
+/// Not a JSON projection, because the payload is the file. Everything the caller needs to save it
+/// travels in the headers, which is where a browser already looks for it.
+pub struct FileDownload {
+    /// What the browser should call the saved file.
+    file_name: String,
+    /// The file.
+    bytes: Vec<u8>,
+}
+
+/// Characters a file name may keep inside a quoted `filename=` parameter.
+///
+/// A quote or a newline in a file name would end the parameter early and let the rest of the name
+/// become header syntax. Everything outside this set is dropped from the quoted form; the exact
+/// name still reaches the browser through the `filename*` parameter, which is percent-encoded and
+/// cannot carry syntax at all.
+const DISPOSITION_SAFE: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
+impl IntoResponse for FileDownload {
+    fn into_response(self) -> Response {
+        let quoted: String = self
+            .file_name
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_' | ' '))
+            .collect();
+        let quoted = if quoted.trim().is_empty() {
+            "download".to_owned()
+        } else {
+            quoted
+        };
+        let encoded =
+            percent_encoding::utf8_percent_encode(&self.file_name, DISPOSITION_SAFE).to_string();
+
+        let disposition =
+            format!("attachment; filename=\"{quoted}\"; filename*=UTF-8''{encoded}");
+
+        (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
+                (header::CONTENT_DISPOSITION, disposition),
+                // The sandbox serves what a seat put there. Telling the browser not to guess a
+                // type keeps an uploaded .html from being rendered as a page on this origin.
+                (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned()),
+            ],
+            self.bytes,
+        )
+            .into_response()
+    }
+}
+
+/// The last path segment, which is what a browser should call the saved file.
+fn file_name_of(path: &str) -> String {
+    path.rsplit(['/', '\\'])
+        .find(|segment| !segment.is_empty() && *segment != "." && *segment != "..")
+        .unwrap_or("download")
+        .to_owned()
+}
+
+/// Hand back one file from the sandbox as bytes.
+///
+/// Separate from [`read_file_handler`] rather than a mode of it. That route answers *what does this
+/// file say*, and refuses anything it cannot decode as UTF-8 within a panel-sized budget. This one
+/// answers *give me this file*, which is a different question about the same bytes: an image is not
+/// unreadable, it is not text.
+///
+/// # Errors
+///
+/// Refuses if the caller holds no seat, the path names nothing readable, or the file is larger
+/// than one transfer carries.
+pub async fn download_file_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<FilePathRequest>,
+) -> Result<FileDownload, Refusal> {
+    state.shell_seat(&headers).ok_or_else(no_seat)?;
+
+    let bytes = state
+        .files
+        .read_bytes(&payload.path, FILE_TRANSFER_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+
+    Ok(FileDownload {
+        file_name: file_name_of(&payload.path),
+        bytes,
+    })
+}
+
+/// Place one file into the sandbox.
+///
+/// Exclusive creation rather than a write: a drop onto a directory names a destination, and a
+/// destination that already holds something is a collision the person has to see. Silently
+/// replacing it would make losing a file indistinguishable from placing one.
+///
+/// # Errors
+///
+/// Refuses if the caller holds no seat, the payload is not base64 or exceeds the transfer bound,
+/// the path already names something, or the sandbox cannot create and read back the file.
+pub async fn upload_file_handler(
+    State(state): State<GatewayState>,
+    headers: HeaderMap,
+    Json(payload): Json<FileUploadRequest>,
+) -> Result<Json<FileUploadProjection>, Refusal> {
+    let owner = state.shell_seat(&headers).ok_or_else(no_seat)?;
+
+    // Checked before decoding rather than after. Base64 is four characters per three bytes, so the
+    // decoded size is known from the encoded length, and refusing here means an oversized upload
+    // is never held twice.
+    let declared_bytes = payload.content_base64.len() / 4 * 3;
+    if declared_bytes > FILE_TRANSFER_MAX_BYTES {
+        return Err(boundary(&JailError::SizeLimitExceeded {
+            max_bytes: FILE_TRANSFER_MAX_BYTES,
+            actual_bytes: declared_bytes,
+        }));
+    }
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(payload.content_base64.as_bytes())
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorBody {
+                    schema_version: WEB_SCHEMA_V1,
+                    error: "uploadNotBase64",
+                    retryable: false,
+                }),
+            )
+        })?;
+
+    let location = jail_location(&owner, payload.path.clone());
+
+    let _write_guard = FILE_WRITES.lock().unwrap_or_else(PoisonError::into_inner);
+    state
+        .files
+        .create_file_exclusive(&payload.path, &bytes, FILE_TRANSFER_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+
+    // Read back rather than trust the write, the same way the text routes do. A transfer that
+    // reported success for bytes nobody can read again is the failure a person discovers later.
+    let verified = state
+        .files
+        .read_bytes(&payload.path, FILE_TRANSFER_MAX_BYTES)
+        .map_err(|error| boundary(&error))?;
+    if verified != bytes {
+        return Err(boundary(&JailError::Io(
+            "post-upload verification failed".to_string(),
+        )));
+    }
+
+    Ok(Json(FileUploadProjection {
+        schema_version: WEB_SCHEMA_V1,
+        location,
+        path: payload.path,
+        content_sha256: sha256(&verified),
+        size_bytes: u64::try_from(verified.len()).unwrap_or(u64::MAX),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_download_name_is_the_last_segment_and_never_a_traversal() {
+        assert_eq!(file_name_of("/notes/report.pdf"), "report.pdf");
+        assert_eq!(file_name_of("report.pdf"), "report.pdf");
+        assert_eq!(file_name_of("/notes/"), "notes");
+        // A path ending in `..` must not name the saved file `..`, which is a directory entry a
+        // browser would refuse or, worse, resolve.
+        assert_eq!(file_name_of("/notes/.."), "notes");
+        assert_eq!(file_name_of("/"), "download");
+        assert_eq!(file_name_of(""), "download");
+    }
+
+    #[test]
+    fn a_file_name_cannot_carry_header_syntax_into_the_disposition() {
+        let response = FileDownload {
+            // A quote closes the quoted parameter, a newline ends the header, and a semicolon
+            // starts another one. None of the three may survive into the quoted form.
+            file_name: "in\"voice;\nx: y.pdf".to_owned(),
+            bytes: Vec::new(),
+        }
+        .into_response();
+
+        let disposition = response
+            .headers()
+            .get(header::CONTENT_DISPOSITION)
+            .expect("a download says how to save itself")
+            .to_str()
+            .expect("the header is printable ASCII");
+
+        assert!(disposition.starts_with("attachment; filename=\"invoicex y.pdf\""), "{disposition}");
+        // The exact name still reaches the browser, where it cannot be read as syntax.
+        assert!(disposition.contains("filename*=UTF-8''in%22voice%3B%0Ax%3A%20y.pdf"), "{disposition}");
+    }
+
+    #[test]
+    fn a_download_tells_the_browser_not_to_guess_the_type() {
+        // The sandbox serves what a seat put in it. Without this an uploaded .html would render
+        // as a page on the gateway's own origin.
+        let response = FileDownload {
+            file_name: "page.html".to_owned(),
+            bytes: b"<script>".to_vec(),
+        }
+        .into_response();
+
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            response.headers().get(header::X_CONTENT_TYPE_OPTIONS).unwrap(),
+            "nosniff"
+        );
+    }
 
     #[test]
     fn already_existing_file_is_a_non_retryable_conflict() {

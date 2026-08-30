@@ -1331,6 +1331,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64",
  "ciborium",
  "cybou-epistemicd",
  "cybou-fabric",
@@ -1347,6 +1348,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.2.17",
  "http-body-util",
+ "percent-encoding",
  "rusqlite",
  "rustix",
  "serde",
@@ -2547,6 +2549,7 @@ name = "living-canvas"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64",
  "console_error_panic_hook",
  "cybou-protocol",
  "cybou-web-contracts",

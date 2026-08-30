@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+base64.workspace = true
 cybou-protocol = { path = "../cybou-protocol" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
 serde_json.workspace = true
@@ -50,6 +51,16 @@ wasm-bindgen-futures = "=0.4.76"
 web-sys = { version = "=0.3.103", features = [
     "Clipboard",
     "BeforeUnloadEvent",
+    # Moving a file in or out of the sandbox. A download arrives as bytes and has to become
+    # something the browser will save, and an upload starts as a picked File and has to become
+    # bytes; neither is possible without these.
+    "Blob",
+    "BlobPropertyBag",
+    "File",
+    "FileList",
+    "HtmlAnchorElement",
+    "HtmlInputElement",
+    "Url",
     "DomRect",
     "Element",
     "EventSource",

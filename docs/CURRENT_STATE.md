@@ -933,6 +933,19 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   `journalctl` does not fail for a reader outside the `systemd-journal` group — it narrows to that
   account's own entries — so the projection carries whether the whole system journal was visible,
   and the card says so rather than drawing one service's half of the host as the whole of it.
+- **File transfer**: `POST /api/v1/files/upload` and `/api/v1/files/download` move bytes in and out
+  of the Safe Shell jail, bounded at `FILE_TRANSFER_MAX_BYTES` (8 MiB) in either direction. Separate
+  routes rather than a mode of the text ones: `read` and `write` answer *what does this file say*
+  and refuse anything they cannot decode as UTF-8 within a panel-sized budget, and an image is not
+  unreadable, it is not text. An upload creates exclusively and is refused with `409` when the
+  destination already holds something — silently replacing it would make losing a file
+  indistinguishable from placing one. The bytes are read back and compared before success is
+  reported. A download is served `application/octet-stream` with `X-Content-Type-Options: nosniff`,
+  and its `Content-Disposition` carries the name twice: an ASCII-filtered quoted form that cannot
+  close its own parameter, and a percent-encoded `filename*` that cannot be read as header syntax at
+  all. The File Manager shows Upload and per-file Download in the sandbox domain only; the home and
+  agent-workspace domains are served by an owner that carries bounded UTF-8 reads and no transfer, so
+  the buttons are absent there rather than present and failing.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **Command Palette & Omnibar Navigation**: Unified desktop action launcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>) with real-time fuzzy search, keyboard selection cycling (<kbd>↑</kbd>/<kbd>↓</kbd>), <kbd>Enter</kbd> execution, Ask CYBOU cognitive question answering, shortcut badges, and automatic uncollapse/bring-forward card focusing.
 - **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. `SubjectRef` is the canonical primitive for new cross-panel entity references; migration of existing interactions is incomplete.

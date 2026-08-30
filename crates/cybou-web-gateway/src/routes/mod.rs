@@ -38,7 +38,9 @@ pub use drafts::{
 };
 pub use events::events_handler;
 pub use files::{
-    create_file_handler, list_directory_handler, read_file_handler, write_file_handler,
+    FileDownload, create_file_handler, download_file_handler, list_directory_handler,
+    read_file_handler,
+    upload_file_handler, write_file_handler,
 };
 pub use host_files::{
     copy_host_path_handler, create_host_directory_handler, create_host_file_handler,

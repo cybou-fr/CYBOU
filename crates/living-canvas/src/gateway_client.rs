@@ -317,6 +317,54 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
+    async fn upload_file(
+        &self,
+        request: &cybou_web_contracts::FileUploadRequest,
+    ) -> Result<cybou_web_contracts::FileUploadProjection, ClientError> {
+        let response = Request::post("/api/v1/files/upload")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        // The gateway refuses rather than replaces, so this is the ordinary answer to dropping a
+        // file onto a directory that already holds one by that name, not an error condition.
+        if response.status() == 409 {
+            return Err(ClientError::FileAlreadyExists);
+        }
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/files/upload returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
+    async fn download_file(&self, path: &str) -> Result<Vec<u8>, ClientError> {
+        let response = Request::post("/api/v1/files/download")
+            .json(&cybou_web_contracts::FilePathRequest {
+                path: path.to_owned(),
+            })
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/files/download returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .binary()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
     async fn host_list_directory(
         &self,
         path: &str,

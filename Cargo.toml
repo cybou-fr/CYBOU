@@ -60,6 +60,8 @@ repository = "https://github.com/cybou-fr/CYBOU"
 
 [workspace.dependencies]
 agent-client-protocol = "2.0.0"
+# One file transfer carries its bytes in a JSON field, so it carries them base64.
+base64 = "0.22.1"
 cybou-jailfs = { path = "crates/cybou-jailfs" }
 cybou-shelld = { path = "crates/cybou-shelld" }
 serde = { version = "1.0.229", features = ["derive"] }
