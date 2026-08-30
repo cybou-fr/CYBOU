@@ -487,6 +487,9 @@ pub fn project_action_record(
             .collect(),
         verdict: match &record.decision.verdict {
             AuthorizationVerdict::Granted => "granted".to_owned(),
+            AuthorizationVerdict::GrantedOnConfirmation { .. } => {
+                "granted-on-confirmation".to_owned()
+            }
             AuthorizationVerdict::RequiresUserConfirmation { .. } => {
                 "requires-confirmation".to_owned()
             }
@@ -494,6 +497,9 @@ pub fn project_action_record(
         },
         verdict_reason: match &record.decision.verdict {
             AuthorizationVerdict::Granted => None,
+            AuthorizationVerdict::GrantedOnConfirmation { confirmed_by } => {
+                Some(format!("confirmed by {confirmed_by}"))
+            }
             AuthorizationVerdict::RequiresUserConfirmation { prompt } => Some(prompt.clone()),
             AuthorizationVerdict::Denied { reason } => Some(reason.clone()),
         },

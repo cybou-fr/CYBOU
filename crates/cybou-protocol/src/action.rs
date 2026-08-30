@@ -126,11 +126,39 @@ pub enum AuthorizationVerdict {
         /// User confirmation prompt.
         prompt: String,
     },
+    /// A person answered the confirmation this proposal was waiting on, and said yes.
+    ///
+    /// Deliberately not [`Self::Granted`]. The two authorize the same execution and are not the
+    /// same authorization: one says a standing policy already covers this, the other says somebody
+    /// was asked and agreed, at an instant, from a seat. A record that could not tell them apart
+    /// would answer *who authorized this* with the policy in both cases, including the case where
+    /// the policy authorized nothing.
+    #[serde(rename_all = "camelCase")]
+    GrantedOnConfirmation {
+        /// Which seat answered, as the boundary that authenticated it established.
+        ///
+        /// Never taken from the browser. A confirmation whose author is supplied by the party
+        /// being authorized is not a confirmation.
+        confirmed_by: String,
+    },
     /// Refused by policy, criticism check, or security boundary.
     Denied {
         /// Reason for refusal.
         reason: String,
     },
+}
+
+impl AuthorizationVerdict {
+    /// Whether this verdict allows the action to be carried out at all.
+    ///
+    /// Distinct from [`permits_unattended`](../../cybou_remediation/authorize/fn.permits_unattended.html),
+    /// which asks whether it may happen *without asking anybody*. Confirmed execution is
+    /// authorized and was not unattended, and code that conflates the two either refuses what a
+    /// person allowed or performs unasked what they were meant to be asked about.
+    #[must_use]
+    pub const fn permits_execution(&self) -> bool {
+        matches!(self, Self::Granted | Self::GrantedOnConfirmation { .. })
+    }
 }
 
 /// Final authorization decision record.
@@ -301,6 +329,9 @@ impl AuthorizationDecision {
     ) -> Uuid {
         let verdict = match verdict {
             AuthorizationVerdict::Granted => "granted".to_owned(),
+            AuthorizationVerdict::GrantedOnConfirmation { confirmed_by } => {
+                format!("granted-on-confirmation|{confirmed_by}")
+            }
             AuthorizationVerdict::RequiresUserConfirmation { prompt } => {
                 format!("requires-confirmation|{prompt}")
             }

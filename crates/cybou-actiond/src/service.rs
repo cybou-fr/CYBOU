@@ -56,6 +56,40 @@ impl Action1Service {
         Ok((encoded, permit_id))
     }
 
+    /// Answer a proposal that was waiting on a person, and mint the permit that follows.
+    ///
+    /// `decision_seen` is the decision the person was actually shown. Passing it is what makes
+    /// this an answer to a question rather than a request to grant something: a proposal
+    /// re-decided between being drawn and being clicked is a different prompt, and the caller
+    /// cannot tell that from here.
+    ///
+    /// `confirmed_by` is established by whatever authenticated the person — a browser session's
+    /// PAM account, a local seat — and is never a value that party supplied about itself.
+    async fn confirm(
+        &self,
+        proposal_id: String,
+        decision_seen: String,
+        confirmed_by: String,
+    ) -> fdo::Result<(Vec<u8>, String)> {
+        let proposal_id = Uuid::parse_str(&proposal_id)
+            .map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        let decision_seen = Uuid::parse_str(&decision_seen)
+            .map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+
+        let now = OffsetDateTime::now_utc();
+        let record = self
+            .core
+            .confirm(proposal_id, decision_seen, &confirmed_by, now)
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        record_lifecycle(&record, now).await;
+
+        let permit_id = record
+            .permit_id
+            .map_or_else(String::new, |id| id.to_string());
+        let encoded = encode(&record).map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        Ok((encoded, permit_id))
+    }
+
     /// What was proposed, argued and decided for one proposal.
     ///
     /// Writing the lifecycle down was half of answering *why did nginx restart on the fourteenth*.

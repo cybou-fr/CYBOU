@@ -238,6 +238,9 @@ fn offers(insight: &SystemInsight, now: OffsetDateTime) -> Vec<OfferProjection> 
             );
             let (verdict, reason) = match decision.verdict {
                 AuthorizationVerdict::Granted => ("granted".to_owned(), String::new()),
+                AuthorizationVerdict::GrantedOnConfirmation { confirmed_by } => {
+                    ("granted-on-confirmation".to_owned(), confirmed_by)
+                }
                 AuthorizationVerdict::RequiresUserConfirmation { prompt } => {
                     ("requires-confirmation".to_owned(), prompt)
                 }

@@ -73,7 +73,7 @@
 //! claimed simply was not, and the decision that produced it is still there to be read.
 
 use cybou_protocol::action::{
-    ActionOutcome, ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
+    ActionOutcome, ActionProposal, AuthorizationDecision, CriticismCheck,
     ExecutionAttempt, ExecutionStarted,
 };
 use cybou_protocol::admission::Kind;
@@ -487,7 +487,7 @@ fn execution_started_message_id(attempt_id: Uuid) -> Uuid {
 /// Whether this decision authorized anything, for a reader that has only the record.
 #[must_use]
 pub fn was_granted(record: &ActionRecord) -> bool {
-    matches!(record.decision.verdict, AuthorizationVerdict::Granted)
+    record.decision.verdict.permits_execution()
 }
 
 fn envelope(
@@ -532,8 +532,8 @@ fn envelope(
 #[cfg(test)]
 mod tests {
     use cybou_protocol::action::{
-        ActionProposal, Agreement, AttemptReport, AuthorizationDecision, Proposer, Relief,
-        RiskLevel,
+        ActionProposal, Agreement, AttemptReport, AuthorizationDecision, AuthorizationVerdict,
+        Proposer, Relief, RiskLevel,
     };
 
     use super::*;

@@ -892,6 +892,28 @@ rather than silently relabelling it as the preferred route. See the
 
 ## Action boundary
 
+**A proposal a person was asked about can now be answered.** With no standing policy — the default,
+and the only state a fresh installation has — every proposal decides to `RequiresUserConfirmation`
+and stopped there, because nothing could carry the answer back. `ActionCore::confirm` mints the
+permit that follows a yes, and refuses four ways: the verdict must still be the one that asked, so a
+denial cannot be confirmed into existence and one agreement cannot mint two permits; the decision the
+person saw must be the decision that is here, so a proposal re-decided between being drawn and being
+clicked cannot have one question's answer authorize another; every criticism must have passed,
+because confirmation grants the half a person owns and does not revive what the critics objected to;
+and the proposal must be inside a fifteen-minute window, because it carries a diagnosis drawn from
+readings that stop being true.
+
+The four refusals share one error. Which of them was tripped is exactly what a caller would need in
+order to keep trying, and a surface that reports how close a guess came is a way to search the
+lifecycle for something confirmable.
+
+`GrantedOnConfirmation` is deliberately not `Granted`. The two authorize the same execution and are
+not the same authorization: one says a standing policy already covers this, the other says somebody
+was asked, agreed, and is named. A record that could not tell them apart would answer *who
+authorized this* with the policy, on a host whose policy authorized nothing. The seat is established
+by whatever authenticated it and is never supplied by the party being authorized.
+
+
 The host observes itself, concludes, explains, offers, and refuses.
 
 A proposer **cannot choose its own risk**: operations are a closed set and risk and reversibility are
@@ -1009,8 +1031,9 @@ mentioned look identical to a reader.
 
 - **Telemetry has no persistence.** Everything it holds is in memory and bounded; a restart starts
   the window again, and the organ says it has not watched long enough rather than answering.
-- **Confirmation has no operator surface yet.** A decision may require confirmation and therefore
-  produces no permit; only an explicit standing policy can currently reach unattended execution.
+- **Confirmation has an owner but no reachable surface yet.** `Action1.Confirm` turns a decision
+  that was waiting on a person into a permit, and nothing outside the bus can call it: the gateway
+  is read-only against Action1, so a browser still cannot answer a prompt.
 - **The agent vertical has no real-provider evidence yet.** The real OpenCode ACP entrypoint has run
   inside a capsule and completed the credential-free handshake, but no configured provider has
   returned an answer through the full path. Multi-turn streaming is also not built.

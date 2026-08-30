@@ -51,7 +51,22 @@ pub enum ActionError {
     /// A final report did not match the execution identity minted at permit claim.
     #[error("attempt {0} does not match the execution Action1 started")]
     AttemptMismatch(Uuid),
+    /// The proposal is not one a person may answer for, in the way they tried to answer it.
+    ///
+    /// One variant for every refusal in [`ActionCore::confirm`] rather than one each. Which of
+    /// them was tripped is exactly what a caller would need in order to keep trying, and a
+    /// confirmation surface that reports how close a guess came is a way to search the lifecycle
+    /// for something confirmable.
+    #[error("this proposal is not awaiting a confirmation of that kind")]
+    NotAwaitingConfirmation,
 }
+
+/// How long after a proposal was made a person may still answer it.
+///
+/// A proposal carries a diagnosis drawn from readings taken at one instant. Long enough afterwards
+/// the readings are gone and confirming means agreeing to a claim nobody re-checked — the same
+/// reason the permit that follows a confirmation is measured in seconds rather than hours.
+pub const CONFIRMATION_WINDOW: Duration = Duration::minutes(15);
 
 /// Owner of the action lifecycle.
 ///
@@ -136,6 +151,112 @@ impl ActionCore {
             .map_err(|_| ActionError::StateUnavailable)?
             .insert(record.proposal.proposal_id, record.clone());
         Ok(record)
+    }
+
+    /// Atomically consume a permit. A second claim receives nothing.
+    ///
+    /// # Errors
+    ///
+    /// Refuses unknown, consumed, expired permits and unavailable internal state.
+     /// Grant a proposal that was waiting on a person, because a person said yes.
+    ///
+    /// This is the other half of a verdict the host has been able to reach since ADR-0022 and has
+    /// never been able to act on: with no standing policy — the default, and the only state a
+    /// fresh installation has — every proposal decides to
+    /// [`RequiresUserConfirmation`](AuthorizationVerdict::RequiresUserConfirmation) and stops
+    /// there, because nothing could carry the answer back.
+    ///
+    /// Four things are checked, and each of them is a way this could otherwise become a way around
+    /// the boundary rather than a door through it.
+    ///
+    /// **The verdict must still be the one that asked.** A proposal already granted needs no
+    /// confirmation, one already confirmed is spent, and one that was denied cannot be confirmed
+    /// into existence — a person's agreement answers a question, it does not overrule a refusal.
+    ///
+    /// **The decision the person saw must be the decision that is here.** They are agreeing to a
+    /// prompt, and a proposal re-decided between the moment it was drawn and the moment it was
+    /// clicked is a different prompt. Without this the answer to one question authorizes another.
+    ///
+    /// **Every criticism must have passed.** The checks were run when the proposal was decided and
+    /// are stored with it; a confirmation grants the half a person owns, and it does not revive a
+    /// proposal the critics objected to. This is the same rule that already stops a failed critic
+    /// from letting a pre-authorized operation through.
+    ///
+    /// **The proposal must be recent.** A proposal is made from a finding, and a finding is made
+    /// from readings. An hour later the readings are gone, the disk that was filling may be empty,
+    /// and confirming is agreeing to a diagnosis nobody re-checked. The window is deliberately
+    /// short for the same reason the permit that follows it lasts sixty seconds.
+    ///
+    /// # Errors
+    ///
+    /// [`ActionError::UnknownProposal`] when nothing here proposed it, and
+    /// [`ActionError::NotAwaitingConfirmation`] for every other refusal above — deliberately one
+    /// variant, because telling a caller which of the four it tripped tells it how to keep trying.
+    pub fn confirm(
+        &self,
+        proposal_id: Uuid,
+        decision_seen: Uuid,
+        confirmed_by: &str,
+        now: OffsetDateTime,
+    ) -> Result<ActionRecord, ActionError> {
+        if confirmed_by.trim().is_empty() {
+            return Err(ActionError::NotAwaitingConfirmation);
+        }
+
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?;
+        let record = records
+            .get_mut(&proposal_id)
+            .ok_or(ActionError::UnknownProposal(proposal_id))?;
+
+        if !matches!(
+            record.decision.verdict,
+            AuthorizationVerdict::RequiresUserConfirmation { .. }
+        ) {
+            return Err(ActionError::NotAwaitingConfirmation);
+        }
+        if record.decision.decision_id != decision_seen {
+            return Err(ActionError::NotAwaitingConfirmation);
+        }
+        if record.checks.iter().any(|check| !check.passed) {
+            return Err(ActionError::NotAwaitingConfirmation);
+        }
+        if now < record.proposal.proposed_at
+            || now - record.proposal.proposed_at > CONFIRMATION_WINDOW
+        {
+            return Err(ActionError::NotAwaitingConfirmation);
+        }
+
+        // Rebuilt from the stored proposal rather than taken from the caller. The person confirmed
+        // a proposal; they did not supply an action, and there is no field here for them to.
+        let operation = operation_for(&record.proposal.operation)?;
+        let action = executable_action(&record.proposal, operation)?;
+
+        let verdict = AuthorizationVerdict::GrantedOnConfirmation {
+            confirmed_by: confirmed_by.to_owned(),
+        };
+        let decision = AuthorizationDecision {
+            decision_id: AuthorizationDecision::derive_id(proposal_id, &verdict, now),
+            proposal_id,
+            verdict,
+            checked_capabilities: vec![operation.verb().to_owned()],
+            decided_at: now,
+        };
+        let permit = permit_for(&record.proposal, &decision, action, now);
+
+        record.permit_id = Some(permit.permit_id);
+        record.decision = decision;
+        let confirmed = record.clone();
+        drop(records);
+
+        self.permits
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?
+            .insert(permit.permit_id, permit);
+
+        Ok(confirmed)
     }
 
     /// Atomically consume a permit. A second claim receives nothing.
@@ -477,6 +598,213 @@ mod tests {
             AuthorizationVerdict::Denied { .. }
         ));
         assert!(record.permit_id.is_none());
+    }
+
+    /// One host that has been asked and has agreed to nothing yet.
+    ///
+    /// The default standing policy, which is the only one a fresh installation has, so every
+    /// proposal here stops at the verdict a person is meant to answer.
+    fn awaiting_confirmation() -> (ActionCore, ActionRecord, OffsetDateTime) {
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .evaluate_insight(&insight(), "service.restart", now)
+            .expect("evaluate");
+        assert!(matches!(
+            record.decision.verdict,
+            AuthorizationVerdict::RequiresUserConfirmation { .. }
+        ));
+        assert!(record.permit_id.is_none());
+        (core, record, now)
+    }
+
+    #[test]
+    fn a_person_saying_yes_is_what_turns_a_question_into_a_permit() {
+        let (core, record, now) = awaiting_confirmation();
+
+        let confirmed = core
+            .confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now,
+            )
+            .expect("a confirmation");
+
+        // The permit exists and is claimable exactly once, like any other.
+        let permit_id = confirmed.permit_id.expect("a permit");
+        assert!(core.claim_permit(permit_id, now).is_ok());
+        assert_eq!(
+            core.claim_permit(permit_id, now),
+            Err(ActionError::PermitUnavailable)
+        );
+    }
+
+    #[test]
+    fn a_confirmed_grant_is_never_mistaken_for_a_standing_one() {
+        // The two authorize the same execution and are not the same authorization. A record that
+        // could not tell them apart would answer "who authorized this" with the policy, on a host
+        // whose policy authorized nothing.
+        let (core, record, now) = awaiting_confirmation();
+
+        let confirmed = core
+            .confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now,
+            )
+            .expect("a confirmation");
+
+        assert_eq!(
+            confirmed.decision.verdict,
+            AuthorizationVerdict::GrantedOnConfirmation {
+                confirmed_by: "linux-account:alice".to_owned(),
+            }
+        );
+        assert!(confirmed.decision.verdict.permits_execution());
+        // It may execute, and it was not unattended. Code that conflates the two either refuses
+        // what a person allowed or performs unasked what they were meant to be asked about.
+        assert!(!cybou_remediation::permits_unattended(&confirmed.decision));
+        // A different authorization is a different decision, not the same one read twice.
+        assert_ne!(confirmed.decision.decision_id, record.decision.decision_id);
+    }
+
+    #[test]
+    fn the_same_question_cannot_be_answered_twice() {
+        let (core, record, now) = awaiting_confirmation();
+
+        let confirmed = core
+            .confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now,
+            )
+            .expect("a confirmation");
+
+        // Neither with the prompt's decision, which is no longer the one here...
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now,
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
+        // ...nor with the decision the confirmation itself produced. A second yes must not mint a
+        // second permit for one agreement.
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                confirmed.decision.decision_id,
+                "linux-account:alice",
+                now,
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
+    }
+
+    #[test]
+    fn agreeing_to_a_prompt_nobody_is_showing_authorizes_nothing() {
+        // A proposal re-decided between being drawn and being clicked is a different prompt, and
+        // without this check the answer to one question authorizes another.
+        let (core, record, now) = awaiting_confirmation();
+
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                Uuid::new_v4(),
+                "linux-account:alice",
+                now,
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
+    }
+
+    #[test]
+    fn a_proposal_older_than_its_readings_can_no_longer_be_agreed_to() {
+        // A proposal carries a diagnosis drawn from readings taken at one instant. Long enough
+        // afterwards, confirming is agreeing to a claim nobody re-checked.
+        let (core, record, now) = awaiting_confirmation();
+
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now + CONFIRMATION_WINDOW + Duration::seconds(1),
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
+        // And still answerable inside the window, so the bound is a bound rather than a refusal.
+        assert!(
+            core.confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now + CONFIRMATION_WINDOW,
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_refusal_is_not_a_question_and_cannot_be_answered() {
+        // A person's agreement answers a question. It does not overrule a denial: this proposal
+        // names no concrete target, and no amount of saying yes makes one.
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let mut insight = insight();
+        insight.about = None;
+        let record = core
+            .evaluate_insight(&insight, "service.restart", now)
+            .expect("a refusal is still a lifecycle record");
+        assert!(matches!(
+            record.decision.verdict,
+            AuthorizationVerdict::Denied { .. }
+        ));
+
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "linux-account:alice",
+                now,
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
+    }
+
+    #[test]
+    fn a_confirmation_from_nobody_is_not_a_confirmation() {
+        // The seat is established by whatever authenticated it, never supplied by the party being
+        // authorized. An empty one means the caller had none to give.
+        let (core, record, now) = awaiting_confirmation();
+
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                "   ",
+                now,
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
+    }
+
+    #[test]
+    fn nothing_here_proposed_it_is_said_as_itself() {
+        // The one refusal that is distinguishable, because it is about identity rather than about
+        // how close a caller came to something confirmable.
+        let (core, _record, now) = awaiting_confirmation();
+        let invented = Uuid::new_v4();
+
+        assert_eq!(
+            core.confirm(invented, Uuid::new_v4(), "linux-account:alice", now),
+            Err(ActionError::UnknownProposal(invented))
+        );
     }
 
     #[test]
