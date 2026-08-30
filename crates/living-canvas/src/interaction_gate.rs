@@ -461,3 +461,57 @@ async fn a_card_panned_out_of_sight_keeps_its_frame_and_drops_its_contents() {
         "and its contents are not built"
     );
 }
+
+#[wasm_bindgen_test]
+async fn a_narrow_window_draws_every_card_wherever_the_layout_holds_it() {
+    let (_owner, states) = desk_owner();
+    // The same card at the same absurd coordinate, and a phone-sized window. On a stack the cards
+    // have left their coordinates — the column lays them out in order — so a panel the layout
+    // happens to hold at ninety thousand pixels is simply the next one down. Culling it by where it
+    // would have been on a plane would take away a card the person is looking at, which is what
+    // this build would have done without the check this asserts.
+    let mut layout = DesktopLayout::canonical(None);
+    layout.open_card(CardId::SystemLogs(0), 400.0, 300.0);
+    layout.set_position(CardId::SystemLogs(0), 90_000.0, 90_000.0);
+    let desk = Desk::new(layout);
+    let host = stage();
+
+    let (layout, selected, set_selected, dragging, resizing, runtime, auth) = (
+        desk.layout,
+        desk.selected,
+        desk.set_selected,
+        desk.dragging,
+        desk.resizing,
+        desk.runtime,
+        desk.auth,
+    );
+    let camera = crate::components::camera_context::CanvasCamera {
+        pan: signal((0.0, 0.0)).0,
+        zoom: signal(1.0).0,
+        viewport: signal((390.0, 844.0)).0,
+    };
+    mount_to(host.clone(), move || {
+        provide_context(states);
+        provide_context(camera);
+        view! {
+            <crate::components::cards::GenericToolCard
+                card=CardId::SystemLogs(0)
+                layout=layout
+                selected=selected
+                set_selected=set_selected
+                dragging=dragging
+                resizing=resizing
+                auth_modal_open=auth
+                runtime=runtime
+            />
+        }
+    })
+    .forget();
+    settled().await;
+
+    assert_eq!(
+        count(&host, ".system-logs-panel"),
+        1,
+        "a stacked card is drawn wherever the layout happens to hold it"
+    );
+}

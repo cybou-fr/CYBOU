@@ -1198,6 +1198,19 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   time and fired them for two hours and sixteen minutes before it was killed. What a browser does
   with the bundle is covered by the seven `wasm-bindgen-test` tests, which settle on a microtask
   rather than on an idle page.
+- **A narrow window gets a stack rather than a plane**: below 760 pixels a panel is wider than
+  the screen it is on, and a spatial desktop is asking somebody to pan sideways to read a
+  sentence. The cards leave their coordinates and become one column in the order the layout
+  holds them, which is ADR-0044's cluster stack view at its simplest: not a smaller canvas,
+  because pan and zoom mean nothing once everything is already as wide as the window, so the
+  transform is dropped and the column scrolls. The threshold belongs to the canvas — a window
+  exactly that wide keeps its plane, since stacking one that fits takes the desktop away from
+  somebody who could use it — and a window nobody has measured is not a narrow one, or every
+  panel would stack on the first frame and unstack on the second in front of the person.
+  Culling is off on a stack, which is the part that would have shipped wrong: it reads where a
+  card would be on a plane, and in a column that is nothing, so a panel the layout happens to
+  hold at ninety thousand pixels is simply the next one down. A browser test holds that.
+  What SD14 still lacks is a Dock that adapts to it.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned

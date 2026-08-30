@@ -563,7 +563,7 @@ mod pinch_tests {
             ((450.0, 400.0), (550.0, 400.0)),
             ((400.0, 400.0), (600.0, 400.0)),
         );
-        assert!((step.zoom - 2.0).abs() < 1e-9, "{:?}", step);
+        assert!((step.zoom - 2.0).abs() < 1e-9, "{step:?}");
     }
 
     #[test]
@@ -574,7 +574,7 @@ mod pinch_tests {
             ((400.0, 400.0), (600.0, 400.0)),
             ((450.0, 400.0), (550.0, 400.0)),
         );
-        assert!((step.zoom - 0.5).abs() < 1e-9, "{:?}", step);
+        assert!((step.zoom - 0.5).abs() < 1e-9, "{step:?}");
     }
 
     #[test]
@@ -609,8 +609,8 @@ mod pinch_tests {
             ((430.0, 380.0), (530.0, 380.0)),
         );
         assert!((step.zoom - 1.0).abs() < 1e-9);
-        assert!((step.pan.0 - 30.0).abs() < 1e-9, "{:?}", step);
-        assert!((step.pan.1 + 20.0).abs() < 1e-9, "{:?}", step);
+        assert!((step.pan.0 - 30.0).abs() < 1e-9, "{step:?}");
+        assert!((step.pan.1 + 20.0).abs() < 1e-9, "{step:?}");
     }
 
     #[test]
@@ -637,8 +637,16 @@ mod pinch_tests {
         let second = pinch_step(first.zoom, first.pan, wider, widest);
 
         // Already at the limit, so the only movement left is the midpoint, which has not moved.
-        assert_eq!(first.zoom, MAX_ZOOM);
-        assert_eq!(second.zoom, MAX_ZOOM);
+        // Compared exactly on purpose: `clamp` returns the bound itself, so anything but the bound
+        // means the clamp did not happen — which is the thing being asserted.
+        #[allow(
+            clippy::float_cmp,
+            reason = "clamp returns the bound, so equality is the claim"
+        )]
+        {
+            assert_eq!(first.zoom, MAX_ZOOM);
+            assert_eq!(second.zoom, MAX_ZOOM);
+        }
         assert!(
             (second.pan.0 - first.pan.0).abs() < 1e-9,
             "{first:?} {second:?}"
@@ -684,5 +692,73 @@ mod pinch_tests {
             pinch_step(f64::NAN, (0.0, 0.0), apart, apart).pan,
             (0.0, 0.0)
         );
+    }
+}
+
+/// The narrowest a window can be and still be a canvas.
+///
+/// Below this a panel is wider than the screen it is on, so a spatial desktop asks somebody to pan
+/// sideways to read a sentence. The number is where the smallest card this build opens — 380 pixels
+/// at its minimum width — stops fitting beside anything at all with room to hold it.
+pub const NARROWEST_CANVAS: f64 = 760.0;
+
+/// How the desktop is laid out, which is a fact about the window rather than a preference.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Presentation {
+    /// Panels at the coordinates the layout gives them, on a plane that pans and zooms.
+    Spatial,
+    /// Panels in one column, full width, in the order the layout holds them.
+    ///
+    /// ADR-0044 calls this a cluster stack view. It is not a smaller canvas: pan and zoom are
+    /// meaningless when everything is already as wide as the screen, and a person on a phone
+    /// scrolls rather than flies.
+    Stacked,
+}
+
+/// Which of the two a window of this width gets.
+///
+/// A window nobody has measured is `Spatial`, because zero is a viewport that has not been laid out
+/// and stacking the desktop on the strength of it would rearrange every panel on the first frame
+/// and rearrange them back on the second.
+#[must_use]
+pub fn presentation_for(viewport_width: f64) -> Presentation {
+    if !viewport_width.is_finite() || viewport_width <= 0.0 {
+        return Presentation::Spatial;
+    }
+    if viewport_width < NARROWEST_CANVAS {
+        Presentation::Stacked
+    } else {
+        Presentation::Spatial
+    }
+}
+
+#[cfg(test)]
+mod presentation_tests {
+    use super::{NARROWEST_CANVAS, Presentation, presentation_for};
+
+    #[test]
+    fn a_phone_gets_a_stack_and_a_desk_gets_a_canvas() {
+        assert_eq!(presentation_for(390.0), Presentation::Stacked);
+        assert_eq!(presentation_for(1440.0), Presentation::Spatial);
+    }
+
+    #[test]
+    fn the_boundary_belongs_to_the_canvas() {
+        // Exactly at the threshold there is room, so the canvas keeps it. Stacking a window that
+        // fits would be taking the desktop away from somebody who could use it.
+        assert_eq!(presentation_for(NARROWEST_CANVAS), Presentation::Spatial);
+        assert_eq!(
+            presentation_for(NARROWEST_CANVAS - 1.0),
+            Presentation::Stacked
+        );
+    }
+
+    #[test]
+    fn a_window_nobody_has_measured_is_not_a_narrow_one() {
+        // Zero is a viewport that has not been laid out. Reading it as narrow would stack every
+        // panel on the first frame and unstack them on the second, in front of the person.
+        assert_eq!(presentation_for(0.0), Presentation::Spatial);
+        assert_eq!(presentation_for(f64::NAN), Presentation::Spatial);
+        assert_eq!(presentation_for(-1.0), Presentation::Spatial);
     }
 }

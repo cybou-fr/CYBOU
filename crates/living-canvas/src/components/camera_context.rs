@@ -29,12 +29,18 @@ impl CanvasCamera {
     /// Whether this card is near enough to the window to be worth drawing.
     #[must_use]
     pub fn shows(&self, geometry: crate::CardGeometry) -> bool {
-        crate::layout::camera::is_within_view(
-            geometry,
-            self.pan.get(),
-            self.zoom.get(),
-            self.viewport.get(),
-        )
+        let viewport = self.viewport.get();
+
+        // On a stack the cards have left their coordinates: the column lays them out in order, and
+        // a panel the layout happens to hold at ninety thousand pixels is the second one down.
+        // Asking where it would have been on a plane would cull a card the person is looking at.
+        if crate::layout::camera::presentation_for(viewport.0)
+            == crate::layout::camera::Presentation::Stacked
+        {
+            return true;
+        }
+
+        crate::layout::camera::is_within_view(geometry, self.pan.get(), self.zoom.get(), viewport)
     }
 }
 

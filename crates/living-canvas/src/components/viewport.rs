@@ -46,11 +46,21 @@ pub fn CanvasViewport(
     // Where the camera is, for cards deciding whether they are worth drawing. Provided here
     // because this is the component that owns the transform; read by `CardFrame`, which is as far
     // from here as it is possible to be while still being on this canvas.
+    let measured = crate::components::camera_context::window_size();
     provide_context(crate::components::camera_context::CanvasCamera {
         pan,
         zoom,
-        viewport: crate::components::camera_context::window_size(),
+        viewport: measured,
     });
+
+    // Below a certain width a panel is wider than the screen it is on, and a spatial desktop is
+    // asking somebody to pan sideways to read a sentence. The panels become one column instead,
+    // which is ADR-0044's cluster stack view at its simplest: not a smaller canvas, because pan and
+    // zoom mean nothing when everything is already as wide as the window.
+    let is_stacked = move || {
+        crate::layout::camera::presentation_for(measured.get().0)
+            == crate::layout::camera::Presentation::Stacked
+    };
 
     // The two fingers of a pinch, by pointer id. A browser interleaves their moves, so both
     // positions have to be remembered as they were: the gesture is the change between frames, and
@@ -68,6 +78,7 @@ pub fn CanvasViewport(
     view! {
         <section
             class="canvas"
+            class:stacked=is_stacked
             id="canvas"
             class:lod-overview=is_lod_overview
             class:lod-glance=is_lod_glance
@@ -79,7 +90,7 @@ pub fn CanvasViewport(
             // pan — a large empty frame with its contents small in one corner. Focus means the same
             // thing at every zoom, which it cannot while the canvas is still scaling it.
             style=move || {
-                if matches!(view_mode.get(), DesktopViewMode::Focus(_)) {
+                if is_stacked() || matches!(view_mode.get(), DesktopViewMode::Focus(_)) {
                     "transform: none;".to_owned()
                 } else {
                     format!(

@@ -4129,3 +4129,46 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   text-align: center;
   color: var(--text-faint);
 }
+
+/* --------------------------------------------------------------------------------------------
+   The stack.
+
+   Below `NARROWEST_CANVAS` a panel is wider than the screen it is on, so the plane stops being a
+   plane: the cards leave their coordinates and become one column in the order the layout holds
+   them. ADR-0044 calls this a cluster stack view, and what makes it readable is that the panels
+   stop being positioned rather than that they are restyled.
+   -------------------------------------------------------------------------------------------- */
+.canvas.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+}
+
+.canvas.stacked .object {
+  /* Static, so the column lays them out. Their `left`/`top` are canvas coordinates and mean
+     nothing here; leaving them positioned would pile every card on top of the first. */
+  position: static !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 220px;
+  /* Dragging a card is a gesture for a plane. On a column it would only fight the scroll. */
+  cursor: default;
+  touch-action: pan-y;
+}
+
+/* The plane's own furniture has nothing to point at once the cards have left their coordinates. */
+.canvas.stacked .relationship-layer,
+.canvas.stacked .ambient,
+.canvas.stacked .canvas-cluster,
+.canvas.stacked .card-resize-handle {
+  display: none;
+}
+
+/* Scrolling is how a column is read, and the canvas is what scrolls. */
+.canvas.stacked {
+  overflow-y: auto;
+  touch-action: pan-y;
+}
