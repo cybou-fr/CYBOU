@@ -336,3 +336,66 @@ mod tests {
         );
     }
 }
+
+/// Which language an editor should colour this file as, from its name.
+///
+/// Case-insensitive, which the chain of `ends_with` comparisons this replaces was not: a `README.MD`
+/// written on a system that does not care about case, or a `SETUP.PY` from an archive, opened as
+/// plain text. The extension is a fact about the name and not about who typed it.
+///
+/// `"text"` for anything unrecognised, because guessing a language for a file this build has never
+/// heard of would colour it wrongly with confidence.
+#[must_use]
+pub fn language_for(file_name: &str) -> &'static str {
+    let extension = file_name
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .unwrap_or_default();
+
+    match extension.as_str() {
+        "rs" => "rust",
+        "py" => "python",
+        "sh" | "bash" => "shell",
+        "toml" => "toml",
+        "yaml" | "yml" => "yaml",
+        "json" => "json",
+        "md" | "markdown" => "markdown",
+        _ => "text",
+    }
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::language_for;
+
+    #[test]
+    fn a_name_is_read_whatever_case_it_was_written_in() {
+        assert_eq!(language_for("main.rs"), "rust");
+        assert_eq!(language_for("MAIN.RS"), "rust");
+        assert_eq!(language_for("README.Md"), "markdown");
+        assert_eq!(language_for("setup.PY"), "python");
+    }
+
+    #[test]
+    fn the_spellings_that_mean_the_same_thing_do() {
+        assert_eq!(language_for("a.yml"), language_for("a.yaml"));
+        assert_eq!(language_for("a.md"), language_for("a.markdown"));
+        assert_eq!(language_for("a.sh"), language_for("a.bash"));
+    }
+
+    #[test]
+    fn a_file_this_build_has_never_heard_of_is_text() {
+        // Rather than a guess coloured with confidence.
+        assert_eq!(language_for("notes"), "text");
+        assert_eq!(language_for("archive.tar.zst"), "text");
+        assert_eq!(language_for(""), "text");
+        assert_eq!(language_for(".hidden"), "text");
+    }
+
+    #[test]
+    fn only_the_last_dot_decides() {
+        // `notes.rs.bak` is a backup, not Rust.
+        assert_eq!(language_for("notes.rs.bak"), "text");
+        assert_eq!(language_for("archive.tar.py"), "python");
+    }
+}

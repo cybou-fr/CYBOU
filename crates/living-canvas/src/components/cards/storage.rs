@@ -126,7 +126,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                         <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
                                 <span style="font-weight: 600;">"Btrfs Pool Capacity"</span>
-                                <span style="font-family: monospace; color: #38bdf8;">{format!("{:.0} / {:.0} GB ({:.1}%)", used_gb, total_gb, pct)}</span>
+                                <span style="font-family: monospace; color: #38bdf8;">{format!("{used_gb:.0} / {total_gb:.0} GB ({pct:.1}%)")}</span>
                             </div>
                             <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;">
                                 <div style=format!("width: {}%; height: 100%; background: #38bdf8; border-radius: 3px;", pct.min(100.0)) />

@@ -145,7 +145,7 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                                     </div>
                                     <div>
                                         <span style="color: var(--text-faint);">"Traffic: "</span>
-                                        <span>{format!("↓ {} MB  ↑ {} MB", rx_mb, tx_mb)}</span>
+                                        <span>{format!("↓ {rx_mb} MB  ↑ {tx_mb} MB")}</span>
                                     </div>
                                 </div>
                             </div>

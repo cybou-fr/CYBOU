@@ -220,25 +220,23 @@ fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> im
             actions: Some(records),
             ..
         } = runtime.get()
+            && let Some(fid) = finding_id
+            && let Some(record) = records.iter().find(|r| r.cause_id == Some(fid))
         {
-            if let Some(fid) = finding_id {
-                if let Some(record) = records.iter().find(|r| r.cause_id == Some(fid)) {
-                    let exec = record.execution_started.is_some() || record.attempt.is_some();
-                    let rel = record
-                        .outcome
-                        .as_ref()
-                        .map_or(false, |o| o.relief == "relieved");
-                    let still = record
-                        .outcome
-                        .as_ref()
-                        .map_or(false, |o| o.relief == "still-present");
-                    let unest = record
-                        .outcome
-                        .as_ref()
-                        .map_or(false, |o| o.relief == "not-established");
-                    return (exec, rel, still, unest);
-                }
-            }
+            let exec = record.execution_started.is_some() || record.attempt.is_some();
+            let rel = record
+                .outcome
+                .as_ref()
+                .is_some_and(|o| o.relief == "relieved");
+            let still = record
+                .outcome
+                .as_ref()
+                .is_some_and(|o| o.relief == "still-present");
+            let unest = record
+                .outcome
+                .as_ref()
+                .is_some_and(|o| o.relief == "not-established");
+            return (exec, rel, still, unest);
         }
         (false, false, false, false)
     };

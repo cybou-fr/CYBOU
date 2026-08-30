@@ -220,21 +220,20 @@ pub fn EditorContent(
     };
 
     let update_cursor_position = move |e: &web_sys::Event| {
-        if let Some(target) = e.target() {
-            if let Ok(textarea) = target.dyn_into::<HtmlTextAreaElement>() {
-                if let Ok(Some(start)) = textarea.selection_start() {
-                    let char_offset = start as usize;
-                    let active_content = active_tab().content;
-                    let (line, col) = calculate_line_column(&active_content, char_offset);
-                    let idx = active_tab_index.get();
-                    tabs.update(|all| {
-                        if let Some(tab) = all.get_mut(idx) {
-                            tab.line = line;
-                            tab.col = col;
-                        }
-                    });
+        if let Some(target) = e.target()
+            && let Ok(textarea) = target.dyn_into::<HtmlTextAreaElement>()
+            && let Ok(Some(start)) = textarea.selection_start()
+        {
+            let char_offset = start as usize;
+            let active_content = active_tab().content;
+            let (line, col) = calculate_line_column(&active_content, char_offset);
+            let idx = active_tab_index.get();
+            tabs.update(|all| {
+                if let Some(tab) = all.get_mut(idx) {
+                    tab.line = line;
+                    tab.col = col;
                 }
-            }
+            });
         }
     };
 
@@ -668,7 +667,7 @@ pub fn EditorContent(
                                     .map(|(i, t)| (i, t.name, t.dirty, t.location.display_path()))
                                     .collect::<Vec<_>>()
                             }
-                            key=|(idx, name, dirty, path)| format!("{}-{}-{}-{}", idx, name, dirty, path)
+                            key=|(idx, name, dirty, path)| format!("{idx}-{name}-{dirty}-{path}")
                             children=move |(idx, name, dirty, _)| {
                                 let is_active = move || active_tab_index.get() == idx;
                                 view! {
@@ -933,11 +932,11 @@ pub fn EditorContent(
                             on:input=move |e| {
                                 let val = event_target_value(&e);
                                 update_current_content(val);
-                                update_cursor_position(&e.clone().into());
+                                update_cursor_position(&e.clone());
                             }
                             on:click=move |e| update_cursor_position(&e.clone().into())
                             on:keyup=move |e| update_cursor_position(&e.clone().into())
-                            on:select=move |e| update_cursor_position(&e.clone().into())
+                            on:select=move |e| update_cursor_position(&e.clone())
                         />
                     </div>
 

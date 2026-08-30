@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Unified generic CardFrame container encapsulating window mechanics, dragging, and resizing.
+//! Unified generic `CardFrame` container encapsulating window mechanics, dragging, and resizing.
 
 use leptos::prelude::*;
 use std::sync::Arc;

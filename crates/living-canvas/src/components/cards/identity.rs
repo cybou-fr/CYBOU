@@ -30,8 +30,7 @@ pub fn IdentityContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     let identity_origin = move || {
         mind()
             .and_then(|m| m.identity.origin)
-            .map(|origin| instant_label(&origin))
-            .unwrap_or_else(unread)
+            .map_or_else(unread, |origin| instant_label(&origin))
     };
     let identity_sessions = move || {
         mind()

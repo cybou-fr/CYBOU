@@ -225,7 +225,9 @@ pub fn ShellContent(
                             let out_copy = out.clone();
                             view! {
                                 <div class="shell-entry">
-                                    {if !cmd.is_empty() {
+                                    {if cmd.is_empty() {
+                                        view! { <span/> }.into_any()
+                                    } else {
                                         view! {
                                             <div class="shell-entry-header">
                                                 <div class="shell-cmd-echo">
@@ -254,8 +256,6 @@ pub fn ShellContent(
                                                 </div>
                                             </div>
                                         }.into_any()
-                                    } else {
-                                        view! { <span/> }.into_any()
                                     }}
                                     <AnsiOutput content=Signal::derive(move || out.clone()) is_error=code != 0 />
                                 </div>

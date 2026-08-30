@@ -4,6 +4,16 @@
 //! Runtime-independent client boundary for Living Canvas.
 
 #![allow(missing_docs)]
+// Every Leptos `#[component]` is a function returning `impl IntoView`, and `pedantic` asks all 120
+// of them to be `#[must_use]`. They are: the `view!` macro consumes what they return, and there is
+// no call site in this crate or any other that could discard one. Silenced with a reason rather
+// than answered one attribute at a time, because 120 warnings nobody can act on are what stops the
+// other 190 from being read — and an earlier attempt to answer them mechanically wrote the
+// attribute twice on every component and failed the build on `duplicated_attributes`.
+#![allow(
+    clippy::must_use_candidate,
+    reason = "a Leptos component's return value is consumed by the view macro that calls it"
+)]
 
 use async_trait::async_trait;
 use cybou_web_contracts::{
@@ -287,46 +297,87 @@ pub trait MindClient {
     async fn host_copy_path(&self, request: &HostPathCopyRequest) -> Result<(), ClientError>;
 
     /// List active and historical server operations.
-    async fn list_operations(&self) -> Result<cybou_web_contracts::OperationsListProjection, ClientError>;
+    async fn list_operations(
+        &self,
+    ) -> Result<cybou_web_contracts::OperationsListProjection, ClientError>;
 
     /// Get execution logs for a specific operation.
-    async fn get_operation_logs(&self, id: uuid::Uuid) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError>;
+    async fn get_operation_logs(
+        &self,
+        id: uuid::Uuid,
+    ) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError>;
 
     /// Cancel a running server operation.
-    async fn cancel_operation(&self, id: uuid::Uuid, reason: Option<String>) -> Result<(), ClientError>;
+    async fn cancel_operation(
+        &self,
+        id: uuid::Uuid,
+        reason: Option<String>,
+    ) -> Result<(), ClientError>;
 
     /// List desktop notifications.
-    async fn list_notifications(&self) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError>;
+    async fn list_notifications(
+        &self,
+    ) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError>;
 
     /// Dismiss one or all notifications.
-    async fn dismiss_notifications(&self, id: Option<uuid::Uuid>, dismiss_all: bool) -> Result<(), ClientError>;
+    async fn dismiss_notifications(
+        &self,
+        id: Option<uuid::Uuid>,
+        dismiss_all: bool,
+    ) -> Result<(), ClientError>;
 
     /// Trigger an interactive notification action.
-    async fn execute_notification_action(&self, id: uuid::Uuid, action_id: &str) -> Result<String, ClientError>;
+    async fn execute_notification_action(
+        &self,
+        id: uuid::Uuid,
+        action_id: &str,
+    ) -> Result<String, ClientError>;
 
     /// List system services and daemons.
-    async fn list_services(&self) -> Result<cybou_web_contracts::ServicesListProjection, ClientError>;
+    async fn list_services(
+        &self,
+    ) -> Result<cybou_web_contracts::ServicesListProjection, ClientError>;
 
     /// Execute a state action on a system service.
-    async fn execute_service_action(&self, name: &str, action: cybou_protocol::system::ServiceAction) -> Result<String, ClientError>;
+    async fn execute_service_action(
+        &self,
+        name: &str,
+        action: cybou_protocol::system::ServiceAction,
+    ) -> Result<String, ClientError>;
 
     /// List active operating system processes.
-    async fn list_processes(&self) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError>;
+    async fn list_processes(
+        &self,
+    ) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError>;
 
     /// Deliver a signal to an operating system process.
-    async fn send_process_signal(&self, pid: u32, signal: cybou_protocol::system::ProcessSignal) -> Result<String, ClientError>;
+    async fn send_process_signal(
+        &self,
+        pid: u32,
+        signal: cybou_protocol::system::ProcessSignal,
+    ) -> Result<String, ClientError>;
 
     /// Get current hardware telemetry & resource monitor metrics.
-    async fn get_system_monitor(&self) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError>;
+    async fn get_system_monitor(
+        &self,
+    ) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError>;
 
     /// Query system log entries.
-    async fn get_system_logs(&self, query: &cybou_web_contracts::SystemLogsQueryRequest) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError>;
+    async fn get_system_logs(
+        &self,
+        query: &cybou_web_contracts::SystemLogsQueryRequest,
+    ) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError>;
 
     /// List Btrfs subvolumes and snapshots.
     async fn get_storage(&self) -> Result<cybou_web_contracts::StorageProjection, ClientError>;
 
     /// Create a point-in-time filesystem snapshot.
-    async fn create_snapshot(&self, subvolume: &str, name: &str, readonly: bool) -> Result<cybou_protocol::system::SnapshotRecord, ClientError>;
+    async fn create_snapshot(
+        &self,
+        subvolume: &str,
+        name: &str,
+        readonly: bool,
+    ) -> Result<cybou_protocol::system::SnapshotRecord, ClientError>;
 
     /// Restore a filesystem snapshot.
     async fn restore_snapshot(&self, snapshot_id: &str) -> Result<String, ClientError>;
@@ -335,109 +386,202 @@ pub trait MindClient {
     async fn get_network(&self) -> Result<cybou_web_contracts::NetworkProjection, ClientError>;
 
     /// Connect or disconnect a network profile.
-    async fn connect_network(&self, connection_id: &str, activate: bool) -> Result<String, ClientError>;
+    async fn connect_network(
+        &self,
+        connection_id: &str,
+        activate: bool,
+    ) -> Result<String, ClientError>;
 
     /// List software packages.
     async fn get_packages(&self) -> Result<cybou_web_contracts::PackagesProjection, ClientError>;
 
     /// Execute a package operation (install/upgrade/remove).
-    async fn execute_package_action(&self, name: &str, action: cybou_protocol::system::PackageActionKind) -> Result<String, ClientError>;
+    async fn execute_package_action(
+        &self,
+        name: &str,
+        action: cybou_protocol::system::PackageActionKind,
+    ) -> Result<String, ClientError>;
 
     /// Get system update status summary.
-    async fn get_system_updates(&self) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError>;
+    async fn get_system_updates(
+        &self,
+    ) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError>;
 
     /// Apply pending system updates.
-    async fn apply_system_updates(&self, package_names: Option<Vec<String>>) -> Result<String, ClientError>;
+    async fn apply_system_updates(
+        &self,
+        package_names: Option<Vec<String>>,
+    ) -> Result<String, ClientError>;
 
     /// Get user accounts and authorized SSH keys.
-    async fn get_users_settings(&self) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError>;
+    async fn get_users_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError>;
 
     /// Create a new local user account.
-    async fn create_user(&self, username: &str, full_name: &str, is_admin: bool) -> Result<cybou_protocol::system::UserAccountRecord, ClientError>;
+    async fn create_user(
+        &self,
+        username: &str,
+        full_name: &str,
+        is_admin: bool,
+    ) -> Result<cybou_protocol::system::UserAccountRecord, ClientError>;
 
     /// Add an authorized SSH public key.
-    async fn add_ssh_key(&self, name: &str, public_key: &str) -> Result<cybou_protocol::system::SshKeyRecord, ClientError>;
+    async fn add_ssh_key(
+        &self,
+        name: &str,
+        public_key: &str,
+    ) -> Result<cybou_protocol::system::SshKeyRecord, ClientError>;
 
     /// Delete an authorized SSH public key.
     async fn delete_ssh_key(&self, key_id: &str) -> Result<String, ClientError>;
 
     /// Get security policy and audit log.
-    async fn get_security_settings(&self) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError>;
+    async fn get_security_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError>;
 
     /// Update security sandboxing policy.
-    async fn update_security_policy(&self, req: cybou_web_contracts::UpdateSecurityPolicyRequest) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError>;
+    async fn update_security_policy(
+        &self,
+        req: cybou_web_contracts::UpdateSecurityPolicyRequest,
+    ) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError>;
 
     /// Get Borg/Btrfs backup repository settings and archives.
-    async fn get_backup_settings(&self) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError>;
+    async fn get_backup_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError>;
 
     /// Trigger an immediate backup snapshot.
-    async fn trigger_backup(&self, name: Option<String>) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError>;
+    async fn trigger_backup(
+        &self,
+        name: Option<String>,
+    ) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError>;
 
     /// Restore a backup archive.
-    async fn restore_archive(&self, archive_id: &str, target_path: Option<String>) -> Result<String, ClientError>;
+    async fn restore_archive(
+        &self,
+        archive_id: &str,
+        target_path: Option<String>,
+    ) -> Result<String, ClientError>;
 
     /// Update automated backup schedule.
-    async fn update_backup_schedule(&self, req: cybou_web_contracts::UpdateBackupScheduleRequest) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError>;
+    async fn update_backup_schedule(
+        &self,
+        req: cybou_web_contracts::UpdateBackupScheduleRequest,
+    ) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError>;
 
     /// Get personal email messages and accounts.
-    async fn get_mail(&self, account_id: Option<String>, folder: Option<cybou_protocol::personal::MailFolderKind>) -> Result<cybou_web_contracts::MailProjection, ClientError>;
+    async fn get_mail(
+        &self,
+        account_id: Option<String>,
+        folder: Option<cybou_protocol::personal::MailFolderKind>,
+    ) -> Result<cybou_web_contracts::MailProjection, ClientError>;
 
     /// Compose and send a new email.
-    async fn send_mail(&self, req: cybou_web_contracts::SendMailRequest) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError>;
+    async fn send_mail(
+        &self,
+        req: cybou_web_contracts::SendMailRequest,
+    ) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError>;
 
     /// Get personal calendar events.
     async fn get_calendar(&self) -> Result<cybou_web_contracts::CalendarProjection, ClientError>;
 
     /// Create a new calendar event.
-    async fn create_calendar_event(&self, req: cybou_web_contracts::CreateCalendarEventRequest) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError>;
+    async fn create_calendar_event(
+        &self,
+        req: cybou_web_contracts::CreateCalendarEventRequest,
+    ) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError>;
 
     /// Get personal notes.
     async fn get_notes(&self) -> Result<cybou_web_contracts::NotesProjection, ClientError>;
 
     /// Create a new personal note.
-    async fn create_note(&self, req: cybou_web_contracts::CreateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError>;
+    async fn create_note(
+        &self,
+        req: cybou_web_contracts::CreateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, ClientError>;
 
     /// Update an existing personal note.
-    async fn update_note(&self, req: cybou_web_contracts::UpdateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError>;
+    async fn update_note(
+        &self,
+        req: cybou_web_contracts::UpdateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, ClientError>;
 
     /// Get address book contacts.
     async fn get_contacts(&self) -> Result<cybou_web_contracts::ContactsProjection, ClientError>;
 
     /// Create a new address book contact.
-    async fn create_contact(&self, req: cybou_web_contracts::CreateContactRequest) -> Result<cybou_protocol::personal::ContactRecord, ClientError>;
+    async fn create_contact(
+        &self,
+        req: cybou_web_contracts::CreateContactRequest,
+    ) -> Result<cybou_protocol::personal::ContactRecord, ClientError>;
 
     /// Retrieve the deep unified Cognitive Graph.
-    async fn get_cognitive_graph(&self, focus: Option<String>) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError>;
+    async fn get_cognitive_graph(
+        &self,
+        focus: Option<String>,
+    ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError>;
 
     /// Query subgraphs and causal relations in the Cognitive Graph.
-    async fn query_cognitive_graph(&self, req: cybou_web_contracts::CognitiveQueryRequest) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError>;
+    async fn query_cognitive_graph(
+        &self,
+        req: cybou_web_contracts::CognitiveQueryRequest,
+    ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError>;
 
     /// Retrieve the canonical Event1 chronological journal.
-    async fn get_event_journal(&self, limit: Option<usize>, offset: Option<usize>) -> Result<cybou_web_contracts::EventJournalProjection, ClientError>;
+    async fn get_event_journal(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<cybou_web_contracts::EventJournalProjection, ClientError>;
 
     /// Interpret a natural language query into a typed cognitive act and realize a qualified response.
-    async fn interpret_meaning(&self, req: &cybou_web_contracts::MeaningInterpretRequest) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError>;
+    async fn interpret_meaning(
+        &self,
+        req: &cybou_web_contracts::MeaningInterpretRequest,
+    ) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError>;
 
     /// Retrieve active dialogue memory status and referents.
-    async fn get_dialogue_memory(&self) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError>;
+    async fn get_dialogue_memory(
+        &self,
+    ) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError>;
 
     /// Retrieve active learning candidates.
-    async fn get_learning_candidates(&self, layer: Option<String>) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError>;
+    async fn get_learning_candidates(
+        &self,
+        layer: Option<String>,
+    ) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError>;
 
     /// Propose a new learning candidate.
-    async fn propose_learning_candidate(&self, req: &cybou_web_contracts::ProposeLearningCandidateRequest) -> Result<cybou_protocol::learning::LearningCandidate, ClientError>;
+    async fn propose_learning_candidate(
+        &self,
+        req: &cybou_web_contracts::ProposeLearningCandidateRequest,
+    ) -> Result<cybou_protocol::learning::LearningCandidate, ClientError>;
 
     /// Evaluate a candidate against demonstrated episodic outcomes and promotion criteria.
-    async fn evaluate_learning_candidate(&self, candidate_id: uuid::Uuid, req: Option<&cybou_web_contracts::EvaluateCandidateRequest>) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError>;
+    async fn evaluate_learning_candidate(
+        &self,
+        candidate_id: uuid::Uuid,
+        req: Option<&cybou_web_contracts::EvaluateCandidateRequest>,
+    ) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError>;
 
     /// Retrieve promoted durable artifacts and lineages.
-    async fn get_learned_artifacts(&self) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError>;
+    async fn get_learned_artifacts(
+        &self,
+    ) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError>;
 
     /// Revoke or deprecate a promoted artifact.
-    async fn revoke_learned_artifact(&self, artifact_id: uuid::Uuid, reason: &str) -> Result<(), ClientError>;
+    async fn revoke_learned_artifact(
+        &self,
+        artifact_id: uuid::Uuid,
+        reason: &str,
+    ) -> Result<(), ClientError>;
 
     /// Retrieve active task scopes and capability grants.
-    async fn get_governance_scopes(&self) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError>;
+    async fn get_governance_scopes(
+        &self,
+    ) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError>;
 
     /// End one of the caller's shells, because the card standing in it was closed.
     ///
@@ -833,7 +977,9 @@ impl MindClient for MockMindClient {
         ))
     }
 
-    async fn list_operations(&self) -> Result<cybou_web_contracts::OperationsListProjection, ClientError> {
+    async fn list_operations(
+        &self,
+    ) -> Result<cybou_web_contracts::OperationsListProjection, ClientError> {
         Ok(cybou_web_contracts::OperationsListProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             active_count: 0,
@@ -841,7 +987,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_operation_logs(&self, id: uuid::Uuid) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError> {
+    async fn get_operation_logs(
+        &self,
+        id: uuid::Uuid,
+    ) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError> {
         Ok(cybou_web_contracts::OperationLogsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             operation_id: id,
@@ -849,11 +998,17 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn cancel_operation(&self, _id: uuid::Uuid, _reason: Option<String>) -> Result<(), ClientError> {
+    async fn cancel_operation(
+        &self,
+        _id: uuid::Uuid,
+        _reason: Option<String>,
+    ) -> Result<(), ClientError> {
         Ok(())
     }
 
-    async fn list_notifications(&self) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError> {
+    async fn list_notifications(
+        &self,
+    ) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError> {
         Ok(cybou_web_contracts::NotificationsListProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             unread_count: 0,
@@ -862,15 +1017,25 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn dismiss_notifications(&self, _id: Option<uuid::Uuid>, _dismiss_all: bool) -> Result<(), ClientError> {
+    async fn dismiss_notifications(
+        &self,
+        _id: Option<uuid::Uuid>,
+        _dismiss_all: bool,
+    ) -> Result<(), ClientError> {
         Ok(())
     }
 
-    async fn execute_notification_action(&self, _id: uuid::Uuid, _action_id: &str) -> Result<String, ClientError> {
+    async fn execute_notification_action(
+        &self,
+        _id: uuid::Uuid,
+        _action_id: &str,
+    ) -> Result<String, ClientError> {
         Ok("mock action executed".to_owned())
     }
 
-    async fn list_services(&self) -> Result<cybou_web_contracts::ServicesListProjection, ClientError> {
+    async fn list_services(
+        &self,
+    ) -> Result<cybou_web_contracts::ServicesListProjection, ClientError> {
         Ok(cybou_web_contracts::ServicesListProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             active_count: 0,
@@ -879,11 +1044,17 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn execute_service_action(&self, name: &str, _action: cybou_protocol::system::ServiceAction) -> Result<String, ClientError> {
+    async fn execute_service_action(
+        &self,
+        name: &str,
+        _action: cybou_protocol::system::ServiceAction,
+    ) -> Result<String, ClientError> {
         Ok(format!("Mock executed action on {name}"))
     }
 
-    async fn list_processes(&self) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError> {
+    async fn list_processes(
+        &self,
+    ) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError> {
         Ok(cybou_web_contracts::ProcessesListProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             total_count: 0,
@@ -893,11 +1064,17 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn send_process_signal(&self, pid: u32, _signal: cybou_protocol::system::ProcessSignal) -> Result<String, ClientError> {
+    async fn send_process_signal(
+        &self,
+        pid: u32,
+        _signal: cybou_protocol::system::ProcessSignal,
+    ) -> Result<String, ClientError> {
         Ok(format!("Mock sent signal to PID {pid}"))
     }
 
-    async fn get_system_monitor(&self) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError> {
+    async fn get_system_monitor(
+        &self,
+    ) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError> {
         Ok(cybou_web_contracts::SystemMonitorProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             hostname: "mock-host".to_owned(),
@@ -916,7 +1093,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_system_logs(&self, _query: &cybou_web_contracts::SystemLogsQueryRequest) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError> {
+    async fn get_system_logs(
+        &self,
+        _query: &cybou_web_contracts::SystemLogsQueryRequest,
+    ) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError> {
         Ok(cybou_web_contracts::SystemLogsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             logs: Vec::new(),
@@ -935,7 +1115,12 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn create_snapshot(&self, subvolume: &str, name: &str, readonly: bool) -> Result<cybou_protocol::system::SnapshotRecord, ClientError> {
+    async fn create_snapshot(
+        &self,
+        subvolume: &str,
+        name: &str,
+        readonly: bool,
+    ) -> Result<cybou_protocol::system::SnapshotRecord, ClientError> {
         Ok(cybou_protocol::system::SnapshotRecord {
             id: "mock-snap-01".to_owned(),
             subvolume_path: subvolume.to_owned(),
@@ -957,7 +1142,11 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn connect_network(&self, connection_id: &str, activate: bool) -> Result<String, ClientError> {
+    async fn connect_network(
+        &self,
+        connection_id: &str,
+        activate: bool,
+    ) -> Result<String, ClientError> {
         Ok(format!("Mock network {connection_id} activate={activate}"))
     }
 
@@ -970,11 +1159,17 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn execute_package_action(&self, name: &str, action: cybou_protocol::system::PackageActionKind) -> Result<String, ClientError> {
+    async fn execute_package_action(
+        &self,
+        name: &str,
+        action: cybou_protocol::system::PackageActionKind,
+    ) -> Result<String, ClientError> {
         Ok(format!("Mock package action on {name}: {action:?}"))
     }
 
-    async fn get_system_updates(&self) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError> {
+    async fn get_system_updates(
+        &self,
+    ) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError> {
         Ok(cybou_web_contracts::SystemUpdatesProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             summary: cybou_protocol::system::SystemUpdatesSummary {
@@ -988,11 +1183,16 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn apply_system_updates(&self, _package_names: Option<Vec<String>>) -> Result<String, ClientError> {
+    async fn apply_system_updates(
+        &self,
+        _package_names: Option<Vec<String>>,
+    ) -> Result<String, ClientError> {
         Ok("Mock applied system updates".to_owned())
     }
 
-    async fn get_users_settings(&self) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError> {
+    async fn get_users_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError> {
         Ok(cybou_web_contracts::UsersSettingsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             users: Vec::new(),
@@ -1000,7 +1200,12 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn create_user(&self, username: &str, full_name: &str, is_admin: bool) -> Result<cybou_protocol::system::UserAccountRecord, ClientError> {
+    async fn create_user(
+        &self,
+        username: &str,
+        full_name: &str,
+        is_admin: bool,
+    ) -> Result<cybou_protocol::system::UserAccountRecord, ClientError> {
         Ok(cybou_protocol::system::UserAccountRecord {
             uid: 1001,
             username: username.to_owned(),
@@ -1013,7 +1218,11 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn add_ssh_key(&self, name: &str, public_key: &str) -> Result<cybou_protocol::system::SshKeyRecord, ClientError> {
+    async fn add_ssh_key(
+        &self,
+        name: &str,
+        public_key: &str,
+    ) -> Result<cybou_protocol::system::SshKeyRecord, ClientError> {
         Ok(cybou_protocol::system::SshKeyRecord {
             id: "mock-key-01".to_owned(),
             name: name.to_owned(),
@@ -1028,7 +1237,9 @@ impl MindClient for MockMindClient {
         Ok(format!("Mock deleted SSH key {key_id}"))
     }
 
-    async fn get_security_settings(&self) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError> {
+    async fn get_security_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError> {
         Ok(cybou_web_contracts::SecuritySettingsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             policy: cybou_protocol::system::SecurityPolicyRecord {
@@ -1042,7 +1253,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn update_security_policy(&self, req: cybou_web_contracts::UpdateSecurityPolicyRequest) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError> {
+    async fn update_security_policy(
+        &self,
+        req: cybou_web_contracts::UpdateSecurityPolicyRequest,
+    ) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError> {
         Ok(cybou_protocol::system::SecurityPolicyRecord {
             landlock_enabled: req.landlock_enabled,
             bubblewrap_enabled: req.bubblewrap_enabled,
@@ -1052,7 +1266,9 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_backup_settings(&self) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError> {
+    async fn get_backup_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError> {
         Ok(cybou_web_contracts::BackupSettingsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             repository: cybou_protocol::system::BackupRepositoryRecord {
@@ -1075,7 +1291,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn trigger_backup(&self, name: Option<String>) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError> {
+    async fn trigger_backup(
+        &self,
+        name: Option<String>,
+    ) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError> {
         Ok(cybou_protocol::system::BackupArchiveRecord {
             id: "mock-arch-01".to_owned(),
             name: name.unwrap_or_else(|| "backup".to_owned()),
@@ -1085,11 +1304,18 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn restore_archive(&self, archive_id: &str, _target_path: Option<String>) -> Result<String, ClientError> {
+    async fn restore_archive(
+        &self,
+        archive_id: &str,
+        _target_path: Option<String>,
+    ) -> Result<String, ClientError> {
         Ok(format!("Mock restored archive {archive_id}"))
     }
 
-    async fn update_backup_schedule(&self, req: cybou_web_contracts::UpdateBackupScheduleRequest) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError> {
+    async fn update_backup_schedule(
+        &self,
+        req: cybou_web_contracts::UpdateBackupScheduleRequest,
+    ) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError> {
         Ok(cybou_protocol::system::BackupScheduleRecord {
             enabled: req.enabled,
             frequency: req.frequency,
@@ -1099,7 +1325,11 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_mail(&self, account_id: Option<String>, folder: Option<cybou_protocol::personal::MailFolderKind>) -> Result<cybou_web_contracts::MailProjection, ClientError> {
+    async fn get_mail(
+        &self,
+        account_id: Option<String>,
+        folder: Option<cybou_protocol::personal::MailFolderKind>,
+    ) -> Result<cybou_web_contracts::MailProjection, ClientError> {
         Ok(cybou_web_contracts::MailProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             accounts: Vec::new(),
@@ -1109,7 +1339,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn send_mail(&self, req: cybou_web_contracts::SendMailRequest) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError> {
+    async fn send_mail(
+        &self,
+        req: cybou_web_contracts::SendMailRequest,
+    ) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError> {
         Ok(cybou_protocol::personal::MailMessageRecord {
             id: "mock-msg-01".to_owned(),
             account_id: req.account_id,
@@ -1133,7 +1366,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn create_calendar_event(&self, req: cybou_web_contracts::CreateCalendarEventRequest) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError> {
+    async fn create_calendar_event(
+        &self,
+        req: cybou_web_contracts::CreateCalendarEventRequest,
+    ) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError> {
         Ok(cybou_protocol::personal::CalendarEventRecord {
             id: "mock-evt-01".to_owned(),
             title: req.title,
@@ -1155,7 +1391,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn create_note(&self, req: cybou_web_contracts::CreateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
+    async fn create_note(
+        &self,
+        req: cybou_web_contracts::CreateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
         Ok(cybou_protocol::personal::NoteRecord {
             id: "mock-note-01".to_owned(),
             title: req.title,
@@ -1167,7 +1406,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn update_note(&self, req: cybou_web_contracts::UpdateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
+    async fn update_note(
+        &self,
+        req: cybou_web_contracts::UpdateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
         Ok(cybou_protocol::personal::NoteRecord {
             id: req.id,
             title: req.title,
@@ -1186,7 +1428,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn create_contact(&self, req: cybou_web_contracts::CreateContactRequest) -> Result<cybou_protocol::personal::ContactRecord, ClientError> {
+    async fn create_contact(
+        &self,
+        req: cybou_web_contracts::CreateContactRequest,
+    ) -> Result<cybou_protocol::personal::ContactRecord, ClientError> {
         Ok(cybou_protocol::personal::ContactRecord {
             id: "mock-cnt-01".to_owned(),
             name: req.name,
@@ -1200,7 +1445,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_cognitive_graph(&self, focus: Option<String>) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
+    async fn get_cognitive_graph(
+        &self,
+        focus: Option<String>,
+    ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
         Ok(cybou_web_contracts::CognitiveGraphProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             graph: cybou_protocol::cognitive::CognitiveGraphRecord {
@@ -1211,7 +1459,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn query_cognitive_graph(&self, req: cybou_web_contracts::CognitiveQueryRequest) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
+    async fn query_cognitive_graph(
+        &self,
+        req: cybou_web_contracts::CognitiveQueryRequest,
+    ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
         Ok(cybou_web_contracts::CognitiveGraphProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             graph: cybou_protocol::cognitive::CognitiveGraphRecord {
@@ -1222,7 +1473,11 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_event_journal(&self, _limit: Option<usize>, _offset: Option<usize>) -> Result<cybou_web_contracts::EventJournalProjection, ClientError> {
+    async fn get_event_journal(
+        &self,
+        _limit: Option<usize>,
+        _offset: Option<usize>,
+    ) -> Result<cybou_web_contracts::EventJournalProjection, ClientError> {
         Ok(cybou_web_contracts::EventJournalProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             entries: Vec::new(),
@@ -1230,7 +1485,10 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn interpret_meaning(&self, req: &cybou_web_contracts::MeaningInterpretRequest) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError> {
+    async fn interpret_meaning(
+        &self,
+        req: &cybou_web_contracts::MeaningInterpretRequest,
+    ) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::MeaningInterpretProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
@@ -1260,7 +1518,9 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_dialogue_memory(&self) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError> {
+    async fn get_dialogue_memory(
+        &self,
+    ) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError> {
         Ok(cybou_web_contracts::DialogueMemoryProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             current_turn: 1,
@@ -1269,27 +1529,31 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_learning_candidates(&self, _layer: Option<String>) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError> {
+    async fn get_learning_candidates(
+        &self,
+        _layer: Option<String>,
+    ) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::LearningCandidatesProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-            candidates: vec![
-                cybou_protocol::learning::LearningCandidate {
-                    candidate_id: uuid::Uuid::new_v4(),
-                    layer: cybou_protocol::learning::LearningLayer::Procedural,
-                    source_evidence: vec![uuid::Uuid::new_v4()],
-                    outcome_evidence: vec![uuid::Uuid::new_v4()],
-                    generalization: "Auto-reconnect D-Bus daemon on dropped connection".into(),
-                    scope: "service.dbus".into(),
-                    derivation_version: 1,
-                    created_at: now,
-                },
-            ],
+            candidates: vec![cybou_protocol::learning::LearningCandidate {
+                candidate_id: uuid::Uuid::new_v4(),
+                layer: cybou_protocol::learning::LearningLayer::Procedural,
+                source_evidence: vec![uuid::Uuid::new_v4()],
+                outcome_evidence: vec![uuid::Uuid::new_v4()],
+                generalization: "Auto-reconnect D-Bus daemon on dropped connection".into(),
+                scope: "service.dbus".into(),
+                derivation_version: 1,
+                created_at: now,
+            }],
             total_count: 1,
         })
     }
 
-    async fn propose_learning_candidate(&self, req: &cybou_web_contracts::ProposeLearningCandidateRequest) -> Result<cybou_protocol::learning::LearningCandidate, ClientError> {
+    async fn propose_learning_candidate(
+        &self,
+        req: &cybou_web_contracts::ProposeLearningCandidateRequest,
+    ) -> Result<cybou_protocol::learning::LearningCandidate, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_protocol::learning::LearningCandidate {
             candidate_id: uuid::Uuid::new_v4(),
@@ -1303,7 +1567,11 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn evaluate_learning_candidate(&self, candidate_id: uuid::Uuid, _req: Option<&cybou_web_contracts::EvaluateCandidateRequest>) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
+    async fn evaluate_learning_candidate(
+        &self,
+        candidate_id: uuid::Uuid,
+        _req: Option<&cybou_web_contracts::EvaluateCandidateRequest>,
+    ) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::CandidateEvaluationProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
@@ -1327,47 +1595,51 @@ impl MindClient for MockMindClient {
         })
     }
 
-    async fn get_learned_artifacts(&self) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError> {
+    async fn get_learned_artifacts(
+        &self,
+    ) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::LearnedArtifactsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-            artifacts: vec![
-                cybou_protocol::learning::LearnedArtifactLineage {
-                    artifact_id: uuid::Uuid::new_v4(),
-                    layer: cybou_protocol::learning::LearningLayer::Procedural,
-                    status: cybou_protocol::learning::ArtifactStatus::Promoted,
-                    contributing_candidates: vec![uuid::Uuid::new_v4()],
-                    source_evidence: vec![uuid::Uuid::new_v4()],
-                    promoted_at: Some(now),
-                    erasure_epoch: 1,
-                },
-            ],
+            artifacts: vec![cybou_protocol::learning::LearnedArtifactLineage {
+                artifact_id: uuid::Uuid::new_v4(),
+                layer: cybou_protocol::learning::LearningLayer::Procedural,
+                status: cybou_protocol::learning::ArtifactStatus::Promoted,
+                contributing_candidates: vec![uuid::Uuid::new_v4()],
+                source_evidence: vec![uuid::Uuid::new_v4()],
+                promoted_at: Some(now),
+                erasure_epoch: 1,
+            }],
             total_count: 1,
         })
     }
 
-    async fn revoke_learned_artifact(&self, _artifact_id: uuid::Uuid, _reason: &str) -> Result<(), ClientError> {
+    async fn revoke_learned_artifact(
+        &self,
+        _artifact_id: uuid::Uuid,
+        _reason: &str,
+    ) -> Result<(), ClientError> {
         Ok(())
     }
 
-    async fn get_governance_scopes(&self) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError> {
+    async fn get_governance_scopes(
+        &self,
+    ) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::GovernanceScopesProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-            scopes: vec![
-                cybou_protocol::governance::TaskScope {
-                    actor_id: uuid::Uuid::new_v4(),
-                    kind: cybou_protocol::governance::ActorKind::Agent,
-                    intention_id: Some(uuid::Uuid::new_v4()),
-                    capabilities: vec!["fs.read".into(), "terminal.exec".into()],
-                    tool_grants: vec!["git.status".into()],
-                    network_destinations: vec!["localhost".into()],
-                    ttl_seconds: 3600,
-                    max_compute_ms: 60000,
-                    delegation_permitted: true,
-                    granted_at: now,
-                },
-            ],
+            scopes: vec![cybou_protocol::governance::TaskScope {
+                actor_id: uuid::Uuid::new_v4(),
+                kind: cybou_protocol::governance::ActorKind::Agent,
+                intention_id: Some(uuid::Uuid::new_v4()),
+                capabilities: vec!["fs.read".into(), "terminal.exec".into()],
+                tool_grants: vec!["git.status".into()],
+                network_destinations: vec!["localhost".into()],
+                ttl_seconds: 3600,
+                max_compute_ms: 60000,
+                delegation_permitted: true,
+                granted_at: now,
+            }],
         })
     }
 

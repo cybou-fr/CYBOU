@@ -55,9 +55,10 @@ pub fn RelationshipsLayer(
 ) -> impl IntoView {
     let relationships = DesktopRelationshipGraph::canonical();
     let vis = move || {
-        visibility
-            .map(|v| v.get())
-            .unwrap_or(crate::layout::relations::RelationVisibility::Selected)
+        visibility.map_or(
+            crate::layout::relations::RelationVisibility::Selected,
+            |v| v.get(),
+        )
     };
 
     view! {

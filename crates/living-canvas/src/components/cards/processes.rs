@@ -88,7 +88,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
             }),
             "memory" => list.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes)),
             "pid" => list.sort_by_key(|p| p.pid),
-            "name" => list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+            "name" => list.sort_by_key(|a| a.name.to_lowercase()),
             _ => {}
         }
         list

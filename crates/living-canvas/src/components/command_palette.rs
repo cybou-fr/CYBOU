@@ -663,7 +663,7 @@ pub fn CommandPalette(
         "arrange-relations" => {
             history.update(|h| h.push(layout.get_untracked()));
             layout.update(|l| {
-                l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport()))
+                l.apply_arrangement(ArrangementMode::Relations, Some(usable_viewport()));
             });
             layout.get_untracked().save();
             set_command_open.set(false);
@@ -825,11 +825,10 @@ pub fn CommandPalette(
                             let idx = selected_index.get();
                             if let Some(action) = actions.get(idx) {
                                 execute_action(action.id);
-                            } else if let Some(ans) = ask_answer() {
-                                if let Some((_, card)) = ans.target {
+                            } else if let Some(ans) = ask_answer()
+                                && let Some((_, card)) = ans.target {
                                     focus_or_open_card(card, 380.0, 480.0);
                                 }
-                            }
                         } else if key == "Escape" {
                             set_command_open.set(false);
                         }

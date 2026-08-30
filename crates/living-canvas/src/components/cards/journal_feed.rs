@@ -29,7 +29,7 @@ async fn async_sleep(ms: i32) {
 #[cfg(not(target_arch = "wasm32"))]
 async fn async_sleep(_ms: i32) {}
 
-/// Connection state established from EventSource callbacks, never inferred from pause state.
+/// Connection state established from `EventSource` callbacks, never inferred from pause state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum StreamState {
     Connecting,
@@ -105,7 +105,7 @@ pub fn JournalFeedContent() -> impl IntoView {
                         let retryable = serde_json::from_str::<serde_json::Value>(&data)
                             .ok()
                             .and_then(|value| {
-                                value.get("retryable").and_then(|value| value.as_bool())
+                                value.get("retryable").and_then(serde_json::Value::as_bool)
                             })
                             .unwrap_or(false);
                         set_stream_state.set(if retryable {
@@ -313,7 +313,7 @@ pub fn JournalFeedContent() -> impl IntoView {
                         let selected_time = t.clone();
                         let selected_topic = top.clone();
                         let is_selected = move || {
-                            selected_event.get().as_ref().map_or(false, |ev| {
+                            selected_event.get().as_ref().is_some_and(|ev| {
                                 ev.0 == selected_time && ev.1 == selected_topic
                             })
                         };

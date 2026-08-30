@@ -120,7 +120,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                             if att > 0 {
                                 Some(view! {
                                     <span style="background: var(--danger-fill-strong); color: var(--danger); font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
-                                        {format!("{} Attention", att)}
+                                        {format!("{att} Attention")}
                                     </span>
                                 })
                             } else {
@@ -288,7 +288,9 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                                 })}
 
                                 // Action Buttons
-                                {if !notif.actions.is_empty() {
+                                {if notif.actions.is_empty() {
+                                    None
+                                } else {
                                     Some(view! {
                                         <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--fill-faintest);">
                                             {notif.actions.into_iter().map(|action| {
@@ -312,8 +314,6 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                                             }).collect::<Vec<_>>()}
                                         </div>
                                     })
-                                } else {
-                                    None
                                 }}
                             </div>
                         }

@@ -416,25 +416,25 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
     Effect::new(move |_| {
         let mounted = Arc::clone(&offers_mounted);
         spawn_local(async move {
-            if let Ok(res) = GatewayMindClient.agent_offers().await {
-                if mounted.load(Ordering::Acquire) {
-                    if let Some(first_profile) = res.profiles.first() {
-                        if profile.get_untracked().is_empty() {
-                            profile.set(first_profile.id.clone());
-                        }
-                        if workspace.get_untracked().is_empty() {
-                            if let Some(first_ws) = first_profile.workspace_roots.first() {
-                                workspace.set(first_ws.clone());
-                            }
-                        }
-                        if model.get_untracked().is_empty() {
-                            if let Some(first_model) = first_profile.models.first() {
-                                model.set(first_model.class.clone());
-                            }
-                        }
+            if let Ok(res) = GatewayMindClient.agent_offers().await
+                && mounted.load(Ordering::Acquire)
+            {
+                if let Some(first_profile) = res.profiles.first() {
+                    if profile.get_untracked().is_empty() {
+                        profile.set(first_profile.id.clone());
                     }
-                    offers.set(Some(res));
+                    if workspace.get_untracked().is_empty()
+                        && let Some(first_ws) = first_profile.workspace_roots.first()
+                    {
+                        workspace.set(first_ws.clone());
+                    }
+                    if model.get_untracked().is_empty()
+                        && let Some(first_model) = first_profile.models.first()
+                    {
+                        model.set(first_model.class.clone());
+                    }
                 }
+                offers.set(Some(res));
             }
         });
     });
@@ -587,7 +587,7 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                         let selected_profile = o.profiles.iter().find(|p| p.id == profile.get()).or_else(|| o.profiles.first());
                         let available_workspaces = selected_profile.map(|p| p.workspace_roots.clone()).unwrap_or_default();
                         let available_models = selected_profile.map(|p| p.models.clone()).unwrap_or_default();
-                        let may_exec = selected_profile.map(|p| p.may_execute).unwrap_or(false);
+                        let may_exec = selected_profile.is_some_and(|p| p.may_execute);
 
                         view! {
                             <div class="agent-launch-form">
@@ -605,8 +605,8 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                                         on:change=move |event| {
                                             let val = event_target_value(&event);
                                             profile.set(val.clone());
-                                            if let Some(ref o) = offers.get_untracked() {
-                                                if let Some(p) = o.profiles.iter().find(|pr| pr.id == val) {
+                                            if let Some(ref o) = offers.get_untracked()
+                                                && let Some(p) = o.profiles.iter().find(|pr| pr.id == val) {
                                                     if let Some(ws) = p.workspace_roots.first() {
                                                         workspace.set(ws.clone());
                                                     }
@@ -614,7 +614,6 @@ pub fn AgentsContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                                                         model.set(m.class.clone());
                                                     }
                                                 }
-                                            }
                                         }
                                     >
                                         {o.profiles.iter().map(|p| {

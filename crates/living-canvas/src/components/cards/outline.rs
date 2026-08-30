@@ -17,22 +17,20 @@ use crate::{
 };
 
 fn viewport_dimensions() -> (f64, f64) {
-    web_sys::window()
-        .map(|window| {
-            (
-                window
-                    .inner_width()
-                    .ok()
-                    .and_then(|value| value.as_f64())
-                    .unwrap_or(1440.0),
-                window
-                    .inner_height()
-                    .ok()
-                    .and_then(|value| value.as_f64())
-                    .unwrap_or(900.0),
-            )
-        })
-        .unwrap_or((1440.0, 900.0))
+    web_sys::window().map_or((1440.0, 900.0), |window| {
+        (
+            window
+                .inner_width()
+                .ok()
+                .and_then(|value| value.as_f64())
+                .unwrap_or(1440.0),
+            window
+                .inner_height()
+                .ok()
+                .and_then(|value| value.as_f64())
+                .unwrap_or(900.0),
+        )
+    })
 }
 
 /// Canvas Outline content component listing clusters, cards, and anchors hierarchically.
@@ -130,10 +128,10 @@ pub fn OutlineContent(
 
     let focus_cluster = move |cluster_id: String| {
         let current_layout = layout_sig.get_untracked();
-        if let Some(cluster) = current_layout.clusters.iter().find(|c| c.id == cluster_id) {
-            if let Some(rect) = current_layout.cluster_rect(cluster) {
-                fit_and_fly(rect, 1.2);
-            }
+        if let Some(cluster) = current_layout.clusters.iter().find(|c| c.id == cluster_id)
+            && let Some(rect) = current_layout.cluster_rect(cluster)
+        {
+            fit_and_fly(rect, 1.2);
         }
     };
 
@@ -224,7 +222,7 @@ pub fn OutlineContent(
                     <For
                         each=move || {
                             let cards = layout_sig.get().cards;
-                            cards.into_iter().filter(|c| matches_filter(&c.id.title()) || matches_filter(c.id.key())).collect::<Vec<_>>()
+                            cards.into_iter().filter(|c| matches_filter(c.id.title()) || matches_filter(c.id.key())).collect::<Vec<_>>()
                         }
                         key=|card| card.id.instance_key()
                         children=move |card| {
@@ -236,7 +234,7 @@ pub fn OutlineContent(
                                 <div class="outline-item card" on:click=move |_| focus_card(cid)>
                                     <span class="outline-icon"><Box size=13 /></span>
                                     <span class="outline-name">{title}</span>
-                                    <span class="outline-pos">{format!("({:.0}, {:.0})", gx, gy)}</span>
+                                    <span class="outline-pos">{format!("({gx:.0}, {gy:.0})")}</span>
                                     <div class="outline-card-actions">
                                         <button
                                             type="button"
@@ -375,7 +373,7 @@ pub fn OutlineContent(
                                 <div class="outline-item anchor" on:click=move |_| focus_anchor(aclick.clone())>
                                     <span class="outline-icon"><Anchor size=13 /></span>
                                     <span class="outline-name">{title}</span>
-                                    <span class="outline-pos">{format!("({:.0}, {:.0})", cx, cy)}</span>
+                                    <span class="outline-pos">{format!("({cx:.0}, {cy:.0})")}</span>
                                     <button
                                         class="outline-anchor-action"
                                         type="button"

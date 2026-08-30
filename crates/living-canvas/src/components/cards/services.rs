@@ -124,7 +124,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                             if failed > 0 {
                                 Some(view! {
                                     <span style="background: var(--danger-fill-strong); color: var(--danger); font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;">
-                                        {format!("{} Failed", failed)}
+                                        {format!("{failed} Failed")}
                                     </span>
                                 })
                             } else {

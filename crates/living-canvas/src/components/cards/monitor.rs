@@ -157,7 +157,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                             <div>
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
                                     <span style="font-weight: 600;">"Physical RAM"</span>
-                                    <span style="font-family: monospace; color: #38bdf8;">{format!("{:.1} / {:.1} GB ({:.0}%)", ram_used_gb, ram_total_gb, ram_pct)}</span>
+                                    <span style="font-family: monospace; color: #38bdf8;">{format!("{ram_used_gb:.1} / {ram_total_gb:.1} GB ({ram_pct:.0}%)")}</span>
                                 </div>
                                 <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;">
                                     <div style=format!("width: {}%; height: 100%; background: #38bdf8; border-radius: 3px;", ram_pct.min(100.0)) />
@@ -169,7 +169,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                                     <div>
                                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
                                             <span style="font-weight: 600;">"Swap Space"</span>
-                                            <span style="font-family: monospace; color: var(--text-second);">{format!("{:.1} / {:.1} GB ({:.0}%)", swap_used_gb, swap_total_gb, swap_pct)}</span>
+                                            <span style="font-family: monospace; color: var(--text-second);">{format!("{swap_used_gb:.1} / {swap_total_gb:.1} GB ({swap_pct:.0}%)")}</span>
                                         </div>
                                         <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;">
                                             <div style=format!("width: {}%; height: 100%; background: var(--text-muted); border-radius: 3px;", swap_pct.min(100.0)) />
@@ -201,7 +201,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                                                     <span style="font-weight: 600; color: var(--text-bright);">{disk.mount_point}</span>
                                                     <span style="font-size: 10px; color: var(--text-faint); margin-left: 6px;">{format!("({} / {})", disk.device, disk.fs_type)}</span>
                                                 </div>
-                                                <span style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.8);">{format!("{:.0} / {:.0} GB ({:.0}%)", used_gb, total_gb, pct)}</span>
+                                                <span style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.8);">{format!("{used_gb:.0} / {total_gb:.0} GB ({pct:.0}%)")}</span>
                                             </div>
                                             <div style="width: 100%; height: 5px; background: var(--line); border-radius: 2px; overflow: hidden;">
                                                 <div style=format!("width: {}%; height: 100%; background: #10b981; border-radius: 2px;", pct.min(100.0)) />
@@ -228,8 +228,8 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                                                 </span>
                                             </div>
                                             <div style="display: flex; justify-content: space-between; color: var(--text-second); font-family: monospace;">
-                                                <span>{format!("RX: {} MB", rx_mb)}</span>
-                                                <span>{format!("TX: {} MB", tx_mb)}</span>
+                                                <span>{format!("RX: {rx_mb} MB")}</span>
+                                                <span>{format!("TX: {tx_mb} MB")}</span>
                                             </div>
                                         </div>
                                     }

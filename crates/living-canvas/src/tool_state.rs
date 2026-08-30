@@ -188,7 +188,7 @@ pub struct FileManagerSignals {
     pub rename_new_name: RwSignal<String>,
     /// Whether delete confirmation modal is open.
     pub delete_modal_open: RwSignal<bool>,
-    /// Target item to delete (name, is_dir).
+    /// Target item to delete (name, `is_dir`).
     pub delete_target: RwSignal<Option<(String, bool)>>,
 }
 
@@ -1917,7 +1917,7 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
-/// Parse a filesystem path into hierarchical breadcrumbs (label, target_path).
+/// Parse a filesystem path into hierarchical breadcrumbs (label, `target_path`).
 #[must_use]
 pub fn parse_path_breadcrumbs(path: &str) -> Vec<(&str, String)> {
     let trimmed = path.trim();

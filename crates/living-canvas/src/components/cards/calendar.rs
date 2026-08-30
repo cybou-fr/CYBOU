@@ -178,7 +178,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                                     <div style="font-size: 11px; color: var(--text-strong);">{evt.description}</div>
                                     {evt.location.map(|loc| view! {
                                         <div style="font-size: 10px; color: #a7f3d0; font-family: monospace;">
-                                            {format!("📍 {}", loc)}
+                                            {format!("📍 {loc}")}
                                         </div>
                                     })}
                                 </div>

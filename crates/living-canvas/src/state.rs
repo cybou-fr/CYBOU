@@ -17,7 +17,7 @@ pub enum RuntimeState {
     Loading,
     /// Connected with server-established session and projections.
     Ready {
-        /// Gateway session mode (LocalDesktop, RemoteBrowser, PublicPreview).
+        /// Gateway session mode (`LocalDesktop`, `RemoteBrowser`, `PublicPreview`).
         mode: SessionMode,
         /// Server-established session projection.
         session: SessionProjection,
@@ -189,7 +189,7 @@ pub struct AskCybouAnswer {
     pub headline: String,
     /// Detailed factual response.
     pub detail: String,
-    /// Optional button / panel link label and target CardId.
+    /// Optional button / panel link label and target `CardId`.
     pub target: Option<(&'static str, crate::CardId)>,
 }
 
@@ -335,7 +335,26 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                 ..
             } => {
                 let live: Vec<_> = sessions.iter().filter(|s| s.is_live()).collect();
-                if !live.is_empty() {
+                if live.is_empty() {
+                    let setup_required = agent_offers.as_ref().is_some_and(|o| {
+                        o.profiles_state != "ready" || o.capacity_state != "ready"
+                    });
+                    if setup_required {
+                        Some(AskCybouAnswer {
+                            headline: "No agents running (Setup required)".to_string(),
+                            detail: "Agent runtime is idle and requires operator profile and capacity configuration before launch.".to_string(),
+                            target: Some(("Open Agents", crate::CardId::Agents)),
+                        })
+                    } else {
+                        Some(AskCybouAnswer {
+                            headline: "No agents currently running".to_string(),
+                            detail:
+                                "Agent runtime is idle. Ready to launch sandboxed OpenCode agents."
+                                    .to_string(),
+                            target: Some(("Launch Agent", crate::CardId::Agents)),
+                        })
+                    }
+                } else {
                     let first = &live[0];
                     let task_desc = first
                         .task
@@ -370,25 +389,6 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
                         ),
                         target: Some(("Open Agents", crate::CardId::Agents)),
                     })
-                } else {
-                    let setup_required = agent_offers.as_ref().map_or(false, |o| {
-                        o.profiles_state != "ready" || o.capacity_state != "ready"
-                    });
-                    if setup_required {
-                        Some(AskCybouAnswer {
-                            headline: "No agents running (Setup required)".to_string(),
-                            detail: "Agent runtime is idle and requires operator profile and capacity configuration before launch.".to_string(),
-                            target: Some(("Open Agents", crate::CardId::Agents)),
-                        })
-                    } else {
-                        Some(AskCybouAnswer {
-                            headline: "No agents currently running".to_string(),
-                            detail:
-                                "Agent runtime is idle. Ready to launch sandboxed OpenCode agents."
-                                    .to_string(),
-                            target: Some(("Launch Agent", crate::CardId::Agents)),
-                        })
-                    }
                 }
             }
             RuntimeState::Ready { agents: None, .. } => Some(AskCybouAnswer {

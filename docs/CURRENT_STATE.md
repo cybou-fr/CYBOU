@@ -1162,6 +1162,21 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   finger is ignored: that is somebody resting a hand. `overscroll-behavior: none` on the body,
   because pull-to-refresh on a canvas is a gesture that discards every unsaved buffer on it.
   SD14's mobile layout — cluster stack views for a narrow viewport — is not started.
+- **The frontend's lint output means something again**: `living-canvas` carried 310 warnings, and
+  120 of them were one systematic false positive — `pedantic` asking every Leptos `#[component]`
+  to be `#[must_use]`, when the `view!` macro that calls one is the only thing that ever does.
+  Silenced at the crate root with its reason rather than answered attribute by attribute, since
+  an earlier mechanical attempt wrote it twice on every component and failed the build on
+  `duplicated_attributes`. With the noise gone the rest could be read and fixed: 310 to 108,
+  every remaining one measured rather than assumed. What is left is 23 byte-count casts to `f64`,
+  exact to four pebibytes and harmless for a file size, and the structural ones — 35 functions
+  over 100 lines, of which `file_manager` at 1132 and `editor` at 1004 are genuinely too large
+  and are recorded rather than silenced.
+- **A file is recognised whatever case its name was written in**: opening one in the Editor chose
+  its language from a chain of `ends_with` comparisons that each had to remember to lower-case
+  and none did, so `README.MD` from a system that does not care about case, or `SETUP.PY` out of
+  an archive, opened as plain text. It is a table now, in the portable half and checked there,
+  including that only the last dot decides — `notes.rs.bak` is a backup and not Rust.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned

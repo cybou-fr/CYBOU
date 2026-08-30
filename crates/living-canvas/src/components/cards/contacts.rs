@@ -191,7 +191,9 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                                 <div style="font-size: 10px; color: var(--text-second); font-family: monospace;">
                                     {c.email}
                                 </div>
-                                {if !c.tags.is_empty() {
+                                {if c.tags.is_empty() {
+                                    view! { <div></div> }.into_any()
+                                } else {
                                     view! {
                                         <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
                                             {c.tags.into_iter().map(|t| view! {
@@ -201,8 +203,6 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                                             }).collect::<Vec<_>>()}
                                         </div>
                                     }.into_any()
-                                } else {
-                                    view! { <div></div> }.into_any()
                                 }}
                             </div>
                         }

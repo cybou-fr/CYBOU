@@ -228,7 +228,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">
                                             {op.progress.step.clone()}
                                         </span>
-                                        {op.progress.percent.map(|p| view! { <span style="font-weight: 600; font-size: 10px;">{format!("{:.0}%", p)}</span> })}
+                                        {op.progress.percent.map(|p| view! { <span style="font-weight: 600; font-size: 10px;">{format!("{p:.0}%")}</span> })}
                                     </div>
 
                                     // Footer actions

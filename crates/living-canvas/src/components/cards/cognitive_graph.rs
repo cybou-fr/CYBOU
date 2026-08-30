@@ -97,7 +97,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                 // Graph Nodes & Edges Grid
                 <div style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;">
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim);">
-                        "Entities & Subsystems (" {move || signals.graph.get().map(|g| g.graph.nodes.len()).unwrap_or(0)} ")"
+                        "Entities & Subsystems (" {move || signals.graph.get().map_or(0, |g| g.graph.nodes.len())} ")"
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
                         {move || signals.graph.get().map(|proj| {
@@ -141,7 +141,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
 
                     // Causal Relations / Edges Section
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-top: 10px;">
-                        "Causal Relations & Governance Edges (" {move || signals.graph.get().map(|g| g.graph.edges.len()).unwrap_or(0)} ")"
+                        "Causal Relations & Governance Edges (" {move || signals.graph.get().map_or(0, |g| g.graph.edges.len())} ")"
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                         {move || signals.graph.get().map(|proj| {
@@ -188,7 +188,9 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                         <div style="color: var(--text-second);">"Confidence: " <b style="color: var(--text-bright);">{format!("{:.1}%", node.confidence * 100.0)}</b></div>
                                         <div style="color: var(--text-second);">"Standing: " <b style="color: #34d399;">"Observed"</b></div>
                                     </div>
-                                    {if !node.metadata.is_empty() {
+                                    {if node.metadata.is_empty() {
+                                        view! { <div></div> }.into_any()
+                                    } else {
                                         view! {
                                             <div style="border-top: 1px solid var(--fill-subtle); padding-top: 8px;">
                                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">"Attributes"</div>
@@ -200,8 +202,6 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                                 }).collect::<Vec<_>>()}
                                             </div>
                                         }.into_any()
-                                    } else {
-                                        view! { <div></div> }.into_any()
                                     }}
                                 </div>
                             }

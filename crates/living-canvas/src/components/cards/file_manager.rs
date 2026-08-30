@@ -306,15 +306,16 @@ pub fn FileManagerContent(
 
     let go_up = move || {
         let cur = current_path.get();
-        if cur != "/" && !cur.is_empty() {
-            if let Some(pos) = cur.rfind('/') {
-                let parent = if pos == 0 {
-                    "/".to_string()
-                } else {
-                    cur[..pos].to_string()
-                };
-                load_dir(parent);
-            }
+        if cur != "/"
+            && !cur.is_empty()
+            && let Some(pos) = cur.rfind('/')
+        {
+            let parent = if pos == 0 {
+                "/".to_string()
+            } else {
+                cur[..pos].to_string()
+            };
+            load_dir(parent);
         }
     };
 
@@ -341,7 +342,7 @@ pub fn FileManagerContent(
                     // The bytes arrived and the browser would not take them. Saying "downloaded"
                     // here would be reporting the half that worked as the whole.
                     Err(reason) => {
-                        error_msg.set(Some(format!("{name} could not be saved: {reason}")))
+                        error_msg.set(Some(format!("{name} could not be saved: {reason}")));
                     }
                 },
                 Err(err) => error_msg.set(Some(format!("{name} could not be read: {err}"))),
@@ -618,23 +619,7 @@ pub fn FileManagerContent(
     let open_in_editor = move |filename: String| {
         let tool_states = expect_context::<ToolCardStates>();
         let editor_state = tool_states.editor(CardId::Editor(0));
-        let lang = if filename.ends_with(".rs") {
-            "rust"
-        } else if filename.ends_with(".py") {
-            "python"
-        } else if filename.ends_with(".sh") {
-            "shell"
-        } else if filename.ends_with(".toml") {
-            "toml"
-        } else if filename.ends_with(".yaml") || filename.ends_with(".yml") {
-            "yaml"
-        } else if filename.ends_with(".json") {
-            "json"
-        } else if filename.ends_with(".md") {
-            "markdown"
-        } else {
-            "text"
-        };
+        let lang = crate::text_diff::language_for(&filename);
         let text = file_content.get();
         let Some(location) = selected_location.get() else {
             error_msg.set(Some(
@@ -782,10 +767,10 @@ pub fn FileManagerContent(
                                                     view! { <span>{label}</span> }.into_any()
                                                 }}
                                             </button>
-                                            {if !is_last {
-                                                view! { <span class="fm-crumb-sep">"/"</span> }.into_any()
-                                            } else {
+                                            {if is_last {
                                                 view! { <span/> }.into_any()
+                                            } else {
+                                                view! { <span class="fm-crumb-sep">"/"</span> }.into_any()
                                             }}
                                         }
                                     }).collect::<Vec<_>>()
@@ -860,7 +845,9 @@ pub fn FileManagerContent(
                                     prop:value=move || filter_query.get()
                                     on:input=move |e| filter_query.set(event_target_value(&e))
                                 />
-                                {move || if !filter_query.get().is_empty() {
+                                {move || if filter_query.get().is_empty() {
+                                    view! { <span/> }.into_any()
+                                } else {
                                     view! {
                                         <button
                                             class="fm-filter-clear"
@@ -870,8 +857,6 @@ pub fn FileManagerContent(
                                             "×"
                                         </button>
                                     }.into_any()
-                                } else {
-                                    view! { <span/> }.into_any()
                                 }}
                             </div>
 
@@ -932,10 +917,10 @@ pub fn FileManagerContent(
                                 {move || {
                                     let total = entries.get().len();
                                     let shown = display_entries().len();
-                                    if !filter_query.get().is_empty() {
-                                        format!("{shown} of {total}")
-                                    } else {
+                                    if filter_query.get().is_empty() {
                                         format!("{total} item(s)")
+                                    } else {
+                                        format!("{shown} of {total}")
                                     }
                                 }}
                             </div>
@@ -1124,9 +1109,9 @@ pub fn FileManagerContent(
                                                 on:click=move |_| {
                                                     if is_dir {
                                                         let new_p = if p == "/" {
-                                                            format!("/{}", n_click)
+                                                            format!("/{n_click}")
                                                         } else {
-                                                            format!("{}/{}", p, n_click)
+                                                            format!("{p}/{n_click}")
                                                         };
                                                         load_dir(new_p);
                                                     } else {

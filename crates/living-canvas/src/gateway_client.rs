@@ -7,9 +7,9 @@ use async_trait::async_trait;
 use cybou_web_contracts::{
     DirectoryListingProjection, DisclosureProjection, FileContentProjection, FileCreateRequest,
     FilePathRequest, FileWriteProjection, FileWriteRequest, HostDirectoryCreateRequest,
-    HostDirectoryListingProjection, HostFileCreateRequest, HostFileWriteRequest, HostPathCopyRequest,
-    HostPathDeleteRequest, HostPathRenameRequest, MindProjection, SessionProjection,
-    ShellCloseRequest, ShellExecRequest, ShellExecResponse, SnapshotProjection,
+    HostDirectoryListingProjection, HostFileCreateRequest, HostFileWriteRequest,
+    HostPathCopyRequest, HostPathDeleteRequest, HostPathRenameRequest, MindProjection,
+    SessionProjection, ShellCloseRequest, ShellExecRequest, ShellExecResponse, SnapshotProjection,
     UserDraftDeleteRequest, UserDraftListProjection, UserDraftProjection, UserDraftSaveRequest,
 };
 use gloo_net::http::Request;
@@ -519,7 +519,9 @@ impl MindClient for GatewayMindClient {
         }
     }
 
-    async fn list_operations(&self) -> Result<cybou_web_contracts::OperationsListProjection, ClientError> {
+    async fn list_operations(
+        &self,
+    ) -> Result<cybou_web_contracts::OperationsListProjection, ClientError> {
         let response = Request::get("/api/v1/operations")
             .send()
             .await
@@ -536,7 +538,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_operation_logs(&self, id: uuid::Uuid) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError> {
+    async fn get_operation_logs(
+        &self,
+        id: uuid::Uuid,
+    ) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError> {
         let response = Request::get(&format!("/api/v1/operations/{id}/logs"))
             .send()
             .await
@@ -553,7 +558,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn cancel_operation(&self, id: uuid::Uuid, reason: Option<String>) -> Result<(), ClientError> {
+    async fn cancel_operation(
+        &self,
+        id: uuid::Uuid,
+        reason: Option<String>,
+    ) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/operations/cancel")
             .json(&cybou_web_contracts::OperationCancelRequest {
                 operation_id: id,
@@ -573,7 +582,9 @@ impl MindClient for GatewayMindClient {
         }
     }
 
-    async fn list_notifications(&self) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError> {
+    async fn list_notifications(
+        &self,
+    ) -> Result<cybou_web_contracts::NotificationsListProjection, ClientError> {
         let response = Request::get("/api/v1/notifications")
             .send()
             .await
@@ -590,7 +601,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn dismiss_notifications(&self, id: Option<uuid::Uuid>, dismiss_all: bool) -> Result<(), ClientError> {
+    async fn dismiss_notifications(
+        &self,
+        id: Option<uuid::Uuid>,
+        dismiss_all: bool,
+    ) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/notifications/dismiss")
             .json(&cybou_web_contracts::NotificationDismissRequest {
                 notification_id: id,
@@ -610,7 +625,11 @@ impl MindClient for GatewayMindClient {
         }
     }
 
-    async fn execute_notification_action(&self, id: uuid::Uuid, action_id: &str) -> Result<String, ClientError> {
+    async fn execute_notification_action(
+        &self,
+        id: uuid::Uuid,
+        action_id: &str,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/notifications/action")
             .json(&cybou_web_contracts::NotificationActionRequest {
                 notification_id: id,
@@ -630,10 +649,15 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Action executed").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Action executed")
+            .to_owned())
     }
 
-    async fn list_services(&self) -> Result<cybou_web_contracts::ServicesListProjection, ClientError> {
+    async fn list_services(
+        &self,
+    ) -> Result<cybou_web_contracts::ServicesListProjection, ClientError> {
         let response = Request::get("/api/v1/system/services")
             .send()
             .await
@@ -650,7 +674,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn execute_service_action(&self, name: &str, action: cybou_protocol::system::ServiceAction) -> Result<String, ClientError> {
+    async fn execute_service_action(
+        &self,
+        name: &str,
+        action: cybou_protocol::system::ServiceAction,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/services/action")
             .json(&cybou_web_contracts::ServiceActionRequest {
                 name: name.to_owned(),
@@ -670,10 +698,15 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Service action executed").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Service action executed")
+            .to_owned())
     }
 
-    async fn list_processes(&self) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError> {
+    async fn list_processes(
+        &self,
+    ) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError> {
         let response = Request::get("/api/v1/system/processes")
             .send()
             .await
@@ -690,12 +723,13 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn send_process_signal(&self, pid: u32, signal: cybou_protocol::system::ProcessSignal) -> Result<String, ClientError> {
+    async fn send_process_signal(
+        &self,
+        pid: u32,
+        signal: cybou_protocol::system::ProcessSignal,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/processes/signal")
-            .json(&cybou_web_contracts::ProcessSignalRequest {
-                pid,
-                signal,
-            })
+            .json(&cybou_web_contracts::ProcessSignalRequest { pid, signal })
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
             .send()
             .await
@@ -710,10 +744,15 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Signal delivered").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Signal delivered")
+            .to_owned())
     }
 
-    async fn get_system_monitor(&self) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError> {
+    async fn get_system_monitor(
+        &self,
+    ) -> Result<cybou_web_contracts::SystemMonitorProjection, ClientError> {
         let response = Request::get("/api/v1/system/monitor")
             .send()
             .await
@@ -730,19 +769,22 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_system_logs(&self, query: &cybou_web_contracts::SystemLogsQueryRequest) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError> {
+    async fn get_system_logs(
+        &self,
+        query: &cybou_web_contracts::SystemLogsQueryRequest,
+    ) -> Result<cybou_web_contracts::SystemLogsProjection, ClientError> {
         let mut url = "/api/v1/system/logs?".to_owned();
         if let Some(ref u) = query.unit {
-            url.push_str(&format!("unit={}&", u));
+            url.push_str(&format!("unit={u}&"));
         }
         if let Some(ref s) = query.severity {
-            url.push_str(&format!("severity={}&", s));
+            url.push_str(&format!("severity={s}&"));
         }
         if let Some(ref q) = query.search {
-            url.push_str(&format!("search={}&", q));
+            url.push_str(&format!("search={q}&"));
         }
         if let Some(limit) = query.limit {
-            url.push_str(&format!("limit={}&", limit));
+            url.push_str(&format!("limit={limit}&"));
         }
         let response = Request::get(&url)
             .send()
@@ -777,7 +819,12 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn create_snapshot(&self, subvolume: &str, name: &str, readonly: bool) -> Result<cybou_protocol::system::SnapshotRecord, ClientError> {
+    async fn create_snapshot(
+        &self,
+        subvolume: &str,
+        name: &str,
+        readonly: bool,
+    ) -> Result<cybou_protocol::system::SnapshotRecord, ClientError> {
         let response = Request::post("/api/v1/system/storage/snapshots")
             .json(&cybou_web_contracts::CreateSnapshotRequest {
                 subvolume_path: subvolume.to_owned(),
@@ -819,7 +866,10 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Snapshot restored").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Snapshot restored")
+            .to_owned())
     }
 
     async fn get_network(&self) -> Result<cybou_web_contracts::NetworkProjection, ClientError> {
@@ -839,7 +889,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn connect_network(&self, connection_id: &str, activate: bool) -> Result<String, ClientError> {
+    async fn connect_network(
+        &self,
+        connection_id: &str,
+        activate: bool,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/network/connect")
             .json(&cybou_web_contracts::NetworkConnectRequest {
                 connection_id: connection_id.to_owned(),
@@ -859,7 +913,10 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Network updated").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Network updated")
+            .to_owned())
     }
 
     async fn get_packages(&self) -> Result<cybou_web_contracts::PackagesProjection, ClientError> {
@@ -879,7 +936,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn execute_package_action(&self, name: &str, action: cybou_protocol::system::PackageActionKind) -> Result<String, ClientError> {
+    async fn execute_package_action(
+        &self,
+        name: &str,
+        action: cybou_protocol::system::PackageActionKind,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/packages/action")
             .json(&cybou_web_contracts::PackageActionRequest {
                 name: name.to_owned(),
@@ -899,10 +960,15 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Package action executed").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Package action executed")
+            .to_owned())
     }
 
-    async fn get_system_updates(&self) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError> {
+    async fn get_system_updates(
+        &self,
+    ) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError> {
         let response = Request::get("/api/v1/system/updates")
             .send()
             .await
@@ -919,7 +985,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn apply_system_updates(&self, package_names: Option<Vec<String>>) -> Result<String, ClientError> {
+    async fn apply_system_updates(
+        &self,
+        package_names: Option<Vec<String>>,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/updates/apply")
             .json(&cybou_web_contracts::ApplyUpdatesRequest { package_names })
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -936,10 +1005,15 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("System updates applied").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("System updates applied")
+            .to_owned())
     }
 
-    async fn get_users_settings(&self) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError> {
+    async fn get_users_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError> {
         let response = Request::get("/api/v1/system/users")
             .send()
             .await
@@ -956,7 +1030,12 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn create_user(&self, username: &str, full_name: &str, is_admin: bool) -> Result<cybou_protocol::system::UserAccountRecord, ClientError> {
+    async fn create_user(
+        &self,
+        username: &str,
+        full_name: &str,
+        is_admin: bool,
+    ) -> Result<cybou_protocol::system::UserAccountRecord, ClientError> {
         let response = Request::post("/api/v1/system/users")
             .json(&cybou_web_contracts::CreateUserRequest {
                 username: username.to_owned(),
@@ -979,7 +1058,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn add_ssh_key(&self, name: &str, public_key: &str) -> Result<cybou_protocol::system::SshKeyRecord, ClientError> {
+    async fn add_ssh_key(
+        &self,
+        name: &str,
+        public_key: &str,
+    ) -> Result<cybou_protocol::system::SshKeyRecord, ClientError> {
         let response = Request::post("/api/v1/system/users/ssh-keys")
             .json(&cybou_web_contracts::AddSshKeyRequest {
                 name: name.to_owned(),
@@ -1020,10 +1103,15 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("SSH key deleted").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("SSH key deleted")
+            .to_owned())
     }
 
-    async fn get_security_settings(&self) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError> {
+    async fn get_security_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError> {
         let response = Request::get("/api/v1/system/security")
             .send()
             .await
@@ -1040,7 +1128,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn update_security_policy(&self, req: cybou_web_contracts::UpdateSecurityPolicyRequest) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError> {
+    async fn update_security_policy(
+        &self,
+        req: cybou_web_contracts::UpdateSecurityPolicyRequest,
+    ) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError> {
         let response = Request::post("/api/v1/system/security/policy")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1059,7 +1150,9 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_backup_settings(&self) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError> {
+    async fn get_backup_settings(
+        &self,
+    ) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError> {
         let response = Request::get("/api/v1/system/backup")
             .send()
             .await
@@ -1076,7 +1169,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn trigger_backup(&self, name: Option<String>) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError> {
+    async fn trigger_backup(
+        &self,
+        name: Option<String>,
+    ) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError> {
         let response = Request::post("/api/v1/system/backup/trigger")
             .json(&cybou_web_contracts::TriggerBackupRequest { name })
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1095,7 +1191,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn restore_archive(&self, archive_id: &str, target_path: Option<String>) -> Result<String, ClientError> {
+    async fn restore_archive(
+        &self,
+        archive_id: &str,
+        target_path: Option<String>,
+    ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/backup/restore")
             .json(&cybou_web_contracts::RestoreArchiveRequest {
                 archive_id: archive_id.to_owned(),
@@ -1115,10 +1215,16 @@ impl MindClient for GatewayMindClient {
             .json()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"].as_str().unwrap_or("Archive restored").to_owned())
+        Ok(outcome["outcome"]
+            .as_str()
+            .unwrap_or("Archive restored")
+            .to_owned())
     }
 
-    async fn update_backup_schedule(&self, req: cybou_web_contracts::UpdateBackupScheduleRequest) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError> {
+    async fn update_backup_schedule(
+        &self,
+        req: cybou_web_contracts::UpdateBackupScheduleRequest,
+    ) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError> {
         let response = Request::post("/api/v1/system/backup/schedule")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1137,7 +1243,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_mail(&self, account_id: Option<String>, folder: Option<cybou_protocol::personal::MailFolderKind>) -> Result<cybou_web_contracts::MailProjection, ClientError> {
+    async fn get_mail(
+        &self,
+        account_id: Option<String>,
+        folder: Option<cybou_protocol::personal::MailFolderKind>,
+    ) -> Result<cybou_web_contracts::MailProjection, ClientError> {
         let mut url = "/api/v1/personal/mail".to_owned();
         let mut query_params = Vec::new();
         if let Some(acc) = account_id {
@@ -1173,7 +1283,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn send_mail(&self, req: cybou_web_contracts::SendMailRequest) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError> {
+    async fn send_mail(
+        &self,
+        req: cybou_web_contracts::SendMailRequest,
+    ) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError> {
         let response = Request::post("/api/v1/personal/mail/send")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1209,7 +1322,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn create_calendar_event(&self, req: cybou_web_contracts::CreateCalendarEventRequest) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError> {
+    async fn create_calendar_event(
+        &self,
+        req: cybou_web_contracts::CreateCalendarEventRequest,
+    ) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError> {
         let response = Request::post("/api/v1/personal/calendar/events")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1245,7 +1361,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn create_note(&self, req: cybou_web_contracts::CreateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
+    async fn create_note(
+        &self,
+        req: cybou_web_contracts::CreateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
         let response = Request::post("/api/v1/personal/notes")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1264,7 +1383,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn update_note(&self, req: cybou_web_contracts::UpdateNoteRequest) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
+    async fn update_note(
+        &self,
+        req: cybou_web_contracts::UpdateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
         let response = Request::post("/api/v1/personal/notes/update")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1300,7 +1422,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn create_contact(&self, req: cybou_web_contracts::CreateContactRequest) -> Result<cybou_protocol::personal::ContactRecord, ClientError> {
+    async fn create_contact(
+        &self,
+        req: cybou_web_contracts::CreateContactRequest,
+    ) -> Result<cybou_protocol::personal::ContactRecord, ClientError> {
         let response = Request::post("/api/v1/personal/contacts")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1319,7 +1444,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_cognitive_graph(&self, focus: Option<String>) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
+    async fn get_cognitive_graph(
+        &self,
+        focus: Option<String>,
+    ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
         let mut url = "/api/v1/cognitive/graph".to_owned();
         if let Some(f) = focus {
             url = format!("{url}?focus={f}");
@@ -1340,7 +1468,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn query_cognitive_graph(&self, req: cybou_web_contracts::CognitiveQueryRequest) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
+    async fn query_cognitive_graph(
+        &self,
+        req: cybou_web_contracts::CognitiveQueryRequest,
+    ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
         let response = Request::post("/api/v1/cognitive/query")
             .json(&req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1359,7 +1490,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_event_journal(&self, limit: Option<usize>, offset: Option<usize>) -> Result<cybou_web_contracts::EventJournalProjection, ClientError> {
+    async fn get_event_journal(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<cybou_web_contracts::EventJournalProjection, ClientError> {
         let mut url = "/api/v1/cognitive/journal".to_owned();
         let mut params = Vec::new();
         if let Some(lim) = limit {
@@ -1453,7 +1588,9 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_dialogue_memory(&self) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError> {
+    async fn get_dialogue_memory(
+        &self,
+    ) -> Result<cybou_web_contracts::DialogueMemoryProjection, ClientError> {
         let response = Request::get("/api/v1/meaning/dialogue")
             .send()
             .await
@@ -1470,7 +1607,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_learning_candidates(&self, layer: Option<String>) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError> {
+    async fn get_learning_candidates(
+        &self,
+        layer: Option<String>,
+    ) -> Result<cybou_web_contracts::LearningCandidatesProjection, ClientError> {
         let url = if let Some(l) = layer {
             format!("/api/v1/learning/candidates?layer={l}")
         } else {
@@ -1492,7 +1632,10 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn propose_learning_candidate(&self, req: &cybou_web_contracts::ProposeLearningCandidateRequest) -> Result<cybou_protocol::learning::LearningCandidate, ClientError> {
+    async fn propose_learning_candidate(
+        &self,
+        req: &cybou_web_contracts::ProposeLearningCandidateRequest,
+    ) -> Result<cybou_protocol::learning::LearningCandidate, ClientError> {
         let response = Request::post("/api/v1/learning/candidates")
             .json(req)
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -1511,14 +1654,19 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn evaluate_learning_candidate(&self, candidate_id: uuid::Uuid, req: Option<&cybou_web_contracts::EvaluateCandidateRequest>) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
+    async fn evaluate_learning_candidate(
+        &self,
+        candidate_id: uuid::Uuid,
+        req: Option<&cybou_web_contracts::EvaluateCandidateRequest>,
+    ) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
         let url = format!("/api/v1/learning/candidates/{candidate_id}/evaluate");
         let builder = Request::post(&url);
         let request = if let Some(r) = req {
             builder.json(r)
         } else {
             builder.json(&serde_json::Value::Null)
-        }.map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        }
+        .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
 
         let response = request
             .send()
@@ -1536,7 +1684,9 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn get_learned_artifacts(&self) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError> {
+    async fn get_learned_artifacts(
+        &self,
+    ) -> Result<cybou_web_contracts::LearnedArtifactsProjection, ClientError> {
         let response = Request::get("/api/v1/learning/artifacts")
             .send()
             .await
@@ -1553,7 +1703,11 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
-    async fn revoke_learned_artifact(&self, artifact_id: uuid::Uuid, reason: &str) -> Result<(), ClientError> {
+    async fn revoke_learned_artifact(
+        &self,
+        artifact_id: uuid::Uuid,
+        reason: &str,
+    ) -> Result<(), ClientError> {
         let url = format!("/api/v1/learning/artifacts/{artifact_id}/revoke");
         let response = Request::post(&url)
             .json(&cybou_web_contracts::RevokeArtifactRequest {
@@ -1573,7 +1727,9 @@ impl MindClient for GatewayMindClient {
         Ok(())
     }
 
-    async fn get_governance_scopes(&self) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError> {
+    async fn get_governance_scopes(
+        &self,
+    ) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError> {
         let response = Request::get("/api/v1/governance/scopes")
             .send()
             .await

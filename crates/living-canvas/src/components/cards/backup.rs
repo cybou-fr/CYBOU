@@ -75,7 +75,7 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
     };
 
     let toggle_schedule = move |enabled: bool| {
-        let cur_sched = signals.backup_settings.get().map(|s| s.schedule).unwrap_or(
+        let cur_sched = signals.backup_settings.get().map_or(
             cybou_protocol::system::BackupScheduleRecord {
                 enabled: true,
                 frequency: "daily".to_owned(),
@@ -83,6 +83,7 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                 retention_weekly: 4,
                 retention_monthly: 12,
             },
+            |s| s.schedule,
         );
         let req = cybou_web_contracts::UpdateBackupScheduleRequest {
             enabled,

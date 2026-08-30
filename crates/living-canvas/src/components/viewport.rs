@@ -117,9 +117,9 @@ pub fn CanvasViewport(
                 }
                 let is_canvas_bg = event.target()
                     .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
-                    .map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient") || el.tag_name().eq_ignore_ascii_case("svg"));
+                    .is_some_and(|el| el.class_list().contains("canvas") || el.class_list().contains("ambient") || el.tag_name().eq_ignore_ascii_case("svg"));
                 if is_canvas_bg || event.button() == 1 {
-                    set_panning.set(Some((event.client_x() as f64, event.client_y() as f64, pan.get().0, pan.get().1)));
+                    set_panning.set(Some((f64::from(event.client_x()), f64::from(event.client_y()), pan.get().0, pan.get().1)));
                 }
             }
             on:pointermove=move |event: PointerEvent| {
@@ -157,8 +157,8 @@ pub fn CanvasViewport(
                 }
 
                 if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
-                    let cur_x = event.client_x() as f64;
-                    let cur_y = event.client_y() as f64;
+                    let cur_x = f64::from(event.client_x());
+                    let cur_y = f64::from(event.client_y());
                     set_pan.set((init_px + (cur_x - start_x), init_py + (cur_y - start_y)));
                 }
                 move_drag(event.clone(), layout, dragging, snap_guides);
@@ -169,11 +169,10 @@ pub fn CanvasViewport(
                 if let Some((_start_x, _start_y, init_px, init_py)) = panning.get() {
                     let cur_px = pan.get_untracked().0;
                     let cur_py = pan.get_untracked().1;
-                    if (cur_px - init_px).abs() > 15.0 || (cur_py - init_py).abs() > 15.0 {
-                        if let Some(ch) = camera_history {
+                    if ((cur_px - init_px).abs() > 15.0 || (cur_py - init_py).abs() > 15.0)
+                        && let Some(ch) = camera_history {
                             ch.update(|h| h.record(crate::CameraState::new(init_px, init_py, zoom.get_untracked())));
                         }
-                    }
                 }
                 set_panning.set(None);
                 finish_drag(layout, history, dragging, snap_guides);
@@ -189,8 +188,8 @@ pub fn CanvasViewport(
                 <For
                     each=move || snap_guides.get()
                     key=|guide| match guide {
-                        SnapGuide::Vertical(x) => format!("v-{}", x),
-                        SnapGuide::Horizontal(y) => format!("h-{}", y),
+                        SnapGuide::Vertical(x) => format!("v-{x}"),
+                        SnapGuide::Horizontal(y) => format!("h-{y}"),
                     }
                     children=move |guide| {
                         match guide {

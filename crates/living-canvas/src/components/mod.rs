@@ -4,8 +4,8 @@
 //! Reusable Leptos component hierarchy for Living Canvas.
 
 pub mod auth_modal;
-pub mod card_controls;
 pub mod camera_context;
+pub mod card_controls;
 pub mod card_frame;
 pub mod cards;
 pub mod command_palette;
