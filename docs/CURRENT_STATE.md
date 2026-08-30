@@ -1010,6 +1010,7 @@ bash scripts/test-multi-daemon-integration.sh
 bash scripts/test-capsule-gate.sh
 bash scripts/test-egress-gate.sh
 bash scripts/test-action-gate.sh
+bash scripts/test-confirmation-gate.sh
 bash scripts/test-acp-gate.sh
 bash scripts/test-standing-lease-gate.sh
 bash scripts/test-model-gateway-gate.sh
@@ -1052,9 +1053,12 @@ mentioned look identical to a reader.
 
 - **Telemetry has no persistence.** Everything it holds is in memory and bounded; a restart starts
   the window again, and the organ says it has not watched long enough rather than answering.
-- **A confirmed action has never actually run.** The path from a person's answer to a permit is
-  built and tested; no deployment has carried one through to an executed attempt and an observed
-  outcome, because that needs a standing deployment with a real finding on it.
+- **A confirmed action has run on a gate host, not on a deployment.** `test-confirmation-gate.sh`
+  carries one from a finding through a question, an answer, a permit, a systemd restart and an
+  independent re-observation, against a disposable unit and a Journal of its own. No deployment has
+  carried one through from a finding its own telemetry reached, and no browser has been the thing
+  that answered — the gate stands in for the gateway, because it is the only party that can
+  establish a seat.
 - **The agent vertical has no real-provider evidence yet.** The real OpenCode ACP entrypoint has run
   inside a capsule and completed the credential-free handshake, but no configured provider has
   returned an answer through the full path. Multi-turn streaming is also not built.

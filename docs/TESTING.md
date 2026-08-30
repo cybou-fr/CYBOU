@@ -148,6 +148,29 @@ every owner in that integration surface, and then asserts:
 Each of those assertions exists because the property it names was once broken while everything
 looked fine.
 
+## What proves a person can authorize one
+
+```bash
+sudo -E bash scripts/test-confirmation-gate.sh
+```
+
+The gate beside this one grants `service.restart` in advance. This one grants nothing —
+`CYBOU_PREAUTHORIZED_ACTIONS` is set empty rather than left unset, so the run states the condition
+instead of inheriting it — which is the state a fresh installation is in and the state in which
+every proposal stops at `RequiresUserConfirmation`.
+
+It proves that the host asks rather than acts; that an answer naming a decision nobody showed is
+refused; that a person's answer mints a permit and is recorded as `GrantedOnConfirmation` naming
+the seat, not as a grant the policy made; that the same answer cannot be given twice; that the unit
+actually restarts and an independent connection to systemd agrees; that the permit cannot be
+replayed; and that the Journal ends up holding **two** decisions, because the question and the
+answer are two.
+
+It starts its own `cybou-eventd` under `dbus-run-session` with an `XDG_DATA_HOME` of its own. That
+is not tidiness: Action1 and the executor write the lifecycle to the Journal, an execution that
+cannot be made durable is refused before the Body is touched, and a gate without a Journal would be
+reporting the absence of one as a failure of confirmation.
+
 ## What proves the authorized action deployment topology
 
 ```bash

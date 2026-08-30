@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use cybou_fabric::{decode, encode, event_client::EventClient};
+use cybou_fabric::{decode, encode, event_client::EventClient, event_client::EventClientError};
 use cybou_protocol::telemetry::SystemInsight;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -254,8 +254,20 @@ async fn record_lifecycle(record: &crate::ActionRecord, now: OffsetDateTime) {
         }
     };
     for envelope in contributions {
-        if let Err(error) = client.submit(&envelope).await {
-            eprintln!("[cybou-actiond] A lifecycle step was not recorded: {error}");
+        match client.submit(&envelope).await {
+            Ok(_) => {}
+            // A lifecycle is written whole every time it grows a step, and the message identity of
+            // each step is derived from what that step records. So re-recording an episode
+            // re-offers the contributions already in the Journal, and the Journal refuses them.
+            //
+            // That refusal is the derivation working. Reporting it would print "a lifecycle step
+            // was not recorded" about a step the Journal is holding — which is how a confirmation
+            // that reached the Journal correctly came to look like one that did not.
+            Err(EventClientError::Rejected(why))
+                if why.contains(&cybou_protocol::admission::Rejection::DuplicateMessageId.to_string()) => {}
+            Err(error) => {
+                eprintln!("[cybou-actiond] A lifecycle step was not recorded: {error}");
+            }
         }
     }
 }

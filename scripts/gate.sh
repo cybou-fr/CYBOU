@@ -277,6 +277,23 @@ case "$action_status" in
     *) exit "$action_status" ;;
 esac
 
+# ADR-0022, the other half. The gate above proves the path a standing policy opens; this one runs
+# the host in the state every installation is in until somebody changes it, where a proposal stops
+# at a question and a person's answer is what carries it the rest of the way.
+announce "confirmed action boundary"
+failed="confirmed action boundary"
+confirmation_status=0
+bash scripts/test-confirmation-gate.sh || confirmation_status=$?
+case "$confirmation_status" in
+    0) failed="" ;;
+    3)
+        announce "confirmed action boundary not run: a root systemd host, dbus-run-session and sqlite3 are required"
+        skipped="$skipped confirmed-action-boundary"
+        failed=""
+        ;;
+    *) exit "$confirmation_status" ;;
+esac
+
 # Licensing headers, because CI runs this and a gate that claims to be every check and is not is the
 # same defect as a check whose failure is invisible. Skipped with a said reason rather than silently
 # when the tool is absent: an absent check must not look like a passed one.
