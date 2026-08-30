@@ -1210,7 +1210,18 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   Culling is off on a stack, which is the part that would have shipped wrong: it reads where a
   card would be on a plane, and in a column that is nothing, so a panel the layout happens to
   hold at ninety thousand pixels is simply the next one down. A browser test holds that.
-  What SD14 still lacks is a Dock that adapts to it.
+  The Dock adapts with it — full width and scrolled sideways rather than a centred pill, since
+  thirty-one items at thirty-four pixels do not fit a telephone and a pill that overflows puts
+  half of them past both edges with no way to reach them. It asks the same rule the canvas
+  asks, which is why the camera is provided by `App` rather than by the viewport: the Dock is
+  the viewport's sibling and could not otherwise see it.
+
+  The stylesheet had been stacking cards at `max-width: 760px` since before any of this and
+  could only ever say so in CSS, so a narrow window got a column of cards on a plane that still
+  panned and zoomed underneath them. The two also disagreed by a pixel — `max-width: 760px`
+  includes 760 and the rule excludes it — so a window exactly that wide was stacked by the
+  stylesheet and spatial to everything else. The stylesheet no longer decides; the media query
+  keeps only what is about a small screen and nothing else.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned

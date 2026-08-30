@@ -46,12 +46,20 @@ pub fn CanvasViewport(
     // Where the camera is, for cards deciding whether they are worth drawing. Provided here
     // because this is the component that owns the transform; read by `CardFrame`, which is as far
     // from here as it is possible to be while still being on this canvas.
-    let measured = crate::components::camera_context::window_size();
-    provide_context(crate::components::camera_context::CanvasCamera {
-        pan,
-        zoom,
-        viewport: measured,
-    });
+    // Provided by `App` for the whole desktop. Measured here only when nothing above did, which
+    // is every component test: a viewport that insisted on its own would give the cards inside it
+    // a different window from the one the Dock beside them is reading.
+    let camera =
+        use_context::<crate::components::camera_context::CanvasCamera>().unwrap_or_else(|| {
+            let camera = crate::components::camera_context::CanvasCamera {
+                pan,
+                zoom,
+                viewport: crate::components::camera_context::window_size(),
+            };
+            provide_context(camera);
+            camera
+        });
+    let measured = camera.viewport;
 
     // Below a certain width a panel is wider than the screen it is on, and a spatial desktop is
     // asking somebody to pan sideways to read a sentence. The panels become one column instead,

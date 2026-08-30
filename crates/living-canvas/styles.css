@@ -1179,9 +1179,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   .history-btn span, .runtime-trigger span, .auth-trigger-btn span { display: none; }
   .history-btn, .runtime-trigger, .auth-trigger-btn { padding: 0 8px; }
 
-  .canvas { min-height: 900px; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; }
+  /* The stacking itself is not here any more. It is `.canvas.stacked`, which one rule in
+     `layout::camera` decides, because the same decision also drops the stage transform and turns
+     off culling — and a stylesheet cannot reach either. This query keeps what is only ever about a
+     small screen. */
   .relationships, .snap-guides-layer, .desktop-minimap { display: none; }
-  .object { position: static; width: 100%; transform: none; }
   .capabilities { order: -1; }
 }
 
@@ -4141,9 +4143,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .canvas.stacked {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 16px;
+  padding: 24px 16px;
   min-height: 0;
+}
+
+/* Health first on a column: on a plane a person chooses what to look at by looking, and in a
+   column the choice is made for them by whatever is at the top. */
+.canvas.stacked .capabilities {
+  order: -1;
 }
 
 .canvas.stacked .object {
@@ -4171,4 +4179,27 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .canvas.stacked {
   overflow-y: auto;
   touch-action: pan-y;
+}
+
+/* The Dock on a column.
+
+   Full width and scrolled sideways rather than centred: thirty-one items do not fit a telephone,
+   and a centred pill that overflows puts half of them past both edges with no way to reach them. */
+.desktop-dock.stacked {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  max-width: 100%;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  overflow-x: auto;
+  /* Sideways only, so a swipe along the Dock does not scroll the column behind it. */
+  touch-action: pan-x;
+}
+
+.desktop-dock.stacked .dock-apps {
+  flex-wrap: nowrap;
 }

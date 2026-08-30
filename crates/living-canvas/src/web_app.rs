@@ -67,6 +67,16 @@ pub fn App() -> impl IntoView {
     let (zoom, set_zoom) = signal(1.0f64);
     let (pan, set_pan) = signal((0.0f64, 0.0f64));
     let (panning, set_panning) = signal(Option::<(f64, f64, f64, f64)>::None);
+
+    // Where the camera is, provided once for the whole desktop. It used to be provided by the
+    // viewport, which meant only what the viewport draws could read it — and the Dock is its
+    // sibling, so the Dock could not ask whether the desktop is a plane or a column. The
+    // alternative was a media query answering the same question one pixel differently.
+    provide_context(living_canvas::components::camera_context::CanvasCamera {
+        pan,
+        zoom,
+        viewport: living_canvas::components::camera_context::window_size(),
+    });
     let command_input = NodeRef::<leptos::html::Input>::new();
     let view_mode = RwSignal::new(DesktopViewMode::Spatial);
     provide_context(view_mode);

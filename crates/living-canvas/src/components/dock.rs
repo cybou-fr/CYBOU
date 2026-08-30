@@ -126,7 +126,21 @@ pub fn DesktopDock(
     };
 
     view! {
-        <footer class="desktop-dock" aria-label="Desktop Card Shelf and Taskbar">
+        <footer
+            class="desktop-dock"
+            // Thirty-one items at thirty-four pixels do not fit a telephone, and a centred
+            // pill that overflows puts half of them past both edges with no way to reach
+            // them. Asked of the same rule the canvas asks, so the two cannot disagree.
+            class:stacked=move || {
+                use_context::<crate::components::camera_context::CanvasCamera>().is_some_and(
+                    |camera| {
+                        crate::layout::camera::presentation_for(camera.viewport.get().0)
+                            == crate::layout::camera::Presentation::Stacked
+                    },
+                )
+            }
+            aria-label="Desktop Card Shelf and Taskbar"
+        >
             <div class="dock-apps">
                 <button
                     class="dock-item"
