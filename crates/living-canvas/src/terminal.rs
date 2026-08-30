@@ -16,6 +16,8 @@
 //! So the browser keeps a screen: a grid of cells with a cursor, fed bytes, read back as rows. The
 //! state lives here and not in the DOM, which also means the whole of it is testable without one.
 
+use std::fmt::Write as _;
+
 use serde::{Deserialize, Serialize};
 
 /// How many lines of scrollback one terminal keeps.
@@ -175,9 +177,205 @@ fn indexed_fallback(index: u8) -> String {
     )
 }
 
+/// Turn one key press into the bytes a program expects to read.
+///
+/// Here rather than in the card, because it is the part of a terminal most worth being sure about
+/// and it needs no browser to check: every one of these is a key that does nothing useful if it
+/// arrives as its own name.
+///
+/// A terminal's input is not text. Arrow keys, Home, End and the control characters are escape
+/// sequences and single bytes, and a card that sent only `key()` would deliver a terminal in which
+/// nothing can be edited, interrupted or scrolled — which is most of what a terminal is for.
+///
+/// Returns `None` for a key that produces nothing, so a modifier held on its own does not arrive
+/// as an empty write.
+#[must_use]
+pub fn key_to_bytes(key: &str, ctrl: bool, alt: bool) -> Option<Vec<u8>> {
+    if ctrl && key.len() == 1 {
+        let character = key.chars().next()?.to_ascii_uppercase();
+        // Ctrl-A through Ctrl-Z, and the handful above them that a shell actually uses.
+        if character.is_ascii_uppercase() {
+            return Some(vec![character as u8 - b'A' + 1]);
+        }
+        return match character {
+            '[' => Some(vec![0x1b]),
+            '\\' => Some(vec![0x1c]),
+            ']' => Some(vec![0x1d]),
+            '@' | ' ' => Some(vec![0x00]),
+            _ => None,
+        };
+    }
+
+    let bytes = match key {
+        "Enter" => b"\r".to_vec(),
+        "Tab" => b"\t".to_vec(),
+        "Backspace" => vec![0x7f],
+        "Escape" => vec![0x1b],
+        "Delete" => b"\x1b[3~".to_vec(),
+        "ArrowUp" => b"\x1b[A".to_vec(),
+        "ArrowDown" => b"\x1b[B".to_vec(),
+        "ArrowRight" => b"\x1b[C".to_vec(),
+        "ArrowLeft" => b"\x1b[D".to_vec(),
+        "Home" => b"\x1b[H".to_vec(),
+        "End" => b"\x1b[F".to_vec(),
+        "PageUp" => b"\x1b[5~".to_vec(),
+        "PageDown" => b"\x1b[6~".to_vec(),
+        // Anything else is a character the browser already decoded for us. Keys that name
+        // themselves — "Shift", "Control", "F5" — are longer than one character and produce
+        // nothing, which is what stops a held modifier arriving as an empty write.
+        other if other.chars().count() == 1 => other.as_bytes().to_vec(),
+        _ => return None,
+    };
+
+    if alt && !bytes.is_empty() && bytes[0] != 0x1b {
+        // Meta is an escape prefix, which is how every terminal has carried it since before it was
+        // called Alt.
+        let mut prefixed = vec![0x1b];
+        prefixed.extend_from_slice(&bytes);
+        return Some(prefixed);
+    }
+    Some(bytes)
+}
+
+/// The inline style one cell is drawn with.
+///
+/// A drawing decision rather than a fact about the screen, which is why it is a function over
+/// a [`Cell`] rather than something the screen stores.
+#[must_use]
+pub fn cell_style(cell: &Cell) -> String {
+    let mut style = String::new();
+    // Inverse swaps the two, which is what a selection and a status line are made of. Applied here
+    // rather than by the screen, because it is a drawing decision and the screen holds facts.
+    let (foreground, background) = if cell.inverse {
+        (cell.background.as_ref(), cell.color.as_ref())
+    } else {
+        (cell.color.as_ref(), cell.background.as_ref())
+    };
+    if let Some(colour) = foreground {
+        let _ = write!(style, "color:{colour};");
+    }
+    if let Some(colour) = background {
+        let _ = write!(style, "background:{colour};");
+    }
+    if cell.bold {
+        style.push_str("font-weight:700;");
+    }
+    if cell.dim {
+        style.push_str("opacity:0.6;");
+    }
+    if cell.underline {
+        style.push_str("text-decoration:underline;");
+    }
+    style
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_control_key_is_a_byte_rather_than_a_letter() {
+        // Ctrl-C is how a person stops a program. Sending "c" would type a letter at whatever is
+        // running and leave them holding a terminal they cannot interrupt.
+        assert_eq!(key_to_bytes("c", true, false), Some(vec![0x03]));
+        assert_eq!(key_to_bytes("C", true, false), Some(vec![0x03]));
+        assert_eq!(key_to_bytes("d", true, false), Some(vec![0x04]));
+        assert_eq!(key_to_bytes("z", true, false), Some(vec![0x1a]));
+        assert_eq!(key_to_bytes("[", true, false), Some(vec![0x1b]));
+    }
+
+    #[test]
+    fn the_keys_that_move_and_edit_are_escape_sequences() {
+        // Without these the terminal has no history, no line editing and no paging: an arrow key
+        // that arrived as "ArrowUp" would type those eight letters at the prompt.
+        assert_eq!(
+            key_to_bytes("ArrowUp", false, false),
+            Some(b"\x1b[A".to_vec())
+        );
+        assert_eq!(
+            key_to_bytes("ArrowDown", false, false),
+            Some(b"\x1b[B".to_vec())
+        );
+        assert_eq!(
+            key_to_bytes("ArrowRight", false, false),
+            Some(b"\x1b[C".to_vec())
+        );
+        assert_eq!(
+            key_to_bytes("ArrowLeft", false, false),
+            Some(b"\x1b[D".to_vec())
+        );
+        assert_eq!(key_to_bytes("Home", false, false), Some(b"\x1b[H".to_vec()));
+        assert_eq!(
+            key_to_bytes("PageUp", false, false),
+            Some(b"\x1b[5~".to_vec())
+        );
+        assert_eq!(
+            key_to_bytes("Delete", false, false),
+            Some(b"\x1b[3~".to_vec())
+        );
+    }
+
+    #[test]
+    fn enter_is_a_carriage_return_and_backspace_is_delete() {
+        // A newline instead of a carriage return gives a shell that never runs anything, and
+        // backspace is 0x7f rather than 0x08 on every terminal a Linux shell expects to meet.
+        assert_eq!(key_to_bytes("Enter", false, false), Some(b"\r".to_vec()));
+        assert_eq!(key_to_bytes("Backspace", false, false), Some(vec![0x7f]));
+        assert_eq!(key_to_bytes("Tab", false, false), Some(b"\t".to_vec()));
+        assert_eq!(key_to_bytes("Escape", false, false), Some(vec![0x1b]));
+    }
+
+    #[test]
+    fn alt_is_an_escape_prefix() {
+        // Meta has been an escape prefix since before it was called Alt, and it is how Alt-B and
+        // Alt-F move by words at a shell prompt.
+        assert_eq!(key_to_bytes("b", false, true), Some(vec![0x1b, b'b']));
+        // Not applied twice to something that is already an escape.
+        assert_eq!(key_to_bytes("Escape", false, true), Some(vec![0x1b]));
+    }
+
+    #[test]
+    fn a_key_that_is_only_a_modifier_sends_nothing() {
+        // Holding shift is not input. An empty write here would be a keystroke the host has to
+        // interpret, and every held modifier would produce one.
+        assert_eq!(key_to_bytes("Shift", false, false), None);
+        assert_eq!(key_to_bytes("Control", false, false), None);
+        assert_eq!(key_to_bytes("F5", false, false), None);
+        assert_eq!(key_to_bytes("", false, false), None);
+    }
+
+    #[test]
+    fn an_ordinary_character_is_itself() {
+        assert_eq!(key_to_bytes("a", false, false), Some(b"a".to_vec()));
+        assert_eq!(key_to_bytes(" ", false, false), Some(b" ".to_vec()));
+        // Decoded by the browser already, so anything it hands over arrives whole.
+        assert_eq!(
+            key_to_bytes("é", false, false),
+            Some("é".as_bytes().to_vec())
+        );
+    }
+
+    #[test]
+    fn inverse_swaps_the_two_colours_rather_than_picking_one() {
+        // A status line and a selection are made of this. Drawing inverse as "some other colour"
+        // would make a selected line unreadable against the line beside it.
+        let cell = Cell {
+            text: "x".to_owned(),
+            color: Some("red".to_owned()),
+            background: Some("blue".to_owned()),
+            inverse: true,
+            ..Cell::default()
+        };
+        let style = cell_style(&cell);
+        assert!(style.contains("color:blue;"), "{style}");
+        assert!(style.contains("background:red;"), "{style}");
+    }
+
+    #[test]
+    fn a_cell_that_set_nothing_is_drawn_with_nothing() {
+        // So it inherits the panel, rather than this module choosing a colour the theme never did.
+        assert_eq!(cell_style(&Cell::default()), "");
+    }
 
     #[test]
     fn a_program_can_put_a_character_where_it_says_it_did() {

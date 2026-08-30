@@ -43,6 +43,13 @@ pub enum CardId {
     Agents,
     /// Dynamic bounded CYBOU Shell instance (Zone 3 `DemoReadOnly` capability).
     Shell(u32),
+    /// Interactive terminal running as the signed-in account (ADR-0047).
+    ///
+    /// Deliberately a separate kind from [`Self::Shell`] and not a mode of it. One is a bounded
+    /// read-only surface every deployment serves; the other runs programs as a person and exists
+    /// only where an operator enabled it. A single card that quietly became either would leave
+    /// somebody unsure which one they are typing into.
+    Terminal(u32),
     /// Dynamic bounded File Manager instance (Zone 3 Read-Only storage).
     FileManager(u32),
     /// Real-time Journal event stream.
@@ -172,6 +179,7 @@ impl CardId {
             Self::Insight => "insight",
             Self::Agents => "agents",
             Self::Shell(_) => "shell",
+            Self::Terminal(_) => "terminal",
             Self::FileManager(_) => "files",
             Self::JournalFeed(_) => "journal-feed",
             Self::Editor(_) => "editor",
@@ -210,6 +218,7 @@ impl CardId {
     pub fn instance_key(self) -> String {
         match self {
             Self::Shell(instance)
+            | Self::Terminal(instance)
             | Self::FileManager(instance)
             | Self::JournalFeed(instance)
             | Self::Editor(instance)
@@ -268,6 +277,7 @@ impl CardId {
             Self::Insight => "System Insight",
             Self::Agents => "Agents",
             Self::Shell(_) => "Shell",
+            Self::Terminal(_) => "Terminal",
             Self::FileManager(_) => "File Manager",
             Self::JournalFeed(_) => "Presence Stream",
             Self::Editor(_) => "Text Editor",
@@ -317,6 +327,7 @@ impl CardId {
             "insight" => Some(Self::Insight),
             "agents" => Some(Self::Agents),
             "shell" => Some(Self::Shell(0)),
+            "terminal" => Some(Self::Terminal(0)),
             "files" => Some(Self::FileManager(0)),
             "journal-feed" => Some(Self::JournalFeed(0)),
             "editor" => Some(Self::Editor(0)),
@@ -551,6 +562,20 @@ impl CardId {
                 default_size: (420.0, 320.0),
                 min_size: (300.0, 200.0),
                 max_size: (720.0, 720.0),
+            },
+            Self::Terminal(_) => CardSpec {
+                kind: CardKind::Tool,
+                singleton: false,
+                movable: true,
+                resizable: true,
+                collapsible: true,
+                closable: true,
+                deckable: true,
+                // Eighty by twenty-four at a readable monospace size, which is the shape every
+                // program that draws still assumes when nothing tells it otherwise.
+                default_size: (720.0, 460.0),
+                min_size: (420.0, 220.0),
+                max_size: (1600.0, 1200.0),
             },
             Self::Shell(_) => CardSpec {
                 kind: CardKind::Tool,

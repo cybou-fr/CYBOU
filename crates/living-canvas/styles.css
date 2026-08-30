@@ -3637,3 +3637,73 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   font-size: 11px;
   color: var(--text-muted, #94a3b8);
 }
+
+/* The terminal. A grid of monospace cells, drawn from the screen the browser keeps. */
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.terminal-status {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+}
+
+.terminal-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.terminal-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Prose rather than a status light: what it says decides whether a person goes to an operator or
+   simply reconnects. */
+.terminal-refusal {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+  font-size: 11px;
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.terminal-screen {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-main, #e2e8f0);
+  background: #0b0d12;
+}
+
+.terminal-screen:focus-visible {
+  outline: 1px solid rgba(129, 140, 248, 0.8);
+  outline-offset: -1px;
+}
+
+/* `pre` whitespace, because a run of spaces in a drawn screen is the drawing. */
+.terminal-row {
+  white-space: pre;
+}

@@ -13,6 +13,8 @@ repository.workspace = true
 [dependencies]
 async-trait.workspace = true
 base64.workspace = true
+# The terminal wire is CBOR, the same bytes the owner writes. The browser re-encodes nothing.
+ciborium.workspace = true
 # The browser keeps a real screen — a grid with a cursor — rather than a span parser, because
 # ADR-0047 argues for a terminal by naming the programs that repaint. Pure data structures:
 # it brings `vte`, `itoa` and `unicode-width` and holds no capability of any kind.
@@ -81,6 +83,10 @@ web-sys = { version = "=0.3.103", features = [
     "PointerEvent",
     "Storage",
     "Window",
+    # The terminal: a socket that stays open, and the events that say what happened to it.
+    "BinaryType",
+    "CloseEvent",
+    "WebSocket",
 ] }
 
 [lints]

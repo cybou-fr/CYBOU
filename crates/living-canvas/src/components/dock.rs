@@ -241,6 +241,15 @@ pub fn DesktopDock(
                 </button>
                 <button
                     class="dock-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "terminal"))
+                    title="Terminal — runs as your account"
+                    on:click=move |_| open_or_focus(CardId::Terminal(0), 720.0, 460.0)
+                >
+                    <IconTerminal size=18 />
+                    <span class="dock-tooltip">"Terminal"</span>
+                </button>
+                <button
+                    class="dock-item"
                     class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "system-logs"))
                     title="System Logs"
                     on:click=move |_| open_or_focus(CardId::SystemLogs(0), 600.0, 420.0)

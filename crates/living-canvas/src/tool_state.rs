@@ -22,6 +22,7 @@
 
 use std::collections::HashMap;
 
+use leptos::prelude::LocalStorage;
 use leptos::prelude::*;
 use leptos::reactive::owner::{Owner, StoredValue};
 
@@ -38,6 +39,42 @@ pub struct FileConflict {
 
 /// The greeting a Shell card shows before anyone has typed anything.
 const SHELL_BANNER: &str = "Bounded, read-only. Type 'help' to see what this shell can do.\n";
+
+/// One Terminal card's live session.
+///
+/// The screen and the socket are local signals rather than ordinary ones. Neither a `vt100` parser
+/// nor a `WebSocket` is `Send`, and neither should be: this is one screen belonging to one tab, and
+/// a type that could be moved between threads would be claiming otherwise.
+#[derive(Clone, Copy)]
+pub struct TerminalSignals {
+    /// The screen, fed by the host and read by the view.
+    pub screen: RwSignal<crate::terminal::TerminalScreen, LocalStorage>,
+    /// Bumped whenever bytes arrive.
+    ///
+    /// The screen is mutated in place and is not a value the view can compare, so something has to
+    /// tell it that a repaint is due. Without this the grid would redraw only when some other
+    /// signal happened to change, which is a terminal that answers late.
+    pub generation: RwSignal<u64>,
+    /// The live socket, while there is one.
+    pub socket: RwSignal<Option<web_sys::WebSocket>, LocalStorage>,
+    /// What this card is doing, in one word for the bar.
+    pub status: RwSignal<String>,
+    /// Why there is no terminal, in prose a person can act on.
+    pub refusal: RwSignal<Option<String>>,
+}
+
+impl TerminalSignals {
+    /// A terminal that has not connected.
+    fn new() -> Self {
+        Self {
+            screen: RwSignal::new_local(crate::terminal::TerminalScreen::new(80, 24)),
+            generation: RwSignal::new(0),
+            socket: RwSignal::new_local(None),
+            status: RwSignal::new("Not connected".to_owned()),
+            refusal: RwSignal::new(None),
+        }
+    }
+}
 
 /// One Shell card's interactive state.
 ///
@@ -1183,6 +1220,7 @@ pub struct ToolCardStates {
     /// The owner every piece of state is created under.
     owner: StoredValue<Owner>,
     shells: StoredValue<HashMap<CardId, ShellSignals>>,
+    terminals: StoredValue<HashMap<CardId, TerminalSignals>>,
     file_managers: StoredValue<HashMap<CardId, FileManagerSignals>>,
     editors: StoredValue<HashMap<CardId, EditorSignals>>,
     diffs: StoredValue<HashMap<CardId, DiffSignals>>,
@@ -1218,6 +1256,7 @@ impl ToolCardStates {
         Self {
             owner: StoredValue::new(owner),
             shells: StoredValue::new(HashMap::new()),
+            terminals: StoredValue::new(HashMap::new()),
             file_managers: StoredValue::new(HashMap::new()),
             editors: StoredValue::new(HashMap::new()),
             diffs: StoredValue::new(HashMap::new()),
@@ -1254,6 +1293,24 @@ impl ToolCardStates {
         }
         let created = self.owner.with_value(|owner| owner.with(ShellSignals::new));
         self.shells.update_value(|held| {
+            held.insert(card, created);
+        });
+        created
+    }
+
+    /// This Terminal card's state, creating it the first time the card is shown.
+    ///
+    /// Held here rather than in the component, so closing a Terminal panel and reopening it finds
+    /// the same session — closing a card is a presentation act and must not end a shell.
+    #[must_use]
+    pub fn terminal(&self, card: CardId) -> TerminalSignals {
+        if let Some(existing) = self.terminals.with_value(|held| held.get(&card).copied()) {
+            return existing;
+        }
+        let created = self
+            .owner
+            .with_value(|owner| owner.with(TerminalSignals::new));
+        self.terminals.update_value(|held| {
             held.insert(card, created);
         });
         created
@@ -1338,7 +1395,10 @@ impl ToolCardStates {
     /// This Notifications Center card's state, creating it the first time the card is shown.
     #[must_use]
     pub fn notifications(&self, card: CardId) -> NotificationsSignals {
-        if let Some(existing) = self.notifications.with_value(|held| held.get(&card).copied()) {
+        if let Some(existing) = self
+            .notifications
+            .with_value(|held| held.get(&card).copied())
+        {
             return existing;
         }
         let created = self
@@ -1473,7 +1533,10 @@ impl ToolCardStates {
     /// This Users & SSH Keys card's state, creating it the first time the card is shown.
     #[must_use]
     pub fn user_settings(&self, card: CardId) -> UserSettingsSignals {
-        if let Some(existing) = self.user_settings.with_value(|held| held.get(&card).copied()) {
+        if let Some(existing) = self
+            .user_settings
+            .with_value(|held| held.get(&card).copied())
+        {
             return existing;
         }
         let created = self
@@ -1521,9 +1584,7 @@ impl ToolCardStates {
         if let Some(existing) = self.mails.with_value(|held| held.get(&card).copied()) {
             return existing;
         }
-        let created = self
-            .owner
-            .with_value(|owner| owner.with(MailSignals::new));
+        let created = self.owner.with_value(|owner| owner.with(MailSignals::new));
         self.mails.update_value(|held| {
             held.insert(card, created);
         });
@@ -1551,9 +1612,7 @@ impl ToolCardStates {
         if let Some(existing) = self.notes.with_value(|held| held.get(&card).copied()) {
             return existing;
         }
-        let created = self
-            .owner
-            .with_value(|owner| owner.with(NotesSignals::new));
+        let created = self.owner.with_value(|owner| owner.with(NotesSignals::new));
         self.notes.update_value(|held| {
             held.insert(card, created);
         });
@@ -1578,7 +1637,10 @@ impl ToolCardStates {
     /// This Cognitive Graph & Causal DAG card's state, creating it the first time the card is shown.
     #[must_use]
     pub fn cognitive_graph(&self, card: CardId) -> CognitiveGraphSignals {
-        if let Some(existing) = self.cognitive_graphs.with_value(|held| held.get(&card).copied()) {
+        if let Some(existing) = self
+            .cognitive_graphs
+            .with_value(|held| held.get(&card).copied())
+        {
             return existing;
         }
         let created = self
@@ -1593,7 +1655,10 @@ impl ToolCardStates {
     /// This Canonical Event1 Journal card's state, creating it the first time the card is shown.
     #[must_use]
     pub fn event_journal(&self, card: CardId) -> EventJournalSignals {
-        if let Some(existing) = self.event_journals.with_value(|held| held.get(&card).copied()) {
+        if let Some(existing) = self
+            .event_journals
+            .with_value(|held| held.get(&card).copied())
+        {
             return existing;
         }
         let created = self

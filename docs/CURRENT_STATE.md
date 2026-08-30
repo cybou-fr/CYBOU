@@ -882,8 +882,25 @@ a resize changes both dimensions, and invalid UTF-8 does not derail the grid. No
 persisted, because a terminal buffer is the likeliest place for a password typed at a prompt to
 reach a browser profile: the scrollback is held in the tab and nowhere else.
 
-**No card opens the socket yet.** The screen and the transport both exist and nothing joins them,
-so the Safe Shell remains what the desktop serves.
+The Terminal card joins them. It is a separate card kind from the Shell rather than a mode of it:
+one is a bounded read-only surface every deployment serves, the other runs programs as a person
+and exists only where an operator enabled it, and a single card that quietly became either would
+leave somebody unsure which one they are typing into. It is in the Dock and the command palette
+beside the Shell, and its session is held in the card state rather than the component, so closing
+the panel and reopening it finds the same shell — closing a card is a presentation act and must
+not end a process.
+
+Keys are turned into bytes rather than sent as names, which is most of what a terminal is: Ctrl-C
+is `0x03` and not the letter `c`, the arrows are escape sequences, Enter is a carriage return,
+Backspace is `0x7f`, and Alt is an escape prefix. A key this card handles is consumed, so Ctrl-C
+does not also copy a selection and Tab does not leave the panel while completing a filename. That
+mapping is in the portable module beside the screen and is checked on the native target, because
+every one of those keys does nothing useful if it arrives as its own name.
+
+**No browser has driven one end to end.** The card compiles and its logic is covered natively;
+the socket, the keyboard and the grid have not been exercised in a real browser, because the
+browser gate needs `chromedriver` and this workspace has none installed. The vertical is built
+and unproven at its last inch.
 
 ## Agent runtime
 
@@ -1126,7 +1143,7 @@ mentioned look identical to a reader.
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
 | General agent sessions | one digest-pinned OpenCode pack and one ACP prompt turn exist; multi-turn streaming, further packs and real-provider evidence do not |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
-| A terminal on screen | the owner exists and the gateway carries it; no browser draws one yet, because the desktop has no terminal emulator and no card that opens the socket |
+| A terminal proven in a browser | owner, transport, screen and card all exist and are covered by native tests; no browser has driven one end to end, because the browser gate needs `chromedriver` and this workspace has none |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |
 | Semantic file index | not started |

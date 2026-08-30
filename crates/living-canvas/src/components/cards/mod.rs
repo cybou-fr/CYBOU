@@ -45,6 +45,7 @@ pub mod session;
 pub mod shell;
 pub mod storage;
 pub mod system_logs;
+pub mod terminal;
 pub mod updates;
 pub mod user_settings;
 
@@ -90,5 +91,6 @@ pub use session::{SessionCard, SessionContent};
 pub use shell::{ShellCard, ShellContent};
 pub use storage::StorageContent;
 pub use system_logs::SystemLogsContent;
+pub use terminal::TerminalContent;
 pub use updates::UpdatesContent;
 pub use user_settings::UserSettingsContent;

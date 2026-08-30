@@ -2590,6 +2590,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64",
+ "ciborium",
  "console_error_panic_hook",
  "cybou-protocol",
  "cybou-web-contracts",

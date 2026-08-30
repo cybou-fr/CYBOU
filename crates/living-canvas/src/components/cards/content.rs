@@ -85,6 +85,10 @@ pub fn CardContent(
         CardId::Monitor(_) => {
             view! { <crate::components::cards::monitor::MonitorContent card=card /> }.into_any()
         }
+        CardId::Terminal(instance) => {
+            view! { <crate::components::cards::terminal::TerminalContent instance=instance /> }
+                .into_any()
+        }
         CardId::SystemLogs(_) => {
             view! { <crate::components::cards::system_logs::SystemLogsContent card=card /> }
                 .into_any()

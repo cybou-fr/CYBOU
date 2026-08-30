@@ -156,6 +156,15 @@ const ALL_PALETTE_ACTIONS: &[PaletteAction] = &[
         icon_kind: "sparkles",
     },
     PaletteAction {
+        id: "terminal",
+        category: PaletteCategory::Tools,
+        title: "Open Terminal",
+        subtitle: "Interactive shell running as your account",
+        keywords: "terminal shell tty console pty bash sh command line prompt interactive",
+        shortcut: None,
+        icon_kind: "terminal",
+    },
+    PaletteAction {
         id: "system-logs",
         category: PaletteCategory::Tools,
         title: "Open System Logs",
@@ -606,6 +615,7 @@ pub fn CommandPalette(
         "services" => focus_or_open_card(CardId::Services(0), 580.0, 420.0),
         "processes" => focus_or_open_card(CardId::Processes(0), 620.0, 440.0),
         "monitor" => focus_or_open_card(CardId::Monitor(0), 560.0, 460.0),
+        "terminal" => focus_or_open_card(CardId::Terminal(0), 720.0, 460.0),
         "system-logs" => focus_or_open_card(CardId::SystemLogs(0), 600.0, 420.0),
         "storage" => focus_or_open_card(CardId::Storage(0), 580.0, 440.0),
         "network" => focus_or_open_card(CardId::Network(0), 560.0, 420.0),
