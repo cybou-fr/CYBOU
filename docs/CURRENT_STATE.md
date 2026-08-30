@@ -1183,7 +1183,22 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   panel inside it*, and a card panned ninety thousand pixels away keeps its `.object` frame
   while its contents are not built — which is what the minimap, hit-testing and the tests that
   click a card by index all depend on. Seven browser tests, run in headless Chromium.
- 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
+- **What a browser is handed is what was built**: `test-desktop-delivery-gate.sh` builds the
+  frontend with trunk, serves it from the real gateway and asks for it the way a browser does.
+  It checks that the index names a module the gateway will actually serve — an index naming a
+  file that 404s is a blank page that says nothing — that the module begins with the WebAssembly
+  magic number rather than being an `index.html` some fallback handed back, that it is compressed
+  on the way out, and that the manifest arrives as `application/manifest+json` with every icon it
+  names. Measured on a passing run: 8 091 716 bytes identity, 2 060 918 gzip, 1 706 298 Brotli.
+
+  It is deliberately not a browser. The first version drove headless Chromium with
+  `--virtual-time-budget`, because `--dump-dom` fires on the load event and a WebAssembly desktop
+  has mounted nothing by then. That budget waits for a page to fall idle and this page never does
+  — the Dock and the Terminal card each hold a repeating timer — so Chromium advanced virtual
+  time and fired them for two hours and sixteen minutes before it was killed. What a browser does
+  with the bundle is covered by the seven `wasm-bindgen-test` tests, which settle on a microtask
+  rather than on an idle page.
+- **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned
   away — and these are not idle markup, since each holds signals that update on a timer. The
@@ -1218,6 +1233,7 @@ bash scripts/test-capsule-gate.sh
 bash scripts/test-egress-gate.sh
 bash scripts/test-action-gate.sh
 bash scripts/test-confirmation-gate.sh
+bash scripts/test-desktop-delivery-gate.sh
 bash scripts/test-acp-gate.sh
 bash scripts/test-standing-lease-gate.sh
 bash scripts/test-model-gateway-gate.sh
