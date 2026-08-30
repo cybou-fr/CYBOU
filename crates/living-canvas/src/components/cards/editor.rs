@@ -745,6 +745,24 @@ pub fn EditorContent(
                     </div>
                 </div>
 
+                // Twenty-eight things this panel says about itself, none of which had anywhere
+                // to appear: a draft autosave that failed, a save the host refused, a conflict
+                // that was re-read, how many occurrences a replace changed, the authority a file
+                // was admitted under. A message written to a signal nothing renders is a panel
+                // that answered and was not heard.
+                {move || status_msg.get().map(|message| view! {
+                    <div class="card-status-line" role="status">
+                        <span>{message}</span>
+                        <button
+                            class="card-status-dismiss"
+                            title="Dismiss"
+                            on:click=move |_| status_msg.set(None)
+                        >
+                            "×"
+                        </button>
+                    </div>
+                })}
+
                 {move || {
                     let tab = active_tab();
                     if tab.location.requires_action_authorization() {

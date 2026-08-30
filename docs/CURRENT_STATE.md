@@ -1113,7 +1113,18 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   tokens under `prefers-color-scheme`, and is deliberately overridable by an explicit choice: a
   person who has set one has said something, and the system preference is only a guess about
   them. What remains in source is one-off colour, not repetition.
-- **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
+- **A card that could not be read says so**: two panels wrote why they had failed into a signal
+  no view rendered. The Editor put twenty-eight messages there — a draft autosave that failed, a
+  save the host refused, a conflict re-read, the authority a file was admitted under — and the
+  System Monitor put `Failed to load telemetry` there, so a host whose gateway could not be
+  reached drew an empty Monitor, indistinguishable from a machine doing nothing. Both render
+  now, and an unread projection says it is unread rather than drawing a host with no memory and
+  no disks. `scripts/validate-card-signals.py` refuses a panel that writes a message it never
+  reads; a file that writes into another card's state is listed by name with its reason, so the
+  exemption cannot widen quietly. The check is per file, which is the whole of why it works — an
+  earlier version asked whether the name was read anywhere in the crate, and since every card
+  has a `status_msg` it passed on both defects it was written for.
+ 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **Command Palette & Omnibar Navigation**: Unified desktop action launcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>) with real-time fuzzy search, keyboard selection cycling (<kbd>↑</kbd>/<kbd>↓</kbd>), <kbd>Enter</kbd> execution, Ask CYBOU cognitive question answering, shortcut badges, and automatic uncollapse/bring-forward card focusing.
 - **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. `SubjectRef` is the canonical primitive for new cross-panel entity references; migration of existing interactions is incomplete.
 - **Universal Entity Inspector & Deep Links**: Dedicated introspection panel for canonical `SubjectRef` entities featuring categorized preset pickers (Services, Files, Agents, System), custom target entry, 1-click copyable `cybou://` canonical URIs and deep link hashes, formatted raw JSON spec viewer, and epistemic honesty regarding authoritative projection status. Complete service, package, mail, and calendar subject hashes open and focus the Universal Inspector on initial load and subsequent `hashchange`. Identity-only links whose metadata or filesystem authority requires an owner lookup are refused rather than completed with browser-invented values; that resolver remains unbuilt.
@@ -1145,6 +1156,7 @@ bash scripts/test-agent-runtime-gate.sh
 bash scripts/test-opencode-pack-gate.sh
 bash scripts/test-self-maintenance-gate.sh
 python3 scripts/validate-cognitive-docs.py .
+python3 scripts/validate-card-signals.py
 python3 scripts/validate-desktop-styles.py
 python3 scripts/validate-organ-layering.py
 python3 scripts/validate-doc-links.py

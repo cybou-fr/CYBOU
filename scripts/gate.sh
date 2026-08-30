@@ -71,6 +71,7 @@ step "clippy"                cargo clippy --workspace --all-targets --locked -- 
 step "native tests"          cargo test --workspace --locked
 step "browser tests"         cargo test -p living-canvas --target wasm32-unknown-unknown --locked
 step "cognitive documents"   python3 scripts/validate-cognitive-docs.py .
+step "card messages"      python3 scripts/validate-card-signals.py
 step "desktop styles"        python3 scripts/validate-desktop-styles.py
 step "organ layering"        python3 scripts/validate-organ-layering.py
 step "document links"        python3 scripts/validate-doc-links.py

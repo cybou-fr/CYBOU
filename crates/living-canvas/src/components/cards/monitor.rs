@@ -56,6 +56,34 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                 </button>
             </div>
 
+            // The panel wrote "Failed to load telemetry" into a signal nothing read, so a host
+            // whose gateway could not be reached drew an empty Monitor: indistinguishable from a
+            // machine doing nothing, which is the one reading this panel must never give.
+            {move || signals.status_msg.get().map(|message| view! {
+                <div class="card-status-line" role="status">
+                    <span>{message}</span>
+                    <button
+                        class="card-status-dismiss"
+                        title="Dismiss"
+                        on:click=move |_| signals.status_msg.set(None)
+                    >
+                        "×"
+                    </button>
+                </div>
+            })}
+
+            // And an unread projection is not an empty one. Until telemetry arrives this says it
+            // has not arrived, rather than drawing a host with no memory and no disks.
+            {move || (signals.monitor.get().is_none() && signals.status_msg.get().is_none()).then(|| view! {
+                <div class="card-unread">
+                    {move || if signals.loading.get() {
+                        "Reading this host…"
+                    } else {
+                        "Not read yet."
+                    }}
+                </div>
+            })}
+
             {move || signals.monitor.get().map(|mon| {
                 let uptime_hours = mon.uptime_seconds / 3600;
                 let ram_used_gb = mon.memory_used_bytes as f64 / (1024.0 * 1024.0 * 1024.0);

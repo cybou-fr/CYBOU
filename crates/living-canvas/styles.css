@@ -4076,3 +4076,37 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 :root[data-theme="light"] {
   color-scheme: light;
 }
+
+/* --------------------------------------------------------------------------------------------
+   What a card says about itself.
+
+   One appearance wherever it happens, because "this could not be read" is the same statement in
+   every panel and a person should not have to learn it twice.
+   -------------------------------------------------------------------------------------------- */
+.card-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--accent-line);
+  font-size: 11px;
+  color: var(--accent-text);
+  background: var(--accent-fill);
+}
+
+.card-status-dismiss {
+  border: none;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+/* Not an empty panel. A projection that has not arrived says so, rather than drawing a host with
+   no memory and no disks. */
+.card-unread {
+  padding: 24px 16px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-faint);
+}
