@@ -1149,6 +1149,19 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   — were plain divs. Nobody was told the desktop had asked them something, and a keyboard could
   tab straight past the question into the canvas behind it, where the buttons still worked. Each
   carries `role="dialog"`, `aria-modal` and the heading already inside it as its name.
+- **The canvas answers to fingers**: the cards declared `touch-action: none` and the plane they
+  sit on did not, so a one-finger drag on empty canvas was a page scroll and panning by touch did
+  not work at all. And there was no way to zoom: the wheel gesture wants a modifier key, so a
+  person on a tablet could pan an infinite canvas and never change how much of it they could see.
+  A two-finger pinch scales about the point between the fingers and follows that point as it
+  moves — doing only the first makes the canvas slide out from under the gesture — and the scale
+  is applied after clamping, or a pinch past the limit keeps translating while the size stays
+  put. The arithmetic is in `layout::camera` and checked natively, including that the canvas
+  point under the fingers is the same one after. Fingers in the same place change nothing, since
+  dividing by that distance sends the canvas to infinity on the frame two fingers touch. A third
+  finger is ignored: that is somebody resting a hand. `overscroll-behavior: none` on the body,
+  because pull-to-refresh on a canvas is a gesture that discards every unsaved buffer on it.
+  SD14's mobile layout — cluster stack views for a narrow viewport — is not started.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned

@@ -92,7 +92,9 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+/* No overscroll, because a desktop panned to its edge should stay there rather than reload:
+   pull-to-refresh on a canvas is a gesture that throws away every unsaved buffer on it. */
+body { margin: 0; min-width: 320px; min-height: 100vh; overscroll-behavior: none; }
 button, a { font: inherit; color: inherit; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
@@ -229,7 +231,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .runtime-menu button:hover { background: rgba(255,255,255,.06); }
 .runtime-menu hr { width: 100%; border: 0; border-top: 1px solid rgba(154,167,184,.16); }
 
-.canvas { position: relative; min-height: calc(100vh - 64px); isolation: isolate; }
+/* `touch-action: none` because this plane is dragged and pinched rather than scrolled. Without
+   it a one-finger drag on empty canvas was a page scroll and panning by touch did not work at
+   all — the cards declared it and the plane they sit on did not. */
+.canvas { position: relative; min-height: calc(100vh - 64px); isolation: isolate; touch-action: none; }
 .ambient { position: absolute; inset: 16% 26%; border: 1px solid rgba(112, 225, 200, 0.08); border-radius: 50%; filter: blur(1px); }
 .relationship-layer { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .relationship-edge { opacity: .28; transition: opacity 160ms ease; }

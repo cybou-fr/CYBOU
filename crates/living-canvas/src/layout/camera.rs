@@ -473,3 +473,216 @@ mod culling_tests {
         assert!(is_within_view(huge, (0.0, 0.0), 1.0, WINDOW));
     }
 }
+
+/// The closest and furthest the canvas may be taken.
+///
+/// The same pair the wheel and the camera flights already use, written once here so a gesture and a
+/// keystroke cannot disagree about how far out the desktop goes.
+pub const MIN_ZOOM: f64 = 0.4;
+/// See [`MIN_ZOOM`].
+pub const MAX_ZOOM: f64 = 2.0;
+
+/// Where the canvas is after one step of a two-finger gesture.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pinch {
+    /// The new scale.
+    pub zoom: f64,
+    /// The new translation.
+    pub pan: (f64, f64),
+}
+
+/// Advance a pinch by one move.
+///
+/// Touch had no way to zoom at all: the wheel gesture wants a modifier key and the buttons are a
+/// control rather than a gesture, so a person on a tablet could pan an infinite canvas and never
+/// change how much of it they could see.
+///
+/// Two things happen at once and both belong here. The distance between the fingers scales the
+/// canvas about the point between them, which is what makes a pinch feel like it is holding the
+/// thing under the fingers rather than the corner of the screen. And the point between them moves,
+/// which pans. Doing only the first makes the canvas slide out from under a two-finger drag.
+///
+/// The scale is applied after clamping rather than before, or a pinch that ran past the limit would
+/// keep translating as though it had not: the fingers would still spread and the canvas would still
+/// drift while its size stayed put.
+#[must_use]
+pub fn pinch_step(
+    zoom: f64,
+    pan: (f64, f64),
+    previous: ((f64, f64), (f64, f64)),
+    current: ((f64, f64), (f64, f64)),
+) -> Pinch {
+    let unchanged = Pinch { zoom, pan };
+
+    if !(zoom.is_finite() && zoom > 0.0) {
+        return unchanged;
+    }
+    for point in [previous.0, previous.1, current.0, current.1] {
+        if !(point.0.is_finite() && point.1.is_finite()) {
+            return unchanged;
+        }
+    }
+
+    let distance = |a: (f64, f64), b: (f64, f64)| (b.0 - a.0).hypot(b.1 - a.1);
+    let midpoint =
+        |a: (f64, f64), b: (f64, f64)| (f64::midpoint(a.0, b.0), f64::midpoint(a.1, b.1));
+
+    let was = distance(previous.0, previous.1);
+    let now = distance(current.0, current.1);
+    // Two fingers in the same place have no distance to compare, and dividing by it would send the
+    // canvas to infinity on the frame somebody's fingers happened to touch.
+    if was < 1.0 || now < 1.0 {
+        return unchanged;
+    }
+
+    let new_zoom = (zoom * (now / was)).clamp(MIN_ZOOM, MAX_ZOOM);
+    let applied = new_zoom / zoom;
+
+    let from = midpoint(previous.0, previous.1);
+    let to = midpoint(current.0, current.1);
+
+    Pinch {
+        zoom: new_zoom,
+        pan: (
+            to.0 - (from.0 - pan.0) * applied,
+            to.1 - (from.1 - pan.1) * applied,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod pinch_tests {
+    use super::{MAX_ZOOM, MIN_ZOOM, Pinch, pinch_step};
+
+    /// Two fingers 100 apart, centred on the same point, spread to 200.
+    #[test]
+    fn spreading_the_fingers_zooms_in() {
+        let step = pinch_step(
+            1.0,
+            (0.0, 0.0),
+            ((450.0, 400.0), (550.0, 400.0)),
+            ((400.0, 400.0), (600.0, 400.0)),
+        );
+        assert!((step.zoom - 2.0).abs() < 1e-9, "{:?}", step);
+    }
+
+    #[test]
+    fn pinching_them_together_zooms_out() {
+        let step = pinch_step(
+            1.0,
+            (0.0, 0.0),
+            ((400.0, 400.0), (600.0, 400.0)),
+            ((450.0, 400.0), (550.0, 400.0)),
+        );
+        assert!((step.zoom - 0.5).abs() < 1e-9, "{:?}", step);
+    }
+
+    #[test]
+    fn the_point_between_the_fingers_stays_where_it_was() {
+        // What makes a pinch feel like it is holding the thing under the fingers rather than the
+        // corner of the screen. The canvas point under the midpoint before must be under it after.
+        let pan = (120.0, -60.0);
+        let zoom = 1.0;
+        let previous = ((450.0, 380.0), (550.0, 420.0));
+        let current = ((400.0, 360.0), (600.0, 440.0));
+        let midpoint = (500.0, 400.0);
+
+        let before = ((midpoint.0 - pan.0) / zoom, (midpoint.1 - pan.1) / zoom);
+        let step = pinch_step(zoom, pan, previous, current);
+        let after = (
+            (midpoint.0 - step.pan.0) / step.zoom,
+            (midpoint.1 - step.pan.1) / step.zoom,
+        );
+
+        assert!((before.0 - after.0).abs() < 1e-9, "{before:?} {after:?}");
+        assert!((before.1 - after.1).abs() < 1e-9, "{before:?} {after:?}");
+    }
+
+    #[test]
+    fn two_fingers_moving_together_pan_without_zooming() {
+        // A two-finger drag at a constant separation. Zooming about the midpoint without also
+        // following it is what makes the canvas slide out from under the gesture.
+        let step = pinch_step(
+            1.0,
+            (0.0, 0.0),
+            ((400.0, 400.0), (500.0, 400.0)),
+            ((430.0, 380.0), (530.0, 380.0)),
+        );
+        assert!((step.zoom - 1.0).abs() < 1e-9);
+        assert!((step.pan.0 - 30.0).abs() < 1e-9, "{:?}", step);
+        assert!((step.pan.1 + 20.0).abs() < 1e-9, "{:?}", step);
+    }
+
+    #[test]
+    fn the_canvas_stops_at_its_limits() {
+        let wide_apart = ((0.0, 400.0), (1200.0, 400.0));
+        let close = ((595.0, 400.0), (605.0, 400.0));
+
+        let zoomed_in = pinch_step(1.9, (0.0, 0.0), close, wide_apart);
+        assert!((zoomed_in.zoom - MAX_ZOOM).abs() < 1e-9, "{zoomed_in:?}");
+
+        let zoomed_out = pinch_step(0.5, (0.0, 0.0), wide_apart, close);
+        assert!((zoomed_out.zoom - MIN_ZOOM).abs() < 1e-9, "{zoomed_out:?}");
+    }
+
+    #[test]
+    fn a_gesture_past_the_limit_stops_translating_too() {
+        // The reason the scale is applied after clamping. If it were not, the fingers would keep
+        // spreading, the size would stay put, and the canvas would drift away underneath them.
+        let close = ((595.0, 400.0), (605.0, 400.0));
+        let wider = ((300.0, 400.0), (900.0, 400.0));
+        let widest = ((0.0, 400.0), (1200.0, 400.0));
+
+        let first = pinch_step(MAX_ZOOM, (0.0, 0.0), close, wider);
+        let second = pinch_step(first.zoom, first.pan, wider, widest);
+
+        // Already at the limit, so the only movement left is the midpoint, which has not moved.
+        assert_eq!(first.zoom, MAX_ZOOM);
+        assert_eq!(second.zoom, MAX_ZOOM);
+        assert!(
+            (second.pan.0 - first.pan.0).abs() < 1e-9,
+            "{first:?} {second:?}"
+        );
+    }
+
+    #[test]
+    fn fingers_in_the_same_place_change_nothing() {
+        // Dividing by that distance would send the canvas to infinity on the frame two fingers
+        // happened to touch.
+        let same = ((500.0, 400.0), (500.0, 400.0));
+        let apart = ((400.0, 400.0), (600.0, 400.0));
+
+        assert_eq!(
+            pinch_step(1.0, (7.0, 9.0), same, apart),
+            Pinch {
+                zoom: 1.0,
+                pan: (7.0, 9.0)
+            }
+        );
+        assert_eq!(
+            pinch_step(1.0, (7.0, 9.0), apart, same),
+            Pinch {
+                zoom: 1.0,
+                pan: (7.0, 9.0)
+            }
+        );
+    }
+
+    #[test]
+    fn a_gesture_that_cannot_be_believed_changes_nothing() {
+        let apart = ((400.0, 400.0), (600.0, 400.0));
+        let broken = ((f64::NAN, 400.0), (600.0, 400.0));
+
+        assert_eq!(
+            pinch_step(1.0, (0.0, 0.0), apart, broken),
+            Pinch {
+                zoom: 1.0,
+                pan: (0.0, 0.0)
+            }
+        );
+        assert_eq!(
+            pinch_step(f64::NAN, (0.0, 0.0), apart, apart).pan,
+            (0.0, 0.0)
+        );
+    }
+}

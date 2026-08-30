@@ -52,6 +52,11 @@ pub fn CanvasViewport(
         viewport: crate::components::camera_context::window_size(),
     });
 
+    // The two fingers of a pinch, by pointer id. A browser interleaves their moves, so both
+    // positions have to be remembered as they were: the gesture is the change between frames, and
+    // a frame that only knew where one finger is would read half of it as a pan.
+    let touches: RwSignal<Vec<(i32, (f64, f64))>> = RwSignal::new(Vec::new());
+
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
 
@@ -97,6 +102,19 @@ pub fn CanvasViewport(
                 }
             }
             on:pointerdown=move |event: PointerEvent| {
+                if event.pointer_type() == "touch" {
+                    touches.update(|held| {
+                        held.retain(|(id, _)| *id != event.pointer_id());
+                        // Only ever two. A third finger on the canvas is somebody resting a hand,
+                        // and letting it join the gesture would make the pinch jump.
+                        if held.len() < 2 {
+                            held.push((
+                                event.pointer_id(),
+                                (f64::from(event.client_x()), f64::from(event.client_y())),
+                            ));
+                        }
+                    });
+                }
                 let is_canvas_bg = event.target()
                     .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
                     .map_or(false, |el| el.class_list().contains("canvas") || el.class_list().contains("ambient") || el.tag_name().eq_ignore_ascii_case("svg"));
@@ -105,6 +123,39 @@ pub fn CanvasViewport(
                 }
             }
             on:pointermove=move |event: PointerEvent| {
+                // A pinch takes precedence over everything else on the canvas: while two fingers
+                // are down the person is moving the camera, not dragging what is under them.
+                if event.pointer_type() == "touch" && touches.get_untracked().len() == 2 {
+                    let held = touches.get_untracked();
+                    let current = (
+                        f64::from(event.client_x()),
+                        f64::from(event.client_y()),
+                    );
+                    let moved: Vec<(i32, (f64, f64))> = held
+                        .iter()
+                        .map(|(id, point)| {
+                            if *id == event.pointer_id() {
+                                (*id, current)
+                            } else {
+                                (*id, *point)
+                            }
+                        })
+                        .collect();
+
+                    let step = crate::layout::camera::pinch_step(
+                        zoom.get_untracked(),
+                        pan.get_untracked(),
+                        (held[0].1, held[1].1),
+                        (moved[0].1, moved[1].1),
+                    );
+                    set_zoom.set(step.zoom);
+                    set_pan.set(step.pan);
+                    touches.set(moved);
+                    // A pinch that also panned would move the canvas twice.
+                    set_panning.set(None);
+                    return;
+                }
+
                 if let Some((start_x, start_y, init_px, init_py)) = panning.get() {
                     let cur_x = event.client_x() as f64;
                     let cur_y = event.client_y() as f64;
@@ -113,7 +164,8 @@ pub fn CanvasViewport(
                 move_drag(event.clone(), layout, dragging, snap_guides);
                 move_resize(event, layout, resizing);
             }
-            on:pointerup=move |_| {
+            on:pointerup=move |event: PointerEvent| {
+                touches.update(|held| held.retain(|(id, _)| *id != event.pointer_id()));
                 if let Some((_start_x, _start_y, init_px, init_py)) = panning.get() {
                     let cur_px = pan.get_untracked().0;
                     let cur_py = pan.get_untracked().1;
