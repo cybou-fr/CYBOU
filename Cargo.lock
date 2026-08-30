@@ -929,6 +929,7 @@ dependencies = [
  "async-trait",
  "cybou-fabric",
  "cybou-protocol",
+ "cybou-telemetryd",
  "thiserror 2.0.20",
  "time",
  "tokio",

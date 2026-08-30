@@ -19,6 +19,12 @@ time.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 
+[dev-dependencies]
+# Only the gate example uses this, to put a finding in the Journal the way the organ that observes
+# findings does. A proposal cites its finding, and the Journal will not hold a contribution citing
+# something that is not in it.
+cybou-telemetryd = { path = "../cybou-telemetryd" }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
 

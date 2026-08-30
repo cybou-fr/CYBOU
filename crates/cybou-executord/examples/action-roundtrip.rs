@@ -6,8 +6,9 @@
 use cybou_fabric::{ACTION, EXECUTOR, decode, encode};
 use cybou_protocol::{
     action::{AttemptReport, ExecutionAttempt},
-    telemetry::{EvidenceStrength, Finding, MetricKey, Subject, SystemInsight},
+    telemetry::{EvidenceStrength, Finding, InsightEvidence, MetricKey, Subject, SystemInsight},
 };
+use std::error::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 use zbus::Proxy;
@@ -28,15 +29,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ACTION.interface,
     )
     .await?;
+    let since = OffsetDateTime::now_utc();
+    let key = MetricKey::named(Subject::ServiceActive, UNIT.to_owned());
     let insight = SystemInsight {
         insight_id: Uuid::new_v4(),
         finding: Finding::ServiceInactive,
-        about: Some(MetricKey::named(Subject::ServiceActive, UNIT.to_owned())),
-        because: Vec::new(),
+        about: Some(key.clone()),
+        // A finding has to be able to say why. The Journal will not hold an inference that cites
+        // nothing, and the lifecycle written about this proposal cites the finding in turn — so a
+        // finding with no readings behind it stops the whole chain at the executor, which refuses
+        // to touch the Body for an execution it cannot make durable.
+        because: vec![InsightEvidence {
+            key,
+            observed: 0.0,
+            deviation: None,
+        }],
         strength: EvidenceStrength::Strong,
-        concluded_at: OffsetDateTime::now_utc(),
-        since: OffsetDateTime::now_utc(),
+        concluded_at: since,
+        since,
     };
+
+    // The finding goes in first because the proposal cites it, and a contribution may only cite
+    // something the Journal already holds.
+    observe(&insight).await?;
+
     let (record, permit_id): (Vec<u8>, String) = action
         .call(
             "EvaluateInsight",
@@ -104,5 +120,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("single-use permit was replayed".into());
     }
     println!("proposal → decision → permit → restart → independent active observation");
+    Ok(())
+}
+
+/// Put the finding in the Journal, together with the readings it rests on.
+///
+/// Through `cybou_telemetryd::journal`, which is what the organ that observes findings uses, so
+/// this is the shape a real one arrives in rather than one this file invented.
+async fn observe(insight: &SystemInsight) -> Result<(), Box<dyn Error>> {
+    let client = cybou_fabric::event_client::EventClient::session().await?;
+    for envelope in cybou_telemetryd::journal::contributions(insight, OffsetDateTime::now_utc())? {
+        client.submit(&envelope).await?;
+    }
     Ok(())
 }

@@ -177,6 +177,13 @@ reporting the absence of one as a failure of confirmation.
 sudo -E bash scripts/test-action-gate.sh
 ```
 
+Like the confirmation gate, it brings its own `cybou-eventd` under `dbus-run-session` with an
+`XDG_DATA_HOME` of its own, and its client puts the finding in the Journal before proposing
+anything. Both are load-bearing rather than tidy: the proposal cites the finding, the lifecycle
+cites the proposal, and the executor refuses to touch the Body for an execution it cannot make
+durable — so on a host with no Journal this gate used to fail at the executor and report the
+absence of one as a failure of the action boundary.
+
 The gate creates one harmless disposable systemd service. The unprivileged production Action1 and
 root executor share the system transport so D-Bus can authenticate both UIDs, under an explicit
 least-privilege policy; the root-only gate uses an equivalent temporary rule that its cleanup trap
