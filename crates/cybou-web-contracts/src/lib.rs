@@ -715,6 +715,19 @@ pub struct FileUploadProjection {
     pub size_bytes: u64,
 }
 
+/// A person's answer to a proposal that was waiting on one.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmActionRequest {
+    /// Which proposal is being answered.
+    pub proposal_id: Uuid,
+    /// The decision the person was shown when they answered.
+    ///
+    /// Not the decision they want; the decision they saw. Action1 refuses if it is no longer the
+    /// one it holds.
+    pub decision_id: Uuid,
+}
+
 /// Which path in the sandbox a request is about.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1065,6 +1078,12 @@ pub struct ActionOutcomeProjection {
 pub struct ActionRecordProjection {
     /// Proposal identity.
     pub proposal_id: Uuid,
+    /// Identity of the decision this record currently carries.
+    ///
+    /// On the wire so a person answering a confirmation can say which decision they were shown.
+    /// A proposal re-decided between being drawn and being clicked is a different prompt, and
+    /// without this the answer to one question could authorize another.
+    pub decision_id: Uuid,
     /// Associated telemetry insight/cause identity, if any.
     pub cause_id: Option<Uuid>,
     /// Proposer description.

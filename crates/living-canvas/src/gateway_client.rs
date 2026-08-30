@@ -317,6 +317,28 @@ impl MindClient for GatewayMindClient {
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
+    async fn confirm_action(
+        &self,
+        request: &cybou_web_contracts::ConfirmActionRequest,
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
+        let response = Request::post("/api/v1/actions/confirm")
+            .json(request)
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .send()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+        if !response.ok() {
+            return Err(ClientError::GatewayRequest(format!(
+                "/api/v1/actions/confirm returned HTTP {}",
+                response.status()
+            )));
+        }
+        response
+            .json()
+            .await
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+    }
+
     async fn upload_file(
         &self,
         request: &cybou_web_contracts::FileUploadRequest,

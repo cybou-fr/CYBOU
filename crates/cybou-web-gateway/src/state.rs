@@ -121,6 +121,21 @@ pub trait PresenceSource: Send + Sync + 'static {
     async fn recent_actions(&self) -> Option<Vec<cybou_web_contracts::ActionRecordProjection>> {
         None
     }
+
+    /// Carry a person's confirmation to Action1, or None if Action1 is unreachable or refused.
+    ///
+    /// The gateway decides nothing here. It establishes who is at the keyboard — it is the only
+    /// party that authenticated them — and relays an answer to a question Action1 asked. Every
+    /// check on whether that answer authorizes anything is Action1's, and the permit it mints
+    /// never comes back through this boundary.
+    async fn confirm_action(
+        &self,
+        _proposal_id: uuid::Uuid,
+        _decision_seen: uuid::Uuid,
+        _confirmed_by: &str,
+    ) -> Option<cybou_web_contracts::ActionRecordProjection> {
+        None
+    }
 }
 
 /// Failure response safe to expose at the browser boundary.
@@ -358,6 +373,25 @@ impl GatewayState {
     pub fn session_for(&self, headers: &HeaderMap) -> Option<Session> {
         let token = Self::token_in(headers)?;
         self.sessions.resolve(token, OffsetDateTime::now_utc())
+    }
+
+    /// Who is at the keyboard, as the boundary that authenticated them established it.
+    ///
+    /// Never taken from the request body. It names a draft partition and, since confirmation
+    /// exists, an authorization; a value the browser supplied about itself would be neither.
+    /// `None` means nobody is: a public reader holds no seat.
+    #[must_use]
+    pub fn authenticated_principal(&self, headers: &HeaderMap) -> Option<String> {
+        if let Some(session) = self.session_for(headers) {
+            return Some(format!("linux-account:{}", session.username));
+        }
+        if matches!(
+            self.shell_seat(headers),
+            Some(crate::shells::ShellOwner::LocalDesktop { .. })
+        ) {
+            return Some("local-desktop".to_owned());
+        }
+        None
     }
 
     /// The session token this request carries, whether or not it names a live session.

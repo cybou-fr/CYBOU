@@ -317,6 +317,15 @@ impl PresenceSource for ZbusPresenceSource {
         Self::recent_actions(self).await
     }
 
+    async fn confirm_action(
+        &self,
+        proposal_id: uuid::Uuid,
+        decision_seen: uuid::Uuid,
+        confirmed_by: &str,
+    ) -> Option<cybou_web_contracts::ActionRecordProjection> {
+        Self::confirm_action(self, proposal_id, decision_seen, confirmed_by).await
+    }
+
     async fn wait_for_change(&self) -> Result<(), GatewayError> {
         self.changed
             .lock()

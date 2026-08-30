@@ -913,6 +913,27 @@ was asked, agreed, and is named. A record that could not tell them apart would a
 authorized this* with the policy, on a host whose policy authorized nothing. The seat is established
 by whatever authenticated it and is never supplied by the party being authorized.
 
+**A browser can now answer.** `POST /api/v1/actions/confirm` carries a person's answer to
+`Action1.Confirm` and is the first write the gateway makes against the action boundary. It remains
+unable to execute anything and decides nothing: it supplies exactly two things Action1 cannot know
+— who is at the keyboard, and that they hold a seat entitling them to be asked — and the request
+contract carries only two identities, the proposal and the decision that was on screen. There is no
+field on it for an operation, a target or an argument, so a confirmation cannot become a request and
+the proposal Action1 holds stays the thing that gets carried out. The permit the answer mints is
+dropped where the reply is decoded and never crosses to the browser that prompted it.
+
+Both the seat name and the refusal are single. `authenticated_principal` now lives on the gateway
+state rather than beside the drafts it used to name alone, because it names an authorization too and
+two definitions of *who is at the keyboard* that could drift is exactly the defect this codebase
+keeps finding. And every way an answer can fail — a stale decision, a spent verdict, an objecting
+critic, a proposal older than its readings, an unreachable owner — is reported as one
+non-retryable `409`, because Action1 deliberately does not say which of its checks refused and a
+gateway that split that into distinct statuses would say it on Action1's behalf.
+
+The Insight card draws the control from the `ActionRecord`, not from the offer beside it: an offer
+is the gateway's own recomputation of what could be proposed and carries no proposal identity, and
+the record is the only thing there is to answer.
+
 
 The host observes itself, concludes, explains, offers, and refuses.
 
@@ -1031,9 +1052,9 @@ mentioned look identical to a reader.
 
 - **Telemetry has no persistence.** Everything it holds is in memory and bounded; a restart starts
   the window again, and the organ says it has not watched long enough rather than answering.
-- **Confirmation has an owner but no reachable surface yet.** `Action1.Confirm` turns a decision
-  that was waiting on a person into a permit, and nothing outside the bus can call it: the gateway
-  is read-only against Action1, so a browser still cannot answer a prompt.
+- **A confirmed action has never actually run.** The path from a person's answer to a permit is
+  built and tested; no deployment has carried one through to an executed attempt and an observed
+  outcome, because that needs a standing deployment with a real finding on it.
 - **The agent vertical has no real-provider evidence yet.** The real OpenCode ACP entrypoint has run
   inside a capsule and completed the credential-free handshake, but no configured provider has
   returned an answer through the full path. Multi-turn streaming is also not built.

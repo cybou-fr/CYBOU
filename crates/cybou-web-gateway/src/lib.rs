@@ -69,6 +69,7 @@ pub use state::{
 
 use routes::{
     actions_handler, add_ssh_key, agent_offers_handler, agents_handler, api_not_found,
+    confirm_action_handler,
     apply_system_updates, cancel_operation, capsule_action_handler, capsule_telemetry_handler,
     connect_network, copy_host_path_handler, create_calendar_event, create_contact,
     create_file_handler, create_host_directory_handler, create_host_file_handler, create_note,
@@ -256,6 +257,7 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/insight", get(insight_handler))
         .route("/api/v1/actions", get(actions_handler))
         .route("/api/v1/actions/recent", get(recent_actions_handler))
+        .route("/api/v1/actions/confirm", post(confirm_action_handler))
         .route("/api/v1/agents/offers", get(agent_offers_handler))
         .route(
             "/api/v1/agents",
@@ -1461,6 +1463,87 @@ mod tests {
             get_route(&app, "/api/v1/snapshot", None).await,
             StatusCode::OK
         );
+    }
+
+    /// Answer a proposal as whoever holds this cookie, if any.
+    async fn confirm_as(app: &Router, cookie: &str) -> axum::http::Response<Body> {
+        let payload = serde_json::to_vec(&cybou_web_contracts::ConfirmActionRequest {
+            proposal_id: Uuid::new_v4(),
+            decision_id: Uuid::new_v4(),
+        })
+        .expect("serialize");
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/api/v1/actions/confirm")
+            .header("content-type", "application/json");
+        if !cookie.is_empty() {
+            request = request.header("cookie", cookie);
+        }
+        app.clone()
+            .oneshot(request.body(Body::from(payload)).expect("a request"))
+            .await
+            .expect("a response")
+    }
+
+    #[tokio::test]
+    async fn a_reader_with_no_seat_cannot_authorize_anything() {
+        // This deployment opened its read-only surface deliberately, so the request is not
+        // anonymous by mistake: it can read what the host would like to do and cannot answer.
+        // Refused here rather than passed on, because the gateway is the only party that could
+        // say who is confirming and for this request there is nobody.
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+
+        let response = confirm_as(&app, "").await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let refusal: serde_json::Value = serde_json::from_slice(&body).expect("a refusal");
+        assert_eq!(refusal["error"], "confirmationRequiresASeat");
+    }
+
+    #[tokio::test]
+    async fn an_answer_action1_did_not_take_is_never_reported_as_authorized() {
+        // This router has no Action1 behind it, which stands in for every way the answer can fail:
+        // the verdict is no longer the one that asked, the decision on screen is stale, a critic
+        // objected, the proposal outlived its readings, or the owner is not there at all. All of
+        // them arrive here as "not accepted", and none of them may arrive as success.
+        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
+        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
+
+        let response = confirm_as(&app, &cookie).await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let refusal: serde_json::Value = serde_json::from_slice(&body).expect("a refusal");
+        assert_eq!(refusal["error"], "confirmationNotAccepted");
+        // Non-retryable: four of the five reasons above stay true however often it is asked, and a
+        // surface that invited a retry would be inviting a search for something confirmable.
+        assert_eq!(refusal["retryable"], false);
+    }
+
+    #[tokio::test]
+    async fn a_confirmation_carries_no_operation_for_the_browser_to_choose() {
+        // The request contract is the whole argument: two identities and nothing else. If a
+        // browser could name the operation or the target, a confirmation would be a request, and
+        // the proposal Action1 holds would stop being what gets carried out.
+        let encoded = serde_json::to_value(cybou_web_contracts::ConfirmActionRequest {
+            proposal_id: Uuid::nil(),
+            decision_id: Uuid::nil(),
+        })
+        .expect("serialize");
+
+        let mut fields: Vec<&str> = encoded
+            .as_object()
+            .expect("an object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        fields.sort_unstable();
+        assert_eq!(fields, ["decisionId", "proposalId"]);
     }
 
     /// Post an arbitrary JSON body to a sandbox route as whoever holds this cookie.

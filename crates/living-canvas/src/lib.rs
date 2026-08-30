@@ -158,6 +158,20 @@ pub trait MindClient {
         cause_id: Option<uuid::Uuid>,
     ) -> Result<Vec<cybou_web_contracts::ActionRecordProjection>, ClientError>;
 
+    /// Answer a proposal that was waiting on a person.
+    ///
+    /// The request names the proposal and the decision that was on screen when the person
+    /// answered. It names no operation and no target: those are on the proposal Action1 already
+    /// holds, and a confirmation that could carry them would be a request rather than an answer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the answer was not accepted.
+    async fn confirm_action(
+        &self,
+        request: &cybou_web_contracts::ConfirmActionRequest,
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError>;
+
     /// Ask the agent runtime owner to end one session and confirm its teardown.
     ///
     /// # Errors
@@ -722,6 +736,15 @@ impl MindClient for MockMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         Err(ClientError::ProjectionUnavailable(
             "mock file writes are unavailable".to_string(),
+        ))
+    }
+
+    async fn confirm_action(
+        &self,
+        _request: &cybou_web_contracts::ConfirmActionRequest,
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(
+            "mock confirmations are unavailable".to_string(),
         ))
     }
 

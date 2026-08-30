@@ -397,16 +397,7 @@ fn draft_refusal(error: DraftStoreError) -> Refusal {
 }
 
 fn authenticated_principal(state: &GatewayState, headers: &HeaderMap) -> Option<String> {
-    if let Some(session) = state.session_for(headers) {
-        return Some(format!("linux-account:{}", session.username));
-    }
-    if matches!(
-        state.shell_seat(headers),
-        Some(crate::shells::ShellOwner::LocalDesktop { .. })
-    ) {
-        return Some("local-desktop".to_string());
-    }
-    None
+    state.authenticated_principal(headers)
 }
 
 /// List all drafts for the authenticated seat.

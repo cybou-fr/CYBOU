@@ -436,6 +436,35 @@ impl ZbusPresenceSource {
         Some(records.iter().map(project_action_record).collect())
     }
 
+    /// Carry one person's confirmation to Action1 and return what it decided.
+    ///
+    /// The reply carries the minted permit identity beside the record. It is dropped here and
+    /// never leaves this function: a permit is a single-use capability over the Body, and the
+    /// browser that prompted the confirmation is the one party on this path that must not hold
+    /// one. What the browser is told is what was decided.
+    pub(super) async fn confirm_action(
+        &self,
+        proposal_id: uuid::Uuid,
+        decision_seen: uuid::Uuid,
+        confirmed_by: &str,
+    ) -> Option<cybou_web_contracts::ActionRecordProjection> {
+        let (encoded, _permit_id) = self
+            .read_with::<(Vec<u8>, String), (String, String, String)>(
+                ACTION,
+                "Confirm",
+                &(
+                    proposal_id.to_string(),
+                    decision_seen.to_string(),
+                    confirmed_by.to_owned(),
+                ),
+            )
+            .await?;
+        let record: cybou_protocol::action::ActionRecord = decode(&encoded)
+            .or_else(|_| ciborium::from_reader(encoded.as_slice()))
+            .ok()?;
+        Some(project_action_record(&record))
+    }
+
     /// Recent lifecycle records held by Action1.
     pub(super) async fn recent_actions(
         &self,
@@ -458,6 +487,7 @@ pub fn project_action_record(
 
     cybou_web_contracts::ActionRecordProjection {
         proposal_id: record.proposal.proposal_id,
+        decision_id: record.decision.decision_id,
         cause_id: record.proposal.cause_id,
         proposer: record.proposal.proposed_by.describe(),
         intent: record.proposal.intent.clone(),

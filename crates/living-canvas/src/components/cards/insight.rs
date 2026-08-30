@@ -27,7 +27,7 @@ use lucide_leptos::Activity;
 use std::sync::Arc;
 
 use crate::{
-    CardId, DesktopItemId, DesktopLayout,
+    CardId, DesktopItemId, DesktopLayout, MindClient,
     components::card_frame::CardFrame,
     heading::heading_line,
     instant::instant_label,
@@ -159,6 +159,62 @@ fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> im
     let has_offers = !offers.is_empty();
 
     let finding_id = finding.id;
+
+    // What Action1 actually holds about this finding, if it is waiting on a person.
+    //
+    // Deliberately read off the record rather than off the offer beside it. An offer is this
+    // gateway's own recomputation of what could be proposed and carries no proposal identity at
+    // all; the record is the proposal Action1 made, and it is the only thing there is to answer.
+    let awaiting_answer = move || -> Option<(uuid::Uuid, uuid::Uuid)> {
+        let RuntimeState::Ready {
+            actions: Some(records),
+            ..
+        } = runtime.get()
+        else {
+            return None;
+        };
+        let finding_id = finding_id?;
+        let record = records
+            .iter()
+            .find(|record| record.cause_id == Some(finding_id))?;
+        (record.verdict == "requires-confirmation")
+            .then_some((record.proposal_id, record.decision_id))
+    };
+
+    let answer_status = RwSignal::new(Option::<String>::None);
+    let answering = RwSignal::new(false);
+
+    let confirm = move |(proposal_id, decision_id): (uuid::Uuid, uuid::Uuid)| {
+        answering.set(true);
+        answer_status.set(None);
+        leptos::task::spawn_local(async move {
+            let request = cybou_web_contracts::ConfirmActionRequest {
+                proposal_id,
+                decision_id,
+            };
+            match crate::GatewayMindClient.confirm_action(&request).await {
+                // What comes back is the decision, never the permit. The card says what was
+                // authorized; whether it then ran is the timeline's question and is answered by
+                // the record, not by this reply.
+                Ok(record) => answer_status.set(Some(format!(
+                    "Authorized. {}",
+                    record
+                        .verdict_reason
+                        .unwrap_or_else(|| "Waiting for it to be carried out.".to_owned())
+                ))),
+                // Action1 does not say which of its checks refused, and neither does this. The
+                // one thing a person can act on is that the answer is stale, which is true of
+                // every one of them.
+                Err(_) => answer_status.set(Some(
+                    "Not accepted. It may have been answered already, or the reading behind it \
+                     may be too old. Refresh and look again."
+                        .to_owned(),
+                )),
+            }
+            answering.set(false);
+        });
+    };
+
     let action_state = move || {
         if let RuntimeState::Ready {
             actions: Some(records),
@@ -220,6 +276,30 @@ fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> im
             <Show when=move || has_offers>
                 <span class="offer-label">"Self-Healing Actions"</span>
             </Show>
+            // One finding, one proposal, one answer. The control is here rather than on each
+            // offer line because the offers describe what could be done and the record is the one
+            // thing Action1 is actually waiting on.
+            <Show when=move || awaiting_answer().is_some()>
+                <div class="offer-confirm">
+                    <span class="offer-confirm-prompt">
+                        "This host is waiting for you to say whether it may do this."
+                    </span>
+                    <button
+                        class="offer-confirm-btn"
+                        disabled=move || answering.get()
+                        on:click=move |_| {
+                            if let Some(ids) = awaiting_answer() {
+                                confirm(ids);
+                            }
+                        }
+                    >
+                        {move || if answering.get() { "Authorizing…" } else { "Authorize" }}
+                    </button>
+                </div>
+            </Show>
+            {move || answer_status.get().map(|message| view! {
+                <div class="offer-confirm-status">{message}</div>
+            })}
             <div class="offer-list">
                 {offers
                     .into_iter()
