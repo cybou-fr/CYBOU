@@ -847,8 +847,28 @@ not the same set. Where no instance is enabled the capability is absent and says
 back to the sandboxed shell, since a person who believes they are on the host and is not would run
 the right command in the wrong place.
 
-**Nothing reaches it yet.** The gateway has no bidirectional transport, so no browser has held one of
-these sessions. The Safe Shell remains what the desktop serves.
+`GET /api/v1/terminal` upgrades to a WebSocket and carries one session between a browser and that
+account's owner. It is the gateway's first bidirectional surface and deliberately the thinnest one
+that can exist: it parses no frame, knows what no keystroke means, and decides nothing about what
+may run. It supplies the single fact neither end can establish for itself — which Linux account is
+at the keyboard — taken from the numeric identity the privileged helper established, never from a
+name in the request.
+
+Frames are re-framed rather than re-encoded. A WebSocket message already carries a length and the
+owner's socket needs one, so the difference between the two ends is four bytes of prefix; decoding
+here would put a second parser on the path with nothing to add and its own opinions about malformed
+input. The frame bound is read from the protocol rather than restated, because a gateway that
+accepted a larger frame than the owner would leave a gap in the boundary exactly the width of the
+disagreement.
+
+A refusal happens before the upgrade, not after. A socket that opened and then closed would look
+like a terminal that crashed, and the difference between *this host has no terminal for you* and
+*your terminal died* is what tells a person whether to ask an operator for access. A seat without a
+Linux account behind it — the local desktop seat holds none — is refused rather than given a guessed
+account, because the guess would be choosing whose shell somebody gets.
+
+**No browser draws one yet.** The desktop has no terminal emulator and no card that opens this
+socket, so the Safe Shell remains what it serves.
 
 ## Agent runtime
 
@@ -1079,7 +1099,7 @@ mentioned look identical to a reader.
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
 | General agent sessions | one digest-pinned OpenCode pack and one ACP prompt turn exist; multi-turn streaming, further packs and real-provider evidence do not |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
-| A terminal a browser can reach | `cybou-ptyd` allocates a real pseudoterminal and is proven against a live shell; nothing connects to it yet, because the gateway has no bidirectional transport and no browser has held one |
+| A terminal on screen | the owner exists and the gateway carries it; no browser draws one yet, because the desktop has no terminal emulator and no card that opens the socket |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |
 | Semantic file index | not started |

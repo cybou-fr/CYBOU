@@ -72,7 +72,9 @@ sha2 = "0.11.0"
 chacha20poly1305 = "0.10.1"
 getrandom = "0.2.15"
 async-trait = "0.1.92"
-axum = "0.8.9"
+# `ws` is not a default feature. The terminal is the first surface here that has to talk in
+# both directions at once (ADR-0047).
+axum = { version = "0.8.9", features = ["ws"] }
 reqwest = { version = "0.12.23", default-features = false, features = ["rustls-tls"] }
 rustix = { version = "1.1.4", features = ["fs"] }
 ciborium = "0.2.2"

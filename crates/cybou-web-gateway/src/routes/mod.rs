@@ -21,10 +21,12 @@ pub mod personal;
 pub mod shell;
 pub mod snapshot;
 pub mod system;
+pub mod terminal;
 
 use axum::http::StatusCode;
 
 pub use actions::{actions_handler, confirm_action_handler, recent_actions_handler};
+pub use terminal::terminal_handler;
 pub use agents::{
     agent_offers_handler, agents_handler, capsule_action_handler, capsule_telemetry_handler,
     launch_agent_handler, stop_agent_handler,

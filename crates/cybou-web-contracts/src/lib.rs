@@ -678,6 +678,17 @@ pub const FILE_READ_MAX_BYTES: usize = 256 * 1024;
 /// How many UTF-8 bytes one bounded sandbox write accepts.
 pub const FILE_WRITE_MAX_BYTES: usize = 256 * 1024;
 
+/// The terminal wire, shared with the owner that allocates the pseudoterminal.
+///
+/// Re-exported rather than restated. A browser and a host that disagreed about what a resize frame
+/// is would disagree silently, in the one direction where the disagreement is a program drawing
+/// into the wrong window.
+pub use cybou_protocol::terminal::{
+    FromGateway as TerminalFromGateway, FromOwner as TerminalFromOwner,
+    MAX_COLUMNS as TERMINAL_MAX_COLUMNS, MAX_FRAME_BYTES as TERMINAL_MAX_FRAME_BYTES,
+    MAX_ROWS as TERMINAL_MAX_ROWS, Refusal as TerminalRefusal, window_is_possible as terminal_window_is_possible,
+};
+
 /// How many bytes one file transfer carries, in either direction.
 ///
 /// Larger than the text read and write bounds, because those exist to keep a projection small

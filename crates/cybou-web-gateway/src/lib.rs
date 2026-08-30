@@ -69,7 +69,7 @@ pub use state::{
 
 use routes::{
     actions_handler, add_ssh_key, agent_offers_handler, agents_handler, api_not_found,
-    confirm_action_handler,
+    confirm_action_handler, terminal_handler,
     apply_system_updates, cancel_operation, capsule_action_handler, capsule_telemetry_handler,
     connect_network, copy_host_path_handler, create_calendar_event, create_contact,
     create_file_handler, create_host_directory_handler, create_host_file_handler, create_note,
@@ -258,6 +258,7 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/actions", get(actions_handler))
         .route("/api/v1/actions/recent", get(recent_actions_handler))
         .route("/api/v1/actions/confirm", post(confirm_action_handler))
+        .route("/api/v1/terminal", get(terminal_handler))
         .route("/api/v1/agents/offers", get(agent_offers_handler))
         .route(
             "/api/v1/agents",

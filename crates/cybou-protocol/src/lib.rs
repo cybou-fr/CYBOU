@@ -39,6 +39,7 @@ pub mod promotion;
 pub mod security;
 pub mod subject;
 pub mod system;
+pub mod terminal;
 pub mod telemetry;
 
 pub use admission::Kind;
