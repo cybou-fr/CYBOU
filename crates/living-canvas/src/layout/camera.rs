@@ -337,3 +337,139 @@ mod tests {
         assert_eq!(camera_ease(2.0), 1.0);
     }
 }
+
+/// How far outside the window a card is still drawn.
+///
+/// Wide on purpose. The cost this saves is drawing a panel nobody can see; the cost it risks is a
+/// panel arriving late as somebody pans towards it, and the second is the one a person notices. A
+/// margin of this size means a card is ready well before its edge reaches the window.
+pub const OFFSCREEN_MARGIN: f64 = 600.0;
+
+/// Whether a card at this geometry is near enough to the window to be worth drawing.
+///
+/// ADR-0044 names this as the cost of an infinite canvas: dozens of live reactive panels, all of
+/// them in the DOM whether or not anybody can see them. Every card here holds signals that update
+/// on a timer, so an off-screen panel is not merely idle markup — it is work.
+///
+/// The stage is drawn as `translate3d(pan) scale(zoom)` from an origin at its top left, so a card
+/// at canvas `(x, y)` reaches the window at `pan + (x, y) * zoom`. That is the whole of the
+/// arithmetic, and it is here rather than in the component so it can be checked without one.
+///
+/// Answers `true` whenever the camera cannot be believed — a zoom of zero, a viewport nothing has
+/// measured yet, an infinity from a division somewhere upstream. A card must never be hidden
+/// because a number arrived wrong: the failure of this function has to be drawing too much.
+#[must_use]
+pub fn is_within_view(
+    geometry: crate::CardGeometry,
+    pan: (f64, f64),
+    zoom: f64,
+    viewport: (f64, f64),
+) -> bool {
+    if !(zoom.is_finite() && zoom > 0.0) {
+        return true;
+    }
+    if !(pan.0.is_finite() && pan.1.is_finite()) {
+        return true;
+    }
+    // A viewport of zero is a window nobody has measured, not a window nothing fits in.
+    if !(viewport.0.is_finite() && viewport.1.is_finite()) || viewport.0 <= 0.0 || viewport.1 <= 0.0
+    {
+        return true;
+    }
+
+    let left = pan.0 + geometry.x * zoom;
+    let top = pan.1 + geometry.y * zoom;
+    let right = left + geometry.width * zoom;
+    let bottom = top + geometry.height * zoom;
+
+    right >= -OFFSCREEN_MARGIN
+        && bottom >= -OFFSCREEN_MARGIN
+        && left <= viewport.0 + OFFSCREEN_MARGIN
+        && top <= viewport.1 + OFFSCREEN_MARGIN
+}
+
+#[cfg(test)]
+mod culling_tests {
+    use super::{OFFSCREEN_MARGIN, is_within_view};
+    use crate::CardGeometry;
+
+    const WINDOW: (f64, f64) = (1280.0, 800.0);
+
+    fn card(x: f64, y: f64) -> CardGeometry {
+        CardGeometry::new(x, y, (360.0, 260.0), 1)
+    }
+
+    #[test]
+    fn a_card_in_the_window_is_drawn() {
+        assert!(is_within_view(card(100.0, 100.0), (0.0, 0.0), 1.0, WINDOW));
+    }
+
+    #[test]
+    fn a_card_far_away_is_not() {
+        // The case this exists for: an infinite canvas somebody has panned across, with the panels
+        // they left behind still updating on a timer.
+        assert!(!is_within_view(card(9000.0, 0.0), (0.0, 0.0), 1.0, WINDOW));
+        assert!(!is_within_view(card(0.0, 9000.0), (0.0, 0.0), 1.0, WINDOW));
+        assert!(!is_within_view(card(-9000.0, 0.0), (0.0, 0.0), 1.0, WINDOW));
+    }
+
+    #[test]
+    fn a_card_just_outside_the_window_is_still_drawn() {
+        // Inside the margin, so panning towards it finds it already there rather than watching it
+        // arrive. The margin is the difference between culling nobody notices and a desktop that
+        // flickers at its edges.
+        let just_past = WINDOW.0 + OFFSCREEN_MARGIN / 2.0;
+        assert!(is_within_view(
+            card(just_past, 0.0),
+            (0.0, 0.0),
+            1.0,
+            WINDOW
+        ));
+    }
+
+    #[test]
+    fn the_pan_moves_what_is_visible() {
+        let far = card(4000.0, 0.0);
+        assert!(!is_within_view(far, (0.0, 0.0), 1.0, WINDOW));
+        // Panned so that card is now in front of the window.
+        assert!(is_within_view(far, (-3900.0, 0.0), 1.0, WINDOW));
+    }
+
+    #[test]
+    fn zooming_out_brings_distant_cards_back() {
+        // At a tenth scale the canvas that did not fit now does, and every card on it has to be
+        // drawn again — the overview is exactly when a person is looking at all of them.
+        let far = card(4000.0, 2000.0);
+        assert!(!is_within_view(far, (0.0, 0.0), 1.0, WINDOW));
+        assert!(is_within_view(far, (0.0, 0.0), 0.1, WINDOW));
+    }
+
+    #[test]
+    fn a_camera_that_cannot_be_believed_draws_everything() {
+        // The failure of this function has to be drawing too much. A card hidden because a number
+        // arrived wrong is a panel a person cannot find and cannot explain.
+        let anywhere = card(9000.0, 9000.0);
+        assert!(is_within_view(anywhere, (0.0, 0.0), 0.0, WINDOW));
+        assert!(is_within_view(anywhere, (0.0, 0.0), -1.0, WINDOW));
+        assert!(is_within_view(anywhere, (0.0, 0.0), f64::NAN, WINDOW));
+        assert!(is_within_view(anywhere, (f64::NAN, 0.0), 1.0, WINDOW));
+        assert!(is_within_view(anywhere, (f64::INFINITY, 0.0), 1.0, WINDOW));
+    }
+
+    #[test]
+    fn a_window_nobody_has_measured_draws_everything() {
+        // Zero is a viewport that has not been laid out, not a viewport nothing fits in. Reading it
+        // as the second would blank the desktop on the first frame.
+        let anywhere = card(9000.0, 9000.0);
+        assert!(is_within_view(anywhere, (0.0, 0.0), 1.0, (0.0, 0.0)));
+        assert!(is_within_view(anywhere, (0.0, 0.0), 1.0, (1280.0, 0.0)));
+        assert!(is_within_view(anywhere, (0.0, 0.0), 1.0, (f64::NAN, 800.0)));
+    }
+
+    #[test]
+    fn a_card_larger_than_the_window_is_drawn_from_either_edge() {
+        // A panel dragged wider than the screen is visible while neither of its corners is.
+        let huge = CardGeometry::new(-500.0, -500.0, (4000.0, 3000.0), 1);
+        assert!(is_within_view(huge, (0.0, 0.0), 1.0, WINDOW));
+    }
+}

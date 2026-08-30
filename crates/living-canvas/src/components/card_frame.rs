@@ -41,6 +41,29 @@ pub fn CardFrame(
     let is_standard = move || representation() == crate::PanelRepresentation::Standard;
     let is_magnet_target = move || dragging.get().and_then(|d| d.drop_target) == Some(card);
 
+    // Whether this card's contents are worth building.
+    //
+    // ADR-0044 named this as the cost of an infinite canvas, and it is not idle markup: every card
+    // here holds signals that update on a timer, so a panel nobody can see is work nobody asked
+    // for. What is dropped is the contents; the frame stays, which keeps the card where the layout
+    // says it is, keeps the minimap and hit-testing honest, and keeps a selected card selectable.
+    //
+    // Absent context means everything draws. A card must never be hidden because a wiring step was
+    // forgotten somewhere above it — a panel that vanished for that reason is one a person cannot
+    // find and cannot explain.
+    let camera = use_context::<crate::components::camera_context::CanvasCamera>();
+    let is_drawable = move || {
+        // Focus takes the card out of the canvas transform entirely, and a dragged card is under
+        // the pointer whatever the arithmetic says about where it was when the drag began.
+        if dragging
+            .get()
+            .is_some_and(|drag| drag.target == crate::interaction::DragTarget::Card(card))
+        {
+            return true;
+        }
+        camera.is_none_or(|camera| camera.shows(layout.get().geometry(card)))
+    };
+
     let aria_label = format!(
         "{} card. Drag to reposition; use arrow keys for keyboard movement.",
         card.title()
@@ -77,11 +100,13 @@ pub fn CardFrame(
                     <CardControls card=card layout=layout />
                 </header>
 
-                <Show
-                    when=move || !layout.get().presentation(card).collapsed
-                    fallback=move || collapsed.with_value(|c| c())
-                >
-                    {move || render_children.with_value(|rc| rc())}
+                <Show when=is_drawable>
+                    <Show
+                        when=move || !layout.get().presentation(card).collapsed
+                        fallback=move || collapsed.with_value(|c| c())
+                    >
+                        {move || render_children.with_value(|rc| rc())}
+                    </Show>
                 </Show>
 
                 <CardResizeHandle card=card layout=layout resizing=resizing />

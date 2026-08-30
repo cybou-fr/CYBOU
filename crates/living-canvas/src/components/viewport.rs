@@ -43,6 +43,15 @@ pub fn CanvasViewport(
     set_panning: WriteSignal<Option<(f64, f64, f64, f64)>>,
     #[prop(optional)] camera_history: Option<RwSignal<crate::CameraHistory>>,
 ) -> impl IntoView {
+    // Where the camera is, for cards deciding whether they are worth drawing. Provided here
+    // because this is the component that owns the transform; read by `CardFrame`, which is as far
+    // from here as it is possible to be while still being on this canvas.
+    provide_context(crate::components::camera_context::CanvasCamera {
+        pan,
+        zoom,
+        viewport: crate::components::camera_context::window_size(),
+    });
+
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
 

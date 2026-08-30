@@ -1124,7 +1124,20 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   exemption cannot widen quietly. The check is per file, which is the whole of why it works — an
   earlier version asked whether the name was read anywhere in the crate, and since every card
   has a `status_msg` it passed on both defects it was written for.
- 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
+- **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
+- **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
+  and nothing implemented it, so every panel stayed in the DOM however far it had been panned
+  away — and these are not idle markup, since each holds signals that update on a timer. The
+  stage is drawn as `translate3d(pan) scale(zoom)` from its top left, so where a card reaches
+  the window is arithmetic; it lives in `layout::camera` rather than in the component and is
+  checked on the native target. What is dropped is the card's contents. The frame stays, which
+  keeps the card where the layout says it is, keeps the minimap and hit-testing honest, and
+  keeps a card the browser gate clicks by index still there to click. The margin is wide,
+  because the cost this saves is drawing something nobody sees and the cost it risks is a panel
+  arriving late as somebody pans towards it — and the second is the one a person notices. An
+  unbelievable camera draws everything: a zoom of zero, a window nothing has measured yet, an
+  infinity from somewhere upstream. A card must never be hidden because a number arrived wrong,
+  so the failure of this is drawing too much.
 - **Command Palette & Omnibar Navigation**: Unified desktop action launcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>) with real-time fuzzy search, keyboard selection cycling (<kbd>↑</kbd>/<kbd>↓</kbd>), <kbd>Enter</kbd> execution, Ask CYBOU cognitive question answering, shortcut badges, and automatic uncollapse/bring-forward card focusing.
 - **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. `SubjectRef` is the canonical primitive for new cross-panel entity references; migration of existing interactions is incomplete.
 - **Universal Entity Inspector & Deep Links**: Dedicated introspection panel for canonical `SubjectRef` entities featuring categorized preset pickers (Services, Files, Agents, System), custom target entry, 1-click copyable `cybou://` canonical URIs and deep link hashes, formatted raw JSON spec viewer, and epistemic honesty regarding authoritative projection status. Complete service, package, mail, and calendar subject hashes open and focus the Universal Inspector on initial load and subsequent `hashchange`. Identity-only links whose metadata or filesystem authority requires an owner lookup are refused rather than completed with browser-invented values; that resolver remains unbuilt.
