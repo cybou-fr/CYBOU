@@ -340,3 +340,124 @@ async fn a_card_docked_into_a_deck_is_not_drawn_standing_on_its_own() {
 
     let _ = desk.history;
 }
+
+/// How many elements of a selector this mount drew.
+fn count(host: &web_sys::HtmlElement, selector: &str) -> u32 {
+    AsRef::<web_sys::Element>::as_ref(host)
+        .query_selector_all(selector)
+        .expect("query the stage")
+        .length()
+}
+
+#[wasm_bindgen_test]
+async fn a_card_with_no_component_of_its_own_is_still_drawn() {
+    let (_owner, states) = desk_owner();
+    // The defect this exists for. Twenty-one card kinds were reachable from the Dock and the
+    // command palette and had no component in the viewport, so opening one added it to the layout,
+    // moved the selection onto it, saved, and drew nothing at all. Not an error and not an empty
+    // panel: nothing, on a desktop that had just been told to open it.
+    //
+    // The native test beside this one asserts that these kinds claim no component of their own.
+    // Only a browser can say whether that means they are drawn.
+    let mut layout = DesktopLayout::canonical(None);
+    layout.open_card(CardId::SystemLogs(0), 400.0, 300.0);
+    let desk = Desk::new(layout);
+    let host = stage();
+
+    let (layout, selected, set_selected, dragging, resizing, runtime, auth) = (
+        desk.layout,
+        desk.selected,
+        desk.set_selected,
+        desk.dragging,
+        desk.resizing,
+        desk.runtime,
+        desk.auth,
+    );
+    mount_to(host.clone(), move || {
+        provide_context(states);
+        view! {
+            <crate::components::cards::GenericToolCard
+                card=CardId::SystemLogs(0)
+                layout=layout
+                selected=selected
+                set_selected=set_selected
+                dragging=dragging
+                resizing=resizing
+                auth_modal_open=auth
+                runtime=runtime
+            />
+        }
+    })
+    .forget();
+    settled().await;
+
+    assert_eq!(
+        count(&host, ".object.system-logs"),
+        1,
+        "the card is on the canvas"
+    );
+    // And it is the panel rather than an empty frame: the generic card dispatches through the same
+    // component a Deck has always used, so what appears is the System Logs surface itself.
+    assert_eq!(
+        count(&host, ".system-logs-panel"),
+        1,
+        "with its own contents in it"
+    );
+}
+
+#[wasm_bindgen_test]
+async fn a_card_panned_out_of_sight_keeps_its_frame_and_drops_its_contents() {
+    let (_owner, states) = desk_owner();
+    // Culling, from the outside. The arithmetic is checked natively; what only a browser can say is
+    // that the frame survives — the minimap, hit-testing and the tests that click a card by index
+    // all depend on `.object` still being there.
+    let mut layout = DesktopLayout::canonical(None);
+    layout.open_card(CardId::SystemLogs(0), 400.0, 300.0);
+    layout.set_position(CardId::SystemLogs(0), 90_000.0, 90_000.0);
+    let desk = Desk::new(layout);
+    let host = stage();
+
+    let (layout, selected, set_selected, dragging, resizing, runtime, auth) = (
+        desk.layout,
+        desk.selected,
+        desk.set_selected,
+        desk.dragging,
+        desk.resizing,
+        desk.runtime,
+        desk.auth,
+    );
+    let camera = crate::components::camera_context::CanvasCamera {
+        pan: signal((0.0, 0.0)).0,
+        zoom: signal(1.0).0,
+        viewport: signal((1280.0, 800.0)).0,
+    };
+    mount_to(host.clone(), move || {
+        provide_context(states);
+        provide_context(camera);
+        view! {
+            <crate::components::cards::GenericToolCard
+                card=CardId::SystemLogs(0)
+                layout=layout
+                selected=selected
+                set_selected=set_selected
+                dragging=dragging
+                resizing=resizing
+                auth_modal_open=auth
+                runtime=runtime
+            />
+        }
+    })
+    .forget();
+    settled().await;
+
+    assert_eq!(
+        count(&host, ".object.system-logs"),
+        1,
+        "the frame stays where the layout put it"
+    );
+    assert_eq!(
+        count(&host, ".system-logs-panel"),
+        0,
+        "and its contents are not built"
+    );
+}

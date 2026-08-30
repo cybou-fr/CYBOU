@@ -1177,7 +1177,13 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   and none did, so `README.MD` from a system that does not care about case, or `SETUP.PY` out of
   an archive, opened as plain text. It is a table now, in the portable half and checked there,
   including that only the last dot decides — `notes.rs.bak` is a backup and not Rust.
-- **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
+- **The two frontend fixes that live in the DOM are asserted there**: the generic frame and the
+  culling both had native tests for their arithmetic and nothing for the thing they are about.
+  Two browser tests now say it: a card kind with no component of its own is drawn *with its own
+  panel inside it*, and a card panned ninety thousand pixels away keeps its `.object` frame
+  while its contents are not built — which is what the minimap, hit-testing and the tests that
+  click a card by index all depend on. Seven browser tests, run in headless Chromium.
+ 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned
   away — and these are not idle markup, since each holds signals that update on a timer. The

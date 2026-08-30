@@ -20,7 +20,11 @@ controls stacked in a corner.
 
 ## The evidence
 
-Browser tests, in real Chromium via `chromedriver`:
+Browser tests, in real Chromium via `chromedriver` (`apt install chromium-driver` on Debian;
+`scripts/gate.sh` looks for it at `/usr/bin/chromedriver`). Seven of them as of 2026-08-30:
+the four that were there, the deck invariant, and two that could not be asserted anywhere else
+— that a card with no component of its own is drawn with its own contents in it, and that a
+card panned out of sight keeps its frame while dropping them:
 
 ```bash
 cargo test -p living-canvas --target wasm32-unknown-unknown --locked
