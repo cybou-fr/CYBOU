@@ -341,7 +341,15 @@ pub fn JournalFeedContent() -> impl IntoView {
                     <header class="jf-insp-header">
                         <div class="jf-insp-title">
                             <FileText size=12 />
-                            <span><b>{move || selected_event.get().unwrap().1}</b> " · " {move || selected_event.get().unwrap().0}</span>
+                            // Read once, and from the value rather than from the fact that `Show`
+                            // decided to render. The two are separate reads of the same signal and
+                            // the selection can be cleared between them — by the Close button in
+                            // this header, or by a refresh replacing the feed — and an `unwrap`
+                            // here does not fail this card. A panic in wasm aborts the module, so
+                            // it takes the whole desktop, with no way back but a reload.
+                            <span>{move || selected_event.get().map(|event| view! {
+                                <b>{event.1}</b> " · " {event.0}
+                            })}</span>
                         </div>
                         <div class="jf-insp-actions">
                             <button

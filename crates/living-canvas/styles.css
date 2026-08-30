@@ -15,6 +15,34 @@
   /* For a gap in what somebody believes is covered — louder than muted, quieter than an alarm,
      because an unreadable file is a thing to go and look at rather than a thing that has broken. */
   --warn: #e8b562;
+
+  /* Referenced from components since before they existed. `var(--bg-card, #1e1e24)` appears at
+     twenty call sites and `var(--text-main, #e0e0e0)` at twenty-three, and neither token was ever
+     defined — so every one of them has been drawing its fallback, and the fallback is what a
+     theme cannot change. Defining them is what makes the next stage possible at all. */
+  --bg-card: #1e1e24;
+  --text-main: #e0e0e0;
+  --text-muted: #94a3b8;
+
+  /* The sixteen a shell prompt and `ls` actually use. The terminal emits
+     `var(--term-N, <fallback>)` for all 256; these are the ones worth a theme's attention, and
+     the rest fall back to the standard cube. */
+  --term-0: #1e1e2e;
+  --term-1: #f38ba8;
+  --term-2: #a6e3a1;
+  --term-3: #f9e2af;
+  --term-4: #89b4fa;
+  --term-5: #cba6f7;
+  --term-6: #94e2d5;
+  --term-7: #bac2de;
+  --term-8: #585b70;
+  --term-9: #f38ba8;
+  --term-10: #a6e3a1;
+  --term-11: #f9e2af;
+  --term-12: #89b4fa;
+  --term-13: #cba6f7;
+  --term-14: #94e2d5;
+  --term-15: #e6e9ef;
 }
 
 * { box-sizing: border-box; }
