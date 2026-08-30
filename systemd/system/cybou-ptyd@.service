@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+#
+# One interactive terminal owner per explicitly admitted Linux account:
+#   systemctl enable --now cybou-ptyd@alice.service
+#
+# Deliberately not enabled by any deployment. ADR-0047 grants a signed-in person the ability to run
+# programs as themselves, and enabling that is an act naming one account: the set of people who may
+# read a projection and the set who may run programs are not the same set, and a default must not
+# make them the same.
+#
+# Where no instance is enabled the capability is absent and the gateway says so. It does not fall
+# back to the sandboxed shell: a person who believes they are on the host and is not would run the
+# right command in the wrong place.
+
+[Unit]
+Description=Cybou interactive terminal owner for %i
+Documentation=https://github.com/cybou-fr/CYBOU
+After=cybou-authd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/cybou/cybou-ptyd-runner.sh %i
+
+Restart=on-failure
+RestartSec=1
+UMask=0077
+
+# Deliberately weaker than the host-files owner's confinement, and the difference is the point of
+# the unit. That owner reads files and is locked down accordingly; this one exists so a person can
+# run their own programs, and a sandbox that stopped them would be a terminal that cannot do what
+# terminals are for. The boundary here is the account, held by the kernel, exactly as for SSH.
+NoNewPrivileges=no
+PrivateTmp=no
+ProtectSystem=no
+ProtectHome=no
+
+[Install]
+WantedBy=multi-user.target

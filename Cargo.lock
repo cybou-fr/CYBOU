@@ -1223,6 +1223,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-ptyd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "pty-process",
+ "rustix",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "cybou-remediation"
 version = "0.1.0"
 dependencies = [
@@ -2992,6 +3003,16 @@ dependencies = [
  "syn 2.0.119",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "pty-process"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71cec9e2670207c5ebb9e477763c74436af3b9091dd550b9fb3c1bec7f3ea266"
+dependencies = [
+ "rustix",
+ "tokio",
 ]
 
 [[package]]

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-ptyd"
+description = "Unprivileged per-user owner for one interactive pseudoterminal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ciborium.workspace = true
+serde.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The one dependency ADR-0047 records as a cost. It brings in `rustix`, which this workspace
+# already carries at the same major version, and optionally `tokio`, which it also already carries
+# — so the new surface is this crate and nothing behind it. It exists because `unsafe_code =
+# "forbid"` cannot allocate a controlling terminal: neither `forkpty` nor a `pre_exec` calling
+# `setsid` and `TIOCSCTTY` can be written under it.
+pty-process = { version = "0.5.3", features = ["async"] }
+rustix = { workspace = true, features = ["process"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

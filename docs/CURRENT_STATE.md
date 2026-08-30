@@ -813,6 +813,43 @@ Every class the components render has a rule, checked by `scripts/validate-deskt
 
 A stranger is served the sign-in view and nothing else where the deployment says so.
 
+## Terminal
+
+`cybou-ptyd` owns one interactive pseudoterminal per connection, running as the account it was
+started for ([ADR-0047](adr/ADR-0047-interactive-terminal-under-the-authenticated-account.md), which
+supersedes the shell half of [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bounded-body-capabilities.md)).
+It refuses to start as root, binds a per-UID socket its systemd instance created, and spawns that
+account's login shell from the passwd database rather than a guess.
+
+Nothing inside the terminal is filtered, and that is the decision rather than an omission: command
+filtering on a real shell is theatre, and a filter that can be defeated is worse than an absent one
+because it is believed. The boundary is the account, held by the kernel, as it is for SSH. A terminal
+is therefore never a route for Action1 operations — doing one by hand is a person acting with their
+own authority, and the Journal records that differently, because the host did not do it.
+
+What is here instead is bounds, each on something a terminal can make unbounded. A frame's declared
+length is refused before anything is allocated for it. Unread output past four mebibytes ends the
+session rather than being held or silently dropped — held bytes are this host's memory and dropped
+bytes are a terminal that lies about what it printed. A window size outside 1000 by 1000, or zero in
+either direction, is refused rather than clamped: zero columns is a browser that has not measured
+itself, and programs divide by it. A session with no input and no output for four hours is closed,
+which collects the tab that was shut without the socket noticing. The shell never outlives the
+connection.
+
+The frames are exercised against a real pseudoterminal and a real `/bin/sh`, not a mock: `test -t 0`
+answers from the kernel, and `stty size` reports back the window the browser said it had. That is the
+whole difference between this and the sandboxed Safe Shell, so it is asked of the kernel rather than
+assumed from the fact that a crate was called.
+
+`cybou-ptyd@.service` ships **disabled** and no deployment enables it. Enabling it is an act naming
+one account, because the set of people who may read a projection and the set who may run programs are
+not the same set. Where no instance is enabled the capability is absent and says so; it does not fall
+back to the sandboxed shell, since a person who believes they are on the host and is not would run
+the right command in the wrong place.
+
+**Nothing reaches it yet.** The gateway has no bidirectional transport, so no browser has held one of
+these sessions. The Safe Shell remains what the desktop serves.
+
 ## Agent runtime
 
 `cybou-agentd serve` owns `org.cybou.Runtime.Agent1`. It recovers still-running capsules from their
@@ -1042,6 +1079,7 @@ mentioned look identical to a reader.
 | Inference runtime | no local or remote model worker exists; the brokerage contract has nothing behind it |
 | General agent sessions | one digest-pinned OpenCode pack and one ACP prompt turn exist; multi-turn streaming, further packs and real-provider evidence do not |
 | Native desktop session | `cybou-desktop.service` is built and ships disabled; it has never run on a machine with a seat |
+| A terminal a browser can reach | `cybou-ptyd` allocates a real pseudoterminal and is proven against a live shell; nothing connects to it yet, because the gateway has no bidirectional transport and no browser has held one |
 | Sensitive payload storage | the AEAD primitive, key store and erasure protocol exist and are tested; no payload is encrypted and no perception source is sensitive |
 | Automatic retention expiry | retention classes are carried; nothing acts on a lifetime |
 | Semantic file index | not started |

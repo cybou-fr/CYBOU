@@ -32,6 +32,7 @@ cybou_ssh "
     cybou-identityd
     cybou-healthd
     cybou-host-filesd
+    cybou-ptyd
     cybou-intentiond
     cybou-predictord
     cybou-perceptiond
@@ -101,6 +102,7 @@ cybou_ssh "
   # have one.
   sudo install -m 0755 scripts/cybou-desktop-session.sh /usr/libexec/cybou/cybou-desktop-session.sh
   sudo install -m 0755 scripts/cybou-host-filesd-runner.sh /usr/libexec/cybou/cybou-host-filesd-runner.sh
+  sudo install -m 0755 scripts/cybou-ptyd-runner.sh /usr/libexec/cybou/cybou-ptyd-runner.sh
   sudo install -m 0755 scripts/cybou-action-policy.sh /usr/sbin/cybou-action-policy
 
   sudo getent group cybou >/dev/null || sudo groupadd --system cybou
@@ -164,6 +166,7 @@ cybou_ssh "
   # group-owned by cybou, so only the gateway can attempt a password.
   sudo install -m 0644 systemd/system/cybou-authd.service \
     systemd/system/cybou-host-filesd@.service \
+    systemd/system/cybou-ptyd@.service \
     systemd/system/cybou-executord.service systemd/system/cybou-agent-gateway@.service \
     /etc/systemd/system/
   # The session owner writes the lease and the launch file here; systemd reads them back as root
@@ -212,6 +215,10 @@ cybou_ssh "
   # HostUserPath is an explicit per-account capability. The demo account is the only account this
   # deployment provisions, so it is the only owner instance enabled here. Additional admitted
   # accounts require an equally explicit enable by the operator.
+  # No `cybou-ptyd@` instance is enabled, and that is the deployment doing what ADR-0047
+  # says. A terminal lets a signed-in person run programs as themselves, so enabling it is
+  # an act naming one account — `systemctl enable --now cybou-ptyd@alice.service` — and not
+  # something a deploy decides on an operator's behalf.
   sudo systemctl enable --now cybou-host-filesd@demo.service
   sudo systemctl restart cybou-host-filesd@demo.service
 
