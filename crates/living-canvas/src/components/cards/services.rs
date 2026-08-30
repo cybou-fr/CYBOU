@@ -3,13 +3,12 @@
 
 //! Services Manager card component for managing systemd units and daemons.
 
-use leptos::prelude::*;
-use cybou_protocol::system::{ServiceAction, ServiceState};
 use cybou_protocol::SubjectRef;
+use cybou_protocol::system::{ServiceAction, ServiceState};
+use leptos::prelude::*;
 
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
     tool_state::ToolCardStates,
 };
@@ -29,7 +28,9 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load services: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load services: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -44,7 +45,9 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                     load_services();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Service action failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Service action failed: {err}")));
                 }
             }
         });
@@ -52,10 +55,12 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
 
     let inspect_service = move |name: String| {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
-        inspector_signals.target_subject.set(Some(SubjectRef::Service {
-            name,
-            node_id: None,
-        }));
+        inspector_signals
+            .target_subject
+            .set(Some(SubjectRef::Service {
+                name,
+                node_id: None,
+            }));
     };
 
     // Trigger initial load
@@ -88,10 +93,20 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
     };
 
     let active_count = move || {
-        signals.services.get().iter().filter(|s| s.state == ServiceState::Active).count()
+        signals
+            .services
+            .get()
+            .iter()
+            .filter(|s| s.state == ServiceState::Active)
+            .count()
     };
     let failed_count = move || {
-        signals.services.get().iter().filter(|s| s.state == ServiceState::Failed).count()
+        signals
+            .services
+            .get()
+            .iter()
+            .filter(|s| s.state == ServiceState::Failed)
+            .count()
     };
 
     view! {

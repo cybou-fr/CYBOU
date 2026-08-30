@@ -77,64 +77,51 @@ pub fn CardContent(
                 .into_any()
         }
         CardId::Services(_) => {
-            view! { <crate::components::cards::services::ServicesContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::services::ServicesContent card=card /> }.into_any()
         }
         CardId::Processes(_) => {
-            view! { <crate::components::cards::processes::ProcessesContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::processes::ProcessesContent card=card /> }.into_any()
         }
         CardId::Monitor(_) => {
-            view! { <crate::components::cards::monitor::MonitorContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::monitor::MonitorContent card=card /> }.into_any()
         }
         CardId::SystemLogs(_) => {
             view! { <crate::components::cards::system_logs::SystemLogsContent card=card /> }
                 .into_any()
         }
         CardId::Storage(_) => {
-            view! { <crate::components::cards::storage::StorageContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::storage::StorageContent card=card /> }.into_any()
         }
         CardId::Network(_) => {
-            view! { <crate::components::cards::network::NetworkContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::network::NetworkContent card=card /> }.into_any()
         }
         CardId::Packages(_) => {
-            view! { <crate::components::cards::packages::PackagesContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::packages::PackagesContent card=card /> }.into_any()
         }
         CardId::Updates(_) => {
-            view! { <crate::components::cards::updates::UpdatesContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::updates::UpdatesContent card=card /> }.into_any()
         }
         CardId::UserSettings(_) => {
             view! { <crate::components::cards::user_settings::UserSettingsContent card=card /> }
                 .into_any()
         }
         CardId::Security(_) => {
-            view! { <crate::components::cards::security::SecurityContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::security::SecurityContent card=card /> }.into_any()
         }
         CardId::Backup(_) => {
-            view! { <crate::components::cards::backup::BackupContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::backup::BackupContent card=card /> }.into_any()
         }
         CardId::Mail(_) => {
-            view! { <crate::components::cards::mail::MailContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::mail::MailContent card=card /> }.into_any()
         }
         CardId::Calendar(_) => {
-            view! { <crate::components::cards::calendar::CalendarContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::calendar::CalendarContent card=card /> }.into_any()
         }
         CardId::Notes(_) => {
-            view! { <crate::components::cards::notes::NotesContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::notes::NotesContent card=card /> }.into_any()
         }
         CardId::Contacts(_) => {
-            view! { <crate::components::cards::contacts::ContactsContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::contacts::ContactsContent card=card /> }.into_any()
         }
         CardId::CognitiveGraph(_) => {
             view! { <crate::components::cards::cognitive_graph::CognitiveGraphContent card=card /> }
@@ -145,12 +132,10 @@ pub fn CardContent(
                 .into_any()
         }
         CardId::Meaning(_) => {
-            view! { <crate::components::cards::meaning::MeaningContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::meaning::MeaningContent card=card /> }.into_any()
         }
         CardId::Learning(_) => {
-            view! { <crate::components::cards::learning::LearningContent card=card /> }
-                .into_any()
+            view! { <crate::components::cards::learning::LearningContent card=card /> }.into_any()
         }
         CardId::Outline => view! { <OutlineContent /> }.into_any(),
         CardId::JournalFeed(_) => view! { <JournalFeedContent /> }.into_any(),

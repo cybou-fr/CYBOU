@@ -1061,6 +1061,18 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   all. The File Manager shows Upload and per-file Download in the sandbox domain only; the home and
   agent-workspace domains are served by an owner that carries bounded UTF-8 reads and no transfer, so
   the buttons are absent there rather than present and failing.
+- **Every card the Dock can open now draws**: the viewport named each card it could render, one
+  component at a time. Fourteen singletons and six dynamic kinds had one; twenty-one others —
+  Services, Processes, System Logs, Storage, Network, Packages, Updates, Users, Security,
+  Backup, Mail, Calendar, Notes, Contacts, the Cognitive Graph, the Event Journal, Meaning,
+  Learning, Operations, Notifications — did not, and were reachable from the Dock and the
+  command palette regardless. Opening one added it to the layout, moved the selection onto it,
+  saved, and drew nothing: not an error and not an empty panel, but nothing at all on a desktop
+  that had just been told to open it. The same card tabbed into a Deck drew perfectly, because a
+  Deck has always rendered whatever `CardContent` can dispatch, which was every kind all along.
+  A card with no component of its own is now drawn by the generic frame, and which kinds have
+  one is a question the card answers about itself, so it is checked on the native target rather
+  than being a fact about a file somebody has to remember.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **Command Palette & Omnibar Navigation**: Unified desktop action launcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>) with real-time fuzzy search, keyboard selection cycling (<kbd>↑</kbd>/<kbd>↓</kbd>), <kbd>Enter</kbd> execution, Ask CYBOU cognitive question answering, shortcut badges, and automatic uncollapse/bring-forward card focusing.
 - **Decoupled Lifecycle & SubjectRef**: Cards act as projections into system entities; closing a card never terminates the underlying system process, agent, or account. `SubjectRef` is the canonical primitive for new cross-panel entity references; migration of existing interactions is incomplete.

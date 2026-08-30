@@ -3,13 +3,12 @@
 
 //! Storage and Btrfs Snapshots card component.
 
-use leptos::prelude::*;
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconFile, IconRefresh},
     tool_state::ToolCardStates,
 };
+use leptos::prelude::*;
 
 #[component]
 pub fn StorageContent(card: CardId) -> impl IntoView {
@@ -26,7 +25,9 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load storage: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load storage: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -34,22 +35,31 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
     };
 
     let trigger_create_snapshot = move || {
-        let subvol = signals.selected_subvolume.get().unwrap_or_else(|| "@home".to_owned());
+        let subvol = signals
+            .selected_subvolume
+            .get()
+            .unwrap_or_else(|| "@home".to_owned());
         let name = signals.new_snap_name.get();
         if name.trim().is_empty() {
-            signals.status_msg.set(Some("Please enter a snapshot name".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Please enter a snapshot name".to_owned()));
             return;
         }
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
             match client.create_snapshot(&subvol, &name, true).await {
                 Ok(_) => {
-                    signals.status_msg.set(Some(format!("Created snapshot '{name}' on {subvol}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Created snapshot '{name}' on {subvol}")));
                     signals.new_snap_name.set(String::new());
                     load_storage();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Snapshot failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Snapshot failed: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -64,7 +74,9 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                     load_storage();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Restore failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Restore failed: {err}")));
                 }
             }
         });

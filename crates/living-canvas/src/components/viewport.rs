@@ -12,8 +12,8 @@ use crate::{
     components::{
         cards::{
             AgentsCard, AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
-            DiffCard, DisclosureCard, EditorCard, FileManagerCard, IdentityCard, InsightCard,
-            InspectorCard, JournalCard, JournalFeedCard, LifecycleCard, OutlineCard,
+            DiffCard, DisclosureCard, EditorCard, FileManagerCard, GenericToolCard, IdentityCard,
+            InsightCard, InspectorCard, JournalCard, JournalFeedCard, LifecycleCard, OutlineCard,
             PerceptionCard, SelfModelCard, SessionCard, ShellCard,
         },
         deck::DeckContainerView,
@@ -253,6 +253,18 @@ pub fn CanvasViewport(
                     <InspectorCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
                 }
             />
+            // Everything the layout holds that nothing above has claimed. Without this a card
+            // kind reachable from the Dock but missing a wrapper here was opened, selected, saved
+            // and never drawn — and the same card tabbed into a Deck drew perfectly, because a
+            // Deck has always rendered whatever `CardContent` can dispatch.
+            <For
+                each=move || unclaimed_cards(&layout.get())
+                key=|card| *card
+                children=move |card| view! {
+                    <GenericToolCard card=card layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime />
+                }
+            />
+
             <Show when=move || outline_open(&layout.get())>
                 <OutlineCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing _auth_modal_open=auth_modal_open _runtime=runtime />
             </Show>
@@ -276,6 +288,19 @@ pub fn CanvasViewport(
             />
         </section>
     }
+}
+
+/// The cards this layout holds that nothing else on this canvas draws.
+///
+/// Cards inside a Deck are excluded: the Deck draws them, and drawing them here as well would put
+/// two of the same panel on the canvas, one of them outside the Deck that owns it.
+fn unclaimed_cards(layout: &DesktopLayout) -> Vec<CardId> {
+    layout
+        .cards
+        .iter()
+        .map(|card| card.id)
+        .filter(|card| !card.has_dedicated_view() && !layout.is_in_deck(*card))
+        .collect()
 }
 
 /// The Shell cards this layout holds, by instance.

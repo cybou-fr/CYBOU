@@ -3,15 +3,10 @@
 
 //! System and Journald Log Viewer card component.
 
-use leptos::prelude::*;
 use cybou_web_contracts::SystemLogsQueryRequest;
+use leptos::prelude::*;
 
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 
 #[component]
 pub fn SystemLogsContent(card: CardId) -> impl IntoView {
@@ -36,11 +31,15 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                 Ok(proj) => {
                     signals.logs.set(proj.logs);
                     signals.unavailable.set(proj.unavailable);
-                    signals.system_journal_readable.set(proj.system_journal_readable);
+                    signals
+                        .system_journal_readable
+                        .set(proj.system_journal_readable);
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load logs: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load logs: {err}")));
                 }
             }
             signals.loading.set(false);

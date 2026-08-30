@@ -3,13 +3,8 @@
 
 //! Personal Contacts & Cognitive Subject Directory card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn ContactsContent(card: CardId) -> impl IntoView {
@@ -26,7 +21,9 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load contacts: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load contacts: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -38,11 +35,19 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
         let email = signals.new_email.get();
         let role = signals.new_role.get();
         let org = signals.new_org.get();
-        let tags: Vec<String> = signals.new_tags.get().split(',').map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect();
+        let tags: Vec<String> = signals
+            .new_tags
+            .get()
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect();
         let notes = signals.new_notes.get();
 
         if name.trim().is_empty() || email.trim().is_empty() {
-            signals.status_msg.set(Some("Name and email are required".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Name and email are required".to_owned()));
             return;
         }
 
@@ -61,7 +66,9 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.create_contact(req).await {
                 Ok(cnt) => {
-                    signals.status_msg.set(Some(format!("Added contact '{}'", cnt.name)));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Added contact '{}'", cnt.name)));
                     signals.new_name.set(String::new());
                     signals.new_email.set(String::new());
                     signals.new_role.set(String::new());
@@ -72,7 +79,9 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                     load_contacts();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to add contact: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to add contact: {err}")));
                 }
             }
             signals.loading.set(false);

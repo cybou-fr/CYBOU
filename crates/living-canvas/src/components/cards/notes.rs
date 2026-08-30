@@ -3,13 +3,8 @@
 
 //! Personal Notes & Knowledge base card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn NotesContent(card: CardId) -> impl IntoView {
@@ -26,7 +21,9 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load notes: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load notes: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -36,11 +33,19 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
     let trigger_save = move || {
         let title = signals.edit_title.get();
         let content = signals.edit_content.get();
-        let tags: Vec<String> = signals.edit_tags.get().split(',').map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect();
+        let tags: Vec<String> = signals
+            .edit_tags
+            .get()
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect();
         let is_pinned = signals.edit_pinned.get();
 
         if title.trim().is_empty() {
-            signals.status_msg.set(Some("Please enter a note title".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Please enter a note title".to_owned()));
             return;
         }
 
@@ -56,11 +61,15 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                 };
                 match client.update_note(req).await {
                     Ok(note) => {
-                        signals.status_msg.set(Some(format!("Updated note '{}'", note.title)));
+                        signals
+                            .status_msg
+                            .set(Some(format!("Updated note '{}'", note.title)));
                         load_notes();
                     }
                     Err(err) => {
-                        signals.status_msg.set(Some(format!("Update failed: {err}")));
+                        signals
+                            .status_msg
+                            .set(Some(format!("Update failed: {err}")));
                     }
                 }
             } else {
@@ -73,12 +82,16 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                 };
                 match client.create_note(req).await {
                     Ok(note) => {
-                        signals.status_msg.set(Some(format!("Created note '{}'", note.title)));
+                        signals
+                            .status_msg
+                            .set(Some(format!("Created note '{}'", note.title)));
                         signals.selected_note_id.set(Some(note.id));
                         load_notes();
                     }
                     Err(err) => {
-                        signals.status_msg.set(Some(format!("Create failed: {err}")));
+                        signals
+                            .status_msg
+                            .set(Some(format!("Create failed: {err}")));
                     }
                 }
             }

@@ -3,16 +3,14 @@
 
 //! Notifications Center card component for desktop attention, evidence, system, and agent feeds.
 
-use leptos::prelude::*;
 use cybou_protocol::notification::{NotificationCategory, NotificationSeverity};
+use leptos::prelude::*;
 use uuid::Uuid;
 
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{
-        IconAlertCircle, IconAlertTriangle, IconBell, IconClose,
-        IconInfo, IconRefresh,
+        IconAlertCircle, IconAlertTriangle, IconBell, IconClose, IconInfo, IconRefresh,
     },
     tool_state::ToolCardStates,
 };
@@ -34,7 +32,9 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load notifications: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load notifications: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -48,7 +48,9 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                     load_notifications();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Dismiss failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Dismiss failed: {err}")));
                 }
             }
         });
@@ -56,13 +58,18 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
 
     let trigger_action = move |notif_id: Uuid, action_id: String| {
         leptos::task::spawn_local(async move {
-            match client.execute_notification_action(notif_id, &action_id).await {
+            match client
+                .execute_notification_action(notif_id, &action_id)
+                .await
+            {
                 Ok(outcome) => {
                     signals.status_msg.set(Some(outcome));
                     load_notifications();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Action failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Action failed: {err}")));
                 }
             }
         });
@@ -91,7 +98,8 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                 if search.is_empty() {
                     true
                 } else {
-                    n.title.to_lowercase().contains(&search) || n.body.to_lowercase().contains(&search)
+                    n.title.to_lowercase().contains(&search)
+                        || n.body.to_lowercase().contains(&search)
                 }
             })
             .collect::<Vec<_>>()
@@ -219,7 +227,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                     children=move |notif| {
                         let notif_id = notif.id;
                         let category_label = notif.category.label();
-                        
+
                         let (cat_bg, cat_color) = match notif.category {
                             NotificationCategory::Attention => ("rgba(239, 68, 68, 0.2)", "#f87171"),
                             NotificationCategory::Evidence => ("rgba(59, 130, 246, 0.2)", "#60a5fa"),

@@ -3,13 +3,12 @@
 
 //! Canonical Event1 Journal timeline & replay card component.
 
-use leptos::prelude::*;
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
     tool_state::ToolCardStates,
 };
+use leptos::prelude::*;
 
 #[component]
 pub fn EventJournalContent(card: CardId) -> impl IntoView {
@@ -26,7 +25,9 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load journal: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load journal: {err}")));
                 }
             }
             signals.loading.set(false);

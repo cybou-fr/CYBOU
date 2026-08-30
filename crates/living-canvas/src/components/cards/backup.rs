@@ -3,13 +3,8 @@
 
 //! Borg & Btrfs Automated Backup Vault card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn BackupContent(card: CardId) -> impl IntoView {
@@ -26,7 +21,9 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load backup vault: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load backup vault: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -35,17 +32,26 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
 
     let trigger_backup = move || {
         let name_str = signals.new_backup_name.get();
-        let name_opt = if name_str.trim().is_empty() { None } else { Some(name_str.trim().to_owned()) };
+        let name_opt = if name_str.trim().is_empty() {
+            None
+        } else {
+            Some(name_str.trim().to_owned())
+        };
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
             match client.trigger_backup(name_opt).await {
                 Ok(arch) => {
-                    signals.status_msg.set(Some(format!("Backup archive '{}' completed in {}s", arch.name, arch.duration_seconds)));
+                    signals.status_msg.set(Some(format!(
+                        "Backup archive '{}' completed in {}s",
+                        arch.name, arch.duration_seconds
+                    )));
                     signals.new_backup_name.set(String::new());
                     load_backup();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Backup failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Backup failed: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -60,24 +66,24 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                     load_backup();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Restore failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Restore failed: {err}")));
                 }
             }
         });
     };
 
     let toggle_schedule = move |enabled: bool| {
-        let cur_sched = signals
-            .backup_settings
-            .get()
-            .map(|s| s.schedule)
-            .unwrap_or(cybou_protocol::system::BackupScheduleRecord {
+        let cur_sched = signals.backup_settings.get().map(|s| s.schedule).unwrap_or(
+            cybou_protocol::system::BackupScheduleRecord {
                 enabled: true,
                 frequency: "daily".to_owned(),
                 retention_daily: 7,
                 retention_weekly: 4,
                 retention_monthly: 12,
-            });
+            },
+        );
         let req = cybou_web_contracts::UpdateBackupScheduleRequest {
             enabled,
             frequency: cur_sched.frequency,
@@ -88,11 +94,16 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.update_backup_schedule(req).await {
                 Ok(_) => {
-                    signals.status_msg.set(Some(format!("Backup schedule {}", if enabled { "enabled" } else { "disabled" })));
+                    signals.status_msg.set(Some(format!(
+                        "Backup schedule {}",
+                        if enabled { "enabled" } else { "disabled" }
+                    )));
                     load_backup();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Schedule update failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Schedule update failed: {err}")));
                 }
             }
         });

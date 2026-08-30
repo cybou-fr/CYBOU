@@ -3,13 +3,8 @@
 
 //! System Software & Kernel Updates card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn UpdatesContent(card: CardId) -> impl IntoView {
@@ -26,7 +21,9 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load updates: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load updates: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -42,7 +39,9 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                     load_updates();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Update failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Update failed: {err}")));
                 }
             }
             signals.loading.set(false);

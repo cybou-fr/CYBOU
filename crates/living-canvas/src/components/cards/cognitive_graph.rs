@@ -3,13 +3,12 @@
 
 //! Deep Cognitive Graph & Causal DAG card component.
 
-use leptos::prelude::*;
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
     tool_state::ToolCardStates,
 };
+use leptos::prelude::*;
 
 #[component]
 pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
@@ -24,12 +23,14 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
             let res = if query_text.trim().is_empty() {
                 client.get_cognitive_graph(None).await
             } else {
-                client.query_cognitive_graph(cybou_web_contracts::CognitiveQueryRequest {
-                    query: query_text,
-                    node_types: None,
-                    focus_id: signals.selected_node_id.get(),
-                    max_depth: Some(2),
-                }).await
+                client
+                    .query_cognitive_graph(cybou_web_contracts::CognitiveQueryRequest {
+                        query: query_text,
+                        node_types: None,
+                        focus_id: signals.selected_node_id.get(),
+                        max_depth: Some(2),
+                    })
+                    .await
             };
 
             match res {
@@ -38,7 +39,9 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load cognitive graph: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load cognitive graph: {err}")));
                 }
             }
             signals.loading.set(false);

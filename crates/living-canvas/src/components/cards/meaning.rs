@@ -6,13 +6,12 @@
 //! Provides deterministic semantic interpretation, qualified response planning,
 //! reference resolution, and multilingual realization without LLM guessing.
 
-use leptos::prelude::*;
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconBot, IconRefresh, IconSearch},
     tool_state::ToolCardStates,
 };
+use leptos::prelude::*;
 
 #[component]
 pub fn MeaningContent(card: CardId) -> impl IntoView {
@@ -38,10 +37,12 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
         let lang = signals.language.get();
 
         leptos::task::spawn_local(async move {
-            let res = client.interpret_meaning(&cybou_web_contracts::MeaningInterpretRequest {
-                utterance: text,
-                language: Some(lang),
-            }).await;
+            let res = client
+                .interpret_meaning(&cybou_web_contracts::MeaningInterpretRequest {
+                    utterance: text,
+                    language: Some(lang),
+                })
+                .await;
 
             match res {
                 Ok(proj) => {
@@ -50,7 +51,9 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                     load_dialogue_memory();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Interpretation refused: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Interpretation refused: {err}")));
                 }
             }
             signals.loading.set(false);

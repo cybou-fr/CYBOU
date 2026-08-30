@@ -3,13 +3,8 @@
 
 //! Personal Mail & Messages card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn MailContent(card: CardId) -> impl IntoView {
@@ -26,7 +21,9 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load mail: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load mail: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -38,7 +35,9 @@ pub fn MailContent(card: CardId) -> impl IntoView {
         let subject = signals.compose_subject.get();
         let body = signals.compose_body.get();
         if to_str.trim().is_empty() || subject.trim().is_empty() {
-            signals.status_msg.set(Some("Recipient and subject are required".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Recipient and subject are required".to_owned()));
             return;
         }
         let to = to_str.split(',').map(|s| s.trim().to_owned()).collect();
@@ -53,7 +52,9 @@ pub fn MailContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.send_mail(req).await {
                 Ok(msg) => {
-                    signals.status_msg.set(Some(format!("Sent email '{}'", msg.subject)));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Sent email '{}'", msg.subject)));
                     signals.compose_to.set(String::new());
                     signals.compose_subject.set(String::new());
                     signals.compose_body.set(String::new());

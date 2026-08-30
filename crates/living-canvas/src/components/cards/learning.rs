@@ -6,13 +6,12 @@
 //! Provides inspectable candidate extraction, multi-layered skill induction,
 //! deterministic promotion evaluation, artifact lineage, and task-scoped capability governance.
 
-use leptos::prelude::*;
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconLayers, IconPlus, IconRefresh},
     tool_state::ToolCardStates,
 };
+use leptos::prelude::*;
 
 #[component]
 pub fn LearningContent(card: CardId) -> impl IntoView {
@@ -45,11 +44,15 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
             match client.evaluate_learning_candidate(candidate_id, None).await {
                 Ok(eval_proj) => {
                     signals.evaluation.set(Some(eval_proj));
-                    signals.status_msg.set(Some("Candidate evaluated against promotion gate.".to_string()));
+                    signals.status_msg.set(Some(
+                        "Candidate evaluated against promotion gate.".to_string(),
+                    ));
                     load_all();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Evaluation failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Evaluation failed: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -59,13 +62,20 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
     let revoke_artifact = move |artifact_id: uuid::Uuid| {
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
-            match client.revoke_learned_artifact(artifact_id, "User governance veto").await {
+            match client
+                .revoke_learned_artifact(artifact_id, "User governance veto")
+                .await
+            {
                 Ok(()) => {
-                    signals.status_msg.set(Some("Learned artifact revoked.".to_string()));
+                    signals
+                        .status_msg
+                        .set(Some("Learned artifact revoked.".to_string()));
                     load_all();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Revocation failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Revocation failed: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -100,11 +110,15 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                     signals.new_generalization.set(String::new());
                     signals.new_scope.set(String::new());
                     signals.is_proposing.set(false);
-                    signals.status_msg.set(Some("New learning candidate proposed.".to_string()));
+                    signals
+                        .status_msg
+                        .set(Some("New learning candidate proposed.".to_string()));
                     load_all();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Proposal failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Proposal failed: {err}")));
                 }
             }
             signals.loading.set(false);

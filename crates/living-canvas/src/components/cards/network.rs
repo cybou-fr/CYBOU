@@ -3,12 +3,11 @@
 
 //! Network Connections, Wi-Fi, and VPN tunnels card component.
 
-use leptos::prelude::*;
 use cybou_protocol::system::NetworkConnectionKind;
+use leptos::prelude::*;
 
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconActivity, IconRefresh},
     tool_state::ToolCardStates,
 };
@@ -28,7 +27,9 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load network: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load network: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -43,7 +44,9 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                     load_network();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Network update failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Network update failed: {err}")));
                 }
             }
         });

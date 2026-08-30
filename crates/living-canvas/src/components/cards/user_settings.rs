@@ -3,13 +3,8 @@
 
 //! User Accounts and SSH Authorized Keys settings card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn UserSettingsContent(card: CardId) -> impl IntoView {
@@ -27,7 +22,9 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load users: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load users: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -39,21 +36,28 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
         let full_name = signals.new_full_name.get();
         let is_admin = signals.new_is_admin.get();
         if username.trim().is_empty() {
-            signals.status_msg.set(Some("Please enter a username".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Please enter a username".to_owned()));
             return;
         }
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
             match client.create_user(&username, &full_name, is_admin).await {
                 Ok(user) => {
-                    signals.status_msg.set(Some(format!("Created user account '{}' (UID {})", user.username, user.uid)));
+                    signals.status_msg.set(Some(format!(
+                        "Created user account '{}' (UID {})",
+                        user.username, user.uid
+                    )));
                     signals.new_user_name.set(String::new());
                     signals.new_full_name.set(String::new());
                     signals.new_is_admin.set(false);
                     load_users();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("User creation failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("User creation failed: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -64,20 +68,27 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
         let name = signals.new_key_name.get();
         let key = signals.new_public_key.get();
         if name.trim().is_empty() || key.trim().is_empty() {
-            signals.status_msg.set(Some("Please enter a key label and public key".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Please enter a key label and public key".to_owned()));
             return;
         }
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
             match client.add_ssh_key(&name, &key).await {
                 Ok(k) => {
-                    signals.status_msg.set(Some(format!("Added SSH key '{}' ({})", k.name, k.fingerprint)));
+                    signals.status_msg.set(Some(format!(
+                        "Added SSH key '{}' ({})",
+                        k.name, k.fingerprint
+                    )));
                     signals.new_key_name.set(String::new());
                     signals.new_public_key.set(String::new());
                     load_users();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to add SSH key: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to add SSH key: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -92,7 +103,9 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
                     load_users();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Delete failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Delete failed: {err}")));
                 }
             }
         });

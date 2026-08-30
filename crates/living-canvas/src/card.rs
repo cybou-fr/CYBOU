@@ -100,6 +100,41 @@ pub enum CardId {
 }
 
 impl CardId {
+    /// Whether some component draws this card by name rather than through the generic frame.
+    ///
+    /// A fact about the card and not about the viewport, so it can be checked without a browser.
+    /// The list is the exception: these kinds have a component of their own because they need
+    /// props no generic frame can supply. Every other kind is drawn generically, which is what
+    /// stops a new card kind from being openable and invisible until somebody remembers one more
+    /// file.
+    #[must_use]
+    pub const fn has_dedicated_view(self) -> bool {
+        matches!(
+            self,
+            Self::Identity
+                | Self::Session
+                | Self::Capabilities
+                | Self::Journal
+                | Self::Lifecycle
+                | Self::Commitments
+                | Self::SelfModel
+                | Self::Attention
+                | Self::Beliefs
+                | Self::Perception
+                | Self::Context
+                | Self::Disclosure
+                | Self::Insight
+                | Self::Agents
+                | Self::Outline
+                | Self::Shell(_)
+                | Self::FileManager(_)
+                | Self::JournalFeed(_)
+                | Self::Editor(_)
+                | Self::Diff(_)
+                | Self::Inspector(_)
+        )
+    }
+
     /// All 14 canonical System cards.
     pub const ALL_SYSTEM_CARDS: [Self; 14] = [
         Self::Identity,
@@ -1115,8 +1150,77 @@ mod tests {
         assert_eq!(CardId::Calendar(6).instance_key(), "calendar:6");
         assert_eq!(CardId::Notes(7).instance_key(), "notes:7");
         assert_eq!(CardId::Contacts(8).instance_key(), "contacts:8");
-        assert_eq!(CardId::CognitiveGraph(9).instance_key(), "cognitive-graph:9");
+        assert_eq!(
+            CardId::CognitiveGraph(9).instance_key(),
+            "cognitive-graph:9"
+        );
         assert_eq!(CardId::EventJournal(10).instance_key(), "event-journal:10");
         assert_eq!(CardId::Identity.instance_key(), "identity");
+    }
+}
+
+#[cfg(test)]
+mod dedicated_view_tests {
+    use super::CardId;
+
+    #[test]
+    fn every_singleton_is_drawn_by_a_component_of_its_own() {
+        for card in CardId::ALL_SYSTEM_CARDS {
+            assert!(
+                card.has_dedicated_view(),
+                "{card:?} is a System card and must be drawn by its own component"
+            );
+        }
+        assert!(CardId::Outline.has_dedicated_view());
+    }
+
+    #[test]
+    fn the_tools_the_dock_can_open_are_drawn_generically_rather_than_not_at_all() {
+        // Every one of these was reachable from the Dock and the command palette and had no
+        // component in the viewport, so opening one added it to the layout, selected it, saved,
+        // and drew nothing. They are answered by the generic frame now, and this is the list that
+        // says so.
+        for card in [
+            CardId::Services(0),
+            CardId::Processes(0),
+            CardId::Monitor(0),
+            CardId::SystemLogs(0),
+            CardId::Storage(0),
+            CardId::Network(0),
+            CardId::Packages(0),
+            CardId::Updates(0),
+            CardId::UserSettings(0),
+            CardId::Security(0),
+            CardId::Backup(0),
+            CardId::Mail(0),
+            CardId::Calendar(0),
+            CardId::Notes(0),
+            CardId::Contacts(0),
+            CardId::CognitiveGraph(0),
+            CardId::EventJournal(0),
+            CardId::Meaning(0),
+            CardId::Learning(0),
+            CardId::Operations(0),
+            CardId::Notifications(0),
+        ] {
+            assert!(
+                !card.has_dedicated_view(),
+                "{card:?} claims a component of its own; if it has one, add it to the viewport too"
+            );
+        }
+    }
+
+    #[test]
+    fn the_answer_does_not_depend_on_which_instance_it_is() {
+        // A second Shell is still a Shell. An answer that varied by instance would draw one of
+        // them twice and the other not at all.
+        assert_eq!(
+            CardId::Shell(0).has_dedicated_view(),
+            CardId::Shell(7).has_dedicated_view()
+        );
+        assert_eq!(
+            CardId::Services(0).has_dedicated_view(),
+            CardId::Services(7).has_dedicated_view()
+        );
     }
 }

@@ -3,13 +3,8 @@
 
 //! Security Sandboxing Policy & Audit Log card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn SecurityContent(card: CardId) -> impl IntoView {
@@ -27,42 +22,53 @@ pub fn SecurityContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load security: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load security: {err}")));
                 }
             }
             signals.loading.set(false);
         });
     };
 
-    let toggle_policy = move |update_fn: Box<dyn FnOnce(&mut cybou_protocol::system::SecurityPolicyRecord)>| {
-        let mut cur = signals.policy.get().unwrap_or(cybou_protocol::system::SecurityPolicyRecord {
-            landlock_enabled: true,
-            bubblewrap_enabled: true,
-            apparmor_enforcing: true,
-            seccomp_strict: true,
-            egress_firewall_strict: true,
-        });
-        update_fn(&mut cur);
-        let req = cybou_web_contracts::UpdateSecurityPolicyRequest {
-            landlock_enabled: cur.landlock_enabled,
-            bubblewrap_enabled: cur.bubblewrap_enabled,
-            apparmor_enforcing: cur.apparmor_enforcing,
-            seccomp_strict: cur.seccomp_strict,
-            egress_firewall_strict: cur.egress_firewall_strict,
+    let toggle_policy =
+        move |update_fn: Box<dyn FnOnce(&mut cybou_protocol::system::SecurityPolicyRecord)>| {
+            let mut cur =
+                signals
+                    .policy
+                    .get()
+                    .unwrap_or(cybou_protocol::system::SecurityPolicyRecord {
+                        landlock_enabled: true,
+                        bubblewrap_enabled: true,
+                        apparmor_enforcing: true,
+                        seccomp_strict: true,
+                        egress_firewall_strict: true,
+                    });
+            update_fn(&mut cur);
+            let req = cybou_web_contracts::UpdateSecurityPolicyRequest {
+                landlock_enabled: cur.landlock_enabled,
+                bubblewrap_enabled: cur.bubblewrap_enabled,
+                apparmor_enforcing: cur.apparmor_enforcing,
+                seccomp_strict: cur.seccomp_strict,
+                egress_firewall_strict: cur.egress_firewall_strict,
+            };
+            leptos::task::spawn_local(async move {
+                match client.update_security_policy(req).await {
+                    Ok(pol) => {
+                        signals.policy.set(Some(pol));
+                        signals
+                            .status_msg
+                            .set(Some("Security policy successfully updated".to_owned()));
+                        load_security();
+                    }
+                    Err(err) => {
+                        signals
+                            .status_msg
+                            .set(Some(format!("Policy update failed: {err}")));
+                    }
+                }
+            });
         };
-        leptos::task::spawn_local(async move {
-            match client.update_security_policy(req).await {
-                Ok(pol) => {
-                    signals.policy.set(Some(pol));
-                    signals.status_msg.set(Some("Security policy successfully updated".to_owned()));
-                    load_security();
-                }
-                Err(err) => {
-                    signals.status_msg.set(Some(format!("Policy update failed: {err}")));
-                }
-            }
-        });
-    };
 
     // Trigger initial load
     Effect::new(move |_| {

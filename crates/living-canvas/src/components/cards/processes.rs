@@ -3,13 +3,12 @@
 
 //! Process Manager card component for monitoring and controlling OS processes.
 
-use leptos::prelude::*;
-use cybou_protocol::system::ProcessSignal;
 use cybou_protocol::SubjectRef;
+use cybou_protocol::system::ProcessSignal;
+use leptos::prelude::*;
 
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
     tool_state::ToolCardStates,
 };
@@ -29,7 +28,9 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load processes: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load processes: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -44,7 +45,9 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                     load_processes();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Signal failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Signal failed: {err}")));
                 }
             }
         });
@@ -52,7 +55,9 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
 
     let inspect_process = move |pid: u32, name: String| {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
-        inspector_signals.target_subject.set(Some(SubjectRef::Process { pid, name }));
+        inspector_signals
+            .target_subject
+            .set(Some(SubjectRef::Process { pid, name }));
     };
 
     // Trigger initial load
@@ -76,7 +81,11 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
         });
 
         match sort.as_str() {
-            "cpu" => list.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal)),
+            "cpu" => list.sort_by(|a, b| {
+                b.cpu_percent
+                    .partial_cmp(&a.cpu_percent)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }),
             "memory" => list.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes)),
             "pid" => list.sort_by_key(|p| p.pid),
             "name" => list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),

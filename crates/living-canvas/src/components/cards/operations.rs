@@ -3,16 +3,13 @@
 
 //! Operations Manager card component for monitoring server-owned background tasks.
 
-use leptos::prelude::*;
 use cybou_protocol::operation::OperationState;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 use crate::{
-    MindClient,
-    CardId,
-    components::icons::{
-        IconActivity, IconRefresh, IconStop,
-    },
+    CardId, MindClient,
+    components::icons::{IconActivity, IconRefresh, IconStop},
     tool_state::ToolCardStates,
 };
 
@@ -31,7 +28,9 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load operations: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load operations: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -48,13 +47,20 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
 
     let cancel_op = move |id: Uuid| {
         leptos::task::spawn_local(async move {
-            match client.cancel_operation(id, Some("Cancelled by user".to_owned())).await {
+            match client
+                .cancel_operation(id, Some("Cancelled by user".to_owned()))
+                .await
+            {
                 Ok(()) => {
-                    signals.status_msg.set(Some("Operation cancelled".to_owned()));
+                    signals
+                        .status_msg
+                        .set(Some("Operation cancelled".to_owned()));
                     load_operations();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Cancel failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Cancel failed: {err}")));
                 }
             }
         });
@@ -69,15 +75,34 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
         let all = signals.operations.get();
         let filter = signals.filter_status.get();
         match filter.as_deref() {
-            Some("running") => all.into_iter().filter(|op| matches!(op.state, OperationState::Running | OperationState::Queued)).collect(),
-            Some("completed") => all.into_iter().filter(|op| matches!(op.state, OperationState::Completed)).collect(),
-            Some("failed") => all.into_iter().filter(|op| matches!(op.state, OperationState::Failed { .. } | OperationState::Cancelled)).collect(),
+            Some("running") => all
+                .into_iter()
+                .filter(|op| matches!(op.state, OperationState::Running | OperationState::Queued))
+                .collect(),
+            Some("completed") => all
+                .into_iter()
+                .filter(|op| matches!(op.state, OperationState::Completed))
+                .collect(),
+            Some("failed") => all
+                .into_iter()
+                .filter(|op| {
+                    matches!(
+                        op.state,
+                        OperationState::Failed { .. } | OperationState::Cancelled
+                    )
+                })
+                .collect(),
             _ => all,
         }
     };
 
     let active_count = move || {
-        signals.operations.get().iter().filter(|op| !op.state.is_terminal()).count()
+        signals
+            .operations
+            .get()
+            .iter()
+            .filter(|op| !op.state.is_terminal())
+            .count()
     };
 
     view! {

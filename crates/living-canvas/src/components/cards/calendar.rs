@@ -3,13 +3,8 @@
 
 //! Personal Calendar & Event Schedule card component.
 
+use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
-use crate::{
-    MindClient,
-    CardId,
-    components::icons::IconRefresh,
-    tool_state::ToolCardStates,
-};
 
 #[component]
 pub fn CalendarContent(card: CardId) -> impl IntoView {
@@ -26,7 +21,9 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load calendar: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load calendar: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -40,7 +37,9 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
         let end = signals.new_end.get();
         let color = signals.new_color.get();
         if title.trim().is_empty() {
-            signals.status_msg.set(Some("Please enter an event title".to_owned()));
+            signals
+                .status_msg
+                .set(Some("Please enter an event title".to_owned()));
             return;
         }
         let req = cybou_web_contracts::CreateCalendarEventRequest {
@@ -58,14 +57,18 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.create_calendar_event(req).await {
                 Ok(event) => {
-                    signals.status_msg.set(Some(format!("Created event '{}'", event.title)));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Created event '{}'", event.title)));
                     signals.new_title.set(String::new());
                     signals.new_desc.set(String::new());
                     signals.is_creating.set(false);
                     load_calendar();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Create failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Create failed: {err}")));
                 }
             }
             signals.loading.set(false);

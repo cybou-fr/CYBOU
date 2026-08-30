@@ -370,8 +370,7 @@ pub fn EditorContent(
                                         });
                                     }
                                 });
-                                if let Some(conflicted_tab) =
-                                    tabs.get_untracked().get(idx).cloned()
+                                if let Some(conflicted_tab) = tabs.get_untracked().get(idx).cloned()
                                 {
                                     open_conflict_diff(
                                         conflicted_tab,
@@ -515,7 +514,9 @@ pub fn EditorContent(
     let trigger_save_as = move || {
         let path = save_as_path.get_untracked();
         if path.trim().is_empty() {
-            status_msg.set(Some("Save As requires a relative jail path or absolute user path.".to_string()));
+            status_msg.set(Some(
+                "Save As requires a relative jail path or absolute user path.".to_string(),
+            ));
             return;
         }
         let idx = active_tab_index.get_untracked();
@@ -548,7 +549,10 @@ pub fn EditorContent(
                         });
                         save_as_open.set(false);
                         save_as_path.set(String::new());
-                        status_msg.set(Some(format!("Created and verified on Home ({} bytes).", created.size_bytes)));
+                        status_msg.set(Some(format!(
+                            "Created and verified on Home ({} bytes).",
+                            created.size_bytes
+                        )));
                     }
                     Err(err) => {
                         status_msg.set(Some(format!("Save As failed: {err}")));

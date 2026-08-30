@@ -3,13 +3,12 @@
 
 //! Software Package Manager card component with governed Action1 operations.
 
-use leptos::prelude::*;
-use cybou_protocol::system::{PackageActionKind, PackageStatus};
 use cybou_protocol::SubjectRef;
+use cybou_protocol::system::{PackageActionKind, PackageStatus};
+use leptos::prelude::*;
 
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
     tool_state::ToolCardStates,
 };
@@ -29,7 +28,9 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load packages: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load packages: {err}")));
                 }
             }
             signals.loading.set(false);
@@ -44,7 +45,9 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                     load_packages();
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Package action failed: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Package action failed: {err}")));
                 }
             }
         });
@@ -52,10 +55,12 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
 
     let inspect_package = move |name: String, version: Option<String>| {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
-        inspector_signals.target_subject.set(Some(SubjectRef::Package {
-            name,
-            installed_version: version,
-        }));
+        inspector_signals
+            .target_subject
+            .set(Some(SubjectRef::Package {
+                name,
+                installed_version: version,
+            }));
     };
 
     // Trigger initial load
@@ -69,12 +74,12 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
         let search = signals.search_query.get().to_lowercase();
 
         all.into_iter()
-            .filter(|p| {
-                match tab.as_str() {
-                    "installed" => p.status == PackageStatus::Installed || p.status == PackageStatus::Upgradable,
-                    "upgradable" => p.status == PackageStatus::Upgradable,
-                    _ => true,
+            .filter(|p| match tab.as_str() {
+                "installed" => {
+                    p.status == PackageStatus::Installed || p.status == PackageStatus::Upgradable
                 }
+                "upgradable" => p.status == PackageStatus::Upgradable,
+                _ => true,
             })
             .filter(|p| {
                 if search.is_empty() {

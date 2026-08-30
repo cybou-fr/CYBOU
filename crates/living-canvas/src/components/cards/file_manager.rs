@@ -5,8 +5,8 @@
 
 use cybou_protocol::{LocationRef, SubjectRef};
 use cybou_web_contracts::{
-    HostDirectoryCreateRequest, HostFileCreateRequest, HostPathDeleteRequest, HostPathRenameRequest,
-    LocationCategory, SessionMode,
+    HostDirectoryCreateRequest, HostFileCreateRequest, HostPathDeleteRequest,
+    HostPathRenameRequest, LocationCategory, SessionMode,
 };
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -340,7 +340,9 @@ pub fn FileManagerContent(
                     Ok(()) => action_message.set(Some(format!("Downloaded {name}"))),
                     // The bytes arrived and the browser would not take them. Saying "downloaded"
                     // here would be reporting the half that worked as the whole.
-                    Err(reason) => error_msg.set(Some(format!("{name} could not be saved: {reason}"))),
+                    Err(reason) => {
+                        error_msg.set(Some(format!("{name} could not be saved: {reason}")))
+                    }
                 },
                 Err(err) => error_msg.set(Some(format!("{name} could not be read: {err}"))),
             }
@@ -635,15 +637,16 @@ pub fn FileManagerContent(
         };
         let text = file_content.get();
         let Some(location) = selected_location.get() else {
-            error_msg.set(Some("Editor open refused: no authority reference".to_string()));
+            error_msg.set(Some(
+                "Editor open refused: no authority reference".to_string(),
+            ));
             return;
         };
         let Some(expected_sha256) = selected_sha256.get() else {
             error_msg.set(Some("Editor open refused: no content version".to_string()));
             return;
         };
-        let mut tab =
-            crate::tool_state::EditorTab::from_location(location, text, expected_sha256);
+        let mut tab = crate::tool_state::EditorTab::from_location(location, text, expected_sha256);
         tab.name = filename;
         tab.language = lang.to_string();
         let admission = editor_state.admit_file(tab);
@@ -692,7 +695,9 @@ pub fn FileManagerContent(
             l.update(|layout| layout.open_card(CardId::Agents, 460.0, 200.0));
             l.get_untracked().save();
         }
-        action_message.set(Some(format!("File {filename} attached to Agent workspace context")));
+        action_message.set(Some(format!(
+            "File {filename} attached to Agent workspace context"
+        )));
     };
 
     view! {

@@ -3,13 +3,12 @@
 
 //! System Resource Monitor and Hardware Telemetry card component.
 
-use leptos::prelude::*;
 use crate::{
-    MindClient,
-    CardId,
+    CardId, MindClient,
     components::icons::{IconActivity, IconRefresh},
     tool_state::ToolCardStates,
 };
+use leptos::prelude::*;
 
 #[component]
 pub fn MonitorContent(card: CardId) -> impl IntoView {
@@ -26,7 +25,9 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                     signals.status_msg.set(None);
                 }
                 Err(err) => {
-                    signals.status_msg.set(Some(format!("Failed to load telemetry: {err}")));
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to load telemetry: {err}")));
                 }
             }
             signals.loading.set(false);
