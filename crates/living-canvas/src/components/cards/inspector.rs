@@ -425,7 +425,7 @@ pub fn InspectorContent(
 
                 // Status Message
                 <Show when=move || status_msg.get().is_some()>
-                    <div class="inspector-status">
+                    <div class="inspector-status" role="status" aria-live="polite">
                         {move || status_msg.get().unwrap_or_default()}
                     </div>
                 </Show>

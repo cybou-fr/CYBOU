@@ -126,7 +126,7 @@ pub fn DiffContent(
 
                 // Status Message
                 <Show when=move || status_msg.get().is_some()>
-                    <div class="diff-status-bar">
+                    <div class="diff-status-bar" role="status" aria-live="polite">
                         {move || status_msg.get().unwrap_or_default()}
                     </div>
                 </Show>

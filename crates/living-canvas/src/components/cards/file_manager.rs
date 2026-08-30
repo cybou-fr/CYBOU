@@ -942,14 +942,14 @@ pub fn FileManagerContent(
                         </div>
 
                         <Show when=move || action_message.get().is_some()>
-                            <div class="fm-action-toast">
+                            <div class="fm-action-toast" role="status" aria-live="polite">
                                 <span>{move || action_message.get().unwrap_or_default()}</span>
                                 <button class="fm-toast-close" on:click=move |_| action_message.set(None)>"×"</button>
                             </div>
                         </Show>
 
                         <Show when=move || error_msg.get().is_some()>
-                            <div class="auth-error">
+                            <div class="auth-error" role="alert">
                                 {move || error_msg.get().unwrap_or_default()}
                             </div>
                         </Show>
@@ -957,7 +957,7 @@ pub fn FileManagerContent(
                         // Modals
                         <Show when=move || create_modal_open.get()>
                             <div class="fm-modal-backdrop" on:click=move |_| create_modal_open.set(false)>
-                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation() role="dialog" aria-modal="true" aria-label="Create New File">
                                     <header class="fm-modal-header">
                                         <strong>"Create New File"</strong>
                                         <button class="fm-modal-close" on:click=move |_| create_modal_open.set(false)>"×"</button>
@@ -979,7 +979,7 @@ pub fn FileManagerContent(
                                             }
                                         />
                                         <Show when=move || create_error.get().is_some()>
-                                            <div class="auth-error">
+                                            <div class="auth-error" role="alert">
                                                 {move || create_error.get().unwrap_or_default()}
                                             </div>
                                         </Show>
@@ -994,7 +994,7 @@ pub fn FileManagerContent(
 
                         <Show when=move || create_dir_modal_open.get()>
                             <div class="fm-modal-backdrop" on:click=move |_| create_dir_modal_open.set(false)>
-                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation() role="dialog" aria-modal="true" aria-label="Create New Folder">
                                     <header class="fm-modal-header">
                                         <strong>"Create New Folder"</strong>
                                         <button class="fm-modal-close" on:click=move |_| create_dir_modal_open.set(false)>"×"</button>
@@ -1016,7 +1016,7 @@ pub fn FileManagerContent(
                                             }
                                         />
                                         <Show when=move || create_error.get().is_some()>
-                                            <div class="auth-error">
+                                            <div class="auth-error" role="alert">
                                                 {move || create_error.get().unwrap_or_default()}
                                             </div>
                                         </Show>
@@ -1031,7 +1031,7 @@ pub fn FileManagerContent(
 
                         <Show when=move || rename_modal_open.get()>
                             <div class="fm-modal-backdrop" on:click=move |_| rename_modal_open.set(false)>
-                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation() role="dialog" aria-modal="true" aria-label="Rename Item">
                                     <header class="fm-modal-header">
                                         <strong>"Rename Item"</strong>
                                         <button class="fm-modal-close" on:click=move |_| rename_modal_open.set(false)>"×"</button>
@@ -1062,7 +1062,7 @@ pub fn FileManagerContent(
 
                         <Show when=move || delete_modal_open.get()>
                             <div class="fm-modal-backdrop" on:click=move |_| delete_modal_open.set(false)>
-                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                                <div class="fm-modal-card" on:click=move |e: web_sys::MouseEvent| e.stop_propagation() role="dialog" aria-modal="true" aria-label="Confirm Deletion">
                                     <header class="fm-modal-header">
                                         <strong>"Confirm Deletion"</strong>
                                         <button class="fm-modal-close" on:click=move |_| delete_modal_open.set(false)>"×"</button>

@@ -4095,6 +4095,20 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   background: var(--accent-fill);
 }
 
+/* The same bar, when what it carries is a failure rather than a note. Announced assertively,
+   because a panel that has nothing else to show is not a panel to mention in passing. */
+.card-alert-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--danger-line);
+  font-size: 11px;
+  color: var(--danger);
+  background: var(--danger-fill);
+}
+
 .card-status-dismiss {
   border: none;
   color: inherit;

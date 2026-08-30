@@ -156,7 +156,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
             // Status message / toast
             {move || signals.status_msg.get().map(|msg| {
                 view! {
-                    <div style="background: var(--danger-fill); color: #fca5a5; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--danger-line); display: flex; justify-content: space-between;">
+                    <div class="card-alert-line" role="alert">
                         <span>{msg}</span>
                         <button style="background: none; border: none; color: inherit; cursor: pointer;" on:click=move |_| signals.status_msg.set(None)>"×"</button>
                     </div>

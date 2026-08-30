@@ -252,7 +252,7 @@ pub fn TerminalContent(
             // terminal died" sends them to reconnect, and a card that showed one for the other
             // would send them to the wrong place.
             {move || signals.refusal.get().map(|reason| view! {
-                <div class="terminal-refusal">{reason}</div>
+                <div class="terminal-refusal" role="alert">{reason}</div>
             })}
 
             <div

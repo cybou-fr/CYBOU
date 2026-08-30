@@ -66,7 +66,7 @@ fn SignInForm(
     view! {
         <div class="auth-body">
             <Show when=move || error_msg.get().is_some()>
-                <div class="auth-error">{move || error_msg.get().unwrap_or_default()}</div>
+                <div class="auth-error" role="alert">{move || error_msg.get().unwrap_or_default()}</div>
             </Show>
 
             <form on:submit=move |e: web_sys::SubmitEvent| {
@@ -134,7 +134,7 @@ pub fn AuthModal(open: RwSignal<bool>) -> impl IntoView {
     view! {
         <Show when=move || open.get()>
             <div class="modal-overlay" on:click=move |_| open.set(false)>
-                <div class="auth-modal" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
+                <div class="auth-modal" role="dialog" aria-modal="true" aria-label="Sign in" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
                     <header class="auth-header">
                         <div class="auth-title">
                             <IconShield size=18 />

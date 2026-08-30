@@ -951,7 +951,7 @@ pub fn EditorContent(
                     </Show>
                 </div>
 
-                <div class="editor-status-bar">
+                <div class="editor-status-bar" aria-hidden="true">
                     <div class="editor-status-left">
                         <span>{move || format!("Ln {}, Col {}", active_tab().line, active_tab().col)}</span>
                         <span>"UTF-8"</span>
@@ -965,7 +965,7 @@ pub fn EditorContent(
 
                 <Show when=move || save_proposal_open.get()>
                     <div class="editor-modal-overlay">
-                        <div class="editor-modal-card">
+                        <div class="editor-modal-card" role="dialog" aria-modal="true" aria-label="Save System Configuration">
                             <h3>"Save System Configuration"</h3>
                             <p>
                                 "This modifies a privileged configuration file: "
@@ -994,7 +994,7 @@ pub fn EditorContent(
 
                 <Show when=move || save_as_open.get()>
                     <div class="editor-modal-overlay">
-                        <div class="editor-modal-card">
+                        <div class="editor-modal-card" role="dialog" aria-modal="true" aria-label="Save As">
                             <h3>"Save As"</h3>
                             <p>"Create a new file inside your authenticated workspace jail. Existing files are never overwritten."</p>
                             <input
@@ -1018,7 +1018,7 @@ pub fn EditorContent(
 
                 <Show when=move || conflict_discard_open.get()>
                     <div class="editor-modal-overlay">
-                        <div class="editor-modal-card">
+                        <div class="editor-modal-card" role="dialog" aria-modal="true" aria-label="Discard Local Buffer?">
                             <h3>"Discard Local Buffer?"</h3>
                             <p>"Replace this tab with the verified server version. Unsaved local changes in this tab cannot be recovered by CYBOU."</p>
                             <div class="editor-modal-actions">
@@ -1052,7 +1052,7 @@ pub fn EditorContent(
 
                 <Show when=move || pending_close_tab.get().is_some()>
                     <div class="editor-modal-overlay">
-                        <div class="editor-modal-card">
+                        <div class="editor-modal-card" role="dialog" aria-modal="true" aria-label="Close Unsaved Tab?">
                             <h3>"Close Unsaved Tab?"</h3>
                             <p>
                                 "Closing "
@@ -1081,7 +1081,7 @@ pub fn EditorContent(
 
                 <Show when=move || card_close_open.get()>
                     <div class="editor-modal-overlay">
-                        <div class="editor-modal-card">
+                        <div class="editor-modal-card" role="dialog" aria-modal="true" aria-label="Close Editor With Unsaved Buffers?">
                             <h3>"Close Editor With Unsaved Buffers?"</h3>
                             <p>"This editor contains unsaved or unresolved tabs. Closing the panel permanently discards every local buffer in it; no file will be changed."</p>
                             <div class="editor-modal-actions">

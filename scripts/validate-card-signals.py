@@ -37,6 +37,12 @@ READ = re.compile(
     rf"(?:(\w+)\s*\.\s*)?(\w*(?:{_SPOKEN_ALTERNATION}))\s*\.\s*get(?:_untracked)?\(\)"
 )
 
+# What makes a rendered message reach somebody who is not looking at it. `role="alert"` is the
+# assertive form and is deliberately allowed as an alternative rather than required: most of these
+# answer something the person just did, and interrupting them to say a listing refreshed is worse
+# than waiting for a pause.
+LIVE_REGION = re.compile(r'aria-live=|role="status"|role="alert"')
+
 # Files that legitimately write a message another card renders. The receiver is named, so this
 # cannot quietly widen into "this file is exempt".
 CROSS_CARD_WRITERS = {
@@ -91,6 +97,15 @@ def main() -> int:
             problems.append(
                 f"error: {relative} writes `{where}` {count} time(s) and never reads it, so this "
                 f"panel says it where nobody can hear it"
+            )
+
+        # Visible is half of it. A panel that has just refused a write, lost its connection or
+        # finished a replace has changed, and a person not looking at it is told by the live region
+        # or not at all. This crate carried none until 2026-08-30.
+        if reads and not LIVE_REGION.search(text):
+            problems.append(
+                f"error: {relative} renders a message and has no live region, so a screen reader "
+                f"is never told the panel said anything"
             )
 
     for problem in problems:

@@ -1135,6 +1135,20 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
   send. Compression wraps the file service rather than the router, which keeps it off the two
   paths where it would harm: `/api/v1/events` is an event stream that a compressor filling a
   block would delay, and `/api/v1/terminal` is a socket upgrade with no body to compress.
+- **A screen reader is told what the desktop did**: the crate rendered 128 messages and carried
+  no `aria-live` at all, so a panel that had just refused a write, lost its connection or
+  finished a replace changed in silence for anybody not looking at it. Twenty live regions now,
+  polite where the message answers something the person did and assertive where the panel has
+  nothing else to show — interrupting somebody to say a listing refreshed is worse than waiting
+  for a pause, and holding *this host has no terminal for you* until they stop typing is worse
+  than interrupting. The Editor's own footer is `aria-hidden`, because reading a line and column
+  aloud on every keystroke makes an editor unusable with a screen reader rather than usable.
+  `validate-card-signals.py` now refuses a file that renders a message with no live region in it,
+  and found five the first time it ran, one of them in a card written the same day.
+- **A dialog says it is one**: ten modals — sign in, five in the Editor, four in the File Manager
+  — were plain divs. Nobody was told the desktop had asked them something, and a keyboard could
+  tab straight past the question into the canvas behind it, where the buttons still worked. Each
+  carries `role="dialog"`, `aria-modal` and the heading already inside it as its name.
 - **Spatial Clusters Engine**: 2D bounding hull clusters (`DesktopCluster`) visually grouping related cards with contextual themes.
 - **A card nobody can see is not built**: ADR-0044 named this as the cost of an infinite canvas
   and nothing implemented it, so every panel stayed in the DOM however far it had been panned
