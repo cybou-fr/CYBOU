@@ -66,15 +66,6 @@ pub struct PaletteAction {
 const ALL_PALETTE_ACTIONS: &[PaletteAction] = &[
     // Tools & Apps
     PaletteAction {
-        id: "shell",
-        category: PaletteCategory::Tools,
-        title: "Open Shell",
-        subtitle: "A bounded, read-only shell",
-        keywords: "shell terminal bash command zone3 body exec",
-        shortcut: None,
-        icon_kind: "external",
-    },
-    PaletteAction {
         id: "files",
         category: PaletteCategory::Tools,
         title: "Open File Manager",

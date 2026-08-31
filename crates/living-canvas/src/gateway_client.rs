@@ -9,8 +9,8 @@ use cybou_web_contracts::{
     FilePathRequest, FileWriteProjection, FileWriteRequest, HostDirectoryCreateRequest,
     HostDirectoryListingProjection, HostFileCreateRequest, HostFileWriteRequest,
     HostPathCopyRequest, HostPathDeleteRequest, HostPathRenameRequest, MindProjection,
-    SessionProjection, ShellCloseRequest, ShellExecRequest, ShellExecResponse, SnapshotProjection,
-    UserDraftDeleteRequest, UserDraftListProjection, UserDraftProjection, UserDraftSaveRequest,
+    SessionProjection, SnapshotProjection, UserDraftDeleteRequest, UserDraftListProjection,
+    UserDraftProjection, UserDraftSaveRequest,
 };
 use gloo_net::http::Request;
 use serde::de::DeserializeOwned;
@@ -1506,49 +1506,6 @@ impl MindClient for GatewayMindClient {
         if !response.ok() {
             return Err(ClientError::GatewayRequest(format!(
                 "/api/v1/cognitive/journal returned HTTP {}",
-                response.status()
-            )));
-        }
-        response
-            .json()
-            .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
-    }
-
-    async fn close_shell(&self, instance: u32) -> Result<(), ClientError> {
-        let response = Request::post("/api/v1/shell/close")
-            .json(&ShellCloseRequest { instance })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
-            .send()
-            .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        if response.ok() {
-            Ok(())
-        } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/shell/close returned HTTP {}",
-                response.status()
-            )))
-        }
-    }
-
-    async fn execute_shell(
-        &self,
-        command: &str,
-        instance: u32,
-    ) -> Result<ShellExecResponse, ClientError> {
-        let response = Request::post("/api/v1/shell/exec")
-            .json(&ShellExecRequest {
-                command: command.to_owned(),
-                instance,
-            })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
-            .send()
-            .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/shell/exec returned HTTP {}",
                 response.status()
             )));
         }

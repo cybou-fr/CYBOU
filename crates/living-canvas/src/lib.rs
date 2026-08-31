@@ -20,8 +20,7 @@ use cybou_web_contracts::{
     DirectoryListingProjection, DisclosureProjection, FileContentProjection, FileWriteProjection,
     FileWriteRequest, HostDirectoryCreateRequest, HostDirectoryListingProjection,
     HostFileCreateRequest, HostFileWriteRequest, HostPathCopyRequest, HostPathDeleteRequest,
-    HostPathRenameRequest, MindProjection, SessionProjection, ShellExecResponse,
-    SnapshotProjection,
+    HostPathRenameRequest, MindProjection, SessionProjection, SnapshotProjection,
 };
 use thiserror::Error;
 
@@ -595,23 +594,6 @@ pub trait MindClient {
     async fn get_governance_scopes(
         &self,
     ) -> Result<cybou_web_contracts::GovernanceScopesProjection, ClientError>;
-
-    /// End one of the caller's shells, because the card standing in it was closed.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ClientError`] when the gateway refuses or cannot be reached.
-    async fn close_shell(&self, instance: u32) -> Result<(), ClientError>;
-
-    /// Execute a bounded Shell capability in one of the caller's shells.
-    ///
-    /// `instance` names which Shell card the command came from. Two cards are two places a person
-    /// is standing, and passing a constant here would make them one.
-    async fn execute_shell(
-        &self,
-        command: &str,
-        instance: u32,
-    ) -> Result<ShellExecResponse, ClientError>;
 }
 
 /// Deterministic client for component, visual, and state-vocabulary tests.
@@ -1659,24 +1641,6 @@ impl MindClient for MockMindClient {
                 delegation_permitted: true,
                 granted_at: now,
             }],
-        })
-    }
-
-    async fn close_shell(&self, _instance: u32) -> Result<(), ClientError> {
-        Ok(())
-    }
-
-    async fn execute_shell(
-        &self,
-        command: &str,
-        _instance: u32,
-    ) -> Result<ShellExecResponse, ClientError> {
-        Ok(ShellExecResponse {
-            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-            exit_code: 0,
-            stdout: format!("mock shell output for: {command}\n"),
-            stderr: String::new(),
-            cwd: "/".to_owned(),
         })
     }
 }
