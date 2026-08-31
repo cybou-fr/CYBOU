@@ -619,7 +619,6 @@ pub fn CommandPalette(
     };
 
     let execute_action = move |action_id: &'static str| match action_id {
-        "shell" => focus_or_open_card(CardId::Shell(0)),
         "files" => focus_or_open_card(CardId::FileManager(0)),
         "editor" => focus_or_open_card(CardId::Editor(0)),
         "diff" => focus_or_open_card(CardId::Diff(0)),

@@ -204,15 +204,6 @@ pub fn DesktopDock(
                     </button>
                 <button
                         class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "shell"))
-                        title="Shell"
-                        on:click=move |_| open_or_focus(CardId::Shell(0))
-                    >
-                        <lucide_leptos::SquareChevronRight size=18 />
-                        <span class="dock-tooltip">"Shell"</span>
-                    </button>
-                <button
-                        class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "inspector"))
                         title="Universal Inspector"
                         on:click=move |_| open_or_focus(CardId::Inspector(0))

@@ -61,6 +61,11 @@ pub fn App() -> impl IntoView {
     )));
     let (runtime_menu_open, set_runtime_menu_open) = signal(false);
     let (minimap_visible, set_minimap_visible) = signal(true);
+    // Sticking is asked for rather than assumed. A card dragged across a small window spends most
+    // of the journey inside its bounds plus twenty-four pixels, so the magnet used to catch cards
+    // that were only travelling through — and where they landed was not where the hand let go.
+    let magnet = RwSignal::new(false);
+    provide_context(magnet);
     let (command_open, set_command_open) = signal(false);
     let (command_query, set_command_query) = signal(String::new());
     let auth_modal_open = RwSignal::new(false);
@@ -460,6 +465,20 @@ pub fn App() -> impl IntoView {
                         }
                     >
                         <IconMaximize size=12 />
+                    </button>
+                    <button
+                        class="canvas-btn"
+                        class:active=move || magnet.get()
+                        title=move || if magnet.get() {
+                            "Sticking is on: cards align and merge into decks"
+                        } else {
+                            "Sticking is off: cards go where you put them"
+                        }
+                        aria-label="Toggle sticking"
+                        aria-pressed=move || if magnet.get() { "true" } else { "false" }
+                        on:click=move |_| magnet.update(|on| *on = !*on)
+                    >
+                        <lucide_leptos::Anchor size=12 />
                     </button>
                     <button
                         class="canvas-btn"

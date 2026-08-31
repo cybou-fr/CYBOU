@@ -15,7 +15,6 @@ use crate::{
         insight::InsightContent, inspector::InspectorContent, journal::JournalContent,
         journal_feed::JournalFeedContent, lifecycle::LifecycleContent, outline::OutlineContent,
         perception::PerceptionContent, self_model::SelfModelContent, session::SessionContent,
-        shell::ShellContent,
     },
     state::RuntimeState,
 };
@@ -48,10 +47,6 @@ pub fn CardContent(
         CardId::Disclosure => view! { <DisclosureContent runtime=runtime /> }.into_any(),
         CardId::Insight => view! { <InsightContent runtime=runtime /> }.into_any(),
         CardId::Agents => view! { <AgentsContent runtime=runtime /> }.into_any(),
-        CardId::Shell(instance) => {
-            view! { <ShellContent runtime=runtime auth_modal_open=auth instance=instance /> }
-                .into_any()
-        }
         CardId::FileManager(instance) => {
             view! { <FileManagerContent runtime=runtime auth_modal_open=auth instance=instance /> }
                 .into_any()

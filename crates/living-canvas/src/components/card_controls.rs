@@ -6,10 +6,8 @@
 use leptos::prelude::*;
 use web_sys::PointerEvent;
 
-use leptos::task::spawn_local;
-
 use crate::{
-    CardId, DesktopItemId, DesktopLayout, DesktopViewMode, GatewayMindClient, MindClient,
+    CardId, DesktopItemId, DesktopLayout, DesktopViewMode,
     components::icons::{
         IconClose, IconExternalLink, IconLayers, IconMaximize, IconMinimize, IconPin,
         IconResizeGrip,
@@ -43,11 +41,6 @@ pub fn request_close_card(
     // Closing is the one action that really is a person finished with the card. Everything else
     // that unmounts it deliberately preserves its tool state.
     tool_states.forget(card);
-    if let CardId::Shell(instance) = card {
-        spawn_local(async move {
-            let _ = GatewayMindClient.close_shell(instance).await;
-        });
-    }
     layout.get_untracked().save();
 }
 

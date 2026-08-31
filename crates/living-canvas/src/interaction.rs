@@ -320,6 +320,7 @@ pub fn move_drag(
     dragging: RwSignal<Option<DragState>>,
     snap_guides: RwSignal<Vec<SnapGuide>>,
     zoom: f64,
+    magnet: bool,
 ) {
     let Some(drag) = dragging.get_untracked() else {
         return;
@@ -348,10 +349,19 @@ pub fn move_drag(
         DragTarget::Deck(deck_id) => DesktopItemId::Deck(deck_id.clone()),
     };
 
-    let snap =
+    // With the magnet off there is nothing to compute: the card goes where the pointer is, and no
+    // guides are drawn because nothing is aligning to anything.
+    let snap = if magnet {
         layout
             .get_untracked()
-            .compute_snap(&target_id, raw_x, raw_y, drag.width, drag.height, 8.0);
+            .compute_snap(&target_id, raw_x, raw_y, drag.width, drag.height, 8.0)
+    } else {
+        crate::layout::snap::SnapResult {
+            snapped_x: raw_x,
+            snapped_y: raw_y,
+            guides: Vec::new(),
+        }
+    };
 
     // No floor. The canvas is unbounded in every direction and the origin is not a corner of
     // anything a person can see; clamping here put a wall twelve pixels from it that nothing on
@@ -371,8 +381,10 @@ pub fn move_drag(
             let drag_center_x = x + drag.width / 2.0;
             let drag_center_y = y + drag.height / 2.0;
 
+            // A drop target is what turns a drag into a deck merge. Off, a card dragged across a
+            // small window is a card dragged across a small window.
             let mut found_target = None;
-            for card_inst in &current_layout.cards {
+            for card_inst in current_layout.cards.iter().filter(|_| magnet) {
                 if card_inst.id == dragged_card {
                     continue;
                 }

@@ -14,6 +14,7 @@ use crate::{
             AgentsCard, AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
             DiffCard, DisclosureCard, EditorCard, FileManagerCard, GenericToolCard, IdentityCard,
             InsightCard, InspectorCard, JournalCard, JournalFeedCard, LifecycleCard, OutlineCard,
+            PerceptionCard, SelfModelCard, SessionCard,
         },
         deck::DeckContainerView,
         relations::RelationshipsLayer,
@@ -74,6 +75,10 @@ pub fn CanvasViewport(
     // positions have to be remembered as they were: the gesture is the change between frames, and
     // a frame that only knew where one finger is would read half of it as a pan.
     let touches: RwSignal<Vec<(i32, (f64, f64))>> = RwSignal::new(Vec::new());
+
+    // Whether a dragged card sticks to anything. Off by default and provided by the app root, so
+    // the drag handler and the button that turns it on are reading one answer.
+    let magnet = use_context::<RwSignal<bool>>().unwrap_or_else(|| RwSignal::new(false));
 
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
@@ -227,7 +232,14 @@ pub fn CanvasViewport(
                     let cur_y = f64::from(event.client_y());
                     set_pan.set((init_px + (cur_x - start_x), init_py + (cur_y - start_y)));
                 }
-                move_drag(event.clone(), layout, dragging, snap_guides, zoom.get_untracked());
+                move_drag(
+                    event.clone(),
+                    layout,
+                    dragging,
+                    snap_guides,
+                    zoom.get_untracked(),
+                    magnet.get_untracked(),
+                );
                 move_resize(event, layout, resizing);
             }
             on:pointerup=move |event: PointerEvent| {
@@ -338,12 +350,6 @@ pub fn CanvasViewport(
             // are not singletons; rendering exactly one of each made that a promise the desktop
             // could not keep, so a second Shell could be opened into the model and never appear.
             <For
-                each=move || shell_instances(&layout.get())
-                key=|instance| *instance
-                children=move |instance| view! {
-                }
-            />
-            <For
                 each=move || file_manager_instances(&layout.get())
                 key=|instance| *instance
                 children=move |instance| view! {
@@ -425,18 +431,6 @@ fn unclaimed_cards(layout: &DesktopLayout) -> Vec<CardId> {
         .iter()
         .map(|card| card.id)
         .filter(|card| !card.has_dedicated_view() && !layout.is_in_deck(*card))
-        .collect()
-}
-
-/// The Shell cards this layout holds, by instance.
-fn shell_instances(layout: &DesktopLayout) -> Vec<u32> {
-    layout
-        .cards
-        .iter()
-        .filter_map(|card| match card.id {
-            CardId::Shell(instance) => Some(instance),
-            _ => None,
-        })
         .collect()
 }
 
