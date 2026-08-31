@@ -10,10 +10,7 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use crate::instant_label;
 use crate::{
     ArrangementMode, CardId, DesktopItemId, DesktopLayout,
-    components::icons::{
-        IconActivity, IconBell, IconBot, IconFile, IconFolder, IconGrid, IconHome, IconLayers,
-        IconRefresh, IconShield, IconTerminal,
-    },
+    components::icons::{IconBell, IconBot, IconFolder, IconHome, IconRefresh, IconShield},
     state::RuntimeState,
 };
 
