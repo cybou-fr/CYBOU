@@ -777,148 +777,266 @@
     }
   };
 
-  const getStoredLang = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const paramLang = urlParams.get('lang');
-    if (paramLang && translations[paramLang]) return paramLang;
-    const stored = localStorage.getItem('cybou_lang');
-    if (stored && translations[stored]) return stored;
-    const nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
-    return translations[nav] ? nav : 'en';
+  let currentLang = localStorage.getItem('cybou_lang') || 'en';
+
+  const INLINE_MARKUP = /&lt;(\/?)(strong|em|code)&gt;/g;
+
+  const applyText = (node, value) => {
+    if (value.indexOf('<') === -1) {
+      node.textContent = value;
+      return;
+    }
+    const escaped = value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    node.innerHTML = escaped.replace(INLINE_MARKUP, '<$1$2>');
   };
 
-  let currentLang = getStoredLang();
+  const t = (key, replacements) => {
+    const table = translations[currentLang] || translations.en;
+    let value = table[key] || translations.en[key] || key;
+    if (replacements) {
+      Object.keys(replacements).forEach((name) => {
+        value = value.replace('{' + name + '}', replacements[name]);
+      });
+    }
+    return value;
+  };
 
-  const applyLanguage = (lang) => {
-    if (!translations[lang]) lang = 'en';
+  const setLanguage = (lang) => {
+    if (!translations[lang]) return;
     currentLang = lang;
     localStorage.setItem('cybou_lang', lang);
-    document.documentElement.lang = lang;
 
-    const t = translations[lang];
-
-    document.querySelectorAll('[data-i18n]').forEach((el) => {
-      const key = el.getAttribute('data-i18n');
-      if (t[key] !== undefined) {
-        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-          el.value = t[key];
-        } else {
-          el.innerHTML = t[key];
-        }
+    document.querySelectorAll('[data-i18n]').forEach((node) => {
+      const key = node.getAttribute('data-i18n');
+      const value = translations[lang][key];
+      if (value) {
+        applyText(node, value);
       }
     });
 
-    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-      const key = el.getAttribute('data-i18n-placeholder');
-      if (t[key] !== undefined) {
-        el.placeholder = t[key];
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((node) => {
+      const value = translations[lang][node.getAttribute('data-i18n-placeholder')];
+      if (value) {
+        node.setAttribute('placeholder', value);
       }
     });
 
-    document.querySelectorAll('[data-lang-current]').forEach((el) => {
-      el.textContent = lang.toUpperCase();
+    document.querySelectorAll('[data-lang-current]').forEach((node) => {
+      node.textContent = lang.toUpperCase();
     });
 
     document.querySelectorAll('[data-lang]').forEach((btn) => {
       btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
     });
+
+    document.documentElement.setAttribute('lang', lang);
+
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) {
+      const base = canonical.href.split('?')[0];
+      const self = lang === 'en' ? base : `${base}?lang=${lang}`;
+      canonical.href = self;
+      document.querySelector('meta[property="og:url"]')?.setAttribute('content', self);
+    }
   };
 
-  // Language dropdown event handlers
-  document.querySelectorAll('[data-lang-dropdown]').forEach((dropdown) => {
-    const trigger = dropdown.querySelector('[data-lang-trigger]');
-    const menu = dropdown.querySelector('[data-lang-menu]');
-    if (!trigger || !menu) return;
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramLang = urlParams.get('lang');
+  const hashLang = window.location.hash.startsWith('#lang=') ? window.location.hash.slice(6) : null;
+  const browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
 
-    trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isExpanded = trigger.getAttribute('aria-expanded') === 'true';
-      trigger.setAttribute('aria-expanded', !isExpanded);
-      menu.setAttribute('aria-hidden', isExpanded);
-      dropdown.classList.toggle('open', !isExpanded);
+  const initialLang =
+    (paramLang && translations[paramLang] && paramLang) ||
+    (hashLang && translations[hashLang] && hashLang) ||
+    localStorage.getItem('cybou_lang') ||
+    (translations[browserLang] ? browserLang : 'en');
+
+  setLanguage(initialLang);
+
+  document.querySelectorAll('[data-lang-trigger]').forEach((trigger) => {
+    trigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const menu = trigger.nextElementSibling;
+      const isOpen = menu.classList.toggle('open');
+      trigger.classList.toggle('open', isOpen);
+      trigger.setAttribute('aria-expanded', String(isOpen));
+      menu.setAttribute('aria-hidden', String(!isOpen));
     });
+  });
 
-    menu.querySelectorAll('[data-lang]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const selected = btn.getAttribute('data-lang');
-        applyLanguage(selected);
-        trigger.setAttribute('aria-expanded', 'false');
-        menu.setAttribute('aria-hidden', 'true');
-        dropdown.classList.remove('open');
+  document.querySelectorAll('[data-lang]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const lang = btn.getAttribute('data-lang');
+      setLanguage(lang);
+      document.querySelectorAll('[data-lang-menu]').forEach((m) => {
+        m.classList.remove('open');
+        m.setAttribute('aria-hidden', 'true');
+      });
+      document.querySelectorAll('[data-lang-trigger]').forEach((t) => {
+        t.classList.remove('open');
+        t.setAttribute('aria-expanded', 'false');
       });
     });
   });
 
   document.addEventListener('click', () => {
-    document.querySelectorAll('[data-lang-dropdown]').forEach((dropdown) => {
-      const trigger = dropdown.querySelector('[data-lang-trigger]');
-      const menu = dropdown.querySelector('[data-lang-menu]');
-      if (trigger && menu) {
-        trigger.setAttribute('aria-expanded', 'false');
-        menu.setAttribute('aria-hidden', 'true');
-        dropdown.classList.remove('open');
-      }
+    document.querySelectorAll('[data-lang-menu]').forEach((m) => {
+      m.classList.remove('open');
+      m.setAttribute('aria-hidden', 'true');
+    });
+    document.querySelectorAll('[data-lang-trigger]').forEach((t) => {
+      t.classList.remove('open');
+      t.setAttribute('aria-expanded', 'false');
     });
   });
 
-  // Mobile navigation
-  if (menuButton && mobileNav) {
-    menuButton.addEventListener('click', () => {
-      const isOpen = mobileNav.classList.toggle('open');
-      menuButton.setAttribute('aria-expanded', isOpen);
-    });
-
-    mobileNav.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        mobileNav.classList.remove('open');
-        menuButton.setAttribute('aria-expanded', 'false');
+  // Interactive FAQ Accordion
+  document.querySelectorAll('.faq-question').forEach((button) => {
+    button.setAttribute('aria-expanded', 'false');
+    button.addEventListener('click', () => {
+      const item = button.closest('.faq-item');
+      const open = !item?.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach((el) => {
+        el.classList.remove('open');
+        el.querySelector('.faq-question')?.setAttribute('aria-expanded', 'false');
       });
+      item?.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', String(open));
     });
-  }
+  });
 
-  // Header scroll appearance
-  window.addEventListener('scroll', () => {
-    if (header) {
-      header.classList.toggle('scrolled', window.scrollY > 20);
+  const updateHeader = () => header?.classList.toggle('is-scrolled', window.scrollY > 24);
+  updateHeader();
+  window.addEventListener('scroll', updateHeader, { passive: true });
+
+  menuButton?.addEventListener('click', () => {
+    const open = !mobileNav.classList.contains('open');
+    mobileNav.classList.toggle('open', open);
+    document.body.classList.toggle('menu-open', open);
+    menuButton.setAttribute('aria-expanded', String(open));
+  });
+
+  mobileNav?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => {
+      mobileNav.classList.remove('open');
+      document.body.classList.remove('menu-open');
+      menuButton?.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  const setLauncher = (open) => {
+    launcher?.classList.toggle('open', open);
+    launcherButton?.classList.toggle('active', open);
+    launcher?.setAttribute('aria-hidden', String(!open));
+  };
+
+  launcherButton?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setLauncher(!launcher.classList.contains('open'));
+  });
+
+  desktopStage?.addEventListener('click', (event) => {
+    if (!launcher?.contains(event.target) && !launcherButton?.contains(event.target)) setLauncher(false);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setLauncher(false);
+      mobileNav?.classList.remove('open');
+      document.body.classList.remove('menu-open');
+      menuButton?.setAttribute('aria-expanded', 'false');
     }
   });
 
-  // Interactive Desktop Concept
-  if (launcherButton && launcher) {
-    launcherButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      launcher.classList.toggle('open');
-    });
+  const updateClock = () => {
+    if (!clock) return;
+    const now = new Date();
+    clock.textContent = new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(now);
+  };
+  updateClock();
+  setInterval(updateClock, 30000);
 
-    document.addEventListener('click', (e) => {
-      if (!launcher.contains(e.target) && !launcherButton.contains(e.target)) {
-        launcher.classList.remove('open');
-      }
+  document.querySelectorAll('[data-year]').forEach((node) => {
+    node.textContent = String(new Date().getFullYear());
+  });
+
+  // Reveal animations on scroll
+  const revealNodes = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.10, rootMargin: '0px 0px -20px' });
+    revealNodes.forEach((node) => observer.observe(node));
+  } else {
+    revealNodes.forEach((node) => node.classList.add('visible'));
+  }
+
+  // Also make sure above-the-fold nodes are visible immediately
+  setTimeout(() => {
+    document.querySelectorAll('.hero .reveal, #main > section:first-of-type .reveal').forEach((node) => {
+      node.classList.add('visible');
+    });
+  }, 50);
+
+  if (desktopStage && window.matchMedia('(pointer:fine)').matches) {
+    desktopStage.addEventListener('pointermove', (event) => {
+      const box = desktopStage.getBoundingClientRect();
+      const x = (event.clientX - box.left) / box.width - 0.5;
+      const y = (event.clientY - box.top) / box.height - 0.5;
+      desktopStage.style.setProperty('--pointer-x', x.toFixed(3));
+      desktopStage.style.setProperty('--pointer-y', y.toFixed(3));
     });
   }
 
-  // FAQ Accordion
-  document.querySelectorAll('.faq-question').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const item = btn.closest('.faq-item');
-      if (item) {
-        item.classList.toggle('open');
+  // Interactive Desktop Mock-up Handlers
+  const launcherInput = document.querySelector('[data-launcher-input]');
+  const launcherGrid = document.querySelector('[data-launcher-grid]');
+
+  launcherInput?.addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase().trim();
+    if (!launcherGrid) return;
+    launcherGrid.querySelectorAll('button').forEach((btn) => {
+      const name = (btn.getAttribute('data-app-name') || btn.textContent).toLowerCase();
+      btn.style.display = name.includes(term) ? '' : 'none';
+    });
+  });
+
+  const workspaceDots = document.querySelectorAll('[data-workspace-dots] .ws-dot');
+  const desktopStatusText = document.querySelector('[data-desktop-status-text]');
+
+  workspaceDots.forEach((dot) => {
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      workspaceDots.forEach((d) => d.classList.remove('active'));
+      dot.classList.add('active');
+      const wsNum = dot.getAttribute('data-ws');
+      if (desktopStatusText) {
+        desktopStatusText.textContent = t('ws_active', { n: wsNum });
       }
     });
   });
 
-  // Clock in concept desktop
-  const updateClock = () => {
-    if (!clock) return;
-    const now = new Date();
-    const h = String(now.getHours()).padStart(2, '0');
-    const m = String(now.getMinutes()).padStart(2, '0');
-    clock.textContent = `${h}:${m}`;
-  };
-  setInterval(updateClock, 1000);
-  updateClock();
-
-  // Initialize language on DOM load
-  applyLanguage(currentLang);
+  const appDockBtns = document.querySelectorAll('[data-app-dock] button');
+  appDockBtns.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const appName = btn.getAttribute('data-app');
+      if (desktopStatusText) {
+        desktopStatusText.textContent = t('app_ready', { app: appName });
+      }
+    });
+  });
 })();
