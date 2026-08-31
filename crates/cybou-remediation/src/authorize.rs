@@ -72,6 +72,9 @@ impl StandingPolicy {
         match proposer {
             Proposer::Mind => &self.pre_authorized,
             Proposer::Agent { .. } => &self.pre_authorized_for_agents,
+            // A person's request is never pre-authorized. Pre-authorization exists so something
+            // can act while nobody is present, and a person asking is the case where somebody is.
+            Proposer::Person { .. } => &[],
         }
     }
 }

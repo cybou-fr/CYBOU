@@ -1014,6 +1014,32 @@ was asked, agreed, and is named. A record that could not tell them apart would a
 authorized this* with the policy, on a host whose policy authorized nothing. The seat is established
 by whatever authenticated it and is never supplied by the party being authorized.
 
+**And a person can now ask.** `Action1` had one entrance — a finding this host reached about
+itself — so every proposal in the system was Mind's. That is right for remediation and it left
+the desktop with fourteen `SystemHub` methods answering `Err(Refused)` beneath panels that were
+complete except for the part where anything happens.
+
+`ActionCore::request` is the other door ([ADR-0048](adr/ADR-0048-a-person-may-ask-for-an-action.md)),
+and its shape is that **the asking is the confirmation**: somebody who read the unit name and
+pressed the button has already answered the question a confirmation asks, and asking them again
+teaches them to click through it. So a request that passes criticism is decided
+`GrantedOnConfirmation` naming the seat, never `Granted` — no policy granted this, and the
+record must not read as though one had.
+
+It opens no new capability. `Operation::RestartService` was already in the closed table and
+`ExecutableAction::ServiceRestart` already had an adapter, both proven end to end by two gates;
+what was missing was a proposer, since `Proposer` had `Mind` and `Agent` and a person is
+neither. What is forbidden stays forbidden: a person asking does not make formatting a
+filesystem askable, for the same reason it is not offered to Mind. A verb outside the table is
+refused as not an operation rather than as an operation of unknown risk. Risk and reversibility
+are taken from the table rather than from the asker, so a proposer cannot understate what it is
+asking for. And a person brings no evidence, so `brings_its_own_evidence` answers false for
+them and the proposal cites no cause — inventing a finding to point at would be this host
+claiming it had concluded something.
+
+**Nothing reaches it yet.** There is no bus method and no route, so no button is connected;
+that is the next step and is stated as an absence.
+
 **A browser can now answer.** `POST /api/v1/actions/confirm` carries a person's answer to
 `Action1.Confirm` and is the first write the gateway makes against the action boundary. It remains
 unable to execute anything and decides nothing: it supplies exactly two things Action1 cannot know

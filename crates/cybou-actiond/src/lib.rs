@@ -9,10 +9,13 @@ use cybou_protocol::{
     action::{
         ActionOutcome, ActionProposal, AuthorizationDecision, AuthorizationVerdict, CriticismCheck,
         ExecutableAction, ExecutionAttempt, ExecutionClaim, ExecutionPermit, ExecutionStarted,
+        Proposer,
     },
     telemetry::SystemInsight,
 };
-use cybou_remediation::{Operation, StandingPolicy, authorize, criticise, propose};
+use cybou_remediation::{
+    Operation, StandingPolicy, authorize, criticise, criticise_request, propose,
+};
 use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -158,6 +161,142 @@ impl ActionCore {
     /// # Errors
     ///
     /// Refuses unknown, consumed, expired permits and unavailable internal state.
+    /// Carry out what a person at a seat asked for, if the boundary allows it.
+    ///
+    /// `Action1`'s only entrance was `evaluate_insight`, which takes a finding this host reached
+    /// about itself. That is the right shape for remediation and it leaves an operator looking at a
+    /// failed unit on a panel built to show them exactly that, with nothing to press. ADR-0048
+    /// opens the other door.
+    ///
+    /// **The asking is the confirmation.** A person who was looking at the panel, read the unit
+    /// name and pressed the button has already answered the question a confirmation asks; deciding
+    /// `RequiresUserConfirmation` and asking them again is asking the same person the same thing
+    /// twice, which teaches them to click through it. So a request that passes criticism is
+    /// `GrantedOnConfirmation`, naming the seat — never `Granted`, because no policy granted this
+    /// and the record must not read as though one had.
+    ///
+    /// Everything the boundary already refuses, it still refuses. The operation table is closed, so
+    /// a verb outside it is not an operation with unknown risk but not an operation; and the
+    /// operations that are never offered are not offered to a person either, because there is no
+    /// answer somebody could give that would make formatting a filesystem safe.
+    ///
+    /// What a person cannot bring is evidence. The critics that compare a proposal against its
+    /// readings have nothing to compare, so what remains is the operation table — a smaller check
+    /// than a finding gets, and the reason [`Proposer::brings_its_own_evidence`] answers false for
+    /// them.
+    ///
+    /// # Errors
+    ///
+    /// [`ActionError::UnknownOperation`] for a verb this build cannot express, and
+    /// [`ActionError::InvalidTarget`] for one that names nothing concrete to act on.
+    pub fn request(
+        &self,
+        verb: &str,
+        target: &str,
+        seat: &str,
+        now: OffsetDateTime,
+    ) -> Result<ActionRecord, ActionError> {
+        let operation = operation_for(verb)?;
+
+        if seat.trim().is_empty() {
+            // A request from nobody is not a request. The seat is established by whatever
+            // authenticated the person, so an empty one means the caller had none to give.
+            return Err(ActionError::InvalidTarget(
+                "a request carries the seat that asked for it".to_owned(),
+            ));
+        }
+
+        let proposal = ActionProposal {
+            proposal_id: Uuid::new_v4(),
+            proposed_by: Proposer::Person {
+                seat: seat.to_owned(),
+            },
+            // No cause. A person's reason for wanting a service restarted is theirs, and inventing
+            // a finding to point at would be this host claiming it had concluded something.
+            cause_id: None,
+            intent: format!("{seat} asked for {verb} on {target}"),
+            operation: verb.to_owned(),
+            target_resource: target.to_owned(),
+            parameters: Vec::new(),
+            // Taken from the operation rather than from the caller, which is the rule that makes
+            // the risk check meaningful: a proposer cannot understate what it is asking for.
+            risk_level: operation.risk(),
+            reversible: operation.reversible(),
+            proposed_at: now,
+        };
+
+        let mut checks = criticise_request(&proposal);
+        let adapter = executable_action(&proposal, operation);
+        checks.push(CriticismCheck {
+            rule_id: "executor-adapter-exists".to_owned(),
+            description: "The first executor has a typed adapter for this action and target."
+                .to_owned(),
+            passed: adapter.is_ok(),
+            objection: adapter.as_ref().err().map(ToString::to_string),
+        });
+
+        let objected = checks.iter().any(|check| !check.passed);
+        let verdict = if operation.forbidden() {
+            // Forbidden means never, for anybody. A person asking does not make it askable,
+            // for the same reason it is not offered to Mind: there is no answer somebody could
+            // give that would make it safe.
+            AuthorizationVerdict::Denied {
+                reason: format!(
+                    "{} is refused whatever the evidence says",
+                    proposal.operation
+                ),
+            }
+        } else if objected {
+            AuthorizationVerdict::Denied {
+                reason: "a criticism refused this request".to_owned(),
+            }
+        } else {
+            AuthorizationVerdict::GrantedOnConfirmation {
+                confirmed_by: seat.to_owned(),
+            }
+        };
+
+        let decision = AuthorizationDecision {
+            decision_id: AuthorizationDecision::derive_id(proposal.proposal_id, &verdict, now),
+            proposal_id: proposal.proposal_id,
+            verdict,
+            checked_capabilities: vec![operation.verb().to_owned()],
+            decided_at: now,
+        };
+
+        let permit = decision
+            .verdict
+            .permits_execution()
+            .then(|| {
+                adapter
+                    .ok()
+                    .map(|action| permit_for(&proposal, &decision, action, now))
+            })
+            .flatten();
+        let permit_id = permit.as_ref().map(|permit| permit.permit_id);
+        if let Some(permit) = permit {
+            self.permits
+                .lock()
+                .map_err(|_| ActionError::StateUnavailable)?
+                .insert(permit.permit_id, permit);
+        }
+
+        let record = ActionRecord {
+            proposal,
+            checks,
+            decision,
+            permit_id,
+            execution_started: None,
+            attempt: None,
+            outcome: None,
+        };
+        self.records
+            .lock()
+            .map_err(|_| ActionError::StateUnavailable)?
+            .insert(record.proposal.proposal_id, record.clone());
+        Ok(record)
+    }
+
     /// Grant a proposal that was waiting on a person, because a person said yes.
     ///
     /// This is the other half of a verdict the host has been able to reach since ADR-0022 and has
@@ -598,6 +737,175 @@ mod tests {
             AuthorizationVerdict::Denied { .. }
         ));
         assert!(record.permit_id.is_none());
+    }
+
+    const SEAT: &str = "linux-account:alice";
+    const UNIT: &str = "systemd:demo-api.service";
+
+    #[test]
+    fn a_person_asking_is_the_confirmation_that_asking_would_otherwise_wait_for() {
+        // The whole of ADR-0048. A person who read the unit name and pressed the button has already
+        // answered the question a confirmation asks, and asking them again teaches them to click
+        // through it.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request("service.restart", UNIT, SEAT, OffsetDateTime::UNIX_EPOCH)
+            .expect("a request this build can express");
+
+        assert_eq!(
+            record.decision.verdict,
+            AuthorizationVerdict::GrantedOnConfirmation {
+                confirmed_by: SEAT.to_owned()
+            }
+        );
+        let permit = record.permit_id.expect("a permit");
+        assert!(
+            core.claim_permit(permit, OffsetDateTime::UNIX_EPOCH)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn it_is_never_recorded_as_something_a_policy_granted() {
+        // No policy granted this. A record reading `granted` would attribute a person's decision to
+        // a standing policy, on a host whose policy authorized nothing.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request("service.restart", UNIT, SEAT, OffsetDateTime::UNIX_EPOCH)
+            .expect("a request");
+
+        assert_ne!(record.decision.verdict, AuthorizationVerdict::Granted);
+        assert!(record.decision.verdict.permits_execution());
+        assert!(!cybou_remediation::permits_unattended(&record.decision));
+        assert!(record.proposal.proposed_by.is_a_person());
+    }
+
+    #[test]
+    fn a_person_brings_no_evidence_and_the_record_says_so() {
+        // A proposal from Mind carries a finding and the readings behind it. A person's request
+        // carries a name they typed, and a record that could not tell the two apart would let a
+        // reader take somebody's preference for something this host observed.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request("service.restart", UNIT, SEAT, OffsetDateTime::UNIX_EPOCH)
+            .expect("a request");
+
+        assert!(!record.proposal.proposed_by.brings_its_own_evidence());
+        assert_eq!(record.proposal.cause_id, None);
+    }
+
+    #[test]
+    fn what_is_never_offered_is_not_offered_to_a_person_either() {
+        // There is no answer somebody could give that makes formatting a filesystem safe, which is
+        // the same reason it is not offered to Mind.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+
+        for verb in [
+            "filesystem.format",
+            "system.poweroff",
+            "service.data.delete",
+        ] {
+            let record = core
+                .request(verb, UNIT, SEAT, OffsetDateTime::UNIX_EPOCH)
+                .expect("a refusal is still a lifecycle record");
+            assert!(
+                matches!(record.decision.verdict, AuthorizationVerdict::Denied { .. }),
+                "{verb} was not refused"
+            );
+            assert!(record.permit_id.is_none(), "{verb} produced a permit");
+        }
+    }
+
+    #[test]
+    fn a_verb_outside_the_table_is_not_an_operation_with_unknown_risk() {
+        // It is not an operation. Accepting one would be accepting a string as an instruction,
+        // which is the shape this whole boundary exists to refuse.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+
+        assert!(matches!(
+            core.request("service.obliterate", UNIT, SEAT, OffsetDateTime::UNIX_EPOCH),
+            Err(ActionError::UnknownOperation(_))
+        ));
+    }
+
+    #[test]
+    fn a_request_from_nobody_is_not_a_request() {
+        // The seat is established by whatever authenticated the person. An empty one means the
+        // caller had none to give, and a permit minted for it would name nobody.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+
+        assert!(matches!(
+            core.request("service.restart", UNIT, "  ", OffsetDateTime::UNIX_EPOCH),
+            Err(ActionError::InvalidTarget(_))
+        ));
+    }
+
+    #[test]
+    fn a_target_the_executor_cannot_act_on_is_refused_rather_than_attempted() {
+        // The adapter check, which is what stops a permit existing for a unit nothing can restart.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request(
+                "service.restart",
+                "systemd:<unit>",
+                SEAT,
+                OffsetDateTime::UNIX_EPOCH,
+            )
+            .expect("a refusal is still a lifecycle record");
+
+        assert!(matches!(
+            record.decision.verdict,
+            AuthorizationVerdict::Denied { .. }
+        ));
+        assert!(record.permit_id.is_none());
+    }
+
+    #[test]
+    fn the_risk_is_the_operations_own_and_not_the_askers() {
+        // `ActionProposal` carries risk and reversibility as ordinary fields, so anything building
+        // one by hand can fill them in freely. A person's request takes them from the table.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request("service.restart", UNIT, SEAT, OffsetDateTime::UNIX_EPOCH)
+            .expect("a request");
+
+        assert_eq!(
+            record.proposal.risk_level,
+            cybou_remediation::Operation::RestartService.risk()
+        );
+        assert_eq!(
+            record.proposal.reversible,
+            cybou_remediation::Operation::RestartService.reversible()
+        );
+    }
+
+    #[test]
+    fn a_request_is_answered_once_and_its_permit_spent_once() {
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request("service.restart", UNIT, SEAT, OffsetDateTime::UNIX_EPOCH)
+            .expect("a request");
+        let permit = record.permit_id.expect("a permit");
+
+        assert!(
+            core.claim_permit(permit, OffsetDateTime::UNIX_EPOCH)
+                .is_ok()
+        );
+        assert_eq!(
+            core.claim_permit(permit, OffsetDateTime::UNIX_EPOCH),
+            Err(ActionError::PermitUnavailable)
+        );
+
+        // And it cannot be confirmed afterwards: it was never waiting on an answer.
+        assert_eq!(
+            core.confirm(
+                record.proposal.proposal_id,
+                record.decision.decision_id,
+                SEAT,
+                OffsetDateTime::UNIX_EPOCH,
+            ),
+            Err(ActionError::NotAwaitingConfirmation)
+        );
     }
 
     /// One host that has been asked and has agreed to nothing yet.

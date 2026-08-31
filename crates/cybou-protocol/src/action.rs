@@ -68,6 +68,20 @@ pub struct ActionProposal {
 pub enum Proposer {
     /// Cybou, from a finding it reached about itself.
     Mind,
+    /// A person at an authenticated seat, asking for something themselves.
+    ///
+    /// Not a smaller Mind. A proposal from Mind carries a finding and the readings behind it; a
+    /// person's request carries a name they typed and the fact that they were looking at the panel
+    /// when they typed it. Both are reasons to act and only one of them can be checked against
+    /// anything this host observed (ADR-0048).
+    #[serde(rename_all = "camelCase")]
+    Person {
+        /// Which seat asked, as the boundary that authenticated it established.
+        ///
+        /// Never taken from the request body. A proposer who names themselves is not a proposer
+        /// this record can attribute anything to.
+        seat: String,
+    },
     /// An agent inside a capsule.
     #[serde(rename_all = "camelCase")]
     Agent {
@@ -84,6 +98,7 @@ impl Proposer {
     pub fn describe(&self) -> String {
         match self {
             Self::Mind => "this host, from its own readings".to_owned(),
+            Self::Person { seat } => format!("the person at {seat}"),
             Self::Agent { agent, capsule_id } => {
                 format!("the agent {agent} in capsule {capsule_id}")
             }
@@ -98,6 +113,15 @@ impl Proposer {
     #[must_use]
     pub const fn brings_its_own_evidence(&self) -> bool {
         matches!(self, Self::Mind)
+    }
+
+    /// Whether this party is a person, rather than something running on their behalf.
+    ///
+    /// Asked where the difference is what may happen next — a person's request is its own
+    /// confirmation because they are present to have made it, and neither Mind nor an agent is.
+    #[must_use]
+    pub const fn is_a_person(&self) -> bool {
+        matches!(self, Self::Person { .. })
     }
 }
 

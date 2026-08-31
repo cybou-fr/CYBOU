@@ -46,6 +46,7 @@ SPDX-License-Identifier: MIT
 | [0045](ADR-0045-cybou-core-desktop-pack-and-workspace-primitives.md) | CYBOU Core Desktop Pack: Universal Workspace Primitives, Text Editor, Diff Engine, Files 2.0, Mail & Personal Core, System Control Center, and Authority Domains | Proposed |
 | [0046](ADR-0046-cybou-spatial-desktop-operating-model.md) | CYBOU Spatial Desktop Operating Model: Full Lifecycle, SubjectRef Primitives, System Inspection, Universal Search, Epistemic State Machine, Background Operations, and Resilience Acceptance Gates (SD1–SD15) | Proposed |
 | [0047](ADR-0047-interactive-terminal-under-the-authenticated-account.md) | An interactive terminal that runs as the person who signed in; supersedes the shell half of 0040 | Proposed |
+| [0048](ADR-0048-a-person-may-ask-for-an-action.md) | A person may ask for an action, and the asking is the confirmation; extends 0022 | Proposed |
 
 Numbers have gaps, and the gaps are deliberate. An ADR whose decision no longer constrains how Cybou
 may be designed is deleted rather than kept as an entry nobody should read — the number stays retired
