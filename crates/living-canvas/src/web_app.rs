@@ -316,6 +316,18 @@ pub fn App() -> impl IntoView {
             {
                 event.prevent_default();
                 set_zoom.update(|z| *z = (*z - 0.1).max(0.4));
+            } else if event.key() == "Escape" {
+                // Focus mode takes a card out of the canvas and fills the window with it, and the
+                // only way back out was the button that put you there — which is off screen the
+                // moment the card scrolls. Escape leaves it, and failing that clears the
+                // selection, which is what Escape means everywhere else.
+                if matches!(view_mode.get_untracked(), DesktopViewMode::Focus(_)) {
+                    event.prevent_default();
+                    view_mode.set(DesktopViewMode::Spatial);
+                } else if selected.get_untracked().is_some() {
+                    event.prevent_default();
+                    set_selected.set(None);
+                }
             } else if event.alt_key() && event.key() == "ArrowLeft" {
                 event.prevent_default();
                 apply_camera_back(camera_history, pan, set_pan, zoom, set_zoom);
