@@ -22,6 +22,7 @@ pub mod shell;
 pub mod snapshot;
 pub mod system;
 pub mod terminal;
+pub mod workspace;
 
 use axum::http::StatusCode;
 
@@ -70,6 +71,7 @@ pub use system::{
     update_security_policy,
 };
 pub use terminal::terminal_handler;
+pub use workspace::{WorkspaceStore, get_layout_handler, save_layout_handler};
 
 /// 404 handler for unmatched API routes preventing SPA fallback on API endpoints.
 pub async fn api_not_found() -> StatusCode {

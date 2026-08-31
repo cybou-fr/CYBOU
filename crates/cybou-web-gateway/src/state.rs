@@ -243,6 +243,8 @@ pub struct GatewayState {
     pub host_user_files: Option<Arc<dyn HostUserFileSource>>,
     /// User drafts storage for safe recovery.
     pub drafts: Arc<crate::routes::UserDraftStore>,
+    /// Where a person's desktop arrangement lives when it is not in one browser.
+    pub workspace: Arc<crate::routes::WorkspaceStore>,
     /// Server operations and task progress manager.
     pub operations: Arc<crate::operations_hub::OperationsHub>,
     /// Reactive desktop notifications hub.

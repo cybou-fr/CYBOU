@@ -90,6 +90,10 @@ pub fn App() -> impl IntoView {
     living_canvas::refresh::provide_desktop_clock();
     let layout = RwSignal::new(load_layout());
     provide_context(layout);
+    // The local copy is what there is until the account answers. From here on it is a cache
+    // in front of the arrangement the seat carries, rather than the only place it exists.
+    #[cfg(target_arch = "wasm32")]
+    living_canvas::workspace_sync::provide_workspace_sync(layout);
     provide_context(set_selected);
     provide_context(pan);
     provide_context(set_pan);

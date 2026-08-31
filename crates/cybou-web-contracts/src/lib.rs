@@ -972,6 +972,31 @@ pub struct UserDraftListProjection {
     pub drafts: Vec<UserDraftProjection>,
 }
 
+/// One person's saved desktop arrangement.
+///
+/// The layout itself is a string and stays one all the way through the gateway. Its schema belongs
+/// to the frontend that writes it; parsing it here would be a second implementation of that schema,
+/// and it would be wrong the first time a card gained a field.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopLayoutProjection {
+    /// Contract schema version.
+    pub schema_version: SchemaVersion,
+    /// The arrangement this seat last saved, or `None` if it has never saved one. `None` is not an
+    /// empty desktop: it means the browser should keep whatever it already had.
+    pub layout: Option<String>,
+    /// When it was saved.
+    pub updated_at_utc: Option<String>,
+}
+
+/// Request to replace this seat's desktop arrangement.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopLayoutSaveRequest {
+    /// The arrangement, as the browser wrote it.
+    pub layout: String,
+}
+
 /// Request to save or update a user draft.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -78,18 +78,18 @@ use routes::{
     download_file_handler, evaluate_candidate_handler, events_handler, execute_notification_action,
     execute_package_action, execute_service_action, get_artifacts_handler, get_backup_settings,
     get_calendar, get_candidates_handler, get_cognitive_graph, get_contacts, get_event_journal,
-    get_governance_scopes_handler, get_mail, get_network, get_notes, get_operation,
-    get_operation_logs, get_packages, get_security_settings, get_storage, get_system_logs,
-    get_system_monitor, get_system_updates, get_users_settings, insight_handler, interpret_handler,
-    launch_agent_handler, list_directory_handler, list_drafts_handler, list_host_directory_handler,
-    list_notifications, list_operations, list_processes, list_services, login_handler,
-    logout_handler, mind_handler, propose_candidate_handler, query_cognitive_graph,
-    read_file_handler, read_host_file_handler, recent_actions_handler, rename_host_path_handler,
-    restore_archive, restore_snapshot, revoke_artifact_handler, save_draft_handler, send_mail,
-    send_process_signal, session_handler, shell_close_handler, shell_exec_handler,
-    snapshot_handler, stop_agent_handler, terminal_handler, trigger_backup, update_backup_schedule,
-    update_note, update_security_policy, upload_file_handler, write_file_handler,
-    write_host_file_handler,
+    get_governance_scopes_handler, get_layout_handler, get_mail, get_network, get_notes,
+    get_operation, get_operation_logs, get_packages, get_security_settings, get_storage,
+    get_system_logs, get_system_monitor, get_system_updates, get_users_settings, insight_handler,
+    interpret_handler, launch_agent_handler, list_directory_handler, list_drafts_handler,
+    list_host_directory_handler, list_notifications, list_operations, list_processes,
+    list_services, login_handler, logout_handler, mind_handler, propose_candidate_handler,
+    query_cognitive_graph, read_file_handler, read_host_file_handler, recent_actions_handler,
+    rename_host_path_handler, restore_archive, restore_snapshot, revoke_artifact_handler,
+    save_draft_handler, save_layout_handler, send_mail, send_process_signal, session_handler,
+    shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler,
+    terminal_handler, trigger_backup, update_backup_schedule, update_note, update_security_policy,
+    upload_file_handler, write_file_handler, write_host_file_handler,
 };
 use state::GatewayState;
 
@@ -216,6 +216,19 @@ pub(crate) fn router_in_sandbox(
         )
     };
 
+    // The arrangement store shares the drafts' private database: same isolation rule, same
+    // lifetime, same seat scoping, and one file to keep outside the sandbox rather than two.
+    #[cfg(test)]
+    let workspace = Arc::new(crate::routes::WorkspaceStore::new());
+    #[cfg(not(test))]
+    let workspace = {
+        let db_path = crate::routes::draft_database_path(sandbox_path);
+        Arc::new(
+            crate::routes::WorkspaceStore::open(&db_path)
+                .expect("initialize private workspace database"),
+        )
+    };
+
     let state = GatewayState {
         presence,
         privileged,
@@ -234,6 +247,7 @@ pub(crate) fn router_in_sandbox(
         files: jail,
         host_user_files: host_user_files_source(),
         drafts,
+        workspace,
         operations: Arc::new(crate::operations_hub::OperationsHub::new()),
         notifications: Arc::new(crate::notifications_hub::NotificationsHub::new()),
         system: Arc::new(crate::system_hub::SystemHub::new()),
@@ -300,6 +314,10 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/host-files/rename", post(rename_host_path_handler))
         .route("/api/v1/host-files/delete", post(delete_host_path_handler))
         .route("/api/v1/host-files/copy", post(copy_host_path_handler))
+        .route(
+            "/api/v1/desktop/layout",
+            get(get_layout_handler).put(save_layout_handler),
+        )
         .route("/api/v1/drafts", get(list_drafts_handler))
         .route("/api/v1/drafts/save", post(save_draft_handler))
         .route("/api/v1/drafts/delete", post(delete_draft_handler))
@@ -901,6 +919,110 @@ mod tests {
             .expect("a response");
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(cursor_for(&app, Some(&cookie)).await, "public");
+    }
+
+    #[tokio::test]
+    async fn a_desktop_arrangement_follows_the_account_rather_than_the_browser() {
+        // The point of moving this off `localStorage`. Signing in somewhere else is modelled here
+        // as a second session, which is what the gateway can actually tell apart: the first browser
+        // is gone, the cookie with it, and the arrangement is still the person's.
+        let app = guarded_router();
+        let first = sign_in(&app, "alice", "hunter2")
+            .await
+            .expect("first session");
+
+        // Nothing saved yet is `null` rather than an empty desktop, so a browser that already has
+        // an arrangement keeps it instead of being wiped by a first sign-in.
+        let empty = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/desktop/layout")
+                    .header("cookie", &first)
+                    .body(Body::empty())
+                    .expect("read request"),
+            )
+            .await
+            .expect("read response");
+        assert_eq!(empty.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(empty.into_body(), 64 * 1024)
+            .await
+            .expect("read body");
+        let projection: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        assert!(projection["layout"].is_null());
+
+        let saved = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/api/v1/desktop/layout")
+                    .header("cookie", &first)
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"layout":"{\"schemaVersion\":9,\"cards\":[]}"}"#,
+                    ))
+                    .expect("save request"),
+            )
+            .await
+            .expect("save response");
+        assert_eq!(saved.status(), StatusCode::OK);
+
+        let logged_out = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/logout")
+                    .header("cookie", &first)
+                    .body(Body::empty())
+                    .expect("logout request"),
+            )
+            .await
+            .expect("logout response");
+        assert_eq!(logged_out.status(), StatusCode::OK);
+
+        let second = sign_in(&app, "alice", "hunter2")
+            .await
+            .expect("second session");
+        let restored = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/desktop/layout")
+                    .header("cookie", &second)
+                    .body(Body::empty())
+                    .expect("read request"),
+            )
+            .await
+            .expect("read response");
+        assert_eq!(restored.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(restored.into_body(), 64 * 1024)
+            .await
+            .expect("read body");
+        let projection: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        assert_eq!(
+            projection["layout"].as_str(),
+            Some(r#"{"schemaVersion":9,"cards":[]}"#)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_arrangement_is_refused_to_a_reader_with_no_seat() {
+        // A public preview has no account to hang a desktop on. It is refused rather than given
+        // somebody else's, and rather than given a shared one that the next visitor would inherit.
+        let app = guarded_router();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/desktop/layout")
+                    .body(Body::empty())
+                    .expect("read request"),
+            )
+            .await
+            .expect("read response");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

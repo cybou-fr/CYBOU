@@ -34,6 +34,7 @@ pub mod layout;
 pub mod markdown;
 pub mod refresh;
 pub mod terminal;
+pub mod workspace_sync;
 
 #[cfg(target_arch = "wasm32")]
 pub mod components;
