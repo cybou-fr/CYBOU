@@ -36,7 +36,7 @@ impl Default for OperationsHub {
 }
 
 impl OperationsHub {
-    /// Create a new empty OperationsHub.
+    /// Create a new empty `OperationsHub`.
     #[must_use]
     pub fn new() -> Self {
         Self::default()

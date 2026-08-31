@@ -30,7 +30,7 @@ impl Default for NotificationsHub {
 }
 
 impl NotificationsHub {
-    /// Create a new NotificationsHub.
+    /// Create a new `NotificationsHub`.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -70,11 +70,11 @@ impl NotificationsHub {
                 item.dismissed = true;
                 item.read = true;
             }
-        } else if let Some(target_id) = id {
-            if let Some(item) = items.iter_mut().find(|n| n.id == target_id) {
-                item.dismissed = true;
-                item.read = true;
-            }
+        } else if let Some(target_id) = id
+            && let Some(item) = items.iter_mut().find(|n| n.id == target_id)
+        {
+            item.dismissed = true;
+            item.read = true;
         }
     }
 

@@ -113,8 +113,7 @@ pub async fn get_event_journal(
         let journal = &mind.journal;
         let total = journal
             .contribution_count
-            .map(|c| c as usize)
-            .unwrap_or(journal.recent.len());
+            .map_or(journal.recent.len(), |c| c as usize);
         if journal_proj.entries.is_empty() && !journal.recent.is_empty() {
             let mapped: Vec<EventJournalEntry> = journal
                 .recent

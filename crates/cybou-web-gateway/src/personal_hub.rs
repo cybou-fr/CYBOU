@@ -67,7 +67,7 @@ impl PersonalHub {
         #[cfg(target_os = "linux")]
         {
             let candidate = PathBuf::from("/var/lib/cybou/personal-store.json");
-            if candidate.parent().is_some_and(|p| p.exists()) {
+            if candidate.parent().is_some_and(std::path::Path::exists) {
                 return Some(candidate);
             }
         }
@@ -78,12 +78,11 @@ impl PersonalHub {
     #[must_use]
     pub fn with_optional_store(store_path: Option<PathBuf>) -> Self {
         let mut loaded = PersonalStore::default();
-        if let Some(ref path) = store_path {
-            if let Ok(bytes) = std::fs::read(path) {
-                if let Ok(parsed) = serde_json::from_slice::<PersonalStore>(&bytes) {
-                    loaded = parsed;
-                }
-            }
+        if let Some(ref path) = store_path
+            && let Ok(bytes) = std::fs::read(path)
+            && let Ok(parsed) = serde_json::from_slice::<PersonalStore>(&bytes)
+        {
+            loaded = parsed;
         }
 
         Self {
@@ -105,23 +104,27 @@ impl PersonalHub {
             accounts: self
                 .accounts
                 .read()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
             messages: self
                 .messages
                 .read()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
             calendar_events: self
                 .calendar_events
                 .read()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
-            notes: self.notes.read().unwrap_or_else(|e| e.into_inner()).clone(),
+            notes: self
+                .notes
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
             contacts: self
                 .contacts
                 .read()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
         };
 
@@ -143,9 +146,12 @@ impl PersonalHub {
         let accounts = self
             .accounts
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        let all_messages = self.messages.read().unwrap_or_else(|e| e.into_inner());
+        let all_messages = self
+            .messages
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let active_account_id = selected_account_id.unwrap_or_default();
         let active_folder = selected_folder.unwrap_or(MailFolderKind::Inbox);
@@ -180,7 +186,7 @@ impl PersonalHub {
         let events = self
             .calendar_events
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
 
         CalendarProjection {
@@ -211,7 +217,7 @@ impl PersonalHub {
             let mut events = self
                 .calendar_events
                 .write()
-                .unwrap_or_else(|e| e.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             events.push(event.clone());
         }
         self.persist();
@@ -221,7 +227,11 @@ impl PersonalHub {
     /// Retrieve notes.
     #[must_use]
     pub fn get_notes(&self) -> NotesProjection {
-        let notes = self.notes.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let notes = self
+            .notes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
 
         NotesProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -246,7 +256,10 @@ impl PersonalHub {
         };
 
         {
-            let mut notes = self.notes.write().unwrap_or_else(|e| e.into_inner());
+            let mut notes = self
+                .notes
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             notes.push(note.clone());
         }
         self.persist();
@@ -255,7 +268,10 @@ impl PersonalHub {
 
     /// Update an existing note.
     pub fn update_note(&self, req: UpdateNoteRequest) -> Result<NoteRecord, GatewayError> {
-        let mut notes = self.notes.write().unwrap_or_else(|e| e.into_inner());
+        let mut notes = self
+            .notes
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let note = notes
             .iter_mut()
             .find(|n| n.id == req.id)
@@ -281,7 +297,7 @@ impl PersonalHub {
         let contacts = self
             .contacts
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
 
         ContactsProjection {
@@ -305,7 +321,10 @@ impl PersonalHub {
         };
 
         {
-            let mut contacts = self.contacts.write().unwrap_or_else(|e| e.into_inner());
+            let mut contacts = self
+                .contacts
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             contacts.push(contact.clone());
         }
         self.persist();

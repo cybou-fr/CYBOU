@@ -155,14 +155,13 @@ impl SystemHub {
             .disk_partitions
             .into_iter()
             .find(|d| d.mount_point == "/");
-        let (total_space_bytes, free_space_bytes) = root_disk
-            .map(|d| (d.total_bytes, d.available_bytes))
-            .unwrap_or((0, 0));
+        let (total_space_bytes, free_space_bytes) =
+            root_disk.map_or((0, 0), |d| (d.total_bytes, d.available_bytes));
 
         let snapshots = self
             .snapshots
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
 
         StorageProjection {
@@ -195,7 +194,7 @@ impl SystemHub {
         let connections = self
             .connections
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
 
         NetworkProjection {
@@ -219,7 +218,7 @@ impl SystemHub {
         let packages = self
             .packages
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         let installed_count = packages.len();
         PackagesProjection {
@@ -266,11 +265,15 @@ impl SystemHub {
     /// Get users and SSH keys.
     #[must_use]
     pub fn get_users_settings(&self) -> UsersSettingsProjection {
-        let users = self.users.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let users = self
+            .users
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         let ssh_keys = self
             .ssh_keys
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         UsersSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -309,12 +312,12 @@ impl SystemHub {
         let policy = self
             .security_policy
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         let audit_log = self
             .security_audit
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         SecuritySettingsProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -337,17 +340,17 @@ impl SystemHub {
         let repository = self
             .backup_repo
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         let archives = self
             .backup_archives
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         let schedule = self
             .backup_schedule
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         BackupSettingsProjection {
             schema_version: WEB_SCHEMA_V1,

@@ -48,7 +48,7 @@ impl Default for LearningHub {
 }
 
 impl LearningHub {
-    /// Create a new LearningHub initialized with default store path if available.
+    /// Create a new `LearningHub` initialized with default store path if available.
     #[must_use]
     pub fn new() -> Self {
         let store_path = Self::default_store_path();
@@ -64,23 +64,22 @@ impl LearningHub {
         #[cfg(target_os = "linux")]
         {
             let candidate = PathBuf::from("/var/lib/cybou/learning-store.json");
-            if candidate.parent().is_some_and(|p| p.exists()) {
+            if candidate.parent().is_some_and(std::path::Path::exists) {
                 return Some(candidate);
             }
         }
         None
     }
 
-    /// Construct LearningHub with an optional backing store path.
+    /// Construct `LearningHub` with an optional backing store path.
     #[must_use]
     pub fn with_optional_store(store_path: Option<PathBuf>) -> Self {
         let mut loaded = LearningStore::default();
-        if let Some(ref path) = store_path {
-            if let Ok(bytes) = std::fs::read(path) {
-                if let Ok(parsed) = serde_json::from_slice::<LearningStore>(&bytes) {
-                    loaded = parsed;
-                }
-            }
+        if let Some(ref path) = store_path
+            && let Ok(bytes) = std::fs::read(path)
+            && let Ok(parsed) = serde_json::from_slice::<LearningStore>(&bytes)
+        {
+            loaded = parsed;
         }
 
         Self {
@@ -101,22 +100,22 @@ impl LearningHub {
             candidates: self
                 .candidates
                 .lock()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
             demonstrations: self
                 .demonstrations
                 .lock()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
             artifacts: self
                 .artifacts
                 .lock()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
             scopes: self
                 .scopes
                 .lock()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone(),
         };
 
@@ -133,10 +132,13 @@ impl LearningHub {
         &self,
         layer_filter: Option<LearningLayer>,
     ) -> LearningCandidatesProjection {
-        let candidates = self.candidates.lock().unwrap_or_else(|e| e.into_inner());
+        let candidates = self
+            .candidates
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let filtered: Vec<LearningCandidate> = candidates
             .iter()
-            .filter(|c| layer_filter.map_or(true, |l| c.layer == l))
+            .filter(|c| layer_filter.is_none_or(|l| c.layer == l))
             .cloned()
             .collect();
         let total_count = filtered.len();
@@ -163,7 +165,10 @@ impl LearningHub {
         };
 
         {
-            let mut candidates = self.candidates.lock().unwrap_or_else(|e| e.into_inner());
+            let mut candidates = self
+                .candidates
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             candidates.push(candidate.clone());
         }
         self.persist();
@@ -176,7 +181,10 @@ impl LearningHub {
         candidate_id: Uuid,
         supplied_outcomes: Option<Vec<DemonstratedOutcome>>,
     ) -> Result<CandidateEvaluationProjection, String> {
-        let candidates = self.candidates.lock().unwrap_or_else(|e| e.into_inner());
+        let candidates = self
+            .candidates
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let candidate = candidates
             .iter()
             .find(|c| c.candidate_id == candidate_id)
@@ -190,7 +198,7 @@ impl LearningHub {
             let demos = self
                 .demonstrations
                 .lock()
-                .unwrap_or_else(|e| e.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             demos
                 .iter()
                 .find(|(id, _)| *id == candidate_id)
@@ -222,7 +230,10 @@ impl LearningHub {
                 };
 
                 {
-                    let mut artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut artifacts = self
+                        .artifacts
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
                     artifacts.push(artifact.clone());
                 }
 
@@ -249,7 +260,10 @@ impl LearningHub {
 
     /// Retrieve list of promoted durable artifacts.
     pub fn get_artifacts(&self) -> LearnedArtifactsProjection {
-        let artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
+        let artifacts = self
+            .artifacts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let total_count = artifacts.len();
 
         LearnedArtifactsProjection {
@@ -261,7 +275,10 @@ impl LearningHub {
 
     /// Revoke or deprecate a promoted artifact.
     pub fn revoke_artifact(&self, req: RevokeArtifactRequest) -> bool {
-        let mut artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
+        let mut artifacts = self
+            .artifacts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let revoked = if let Some(art) = artifacts
             .iter_mut()
             .find(|a| a.artifact_id == req.artifact_id)
@@ -280,7 +297,10 @@ impl LearningHub {
 
     /// Retrieve active task-scoped capability grants and governance scopes.
     pub fn get_scopes(&self) -> GovernanceScopesProjection {
-        let scopes = self.scopes.lock().unwrap_or_else(|e| e.into_inner());
+        let scopes = self
+            .scopes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         GovernanceScopesProjection {
             schema_version: WEB_SCHEMA_V1,
             scopes: scopes.clone(),

@@ -98,12 +98,12 @@ pub fn read_real_processes() -> ProcessesListProjection {
             for entry in entries.flatten() {
                 let file_name = entry.file_name();
                 let name_str = file_name.to_string_lossy();
-                if let Ok(pid) = name_str.parse::<u32>() {
-                    if let Some(proc) = read_single_process(pid, &users_map) {
-                        processes.push(proc);
-                        if processes.len() >= 500 {
-                            break;
-                        }
+                if let Ok(pid) = name_str.parse::<u32>()
+                    && let Some(proc) = read_single_process(pid, &users_map)
+                {
+                    processes.push(proc);
+                    if processes.len() >= 500 {
+                        break;
                     }
                 }
             }
@@ -549,12 +549,11 @@ fn read_os_pretty_name() -> String {
 
 #[cfg(target_os = "linux")]
 fn read_uptime_seconds() -> u64 {
-    if let Ok(content) = fs::read_to_string("/proc/uptime") {
-        if let Some(first) = content.split_whitespace().next() {
-            if let Ok(secs) = first.parse::<f64>() {
-                return secs as u64;
-            }
-        }
+    if let Ok(content) = fs::read_to_string("/proc/uptime")
+        && let Some(first) = content.split_whitespace().next()
+        && let Ok(secs) = first.parse::<f64>()
+    {
+        return secs as u64;
     }
     0
 }
@@ -744,9 +743,10 @@ fn read_single_process(pid: u32, users_map: &HashMap<u32, String>) -> Option<Pro
     let rss_pages = stat_parts[23].parse::<u64>().unwrap_or(0);
     let memory_bytes = rss_pages * 4096;
 
-    let cmdline = fs::read_to_string(format!("{proc_path}/cmdline"))
-        .map(|s| s.replace('\0', " ").trim().to_owned())
-        .unwrap_or_else(|_| raw_name.clone());
+    let cmdline = fs::read_to_string(format!("{proc_path}/cmdline")).map_or_else(
+        |_| raw_name.clone(),
+        |s| s.replace('\0', " ").trim().to_owned(),
+    );
 
     let display_cmd = if cmdline.is_empty() {
         raw_name.clone()
@@ -758,13 +758,13 @@ fn read_single_process(pid: u32, users_map: &HashMap<u32, String>) -> Option<Pro
     if let Ok(status) = fs::read_to_string(format!("{proc_path}/status")) {
         for line in status.lines() {
             if let Some(rest) = line.strip_prefix("Uid:") {
-                if let Some(uid_str) = rest.split_whitespace().next() {
-                    if let Ok(uid) = uid_str.parse::<u32>() {
-                        user = users_map
-                            .get(&uid)
-                            .cloned()
-                            .unwrap_or_else(|| uid.to_string());
-                    }
+                if let Some(uid_str) = rest.split_whitespace().next()
+                    && let Ok(uid) = uid_str.parse::<u32>()
+                {
+                    user = users_map
+                        .get(&uid)
+                        .cloned()
+                        .unwrap_or_else(|| uid.to_string());
                 }
                 break;
             }
@@ -792,23 +792,23 @@ fn query_unit_status(name: &str) -> (ServiceState, String, Option<u32>, Option<u
 
     if let Ok(entries) = fs::read_dir("/proc") {
         for entry in entries.flatten() {
-            if let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() {
-                if let Ok(comm) = fs::read_to_string(format!("/proc/{pid}/comm")) {
-                    let comm_clean = comm.trim();
-                    if comm_clean == binary_name
-                        || (!base_name.is_empty() && comm_clean.contains(&base_name))
-                    {
-                        let memory_bytes = fs::read_to_string(format!("/proc/{pid}/statm"))
-                            .ok()
-                            .and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok())
-                            .map(|rss| rss * 4096);
-                        return (
-                            ServiceState::Active,
-                            "running".to_owned(),
-                            Some(pid),
-                            memory_bytes,
-                        );
-                    }
+            if let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>()
+                && let Ok(comm) = fs::read_to_string(format!("/proc/{pid}/comm"))
+            {
+                let comm_clean = comm.trim();
+                if comm_clean == binary_name
+                    || (!base_name.is_empty() && comm_clean.contains(&base_name))
+                {
+                    let memory_bytes = fs::read_to_string(format!("/proc/{pid}/statm"))
+                        .ok()
+                        .and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok())
+                        .map(|rss| rss * 4096);
+                    return (
+                        ServiceState::Active,
+                        "running".to_owned(),
+                        Some(pid),
+                        memory_bytes,
+                    );
                 }
             }
         }

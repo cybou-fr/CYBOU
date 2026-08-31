@@ -27,7 +27,7 @@ impl Default for MeaningHub {
 }
 
 impl MeaningHub {
-    /// Create a new MeaningHub with 20 turns and 2 hours retention span.
+    /// Create a new `MeaningHub` with 20 turns and 2 hours retention span.
     #[must_use]
     pub fn new() -> Self {
         Self {

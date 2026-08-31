@@ -356,7 +356,7 @@ impl Agent1Service {
         let telemetry = cybou_protocol::agent::CapsuleTelemetryRecord {
             capsule_id: cap_id,
             standing: view.standing,
-            pids_count: if view.is_live() { 1 } else { 0 },
+            pids_count: u32::from(view.is_live()),
             memory_used_mib: 0,
             memory_max_mib: 512,
             cpu_usage_pct: 0.0,

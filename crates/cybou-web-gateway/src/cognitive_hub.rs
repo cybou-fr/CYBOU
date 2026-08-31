@@ -45,8 +45,16 @@ impl CognitiveHub {
     /// Retrieve the full or focused Cognitive Graph from custom in-memory entries.
     #[must_use]
     pub fn get_graph(&self, focus_node_id: Option<String>) -> CognitiveGraphProjection {
-        let nodes = self.nodes.read().unwrap_or_else(|e| e.into_inner()).clone();
-        let edges = self.edges.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let nodes = self
+            .nodes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let edges = self
+            .edges
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         CognitiveGraphProjection {
             schema_version: WEB_SCHEMA_V1,
             graph: CognitiveGraphRecord { nodes, edges },
@@ -261,8 +269,14 @@ impl CognitiveHub {
         }
 
         // Merge any custom in-memory nodes/edges
-        let custom_nodes = self.nodes.read().unwrap_or_else(|e| e.into_inner());
-        let custom_edges = self.edges.read().unwrap_or_else(|e| e.into_inner());
+        let custom_nodes = self
+            .nodes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let custom_edges = self
+            .edges
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         for cn in custom_nodes.iter() {
             if !node_ids.contains(&cn.id) {
                 nodes.push(cn.clone());
@@ -315,8 +329,14 @@ impl CognitiveHub {
     #[must_use]
     pub fn query_graph(&self, req: CognitiveQueryRequest) -> CognitiveGraphProjection {
         let q = req.query.trim().to_lowercase();
-        let all_nodes = self.nodes.read().unwrap_or_else(|e| e.into_inner());
-        let all_edges = self.edges.read().unwrap_or_else(|e| e.into_inner());
+        let all_nodes = self
+            .nodes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let all_edges = self
+            .edges
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let matching_nodes: Vec<CognitiveNodeRecord> = all_nodes
             .iter()
@@ -356,7 +376,10 @@ impl CognitiveHub {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> EventJournalProjection {
-        let all = self.journal.read().unwrap_or_else(|e| e.into_inner());
+        let all = self
+            .journal
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let off = offset.unwrap_or(0);
         let lim = limit.unwrap_or(50);
         let total_count = all.len();
@@ -372,7 +395,10 @@ impl CognitiveHub {
 
     /// Record a real canonical Event1 journal entry from observed events.
     pub fn record_event(&self, entry: EventJournalEntry) {
-        let mut jnl = self.journal.write().unwrap_or_else(|e| e.into_inner());
+        let mut jnl = self
+            .journal
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         jnl.push(entry);
     }
 }
