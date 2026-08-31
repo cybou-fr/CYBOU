@@ -468,6 +468,25 @@ pub fn App() -> impl IntoView {
                     </button>
                     <button
                         class="canvas-btn"
+                        title="Tidy what is in view"
+                        aria-label="Tidy what is in view"
+                        on:click=move |_| {
+                            // Only what is on screen. Every other arrangement rewrites the whole
+                            // canvas, which is a strange thing to do to somebody who is looking at
+                            // one corner of it.
+                            let view = living_canvas::interaction::visible_canvas_rect(
+                                pan.get_untracked(),
+                                zoom.get_untracked(),
+                            );
+                            history.update(|h| h.push(layout.get_untracked()));
+                            layout.update(|l| l.tidy_within(view));
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <lucide_leptos::LayoutGrid size=12 />
+                    </button>
+                    <button
+                        class="canvas-btn"
                         title="Remember this place"
                         aria-label="Remember this place"
                         on:click=move |_| {

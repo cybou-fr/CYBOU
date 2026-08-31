@@ -96,6 +96,64 @@ impl DesktopLayout {
 
     /// Arrange top-level items in an adaptive multi-track Grid layout.
     #[allow(clippy::cast_precision_loss)]
+    /// Lay out only the cards standing in `view`, inside `view`, and touch nothing else.
+    ///
+    /// Every other arrangement here rewrites the whole canvas. That is the wrong shape for a
+    /// spatial desktop: somebody looking at five overlapping cards wants those five straightened,
+    /// not their desktop rebuilt around a rule they did not choose while they were looking
+    /// somewhere else.
+    ///
+    /// A pinned card is an obstacle rather than a subject, which is what pinning already means
+    /// everywhere else.
+    ///
+    /// Rows wrap at the view's right edge and continue below it for as long as there are cards.
+    /// The first version stopped at the bottom and left the remainder where they were, which
+    /// produced a tidy view with a card sitting on top of it — the exact state the button exists
+    /// to remove. Below the fold, in order, is the direction a person expects more to be in.
+    pub fn tidy_within(&mut self, view: Rect) {
+        let subjects: Vec<DesktopItem> = self
+            .desktop_items()
+            .into_iter()
+            .filter(|item| !item.is_pinned() && item.effective_rect().intersects(&view))
+            .collect();
+        if subjects.len() < 2 {
+            return;
+        }
+
+        let mut placed: Vec<Rect> = self
+            .desktop_items()
+            .iter()
+            .filter(|item| item.is_pinned() || !item.effective_rect().intersects(&view))
+            .map(DesktopItem::effective_rect)
+            .collect();
+
+        let gap = 20.0;
+        let left = view.x + gap;
+        let top = view.y + gap;
+        let right = view.x + view.width - gap;
+
+        let mut x = left;
+        let mut y = top;
+        let mut row_height: f64 = 0.0;
+
+        for item in subjects {
+            let width = item.geometry.width;
+            let height = item.effective_height();
+            // Wrap unless this is the first card of a row: a card wider than the whole view has
+            // nowhere narrower to be, and giving it a row of its own overhangs to the right
+            // without landing on anything.
+            if x > left && x + width > right {
+                x = left;
+                y += row_height + gap;
+                row_height = 0.0;
+            }
+            self.update_item_position(&item.id, x, y);
+            placed.push(Rect::new(x, y, width, height));
+            x += width + gap;
+            row_height = row_height.max(height);
+        }
+    }
+
     fn arrange_grid(&mut self, viewport: UsableViewport) {
         let items = self.desktop_items();
         let mut pinned_rects: Vec<Rect> = items
@@ -512,6 +570,96 @@ mod tests {
                 .iter()
                 .any(|card| card.id == CardId::Identity && card.geometry.y > 0.0),
             "the arrangement still ran"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tidy_tests {
+    use super::*;
+    use crate::CardId;
+    use crate::layout::engine::DesktopLayout;
+
+    fn overlapping() -> (DesktopLayout, Rect) {
+        let mut layout = DesktopLayout::new();
+        let view = Rect::new(0.0, 0.0, 1400.0, 800.0);
+        // Three cards on the same spot, which is what a desktop looks like after opening things
+        // from a Dock that used to place them all at one coordinate.
+        for card in [
+            CardId::Services(0),
+            CardId::Processes(0),
+            CardId::Monitor(0),
+        ] {
+            layout.open_card(card, 200.0, 200.0);
+        }
+        (layout, view)
+    }
+
+    #[test]
+    fn tidying_separates_what_was_on_top_of_itself() {
+        let (mut layout, view) = overlapping();
+        layout.tidy_within(view);
+
+        let rects: Vec<Rect> = layout
+            .cards
+            .iter()
+            .map(|card| {
+                Rect::new(
+                    card.geometry.x,
+                    card.geometry.y,
+                    card.geometry.width,
+                    card.geometry.height,
+                )
+            })
+            .collect();
+        for (index, one) in rects.iter().enumerate() {
+            for other in rects.iter().skip(index + 1) {
+                assert!(
+                    !one.intersects(other),
+                    "two cards still overlap after tidying"
+                );
+            }
+            assert!(
+                one.x >= view.x && one.y >= view.y,
+                "a card was tidied above or left of the view"
+            );
+        }
+    }
+
+    #[test]
+    fn what_is_not_in_view_is_not_touched() {
+        // The whole difference between this and every other arrangement. A person straightening
+        // one corner has not asked for their desktop to be rebuilt behind them.
+        let (mut layout, view) = overlapping();
+        layout.open_card(CardId::Storage(0), 5_000.0, 5_000.0);
+        let before = layout.geometry(CardId::Storage(0));
+
+        layout.tidy_within(view);
+
+        let after = layout.geometry(CardId::Storage(0));
+        assert!(
+            (before.x - after.x).abs() < f64::EPSILON && (before.y - after.y).abs() < f64::EPSILON,
+            "a card outside the view moved from {},{} to {},{}",
+            before.x,
+            before.y,
+            after.x,
+            after.y
+        );
+    }
+
+    #[test]
+    fn a_pinned_card_is_an_obstacle_and_not_a_subject() {
+        let (mut layout, view) = overlapping();
+        layout.set_position(CardId::Services(0), 300.0, 300.0);
+        layout.set_pinned(CardId::Services(0), true);
+        let before = layout.geometry(CardId::Services(0));
+
+        layout.tidy_within(view);
+
+        let after = layout.geometry(CardId::Services(0));
+        assert!(
+            (before.x - after.x).abs() < f64::EPSILON && (before.y - after.y).abs() < f64::EPSILON,
+            "a pinned card was moved by a tidy"
         );
     }
 }
