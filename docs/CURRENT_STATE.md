@@ -1161,6 +1161,19 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
 - **Core Desktop Pack**: Multi-tab Text Editor with active line/column cursor positioning, in-editor Search & Replace (<kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Ctrl</kbd>+<kbd>H</kbd>), and safe structured Markdown preview; standalone Universal Diff Viewer; sandboxed File Manager with interactive path breadcrumbs, instant in-directory name filtering, multi-criteria sorting (Name, Size, Type), exclusive file creation dialog, and rich preview metadata (SHA digest, human-readable sizes, authority badge); and bounded Safe Shell with zero-unsafe ANSI SGR color/formatting rendering, terminal session toolbar (Clear, Copy All), command execution status badges with per-entry output copy, and quick starter suggestion chips. Files opened from the Safe Shell jail can be conditionally saved with an owner-issued location, expected SHA-256 conflict check, bounded write, and post-write verification; host and system locations remain unwritable. A stale write is stopped, the current server version is re-read under the same authority reference, and a read-only Diff Viewer compares it with the preserved editor buffer. Save remains disabled until the person either explicitly adopts the verified server version (with destructive confirmation) or accepts its digest as the base for a subsequent conditional save; the viewer claims no commit action.
 - **Editor buffer safety**: Closing a dirty or conflicted tab requires explicit destructive confirmation and states that no file is changed. The same guard covers closing the entire Editor panel when any tab is dirty or conflicted. Closing the final clean tab replaces it with a new editor-local draft; every new draft has a distinct identity rather than aliasing every `untitled` buffer.
 - **Files → Editor admission**: Opening the same owner-issued `LocationRef` again focuses its existing tab and never replaces that tab's local contents. The first file replaces only a pristine empty draft; otherwise it opens in a new tab. The Editor panel is brought forward and selected.
+- **Zoom is a way of looking, not a setting**: the wheel zooms, at the pointer, and a trackpad
+still pans (two fingers send a horizontal or fractional delta; a mouse notch sends whole steps).
+Past 0.75 a card draws the one-line summary it already hands the frame for being collapsed, so the
+desktop at a distance reads "1/2 capabilities", "134 entries", "Telemetry did not answer". That is
+separate from a card somebody collapsed by hand: it is undone by moving the camera and never
+touches what they chose. The thresholds live in `layout::camera::Detail` because the frame and the
+stylesheet must not answer "how far away is this" differently.
+
+- **A card opens where there is room**: the Dock and the palette used to pass numbers named
+`def_w`/`def_h` straight into `open_card(id, x, y)` — sizes by name, positions by use, identical in
+both files — so every card landed on the same spot on top of whatever was there. Placement is now
+decided when the card opens, from what is on the canvas and what the window is showing.
+
 - **The desktop follows the account**: the card arrangement is stored per authenticated seat in the
 same private SQLite database as drafts (`GET`/`PUT /api/v1/desktop/layout`), and `localStorage` is
 now a cache in front of it rather than the only copy. The gateway keeps the layout as an opaque
