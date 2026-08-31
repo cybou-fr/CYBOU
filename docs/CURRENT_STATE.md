@@ -1084,7 +1084,21 @@ adapter taking an instruction. The dispatch is its own function with a test that
 four, because a dispatch sending two of them to the same adapter would be a Stop button that
 restarts — which looks, to the person who pressed it, exactly like it worked.
 
-The other thirteen `SystemHub` refusals are unchanged.
+**A person may signal a process of their own.** The Process Manager's four buttons reach four
+verbs — `process.terminate`, `process.kill`, `process.pause`, `process.resume` — priced apart
+because they are different acts: SIGTERM is a request and the process gets to save what it was
+holding; SIGKILL cannot be caught. None of them relieves a finding, so no host may reach for one on
+its own; they are things a person does, present. Terminate and kill are not marked reversible,
+because the word means the system can put things back and it cannot.
+
+Two independent checks guard the pid. The gateway establishes who is asking and refuses a process
+whose owner is not the signed-in account's uid; the executor re-reads `/proc` when it acts and
+refuses if the owner has changed, because a pid is a number the kernel reuses and the gap between
+deciding and acting is long enough for one to be handed to something else. pid 1 is refused in both
+places. The live request gate walks both paths — the wrong owner is granted by Action1 and refused
+by the executor, the right one ends a real process.
+
+The other twelve `SystemHub` refusals are unchanged.
 
 **A browser can now answer.** `POST /api/v1/actions/confirm` carries a person's answer to
 `Action1.Confirm` and is the first write the gateway makes against the action boundary. It remains
