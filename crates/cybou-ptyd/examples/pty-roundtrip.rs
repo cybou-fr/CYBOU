@@ -17,7 +17,10 @@ use cybou_protocol::terminal::{FromGateway, FromOwner};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::UnixStream;
 
-async fn send(stream: &mut UnixStream, frame: &FromGateway) -> Result<(), Box<dyn std::error::Error>> {
+async fn send(
+    stream: &mut UnixStream,
+    frame: &FromGateway,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut body = Vec::new();
     ciborium::into_writer(frame, &mut body)?;
     let length = u32::try_from(body.len())?;
@@ -38,8 +41,8 @@ async fn receive(stream: &mut UnixStream) -> Result<FromOwner, Box<dyn std::erro
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let socket = std::env::var("CYBOU_PTY_GATE_SOCKET")
-        .map_err(|_| "CYBOU_PTY_GATE_SOCKET is required")?;
+    let socket =
+        std::env::var("CYBOU_PTY_GATE_SOCKET").map_err(|_| "CYBOU_PTY_GATE_SOCKET is required")?;
     let mut stream = UnixStream::connect(&socket).await?;
 
     send(
@@ -58,11 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A command whose output could not have come from anywhere else. `id -u` answers with the uid
     // the shell is running as, which is the claim ADR-0047 makes and the one worth checking: a
     // terminal that ran as somebody else would be the failure that matters.
-    send(
-        &mut stream,
-        &FromGateway::Input(b"id -u; exit\n".to_vec()),
-    )
-    .await?;
+    send(&mut stream, &FromGateway::Input(b"id -u; exit\n".to_vec())).await?;
 
     let expected = unsafe_free_uid()?;
     let mut seen = Vec::new();
