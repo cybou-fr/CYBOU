@@ -66,7 +66,11 @@ mod tests {
         // a first visit opened fourteen panels of unfamiliar vocabulary at once. The five below
         // are a decision about what somebody arrives wanting to know, not a claim that the rest
         // stopped mattering — so the second half of this test is the half that protects them.
-        let layout = DesktopLayout::default();
+        // `load()`, not `default()`. The browser calls the loader, the loader normalizes, and
+        // normalizing used to re-add every System card the layout was missing — so this test read
+        // five while the desktop drew fourteen. A test that calls a different function from the one
+        // the product calls is a test of nothing in particular.
+        let layout = DesktopLayout::load();
         assert_eq!(layout.schema_version, 9);
 
         let expected = [
@@ -94,6 +98,25 @@ mod tests {
             );
             assert_eq!(CardId::from_key(sys_id.key()), Some(sys_id));
         }
+    }
+
+    #[test]
+    fn a_card_somebody_closed_stays_closed() {
+        // Normalizing used to treat a missing System card as damage and put it back, so closing
+        // one lasted until the next reload and then reappeared at 60,60 on top of whatever was
+        // there. Closing a window has to mean something.
+        let mut layout = DesktopLayout::load();
+        let closed = CardId::Journal;
+        // Through the same call the close button makes. Removing the card by hand would test a
+        // path nothing takes and would miss the part that does the remembering.
+        layout.close_card(closed);
+
+        layout.validate_and_normalize();
+
+        assert!(
+            !layout.contains_card(closed),
+            "the desktop put back a card that was closed"
+        );
     }
 
     #[test]

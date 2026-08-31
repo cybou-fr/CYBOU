@@ -19,7 +19,7 @@ impl DesktopLayout {
     pub fn load() -> Self {
         let storage = web_sys::window().and_then(|w| w.local_storage().ok().flatten());
         let Some(storage) = storage else {
-            let mut def = Self::default();
+            let mut def = Self::canonical(Some(crate::interaction::usable_viewport()));
             def.validate_and_normalize();
             return def;
         };
@@ -43,7 +43,11 @@ impl DesktopLayout {
             return migrated;
         }
 
-        let mut default_layout = Self::default();
+        // Arranged for the window somebody is actually looking at. `Self::default()` arranges for
+        // 1440x900 whatever the screen is, which put the fifth card of a first visit at x=1302 —
+        // off the right-hand edge of a 1280-wide window, on the one load where nobody has learned
+        // yet that the canvas pans.
+        let mut default_layout = Self::canonical(Some(crate::interaction::usable_viewport()));
         default_layout.validate_and_normalize();
         default_layout.save();
         default_layout

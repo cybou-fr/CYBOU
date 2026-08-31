@@ -129,6 +129,8 @@ impl DesktopLayout {
             self.bring_forward(id);
             return;
         }
+        // Opening it is the answer to having closed it.
+        self.closed.retain(|closed| *closed != id);
         let spec = id.spec();
         let max_z = self.cards.iter().map(|c| c.geometry.z).max().unwrap_or(0);
         self.cards.push(CardInstance {
@@ -141,6 +143,10 @@ impl DesktopLayout {
     /// Close and remove a card from the layout if closable.
     pub fn close_card(&mut self, id: CardId) {
         if id.spec().closable {
+            // Remembered, so that the next load knows this was a decision rather than a gap.
+            if CardId::ALL_SYSTEM_CARDS.contains(&id) && !self.closed.contains(&id) {
+                self.closed.push(id);
+            }
             self.cards.retain(|c| c.id != id);
             for deck in &mut self.decks {
                 deck.remove_card(id);

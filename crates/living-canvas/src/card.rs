@@ -392,7 +392,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (220.0, 188.0),
                 min_size: (180.0, 140.0),
@@ -404,7 +404,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (240.0, 236.0),
                 min_size: (200.0, 160.0),
@@ -416,7 +416,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (390.0, 294.0),
                 min_size: (280.0, 200.0),
@@ -428,7 +428,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (300.0, 285.0),
                 min_size: (240.0, 180.0),
@@ -440,7 +440,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (335.0, 252.0),
                 min_size: (260.0, 180.0),
@@ -452,7 +452,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (310.0, 184.0),
                 min_size: (240.0, 140.0),
@@ -464,7 +464,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (330.0, 210.0),
                 min_size: (260.0, 150.0),
@@ -476,7 +476,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (320.0, 170.0),
                 min_size: (240.0, 130.0),
@@ -488,7 +488,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (330.0, 260.0),
                 min_size: (260.0, 180.0),
@@ -500,7 +500,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (330.0, 170.0),
                 min_size: (260.0, 140.0),
@@ -512,7 +512,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (330.0, 200.0),
                 min_size: (260.0, 160.0),
@@ -527,7 +527,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (360.0, 260.0),
                 min_size: (280.0, 180.0),
@@ -539,7 +539,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 // Larger than the rest by default. A finding carries its readings and its offers,
                 // and a card that showed the headline with everything behind a scrollbar would be
@@ -557,7 +557,7 @@ impl CardId {
                 movable: true,
                 resizable: true,
                 collapsible: true,
-                closable: false,
+                closable: true,
                 deckable: true,
                 default_size: (420.0, 320.0),
                 min_size: (300.0, 200.0),
@@ -1038,6 +1038,12 @@ pub struct CardSpec {
     /// Can be collapsed into a compact header pill.
     pub collapsible: bool,
     /// Can be closed without destroying canonical state.
+    ///
+    /// Every System card is, and was not until a first visit stopped opening all fourteen. A panel
+    /// that can be opened from the Dock and never shut again is a panel that accumulates: somebody
+    /// looks at Beliefs once and it is on their desktop for good. Closing one is not destroying
+    /// anything — the organ behind it keeps composing, and the card comes back from the Dock in
+    /// the state it was in.
     pub closable: bool,
     /// Can be grouped into tabbed Decks.
     pub deckable: bool,
@@ -1111,7 +1117,11 @@ mod tests {
         // while it did.
         for card_id in CardId::ALL_SYSTEM_CARDS {
             let mut older = crate::DesktopLayout::canonical(None);
+            // Out of both lists, because that is what a layout saved before the card existed looks
+            // like: it is not open, and nobody closed it either. A card missing from `cards` alone
+            // is a card somebody shut, and putting that one back is the bug this sits beside.
             older.cards.retain(|card| card.id != card_id);
+            older.closed.retain(|closed| *closed != card_id);
             assert!(!older.cards.iter().any(|card| card.id == card_id));
 
             older.validate_and_normalize();
@@ -1133,7 +1143,9 @@ mod tests {
             assert!(spec.movable);
             assert!(spec.resizable);
             assert!(spec.collapsible);
-            assert!(!spec.closable);
+            // Closable, since a first visit stopped opening all fourteen: a card that opens from
+            // the Dock and cannot be shut again only ever accumulates.
+            assert!(spec.closable);
             assert!(spec.deckable);
 
             assert!(spec.default_size.0 >= spec.min_size.0);

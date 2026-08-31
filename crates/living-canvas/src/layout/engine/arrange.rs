@@ -356,42 +356,59 @@ impl DesktopLayout {
         // Where a column has to stop. The dock stands along the bottom of the window and is drawn
         // over the canvas, so the last stretch of the viewport is not somewhere a card can be seen.
         let floor = (viewport.height - DOCK_RESERVE).max(start_y + MIN_COLUMN_RUN);
-        // The first column of a spillover. Everything semantic has already been given an x, so a
-        // column that runs out of height continues to the right of all of them rather than on top
-        // of one of them.
-        let mut next_band_x = offsets
+
+        // One cursor per column, because a card that does not fit in its own column is offered the
+        // others before anywhere new is invented. The columns are semantic — who is being answered,
+        // what the host is doing, what it believes — so this is a demotion, taken only when the
+        // alternative is a card nobody can see.
+        let mut cursors: Vec<f64> = vec![start_y; offsets.len()];
+        let mut bands: Vec<f64> = offsets.clone();
+        let widest: Vec<f64> = cols
             .iter()
-            .zip(&cols)
-            .map(|(x, col)| {
-                x + col
-                    .iter()
+            .map(|col| {
+                col.iter()
                     .map(|item| item.geometry.width)
                     .fold(col_width, f64::max)
             })
-            .fold(start_x, f64::max)
-            + col_gap;
+            .collect();
 
         for (c_idx, col) in cols.into_iter().enumerate() {
-            let mut col_x = offsets[c_idx];
-            let mut cur_y = start_y;
-
             for item in col {
                 let eff_w = item.geometry.width;
                 let eff_h = item.effective_height();
 
-                // A card that would hang below the dock starts a new column instead. Only when
-                // something is already above it: a card taller than the whole viewport has nowhere
-                // better to go, and moving it sideways forever would be a loop.
-                if cur_y > start_y && cur_y + eff_h > floor {
-                    col_x = next_band_x;
-                    next_band_x += eff_w.max(col_width) + col_gap;
-                    cur_y = start_y;
+                // Its own column first, then every other, left to right.
+                let mut chosen = (cursors[c_idx] + eff_h <= floor).then_some(c_idx);
+                if chosen.is_none() {
+                    chosen = (0..bands.len()).find(|&idx| {
+                        cursors[idx] + eff_h <= floor && bands[idx] + eff_w <= viewport.width
+                    });
                 }
+                // A new column, but only one the window can show. Off the right-hand edge is not
+                // better than below the fold: both are invisible, and below is the direction a
+                // person expects to find more of a page.
+                if chosen.is_none() {
+                    let next_x = bands
+                        .iter()
+                        .zip(&widest)
+                        .map(|(x, w)| x + w)
+                        .fold(start_x, f64::max)
+                        + col_gap;
+                    if next_x + eff_w <= viewport.width {
+                        bands.push(next_x);
+                        cursors.push(start_y);
+                        chosen = Some(bands.len() - 1);
+                    }
+                }
+                // Nowhere fits: keep it in its own column and let it run past the fold. A card
+                // placed nowhere would be a card the layout has lost.
+                let idx = chosen.unwrap_or(c_idx);
 
+                let col_x = bands[idx];
+                let mut cur_y = cursors[idx];
                 loop {
                     let candidate = Rect::new(col_x, cur_y, eff_w, eff_h);
                     let mut collides = false;
-
                     for obst in &placed_rects {
                         if candidate.intersects(obst) {
                             cur_y = obst.bottom() + row_gap;
@@ -399,7 +416,6 @@ impl DesktopLayout {
                             break;
                         }
                     }
-
                     if !collides {
                         break;
                     }
@@ -407,7 +423,7 @@ impl DesktopLayout {
 
                 self.update_item_position(&item.id, col_x, cur_y);
                 placed_rects.push(Rect::new(col_x, cur_y, eff_w, eff_h));
-                cur_y += eff_h + row_gap;
+                cursors[idx] = cur_y + eff_h + row_gap;
             }
         }
     }
@@ -468,5 +484,47 @@ mod tests {
                 .any(|card| card.id == CardId::Identity && card.geometry.y > 0.0),
             "the arrangement still ran"
         );
+    }
+}
+
+#[cfg(test)]
+mod first_visit_tests {
+    use super::*;
+    use crate::layout::engine::DesktopLayout;
+
+    #[test]
+    fn a_first_visit_fits_the_window_it_is_opened_in() {
+        // Found by opening the desktop in a 1280-wide window and reading the coordinates back:
+        // Journal was at x=1746 and Insight at 1302, both past the right-hand edge, put there by
+        // the rule that was supposed to keep cards out from under the dock.
+        // Two different promises, because only one of them can always be kept. Nothing is ever
+        // placed past the right edge: horizontal overflow has nothing to suggest it, and a card put
+        // there is simply lost. Vertical overflow is different — it is the direction a person
+        // expects a page to continue, the minimap shows it, and on a window shorter than the cards
+        // themselves there is nowhere else for them to be.
+        for (width, height, fits_vertically) in [
+            (1280.0, 584.0, false),
+            (1440.0, 804.0, true),
+            (1920.0, 1000.0, true),
+        ] {
+            let viewport = UsableViewport { width, height };
+            let layout = DesktopLayout::canonical(Some(viewport));
+            for card in &layout.cards {
+                let right = card.geometry.x + card.geometry.width;
+                assert!(
+                    right <= width,
+                    "{:?} ends at {right} in a {width}-wide window",
+                    card.id
+                );
+                if fits_vertically {
+                    let bottom = card.geometry.y + card.geometry.height;
+                    assert!(
+                        bottom <= height - DOCK_RESERVE,
+                        "{:?} ends at {bottom}, under the dock in a {height}-tall window",
+                        card.id
+                    );
+                }
+            }
+        }
     }
 }

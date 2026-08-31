@@ -40,6 +40,14 @@ pub struct DesktopLayout {
     /// Optional named spatial anchors / camera landmarks.
     #[serde(default)]
     pub anchors: Vec<crate::layout::model::CanvasAnchor>,
+    /// System cards this desktop is deliberately not showing.
+    ///
+    /// Without this, a System card that is not in `cards` is ambiguous: it is either one somebody
+    /// closed, or one that did not exist when they last saved. The layout used to resolve that by
+    /// putting every missing one back, which made closing a card last exactly until the next
+    /// refresh. Recording the choice is what lets a genuinely new card still arrive.
+    #[serde(default)]
+    pub closed: Vec<CardId>,
 }
 
 impl Default for DesktopLayout {
@@ -58,6 +66,7 @@ impl DesktopLayout {
             decks: Vec::new(),
             clusters: Vec::new(),
             anchors: Vec::new(),
+            closed: Vec::new(),
         }
     }
 
@@ -98,6 +107,13 @@ impl DesktopLayout {
                 presentation: CardPresentation::default(),
             });
         }
+        // The nine that are not open are recorded as closed rather than merely absent. That is
+        // the first-visit decision stated: these exist, they are one click away, and they start
+        // shut. Absent would mean "we have not heard of them", and the next load would open them.
+        layout.closed = CardId::ALL_SYSTEM_CARDS
+            .into_iter()
+            .filter(|card| !canonical_cards.contains(card))
+            .collect();
         layout.apply_arrangement(ArrangementMode::Home, viewport);
         layout
     }
@@ -268,9 +284,13 @@ impl DesktopLayout {
     /// 4. Validates decks: dissolves invalid/empty/<2 card decks, removes duplicate cards, ensures `active_card` is in deck (Invariants L1–L4).
     /// 5. Ensures no card is in multiple decks simultaneously (Invariant L1).
     pub fn validate_and_normalize(&mut self) {
-        // 1. Ensure all system cards exist
+        // 1. A System card that is neither open nor deliberately closed is one that did not
+        // exist when this layout was saved. Those arrive; Disclosure did, and Insight after it.
+        // A card in `closed` is one somebody shut, and it stays shut — which it did not, for as
+        // long as this step could not tell the two apart.
         for sys_id in CardId::ALL_SYSTEM_CARDS {
-            if !self.cards.iter().any(|c| c.id == sys_id) {
+            let known = self.cards.iter().any(|c| c.id == sys_id) || self.closed.contains(&sys_id);
+            if !known {
                 let spec = sys_id.spec();
                 let max_z = self.cards.iter().map(|c| c.geometry.z).max().unwrap_or(0);
                 self.cards.push(CardInstance {
@@ -280,6 +300,10 @@ impl DesktopLayout {
                 });
             }
         }
+        // A card cannot be both open and closed, and a layout that says so is one to believe about
+        // what is on screen.
+        self.closed
+            .retain(|card| !self.cards.iter().any(|open| open.id == *card));
 
         // 2. Clamp and normalize all card geometries
         for card in &mut self.cards {
