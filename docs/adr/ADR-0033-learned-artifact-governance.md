@@ -91,17 +91,17 @@ The required shape is:
 
 ```text
 P0041 ACTIVE
-   │
-   └── experience / consolidation
-           ↓
-       P0042 CANDIDATE
-           ↓
-        evaluation
-        /       \
-    reject     promote
-                 ↓
-            P0042 ACTIVE
-            P0041 RETIRED
+  
+  - experience / consolidation
+  ↓
+  P0042 CANDIDATE
+  ↓
+  evaluation
+  /       \
+  reject     promote
+  ↓
+  P0042 ACTIVE
+  P0041 RETIRED
 ```
 
 This applies to neural and non-neural behavior-changing artifacts when they are not trivially
@@ -117,10 +117,10 @@ fine-tuned descendant; full-weight training is not prohibited.
 
 ```text
 Foundation F0
-      │
-      └── Personal P001
-              │
-              └── Personal P002
+  
+  - Personal P001
+  
+  - Personal P002
 ```
 
 F0 remains a clean rebuild point until retention policy explicitly and safely replaces that role

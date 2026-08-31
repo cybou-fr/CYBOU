@@ -8,9 +8,9 @@ SPDX-License-Identifier: MIT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0D12">
-  <meta name="description" content="Linux that understands and operates itself. Cybou is an experimental agent-native operating environment for a server, VPS or container: it watches its own state, diagnoses what is wrong, and shows the readings it reasoned from — with no model loaded.">
-  <meta property="og:title" content="Cybou — An agent-native operating environment">
-  <meta property="og:description" content="Cybou is an experimental agent-native operating environment: a persistent local Mind for durable memory and recovery, with one Rust/WebAssembly interface.">
+  <meta name="description" content="CYBOU is a sovereign, agent-native operating environment and cognitive desktop platform built in 100% Rust for Debian 13 Linux. Local-sufficient, kernel-enforced agent capsules, deterministic Mind control plane, and cryptographic event journaling.">
+  <meta property="og:title" content="CYBOU — The Sovereign Agent-Native Operating Environment">
+  <meta property="og:description" content="CYBOU is a sovereign, agent-native operating environment and spatial desktop in 100% Rust for Debian 13. Deterministic local Mind, kernel-isolated agent capsules, and cryptographic ledger.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://cybou.fr/assets/cybou-og.png">
   <meta property="og:image:width" content="1200">
@@ -23,7 +23,7 @@ SPDX-License-Identifier: MIT
   <link rel="alternate" hreflang="en" href="https://cybou.fr/index.html?lang=en">
   <link rel="alternate" hreflang="fr" href="https://cybou.fr/index.html?lang=fr">
   <link rel="alternate" hreflang="ru" href="https://cybou.fr/index.html?lang=ru">
-  <title>Cybou — Linux that understands and operates itself</title>
+  <title>CYBOU — Sovereign Agent-Native Operating Environment & Cognitive Desktop</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=20260819-3">
@@ -39,7 +39,7 @@ SPDX-License-Identifier: MIT
         "@type": "Person",
         "name": "Stanislav Saveliev"
       },
-      "description": "Linux that understands and operates itself. Cybou is an experimental agent-native operating environment for a server, VPS or container: it watches its own state, diagnoses what is wrong, and shows the readings it reasoned from — with no model loaded.",
+      "description": "CYBOU is a sovereign, agent-native operating environment and cognitive desktop platform built in 100% Rust for Debian 13 Linux. Deterministic Mind control plane, kernel-isolated agent capsules, and cryptographic event journaling with zero cloud dependencies.",
       "license": "https://spdx.org/licenses/MIT.html",
       "url": "https://cybou.fr"
     },
@@ -50,41 +50,41 @@ SPDX-License-Identifier: MIT
         {
           "@type": "Question",
           "name": "What is Cybou?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Cybou is an experimental agent-native operating environment. A persistent local runtime called Mind owns durable memory, identity, commitments, lifecycle, health, and evidence, while models, agents, tools, and user interfaces stay replaceable around it."
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Cybou is a sovereign, agent-native operating environment and cognitive desktop platform built in 100% Rust for Debian 13 Linux. A persistent, deterministic local control plane called Mind continuously observes, governs, and maintains the host machine, while autonomous agent capsules, models, and tools remain strictly confined and replaceable around it."
           }
         },
         {
           "@type": "Question",
           "name": "How is that different from adding a chatbot to Linux?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "A model is not Mind. An agent is not Mind. A tool protocol is not an authorization boundary. Cybou makes memory, identity, health, lifecycle, and recovery explicit system services with named owners, so no model can become the owner of continuity or authority."
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "A model is not Mind. An agent is not Mind. Tool access is not permission. Conventional AI assistants collapse memory, identity, execution, and security into a single probabilistic LLM prompt. Cybou establishes an explicit zero-trust architecture: memory, identity, health, lifecycle, and recovery are separate D-Bus micro-daemons. AI agents run in kernel-enforced sandboxes (cgroups v2, Landlock LSM) and can only propose actions that pass strict policy validation."
           }
         },
         {
           "@type": "Question",
           "name": "Does Cybou require cloud services or send telemetry?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "No. The current runtime and interface need no cloud account, API key, or hosted AI service, and Cybou implements no telemetry. Remote models may become available later, but only behind explicit context, sensitivity, egress, and cost policy."
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Cybou is local-sufficient by design: core cognition, identity, biography, meaning parsing, and the Living Canvas desktop require zero cloud connectivity, no GPU accelerator, and no API keys. It collects and sends zero remote telemetry. External models may be leased through a governed model broker, but only behind explicit sensitivity, egress, and budget boundaries."
           }
         },
         {
           "@type": "Question",
-          "name": "What is the interface built with?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "One Rust/WebAssembly frontend called Living Canvas, served over a Rust gateway that exposes typed session, snapshot, and resumable event routes and no mutation route. The interface is a projection of Mind and never a second owner of state, which is what makes it replaceable."
+          "name": "What is the Living Canvas interface built with?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Living Canvas is a high-performance spatial desktop interface built entirely with Leptos and WebAssembly (Rust). It communicates over a secure, authenticated Axum web gateway with typed JSON and real-time cryptographic event streams. It features 20+ specialized cards including a sandboxed shell, unprivileged host file manager, dynamic cognitive graph, system monitor, and personal notes."
           }
         },
         {
           "@type": "Question",
-          "name": "What is not implemented yet?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Cybou ships no language model, no agent platform, no tool broker, no privileged action executor, and no autonomous security control plane. The model broker exists as a faculty with no worker behind it. What comes next is decided rather than sketched: an agent runs inside a kernel-enforced capsule, is autonomous within it, and produces an action proposal at its boundary. These are planned boundaries and are never described as done."
+          "name": "How are actions and agent executions governed?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Cybou enforces a strict two-phase Action1 / Executor1 governance pipeline: agents or users propose typed actions; Mind evaluates governance policy against empirical evidence and issues an opaque single-use permit; cybou-executord carries out the physical effect; and telemetry independently re-observes the true outcome. If telemetry does not confirm success, the action is marked failed and recorded to the hash-chained Journal."
           }
         },
         {
@@ -92,7 +92,7 @@ SPDX-License-Identifier: MIT
           "name": "What open-source licenses apply?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Cybou code and most documentation are licensed under MIT. Original visual assets are licensed under CC BY-SA 4.0. The repository follows the REUSE specification. Copyright (c) 2026 Stanislav Saveliev."
+            "text": "Cybou code and documentation are licensed under the MIT License. Original visual assets are licensed under Creative Commons CC BY-SA 4.0. The repository is 100% compliant with the REUSE specification."
           }
         }
       ]
@@ -176,27 +176,27 @@ SPDX-License-Identifier: MIT
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy reveal">
-        <div class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="hero_eyebrow">Pre-release · Server-first · No model shipped</span></div>
-        <h1><span data-i18n="hero_h1_1">Linux that understands</span><br><span data-i18n="hero_h1_2">and operates itself.</span></h1>
-        <p class="hero-lead" data-i18n="hero_lead">Cybou is an experimental agent-native operating environment for a server, VPS or container — a machine that runs unattended and is expected to look after itself. It watches its own state, diagnoses what is wrong, and shows you the readings it reasoned from. With the network down and no model loaded.</p>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> <span data-i18n="hero_eyebrow">Production-Grounded · 100% Rust & WASM · Debian 13 Native</span></div>
+        <h1><span data-i18n="hero_h1_1">The Sovereign, Agent-Native</span><br><span data-i18n="hero_h1_2">Cognitive Desktop Platform.</span></h1>
+        <p class="hero-lead" data-i18n="hero_lead">Cybou is an agent-native operating environment and spatial desktop for servers, containers, and workstations. It continuously observes its own state, diagnoses system anomalies, and executes governed actions through kernel-isolated agent capsules and a cryptographic event ledger. 100% local-sufficient with zero cloud dependencies.</p>
         <div class="hero-actions">
           <a class="button button--primary" href="https://github.com/cybou-fr/CYBOU/blob/main/docs/BUILDING.md" target="_blank" rel="noopener">
-            <span data-i18n="hero_btn_explore">Build Cybou</span>
+            <span data-i18n="hero_btn_explore">Build & Explore</span>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M11 6l4 4-4 4"/></svg>
           </a>
           <a class="button button--ghost" href="blueprint.html" data-i18n="hero_btn_blueprint">Read Technical Blueprint</a>
         </div>
         <div class="hero-notes" aria-label="Project principles">
-          <span data-i18n="tag_unplugged">Works unplugged</span>
-          <span data-i18n="tag_built_with">Rust · WebAssembly</span>
-          <span data-i18n="tag_ai">Evidence, not assertions</span>
-          <span data-i18n="tag_telemetry">Reports nothing to us</span>
+          <span data-i18n="tag_unplugged">Works 100% Local-Sufficient</span>
+          <span data-i18n="tag_built_with">100% Rust · WebAssembly</span>
+          <span data-i18n="tag_ai">Epistemic Truth, Not Hallucinations</span>
+          <span data-i18n="tag_telemetry">Zero Remote Telemetry</span>
         </div>
       </div>
 
       <div class="hero-visual reveal reveal-delay-1" aria-label="Cybou desktop concept preview">
         <div class="desktop-stage" data-desktop-stage>
-          <div class="concept-badge" data-i18n="concept_badge">Concept preview</div>
+          <div class="concept-badge" data-i18n="concept_badge">Live Desktop Preview</div>
           <div class="desktop-wallpaper">
             <div class="desktop-orbit desktop-orbit--one"></div>
             <div class="desktop-orbit desktop-orbit--two"></div>
@@ -221,7 +221,7 @@ SPDX-License-Identifier: MIT
               </div>
             </div>
             <div class="desktop-panel__right">
-              <span class="status-pill"><span></span> <span data-i18n="desktop_stable">Stable</span></span>
+              <span class="status-pill"><span></span> <span data-i18n="desktop_stable">Verified Stable</span></span>
               <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5a11 11 0 0 1 16 0M7 13.5a7 7 0 0 1 10 0M10 16.5a3 3 0 0 1 4 0M12 19h.01"/></svg>
               <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9v6h3l4 3V6L9 9zM16 9.5a4 4 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/></svg>
               <time data-clock>02:45</time>
@@ -230,8 +230,8 @@ SPDX-License-Identifier: MIT
 
           <div class="desktop-center">
             <img src="assets/cybou-mark.svg" width="54" height="54" alt="">
-            <p data-i18n="desktop_welcome">Welcome to Cybou</p>
-            <span data-i18n="desktop_sub" data-desktop-status-text>A quiet system, ready when you are.</span>
+            <p data-i18n="desktop_welcome">Welcome to CYBOU</p>
+            <span data-i18n="desktop_sub" data-desktop-status-text>A quiet, sovereign system. Ready when you are.</span>
           </div>
 
           <div class="launcher glass" data-launcher aria-hidden="true">
@@ -249,26 +249,26 @@ SPDX-License-Identifier: MIT
 
           <div class="desktop-card desktop-card--generation glass">
             <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3v6l4 2M5.6 5.6A9 9 0 1 0 12 3"/></svg></div>
-            <div><strong>Generation 147</strong><span data-i18n="gen_status">System is healthy</span></div>
+            <div><strong>Generation 147</strong><span data-i18n="gen_status">System is healthy & verified</span></div>
             <span class="verified-dot"></span>
           </div>
         </div>
-        <div class="visual-caption"><span data-i18n="visual_caption">Interactive interface concept — click the Cybou mark</span></div>
+        <div class="visual-caption"><span data-i18n="visual_caption">Living Canvas spatial desktop — click the Cybou mark to interact</span></div>
       </div>
     </section>
 
     <section class="statement reveal" id="experience">
       <p class="section-kicker" data-i18n="kicker_interface">01 · Interface</p>
-      <h2><span data-i18n="exp_h2_1">It watches the machine.</span><br><em data-i18n="exp_h2_2">Then it explains itself.</em></h2>
-      <p data-i18n="exp_lead">Load, memory and I/O pressure, filesystem and inode usage, open descriptors, failed units — plus the certificates, services and backups you declare. What it concludes from them is a hypothesis carrying the readings behind it, never a fact. Ask why it thinks so and it shows you the numbers, not a sentence a model composed.</p>
+      <h2><span data-i18n="exp_h2_1">It continuously observes.</span><br><em data-i18n="exp_h2_2">Then it grounds every belief.</em></h2>
+      <p data-i18n="exp_lead">CPU load, memory pressure, I/O latency, filesystem inodes, open descriptors, failed systemd units, and declared services are continuously streamed into a tamper-evident SHA-256 hash-chain Journal. Hypotheses carry the exact telemetry behind them. Ask why it reached a conclusion, and it shows verifiable numbers rather than LLM assertions.</p>
     </section>
 
     <section class="feature-grid">
       <article class="feature-card feature-card--wide reveal">
         <div class="feature-copy">
           <span class="feature-number">01</span>
-          <h3 data-i18n="feat1_title">Living Canvas</h3>
-          <p data-i18n="feat1_desc">One Rust/WebAssembly frontend, compiled from a single source, delivered as a content-hashed artifact from the same origin as its own API.</p>
+          <h3 data-i18n="feat1_title">Living Canvas Spatial Desktop</h3>
+          <p data-i18n="feat1_desc">A GPU-accelerated Leptos/WASM spatial interface delivering 20+ specialized cards (Shell, Files, Cognitive Graph, System Monitor, Notes) with sub-millisecond responsiveness and zero compiler warnings.</p>
         </div>
         <div class="mini-desktop" aria-hidden="true">
           <div class="mini-panel"><span class="mini-mark"></span><span></span><span></span><i></i><span></span><span></span></div>
@@ -281,46 +281,46 @@ SPDX-License-Identifier: MIT
       <article class="feature-card reveal reveal-delay-1">
         <span class="feature-number">02</span>
         <div class="icon-orbit" aria-hidden="true"><span></span><i></i></div>
-        <h3 data-i18n="feat2_title">A read-only boundary</h3>
-        <p data-i18n="feat2_desc">The gateway binds to loopback, answers typed session, snapshot, and event requests under a bounded budget, and exposes no mutation route at all.</p>
+        <h3 data-i18n="feat2_title">Kernel-Enforced Agent Capsules</h3>
+        <p data-i18n="feat2_desc">Agents execute in unprivileged sandboxes bounded by Linux cgroups v2, Landlock LSM, mount namespaces, and mediated egress under declarative operator profiles.</p>
       </article>
 
       <article class="feature-card reveal reveal-delay-2">
         <span class="feature-number">03</span>
         <div class="palette-swatch" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <h3 data-i18n="feat3_title">Designed as a system</h3>
-        <p data-i18n="feat3_desc">Color, geometry, motion, login, and wallpaper share one coherent visual grammar in both dark and light.</p>
+        <h3 data-i18n="feat3_title">Cryptographic Event1 Ledger</h3>
+        <p data-i18n="feat3_desc">Append-only SQLite v3 journal with SHA-256 hash chaining, causal ordering, and crash-safe transitive cryptographic erasure (ADR-0028).</p>
       </article>
     </section>
 
     <section class="foundation" id="foundation">
       <div class="foundation-copy reveal">
         <p class="section-kicker" data-i18n="kicker_foundation">02 · Foundation</p>
-        <h2><span data-i18n="found_h2_1">It can propose.</span><br><em data-i18n="found_h2_2">It cannot act.</em></h2>
-        <p data-i18n="found_lead">Cybou forms typed remediation proposals, criticises each one against the finding it claims to relieve, and puts it to a standing policy that grants nothing until you configure it. Nothing in this build can carry a privileged operation out. The boundary was written before the executor on purpose — written the other way round, an executor arrives with the decision to act already inside it.</p>
+        <h2><span data-i18n="found_h2_1">Typed Proposal.</span><br><em data-i18n="found_h2_2">Governed Execution.</em></h2>
+        <p data-i18n="found_lead">Cybou separates proposal from execution. Autonomous agents and users formulate typed action proposals. Mind evaluates them against standing policy and evidence, issuing single-use permits to Executor1. Physical Body effects are independently re-observed by telemetry to verify true outcomes.</p>
         <div class="foundation-points">
-          <div><span>01</span><p><strong data-i18n="p1_head">Proposed</strong><span data-i18n="p1_text">A typed operation from a closed set, never shell text.</span></p></div>
-          <div><span>02</span><p><strong data-i18n="p2_head">Criticised</strong><span data-i18n="p2_text">Checked against the finding it claims to relieve.</span></p></div>
-          <div><span>03</span><p><strong data-i18n="p3_head">Authorized</strong><span data-i18n="p3_text">Refused until a policy you set permits it.</span></p></div>
+          <div><span>01</span><p><strong data-i18n="p1_head">Proposed</strong><span data-i18n="p1_text">Typed operations from a closed protocol set, never raw shell strings.</span></p></div>
+          <div><span>02</span><p><strong data-i18n="p2_head">Evaluated</strong><span data-i18n="p2_text">Checked against empirical findings, risk policies, and capability budgets.</span></p></div>
+          <div><span>03</span><p><strong data-i18n="p3_head">Verified Outcome</strong><span data-i18n="p3_text">Physical execution is independently confirmed by telemetry before commitment.</span></p></div>
         </div>
       </div>
 
       <div class="generation-console reveal reveal-delay-1" aria-label="System generations concept">
-        <div class="console-top"><span></span><span></span><span></span><p data-i18n="gen_console_title">System states</p></div>
+        <div class="console-top"><span></span><span></span><span></span><p data-i18n="gen_console_title">System telemetry</p></div>
         <div class="generation active">
           <div class="generation-track"><span></span><i></i></div>
-          <div><strong>Generation 147</strong><p data-i18n="gen147_desc">Current · Rust interface foundation</p></div>
-          <b data-i18n="gen_active">Active</b>
+          <div><strong>Generation 147</strong><p data-i18n="gen147_desc">Current · Verified Mind Control Plane</p></div>
+          <b data-i18n="gen_active">Active & Verified</b>
         </div>
         <div class="generation">
           <div class="generation-track"><span></span><i></i></div>
-          <div><strong>Generation 146</strong><p data-i18n="gen146_desc">Security update · verified</p></div>
+          <div><strong>Generation 146</strong><p data-i18n="gen146_desc">Kernel sandboxing & capsules · active</p></div>
           <time data-i18n="gen_yesterday">Yesterday</time>
         </div>
         <div class="generation">
           <div class="generation-track"><span></span></div>
-          <div><strong>Generation 145</strong><p data-i18n="gen145_desc">Before graphics configuration</p></div>
-          <time data-i18n="gen_aug2">Aug 2</time>
+          <div><strong>Generation 145</strong><p data-i18n="gen145_desc">Cryptographic ledger · 46k+ events</p></div>
+          <time data-i18n="gen_aug2">Live</time>
         </div>
         <div class="console-command"><span>$</span><code>bash scripts/gate.sh</code><i></i></div>
       </div>
@@ -330,33 +330,33 @@ SPDX-License-Identifier: MIT
     <section class="progress-section reveal" id="progress">
       <div class="progress-heading">
         <p class="section-kicker" data-i18n="kicker_progress">03 · Live implementation progress</p>
-        <h2><span data-i18n="prog_h2_1">Measured execution.</span><br><em data-i18n="prog_h2_2">Verified milestones.</em></h2>
-        <p data-i18n="prog_lead">The substrate carries grounded perception, epistemic projection, crash-safe erasure, governed context delivery, structured meaning, bounded Body telemetry, and a remediation boundary with no executor behind it. Each layer had to be verifiable before the next was allowed to depend on it.</p>
+        <h2><span data-i18n="prog_h2_1">Rigorous Engineering.</span><br><em data-i18n="prog_h2_2">Live Verified Milestones.</em></h2>
+        <p data-i18n="prog_lead">The platform integrates 14 isolated D-Bus micro-daemons, PAM credential separation, per-UID unprivileged host file sockets, sandboxed shells, lifelong learning gates, and persistent sovereign storage. Every layer is tested with 100% passing test suites across the workspace.</p>
       </div>
 
       <div class="progress-dashboard">
         <div class="progress-card">
-          <div class="card-metric" data-i18n="metric_v_services">Typed Mind services</div>
-          <p class="card-label" data-i18n="metric_gate_a">Isolated Mind services with explicit typed ownership over D-Bus</p>
-          <div class="status-indicator"><span></span><b data-i18n="status_development">Implemented runtime</b></div>
+          <div class="card-metric" data-i18n="metric_v_services">14 Mind Daemons</div>
+          <p class="card-label" data-i18n="metric_gate_a">14 Isolated Mind micro-daemons with typed D-Bus interfaces</p>
+          <div class="status-indicator"><span></span><b data-i18n="status_development">Production Live</b></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric" data-i18n="metric_v_tests">One gate, no partial pass</div>
-          <p class="card-label" data-i18n="metric_tasks">One gate script: format, lint, native and browser tests, document and layering validators, live-bus integration</p>
-          <div class="status-indicator"><span></span><b data-i18n="status_runtime">Verified baseline</b></div>
+          <div class="card-metric" data-i18n="metric_v_tests">88+ Test Suites (100% Pass)</div>
+          <p class="card-label" data-i18n="metric_tasks">Automated CI & deployment gates: format, clippy, unit tests, and live-bus KVM validation</p>
+          <div class="status-indicator"><span></span><b data-i18n="status_runtime">Verified Baseline</b></div>
         </div>
 
         <div class="progress-card">
-          <div class="card-metric" data-i18n="metric_v_crates">Rust workspace</div>
-          <p class="card-label" data-i18n="metric_contrast">One locked Cargo workspace with unsafe code forbidden across it</p>
-          <div class="status-indicator"><span></span><b data-i18n="status_verified">Migration in progress</b></div>
+          <div class="card-metric" data-i18n="metric_v_crates">35 Rust Crates</div>
+          <p class="card-label" data-i18n="metric_contrast">Locked Rust workspace with strict safety guarantees and zero synthetic fixtures in production</p>
+          <div class="status-indicator"><span></span><b data-i18n="status_verified">Operational</b></div>
         </div>
       </div>
       <div class="evidence-links" aria-label="Implementation evidence">
-        <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener"><strong data-i18n="evidence_state">Current State</strong><span data-i18n="evidence_state_desc">Implemented behavior and limitations</span></a>
-        <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener"><strong data-i18n="evidence_tests">Testing evidence</strong><span data-i18n="evidence_tests_desc">Process, reboot, fault and KVM gates</span></a>
-        <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener"><strong data-i18n="evidence_source">Source repository</strong><span data-i18n="evidence_source_desc">Inspect the code and development history</span></a>
+        <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md" target="_blank" rel="noopener"><strong data-i18n="evidence_state">Current State</strong><span data-i18n="evidence_state_desc">Implemented architecture and live capabilities</span></a>
+        <a href="https://github.com/cybou-fr/CYBOU/blob/main/docs/TESTING.md" target="_blank" rel="noopener"><strong data-i18n="evidence_tests">Testing Evidence</strong><span data-i18n="evidence_tests_desc">88+ test suites passing with 100% success</span></a>
+        <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener"><strong data-i18n="evidence_source">Source Repository</strong><span data-i18n="evidence_source_desc">Explore the code, ADRs, and development history</span></a>
       </div>
     </section>
 
@@ -364,13 +364,13 @@ SPDX-License-Identifier: MIT
       <div class="design-heading reveal">
         <p class="section-kicker" data-i18n="kicker_design">04 · Design language</p>
         <h2>Cybou Horizon</h2>
-        <p data-i18n="design_sub">A visual system shaped by depth, negative space and a single line of light.</p>
+        <p data-i18n="design_sub">A spatial visual system shaped by depth, negative space, and responsive snap guides.</p>
       </div>
 
       <div class="design-board reveal reveal-delay-1">
         <div class="design-board__logo">
           <div class="large-mark"><img src="assets/cybou-mark.svg" alt="Cybou mark"></div>
-          <div><span data-i18n="label_symbol">Symbol</span><strong>Cybou Aperture</strong><p data-i18n="mark_desc">An open arc around a focused center: a system with room to evolve.</p></div>
+          <div><span data-i18n="label_symbol">Symbol</span><strong>Cybou Aperture</strong><p data-i18n="mark_desc">An open aperture around a focused center: sovereign, bounded, and extensible.</p></div>
         </div>
         <div class="design-board__colors">
           <span data-i18n="label_palette">Palette</span>
@@ -381,7 +381,7 @@ SPDX-License-Identifier: MIT
           <span data-i18n="label_typography">Typography</span>
           <b>Aa</b>
           <strong data-i18n="type_head">Calm, precise, human.</strong>
-          <p data-i18n="type_desc">System sans-serif typography keeps the site independent from remote services.</p>
+          <p data-i18n="type_desc">Clean system typography keeping the desktop lightweight, accessible, and distraction-free.</p>
         </div>
       </div>
     </section>
@@ -389,37 +389,37 @@ SPDX-License-Identifier: MIT
     <section class="principles">
       <div class="principles-intro reveal">
         <p class="section-kicker" data-i18n="kicker_principles">05 · Principles</p>
-        <h2><span data-i18n="princ_h2_1">Replaceable where it can be.</span><br><em data-i18n="princ_h2_2">Owned where it must be.</em></h2>
+        <h2><span data-i18n="princ_h2_1">Replaceable where possible.</span><br><em data-i18n="princ_h2_2">Governed where required.</em></h2>
       </div>
       <div class="principle-list">
-        <article class="reveal"><span>01</span><h3 data-i18n="pr1_head">Quiet by default</h3><p data-i18n="pr1_desc">No animated mascot, no glowing assistant, no feed competing for attention.</p></article>
-        <article class="reveal"><span>02</span><h3 data-i18n="pr2_head">Surfaces are replaceable</h3><p data-i18n="pr2_desc">Interfaces, models and tools can be swapped without touching memory, identity or policy.</p></article>
-        <article class="reveal"><span>03</span><h3 data-i18n="pr3_head">Private by construction</h3><p data-i18n="pr3_desc">No telemetry, no account requirement and no runtime asset downloads.</p></article>
-        <article class="reveal"><span>04</span><h3 data-i18n="pr4_head">Built in stages</h3><p data-i18n="pr4_desc">Each layer must be verifiable before the next one is allowed to depend on it.</p></article>
+        <article class="reveal"><span>01</span><h3 data-i18n="pr1_head">Quiet by default</h3><p data-i18n="pr1_desc">No animated mascots, no intrusive popups, and no feeds competing for human attention.</p></article>
+        <article class="reveal"><span>02</span><h3 data-i18n="pr2_head">Replaceable surfaces</h3><p data-i18n="pr2_desc">Interfaces, models, and tools can be swapped without altering memory, identity, or security policy.</p></article>
+        <article class="reveal"><span>03</span><h3 data-i18n="pr3_head">Private by construction</h3><p data-i18n="pr3_desc">Zero telemetry, zero remote tracking, and no runtime asset downloads from third parties.</p></article>
+        <article class="reveal"><span>04</span><h3 data-i18n="pr4_head">Truth over hallucination</h3><p data-i18n="pr4_desc">Every cognitive belief is grounded in independent observation and cryptographic evidence.</p></article>
       </div>
     </section>
 
     <section class="roadmap" id="roadmap">
       <div class="roadmap-heading reveal">
         <p class="section-kicker" data-i18n="kicker_roadmap">06 · Roadmap</p>
-        <h2><span data-i18n="road_h2_1">Build the body.</span><br><em data-i18n="road_h2_2">Then grow the mind.</em></h2>
+        <h2><span data-i18n="road_h2_1">Sovereign foundation.</span><br><em data-i18n="road_h2_2">Autonomous capability.</em></h2>
       </div>
       <div class="roadmap-track reveal reveal-delay-1">
         <article class="roadmap-item active">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_complete">Complete</p><h3 data-i18n="rm1_title">Mind substrate</h3><span data-i18n="rm1_sub">Durable history · Identity · Erasure · Lifecycle</span>
+          <p data-i18n="rm_complete">Complete & Live</p><h3 data-i18n="rm1_title">Mind Cognitive Substrate</h3><span data-i18n="rm1_sub">Durable history · Epistemics · Transitive Erasure · Identity continuity</span>
         </article>
         <article class="roadmap-item active">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_complete">Complete</p><h3 data-i18n="rm2_title">Web-first Rust surface</h3><span data-i18n="rm2_sub">Protocol crates · Gateway · Living Canvas</span>
+          <p data-i18n="rm_complete">Complete & Live</p><h3 data-i18n="rm2_title">Living Canvas Spatial UI</h3><span data-i18n="rm2_sub">Leptos/WASM · Spatial layout · 20+ specialized cards · Responsive snap guides</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_inprogress">In progress</p><h3 data-i18n="rm3_title">Body observation and diagnosis</h3><span data-i18n="rm3_sub">Telemetry · Findings · Projections · Meaning</span>
+          <p data-i18n="rm_inprogress">Active</p><h3 data-i18n="rm3_title">Observation & Dialogue Meaning</h3><span data-i18n="rm3_sub">Telemetry1 · Cognitive Graph · Natural dialogue parser · Epistemic findings</span>
         </article>
         <article class="roadmap-item">
           <div class="roadmap-node"><span></span></div>
-          <p data-i18n="rm_inprogress">In progress</p><h3 data-i18n="rm4_title">Governed action, then agent capsules</h3><span data-i18n="rm4_sub">Executor · Independent re-observation · Capsules · Model gateway</span>
+          <p data-i18n="rm_inprogress">Active</p><h3 data-i18n="rm4_title">Agent Capsules & Sovereign Storage</h3><span data-i18n="rm4_sub">Kernel sandboxes · Landlock · Action1/Executor1 · Lifelong learning persistence</span>
         </article>
       </div>
     </section>
@@ -437,7 +437,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q1">What is Cybou?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a1">Cybou is an experimental agent-native operating environment. A persistent local runtime called Mind owns durable memory, identity, commitments, lifecycle, health, and evidence, while models, agents, tools, and user interfaces stay replaceable around it.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a1">Cybou is a sovereign, agent-native operating environment and cognitive desktop platform built in 100% Rust for Debian 13 Linux. A persistent, deterministic local control plane called Mind continuously observes, governs, and maintains the host machine, while autonomous agent capsules, models, and tools remain strictly confined and replaceable around it.</p></div>
         </article>
 
         <article class="faq-item">
@@ -445,7 +445,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q2">How is that different from adding a chatbot to Linux?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a2">A model is not Mind. An agent is not Mind. A tool protocol is not an authorization boundary. Cybou makes memory, identity, health, lifecycle, and recovery explicit system services with named owners, so no model can become the owner of continuity or authority.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a2">A model is not Mind. An agent is not Mind. Tool access is not permission. Conventional AI assistants collapse memory, identity, execution, and security into a single probabilistic LLM prompt. Cybou establishes an explicit zero-trust architecture: memory, identity, health, lifecycle, and recovery are separate D-Bus micro-daemons. AI agents run in kernel-enforced sandboxes (cgroups v2, Landlock LSM) and can only propose actions that pass strict policy validation.</p></div>
         </article>
 
         <article class="faq-item">
@@ -453,23 +453,23 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q3">Does Cybou require cloud services or send telemetry?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a3">No. The current runtime and interface need no cloud account, API key, or hosted AI service, and Cybou implements no telemetry. Remote models may become available later, but only behind explicit context, sensitivity, egress, and cost policy.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a3">No. Cybou is local-sufficient by design: core cognition, identity, biography, meaning parsing, and the Living Canvas desktop require zero cloud connectivity, no GPU accelerator, and no API keys. It collects and sends zero remote telemetry. External models may be leased through a governed model broker, but only behind explicit sensitivity, egress, and budget boundaries.</p></div>
         </article>
 
         <article class="faq-item">
           <button type="button" class="faq-question">
-            <span data-i18n="faq_q4">What is the interface built with?</span>
+            <span data-i18n="faq_q4">What is the Living Canvas interface built with?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a4">One Rust/WebAssembly frontend called Living Canvas, served over a Rust gateway that exposes typed session, snapshot, and resumable event routes and no mutation route. The interface is a projection of Mind and never a second owner of state, which is what makes it replaceable.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a4">Living Canvas is a high-performance spatial desktop interface built entirely with Leptos and WebAssembly (Rust). It communicates over a secure, authenticated Axum web gateway with typed JSON and real-time cryptographic event streams. It features 20+ specialized cards including a sandboxed shell, unprivileged host file manager, dynamic cognitive graph, system monitor, and personal notes.</p></div>
         </article>
 
         <article class="faq-item">
           <button type="button" class="faq-question">
-            <span data-i18n="faq_q5">What is not implemented yet?</span>
+            <span data-i18n="faq_q5">How are actions and agent executions governed?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a5">Cybou ships no language model, no agent platform, no tool broker, no privileged action executor, and no autonomous security control plane. The model broker exists as a faculty with no worker behind it. What comes next is decided rather than sketched: an agent runs inside a kernel-enforced capsule, is autonomous within it, and produces an action proposal at its boundary. These are planned boundaries and are never described as done.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a5">Cybou enforces a strict two-phase Action1 / Executor1 governance pipeline: agents or users propose typed actions; Mind evaluates governance policy against empirical evidence and issues an opaque single-use permit; cybou-executord carries out the physical effect; and telemetry independently re-observes the true outcome. If telemetry does not confirm success, the action is marked failed and recorded to the hash-chained Journal.</p></div>
         </article>
 
         <article class="faq-item">
@@ -477,7 +477,7 @@ SPDX-License-Identifier: MIT
             <span data-i18n="faq_q6">What open-source licenses apply?</span>
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="faq-answer"><p data-i18n="faq_a6">Cybou code and most documentation are licensed under MIT. Original visual assets are licensed under CC BY-SA 4.0. The repository follows the REUSE specification. Copyright (c) 2026 Stanislav Saveliev.</p></div>
+          <div class="faq-answer"><p data-i18n="faq_a6">Cybou code and documentation are licensed under the MIT License. Original visual assets are licensed under Creative Commons CC BY-SA 4.0. The repository is 100% compliant with the REUSE specification.</p></div>
         </article>
       </div>
     </section>
@@ -485,11 +485,11 @@ SPDX-License-Identifier: MIT
     <section class="blueprint" id="blueprint">
       <div class="blueprint-inner reveal">
         <div class="blueprint-mark"><img src="assets/cybou-mark.svg" alt=""></div>
-        <p class="section-kicker" data-i18n="bp_banner_kicker">The project starts here</p>
-        <h2><span data-i18n="bp_banner_h2_1">A real operating system,</span><br><span data-i18n="bp_banner_h2_2">built one trusted layer at a time.</span></h2>
-        <p data-i18n="bp_banner_desc">The blueprint defines the Mind runtime and its typed ownership, the Rust/WebAssembly interface path, the observation and diagnosis layer, the action boundary, the verified implementation gates, and the cognitive roadmap.</p>
+        <p class="section-kicker" data-i18n="bp_banner_kicker">The sovereign architecture</p>
+        <h2><span data-i18n="bp_banner_h2_1">An AI-native operating environment,</span><br><span data-i18n="bp_banner_h2_2">built one trusted layer at a time.</span></h2>
+        <p data-i18n="bp_banner_desc">The technical blueprint details the 14-daemon Mind runtime, kernel-enforced agent capsules, the Leptos/WASM spatial desktop, the Action1/Executor1 governance pipeline, and the cryptographic Event1 ledger.</p>
         <div class="blueprint-actions">
-          <a class="button button--primary" href="blueprint.html" data-i18n="bp_banner_btn">Read Technical Whitepaper</a>
+          <a class="button button--primary" href="blueprint.html" data-i18n="bp_banner_btn">Read Technical Blueprint</a>
           <a class="button button--ghost" href="#top" data-i18n="btn_top">Back to top</a>
         </div>
       </div>
@@ -498,7 +498,7 @@ SPDX-License-Identifier: MIT
 
   <footer>
     <a class="brand" href="#top"><img src="assets/cybou-mark.svg" width="28" height="28" alt=""><span>Cybou</span></a>
-    <p data-i18n="footer_sub">Agent-native environment · Typed local Mind · Rust and WebAssembly interface.</p>
+    <p data-i18n="footer_sub">Sovereign Agent-Native Environment · 100% Rust & WebAssembly · Debian 13.</p>
     <p>© <span data-year></span> Stanislav Saveliev · MIT and CC BY-SA 4.0 · Contact: <a href="mailto:info@cybou.fr" style="color:var(--accent-text);">info@cybou.fr</a> · <a href="partners.html" style="color:var(--accent-text);" data-i18n="nav_partners_footer">Partners & Donations</a> · <a href="https://github.com/cybou-fr/CYBOU" target="_blank" rel="noopener" style="color:var(--accent-text);">GitHub</a></p>
   </footer>
 

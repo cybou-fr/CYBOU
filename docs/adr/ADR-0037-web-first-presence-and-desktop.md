@@ -37,19 +37,19 @@ remote modes. Mode-specific behavior comes from a negotiated session contract, n
 UI implementation.
 
 ```text
-                         one frontend build
-                                │
-                 ┌──────────────┴──────────────┐
-                 ▼                             ▼
-       Chromium/Ozone desktop             HTTPS browser
-            local session                 remote session
-                 │                             │
-                 └──────────────┬──────────────┘
-                                ▼
-                       cybou-web-gateway
-                                │
-                         Presence1 / future
-                         typed Mind services
+  one frontend build
+  
+  --------------|--------------
+  ▼                             ▼
+  Chromium/Ozone desktop             HTTPS browser
+  local session                 remote session
+  
+  - |--------------
+  ▼
+  cybou-web-gateway
+  
+  Presence1 / future
+  typed Mind services
 ```
 
 ### The browser is a renderer and untrusted client
@@ -120,11 +120,11 @@ The target local graphical environment is:
 
 ```text
 NixOS
-  ├── systemd --user Mind services
-  ├── cybou-web-gateway (loopback only)
-  ├── minimal Wayland compositor
-  └── Chromium/Ozone application surface
-          └── Living Canvas
+  - systemd --user Mind services
+  - cybou-web-gateway (loopback only)
+  - minimal Wayland compositor
+  - Chromium/Ozone application surface
+  - Living Canvas
 ```
 
 The compositor provides display, input, output management, lock/session transitions, and recovery

@@ -76,20 +76,20 @@ the type system objects, because both ends are already in scope.
 So the split is physical:
 
 ```text
-              MIND
-                │
-         cybou-actiond
-             Action1
-                │
-        claim + durable
-       ExecutionStarted
-                │
-                ▼
-         cybou-executord
-          Body capability
-                │
-                ▼
-              host
+  MIND
+  
+  cybou-actiond
+  Action1
+  
+  claim + durable
+  ExecutionStarted
+  
+  ▼
+  cybou-executord
+  Body capability
+  
+  ▼
+  host
 ```
 
 `cybou-actiond` owns the proposal lifecycle, criticism, standing policy, user confirmation, the
@@ -163,19 +163,19 @@ This closes the future cognitive loop:
 
 ```text
 Observation
-    ↓
+  ↓
 Mind / Intention
-    ↓
+  ↓
 Planning
-    ↓
+  ↓
 Authorization
-    ↓
+  ↓
 Typed execution
-    ↓
+  ↓
 Environment
-    ↓
+  ↓
 Observed consequence
-    └──────────────► Mind
+  - ► Mind
 ```
 
 ### Models are not execution authorities

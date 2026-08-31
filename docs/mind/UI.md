@@ -18,22 +18,8 @@ application window.
 ## Shell
 
 ```text
-right screen edge
-
-desktop hidden state
-┌─────────────────────────────────────▌
-│                                     ▌
-│                                     ▌  Cybou handle
-│                                     ▌
-└─────────────────────────────────────▌
-
-revealed state
-┌──────────────────────┬───────────────┐
-│                      │ page   Online │
-│       desktop        │               │
-│                      │ active page   │
-│                      │               │
-└──────────────────────┴───────────────┘
+[ Desktop Hidden State ]  -->  Right screen edge shows subtle Cybou handle
+[ Desktop Revealed State ] -->  Expanded sidebar showing active Presence, Cards & Telemetry
 ```
 
 The main panel contract is:

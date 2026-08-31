@@ -68,26 +68,21 @@ executor ≠ Mind
 
 ## Cognitive topology
 
-```text
-                   environment / person
-                           │
-                      Observation
-                           │
-                           ▼
-                         Mind
-          ┌────────────────┼────────────────┐
-          │                │                │
-       identity        intentions        epistemics
-          │             context           learning
-          │             attention          policy
-          └────────────────┼────────────────┘
-                           │
-                 future governed actors
-                 /        |        \
-             faculties   agents   workers
-                           │
-                           ▼
-                  capabilities / Body
+```mermaid
+graph TD
+    Env([👤 Environment / Person]) -->|Observation| Mind[🧠 Mind Control Plane]
+
+    subgraph Mind_Substrate [Mind Substrate]
+        Identity[Identity]
+        Intentions[Intentions]
+        Context[Context & Attention]
+        Epistemics[Epistemics & Learning]
+        Policy[Policy & Governance]
+    end
+
+    Mind --> Mind_Substrate
+    Mind_Substrate --> Actors[Governed Actors: Faculties / Agents / Workers]
+    Actors --> Body[⚙️ Capabilities / Linux Body]
 ```
 
 The diagram is not a neural analogy.
@@ -190,7 +185,7 @@ capability / executor / broker
 Body / external environment
         ↓
 observed consequence
-        └──────────► Observation / Outcome
+        --> Observation / Outcome
 ```
 
 The authorization boundary owns general authorization and execution. Command dispatch is not outcome evidence.

@@ -184,29 +184,29 @@ System meaning:
 
 ```text
 M1  accepted contribution becomes live
- │
+  
 M2  biography becomes causally stricter
- │
+  
 M3  biography gets one canonical writer
- │
+  
 M4  cognitive responsibilities become isolated owners
- │
+  
 M5  continuity gains lifecycle, consolidation, and recovery
- │
+  
 M6  partial failure and pressure become explicit degraded cognition
- │
+  
 M7  world state, evidence, retention, sensitivity, context, and distribution become governed
- │
+  
 M8  human language crosses an explicit meaning boundary
- │
+  
 M9  experience becomes governed learned behaviour and skills
- │
+  
 M10 external mutation crosses authorization + observation
- │
+  
 M11 agents become governed runtime subjects inside enforced capsules
- │
+  
 M12 security and operations become continuously self-maintaining under standing policy
- │
+  
 M13 governance extends across nodes and perimeter
 ```
 

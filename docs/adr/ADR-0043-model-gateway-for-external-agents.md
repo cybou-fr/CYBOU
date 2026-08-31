@@ -37,11 +37,11 @@ the machine, which is the thing capsules exist to prevent.
 
 ```text
 Mind                                 external agent
-  │ typed cognitive task               │ chat completions
+  typed cognitive task               | chat completions
   ▼                                    ▼
 ModelBroker1                      Model Gateway
-  │                                    │
-  └──────────► provider workers ◄──────┘
+  
+  - ► provider workers ◄------
 ```
 
 Two surfaces, one set of provider workers, one policy, one cost ledger. `ModelBroker1` keeps its
@@ -87,7 +87,7 @@ virtual keys, budgets, rate limits and cost tracking already in it.
 
 ```text
 Model Gateway
-  └── cybou-provider-litellm  ──► 100+ providers
+  - cybou-provider-litellm  --► 100+ providers
 ```
 
 This is a worker behind an interface Cybou owns. Native workers may replace it per provider later —

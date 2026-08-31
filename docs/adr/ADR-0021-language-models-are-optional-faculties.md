@@ -69,23 +69,23 @@ The target relationship is:
 
 ```text
 human expression
-      │
-      ▼
+  
+  ▼
 Language / Meaning Interface
-      │
-      ▼
+  
+  ▼
 structured meaning / CognitiveAct
-      │
-      ▼
+  
+  ▼
 Mind
-      │
-      ▼
+  
+  ▼
 ResponsePlan
-      │
-      ▼
+  
+  ▼
 Language Realization
-      │
-      ▼
+  
+  ▼
 human expression
 ```
 

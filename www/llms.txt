@@ -1,101 +1,27 @@
-# Cybou
+# CYBOU — Sovereign Agent-Native Operating Environment & Cognitive Desktop
 
-> Linux that understands and operates itself. Cybou is an experimental agent-native operating environment for a VPS, server, VM or container — a machine that runs unattended, is reached through a browser, and is expected to look after itself. A persistent local runtime called Mind owns durable cognitive state — biography, identity, commitments, health, evidence, meaning — while models, agents, tools, and user interfaces remain replaceable around it. Created by Stanislav Saveliev.
+> Debian 13 · 100% Rust & WebAssembly · Zero-Trust Host Sandboxing · Local-Sufficient
 
-## What it is for
+CYBOU is a next-generation, agent-native operating environment and cognitive desktop platform built in 100% Rust for Debian 13 Linux (servers, containers, edge nodes, and workstations).
 
-Cybou is not Linux with a chatbot attached, and it is not an AI desktop. The question it answers is one a server administrator asks: *what is happening to this machine, why do you think so, and what would you do about it* — answered from evidence the machine gathered itself, with the network down and no model loaded.
+## Fundamental Architecture & Invariants
 
-The vertical it implements is `observe → understand → remember → diagnose → explain → propose → authorize → act → observe outcome`. Every stage exists and is tested except one: **nothing in this repository can carry out an action.** That absence is deliberate and is described below.
+1. **Model ≠ Identity**: An LLM is a replaceable computational faculty, never the owner of memory, biography, or identity.
+2. **Agent ≠ Mind**: Autonomous agents execute as untrusted guests inside kernel-enforced sandboxes (cgroups v2, Landlock LSM, mount namespaces, mediated network egress).
+3. **Tool Access ≠ Permission**: Tools and capabilities are governed by a strict two-phase Action1 / Executor1 pipeline requiring typed proposals, empirical policy evaluation, and opaque single-use permits.
+4. **Perception ≠ Truth**: Observations from Linux `/proc`, `statvfs`, and systemd are hypotheses carrying their exact measurements; all facts are committed to an append-only, SHA-256 hash-chained SQLite v3 journal (`Event1`).
+5. **Local-Sufficient Operation**: Core cognition, dialogue meaning parsing (`cybou-meaningd`), associative context (`cybou-contextd`), and the Living Canvas spatial desktop require zero cloud connectivity, no GPU accelerator, and no API keys.
 
-## Current Product Boundary
+## Core Subsystems
 
-- Mind runs as isolated user services with explicit ownership and typed local IPC over D-Bus. A model is not Mind, an agent is not Mind, and a tool protocol is not an authorization boundary.
-- Durable causal history, identity continuity, intentions, prediction, self projection, bounded attention, health, lifecycle, recovery, grounded perception, epistemic projection, associative context, structured meaning, and governed context delivery.
-- Journal v3 with crash-safe transitive erasure and independently verifiable causal metadata. An erasure destroys the data keys, so a restored backup cannot read what was erased — provided the backup does not also carry the key store.
-- Bounded transient Body telemetry: load, memory, pressure, filesystem and inode usage, open descriptors, failed units, plus certificates, services and backups an operator declares. Telemetry is **not** biography; raw samples never enter the Journal.
-- Findings are hypotheses that carry the readings behind them, never facts. A finding says what it is about — which certificate, which unit — and keeps one identity for as long as it is one condition.
-- Projections say where a watched thing is heading and when it arrives, from robust statistics rather than a model. A probe that stopped reports that its readings stopped, not that the threshold was reached.
-- Remediation proposals are typed, criticised against the finding they claim to relieve, and decided against a standing policy that grants nothing by default.
-- Model brokerage exists as a faculty, not an organ of Mind. With no worker registered it answers by saying what happens instead, which is what a no-model configuration means here.
-- One Rust/WebAssembly frontend, Living Canvas, served over a Rust gateway that exposes typed session, snapshot, and resumable event routes and no mutation route.
-- Local-sufficient operation: nothing Cybou needs to function is remote. No required cloud account, API key, hosted AI service, or telemetry of its users.
+- **Mind Control Plane**: 14 process-isolated D-Bus micro-daemons (`org.cybou.Mind.*`): `cybou-eventd` (canonical Journal writer), `cybou-presenced`, `cybou-epistemicd`, `cybou-contextd`, `cybou-meaningd`, `cybou-identityd`, `cybou-intentiond`, `cybou-predictord`, `cybou-selfd`, `cybou-healthd`, `cybou-telemetryd`, `cybou-actiond`, `cybou-executord`, and `cybou-agentd`.
+- **Living Canvas**: Infinite-plane spatial desktop UI written in Leptos and WebAssembly with 20+ specialized reactive cards (Terminal, File Manager, Editor, Cognitive Graph, Event Stream, Notes, Calendar, Contacts, Mind Inspector, System Monitor) compiling with 0 warnings.
+- **Security & Privilege Separation**: PAM credential authentication (`cybou-authd`), unprivileged per-UID host file daemon (`cybou-host-filesd@<uid>`), private `/run/cybou-host-files/<uid>/owner.sock` sockets, and per-session sandboxed shells (`cybou-shelld`).
+- **Sovereign Persistence & Lifelong Learning**: Atomic local storage for notes, contacts, calendar schedules, and multi-layer learning candidate induction with empirical promotion gates and durable artifact lineages.
 
-## What is deliberately absent
+## Canonical Documentation & Repositories
 
-Cybou ships **no privileged action executor**. The proposal, criticism and authorization boundary is built and nothing can carry an operation out. That order is intentional: an executor written first arrives with the decision to act already inside it, and the boundary is what had to exist first.
-
-When an executor is built it will be two processes, not one. `Action1` may authorize and cannot execute; the executor may execute and cannot authorize.
-
-Cybou also ships no language model, no agent platform, no tool broker, no autonomous security control plane, and no distributed Mind. These are planned boundaries and must never be described as implemented.
-
-## Where this is going
-
-Decided rather than sketched, in ADR-0042 and ADR-0043.
-
-Cybou hosts agents; it does not become one. The agent loop, context compaction, sub-agents, planning
-and several hundred provider quirks are what other open-source projects compete on. What Cybou
-contributes is underneath: an **Agent Capsule** is the unit of grant, an agent is autonomous inside
-it and produces an action proposal at its boundary, the kernel enforces that boundary while cognition
-only explains it, agents come from the public ACP registry rather than a catalogue of our own, and an
-agent receives a capsule-scoped model lease instead of a provider credential.
-
-```text
-autonomous inside its capsule  !=  autonomous on the host
-```
-
-None of it is implemented. It is written down first so the code can be reviewed against explicit
-invariants rather than the invariants being reconstructed afterwards from whatever the code turned
-out to do.
-
-## Key Links
-
-- [Homepage](https://cybou.fr/index.html): Product overview and implementation progress.
-- [Technical Blueprint](https://cybou.fr/blueprint.html): Architecture, verified boundaries, progress matrix, and roadmap.
-- [Partners & Contact](https://cybou.fr/partners.html): Contact, partnership, and donation information.
-- [GitHub Repository](https://github.com/cybou-fr/CYBOU): Source code and canonical technical documentation.
-- [Current State](https://github.com/cybou-fr/CYBOU/blob/main/docs/CURRENT_STATE.md): Authority for implemented behavior and limitations.
-- [Roadmap](https://github.com/cybou-fr/CYBOU/blob/main/docs/ROADMAP.md): Planned capability progression.
-
-## Technical Details
-
-- Language: Rust, one locked Cargo workspace, `unsafe` forbidden across it.
-- Target: Debian 13 is the build, verification and deployment environment. Cybou is developed and deployed server-first.
-- Mind runtime: systemd user services, typed D-Bus contracts, SQLite.
-- Interface: the Living Canvas WebAssembly frontend over the Rust web gateway.
-- Canonical history: `cybou-eventd` is the sole Journal writer.
-- Verification: one script runs formatting, lint, the native test suite, the browser test suite, the documentation and layering validators, and a multi-daemon integration test on a live session bus. It reports which step failed and never reports a pass it did not get.
-- Current maturity: pre-release research and engineering software.
-- Telemetry: Cybou observes the machine it runs on, for that machine's own operator. It reports nothing to its authors.
-- Contact: info@cybou.fr
-- Licenses: MIT for code and most documentation; CC BY-SA 4.0 for declared original visual assets.
-
-## Frequently Asked Questions
-
-### What is Cybou?
-
-Linux that understands and operates itself. A persistent local runtime called Mind owns durable memory, identity, commitments, lifecycle, health, grounded evidence, meaning and bounded context, while models, agents, tools, and interfaces stay replaceable around it. It is built for servers and containers rather than for a desktop.
-
-### How is this different from adding a chatbot to Linux?
-
-A chatbot can also read your files. What it cannot do is tell you why *it* thinks the database stopped, from evidence it gathered itself, while the network is down. Cybou makes memory, identity, health, lifecycle, observation and authority explicit system services with named owners. No model, agent, interface, or coordinator may become the owner of continuity or authority.
-
-### Does Cybou include an AI model?
-
-No. The runtime is useful without one: it observes, diagnoses, explains and proposes with no model loaded. A model faculty is optional and governed, may interpret and propose, and may never become the owner of identity, memory, authorization, or continuity.
-
-### Does Cybou require cloud services or send telemetry?
-
-No cloud account, API key, or hosted AI service is required. Cybou observes the machine it runs on for that machine's operator and reports nothing to its authors. Future external inference or tools must cross explicit context, sensitivity, egress, and cost policy boundaries.
-
-### Can Cybou change my system?
-
-Not today, and not by accident when it can. Nothing in the current build can carry out a privileged operation. Cybou forms typed proposals, criticises them against the finding they claim to relieve, and puts them to a standing policy that grants nothing until an operator configures it.
-
-### How will it know whether an action worked?
-
-Not from what the action said about itself. An executor reporting its own success is the system grading its own homework — `apt clean` exits zero on a filesystem that is still full. What the operation reported and what the readings show afterwards are recorded separately, and the two disagreeing is a first-class result.
-
-### What remains planned?
-
-Two tracks. Finishing the action path: a privileged action executor behind the boundary that already exists, split so that the part which authorizes cannot execute and the part which executes cannot authorize. And the agent platform: kernel-enforced capsules, a standing capability lease, a model gateway with capsule-scoped leases, ACP agent packs, capsule behaviour telemetry, and quarantine. Then lifelong learning, tool brokerage, autonomous security operations, and distributed perimeter governance. None of it is currently shipped.
+- Website: https://cybou.fr
+- GitHub: https://github.com/cybou-fr/CYBOU
+- Technical Blueprint: https://cybou.fr/blueprint.html
+- Architecture Decisions: https://github.com/cybou-fr/CYBOU/tree/main/docs/adr

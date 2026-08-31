@@ -52,21 +52,21 @@ CYBOU Desktop rejects traditional tabbed or page-based navigation (`/home`, `/se
 Operators construct their own physical spatial arrangement:
 
 ```text
-                     MIND SUBSTRATE
-                      (Identity, Context, Beliefs, Attention, Journal)
-                           ↑
-                           │
+  MIND SUBSTRATE
+  (Identity, Context, Beliefs, Attention, Journal)
+  ↑
+  
 SECURITY            ←     HOME     →            INFRASTRUCTURE
 (Firewall, Leases)        (Insight, Agents,     (Nginx, PostgreSQL,
-                           Activity, Forecast)   Storage, Network)
-                           │
-                           ↓
-                        AGENTS
-                      (OpenCode Capsules, Task Workspaces)
-                           │
-                           ↓
-                      DEVELOPMENT
-                      (Source Repositories, Sandboxes)
+  Activity, Forecast)   Storage, Network)
+  
+  ↓
+  AGENTS
+  (OpenCode Capsules, Task Workspaces)
+  
+  ↓
+  DEVELOPMENT
+  (Source Repositories, Sandboxes)
 ```
 
 Navigation across areas is performed through continuous camera translation, spatial anchors, and semantic zoom, preserving mental context across multi-step operations.
@@ -90,19 +90,13 @@ When a panel is collapsed, it does not become a dead placeholder; it acts as a l
 - Certificate: `⚠ Certificate · 8 days remaining`
 - Agent: `● OpenCode · Running · €0.014 spend`
 
-```text
-┌────────────────────────────────────────────────────────┐
-│                      PANEL 2.0                         │
-│                                                        │
-│   [ Glance ]  ──▶  [ Standard ]  ──▶  [ Expanded ]    │
-│       ▲                 ▲                  ▲           │
-│       │                 │                  │           │
-│       └─────────────────┴──────────────────┘           │
-│                         │                              │
-│                         ▼                              │
-│                    [ Focus ]                           │
-│        (Temporary full-screen viewport lens)           │
-└────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    Glance[Glance Card] --> Standard[Standard Card]
+    Standard --> Expanded[Expanded Card]
+    Standard --> Focus[Focus Fullscreen]
+    Glance --> Focus
+    Expanded --> Focus
 ```
 
 ### 3. Semantic Zoom (Level of Detail)
@@ -135,12 +129,9 @@ pub struct ClusterInstance {
 
 #### Collapsible Clusters:
 A Cluster can be collapsed into a single high-level card summarizing its members:
-```text
-┌─ PRODUCTION ──────────────────────────────┐
-│ ● Healthy                                 │
-│ 7 services · 2 certificates · 128 MB RAM  │
-└───────────────────────────────────────────┘
-```
+| Cluster Deck | Status Summary |
+|---|---|
+| **PRODUCTION** | ● Healthy · 7 services · 2 certificates · 128 MB RAM |
 Clicking the cluster smoothly expands the constituent Panels at their saved relative positions.
 
 ### 5. Canvas Anchors & Camera History
@@ -225,24 +216,14 @@ The interface distinguishes between creating surfaces and querying knowledge:
 
 The system organizes panels into singletons and multi-instance resource viewers:
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        CYBOU PRODUCT PANELS                            │
-├────────────────────────────────┬───────────────────────────────────────┤
-│ SYSTEM SINGLETONS              │ MULTI-INSTANCE RESOURCE VIEWERS       │
-│ • System Insight (Telemetry1)  │ • Service(unit_name)                  │
-│ • Recent Activity (Action1)    │ • Process(pid)                        │
-│ • Forecast (Predictor1)        │ • Port(listener_spec)                 │
-│ • System Monitor (CPU/RAM/IO)  │ • FileViewer(path)                    │
-│ • Storage & Mounts             │ • FileEditor(path) [Permitted roots]  │
-│ • Network & Interfaces         │ • LogStream(unit_name / facility)     │
-│ • Debian Packages & Updates    │ • Certificate(subject_name)           │
-│ • Backup Health                │ • AgentSession(capsule_id)            │
-│ • Agents Overview (Agent1)     │ • AgentWorkspace(capsule_id)          │
-│ • Security Control Plane       │ • TaskProgress(task_id)               │
-│ • Mind Explorer (12 Organs)    │ • IncidentInvestigation(cause_id)     │
-└────────────────────────────────┴───────────────────────────────────────┘
-```
+| System Singletons | Multi-Instance Resource Viewers |
+|---|---|
+| • System Insight (`Telemetry1`) | • `Service(unit_name)` |
+| • Recent Activity (`Action1`) | • `Process(pid)` |
+| • System Forecast (`Predictor1`) | • `Certificate(domain)` |
+| • Active Agents (`Agent1`) | • `Package(pkg_name)` |
+| • Network & Firewall | • `Backup(backup_name)` |
+| • Security Leases & Policy | • `Storage(mount_point)` |
 
 ### 11. Cross-Panel Drag-and-Drop Grammar
 

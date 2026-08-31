@@ -17,14 +17,14 @@ the two a person had approved.
 derived from that one object:
 
 ```text
-              one selection
-                    │
-                issue_lease            ← the one public mint
-                    │
-                  Lease
-                    │
-   ┌────────────────┼────────────────┬──────────────────┐
-   ▼                ▼                ▼                  ▼
+  one selection
+  
+  issue_lease            ← the one public mint
+  
+  Lease
+  
+  ----------------+----------------|------------------
+  ▼                ▼                ▼                  ▼
 capsule spec    lease file       model token        the clock
 (compile)       (gateway reads)  (issued against)   (ends both)
 ```

@@ -22,24 +22,25 @@ CYBOU is neither a traditional desktop environment (like GNOME or KDE ported to 
    > *"In CYBOU, the human does not navigate between pages. They open objects, tools, and relations in space."*
 2. **Structural Model**:
    ```text
-                        CYBOU SPATIAL DESKTOP
-   
-                            Infinite Canvas
-                                 │
-           ┌─────────────────────┼─────────────────────┐
-           │                     │                     │
-         Panels                Clusters             Relations
-           │                     │                     │
-           └─────────────────────┼─────────────────────┘
-                                 │
-                           CYBOU Gateway
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-             Mind               Body              Apps
-              │                  │                  │
-        cognition/state    Linux capabilities   mail/calendar/...
-   ```
+  CYBOU SPATIAL DESKTOP
+  
+  Infinite Canvas
+  
+  ---------------------+---------------------
+  
+  Panels                Clusters             Relations
+  
+  - +---------------------
+  
+  CYBOU Gateway
+  
+  ------------------+------------------
+  
+  Mind               Body              Apps
+  
+  cognition/state    Linux capabilities   mail/calendar/...
+  
+```
 
 ### 2. Panel Lifecycle & Decoupled State Invariant
 1. **Presentation Decoupling**:

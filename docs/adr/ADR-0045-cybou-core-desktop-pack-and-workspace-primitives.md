@@ -34,39 +34,39 @@ Panel               = Discrete spatial tool / capability (code: Card, UX: Panel)
 LocationRef         = Typed authority domain for files, workspaces, sandboxes, and snapshots
 
 Tier 1: Desktop Core (P0)
-  ├── Home                  = Live system status, recent actions, active agents, quick dispatch
-  ├── Files 2.0             = Multi-panel filesystem manager with drag-and-drop & inline previews
-  ├── Text Editor           = Multi-tab, syntax-highlighted editor with diff-before-save & authority gating
-  ├── Diff Panel            = Standalone multi-source diff inspector (Editor / Agent / Package / Backup)
-  ├── Terminal              = Dual-mode: CYBOU Safe Shell (bounded) + Linux PTY Terminal (interactive)
-  ├── Settings              = Universal Control Center (System OS settings vs CYBOU Mind behavior)
-  ├── Storage & Disks       = Filesystem mounts, inodes, block devices, SMART health, disk usage treemap
-  ├── System Monitor        = CPU / RAM / Swap / IO pressure (PSI), process tree (host / capsule / service)
-  ├── Services              = Systemd unit manager, dependency inspection, lifecycle control
-  ├── Logs                  = Real-time journal logs viewer with unit, severity, and time filtering
-  ├── Network               = Interfaces, IP routing, DNS, listening ports with spatial relation links
-  ├── Packages & Updates    = APT package management, security updates, changelog diff, Action1 upgrade
-  ├── Tasks & Transfers     = Asynchronous background job tracker & non-blocking file upload/download
-  ├── Notifications         = Unified notification center with camera fly-to spatial navigation
-  └── Ask CYBOU             = Deterministic natural-language command palette and state query engine
+  - Home                  = Live system status, recent actions, active agents, quick dispatch
+  - Files 2.0             = Multi-panel filesystem manager with drag-and-drop & inline previews
+  - Text Editor           = Multi-tab, syntax-highlighted editor with diff-before-save & authority gating
+  - Diff Panel            = Standalone multi-source diff inspector (Editor / Agent / Package / Backup)
+  - Terminal              = Dual-mode: CYBOU Safe Shell (bounded) + Linux PTY Terminal (interactive)
+  - Settings              = Universal Control Center (System OS settings vs CYBOU Mind behavior)
+  - Storage & Disks       = Filesystem mounts, inodes, block devices, SMART health, disk usage treemap
+  - System Monitor        = CPU / RAM / Swap / IO pressure (PSI), process tree (host / capsule / service)
+  - Services              = Systemd unit manager, dependency inspection, lifecycle control
+  - Logs                  = Real-time journal logs viewer with unit, severity, and time filtering
+  - Network               = Interfaces, IP routing, DNS, listening ports with spatial relation links
+  - Packages & Updates    = APT package management, security updates, changelog diff, Action1 upgrade
+  - Tasks & Transfers     = Asynchronous background job tracker & non-blocking file upload/download
+  - Notifications         = Unified notification center with camera fly-to spatial navigation
+  - Ask CYBOU             = Deterministic natural-language command palette and state query engine
 
 Tier 2: Personal Core (P1)
-  ├── Mail                  = IMAP / SMTP / OAuth2 email client with backend secret isolation
-  ├── Calendar              = CalDAV / local event scheduling (personal events ≠ system operations)
-  ├── Notes                 = User Markdown scratchpad (strictly isolated from Mind Epistemic memory)
-  ├── Contacts              = Address book & communication directory
-  ├── PDF Viewer            = Lightweight multi-page document viewer
-  ├── Image Viewer          = Image inspection, metadata display, and zoom/rotation
-  └── Calculator            = Precision desktop calculator
+  - Mail                  = IMAP / SMTP / OAuth2 email client with backend secret isolation
+  - Calendar              = CalDAV / local event scheduling (personal events ≠ system operations)
+  - Notes                 = User Markdown scratchpad (strictly isolated from Mind Epistemic memory)
+  - Contacts              = Address book & communication directory
+  - PDF Viewer            = Lightweight multi-page document viewer
+  - Image Viewer          = Image inspection, metadata display, and zoom/rotation
+  - Calculator            = Precision desktop calculator
 
 Tier 3: CYBOU-native Core
-  ├── Agents                = Autonomous Agent Capsule lifecycle, capacity management, and prompt turns
-  ├── Agent Workspaces      = Isolated capsule file inspection, live edits, and execution tracking
-  ├── Action Episodes       = Durable 5-stage self-healing lifecycle records and causality audit
-  ├── Disclosure & Privacy  = Contextual delivery accounting and sensitivity boundary visualization
-  ├── Mind Explorer         = 14-organ relational cognitive map and epistemics inspection
-  ├── Telemetry & Forecast  = Predictive trend forecasting and resource degradation detection
-  └── Backups & Restore     = Snapshot generation, integrity verification, and historical rollback
+  - Agents                = Autonomous Agent Capsule lifecycle, capacity management, and prompt turns
+  - Agent Workspaces      = Isolated capsule file inspection, live edits, and execution tracking
+  - Action Episodes       = Durable 5-stage self-healing lifecycle records and causality audit
+  - Disclosure & Privacy  = Contextual delivery accounting and sensitivity boundary visualization
+  - Mind Explorer         = 14-organ relational cognitive map and epistemics inspection
+  - Telemetry & Forecast  = Predictive trend forecasting and resource degradation detection
+  - Backups & Restore     = Snapshot generation, integrity verification, and historical rollback
 ```
 
 ---
@@ -77,14 +77,14 @@ Tier 3: CYBOU-native Core
 
 All file, editor, diff, terminal, and agent operations in CYBOU MUST NOT use raw unadorned filesystem path strings. Instead, every workspace target is represented by a typed **`LocationRef`** authority domain:
 
-```text
+### Location References
+
 LocationRef
-  ├── HostUserPath(PathBuf)             = User workspace directory (e.g. /home/user/projects)
-  ├── SystemConfigPath(PathBuf)         = Privileged system file (e.g. /etc/nginx/nginx.conf)
-  ├── AgentWorkspace(CapsuleId, RelPath)= Ephemeral isolated agent capsule sandbox
-  ├── SafeShellJail(SessionId, PathBuf) = Bounded demo/sandbox shell environment
-  └── BackupSnapshot(SnapshotId, PathBuf)= Read-only immutable historical filesystem snapshot
-```
+- `HostUserPath(PathBuf)`: User workspace directory (e.g. /home/user/projects)
+- `SystemConfigPath(PathBuf)`: Privileged system file (e.g. /etc/nginx/nginx.conf)
+- `AgentWorkspace(CapsuleId, RelPath)`: Ephemeral isolated agent capsule sandbox
+- `SafeShellJail(SessionId, PathBuf)`: Bounded demo/sandbox shell environment
+- `BackupSnapshot(SnapshotId, PathBuf)`: Read-only immutable historical filesystem snapshot
 
 #### Authority Invariants by Location Domain
 
@@ -213,14 +213,14 @@ CYBOU email integration MUST follow a strict zero-trust architecture regarding c
 
 ```text
 [Browser Canvas: Mail Panel]
-          │ (Session Cookie)
-          ▼
+  (Session Cookie)
+  ▼
 [cybou-web-gateway]
-          │ (D-Bus / Unix Socket)
-          ▼
+  (D-Bus / Unix Socket)
+  ▼
 [cybou-maild: IMAP / SMTP / OAuth2 Engine] (Credentials in /etc/cybou/credentials)
-          │ (TLS)
-          ▼
+  (TLS)
+  ▼
 [External Mail Provider]
 ```
 
@@ -245,25 +245,25 @@ Derived relations remain strictly advisory; they do not automatically execute ac
 
 The Settings Panel acts as the central control plane, structured with an unambiguous division between **System OS Settings** and **CYBOU Cognitive Settings**:
 
-```text
+### System Settings Hierarchy
+
 SETTINGS
-├── SYSTEM (Debian 13 OS Infrastructure)
-│   ├── Network & Hostname      = IP configuration, DNS, gateway, hostname
-│   ├── Storage & Mounts        = Disk partitions, mount options, fstab
-│   ├── Users & Accounts        = UNIX users, groups, sudo privileges
-│   ├── SSH & Remote Access     = Authorized keys, SSH daemon configuration
-│   ├── Date, Time & NTP        = Timezone, NTP server synchronization
-│   └── Packages & Repositories = APT sources, repository signing keys
-│
-└── CYBOU (Cognitive Mind & Spatial Desktop)
-    ├── General & Appearance    = Dark/Light/System theme, density, canvas grid
-    ├── Spatial Canvas Engine   = Snap distance, relations filter, semantic zoom LOD
-    ├── Cognitive Automation    = Remediation initiative policies, approval thresholds
-    ├── Autonomous Agents       = Capsule concurrency limits, memory/CPU quotas, spend budgets
-    ├── Model Brokerage         = Provider endpoints, model groups, token pricing
-    ├── Epistemics & Privacy    = Sensitivity classifications, disclosure rules
-    └── Backups & Recovery      = Automated snapshot intervals, retention policies
-```
+- SYSTEM (Debian 13 OS Infrastructure)
+- Network & Hostname      = IP configuration, DNS, gateway, hostname
+- Storage & Mounts        = Disk partitions, mount options, fstab
+- Users & Accounts        = UNIX users, groups, sudo privileges
+- SSH & Remote Access     = Authorized keys, SSH daemon configuration
+- Date, Time & NTP        = Timezone, NTP server synchronization
+- Packages & Repositories = APT sources, repository signing keys
+- 
+- CYBOU (Cognitive Mind & Spatial Desktop)
+- General & Appearance    = Dark/Light/System theme, density, canvas grid
+- Spatial Canvas Engine   = Snap distance, relations filter, semantic zoom LOD
+- Cognitive Automation    = Remediation initiative policies, approval thresholds
+- Autonomous Agents       = Capsule concurrency limits, memory/CPU quotas, spend budgets
+- Model Brokerage         = Provider endpoints, model groups, token pricing
+- Epistemics & Privacy    = Sensitivity classifications, disclosure rules
+- Backups & Recovery      = Automated snapshot intervals, retention policies
 
 Any individual settings category can be detached by the operator into an independent standalone Panel.
 

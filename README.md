@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
 [![Rust 2024 Edition](https://img.shields.io/badge/Rust-2024_Edition-orange.svg)](https://www.rust-lang.org/)
 [![Debian 13 Trixie](https://img.shields.io/badge/Target-Debian_13_Trixie-red.svg)](docs/DEPLOYMENT.md)
 [![Architecture: Local-Sufficient](https://img.shields.io/badge/Architecture-Local--Sufficient-blue.svg)](docs/ARCHITECTURE.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSES/MIT.txt)
 
 </div>
 
@@ -35,16 +35,16 @@ AI models and autonomous agents in CYBOU are **untrusted guests, not system owne
 
 ## 💎 Core Value Proposition & Pillars
 
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          CYBOU CORE INVARIANTS                          │
-├───────────────────────────────────┬─────────────────────────────────────┤
-│  🧠 Model ≠ Identity              │  🛡️ Tool Access ≠ Permission        │
-│  🏛️ Agent ≠ Mind                  │  📜 Observation ≠ Knowledge         │
-│  🔒 Confidence ≠ Authorization    │  ⚡ Command Sent ≠ Verified Outcome │
-│  👁️ Perception ≠ Truth            │  ⏳ Attention ≠ Biography           │
-└───────────────────────────────────┴─────────────────────────────────────┘
-```
+| Invariant | Sovereign Principle |
+|---|---|
+| 🧠 **Model ≠ Identity** | LLMs are replaceable computational faculties; biography, commitments, and identity belong exclusively to Mind. |
+| 🏛️ **Agent ≠ Mind** | Autonomous agents are unprivileged guest processes inside kernel sandboxes, never system owners. |
+| 🛡️ **Tool Access ≠ Permission** | Having an API or MCP tool available does not grant authority; every action requires an evaluated policy permit. |
+| 📜 **Observation ≠ Knowledge** | Sensory telemetry metrics are hypotheses carrying raw readings; knowledge requires causal epistemic grounding. |
+| 🔒 **Confidence ≠ Authorization** | High model certainty or prompt persuasion is never treated as a security authorization. |
+| ⚡ **Command Sent ≠ Verified Outcome** | An action is only complete once physical effects are independently re-observed by telemetry. |
+| 👁️ **Perception ≠ Truth** | Perception is a local estimate; ground truth is recorded in the append-only cryptographic event ledger. |
+| ⏳ **Attention ≠ Biography** | Ephemeral workspace focus coalitions decay; persistent autobiographical memories are explicitly committed. |
 
 ### 1. 🧠 Deterministic Cognitive Control Plane (Mind)
 - **14 Process-Isolated Micro-Daemons**: Operating on the D-Bus session bus (`org.cybou.Mind.*`), each owning a distinct cognitive domain: biography (`identityd`), epistemic truth & beliefs (`epistemicd`), associative context (`contextd`), attention (`workspaced`), natural language meaning (`meaningd`), prediction (`predictord`), capability health (`healthd`), and homeostatic lifecycle (`lifecycled`).
@@ -84,46 +84,35 @@ AI models and autonomous agents in CYBOU are **untrusted guests, not system owne
 
 ## 🏗️ System Architecture
 
-```text
-                                  PERSON (Browser / Workspace)
-                                               │
-                                 HTTPS (Caddy Reverse Proxy)
-                                               │
-                                               ▼
-                              cybou-web-gateway (Axum / Rust)
-                                               │
-               ┌───────────────────────────────┴───────────────────────────────┐
-               ▼                                                               ▼
-       Living Canvas UI                                                 cybou-authd
-    (WASM Spatial Desktop)                                      (PAM Credential Verification)
-               │                                                               │
-               │ D-Bus Session Bus                                             ▼
-               ▼                                                   cybou-host-filesd@<uid>
-  ┌─────────────────────────────────────────────────────────────┐  (Per-UID Unprivileged Socket)
-  │                     MIND CONTROL PLANE                      │              │
-  │                                                             │              ▼
-  │  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐  │      /home/<user>/*
-  │  │ cybou-eventd  │ │cybou-presenced│ │ cybou-epistemicd  │  │
-  │  │   (Event1)    │ │  (Presence1)  │ │   (Epistemic1)    │  │
-  │  └───────┬───────┘ └───────┬───────┘ └─────────┬─────────┘  │
-  │          │                 │                   │            │
-  │  ┌───────┴───────┐ ┌───────┴───────┐ ┌─────────┴─────────┐  │
-  │  │cybou-contextd │ │cybou-meaningd │ │  cybou-identityd  │  │
-  │  │  (Context1)   │ │   (Meaning1)  │ │   (Identity1)     │  │
-  │  └───────────────┘ └───────────────┘ └───────────────────┘  │
-  │  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐  │
-  │  │cybou-healthd  │ │cybou-actiond  │ │  cybou-agentd     │  │
-  │  │   (Health1)   │ │   (Action1)   │ │    (Agent1)       │  │
-  │  └───────────────┘ └───────┬───────┘ └─────────┬─────────┘  │
-  └────────────────────────────┼───────────────────┼────────────┘
-                               │                   │
-                               ▼                   ▼
-                        cybou-executord     Agent Capsules
-                         (Executor1)     (cgroups v2, Landlock)
-                               │                   │
-                               ▼                   ▼
-                         Physical Host       External Egress
-                          (Linux Body)       (Brokered Model/Net)
+```mermaid
+graph TD
+    User([👤 Operator / Web Browser]) -->|HTTPS / Caddy| Gateway[🌐 cybou-web-gateway]
+    Gateway -->|WASM Presentation| Canvas[🌌 Living Canvas Desktop]
+    Gateway -->|PAM / Unix Socket| Authd[🔑 cybou-authd]
+    Gateway -->|Per-UID Socket| HostFiles[📁 cybou-host-filesd@UID]
+    HostFiles -->|Read / Write| UserHome[📂 /home/user/*]
+
+    Gateway -->|D-Bus Session Bus| Mind[🧠 Mind Control Plane]
+
+    subgraph Mind_Plane [Mind Control Plane: 14 D-Bus Daemons]
+        EventD[📜 cybou-eventd :: Event1 Ledger]
+        PresenceD[👁️ cybou-presenced :: Presence1 Projection]
+        EpistemicD[⚖️ cybou-epistemicd :: Epistemic1 Truth & Beliefs]
+        MeaningD[💬 cybou-meaningd :: Meaning1 Dialogue Parser]
+        ContextD[🔗 cybou-contextd :: Context1 Associative Memory]
+        IdentityD[🆔 cybou-identityd :: Identity1 Continuity]
+        HealthD[🩺 cybou-healthd :: Health1 Homeostasis]
+        ActionD[🛡️ cybou-actiond :: Action1 Policy & Permits]
+        AgentD[🤖 cybou-agentd :: Agent1 Lifecycle]
+    end
+
+    ActionD -->|Single-Use Permit| ExecutorD[⚡ cybou-executord :: Executor1]
+    ExecutorD -->|Physical Effect| HostBody[🖥️ Linux Host Body]
+    HostBody -->|Telemetry /proc| EventD
+
+    AgentD -->|cgroups v2 / Landlock| Capsules[📦 Agent Capsules :: Sandboxed Guests]
+    Capsules -->|ActionProposal| ActionD
+    Capsules -->|Brokered Egress| ExtNet[🌐 Brokered Model / Network]
 ```
 
 ---
@@ -233,7 +222,9 @@ crates/
 
 ## 📚 Documentation & Architecture Decisions
 
-- 📖 **[Architecture Overview](docs/ARCHITECTURE.md)**: Deep dive into the Mind control plane.
+- 🧠 **[Mind Model](docs/MIND_MODEL.md)**: Conceptual foundations, invariants, and cognitive continuity.
+- 📖 **[Architecture Overview](docs/ARCHITECTURE.md)**: Deep dive into the 14-daemon Mind control plane.
+- 📊 **[Current State](docs/CURRENT_STATE.md)**: Authoritative record of implemented and verified boundaries.
 - 📜 **[Architecture Decision Records (ADRs)](docs/adr/README.md)**: 45+ comprehensive ADRs documenting every design choice.
 - 🧪 **[Testing Strategy](docs/TESTING.md)**: Test invariants, live-bus verification, and failure modes.
 - 🚀 **[Deployment Guide](docs/DEPLOYMENT.md)**: Step-by-step production deployment on Debian 13.
@@ -261,4 +252,4 @@ CYBOU is independently researched and developed. For collaboration, enterprise e
 
 ## 📄 License
 
-Code and documentation are licensed under the **MIT License** ([LICENSE](LICENSE)). Design assets and trademarks are licensed under **CC BY-SA 4.0** in accordance with the REUSE specification.
+Code and documentation are licensed under the **MIT License** ([LICENSES/MIT.txt](LICENSES/MIT.txt)). Design assets and trademarks are licensed under **CC BY-SA 4.0** ([LICENSES/CC-BY-SA-4.0.txt](LICENSES/CC-BY-SA-4.0.txt)) in accordance with the REUSE specification.

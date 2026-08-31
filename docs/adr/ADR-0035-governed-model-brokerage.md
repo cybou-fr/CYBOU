@@ -18,15 +18,12 @@ providers, or multiple critics without making any one implementation the owner o
 
 ### Model access is brokered
 
-```text
-faculty / planner / agent
-        ↓
-     Model Broker
-        ↓
- ┌──────┼─────────┐
- ▼      ▼         ▼
-local  local     remote
-fast   strong    provider
+```mermaid
+graph TD
+    Caller[Faculty / Planner / Agent] --> Broker[Model Broker]
+    Broker --> LocalFast[Local Fast Model]
+    Broker --> LocalStrong[Local Strong Model]
+    Broker --> RemoteProv[Remote Governed Provider]
 ```
 
 No core organ calls an arbitrary provider as a hidden fallback.

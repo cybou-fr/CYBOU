@@ -10,28 +10,21 @@ current process topology, ownership boundaries, failure domains, and ordering.
 
 ## Current process topology
 
-```text
-                          ┌───────────────────────┐
-                          │      Plasma/QML       │
-                          │ Presence proxy only   │
-                          └───────────┬───────────┘
-                                      │ Presence1
-                                      ▼
-                             ┌─────────────────┐
-                             │ cybou-presenced │
-                             └───────┬─────────┘
-                                     │
-          ┌──────────────┬───────────┼───────────┬──────────────┐
-          ▼              ▼           ▼           ▼              ▼
-   identityd       intentiond   predictord      selfd      workspaced
-          │              │           │           │              │
-          └──────────────┴───────────┴───────────┴──────┬───────┘
-                                                        │ Event1
-                                                        ▼
-                                                 cybou-eventd
-                                                        │
-                                                        ▼
-                                                   Journal v2
+```mermaid
+graph TD
+    UI[Living Canvas / Presentation Proxy] -->|Presence1| Presenced[cybou-presenced]
+    Presenced --> Identity[identityd]
+    Presenced --> Intention[intentiond]
+    Presenced --> Predictor[predictord]
+    Presenced --> Self[selfd]
+    Presenced --> Workspace[workspaced]
+
+    Identity -->|Event1| Eventd[cybou-eventd]
+    Intention -->|Event1| Eventd
+    Predictor -->|Event1| Eventd
+    Self -->|Event1| Eventd
+    Workspace -->|Event1| Eventd
+    Eventd -->|Append| Journal[(Cryptographic Journal)]
 ```
 
 Each daemon is a separate executable, D-Bus name, and `systemd --user` service.
@@ -47,17 +40,19 @@ cybou-lifecycled  -- Lifecycle1 -> persistent bounded lifecycle runs
 
 The same processes have different semantic responsibilities:
 
-```text
-                       accepted durable history
-                               │
-       ┌──────────────┬────────┼──────────┬──────────────┐
-       ▼              ▼        ▼          ▼              ▼
-    identity       intention prediction   self        workspace
-    continuity     state     calibration projection   attention
-       │              │        │          │              │
-       └──────────────┴────────┴──────────┴───────┬──────┘
-                                                 ▼
-                                             Presence
+```mermaid
+graph TD
+    History[(Accepted Durable History)] --> Identity[Identity: Continuity]
+    History --> Intention[Intention: State]
+    History --> Prediction[Prediction: Calibration]
+    History --> Self[Self: Projection]
+    History --> Workspace[Workspace: Attention]
+
+    Identity --> Presence[Presence: Aggregated Projection]
+    Intention --> Presence
+    Prediction --> Presence
+    Self --> Presence
+    Workspace --> Presence
 ```
 
 | Process | Semantic responsibility |
@@ -198,10 +193,11 @@ Future presentation surfaces must preserve the same boundary.
 surface with one Living Canvas frontend delivered through a dedicated browser/network gateway.
 This is target architecture, not the current process topology above.
 
-```text
-local Chromium/Ozone ─┐
-                      ├── cybou-web-gateway ── Presence1 / typed Mind APIs
-remote HTTPS browser ─┘
+```mermaid
+graph LR
+    Local[Local Desktop Session] --> Gateway[cybou-web-gateway]
+    Remote[Remote HTTPS Browser] --> Gateway
+    Gateway --> APIs[Presence1 / Typed Mind APIs]
 ```
 
 The gateway is a transport, session, schema, and browser-security boundary. It is not a cognitive
@@ -221,15 +217,15 @@ Target relationship:
 
 ```text
 typed Mind context
-      │
+      |
       ▼
 language faculty
-      │
+      |
 interpretation / explanation / proposal
-      │
+      |
       ▼
 typed protocol
-      │
+      |
       ▼
 Mind
 ```
@@ -245,19 +241,12 @@ and not a central owner of cognition.
 
 Implemented core relationship:
 
-```text
-lifecycle policy / trigger
-        │
-        ▼
-coordinator selects accepted high-water mark
-        │
-        ├── typed maintenance requests to current owners
-        │
-        ▼
-derived Event1 contributions
-        │
-        ▼
-accepted terminal lifecycle record
+```mermaid
+graph TD
+    Policy[Lifecycle Policy / Trigger] --> HighWater[Coordinator Selects High-Water Mark]
+    HighWater -->|Typed Maintenance Requests| Owners[Current Daemon Owners]
+    Owners --> Derived[Derived Event1 Contributions]
+    Derived --> Record[Accepted Terminal Lifecycle Record]
 ```
 
 The coordinator owns run orchestration only. It does not write organ storage or Journal. Accepted
@@ -275,19 +264,13 @@ Journal answers what was accepted into causal history. A future epistemic projec
 answers what is currently observed, reported, inferred, assumed, disputed, superseded, stale, or
 unknown.
 
-```text
-Body / user / sensor
-        │
-        ▼
-perception adapter + provenance
-        │
-        ▼
-candidate Observation → Event1 → Journal
-                              │
-                              ▼
-                  epistemic reconciliation
-                              │
-              governed retention and context
+```mermaid
+graph TD
+    Input[Body / Host / Sensor / User] --> Adapter[Perception Adapter + Provenance]
+    Adapter --> Observation[Candidate Observation]
+    Observation -->|Event1| Journal[(Cryptographic Journal)]
+    Journal --> Reconcile[Epistemic Reconciliation]
+    Reconcile --> Retention[Governed Retention & Context]
 ```
 
 Perception is not truth. Confidence is not authorization. Retention is explicit policy, including
@@ -308,23 +291,23 @@ Target relationship:
 
 ```text
 Mind / planning
-      │
+      |
       ▼
 proposal + criticism
-      │
+      |
       ▼
 authorization
-      │
+      |
       ▼
 typed capability / executor
-      │
+      |
       ▼
 Body / external environment
-      │
+      |
       ▼
 observation + outcome
-      │
-      └──────────────► Mind
+      |
+      --> Mind
 ```
 
 ## Presence and Desktop boundary
@@ -332,23 +315,15 @@ observation + outcome
 Under ADR-0037 and ADR-0040, Presence is rendered via **CYBOU Desktop** (WebAssembly) delivered by
 `cybou-web-gateway`:
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    CYBOU Desktop (WASM)                     │
-│               Cards · Decks · Spatial Canvas                │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTP / SSE / WebSocket
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      cybou-web-gateway                      │
-│        Auth · Session · Schema · Static delivery · CSP      │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Presence1 / Shell1 D-Bus
-                               ▼
-┌──────────────────────────────┴──────────────────────────────┐
-│                       Mind & Body Hosts                     │
-│     cybou-presenced (Mind)     cybou-shelld / jailfs (Body) │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Desktop[🌌 CYBOU Desktop WASM: Cards · Decks · Spatial Canvas] -->|HTTP / SSE / WebSocket| Gateway[🌐 cybou-web-gateway]
+    Gateway -->|Presence1 / Shell1 D-Bus| Hosts[🧠 Mind & Body Daemons]
+
+    subgraph Hosts [Mind & Body Daemons]
+        Presenced[cybou-presenced :: Mind]
+        Shelld[cybou-shelld / jailfs :: Body]
+    end
 ```
 
 CYBOU Desktop establishes:
@@ -359,17 +334,12 @@ CYBOU Desktop establishes:
 
 ### Four Isolated Security Zones
 
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Zone 1: Mind Projection (Read-only aggregation of canonical owners)    │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 4: Governed Actions (Future authorized mutation/execution runtime) │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+| Security Zone | Purpose & Boundaries |
+|---|---|
+| **Zone 1: Mind Projection** | Read-only aggregation of canonical daemon owners via D-Bus session bus. |
+| **Zone 2: Desktop Presentation** | Card geometry, infinite canvas coordinates, snap guides, collapse, and pinning. |
+| **Zone 3: Bounded Body Capabilities** | Interactive sandboxed shell via `cybou-jailfs` and `cybou-shelld` (zero host filesystem escape). |
+| **Zone 4: Governed Actions** | Two-phase Action1 / Executor1 policy criticism and single-use execution permits. |
 
 ## Next
 

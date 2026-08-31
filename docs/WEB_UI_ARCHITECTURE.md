@@ -43,32 +43,32 @@ forward.
 ## Target topology
 
 ```text
-                                PERSON
-                                   │
-                    ┌──────────────┴──────────────┐
-                    ▼                             ▼
-          local Chromium/Ozone              remote Chromium
-          isolated appliance UI             HTTPS browser/PWA
-                    │                             │
-                    └──────────────┬──────────────┘
-                                   ▼
-                          cybou-web-gateway
-                    auth / session / schema / CSP
-                    CSRF / cursor / rate / origin
-                                   │
-                            local session D-Bus
-                                   ▼
-                            cybou-presenced
-                                   │
-          ┌──────────┬─────────────┼──────────────┬───────────┐
-          ▼          ▼             ▼              ▼           ▼
-       healthd   lifecycled    intentiond     contextd     other owners
-                                   │
-                                 Event1
-                                   ▼
-                                eventd
-                                   ▼
-                                Journal
+  PERSON
+  
+  --------------|--------------
+  ▼                             ▼
+  local Chromium/Ozone              remote Chromium
+  isolated appliance UI             HTTPS browser/PWA
+  
+  - |--------------
+  ▼
+  cybou-web-gateway
+  auth / session / schema / CSP
+  CSRF / cursor / rate / origin
+  
+  local session D-Bus
+  ▼
+  cybou-presenced
+  
+  ----------|-------------+--------------|-----------
+  ▼          ▼             ▼              ▼           ▼
+  healthd   lifecycled    intentiond     contextd     other owners
+  
+  Event1
+  ▼
+  eventd
+  ▼
+  Journal
 ```
 
 The gateway is local to the managed Cybou node even when the browser is remote. A later multi-node
@@ -239,15 +239,15 @@ CYBOU Shell is an isolated, unprivileged capability surface to the Debian 13 hos
 #### Four Isolated Security Zones
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Zone 1: Mind Projection (Read-only aggregation of canonical owners)    │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 4: Governed Actions (Future authorized mutation/execution runtime) │
-└─────────────────────────────────────────────────────────────────────────┘
+-------------------------------------------------------------------------
+  Zone 1: Mind Projection (Read-only aggregation of canonical owners)    |
+  - ┤
+  Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  |
+  - ┤
+  Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   |
+  - ┤
+  Zone 4: Governed Actions (Future authorized mutation/execution runtime) |
+  - 
 ```
 
 ---
@@ -341,8 +341,8 @@ Reconnect sequence:
 
 ```text
 resume cursor
-  ├── accepted → replay bounded deltas
-  └── expired  → fresh snapshot and atomic replace
+  - accepted → replay bounded deltas
+  - expired  → fresh snapshot and atomic replace
 ```
 
 SSE is preferred for the first read-only stream because it has simple proxy and reconnect behavior.

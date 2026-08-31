@@ -43,17 +43,17 @@ The target path into Mind is:
 
 ```text
 Utterance / other human expression
-          │
-          ▼
+  
+  ▼
 MeaningInterpretation
-          │
-          ▼
+  
+  ▼
 ReferenceResolution
-          │
-          ▼
+  
+  ▼
 CognitiveAct
-          │
-          ▼
+  
+  ▼
 Mind APIs
 ```
 
@@ -61,14 +61,14 @@ The target path out of Mind is:
 
 ```text
 typed Mind state
-      │
-      ▼
+  
+  ▼
 ResponsePlan
-      │
-      ▼
+  
+  ▼
 Language Realization
-      │
-      ▼
+  
+  ▼
 human-readable expression
 ```
 

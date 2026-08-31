@@ -27,20 +27,20 @@ lifecycle/run orchestration state; it does not own organ projections or Journal.
 
 ```text
 eventd
-├── identityd
-├── intentiond
-├── predictord
-├── workspaced
-├── selfd
-│   ├── identityd
-│   ├── intentiond
-│   └── predictord
-└── presenced
-    ├── identityd
-    ├── intentiond
-    ├── predictord
-    ├── selfd
-    └── workspaced
+  - identityd
+  - intentiond
+  - predictord
+  - workspaced
+  - selfd
+  - identityd
+  - intentiond
+  - predictord
+  - presenced
+  - identityd
+  - intentiond
+  - predictord
+  - selfd
+  - workspaced
 ```
 
 The services are D-Bus activated and stop with the graphical session.

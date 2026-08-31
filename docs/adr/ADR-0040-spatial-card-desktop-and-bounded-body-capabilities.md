@@ -106,26 +106,11 @@ CYBOU Desktop provides spatial freedom combined with deterministic structure:
 
 CYBOU Shell is **not** an unrestricted terminal emulator, shell launcher, or `/bin/sh` process wrapper. It is a strictly typed, sandboxed capability surface to the Debian 13 host (Body):
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    CYBOU Desktop (WASM)                     │
-│               CardInstance { id: Shell(1) }                 │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ JSON-RPC / WebSocket (Local only)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      cybou-web-gateway                      │
-│         Refuses Shell in PublicPreview / Remote modes       │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ D-Bus (org.cybou.Body.Shell1)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                        cybou-shelld                         │
-│       Dedicated unprivileged daemon (NoNewPrivileges=yes)   │
-│              cybou-jailfs (RESOLVE_BENEATH)                 │
-│                 DemoReadOnly -> /home/demo                  │
-│  Builtins only; the accepted set is in Amendment 1 below.   │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Desktop[CYBOU Desktop WASM: CardInstance Shell] -->|JSON-RPC / WebSocket Local only| Gateway[cybou-web-gateway]
+    Gateway -->|D-Bus org.cybou.Body.Shell1| ShellD[cybou-shelld]
+    ShellD -->|JailFs PTY / Bubblewrap| Sandbox[Kernel Sandbox: cgroups v2 / Private FS]
 ```
 
 #### Shell Invariants:
@@ -136,16 +121,11 @@ CYBOU Shell is **not** an unrestricted terminal emulator, shell launcher, or `/b
 
 ### 5. Four Isolated Security Zones
 
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Zone 1: Mind Projection (Read-only aggregation of canonical owners)    │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Zone 4: Governed Actions (Future authorized mutation/execution runtime) │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Desktop[CYBOU Desktop WASM: CardInstance Shell] -->|JSON-RPC / WebSocket Local only| Gateway[cybou-web-gateway]
+    Gateway -->|D-Bus org.cybou.Body.Shell1| ShellD[cybou-shelld]
+    ShellD -->|JailFs PTY / Bubblewrap| Sandbox[Kernel Sandbox: cgroups v2 / Private FS]
 ```
 
 Cross-zone rules:

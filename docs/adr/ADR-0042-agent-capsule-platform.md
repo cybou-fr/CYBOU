@@ -75,21 +75,21 @@ kind of thing from a coding agent and is not a prerequisite for any of this.
 An agent runs inside a capsule. The capsule is what is granted, observed, budgeted and destroyed —
 not the agent, and not each command the agent runs.
 
-```text
+### Agent Capsule Properties
+
 AgentCapsule
-├── agent identity          which agent, which version
-├── ACP endpoint            how Cybou speaks to it
-├── workspace               the one directory it may change
-├── process namespace       its own processes, and only its own
-├── filesystem namespace    the host's filesystem is not in it
-├── network namespace       an allow-list of destinations
-├── model lease             a class of model and a spending ceiling
-├── MCP grants              which tools, and which methods of them
-├── resource budget         CPU, memory, wall-clock
-├── secrets lease           handles, never provider credentials
-├── lifetime                when this stops existing
-└── audit and telemetry     what it did, continuously
-```
+- **agent identity**: which agent, which version
+- **ACP endpoint**: how Cybou speaks to it
+- **workspace**: the one directory it may change
+- **process namespace**: its own processes, and only its own
+- **filesystem namespace**: the host's filesystem is not in it
+- **network namespace**: an allow-list of destinations
+- **model lease**: a class of model and a spending ceiling
+- **MCP grants**: which tools, and which methods of them
+- **resource budget**: CPU, memory, wall-clock
+- **secrets lease**: handles, never provider credentials
+- **lifetime**: when this stops existing
+- **audit and telemetry**: what it did, continuously
 
 ### Autonomy inside the capsule; a proposal at its boundary
 
@@ -231,8 +231,8 @@ behind a trait with one implementation to begin with, so replacing it later chan
 
 ```text
 CapsuleBackend
-  └── BubblewrapV1        (first)
-      NativeLinuxV2       (later, if it earns its place)
+  - BubblewrapV1        (first)
+  NativeLinuxV2       (later, if it earns its place)
 ```
 
 **Rootless first, and no privileged helper until a gate proves one is needed.** Unprivileged user

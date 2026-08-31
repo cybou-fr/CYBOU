@@ -15,11 +15,11 @@ model.
 
 ```text
 Body / user / sensor
-        │ raw signal or testimony
-        ▼
+  raw signal or testimony
+  ▼
 perception adapter
-        │ candidate + provenance + privacy
-        ▼
+  candidate + provenance + privacy
+  ▼
 protocol validation → Event1 acceptance → Journal
 ```
 

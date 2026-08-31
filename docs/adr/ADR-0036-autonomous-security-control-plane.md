@@ -35,7 +35,7 @@ Act
 Verify
   ↓
 Learn
-  └──────────↺
+  - ↺
 ```
 
 ### Security and operations state are first-class concerns
