@@ -4,15 +4,14 @@
 //! Meaning Hub: Integrates Meaning1 deterministic language parsing, reference resolution,
 //! and multilingual realization into the Cybou Web Gateway.
 
-use std::sync::Mutex;
 use cybou_meaning::{Dialogue, Language, interpret, realize};
 use cybou_protocol::meaning::{
-    CognitiveAct, CognitiveActKind, MeaningInterpretation, Qualification,
-    ResponsePlan,
+    CognitiveAct, CognitiveActKind, MeaningInterpretation, Qualification, ResponsePlan,
 };
 use cybou_web_contracts::{
     DialogueMemoryProjection, MeaningInterpretProjection, MeaningInterpretRequest, WEB_SCHEMA_V1,
 };
+use std::sync::Mutex;
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
@@ -37,7 +36,10 @@ impl MeaningHub {
     }
 
     /// Interpret an utterance into a typed cognitive act and formulate a qualified response.
-    pub fn process_utterance(&self, request: &MeaningInterpretRequest) -> MeaningInterpretProjection {
+    pub fn process_utterance(
+        &self,
+        request: &MeaningInterpretRequest,
+    ) -> MeaningInterpretProjection {
         let now = OffsetDateTime::now_utc();
         let lang = match request.language.as_deref().unwrap_or("en") {
             "ru" => Language::Russian,

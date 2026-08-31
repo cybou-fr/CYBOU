@@ -686,7 +686,8 @@ pub const FILE_WRITE_MAX_BYTES: usize = 256 * 1024;
 pub use cybou_protocol::terminal::{
     FromGateway as TerminalFromGateway, FromOwner as TerminalFromOwner,
     MAX_COLUMNS as TERMINAL_MAX_COLUMNS, MAX_FRAME_BYTES as TERMINAL_MAX_FRAME_BYTES,
-    MAX_ROWS as TERMINAL_MAX_ROWS, Refusal as TerminalRefusal, window_is_possible as terminal_window_is_possible,
+    MAX_ROWS as TERMINAL_MAX_ROWS, Refusal as TerminalRefusal,
+    window_is_possible as terminal_window_is_possible,
 };
 
 /// How many bytes one file transfer carries, in either direction.
@@ -1210,9 +1211,8 @@ pub struct NotificationActionRequest {
 // -------------------------------------------------------------------------------------------------
 
 pub use cybou_protocol::system::{
-    CpuCoreStat, DiskPartitionInfo, NetworkInterfaceInfo, ProcessRecord, ProcessSignal,
-    LogsUnavailable, ServiceAction, ServiceRecord, ServiceState, ServiceUnitType,
-    SystemLogEntry,
+    CpuCoreStat, DiskPartitionInfo, LogsUnavailable, NetworkInterfaceInfo, ProcessRecord,
+    ProcessSignal, ServiceAction, ServiceRecord, ServiceState, ServiceUnitType, SystemLogEntry,
 };
 
 /// Projection listing system service daemons.
@@ -1507,7 +1507,10 @@ pub struct SecuritySettingsProjection {
 /// Request to update security confinement policies.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(clippy::struct_excessive_bools, reason = "one field per kernel confinement mechanism")]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one field per kernel confinement mechanism"
+)]
 pub struct UpdateSecurityPolicyRequest {
     /// Linux Landlock filesystem sandbox status.
     pub landlock_enabled: bool,
@@ -1820,15 +1823,11 @@ pub struct DialogueMemoryProjection {
     pub turns_bound: u64,
 }
 
+pub use cybou_protocol::governance::{ActorKind, TaskScope, ToolCallProposal, ToolCallVerdict};
 pub use cybou_protocol::learning::{
     ArtifactStatus, LearnedArtifactLineage, LearningCandidate, LearningLayer, PromotionGate,
 };
-pub use cybou_protocol::promotion::{
-    DemonstratedOutcome, Promoted, PromotionRefused,
-};
-pub use cybou_protocol::governance::{
-    ActorKind, TaskScope, ToolCallProposal, ToolCallVerdict,
-};
+pub use cybou_protocol::promotion::{DemonstratedOutcome, Promoted, PromotionRefused};
 
 /// Projection for active and historical lifelong learning candidates.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -2090,7 +2089,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::too_many_lines, reason = "one round trip per contract, in one place")]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one round trip per contract, in one place"
+    )]
     fn system_contracts_round_trip() {
         use super::{
             BackupArchiveRecord, BackupRepositoryRecord, BackupScheduleRecord,
@@ -2368,7 +2370,8 @@ mod tests {
                 to: vec!["operator@cybou.local".to_string()],
                 subject: "Weekly Landlock Policy Audit".to_string(),
                 preview: "Audit completed with 0 violations".to_string(),
-                body: "# Weekly Security Audit\nAll agent capsules executed under Landlock v3.".to_string(),
+                body: "# Weekly Security Audit\nAll agent capsules executed under Landlock v3."
+                    .to_string(),
                 timestamp: "2026-08-28T22:00:00Z".to_string(),
                 is_unread: true,
                 is_starred: true,
@@ -2407,7 +2410,8 @@ mod tests {
             notes: vec![NoteRecord {
                 id: "note-01".to_string(),
                 title: "CYBOU Spatial Architecture".to_string(),
-                content_markdown: "# Living Canvas\nInfinite 2D spatial canvas with reactive cards.".to_string(),
+                content_markdown:
+                    "# Living Canvas\nInfinite 2D spatial canvas with reactive cards.".to_string(),
                 tags: vec!["architecture".to_string(), "design".to_string()],
                 updated_at: "2026-08-28T23:00:00Z".to_string(),
                 is_pinned: true,
@@ -2441,13 +2445,12 @@ mod tests {
 
     #[test]
     fn cognitive_graph_and_journal_contracts_round_trip() {
-        use std::collections::HashMap;
-        use cybou_protocol::epistemic::EpistemicStatus;
         use super::{
-            CognitiveEdgeRecord, CognitiveEdgeType, CognitiveGraphProjection,
-            CognitiveGraphRecord, CognitiveNodeRecord, CognitiveNodeType, EventJournalEntry,
-            EventJournalProjection,
+            CognitiveEdgeRecord, CognitiveEdgeType, CognitiveGraphProjection, CognitiveGraphRecord,
+            CognitiveNodeRecord, CognitiveNodeType, EventJournalEntry, EventJournalProjection,
         };
+        use cybou_protocol::epistemic::EpistemicStatus;
+        use std::collections::HashMap;
 
         let graph = CognitiveGraphProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -2489,7 +2492,8 @@ mod tests {
                     target_id: "node:service:cybou-web-gateway".to_string(),
                     edge_type: CognitiveEdgeType::Observes,
                     weight: 0.95,
-                    description: "Agent observes gateway REST endpoints and presence stream".to_string(),
+                    description: "Agent observes gateway REST endpoints and presence stream"
+                        .to_string(),
                 }],
             },
             focus_node_id: Some("node:agent:opencode-main".to_string()),
@@ -2523,12 +2527,12 @@ mod tests {
 
     #[test]
     fn capsule_control_and_telemetry_contracts_round_trip() {
-        use cybou_protocol::agent::Standing;
-        use uuid::Uuid;
         use super::{
             CapsuleAction, CapsuleControlRequest, CapsuleTelemetryProjection,
             CapsuleTelemetryRecord, WEB_SCHEMA_V1,
         };
+        use cybou_protocol::agent::Standing;
+        use uuid::Uuid;
 
         let req = CapsuleControlRequest {
             action: CapsuleAction::Quarantine,
@@ -2565,19 +2569,20 @@ mod tests {
 
     #[test]
     fn meaning_contracts_round_trip() {
-        use time::OffsetDateTime;
-        use uuid::Uuid;
         use super::{
             CognitiveAct, CognitiveActKind, MeaningInterpretProjection, MeaningInterpretRequest,
             MeaningInterpretation, Qualification, ResponsePlan, WEB_SCHEMA_V1,
         };
+        use time::OffsetDateTime;
+        use uuid::Uuid;
 
         let req = MeaningInterpretRequest {
             utterance: "explain why cybou-web-gateway restarted".into(),
             language: Some("en".into()),
         };
         let enc_req = serde_json::to_string(&req).expect("serialize req");
-        let dec_req: MeaningInterpretRequest = serde_json::from_str(&enc_req).expect("deserialize req");
+        let dec_req: MeaningInterpretRequest =
+            serde_json::from_str(&enc_req).expect("deserialize req");
         assert_eq!(dec_req, req);
 
         let proj = MeaningInterpretProjection {
@@ -2600,28 +2605,33 @@ mod tests {
             response_plan: Some(ResponsePlan {
                 plan_id: Uuid::new_v4(),
                 intent: "explain_restart".into(),
-                key_points: vec!["Service cybou-web-gateway restarted due to SIGHUP configuration reload".into()],
+                key_points: vec![
+                    "Service cybou-web-gateway restarted due to SIGHUP configuration reload".into(),
+                ],
                 referenced_evidence: Vec::new(),
                 qualifications: vec![Qualification::Unverified],
             }),
-            realization: Some("The service cybou-web-gateway restarted due to SIGHUP reload.".into()),
+            realization: Some(
+                "The service cybou-web-gateway restarted due to SIGHUP reload.".into(),
+            ),
         };
 
         let enc_proj = serde_json::to_string(&proj).expect("serialize proj");
-        let dec_proj: MeaningInterpretProjection = serde_json::from_str(&enc_proj).expect("deserialize proj");
+        let dec_proj: MeaningInterpretProjection =
+            serde_json::from_str(&enc_proj).expect("deserialize proj");
         assert_eq!(dec_proj, proj);
     }
 
     #[test]
     fn learning_and_governance_contracts_round_trip() {
-        use time::OffsetDateTime;
-        use uuid::Uuid;
         use super::{
             ActorKind, ArtifactStatus, CandidateEvaluationProjection, GovernanceScopesProjection,
             LearnedArtifactLineage, LearnedArtifactsProjection, LearningCandidate,
             LearningCandidatesProjection, LearningLayer, Promoted, ProposeLearningCandidateRequest,
             TaskScope, WEB_SCHEMA_V1,
         };
+        use time::OffsetDateTime;
+        use uuid::Uuid;
 
         let now = OffsetDateTime::now_utc();
         let cand_id = Uuid::new_v4();
@@ -2636,7 +2646,8 @@ mod tests {
             outcome_evidence: vec![ev2],
         };
         let enc_prop = serde_json::to_string(&propose).expect("serialize propose");
-        let dec_prop: ProposeLearningCandidateRequest = serde_json::from_str(&enc_prop).expect("deserialize propose");
+        let dec_prop: ProposeLearningCandidateRequest =
+            serde_json::from_str(&enc_prop).expect("deserialize propose");
         assert_eq!(dec_prop, propose);
 
         let candidates = LearningCandidatesProjection {
@@ -2654,7 +2665,8 @@ mod tests {
             total_count: 1,
         };
         let enc_cand = serde_json::to_string(&candidates).expect("serialize candidates");
-        let dec_cand: LearningCandidatesProjection = serde_json::from_str(&enc_cand).expect("deserialize candidates");
+        let dec_cand: LearningCandidatesProjection =
+            serde_json::from_str(&enc_cand).expect("deserialize candidates");
         assert_eq!(dec_cand, candidates);
 
         let artifact_id = Uuid::new_v4();
@@ -2672,7 +2684,8 @@ mod tests {
             total_count: 1,
         };
         let enc_art = serde_json::to_string(&artifacts).expect("serialize artifacts");
-        let dec_art: LearnedArtifactsProjection = serde_json::from_str(&enc_art).expect("deserialize artifacts");
+        let dec_art: LearnedArtifactsProjection =
+            serde_json::from_str(&enc_art).expect("deserialize artifacts");
         assert_eq!(dec_art, artifacts);
 
         let eval_proj = CandidateEvaluationProjection {
@@ -2696,7 +2709,8 @@ mod tests {
             }),
         };
         let enc_eval = serde_json::to_string(&eval_proj).expect("serialize eval_proj");
-        let dec_eval: CandidateEvaluationProjection = serde_json::from_str(&enc_eval).expect("deserialize eval_proj");
+        let dec_eval: CandidateEvaluationProjection =
+            serde_json::from_str(&enc_eval).expect("deserialize eval_proj");
         assert_eq!(dec_eval, eval_proj);
 
         let scopes = GovernanceScopesProjection {
@@ -2715,7 +2729,8 @@ mod tests {
             }],
         };
         let enc_scopes = serde_json::to_string(&scopes).expect("serialize scopes");
-        let dec_scopes: GovernanceScopesProjection = serde_json::from_str(&enc_scopes).expect("deserialize scopes");
+        let dec_scopes: GovernanceScopesProjection =
+            serde_json::from_str(&enc_scopes).expect("deserialize scopes");
         assert_eq!(dec_scopes, scopes);
     }
 }

@@ -17,9 +17,7 @@
 use cybou_fabric::{ACTION, EXECUTOR, decode, encode};
 use cybou_protocol::{
     action::{ActionRecord, AttemptReport, AuthorizationVerdict, ExecutionAttempt},
-    telemetry::{
-        EvidenceStrength, Finding, InsightEvidence, MetricKey, Subject, SystemInsight,
-    },
+    telemetry::{EvidenceStrength, Finding, InsightEvidence, MetricKey, Subject, SystemInsight},
 };
 use std::error::Error;
 use time::OffsetDateTime;
@@ -134,7 +132,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // grant that does not exist.
     match &confirmed.decision.verdict {
         AuthorizationVerdict::GrantedOnConfirmation { confirmed_by } if confirmed_by == SEAT => {}
-        other => return Err(format!("expected a confirmed grant naming its seat, got {other:?}").into()),
+        other => {
+            return Err(
+                format!("expected a confirmed grant naming its seat, got {other:?}").into(),
+            );
+        }
     }
     if confirmed.decision.decision_id == asked {
         return Err("the answer and the question were recorded as one decision".into());

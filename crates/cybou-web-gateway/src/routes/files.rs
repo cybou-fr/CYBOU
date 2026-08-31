@@ -334,8 +334,7 @@ impl IntoResponse for FileDownload {
         let encoded =
             percent_encoding::utf8_percent_encode(&self.file_name, DISPOSITION_SAFE).to_string();
 
-        let disposition =
-            format!("attachment; filename=\"{quoted}\"; filename*=UTF-8''{encoded}");
+        let disposition = format!("attachment; filename=\"{quoted}\"; filename*=UTF-8''{encoded}");
 
         (
             StatusCode::OK,
@@ -492,9 +491,15 @@ mod tests {
             .to_str()
             .expect("the header is printable ASCII");
 
-        assert!(disposition.starts_with("attachment; filename=\"invoicex y.pdf\""), "{disposition}");
+        assert!(
+            disposition.starts_with("attachment; filename=\"invoicex y.pdf\""),
+            "{disposition}"
+        );
         // The exact name still reaches the browser, where it cannot be read as syntax.
-        assert!(disposition.contains("filename*=UTF-8''in%22voice%3B%0Ax%3A%20y.pdf"), "{disposition}");
+        assert!(
+            disposition.contains("filename*=UTF-8''in%22voice%3B%0Ax%3A%20y.pdf"),
+            "{disposition}"
+        );
     }
 
     #[test]
@@ -512,7 +517,10 @@ mod tests {
             "application/octet-stream"
         );
         assert_eq!(
-            response.headers().get(header::X_CONTENT_TYPE_OPTIONS).unwrap(),
+            response
+                .headers()
+                .get(header::X_CONTENT_TYPE_OPTIONS)
+                .unwrap(),
             "nosniff"
         );
     }

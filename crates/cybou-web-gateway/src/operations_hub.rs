@@ -3,14 +3,11 @@
 
 //! Operations Hub for tracking and managing server-owned asynchronous tasks.
 
-use std::{
-    collections::HashMap,
-    sync::RwLock,
-};
 use cybou_protocol::operation::{
     OperationLogEntry, OperationProgress, OperationRecord, OperationState,
 };
 use cybou_web_contracts::{OperationLogsProjection, OperationsListProjection, WEB_SCHEMA_V1};
+use std::{collections::HashMap, sync::RwLock};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -49,10 +46,7 @@ impl OperationsHub {
     #[must_use]
     pub fn list(&self) -> OperationsListProjection {
         let ops = self.operations.read().expect("read operations").clone();
-        let active_count = ops
-            .iter()
-            .filter(|op| !op.state.is_terminal())
-            .count();
+        let active_count = ops.iter().filter(|op| !op.state.is_terminal()).count();
         OperationsListProjection {
             schema_version: WEB_SCHEMA_V1,
             active_count,
@@ -101,7 +95,11 @@ impl OperationsHub {
     }
 
     /// Update progress on an active operation.
-    pub fn update_progress(&self, id: Uuid, progress: OperationProgress) -> Result<(), GatewayError> {
+    pub fn update_progress(
+        &self,
+        id: Uuid,
+        progress: OperationProgress,
+    ) -> Result<(), GatewayError> {
         let mut ops = self.operations.write().expect("write operations");
         let op = ops
             .iter_mut()
@@ -147,7 +145,9 @@ impl OperationsHub {
             .iter_mut()
             .find(|op| op.id == id)
             .ok_or(GatewayError::NotFound)?;
-        op.state = OperationState::Failed { error: error.clone() };
+        op.state = OperationState::Failed {
+            error: error.clone(),
+        };
         op.updated_at = OffsetDateTime::now_utc();
         op.finished_at = Some(OffsetDateTime::now_utc());
         drop(ops);

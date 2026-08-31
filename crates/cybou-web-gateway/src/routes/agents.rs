@@ -384,7 +384,9 @@ async fn action(capsule_id: &str, action: &str) -> Result<bool, String> {
         .map_err(|error| error.to_string())
 }
 
-async fn telemetry(capsule_id: &str) -> Result<cybou_protocol::agent::CapsuleTelemetryRecord, String> {
+async fn telemetry(
+    capsule_id: &str,
+) -> Result<cybou_protocol::agent::CapsuleTelemetryRecord, String> {
     let reply: Vec<u8> = zbus::Connection::session()
         .await
         .map_err(|error| error.to_string())?

@@ -3,11 +3,7 @@
 
 //! HTTP endpoints for querying and managing desktop notifications.
 
-use axum::{
-    Json,
-    extract::State,
-    http::StatusCode,
-};
+use axum::{Json, extract::State, http::StatusCode};
 use cybou_web_contracts::{
     NotificationActionRequest, NotificationDismissRequest, NotificationsListProjection,
 };
@@ -85,7 +81,11 @@ mod tests {
         assert!(result.is_ok());
 
         let final_list = hub.list();
-        let updated = final_list.notifications.iter().find(|n| n.id == notif_id).unwrap();
+        let updated = final_list
+            .notifications
+            .iter()
+            .find(|n| n.id == notif_id)
+            .unwrap();
         assert!(updated.dismissed);
     }
 }

@@ -144,19 +144,13 @@ impl Owner {
             Request::CreateDirectory { path, recursive } => self
                 .create_directory(&path, recursive)
                 .map_or(Response::Refused, |_| Response::Success),
-            Request::RenamePath {
-                from_path,
-                to_path,
-            } => self
+            Request::RenamePath { from_path, to_path } => self
                 .rename_path(&from_path, &to_path)
                 .map_or(Response::Refused, |_| Response::Success),
             Request::DeletePath { path, recursive } => self
                 .delete_path(&path, recursive)
                 .map_or(Response::Refused, |_| Response::Success),
-            Request::CopyPath {
-                from_path,
-                to_path,
-            } => self
+            Request::CopyPath { from_path, to_path } => self
                 .copy_path(&from_path, &to_path)
                 .map_or(Response::Refused, |_| Response::Success),
         }

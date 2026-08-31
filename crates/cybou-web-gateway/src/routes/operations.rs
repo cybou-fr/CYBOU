@@ -8,7 +8,9 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-use cybou_web_contracts::{OperationCancelRequest, OperationLogsProjection, OperationsListProjection};
+use cybou_web_contracts::{
+    OperationCancelRequest, OperationLogsProjection, OperationsListProjection,
+};
 use uuid::Uuid;
 
 use crate::state::{GatewayError, GatewayState};
@@ -45,7 +47,9 @@ pub async fn cancel_operation(
     State(state): State<GatewayState>,
     Json(request): Json<OperationCancelRequest>,
 ) -> Result<StatusCode, GatewayError> {
-    state.operations.cancel(request.operation_id, request.reason)?;
+    state
+        .operations
+        .cancel(request.operation_id, request.reason)?;
     Ok(StatusCode::OK)
 }
 

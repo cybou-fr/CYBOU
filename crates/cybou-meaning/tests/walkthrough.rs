@@ -279,20 +279,10 @@ fn the_same_question_asked_twice_reads_the_same_way() {
     // thing a person compares — the sentence.
     let context = kitchen(Some("honey"));
     let workspace = WorkspaceCore::new(32);
-    let first = walk(
-        &context,
-        &workspace,
-        "what is lemon",
-        &generous_budget(),
-    );
+    let first = walk(&context, &workspace, "what is lemon", &generous_budget());
     for _ in 0..8 {
         assert_eq!(
-            walk(
-                &context,
-                &workspace,
-                "what is lemon",
-                &generous_budget(),
-            ),
+            walk(&context, &workspace, "what is lemon", &generous_budget(),),
             first
         );
     }

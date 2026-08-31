@@ -39,8 +39,8 @@ pub mod promotion;
 pub mod security;
 pub mod subject;
 pub mod system;
-pub mod terminal;
 pub mod telemetry;
+pub mod terminal;
 
 pub use admission::Kind;
 pub use location::LocationRef;

@@ -264,7 +264,9 @@ async fn record_lifecycle(record: &crate::ActionRecord, now: OffsetDateTime) {
             // was not recorded" about a step the Journal is holding — which is how a confirmation
             // that reached the Journal correctly came to look like one that did not.
             Err(EventClientError::Rejected(why))
-                if why.contains(&cybou_protocol::admission::Rejection::DuplicateMessageId.to_string()) => {}
+                if why.contains(
+                    &cybou_protocol::admission::Rejection::DuplicateMessageId.to_string(),
+                ) => {}
             Err(error) => {
                 eprintln!("[cybou-actiond] A lifecycle step was not recorded: {error}");
             }

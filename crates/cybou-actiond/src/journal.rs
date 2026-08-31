@@ -73,8 +73,8 @@
 //! claimed simply was not, and the decision that produced it is still there to be read.
 
 use cybou_protocol::action::{
-    ActionOutcome, ActionProposal, AuthorizationDecision, CriticismCheck,
-    ExecutionAttempt, ExecutionStarted,
+    ActionOutcome, ActionProposal, AuthorizationDecision, CriticismCheck, ExecutionAttempt,
+    ExecutionStarted,
 };
 use cybou_protocol::admission::Kind;
 use cybou_protocol::canonical::CanonicalEnvelope;

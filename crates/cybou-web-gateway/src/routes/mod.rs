@@ -26,7 +26,6 @@ pub mod terminal;
 use axum::http::StatusCode;
 
 pub use actions::{actions_handler, confirm_action_handler, recent_actions_handler};
-pub use terminal::terminal_handler;
 pub use agents::{
     agent_offers_handler, agents_handler, capsule_action_handler, capsule_telemetry_handler,
     launch_agent_handler, stop_agent_handler,
@@ -41,8 +40,7 @@ pub use drafts::{
 pub use events::events_handler;
 pub use files::{
     FileDownload, create_file_handler, download_file_handler, list_directory_handler,
-    read_file_handler,
-    upload_file_handler, write_file_handler,
+    read_file_handler, upload_file_handler, write_file_handler,
 };
 pub use host_files::{
     copy_host_path_handler, create_host_directory_handler, create_host_file_handler,
@@ -58,8 +56,8 @@ pub use meaning::{dialogue_memory_handler, interpret_handler};
 pub use notifications::{dismiss_notifications, execute_notification_action, list_notifications};
 pub use operations::{cancel_operation, get_operation, get_operation_logs, list_operations};
 pub use personal::{
-    create_calendar_event, create_contact, create_note, get_calendar, get_contacts, get_notes,
-    get_mail, send_mail, update_note,
+    create_calendar_event, create_contact, create_note, get_calendar, get_contacts, get_mail,
+    get_notes, send_mail, update_note,
 };
 pub use shell::{shell_close_handler, shell_exec_handler};
 pub use snapshot::{mind_handler, snapshot_handler};
@@ -71,6 +69,7 @@ pub use system::{
     restore_archive, restore_snapshot, send_process_signal, trigger_backup, update_backup_schedule,
     update_security_policy,
 };
+pub use terminal::terminal_handler;
 
 /// 404 handler for unmatched API routes preventing SPA fallback on API endpoints.
 pub async fn api_not_found() -> StatusCode {

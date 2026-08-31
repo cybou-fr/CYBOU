@@ -3,7 +3,6 @@
 
 //! HTTP endpoints for the Canonical Event1 Journal & Deep Cognitive Graph (Milestone 7).
 
-use std::collections::HashSet;
 use axum::{
     Json,
     extract::{Query, State},
@@ -15,6 +14,7 @@ use cybou_web_contracts::{
     CognitiveGraphProjection, CognitiveQueryRequest, EventJournalProjection, WEB_SCHEMA_V1,
 };
 use serde::Deserialize;
+use std::collections::HashSet;
 
 use crate::state::{GatewayError, GatewayState};
 
@@ -111,20 +111,27 @@ pub async fn get_event_journal(
 
     if let Ok(mind) = state.presence.mind().await {
         let journal = &mind.journal;
-        let total = journal.contribution_count.map(|c| c as usize).unwrap_or(journal.recent.len());
+        let total = journal
+            .contribution_count
+            .map(|c| c as usize)
+            .unwrap_or(journal.recent.len());
         if journal_proj.entries.is_empty() && !journal.recent.is_empty() {
-            let mapped: Vec<EventJournalEntry> = journal.recent.iter().map(|c| EventJournalEntry {
-                event_id: c.message_id.clone(),
-                causation_id: None,
-                correlation_id: c.message_id.clone(),
-                origin_organ: c.origin_organ.clone(),
-                event_type: c.kind.clone(),
-                summary: format!("{} contribution from {}", c.kind, c.origin_organ),
-                payload_preview: "Canonical Event1 Journal Contribution".to_owned(),
-                timestamp: c.recorded_at.clone(),
-                subject: None,
-                epistemic_status: cybou_protocol::epistemic::EpistemicStatus::Observed,
-            }).collect();
+            let mapped: Vec<EventJournalEntry> = journal
+                .recent
+                .iter()
+                .map(|c| EventJournalEntry {
+                    event_id: c.message_id.clone(),
+                    causation_id: None,
+                    correlation_id: c.message_id.clone(),
+                    origin_organ: c.origin_organ.clone(),
+                    event_type: c.kind.clone(),
+                    summary: format!("{} contribution from {}", c.kind, c.origin_organ),
+                    payload_preview: "Canonical Event1 Journal Contribution".to_owned(),
+                    timestamp: c.recorded_at.clone(),
+                    subject: None,
+                    epistemic_status: cybou_protocol::epistemic::EpistemicStatus::Observed,
+                })
+                .collect();
             journal_proj.total_count = total.max(mapped.len());
             journal_proj.entries = mapped;
         }

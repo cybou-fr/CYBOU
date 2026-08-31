@@ -4,21 +4,19 @@
 //! Learning & Governance Hub: Manages layered lifelong learning candidates,
 //! deterministic promotion gates, durable artifact lineages, and task-scoped capability governance.
 
-use std::path::PathBuf;
-use std::sync::Mutex;
+use cybou_protocol::governance::TaskScope;
 use cybou_protocol::learning::{
     ArtifactStatus, LearnedArtifactLineage, LearningCandidate, LearningLayer, PromotionGate,
 };
-use cybou_protocol::promotion::{
-    DemonstratedOutcome, evaluate_promotion,
-};
-use cybou_protocol::governance::TaskScope;
+use cybou_protocol::promotion::{DemonstratedOutcome, evaluate_promotion};
 use cybou_web_contracts::{
     CandidateEvaluationProjection, GovernanceScopesProjection, LearnedArtifactsProjection,
     LearningCandidatesProjection, ProposeLearningCandidateRequest, RevokeArtifactRequest,
     WEB_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::Mutex;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -100,10 +98,26 @@ impl LearningHub {
         };
 
         let store = LearningStore {
-            candidates: self.candidates.lock().unwrap_or_else(|e| e.into_inner()).clone(),
-            demonstrations: self.demonstrations.lock().unwrap_or_else(|e| e.into_inner()).clone(),
-            artifacts: self.artifacts.lock().unwrap_or_else(|e| e.into_inner()).clone(),
-            scopes: self.scopes.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            candidates: self
+                .candidates
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            demonstrations: self
+                .demonstrations
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            artifacts: self
+                .artifacts
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            scopes: self
+                .scopes
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
         };
 
         if let Ok(json_bytes) = serde_json::to_vec_pretty(&store) {
@@ -115,7 +129,10 @@ impl LearningHub {
     }
 
     /// Retrieve active learning candidates filtered by optional layer.
-    pub fn get_candidates(&self, layer_filter: Option<LearningLayer>) -> LearningCandidatesProjection {
+    pub fn get_candidates(
+        &self,
+        layer_filter: Option<LearningLayer>,
+    ) -> LearningCandidatesProjection {
         let candidates = self.candidates.lock().unwrap_or_else(|e| e.into_inner());
         let filtered: Vec<LearningCandidate> = candidates
             .iter()
@@ -170,7 +187,10 @@ impl LearningHub {
         let outcomes = if let Some(outs) = supplied_outcomes {
             outs
         } else {
-            let demos = self.demonstrations.lock().unwrap_or_else(|e| e.into_inner());
+            let demos = self
+                .demonstrations
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             demos
                 .iter()
                 .find(|(id, _)| *id == candidate_id)
@@ -242,7 +262,10 @@ impl LearningHub {
     /// Revoke or deprecate a promoted artifact.
     pub fn revoke_artifact(&self, req: RevokeArtifactRequest) -> bool {
         let mut artifacts = self.artifacts.lock().unwrap_or_else(|e| e.into_inner());
-        let revoked = if let Some(art) = artifacts.iter_mut().find(|a| a.artifact_id == req.artifact_id) {
+        let revoked = if let Some(art) = artifacts
+            .iter_mut()
+            .find(|a| a.artifact_id == req.artifact_id)
+        {
             art.status = ArtifactStatus::Revoked;
             true
         } else {

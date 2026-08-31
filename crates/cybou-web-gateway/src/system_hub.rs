@@ -3,7 +3,6 @@
 
 //! Grounded provider and Action1 boundary for system services, processes, telemetry, logs, storage, network, packages, users, security, and backups.
 
-use std::sync::RwLock;
 use cybou_protocol::system::{
     BackupArchiveRecord, BackupRepositoryRecord, BackupScheduleRecord, NetworkConnectionRecord,
     PackageRecord, ProcessSignal, SecurityAuditEntry, SecurityPolicyRecord, ServiceAction,
@@ -13,8 +12,10 @@ use cybou_web_contracts::{
     BackupSettingsProjection, NetworkProjection, PackagesProjection, ProcessesListProjection,
     SecuritySettingsProjection, ServicesListProjection, StorageProjection, SystemLogsProjection,
     SystemLogsQueryRequest, SystemMonitorProjection, SystemUpdatesProjection,
-    UpdateBackupScheduleRequest, UpdateSecurityPolicyRequest, UsersSettingsProjection, WEB_SCHEMA_V1,
+    UpdateBackupScheduleRequest, UpdateSecurityPolicyRequest, UsersSettingsProjection,
+    WEB_SCHEMA_V1,
 };
+use std::sync::RwLock;
 
 use crate::state::GatewayError;
 use crate::system_reader;
@@ -86,7 +87,11 @@ impl SystemHub {
     /// Execute an action on a service through governed authority.
     ///
     /// Direct in-memory simulation is prohibited: privileged execution requires Action1 proposal.
-    pub fn execute_service_action(&self, _name: &str, _action: ServiceAction) -> Result<String, GatewayError> {
+    pub fn execute_service_action(
+        &self,
+        _name: &str,
+        _action: ServiceAction,
+    ) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
 
@@ -99,7 +104,11 @@ impl SystemHub {
     /// Send a signal to an operating system process.
     ///
     /// Direct in-memory simulation is prohibited: privileged process termination requires Action1 or unprivileged self ownership.
-    pub fn send_process_signal(&self, _pid: u32, _signal: ProcessSignal) -> Result<String, GatewayError> {
+    pub fn send_process_signal(
+        &self,
+        _pid: u32,
+        _signal: ProcessSignal,
+    ) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
 
@@ -142,12 +151,19 @@ impl SystemHub {
     #[must_use]
     pub fn get_storage(&self) -> StorageProjection {
         let monitor = system_reader::read_real_monitor();
-        let root_disk = monitor.disk_partitions.into_iter().find(|d| d.mount_point == "/");
+        let root_disk = monitor
+            .disk_partitions
+            .into_iter()
+            .find(|d| d.mount_point == "/");
         let (total_space_bytes, free_space_bytes) = root_disk
             .map(|d| (d.total_bytes, d.available_bytes))
             .unwrap_or((0, 0));
 
-        let snapshots = self.snapshots.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let snapshots = self
+            .snapshots
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
 
         StorageProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -159,7 +175,12 @@ impl SystemHub {
     }
 
     /// Create a storage snapshot.
-    pub fn create_snapshot(&self, _subvolume: &str, _name: &str, _readonly: bool) -> Result<SnapshotRecord, GatewayError> {
+    pub fn create_snapshot(
+        &self,
+        _subvolume: &str,
+        _name: &str,
+        _readonly: bool,
+    ) -> Result<SnapshotRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 
@@ -171,7 +192,11 @@ impl SystemHub {
     /// Get network status.
     #[must_use]
     pub fn get_network(&self) -> NetworkProjection {
-        let connections = self.connections.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let connections = self
+            .connections
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
 
         NetworkProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -180,14 +205,22 @@ impl SystemHub {
     }
 
     /// Connect to a network.
-    pub fn connect_network(&self, _connection_id: &str, _activate: bool) -> Result<String, GatewayError> {
+    pub fn connect_network(
+        &self,
+        _connection_id: &str,
+        _activate: bool,
+    ) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
 
     /// Get package repository and installation status.
     #[must_use]
     pub fn get_packages(&self) -> PackagesProjection {
-        let packages = self.packages.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let packages = self
+            .packages
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         let installed_count = packages.len();
         PackagesProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -198,7 +231,11 @@ impl SystemHub {
     }
 
     /// Execute a package operation.
-    pub fn execute_package_action(&self, _package: &str, _action: cybou_protocol::system::PackageActionKind) -> Result<String, GatewayError> {
+    pub fn execute_package_action(
+        &self,
+        _package: &str,
+        _action: cybou_protocol::system::PackageActionKind,
+    ) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
 
@@ -219,7 +256,10 @@ impl SystemHub {
     }
 
     /// Apply system updates.
-    pub fn apply_system_updates(&self, _package_names: Option<Vec<String>>) -> Result<String, GatewayError> {
+    pub fn apply_system_updates(
+        &self,
+        _package_names: Option<Vec<String>>,
+    ) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
 
@@ -227,7 +267,11 @@ impl SystemHub {
     #[must_use]
     pub fn get_users_settings(&self) -> UsersSettingsProjection {
         let users = self.users.read().unwrap_or_else(|e| e.into_inner()).clone();
-        let ssh_keys = self.ssh_keys.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let ssh_keys = self
+            .ssh_keys
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         UsersSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
             users,
@@ -236,12 +280,21 @@ impl SystemHub {
     }
 
     /// Create a new user account.
-    pub fn create_user(&self, _username: &str, _full_name: &str, _is_admin: bool) -> Result<UserAccountRecord, GatewayError> {
+    pub fn create_user(
+        &self,
+        _username: &str,
+        _full_name: &str,
+        _is_admin: bool,
+    ) -> Result<UserAccountRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 
     /// Add an authorized SSH key.
-    pub fn add_ssh_key(&self, _name: &str, _public_key: &str) -> Result<SshKeyRecord, GatewayError> {
+    pub fn add_ssh_key(
+        &self,
+        _name: &str,
+        _public_key: &str,
+    ) -> Result<SshKeyRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 
@@ -253,8 +306,16 @@ impl SystemHub {
     /// Get security settings and policy.
     #[must_use]
     pub fn get_security_settings(&self) -> SecuritySettingsProjection {
-        let policy = self.security_policy.read().unwrap_or_else(|e| e.into_inner()).clone();
-        let audit_log = self.security_audit.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let policy = self
+            .security_policy
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let audit_log = self
+            .security_audit
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         SecuritySettingsProjection {
             schema_version: WEB_SCHEMA_V1,
             policy,
@@ -263,16 +324,31 @@ impl SystemHub {
     }
 
     /// Update security policy.
-    pub fn update_security_policy(&self, _req: UpdateSecurityPolicyRequest) -> Result<SecurityPolicyRecord, GatewayError> {
+    pub fn update_security_policy(
+        &self,
+        _req: UpdateSecurityPolicyRequest,
+    ) -> Result<SecurityPolicyRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 
     /// Get backup repository settings.
     #[must_use]
     pub fn get_backup_settings(&self) -> BackupSettingsProjection {
-        let repository = self.backup_repo.read().unwrap_or_else(|e| e.into_inner()).clone();
-        let archives = self.backup_archives.read().unwrap_or_else(|e| e.into_inner()).clone();
-        let schedule = self.backup_schedule.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let repository = self
+            .backup_repo
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let archives = self
+            .backup_archives
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let schedule = self
+            .backup_schedule
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         BackupSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
             repository,
@@ -282,17 +358,27 @@ impl SystemHub {
     }
 
     /// Trigger a backup job.
-    pub fn trigger_backup(&self, _comment: Option<String>) -> Result<BackupArchiveRecord, GatewayError> {
+    pub fn trigger_backup(
+        &self,
+        _comment: Option<String>,
+    ) -> Result<BackupArchiveRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 
     /// Restore a backup archive.
-    pub fn restore_archive(&self, _archive_id: &str, _target_path: Option<String>) -> Result<String, GatewayError> {
+    pub fn restore_archive(
+        &self,
+        _archive_id: &str,
+        _target_path: Option<String>,
+    ) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
 
     /// Update backup schedule.
-    pub fn update_backup_schedule(&self, _req: UpdateBackupScheduleRequest) -> Result<BackupScheduleRecord, GatewayError> {
+    pub fn update_backup_schedule(
+        &self,
+        _req: UpdateBackupScheduleRequest,
+    ) -> Result<BackupScheduleRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 }

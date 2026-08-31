@@ -3,10 +3,10 @@
 
 //! Cognitive Graph & Canonical Event1 Journal representations (Milestone 7).
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use crate::epistemic::EpistemicStatus;
 use crate::subject::SubjectRef;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Kind and attributes of a node in the unified CYBOU Cognitive Graph.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

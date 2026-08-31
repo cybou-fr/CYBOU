@@ -421,7 +421,10 @@ pub struct SshKeyRecord {
 /// collapsing them into an enum would have to invent an order of severity between confinements
 /// that do not compare.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[allow(clippy::struct_excessive_bools, reason = "one field per kernel confinement mechanism")]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one field per kernel confinement mechanism"
+)]
 pub struct SecurityPolicyRecord {
     /// Linux Landlock filesystem sandbox status.
     pub landlock_enabled: bool,

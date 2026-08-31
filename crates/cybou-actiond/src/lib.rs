@@ -158,7 +158,7 @@ impl ActionCore {
     /// # Errors
     ///
     /// Refuses unknown, consumed, expired permits and unavailable internal state.
-     /// Grant a proposal that was waiting on a person, because a person said yes.
+    /// Grant a proposal that was waiting on a person, because a person said yes.
     ///
     /// This is the other half of a verdict the host has been able to reach since ADR-0022 and has
     /// never been able to act on: with no standing policy — the default, and the only state a

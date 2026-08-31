@@ -7,8 +7,8 @@
 //! associate directly with a [`SubjectRef`] (such as a local agent session, background operation,
 //! system service, or project host path) to bridge personal productivity with host cognition.
 
-use serde::{Deserialize, Serialize};
 use crate::subject::SubjectRef;
+use serde::{Deserialize, Serialize};
 
 /// Folder kind for personal electronic mailboxes.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

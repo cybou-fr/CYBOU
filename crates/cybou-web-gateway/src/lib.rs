@@ -31,10 +31,10 @@ pub mod fixture;
 pub mod host_files_socket;
 /// Insight summaries.
 pub mod insight;
-/// Meaning and dialogue parsing engine.
-pub mod meaning_hub;
 /// Lifelong learning candidate evaluation, artifact lineages, and capability governance.
 pub mod learning_hub;
+/// Meaning and dialogue parsing engine.
+pub mod meaning_hub;
 /// Desktop notifications hub.
 pub mod notifications_hub;
 /// Long-running server operations manager.
@@ -70,28 +70,26 @@ pub use state::{
 
 use routes::{
     actions_handler, add_ssh_key, agent_offers_handler, agents_handler, api_not_found,
-    confirm_action_handler, terminal_handler,
     apply_system_updates, cancel_operation, capsule_action_handler, capsule_telemetry_handler,
-    connect_network, copy_host_path_handler, create_calendar_event, create_contact,
-    create_file_handler, create_host_directory_handler, create_host_file_handler, create_note,
-    create_snapshot, create_user, delete_draft_handler, delete_host_path_handler, delete_ssh_key,
-    dialogue_memory_handler, disclosure_handler, dismiss_notifications, download_file_handler,
-    events_handler,
-    execute_notification_action, execute_package_action, execute_service_action,
-    get_artifacts_handler, get_backup_settings, get_calendar, get_candidates_handler,
-    get_cognitive_graph, get_contacts, get_event_journal, get_governance_scopes_handler,
-    get_mail, get_network, get_notes, get_operation, get_operation_logs, get_packages,
-    get_security_settings, get_storage, get_system_logs, get_system_monitor, get_system_updates,
-    get_users_settings, insight_handler, interpret_handler, launch_agent_handler,
-    list_directory_handler, list_drafts_handler, list_host_directory_handler, list_notifications,
-    list_operations, list_processes, list_services, login_handler, logout_handler, mind_handler,
-    propose_candidate_handler, query_cognitive_graph, read_file_handler, read_host_file_handler,
-    recent_actions_handler, rename_host_path_handler, restore_archive, restore_snapshot,
-    revoke_artifact_handler, save_draft_handler, send_mail, send_process_signal, session_handler,
-    shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler, trigger_backup,
-    update_backup_schedule, update_note, update_security_policy, upload_file_handler,
-    write_file_handler,
-    write_host_file_handler, evaluate_candidate_handler,
+    confirm_action_handler, connect_network, copy_host_path_handler, create_calendar_event,
+    create_contact, create_file_handler, create_host_directory_handler, create_host_file_handler,
+    create_note, create_snapshot, create_user, delete_draft_handler, delete_host_path_handler,
+    delete_ssh_key, dialogue_memory_handler, disclosure_handler, dismiss_notifications,
+    download_file_handler, evaluate_candidate_handler, events_handler, execute_notification_action,
+    execute_package_action, execute_service_action, get_artifacts_handler, get_backup_settings,
+    get_calendar, get_candidates_handler, get_cognitive_graph, get_contacts, get_event_journal,
+    get_governance_scopes_handler, get_mail, get_network, get_notes, get_operation,
+    get_operation_logs, get_packages, get_security_settings, get_storage, get_system_logs,
+    get_system_monitor, get_system_updates, get_users_settings, insight_handler, interpret_handler,
+    launch_agent_handler, list_directory_handler, list_drafts_handler, list_host_directory_handler,
+    list_notifications, list_operations, list_processes, list_services, login_handler,
+    logout_handler, mind_handler, propose_candidate_handler, query_cognitive_graph,
+    read_file_handler, read_host_file_handler, recent_actions_handler, rename_host_path_handler,
+    restore_archive, restore_snapshot, revoke_artifact_handler, save_draft_handler, send_mail,
+    send_process_signal, session_handler, shell_close_handler, shell_exec_handler,
+    snapshot_handler, stop_agent_handler, terminal_handler, trigger_backup, update_backup_schedule,
+    update_note, update_security_policy, upload_file_handler, write_file_handler,
+    write_host_file_handler,
 };
 use state::GatewayState;
 
@@ -266,8 +264,14 @@ pub(crate) fn router_in_sandbox(
             get(agents_handler).post(launch_agent_handler),
         )
         .route("/api/v1/agents/{capsule_id}", delete(stop_agent_handler))
-        .route("/api/v1/agents/{capsule_id}/action", post(capsule_action_handler))
-        .route("/api/v1/agents/{capsule_id}/telemetry", get(capsule_telemetry_handler))
+        .route(
+            "/api/v1/agents/{capsule_id}/action",
+            post(capsule_action_handler),
+        )
+        .route(
+            "/api/v1/agents/{capsule_id}/telemetry",
+            get(capsule_telemetry_handler),
+        )
         .route("/api/v1/shell/exec", post(shell_exec_handler))
         .route("/api/v1/shell/close", post(shell_close_handler))
         .route("/api/v1/files/list", post(list_directory_handler))
@@ -281,13 +285,18 @@ pub(crate) fn router_in_sandbox(
                 // A base64 body is four bytes per three, and axum's default cap is smaller
                 // than one transfer. Raised for this route alone: every other route on this
                 // surface carries a projection, and none of them should be able to grow.
-                .layer(DefaultBodyLimit::max(FILE_TRANSFER_MAX_BYTES / 3 * 4 + 1024)),
+                .layer(DefaultBodyLimit::max(
+                    FILE_TRANSFER_MAX_BYTES / 3 * 4 + 1024,
+                )),
         )
         .route("/api/v1/host-files/list", post(list_host_directory_handler))
         .route("/api/v1/host-files/read", post(read_host_file_handler))
         .route("/api/v1/host-files/write", post(write_host_file_handler))
         .route("/api/v1/host-files/create", post(create_host_file_handler))
-        .route("/api/v1/host-files/mkdir", post(create_host_directory_handler))
+        .route(
+            "/api/v1/host-files/mkdir",
+            post(create_host_directory_handler),
+        )
         .route("/api/v1/host-files/rename", post(rename_host_path_handler))
         .route("/api/v1/host-files/delete", post(delete_host_path_handler))
         .route("/api/v1/host-files/copy", post(copy_host_path_handler))
@@ -300,9 +309,15 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/operations/cancel", post(cancel_operation))
         .route("/api/v1/notifications", get(list_notifications))
         .route("/api/v1/notifications/dismiss", post(dismiss_notifications))
-        .route("/api/v1/notifications/action", post(execute_notification_action))
+        .route(
+            "/api/v1/notifications/action",
+            post(execute_notification_action),
+        )
         .route("/api/v1/system/services", get(list_services))
-        .route("/api/v1/system/services/action", post(execute_service_action))
+        .route(
+            "/api/v1/system/services/action",
+            post(execute_service_action),
+        )
         .route("/api/v1/system/processes", get(list_processes))
         .route("/api/v1/system/processes/signal", post(send_process_signal))
         .route("/api/v1/system/monitor", get(get_system_monitor))
@@ -313,25 +328,43 @@ pub(crate) fn router_in_sandbox(
         .route("/api/v1/system/network", get(get_network))
         .route("/api/v1/system/network/connect", post(connect_network))
         .route("/api/v1/system/packages", get(get_packages))
-        .route("/api/v1/system/packages/action", post(execute_package_action))
+        .route(
+            "/api/v1/system/packages/action",
+            post(execute_package_action),
+        )
         .route("/api/v1/system/updates", get(get_system_updates))
         .route("/api/v1/system/updates/apply", post(apply_system_updates))
-        .route("/api/v1/system/users", get(get_users_settings).post(create_user))
+        .route(
+            "/api/v1/system/users",
+            get(get_users_settings).post(create_user),
+        )
         .route("/api/v1/system/users/ssh-keys", post(add_ssh_key))
         .route("/api/v1/system/users/ssh-keys/delete", post(delete_ssh_key))
         .route("/api/v1/system/security", get(get_security_settings))
-        .route("/api/v1/system/security/policy", post(update_security_policy))
+        .route(
+            "/api/v1/system/security/policy",
+            post(update_security_policy),
+        )
         .route("/api/v1/system/backup", get(get_backup_settings))
         .route("/api/v1/system/backup/trigger", post(trigger_backup))
         .route("/api/v1/system/backup/restore", post(restore_archive))
-        .route("/api/v1/system/backup/schedule", post(update_backup_schedule))
+        .route(
+            "/api/v1/system/backup/schedule",
+            post(update_backup_schedule),
+        )
         .route("/api/v1/personal/mail", get(get_mail))
         .route("/api/v1/personal/mail/send", post(send_mail))
         .route("/api/v1/personal/calendar", get(get_calendar))
-        .route("/api/v1/personal/calendar/events", post(create_calendar_event))
+        .route(
+            "/api/v1/personal/calendar/events",
+            post(create_calendar_event),
+        )
         .route("/api/v1/personal/notes", get(get_notes).post(create_note))
         .route("/api/v1/personal/notes/update", post(update_note))
-        .route("/api/v1/personal/contacts", get(get_contacts).post(create_contact))
+        .route(
+            "/api/v1/personal/contacts",
+            get(get_contacts).post(create_contact),
+        )
         .route("/api/v1/cognitive/graph", get(get_cognitive_graph))
         .route("/api/v1/cognitive/query", post(query_cognitive_graph))
         .route("/api/v1/cognitive/journal", get(get_event_journal))
@@ -350,7 +383,10 @@ pub(crate) fn router_in_sandbox(
             "/api/v1/learning/artifacts/{artifact_id}/revoke",
             post(revoke_artifact_handler),
         )
-        .route("/api/v1/governance/scopes", get(get_governance_scopes_handler))
+        .route(
+            "/api/v1/governance/scopes",
+            get(get_governance_scopes_handler),
+        )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth_middleware,

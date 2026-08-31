@@ -3,11 +3,11 @@
 
 //! Notifications Hub for aggregating Attention, Evidence, System alerts, and Agent requests.
 
-use std::sync::RwLock;
 use cybou_protocol::notification::{
     NotificationActionKind, NotificationCategory, NotificationItem,
 };
 use cybou_web_contracts::{NotificationsListProjection, WEB_SCHEMA_V1};
+use std::sync::RwLock;
 use uuid::Uuid;
 
 use crate::state::GatewayError;
@@ -93,7 +93,7 @@ impl NotificationsHub {
             .iter_mut()
             .find(|n| n.id == id)
             .ok_or(GatewayError::NotFound)?;
-        
+
         let action = item
             .actions
             .iter()
@@ -104,12 +104,8 @@ impl NotificationsHub {
         item.read = true;
 
         match action.kind {
-            NotificationActionKind::ApproveProposal { .. } => {
-                Err(GatewayError::Refused)
-            }
-            NotificationActionKind::RejectProposal { .. } => {
-                Err(GatewayError::Refused)
-            }
+            NotificationActionKind::ApproveProposal { .. } => Err(GatewayError::Refused),
+            NotificationActionKind::RejectProposal { .. } => Err(GatewayError::Refused),
             NotificationActionKind::Dismiss => {
                 item.dismissed = true;
                 Ok("Notification dismissed".to_owned())

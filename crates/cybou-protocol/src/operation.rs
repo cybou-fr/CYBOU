@@ -84,7 +84,10 @@ impl OperationState {
     /// Whether the operation has reached a terminal state.
     #[must_use]
     pub const fn is_terminal(&self) -> bool {
-        matches!(self, Self::Completed | Self::Failed { .. } | Self::Cancelled)
+        matches!(
+            self,
+            Self::Completed | Self::Failed { .. } | Self::Cancelled
+        )
     }
 
     /// Status badge label.

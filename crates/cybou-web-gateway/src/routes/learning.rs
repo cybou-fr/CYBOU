@@ -32,10 +32,7 @@ pub async fn get_candidates_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
     Query(query): Query<CandidateFilterQuery>,
-) -> Result<
-    Json<LearningCandidatesProjection>,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<Json<LearningCandidatesProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
@@ -60,7 +57,10 @@ pub async fn propose_candidate_handler(
     headers: HeaderMap,
     Json(request): Json<ProposeLearningCandidateRequest>,
 ) -> Result<
-    (StatusCode, Json<cybou_protocol::learning::LearningCandidate>),
+    (
+        StatusCode,
+        Json<cybou_protocol::learning::LearningCandidate>,
+    ),
     (StatusCode, Json<crate::state::ErrorBody>),
 > {
     if !state.may_read_mind(&headers) {
@@ -77,16 +77,16 @@ pub async fn evaluate_candidate_handler(
     headers: HeaderMap,
     Path(candidate_id): Path<Uuid>,
     Json(request): Json<Option<EvaluateCandidateRequest>>,
-) -> Result<
-    Json<CandidateEvaluationProjection>,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<Json<CandidateEvaluationProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
 
     let supplied_outcomes = request.map(|r| r.outcomes);
-    match state.learning.evaluate_candidate(candidate_id, supplied_outcomes) {
+    match state
+        .learning
+        .evaluate_candidate(candidate_id, supplied_outcomes)
+    {
         Ok(projection) => Ok(Json(projection)),
         Err(_) => Err((
             StatusCode::NOT_FOUND,
@@ -103,10 +103,7 @@ pub async fn evaluate_candidate_handler(
 pub async fn get_artifacts_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Result<
-    Json<LearnedArtifactsProjection>,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<Json<LearnedArtifactsProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
@@ -121,10 +118,7 @@ pub async fn revoke_artifact_handler(
     headers: HeaderMap,
     Path(artifact_id): Path<Uuid>,
     Json(request): Json<RevokeArtifactRequest>,
-) -> Result<
-    StatusCode,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<StatusCode, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
@@ -150,10 +144,7 @@ pub async fn revoke_artifact_handler(
 pub async fn get_governance_scopes_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Result<
-    Json<GovernanceScopesProjection>,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<Json<GovernanceScopesProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }

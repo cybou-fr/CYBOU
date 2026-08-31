@@ -3,10 +3,9 @@
 
 //! Provider and governor for the Personal Desktop Pack (Mail, Calendar, Notes, Contacts).
 
-use std::path::PathBuf;
-use std::sync::RwLock;
 use cybou_protocol::personal::{
-    CalendarEventRecord, ContactRecord, MailAccountRecord, MailFolderKind, MailMessageRecord, NoteRecord,
+    CalendarEventRecord, ContactRecord, MailAccountRecord, MailFolderKind, MailMessageRecord,
+    NoteRecord,
 };
 use cybou_web_contracts::{
     CalendarProjection, ContactsProjection, CreateCalendarEventRequest, CreateContactRequest,
@@ -14,6 +13,8 @@ use cybou_web_contracts::{
     WEB_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::RwLock;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -101,11 +102,27 @@ impl PersonalHub {
         };
 
         let store = PersonalStore {
-            accounts: self.accounts.read().unwrap_or_else(|e| e.into_inner()).clone(),
-            messages: self.messages.read().unwrap_or_else(|e| e.into_inner()).clone(),
-            calendar_events: self.calendar_events.read().unwrap_or_else(|e| e.into_inner()).clone(),
+            accounts: self
+                .accounts
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            messages: self
+                .messages
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
+            calendar_events: self
+                .calendar_events
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
             notes: self.notes.read().unwrap_or_else(|e| e.into_inner()).clone(),
-            contacts: self.contacts.read().unwrap_or_else(|e| e.into_inner()).clone(),
+            contacts: self
+                .contacts
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
         };
 
         if let Ok(json_bytes) = serde_json::to_vec_pretty(&store) {
@@ -118,8 +135,16 @@ impl PersonalHub {
 
     /// Retrieve email accounts and messages.
     #[must_use]
-    pub fn get_mail(&self, selected_account_id: Option<String>, selected_folder: Option<MailFolderKind>) -> MailProjection {
-        let accounts = self.accounts.read().unwrap_or_else(|e| e.into_inner()).clone();
+    pub fn get_mail(
+        &self,
+        selected_account_id: Option<String>,
+        selected_folder: Option<MailFolderKind>,
+    ) -> MailProjection {
+        let accounts = self
+            .accounts
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         let all_messages = self.messages.read().unwrap_or_else(|e| e.into_inner());
 
         let active_account_id = selected_account_id.unwrap_or_default();
@@ -152,7 +177,11 @@ impl PersonalHub {
     /// Retrieve calendar events.
     #[must_use]
     pub fn get_calendar(&self) -> CalendarProjection {
-        let events = self.calendar_events.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let events = self
+            .calendar_events
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
 
         CalendarProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -161,7 +190,10 @@ impl PersonalHub {
     }
 
     /// Create a calendar event.
-    pub fn create_calendar_event(&self, req: CreateCalendarEventRequest) -> Result<CalendarEventRecord, GatewayError> {
+    pub fn create_calendar_event(
+        &self,
+        req: CreateCalendarEventRequest,
+    ) -> Result<CalendarEventRecord, GatewayError> {
         let event = CalendarEventRecord {
             id: format!("cal-{}", Uuid::new_v4()),
             title: req.title,
@@ -176,7 +208,10 @@ impl PersonalHub {
         };
 
         {
-            let mut events = self.calendar_events.write().unwrap_or_else(|e| e.into_inner());
+            let mut events = self
+                .calendar_events
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             events.push(event.clone());
         }
         self.persist();
@@ -243,7 +278,11 @@ impl PersonalHub {
     /// Retrieve contacts directory.
     #[must_use]
     pub fn get_contacts(&self) -> ContactsProjection {
-        let contacts = self.contacts.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let contacts = self
+            .contacts
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
 
         ContactsProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -285,13 +324,15 @@ mod tests {
         let store_path = tmp_dir.join("personal.json");
 
         let hub = PersonalHub::with_optional_store(Some(store_path.clone()));
-        let note = hub.create_note(CreateNoteRequest {
-            title: "Test Note".to_owned(),
-            content_markdown: "Hello World".to_owned(),
-            tags: vec!["test".to_owned()],
-            is_pinned: false,
-            referenced_subject: None,
-        }).expect("created note");
+        let note = hub
+            .create_note(CreateNoteRequest {
+                title: "Test Note".to_owned(),
+                content_markdown: "Hello World".to_owned(),
+                tags: vec!["test".to_owned()],
+                is_pinned: false,
+                referenced_subject: None,
+            })
+            .expect("created note");
 
         assert_eq!(note.title, "Test Note");
         assert_eq!(hub.get_notes().notes.len(), 1);

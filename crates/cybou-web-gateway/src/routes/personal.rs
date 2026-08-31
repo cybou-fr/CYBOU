@@ -33,7 +33,9 @@ pub async fn get_mail(
     State(state): State<GatewayState>,
     Query(query): Query<MailQuery>,
 ) -> Result<Json<MailProjection>, GatewayError> {
-    Ok(Json(state.personal.get_mail(query.account_id, query.folder)))
+    Ok(Json(
+        state.personal.get_mail(query.account_id, query.folder),
+    ))
 }
 
 /// POST `/api/v1/personal/mail/send`

@@ -84,9 +84,10 @@ pub async fn create_snapshot(
     State(state): State<GatewayState>,
     Json(request): Json<CreateSnapshotRequest>,
 ) -> Result<Json<SnapshotRecord>, GatewayError> {
-    let record = state
-        .system
-        .create_snapshot(&request.subvolume_path, &request.name, request.readonly)?;
+    let record =
+        state
+            .system
+            .create_snapshot(&request.subvolume_path, &request.name, request.readonly)?;
     Ok(Json(record))
 }
 
@@ -163,9 +164,10 @@ pub async fn create_user(
     State(state): State<GatewayState>,
     Json(request): Json<CreateUserRequest>,
 ) -> Result<Json<UserAccountRecord>, GatewayError> {
-    let record = state
-        .system
-        .create_user(&request.username, &request.full_name, request.is_admin)?;
+    let record =
+        state
+            .system
+            .create_user(&request.username, &request.full_name, request.is_admin)?;
     Ok(Json(record))
 }
 
@@ -254,7 +256,8 @@ mod tests {
         assert!(!svcs.services.is_empty());
 
         // Privileged mutations must fail-closed requiring Action1
-        let restart_res = hub.execute_service_action("cybou-web-gateway.service", ServiceAction::Restart);
+        let restart_res =
+            hub.execute_service_action("cybou-web-gateway.service", ServiceAction::Restart);
         assert!(restart_res.is_err());
 
         let procs = hub.list_processes();

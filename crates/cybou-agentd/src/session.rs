@@ -179,7 +179,10 @@ impl Session {
     /// and recording it as one would show a person a live agent that no longer has a capsule.
     pub fn running(&mut self) -> Result<(), CannotTransition> {
         match &self.state {
-            SessionState::Launching | SessionState::Running | SessionState::Paused | SessionState::Quarantined => {
+            SessionState::Launching
+            | SessionState::Running
+            | SessionState::Paused
+            | SessionState::Quarantined => {
                 self.state = SessionState::Running;
                 Ok(())
             }
@@ -224,7 +227,10 @@ impl Session {
     /// began the ending, so a caller can run teardown exactly once without tracking that separately.
     pub fn begin_ending(&mut self, reason: SessionEnd) -> bool {
         match self.state {
-            SessionState::Launching | SessionState::Running | SessionState::Paused | SessionState::Quarantined => {
+            SessionState::Launching
+            | SessionState::Running
+            | SessionState::Paused
+            | SessionState::Quarantined => {
                 self.state = SessionState::Ending(reason);
                 true
             }
@@ -240,7 +246,10 @@ impl Session {
     pub fn finish_ending(&mut self, at: OffsetDateTime) {
         let reason = match &self.state {
             SessionState::Ending(reason) | SessionState::Ended(reason) => reason.clone(),
-            SessionState::Launching | SessionState::Running | SessionState::Paused | SessionState::Quarantined => {
+            SessionState::Launching
+            | SessionState::Running
+            | SessionState::Paused
+            | SessionState::Quarantined => {
                 SessionEnd::Failed("teardown ran with no recorded reason".to_owned())
             }
         };

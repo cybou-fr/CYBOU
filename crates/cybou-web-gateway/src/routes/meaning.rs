@@ -3,12 +3,7 @@
 
 //! Meaning & Dialogue HTTP endpoints.
 
-use axum::{
-    Json,
-    extract::State,
-    http::HeaderMap,
-    http::StatusCode,
-};
+use axum::{Json, extract::State, http::HeaderMap, http::StatusCode};
 use cybou_web_contracts::{
     DialogueMemoryProjection, MeaningInterpretProjection, MeaningInterpretRequest,
 };
@@ -20,10 +15,7 @@ pub async fn interpret_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
     Json(request): Json<MeaningInterpretRequest>,
-) -> Result<
-    Json<MeaningInterpretProjection>,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<Json<MeaningInterpretProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
@@ -36,10 +28,7 @@ pub async fn interpret_handler(
 pub async fn dialogue_memory_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Result<
-    Json<DialogueMemoryProjection>,
-    (StatusCode, Json<crate::state::ErrorBody>),
-> {
+) -> Result<Json<DialogueMemoryProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }

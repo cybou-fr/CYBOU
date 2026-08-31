@@ -3,20 +3,16 @@
 
 //! Grounded Linux system and hardware reader for real OS observation without mock fixtures.
 
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-};
+use std::{collections::HashMap, fs, path::Path};
 
-use cybou_protocol::system::{
-    CpuCoreStat, DiskPartitionInfo, NetworkInterfaceInfo, ProcessRecord,
-    ServiceRecord, ServiceState, ServiceUnitType,
-};
 use cybou_protocol::system::LogsUnavailable;
+use cybou_protocol::system::{
+    CpuCoreStat, DiskPartitionInfo, NetworkInterfaceInfo, ProcessRecord, ServiceRecord,
+    ServiceState, ServiceUnitType,
+};
 use cybou_web_contracts::{
-    ProcessesListProjection, ServicesListProjection, SystemLogsProjection,
-    SystemLogsQueryRequest, SystemMonitorProjection, WEB_SCHEMA_V1,
+    ProcessesListProjection, ServicesListProjection, SystemLogsProjection, SystemLogsQueryRequest,
+    SystemMonitorProjection, WEB_SCHEMA_V1,
 };
 
 /// Reads real system monitor metrics from Linux /proc and /sys.
@@ -34,7 +30,13 @@ pub fn read_real_monitor() -> SystemMonitorProjection {
         let uptime_seconds = read_uptime_seconds();
         let load_avg = read_load_avg();
 
-        let (memory_total_bytes, memory_used_bytes, memory_free_bytes, swap_total_bytes, swap_used_bytes) = read_meminfo();
+        let (
+            memory_total_bytes,
+            memory_used_bytes,
+            memory_free_bytes,
+            swap_total_bytes,
+            swap_used_bytes,
+        ) = read_meminfo();
         let cores = read_cpu_cores();
         let total_cpu_percent = if cores.is_empty() {
             0.0f32
@@ -382,28 +384,94 @@ fn journal_text(value: &serde_json::Value) -> Option<String> {
 #[must_use]
 pub fn read_real_services() -> ServicesListProjection {
     let known_services = [
-        ("cybou-web-gateway.service", "CYBOU Web Gateway & Browser Desktop API"),
-        ("cybou-host-filesd@demo.service", "CYBOU Host User Filesystem Daemon (demo)"),
-        ("cybou-agentd.service", "CYBOU Agent Capsule Isolation Manager"),
-        ("cybou-actiond.service", "CYBOU Governed Action1 Execution Authority"),
-        ("cybou-presenced.service", "CYBOU Presence1 Event Stream Hub"),
-        ("cybou-telemetryd.service", "CYBOU Telemetry1 Diagnostic Engine"),
-        ("cybou-eventd.service", "CYBOU Event1 Canonical Journal Writer"),
-        ("cybou-identityd.service", "CYBOU Identity1 Subject Continuity Service"),
-        ("cybou-healthd.service", "CYBOU Health1 Capability Health Service"),
-        ("cybou-intentiond.service", "CYBOU Intention1 Commitments and Obligations"),
-        ("cybou-predictord.service", "CYBOU Predictor1 Empirical Forecasting Engine"),
-        ("cybou-perceptiond.service", "CYBOU Perception1 Linux Observation Service"),
-        ("cybou-epistemicd.service", "CYBOU Epistemic1 Knowledge Projection Service"),
-        ("cybou-contextd.service", "CYBOU Context1 Associative Context Service"),
-        ("cybou-meaningd.service", "CYBOU Meaning1 Meaning Boundary Service"),
-        ("cybou-model-brokerd.service", "CYBOU ModelBroker1 Model Gateway"),
-        ("cybou-workspaced.service", "CYBOU Workspace1 Global Attention Service"),
-        ("cybou-lifecycled.service", "CYBOU Lifecycle1 Sleep/Wake Consolidation"),
-        ("cybou-selfd.service", "CYBOU Self1 Continuous Self-Model Service"),
-        ("cybou-shelld.service", "CYBOU Shell1 Sandboxed Execution Service"),
-        ("cybou-remediationd.service", "CYBOU Remediation1 Finding Resolution"),
-        ("cybou-executord.service", "CYBOU Typed Body Action Executor"),
+        (
+            "cybou-web-gateway.service",
+            "CYBOU Web Gateway & Browser Desktop API",
+        ),
+        (
+            "cybou-host-filesd@demo.service",
+            "CYBOU Host User Filesystem Daemon (demo)",
+        ),
+        (
+            "cybou-agentd.service",
+            "CYBOU Agent Capsule Isolation Manager",
+        ),
+        (
+            "cybou-actiond.service",
+            "CYBOU Governed Action1 Execution Authority",
+        ),
+        (
+            "cybou-presenced.service",
+            "CYBOU Presence1 Event Stream Hub",
+        ),
+        (
+            "cybou-telemetryd.service",
+            "CYBOU Telemetry1 Diagnostic Engine",
+        ),
+        (
+            "cybou-eventd.service",
+            "CYBOU Event1 Canonical Journal Writer",
+        ),
+        (
+            "cybou-identityd.service",
+            "CYBOU Identity1 Subject Continuity Service",
+        ),
+        (
+            "cybou-healthd.service",
+            "CYBOU Health1 Capability Health Service",
+        ),
+        (
+            "cybou-intentiond.service",
+            "CYBOU Intention1 Commitments and Obligations",
+        ),
+        (
+            "cybou-predictord.service",
+            "CYBOU Predictor1 Empirical Forecasting Engine",
+        ),
+        (
+            "cybou-perceptiond.service",
+            "CYBOU Perception1 Linux Observation Service",
+        ),
+        (
+            "cybou-epistemicd.service",
+            "CYBOU Epistemic1 Knowledge Projection Service",
+        ),
+        (
+            "cybou-contextd.service",
+            "CYBOU Context1 Associative Context Service",
+        ),
+        (
+            "cybou-meaningd.service",
+            "CYBOU Meaning1 Meaning Boundary Service",
+        ),
+        (
+            "cybou-model-brokerd.service",
+            "CYBOU ModelBroker1 Model Gateway",
+        ),
+        (
+            "cybou-workspaced.service",
+            "CYBOU Workspace1 Global Attention Service",
+        ),
+        (
+            "cybou-lifecycled.service",
+            "CYBOU Lifecycle1 Sleep/Wake Consolidation",
+        ),
+        (
+            "cybou-selfd.service",
+            "CYBOU Self1 Continuous Self-Model Service",
+        ),
+        (
+            "cybou-shelld.service",
+            "CYBOU Shell1 Sandboxed Execution Service",
+        ),
+        (
+            "cybou-remediationd.service",
+            "CYBOU Remediation1 Finding Resolution",
+        ),
+        (
+            "cybou-executord.service",
+            "CYBOU Typed Body Action Executor",
+        ),
         ("caddy.service", "Caddy Sovereign TLS & Reverse Proxy"),
     ];
 
@@ -517,7 +585,10 @@ fn read_meminfo() -> (u64, u64, u64, u64, u64) {
         for line in content.lines() {
             let mut parts = line.split_whitespace();
             let key = parts.next().unwrap_or_default();
-            let val = parts.next().and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+            let val = parts
+                .next()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
             match key {
                 "MemTotal:" => total_mem = val * 1024,
                 "MemFree:" => free_mem = val * 1024,
@@ -547,7 +618,10 @@ fn read_cpu_cores() -> Vec<CpuCoreStat> {
             if line.starts_with("cpu") && !line.starts_with("cpu ") {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 5 {
-                    let core_id = parts[0].trim_start_matches("cpu").parse::<usize>().unwrap_or(0);
+                    let core_id = parts[0]
+                        .trim_start_matches("cpu")
+                        .parse::<usize>()
+                        .unwrap_or(0);
                     let user: u64 = parts[1].parse().unwrap_or(0);
                     let nice: u64 = parts[2].parse().unwrap_or(0);
                     let system: u64 = parts[3].parse().unwrap_or(0);
@@ -674,7 +748,11 @@ fn read_single_process(pid: u32, users_map: &HashMap<u32, String>) -> Option<Pro
         .map(|s| s.replace('\0', " ").trim().to_owned())
         .unwrap_or_else(|_| raw_name.clone());
 
-    let display_cmd = if cmdline.is_empty() { raw_name.clone() } else { cmdline };
+    let display_cmd = if cmdline.is_empty() {
+        raw_name.clone()
+    } else {
+        cmdline
+    };
 
     let mut user = "root".to_owned();
     if let Ok(status) = fs::read_to_string(format!("{proc_path}/status")) {
@@ -682,7 +760,10 @@ fn read_single_process(pid: u32, users_map: &HashMap<u32, String>) -> Option<Pro
             if let Some(rest) = line.strip_prefix("Uid:") {
                 if let Some(uid_str) = rest.split_whitespace().next() {
                     if let Ok(uid) = uid_str.parse::<u32>() {
-                        user = users_map.get(&uid).cloned().unwrap_or_else(|| uid.to_string());
+                        user = users_map
+                            .get(&uid)
+                            .cloned()
+                            .unwrap_or_else(|| uid.to_string());
                     }
                 }
                 break;
@@ -714,12 +795,19 @@ fn query_unit_status(name: &str) -> (ServiceState, String, Option<u32>, Option<u
             if let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() {
                 if let Ok(comm) = fs::read_to_string(format!("/proc/{pid}/comm")) {
                     let comm_clean = comm.trim();
-                    if comm_clean == binary_name || (!base_name.is_empty() && comm_clean.contains(&base_name)) {
+                    if comm_clean == binary_name
+                        || (!base_name.is_empty() && comm_clean.contains(&base_name))
+                    {
                         let memory_bytes = fs::read_to_string(format!("/proc/{pid}/statm"))
                             .ok()
                             .and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok())
                             .map(|rss| rss * 4096);
-                        return (ServiceState::Active, "running".to_owned(), Some(pid), memory_bytes);
+                        return (
+                            ServiceState::Active,
+                            "running".to_owned(),
+                            Some(pid),
+                            memory_bytes,
+                        );
                     }
                 }
             }

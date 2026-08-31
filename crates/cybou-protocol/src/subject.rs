@@ -338,7 +338,8 @@ impl SubjectRef {
                 event_id: decoded_segment(event_id)?,
             }),
             [
-                "file" | "process" | "agent" | "certificate" | "filesystem" | "anchor" | "operation",
+                "file" | "process" | "agent" | "certificate" | "filesystem" | "anchor"
+                | "operation",
                 ..,
             ] => Err(SubjectDeepLinkError::OwnerResolutionRequired),
             _ => Err(SubjectDeepLinkError::InvalidRoute),

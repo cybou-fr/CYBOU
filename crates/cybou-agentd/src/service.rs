@@ -294,8 +294,9 @@ impl Agent1Service {
     /// Perform a lifecycle or control action on a live session (Freeze, Resume, Quarantine, Stop).
     async fn action(&self, capsule_id: String, action: String) -> fdo::Result<bool> {
         let cap_id = identity(&capsule_id)?;
-        let action: cybou_protocol::agent::CapsuleAction = serde_json::from_str(&format!("\"{action}\""))
-            .map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
+        let action: cybou_protocol::agent::CapsuleAction =
+            serde_json::from_str(&format!("\"{action}\""))
+                .map_err(|error| fdo::Error::InvalidArgs(error.to_string()))?;
 
         match action {
             cybou_protocol::agent::CapsuleAction::Stop => self.stop(capsule_id).await,
@@ -306,7 +307,9 @@ impl Agent1Service {
                 let Some(live) = registry.get_mut(cap_id) else {
                     return Ok(false);
                 };
-                live.session.pause().map_err(|e| fdo::Error::Failed(e.to_string()))?;
+                live.session
+                    .pause()
+                    .map_err(|e| fdo::Error::Failed(e.to_string()))?;
                 Ok(true)
             }
             cybou_protocol::agent::CapsuleAction::Resume => {
@@ -316,7 +319,9 @@ impl Agent1Service {
                 let Some(live) = registry.get_mut(cap_id) else {
                     return Ok(false);
                 };
-                live.session.running().map_err(|e| fdo::Error::Failed(e.to_string()))?;
+                live.session
+                    .running()
+                    .map_err(|e| fdo::Error::Failed(e.to_string()))?;
                 Ok(true)
             }
             cybou_protocol::agent::CapsuleAction::Quarantine => {
@@ -326,7 +331,9 @@ impl Agent1Service {
                 let Some(live) = registry.get_mut(cap_id) else {
                     return Ok(false);
                 };
-                live.session.quarantine().map_err(|e| fdo::Error::Failed(e.to_string()))?;
+                live.session
+                    .quarantine()
+                    .map_err(|e| fdo::Error::Failed(e.to_string()))?;
                 Ok(true)
             }
         }
