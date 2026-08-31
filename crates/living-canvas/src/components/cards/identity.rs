@@ -72,18 +72,31 @@ pub fn IdentityCard(
         RuntimeState::Ready { mind, .. } => mind,
         RuntimeState::Loading | RuntimeState::Error(_) | RuntimeState::SignInRequired => None,
     };
-    let identity_id = move || {
+    // The frame's summary needs two of the same readings the content shows. Two closures over the
+    // same signal rather than one shared: the card and its content are separate components, and
+    // threading a value between them would put the frame's business inside the content.
+    let sessions_seen = move || {
         mind()
-            .and_then(|m| m.identity.identity_id)
-            .unwrap_or_else(unread)
+            .and_then(|m| m.identity.session_count)
+            .map_or_else(unread, |value| value.to_string())
+    };
+    let days_continuous = move || {
+        mind()
+            .and_then(|m| m.identity.age_in_days)
+            .map_or_else(unread, |value| format!("{value} d"))
     };
 
+    // What this card says from across the room. It used to be the subject's uuid, which is the one
+    // fact on the card that nobody can read at a glance and nobody would recognise if they could —
+    // at overview zoom it was thirty-six characters of noise where a headline goes. How long this
+    // subject has been continuous, and across how many sessions, is what the card is about.
     let collapsed = move || {
-        let id = identity_id();
+        let sessions = sessions_seen();
+        let age = days_continuous();
         view! {
             <div class="card-collapsed-summary">
-                <b>"Subject continuity"</b>
-                <span>{id}</span>
+                <b>"Identity"</b>
+                <span>{sessions}" sessions · "{age}</span>
             </div>
         }
         .into_any()
