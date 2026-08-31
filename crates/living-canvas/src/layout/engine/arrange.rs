@@ -13,6 +13,18 @@ use crate::layout::relations::DesktopRelationshipGraph;
 
 use super::DesktopLayout;
 
+/// How much of the window's bottom edge the dock covers.
+///
+/// The dock is drawn over the canvas rather than beside it, so a card placed in this strip is a
+/// card behind a toolbar. Measured against the dock's own height plus the room it leaves.
+const DOCK_RESERVE: f64 = 96.0;
+
+/// The shortest a column is allowed to be before the spillover rule gives up on it.
+///
+/// On a window too short to hold anything, refusing to place cards would be worse than placing
+/// them where they can be panned to.
+const MIN_COLUMN_RUN: f64 = 200.0;
+
 impl DesktopLayout {
     /// Apply an automated spatial arrangement algorithm with active viewport awareness.
     ///
@@ -341,13 +353,40 @@ impl DesktopLayout {
 
         let offsets = Self::column_offsets(&cols, start_x, col_gap, col_width);
 
+        // Where a column has to stop. The dock stands along the bottom of the window and is drawn
+        // over the canvas, so the last stretch of the viewport is not somewhere a card can be seen.
+        let floor = (viewport.height - DOCK_RESERVE).max(start_y + MIN_COLUMN_RUN);
+        // The first column of a spillover. Everything semantic has already been given an x, so a
+        // column that runs out of height continues to the right of all of them rather than on top
+        // of one of them.
+        let mut next_band_x = offsets
+            .iter()
+            .zip(&cols)
+            .map(|(x, col)| {
+                x + col
+                    .iter()
+                    .map(|item| item.geometry.width)
+                    .fold(col_width, f64::max)
+            })
+            .fold(start_x, f64::max)
+            + col_gap;
+
         for (c_idx, col) in cols.into_iter().enumerate() {
-            let col_x = offsets[c_idx];
+            let mut col_x = offsets[c_idx];
             let mut cur_y = start_y;
 
             for item in col {
                 let eff_w = item.geometry.width;
                 let eff_h = item.effective_height();
+
+                // A card that would hang below the dock starts a new column instead. Only when
+                // something is already above it: a card taller than the whole viewport has nowhere
+                // better to go, and moving it sideways forever would be a loop.
+                if cur_y > start_y && cur_y + eff_h > floor {
+                    col_x = next_band_x;
+                    next_band_x += eff_w.max(col_width) + col_gap;
+                    cur_y = start_y;
+                }
 
                 loop {
                     let candidate = Rect::new(col_x, cur_y, eff_w, eff_h);
@@ -371,5 +410,63 @@ impl DesktopLayout {
                 cur_y += eff_h + row_gap;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::CardId;
+    use crate::layout::engine::DesktopLayout;
+
+    #[test]
+    fn the_home_arrangement_puts_nothing_under_the_dock() {
+        // The first column held six cards on a viewport nine hundred pixels tall, so the desktop a
+        // person met on their first visit ran off the bottom of it with nothing saying so.
+        let viewport = UsableViewport {
+            width: 1440.0,
+            height: 900.0,
+        };
+        let layout = DesktopLayout::canonical(Some(viewport));
+        let floor = viewport.height - DOCK_RESERVE;
+
+        for card in &layout.cards {
+            let bottom = card.geometry.y + card.geometry.height;
+            assert!(
+                bottom <= floor,
+                "{:?} ends at {bottom}, below the {floor} the dock leaves",
+                card.id
+            );
+        }
+    }
+
+    #[test]
+    fn a_card_taller_than_the_window_is_placed_rather_than_moved_sideways_forever() {
+        // The spillover rule asks whether something is already above the card. Without that, a card
+        // that cannot fit anywhere would take a new column, fail again, and take another.
+        let viewport = UsableViewport {
+            width: 1440.0,
+            height: 200.0,
+        };
+        let layout = DesktopLayout::canonical(Some(viewport));
+        assert_eq!(
+            layout.cards.len(),
+            14,
+            "every canonical card is still on the desktop"
+        );
+        for card in &layout.cards {
+            assert!(
+                card.geometry.x.is_finite() && card.geometry.y.is_finite(),
+                "{:?} was never given a place",
+                card.id
+            );
+        }
+        assert!(
+            layout
+                .cards
+                .iter()
+                .any(|card| card.id == CardId::Identity && card.geometry.y > 0.0),
+            "the arrangement still ran"
+        );
     }
 }
