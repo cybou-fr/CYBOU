@@ -89,9 +89,14 @@ install -m 0644 /dev/stdin "$UNIT" <<'EOF'
 Description=Harmless Cybou requested-action gate unit
 
 [Service]
-Type=oneshot
-ExecStart=/usr/bin/true
-RemainAfterExit=yes
+# It sleeps rather than exiting, because the gate now asks this unit to stop, to start and to
+# reload, and each of those wants a unit it can be true of: a oneshot that has already run is
+# `active` because it was told to remember it ran, and has nothing to reload.
+Type=simple
+ExecStart=/usr/bin/sleep infinity
+# Reloading is a no-op here on purpose. What the gate checks is that the request reached systemd
+# under its own name and the unit survived it, not what re-reading a configuration would do.
+ExecReload=/usr/bin/true
 EOF
 systemctl daemon-reload
 systemctl stop cybou-request-gate.service >/dev/null 2>&1 || true
