@@ -30,10 +30,11 @@ Environment=CYBOU_AUTH_SOCKET=/run/cybou/auth.sock
 # corresponding system instance is absent, host-file routes fail closed.
 Environment=CYBOU_HOST_FILES_SOCKET_DIR=/run/cybou-host-files
 
-# Where the bounded Body reads. Named here because nothing named it before: the gateway fell back to
-# whichever candidate path happened to exist, which on this host was /home/demo — a directory this
-# service cannot read. Every `ls` answered with an I/O error and every file listing was a 502.
-Environment=CYBOU_SHELL_JAIL=/var/lib/cybou/shell-jail
+# Where the per-account terminal owners keep their sockets. Unset, `owner_directory()` answers
+# `None` and the terminal route refuses every request — which is exactly what it did on this
+# deployment while `cybou-ptyd@demo` was running, enabled and listening one directory away. The
+# terminal was not broken; nothing had told the gateway where to look.
+Environment=CYBOU_PTY_SOCKET_DIR=/run/cybou-pty
 
 ExecStart=/usr/libexec/cybou/cybou-web-gateway
 Restart=on-failure
