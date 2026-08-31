@@ -698,6 +698,12 @@ fn executable_action(
         Operation::ReloadService => ExecutableAction::ServiceReload {
             unit: concrete_service(&proposal.target_resource)?,
         },
+        Operation::EnableService => ExecutableAction::ServiceEnable {
+            unit: concrete_service(&proposal.target_resource)?,
+        },
+        Operation::DisableService => ExecutableAction::ServiceDisable {
+            unit: concrete_service(&proposal.target_resource)?,
+        },
         Operation::TerminateProcess => {
             let (owner_uid, pid) = concrete_process(&proposal.target_resource)?;
             ExecutableAction::ProcessTerminate { pid, owner_uid }

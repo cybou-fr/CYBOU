@@ -241,6 +241,16 @@ pub enum ExecutableAction {
         /// A concrete unit name ending in `.service`.
         unit: String,
     },
+    /// Arrange for one concrete systemd service to start at the next boot.
+    ServiceEnable {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
+    /// Stop one concrete systemd service from starting at the next boot.
+    ServiceDisable {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
     /// Ask one process to exit.
     ProcessTerminate {
         /// The process to signal.
@@ -341,6 +351,12 @@ impl ExecutionStarted {
             ExecutableAction::ServiceStop { unit } => ("service.stop", format!("systemd:{unit}")),
             ExecutableAction::ServiceReload { unit } => {
                 ("service.reload", format!("systemd:{unit}"))
+            }
+            ExecutableAction::ServiceEnable { unit } => {
+                ("service.enable", format!("systemd:{unit}"))
+            }
+            ExecutableAction::ServiceDisable { unit } => {
+                ("service.disable", format!("systemd:{unit}"))
             }
             ExecutableAction::ProcessTerminate { pid, owner_uid } => {
                 ("process.terminate", format!("process:{owner_uid}:{pid}"))

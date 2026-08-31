@@ -103,10 +103,12 @@ impl SystemHub {
             ServiceAction::Start => Ok("service.start"),
             ServiceAction::Stop => Ok("service.stop"),
             ServiceAction::Reload => Ok("service.reload"),
-            // Enable and disable change what happens at the next boot rather than what is happening
-            // now, which is a different kind of act: nobody is present when it takes effect. They
-            // are not in the operation table and are refused here by name.
-            ServiceAction::Enable | ServiceAction::Disable => Err(GatewayError::Refused),
+            // These two were refused here by name, with the reason that they change what happens at
+            // the next boot rather than what is happening now and so wanted their own decision
+            // about risk. That decision is made: both are Medium, because the delay between the
+            // act and its effect is the risk, and neither relieves any finding.
+            ServiceAction::Enable => Ok("service.enable"),
+            ServiceAction::Disable => Ok("service.disable"),
         }
     }
 

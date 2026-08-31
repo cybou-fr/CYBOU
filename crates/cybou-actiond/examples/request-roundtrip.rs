@@ -215,6 +215,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     asked_and_done(&action, &executor, "service.start", &target).await?;
     settles_at(&unit, "active").await?;
 
+    // Enable and then disable, in that order, so each is asked for the state it changes. Both are
+    // checked afterwards by asking systemd, and the second one leaves the host as this gate found
+    // it — a gate that enabled a unit and walked away would be a gate that changes the machine.
+    // Asked of the manager rather than read from the unit object. A proxy caches properties and
+    // refreshes them from `PropertiesChanged`, which is how the active-state checks above see a
+    // stop the moment it happens — but enabling changes a file on disk rather than the unit's
+    // state, and the first version of this check read a cached "disabled" straight through a
+    // successful enable. `GetUnitFileState` asks systemd the question every time.
+    asked_and_done(&action, &executor, "service.enable", &target).await?;
+    let enabled: String = manager.call("GetUnitFileState", &(UNIT)).await?;
+    if enabled != "enabled" {
+        return Err(format!("after service.enable systemd says {UNIT} is {enabled}").into());
+    }
+
+    asked_and_done(&action, &executor, "service.disable", &target).await?;
+    let disabled: String = manager.call("GetUnitFileState", &(UNIT)).await?;
+    if disabled != "disabled" {
+        return Err(format!("after service.disable systemd says {UNIT} is {disabled}").into());
+    }
+
     // ------------------------------------------------------------------ and a real process
     // Signalling is the first operation whose adapter refuses on its own account: it reads /proc
     // at the moment it acts and compares the owner against the one the permit was decided for. So
@@ -269,9 +289,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "{SEAT} asked → permit → restart, stop, start, reload{} → independent observation",
         if std::env::var_os("CYBOU_GATE_VICTIM_PID").is_some() {
-            ", terminate"
+            ", enable, disable, terminate"
         } else {
-            ""
+            ", enable, disable"
         }
     );
     Ok(())

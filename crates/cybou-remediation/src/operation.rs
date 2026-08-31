@@ -51,6 +51,10 @@ pub enum Operation {
     ResumeProcess,
     /// Stop a unit that is.
     StopService,
+    /// Arrange for a unit to start at the next boot.
+    EnableService,
+    /// Stop a unit from starting at the next boot.
+    DisableService,
     /// Delete downloaded package archives that can be fetched again.
     CleanPackageCache,
     /// Rotate and compress logs that are past their retention.
@@ -72,6 +76,8 @@ pub const ALL_OPERATIONS: &[Operation] = &[
     Operation::RestartService,
     Operation::StartService,
     Operation::StopService,
+    Operation::EnableService,
+    Operation::DisableService,
     Operation::TerminateProcess,
     Operation::KillProcess,
     Operation::PauseProcess,
@@ -93,6 +99,8 @@ impl Operation {
             Self::ReloadService => "service.reload",
             Self::RestartService => "service.restart",
             Self::StartService => "service.start",
+            Self::EnableService => "service.enable",
+            Self::DisableService => "service.disable",
             Self::TerminateProcess => "process.terminate",
             Self::KillProcess => "process.kill",
             Self::PauseProcess => "process.pause",
@@ -130,6 +138,11 @@ impl Operation {
             // SIGKILL cannot be caught, blocked or ignored. Whatever was in memory is gone, and no
             // amount of care afterwards brings it back.
             Self::KillProcess => RiskLevel::High,
+            // Neither of these changes anything a person can see today, which is exactly why they
+            // are not Low. What they change is what the machine does when nobody is watching it
+            // come up: a unit disabled by mistake is an outage at the next reboot, weeks later,
+            // with nothing connecting it back to this moment. The delay is the risk.
+            Self::EnableService | Self::DisableService => RiskLevel::Medium,
             // Reversible and not harmless: the service comes back, and every connection it was
             // holding is gone.
             // A stop is a restart without the second half: everything the service was holding is
@@ -169,6 +182,8 @@ impl Operation {
                 | Self::StopService
                 | Self::PauseProcess
                 | Self::ResumeProcess
+                | Self::EnableService
+                | Self::DisableService
         )
     }
 
@@ -204,6 +219,11 @@ impl Operation {
             // it as one would let a host reach for it while nobody is present.
             Self::StartService => &[Finding::ServiceInactive],
             Self::StopService => &[],
+            // Enabling does not start anything, so it relieves nothing a host could observe now:
+            // a machine that answered `ServiceInactive` by enabling the unit would have changed
+            // the next boot and left the finding standing. Disabling relieves nothing either, for
+            // the reason stopping does not — it is a thing a person decides, not a remedy.
+            Self::EnableService | Self::DisableService => &[],
             // None of these relieves anything, and that is the entry, not an omission. A finding
             // listed here is a licence for the host to reach for the operation on its own when it
             // concludes something — and a host that may kill processes to relieve a conclusion it

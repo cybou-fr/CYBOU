@@ -97,6 +97,12 @@ ExecStart=/usr/bin/sleep infinity
 # Reloading is a no-op here on purpose. What the gate checks is that the request reached systemd
 # under its own name and the unit survived it, not what re-reading a configuration would do.
 ExecReload=/usr/bin/true
+
+# An [Install] section, because enabling a unit without one changes nothing about the next boot and
+# the executor refuses to pretend otherwise. The gate wants the succeeding path here; the refusal
+# has its own coverage in the executor's own tests.
+[Install]
+WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl stop cybou-request-gate.service >/dev/null 2>&1 || true
@@ -161,6 +167,16 @@ CYBOU_GATE_VICTIM_UID="$(id -u)"
 export CYBOU_GATE_VICTIM_PID CYBOU_GATE_VICTIM_UID
 
 "$ROUNDTRIP"
+
+echo "=== What the person enabled is enabled, and what they disabled is not ==="
+# `is-enabled` reads the unit file state from systemd rather than from the executor's account of
+# itself, and it is the same question `systemctl` answers for anybody who asks later.
+state="$(systemctl is-enabled cybou-request-gate.service 2>&1 || true)"
+if [ "$state" != "disabled" ]; then
+    echo "ERROR: after enable then disable, systemd says the unit is $state" >&2
+    exit 1
+fi
+echo "    ok      systemd says disabled, having said enabled in between"
 
 echo "=== The process the person asked about is gone ==="
 if kill -0 "$victim_pid" 2>/dev/null; then

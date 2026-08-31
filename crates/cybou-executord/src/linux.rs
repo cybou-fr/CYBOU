@@ -185,6 +185,43 @@ impl Body for LinuxBody {
         self.unit_job("ReloadUnit", unit).await
     }
 
+    async fn enable_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        let manager = self.manager().await?;
+        // `EnableUnitFiles` answers with whether the unit carried install information and with the
+        // symlinks it made. A unit with no `[Install]` section can be enabled all day and will
+        // still not start at the next boot, so that first flag is the difference between having
+        // done the thing and having appeared to.
+        let (carries_install_info, _changes): (bool, Vec<(String, String, String)>) = manager
+            .call("EnableUnitFiles", &(vec![unit], false, false))
+            .await
+            .map_err(|error| ExecutorError::Adapter(error.to_string()))?;
+        if !carries_install_info {
+            return Err(ExecutorError::Adapter(format!(
+                "{unit} has no [Install] section, so enabling it would not start it at boot"
+            )));
+        }
+        Self::reload_unit_files(&manager).await?;
+        Ok(vec![BodyReading {
+            field: "systemd.unit-file-state".to_owned(),
+            value: "enabled".to_owned(),
+        }])
+    }
+
+    async fn disable_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        let manager = self.manager().await?;
+        // Not the same call with a flag: disabling answers only with the changes it made, and
+        // there is no install-information question to ask on the way out.
+        let _changes: Vec<(String, String, String)> = manager
+            .call("DisableUnitFiles", &(vec![unit], false))
+            .await
+            .map_err(|error| ExecutorError::Adapter(error.to_string()))?;
+        Self::reload_unit_files(&manager).await?;
+        Ok(vec![BodyReading {
+            field: "systemd.unit-file-state".to_owned(),
+            value: "disabled".to_owned(),
+        }])
+    }
+
     async fn terminate_process(
         &self,
         pid: u32,
@@ -281,6 +318,19 @@ impl LinuxBody {
                 value: actual.to_string(),
             },
         ])
+    }
+
+    /// Make systemd re-read the unit files after they have been changed on disk.
+    ///
+    /// `systemctl` does this for you and the bus API does not. Without it systemd keeps answering
+    /// questions about enablement from what it loaded earlier, so the change is on disk and
+    /// invisible until something else provokes a reload — which is indistinguishable, to anybody
+    /// looking, from the change not having happened.
+    async fn reload_unit_files(manager: &Proxy<'_>) -> Result<(), ExecutorError> {
+        manager
+            .call::<_, _, ()>("Reload", &())
+            .await
+            .map_err(|error| ExecutorError::Adapter(error.to_string()))
     }
 
     /// Ask systemd to do one named thing to one named unit.

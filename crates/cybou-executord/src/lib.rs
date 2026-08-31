@@ -56,6 +56,10 @@ pub trait Body: Send + Sync {
     async fn stop_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
     /// Ask one concrete service to re-read its configuration.
     async fn reload_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Arrange for one concrete service to start at the next boot.
+    async fn enable_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Stop one concrete service from starting at the next boot.
+    async fn disable_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
     /// Ask one process to exit, and let it decide how.
     async fn terminate_process(
         &self,
@@ -98,6 +102,8 @@ async fn perform(
         ExecutableAction::ServiceStart { unit } => body.start_service(unit).await,
         ExecutableAction::ServiceStop { unit } => body.stop_service(unit).await,
         ExecutableAction::ServiceReload { unit } => body.reload_service(unit).await,
+        ExecutableAction::ServiceEnable { unit } => body.enable_service(unit).await,
+        ExecutableAction::ServiceDisable { unit } => body.disable_service(unit).await,
         ExecutableAction::ProcessTerminate { pid, owner_uid } => {
             body.terminate_process(*pid, *owner_uid).await
         }
@@ -243,6 +249,20 @@ mod tests {
                 .push(format!("reload:{unit}"));
             Ok(Vec::new())
         }
+        async fn enable_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("enable:{unit}"));
+            Ok(Vec::new())
+        }
+        async fn disable_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("disable:{unit}"));
+            Ok(Vec::new())
+        }
         async fn terminate_process(
             &self,
             pid: u32,
@@ -317,6 +337,18 @@ mod tests {
                     unit: "d.service".to_owned(),
                 },
                 "reload:d.service",
+            ),
+            (
+                ExecutableAction::ServiceEnable {
+                    unit: "e.service".to_owned(),
+                },
+                "enable:e.service",
+            ),
+            (
+                ExecutableAction::ServiceDisable {
+                    unit: "f.service".to_owned(),
+                },
+                "disable:f.service",
             ),
             // The four signals are one call apart from each other, and the difference between two
             // of them is whether the process gets to save what it was holding.

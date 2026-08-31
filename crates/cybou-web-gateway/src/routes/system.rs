@@ -302,12 +302,16 @@ mod tests {
                 verb
             );
         }
-        for unbuilt in [ServiceAction::Enable, ServiceAction::Disable] {
-            assert!(
-                SystemHub::verb_for(unbuilt).is_err(),
-                "{unbuilt:?} changes what happens at the next boot and has no verb yet"
-            );
-        }
+        // All six now. Enable and disable were refused here by name until the risk of an act that
+        // takes effect at the next boot had been decided rather than assumed.
+        assert_eq!(
+            SystemHub::verb_for(ServiceAction::Enable).expect("a verb"),
+            "service.enable"
+        );
+        assert_eq!(
+            SystemHub::verb_for(ServiceAction::Disable).expect("a verb"),
+            "service.disable"
+        );
         assert_eq!(
             SystemHub::service_target("nginx.service"),
             "systemd:nginx.service"

@@ -108,6 +108,8 @@ fn target_for(operation: Operation, insight: &SystemInsight) -> String {
         | Operation::RestartService
         | Operation::StartService
         | Operation::StopService
+        | Operation::EnableService
+        | Operation::DisableService
         | Operation::DeleteServiceData => about.unwrap_or_else(|| "systemd:<unit>".to_owned()),
         // A placeholder rather than a guess. Nothing a host concludes about itself names a
         // process to signal — none of these relieves any finding — so this arm exists to keep the
