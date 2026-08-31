@@ -4203,3 +4203,56 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .desktop-dock.stacked .dock-apps {
   flex-wrap: nowrap;
 }
+
+/* The freshness controls a tool panel wears in its header.
+   Deliberately quiet: an age that shouted would compete with the numbers it is describing, and
+   the panel is not in trouble — it is telling you how old it is. */
+.panel-freshness {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-freshness-age {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.panel-freshness-toggle {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+/* On, and saying so by colour as well as by the word inside it: `live` and `held` are four letters
+   apart and a person glancing at a header reads the colour first. */
+.panel-freshness-toggle.active {
+  color: var(--accent-text);
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.panel-freshness-now {
+  background: var(--fill-subtle);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Asking while an answer is still on its way does nothing, so the button says it does nothing. */
+.panel-freshness-now:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

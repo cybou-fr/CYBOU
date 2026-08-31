@@ -630,6 +630,8 @@ pub struct ServicesSignals {
     pub loading: RwSignal<bool>,
     /// Status message or toast.
     pub status_msg: RwSignal<Option<String>>,
+    /// Whether the panel keeps asking on its own.
+    pub auto_refresh: RwSignal<bool>,
 }
 
 impl ServicesSignals {
@@ -641,6 +643,7 @@ impl ServicesSignals {
             search_query: RwSignal::new(String::new()),
             loading: RwSignal::new(false),
             status_msg: RwSignal::new(None),
+            auto_refresh: RwSignal::new(true),
         }
     }
 }
@@ -660,6 +663,8 @@ pub struct ProcessesSignals {
     pub loading: RwSignal<bool>,
     /// Status message or toast.
     pub status_msg: RwSignal<Option<String>>,
+    /// Whether the panel keeps asking on its own.
+    pub auto_refresh: RwSignal<bool>,
 }
 
 impl ProcessesSignals {
@@ -671,6 +676,7 @@ impl ProcessesSignals {
             sort_by: RwSignal::new("cpu".to_owned()),
             loading: RwSignal::new(false),
             status_msg: RwSignal::new(None),
+            auto_refresh: RwSignal::new(true),
         }
     }
 }
@@ -721,6 +727,8 @@ pub struct SystemLogsSignals {
     /// Starts true so a card that has not asked yet draws no warning about a journal nobody has
     /// read.
     pub system_journal_readable: RwSignal<bool>,
+    /// Whether the panel keeps asking on its own.
+    pub auto_refresh: RwSignal<bool>,
 }
 
 impl SystemLogsSignals {
@@ -734,6 +742,7 @@ impl SystemLogsSignals {
             status_msg: RwSignal::new(None),
             unavailable: RwSignal::new(None),
             system_journal_readable: RwSignal::new(true),
+            auto_refresh: RwSignal::new(true),
         }
     }
 }

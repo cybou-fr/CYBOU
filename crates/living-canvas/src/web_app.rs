@@ -85,6 +85,9 @@ pub fn App() -> impl IntoView {
     // unmount its content; none of them are a person discarding what they had done.
     let tool_states = ToolCardStates::new();
     provide_context(tool_states);
+    // One clock for every age label in the desktop. Started here rather than per panel so a
+    // hundred open cards do not run a hundred timers to say the same thing.
+    living_canvas::refresh::provide_desktop_clock();
     let layout = RwSignal::new(load_layout());
     provide_context(layout);
     provide_context(set_selected);

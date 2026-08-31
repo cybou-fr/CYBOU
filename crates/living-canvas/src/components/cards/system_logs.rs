@@ -6,13 +6,25 @@
 use cybou_web_contracts::SystemLogsQueryRequest;
 use leptos::prelude::*;
 
-use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
+use crate::{
+    CardId, MindClient, components::freshness::FreshnessControls, refresh::Freshness,
+    tool_state::ToolCardStates,
+};
+
+/// How often the log view is re-read while the panel is open and visible.
+///
+/// Ten seconds. A log is the one panel where being behind is normal — lines arrive when they
+/// arrive — but a viewer that never came back is a viewer showing the last thing that happened
+/// before you looked away.
+const LOGS_INTERVAL_MS: u32 = 10_000;
 
 #[component]
 pub fn SystemLogsContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.system_logs(card);
+
+    let freshness = Freshness::new();
 
     let load_logs = move || {
         signals.loading.set(true);
@@ -35,6 +47,7 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                         .system_journal_readable
                         .set(proj.system_journal_readable);
                     signals.status_msg.set(None);
+                    freshness.arrived();
                 }
                 Err(err) => {
                     signals
@@ -51,6 +64,13 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
         load_logs();
     });
 
+    crate::refresh::keep_reading(
+        LOGS_INTERVAL_MS,
+        signals.auto_refresh,
+        signals.loading,
+        load_logs,
+    );
+
     view! {
         <div class="system-logs-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: #131418; color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
             // Control Toolbar
@@ -63,13 +83,12 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                         </span>
                     </div>
 
-                    <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
-                        title="Reload logs"
-                        on:click=move |_| load_logs()
-                    >
-                        <IconRefresh size=13 />
-                    </button>
+                    <FreshnessControls
+                        freshness=freshness
+                        auto_refresh=signals.auto_refresh
+                        loading=signals.loading
+                        refresh_now=move |()| load_logs()
+                    />
                 </div>
 
                 // Filter row

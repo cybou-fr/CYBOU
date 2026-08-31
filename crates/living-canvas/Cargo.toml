@@ -68,6 +68,9 @@ web-sys = { version = "=0.3.103", features = [
     "HtmlInputElement",
     "Url",
     "DomRect",
+    # A panel that keeps reading stops while the page is hidden, and `Document::hidden` is the
+    # only way to ask. Nothing else in the desktop reaches for the document directly.
+    "Document",
     "Element",
     "EventSource",
     "EventTarget",

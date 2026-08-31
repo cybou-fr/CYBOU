@@ -9,15 +9,26 @@ use leptos::prelude::*;
 
 use crate::{
     CardId, MindClient,
-    components::icons::{IconLayers, IconRefresh},
+    components::{freshness::FreshnessControls, icons::IconLayers},
+    refresh::Freshness,
     tool_state::ToolCardStates,
 };
+
+/// How often the service list is re-read while the panel is open and visible.
+///
+/// Fifteen seconds. Units change state when something changes them, not continuously, and this
+/// list is long enough that reading it more often would cost the host more than it tells anyone.
+const SERVICES_INTERVAL_MS: u32 = 15_000;
 
 #[component]
 pub fn ServicesContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.services(card);
+
+    // A service list is also the place a person looks straight after pressing Stop, so an age
+    // here doubles as the answer to whether that took effect.
+    let freshness = Freshness::new();
 
     let load_services = move || {
         signals.loading.set(true);
@@ -26,6 +37,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                 Ok(projection) => {
                     signals.services.set(projection.services);
                     signals.status_msg.set(None);
+                    freshness.arrived();
                 }
                 Err(err) => {
                     signals
@@ -81,6 +93,13 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
     Effect::new(move |_| {
         load_services();
     });
+
+    crate::refresh::keep_reading(
+        SERVICES_INTERVAL_MS,
+        signals.auto_refresh,
+        signals.loading,
+        load_services,
+    );
 
     let filtered_services = move || {
         let all = signals.services.get();
@@ -147,13 +166,12 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         }}
                     </div>
 
-                    <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
-                        title="Refresh services"
-                        on:click=move |_| load_services()
-                    >
-                        <IconRefresh size=13 />
-                    </button>
+                    <FreshnessControls
+                        freshness=freshness
+                        auto_refresh=signals.auto_refresh
+                        loading=signals.loading
+                        refresh_now=move |()| load_services()
+                    />
                 </div>
 
                 // Filter tabs & search

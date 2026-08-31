@@ -32,6 +32,7 @@ pub mod heading;
 pub mod instant;
 pub mod layout;
 pub mod markdown;
+pub mod refresh;
 pub mod terminal;
 
 #[cfg(target_arch = "wasm32")]

@@ -5,16 +5,27 @@
 
 use crate::{
     CardId, MindClient,
-    components::icons::{IconActivity, IconRefresh},
+    components::{freshness::FreshnessControls, icons::IconActivity},
+    refresh::Freshness,
     tool_state::ToolCardStates,
 };
 use leptos::prelude::*;
+
+/// How often telemetry is re-read while the panel is open and visible.
+///
+/// Five seconds. Load, memory and temperature move on the scale of seconds, and a person watching
+/// this panel is usually watching it because something is happening now.
+const MONITOR_INTERVAL_MS: u32 = 5_000;
 
 #[component]
 pub fn MonitorContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.monitor(card);
+
+    // Telemetry is the panel this matters most for: a load average is a claim about right now,
+    // and one from eleven minutes ago is indistinguishable on screen from one from a second ago.
+    let freshness = Freshness::new();
 
     let load_monitor = move || {
         signals.loading.set(true);
@@ -23,6 +34,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                 Ok(proj) => {
                     signals.monitor.set(Some(proj));
                     signals.status_msg.set(None);
+                    freshness.arrived();
                 }
                 Err(err) => {
                     signals
@@ -39,6 +51,15 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
         load_monitor();
     });
 
+    // And keep asking. `auto_refresh` has been on this struct since the panel was written and was
+    // read by nothing, so the toggle existed and the timer did not.
+    crate::refresh::keep_reading(
+        MONITOR_INTERVAL_MS,
+        signals.auto_refresh,
+        signals.loading,
+        load_monitor,
+    );
+
     view! {
         <div class="monitor-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
             // Header
@@ -47,13 +68,12 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                     <IconActivity size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"Hardware Telemetry & Monitor"</span>
                 </div>
-                <button
-                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
-                    title="Refresh metrics"
-                    on:click=move |_| load_monitor()
-                >
-                    <IconRefresh size=13 />
-                </button>
+                <FreshnessControls
+                    freshness=freshness
+                    auto_refresh=signals.auto_refresh
+                    loading=signals.loading
+                    refresh_now=move |()| load_monitor()
+                />
             </div>
 
             // The panel wrote "Failed to load telemetry" into a signal nothing read, so a host

@@ -9,15 +9,24 @@ use leptos::prelude::*;
 
 use crate::{
     CardId, MindClient,
-    components::icons::{IconLayers, IconRefresh},
+    components::{freshness::FreshnessControls, icons::IconLayers},
+    refresh::Freshness,
     tool_state::ToolCardStates,
 };
+
+/// How often the process table is re-read while the panel is open and visible.
+///
+/// Five seconds, like the monitor. A process table is read to find what is consuming the machine
+/// right now, and one that lags behind sends a person to kill something that already exited.
+const PROCESSES_INTERVAL_MS: u32 = 5_000;
 
 #[component]
 pub fn ProcessesContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.processes(card);
+
+    let freshness = Freshness::new();
 
     let load_processes = move || {
         signals.loading.set(true);
@@ -26,6 +35,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                 Ok(projection) => {
                     signals.processes.set(projection.processes);
                     signals.status_msg.set(None);
+                    freshness.arrived();
                 }
                 Err(err) => {
                     signals
@@ -64,6 +74,13 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
     Effect::new(move |_| {
         load_processes();
     });
+
+    crate::refresh::keep_reading(
+        PROCESSES_INTERVAL_MS,
+        signals.auto_refresh,
+        signals.loading,
+        load_processes,
+    );
 
     let sorted_and_filtered = move || {
         let mut list = signals.processes.get();
@@ -121,13 +138,12 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                         </span>
                     </div>
 
-                    <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
-                        title="Refresh processes"
-                        on:click=move |_| load_processes()
-                    >
-                        <IconRefresh size=13 />
-                    </button>
+                    <FreshnessControls
+                        freshness=freshness
+                        auto_refresh=signals.auto_refresh
+                        loading=signals.loading
+                        refresh_now=move |()| load_processes()
+                    />
                 </div>
 
                 // Search & Sort bar
