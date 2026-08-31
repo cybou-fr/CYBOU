@@ -468,6 +468,33 @@ pub fn App() -> impl IntoView {
                     </button>
                     <button
                         class="canvas-btn"
+                        title="Remember this place"
+                        aria-label="Remember this place"
+                        on:click=move |_| {
+                            // The centre of what is on screen, in canvas coordinates, and a name
+                            // taken from what is standing there. Making an anchor used to mean
+                            // leaving the place to go and describe it in another panel.
+                            let view = living_canvas::interaction::visible_canvas_rect(
+                                pan.get_untracked(),
+                                zoom.get_untracked(),
+                            );
+                            let name = layout.get_untracked().name_for_view(view);
+                            history.update(|h| h.push(layout.get_untracked()));
+                            layout.update(|l| {
+                                l.add_anchor(
+                                    &name,
+                                    view.x + view.width / 2.0,
+                                    view.y + view.height / 2.0,
+                                    zoom.get_untracked(),
+                                );
+                            });
+                            layout.get_untracked().save();
+                        }
+                    >
+                        <lucide_leptos::MapPin size=12 />
+                    </button>
+                    <button
+                        class="canvas-btn"
                         class:active=move || magnet.get()
                         title=move || if magnet.get() {
                             "Sticking is on: cards align and merge into decks"

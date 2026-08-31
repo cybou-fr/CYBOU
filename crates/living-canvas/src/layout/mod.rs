@@ -101,6 +101,40 @@ mod tests {
     }
 
     #[test]
+    fn a_place_is_named_after_what_is_standing_in_it() {
+        // The name a person would have typed. Making an anchor used to mean leaving the place,
+        // opening a panel about the canvas, and describing a view no longer on screen.
+        let layout = DesktopLayout::load();
+        // Tight enough to hold Identity and stop above Session, which starts at y=248.
+        let over_identity = Rect::new(0.0, 0.0, 300.0, 240.0);
+        assert_eq!(layout.name_for_view(over_identity), "Identity");
+
+        let over_two = Rect::new(0.0, 0.0, 900.0, 900.0);
+        let name = layout.name_for_view(over_two);
+        assert!(name.contains(" and "), "two cards in view named it {name}");
+
+        // Empty space is still a place — somewhere to put things — and there is nothing else true
+        // to say about it.
+        let empty = Rect::new(50_000.0, 50_000.0, 400.0, 400.0);
+        assert_eq!(layout.name_for_view(empty), "Place 1");
+    }
+
+    #[test]
+    fn standing_in_the_same_place_twice_keeps_it_twice() {
+        // `add_anchor` refuses a repeated name, so a second visit to the same view would silently
+        // do nothing at all — the one outcome a button must not have.
+        let mut layout = DesktopLayout::load();
+        let view = Rect::new(0.0, 0.0, 300.0, 300.0);
+
+        let first = layout.name_for_view(view);
+        assert!(layout.add_anchor(&first, 150.0, 150.0, 1.0));
+        let second = layout.name_for_view(view);
+        assert_ne!(first, second);
+        assert!(layout.add_anchor(&second, 150.0, 150.0, 1.0));
+        assert_eq!(layout.anchors.len(), 2);
+    }
+
+    #[test]
     fn a_card_may_be_left_of_where_the_canvas_starts() {
         // The origin is not a corner. Dragging clamped to twelve pixels from it and normalizing
         // clamped to zero, so a plane described as unbounded had a wall in one corner that nothing

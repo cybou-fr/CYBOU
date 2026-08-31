@@ -233,6 +233,58 @@ impl DesktopLayout {
         from_v8(v8)
     }
 
+    /// What to call a place, given what is standing in it.
+    ///
+    /// The cards a view holds are the only description of it anybody would recognise. Two names is
+    /// the limit: a list of six is not a name, it is the view written out, and by the time somebody
+    /// is choosing between anchors they are reading a row of pills.
+    ///
+    /// A view with nothing in it is still a place worth keeping — somewhere to put things — and
+    /// gets a number, because there is nothing else true to say about it.
+    #[must_use]
+    pub fn name_for_view(&self, view: crate::layout::model::Rect) -> String {
+        let mut inside: Vec<&'static str> = self
+            .cards
+            .iter()
+            .filter(|card| {
+                let rect = crate::layout::model::Rect::new(
+                    card.geometry.x,
+                    card.geometry.y,
+                    card.geometry.width,
+                    card.geometry.height,
+                );
+                rect.intersects(&view)
+            })
+            .map(|card| card.id.title())
+            .collect();
+        inside.dedup();
+
+        let base = match inside.as_slice() {
+            [] => format!("Place {}", self.anchors.len() + 1),
+            [one] => (*one).to_owned(),
+            [first, second, ..] => format!("{first} and {second}"),
+        };
+
+        // Anchors are unique by name and `add_anchor` refuses a repeat. Somebody standing in the
+        // same place twice meant to keep it twice.
+        if !self
+            .anchors
+            .iter()
+            .any(|anchor| anchor.name.eq_ignore_ascii_case(&base))
+        {
+            return base;
+        }
+        (2..)
+            .map(|nth| format!("{base} {nth}"))
+            .find(|candidate| {
+                !self
+                    .anchors
+                    .iter()
+                    .any(|anchor| anchor.name.eq_ignore_ascii_case(candidate))
+            })
+            .unwrap_or(base)
+    }
+
     /// Add a named camera anchor when its trimmed name is non-empty and unique.
     pub fn add_anchor(&mut self, name: &str, center_x: f64, center_y: f64, zoom: f64) -> bool {
         const MAX_ANCHORS: usize = 32;
@@ -251,8 +303,8 @@ impl DesktopLayout {
         self.anchors.push(crate::layout::model::CanvasAnchor {
             id: format!("anchor-{}", uuid::Uuid::new_v4()),
             name: name.to_owned(),
-            center_x: center_x.clamp(0.0, 10000.0),
-            center_y: center_y.clamp(0.0, 10000.0),
+            center_x: center_x.clamp(-CANVAS_REACH, CANVAS_REACH),
+            center_y: center_y.clamp(-CANVAS_REACH, CANVAS_REACH),
             preferred_zoom: zoom.clamp(0.4, 2.0),
         });
         true
