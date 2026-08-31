@@ -295,6 +295,23 @@ case "$confirmation_status" in
     *) exit "$confirmation_status" ;;
 esac
 
+# ADR-0048, the other entrance. The two gates above start from something this host concluded about
+# itself; this one starts from a person, and there is no question to answer because the asking is
+# the confirmation.
+announce "requested action boundary"
+failed="requested action boundary"
+request_status=0
+bash scripts/test-request-gate.sh || request_status=$?
+case "$request_status" in
+    0) failed="" ;;
+    3)
+        announce "requested action boundary not run: a root systemd host, dbus-run-session and sqlite3 are required"
+        skipped="$skipped requested-action-boundary"
+        failed=""
+        ;;
+    *) exit "$request_status" ;;
+esac
+
 # Licensing headers, because CI runs this and a gate that claims to be every check and is not is the
 # same defect as a check whose failure is invisible. Skipped with a said reason rather than silently
 # when the tool is absent: an absent check must not look like a passed one.

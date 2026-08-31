@@ -1055,6 +1055,15 @@ opposite of what opening that door was for. Its identity is derived from the pro
 lifecycle rewritten as it grows offers the same root again rather than a second person
 asking.
 
+`test-request-gate.sh` carries one from a person's asking to a restart on a live host: the
+request, the permit, the systemd restart, an independent re-observation over a separate
+connection, and the permit refused on replay. It asks the refusals first, because a gate that
+proved the happy path and then checked the boundary would be reporting that the door works
+before checking it is a door rather than a hole — the three forbidden operations produce no
+permit, and a verb outside the table is refused as not an operation. Nothing observes anything
+in that run and no finding is written, so the four `Observation` roots the Journal ends up
+holding are four askings, and their absence would be a restart that traces back to nobody.
+
 **One of the Services panel's six buttons does something.** Restart is in the closed
 operation table with an executor adapter behind it; start, stop, enable and disable are not
 in the table at all, and reload is in it with no adapter. Each of those five is refused by
@@ -1305,6 +1314,7 @@ bash scripts/test-capsule-gate.sh
 bash scripts/test-egress-gate.sh
 bash scripts/test-action-gate.sh
 bash scripts/test-confirmation-gate.sh
+bash scripts/test-request-gate.sh
 bash scripts/test-desktop-delivery-gate.sh
 bash scripts/test-acp-gate.sh
 bash scripts/test-standing-lease-gate.sh
