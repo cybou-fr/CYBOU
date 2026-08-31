@@ -4256,3 +4256,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   opacity: 0.5;
   cursor: default;
 }
+
+/* The shelf stands in named groups rather than as one row of squares. A person looking for the
+   log viewer is looking under System, and a rule between the groups is what makes that findable
+   without adding a word of chrome to a bar that is already the width of the screen. */
+.dock-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-group + .dock-group {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
