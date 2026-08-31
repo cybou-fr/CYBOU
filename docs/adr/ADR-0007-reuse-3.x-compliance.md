@@ -39,14 +39,14 @@ SPDX-License-Identifier: MIT
 - `LICENSES/CC-BY-SA-4.0.txt` - Creative Commons Attribution-ShareAlike 4.0 text
 
 ### License Assignment
-- **Code files** (.cpp, .h, .nix, .js, etc.): MIT License
+- **Code files** (.rs, .toml, .js, .html, .css): MIT License
 - **Asset files** (images, themes, etc.): CC-BY-SA-4.0 License
 - **Documentation**: MIT License (same as code)
 
 ### Validation
 REUSE compliance is validated as part of CI:
-```nix
-# In flake.nix
+```toml
+# In Cargo.toml
 checks.x86_64-linux.reuse = ...
 ```
 
@@ -69,7 +69,7 @@ This runs `reuse lint` to verify all files have proper SPDX headers.
 ## Enforcement
 
 ### CI Check
-The `nix flake check` command includes REUSE validation. Any file without proper SPDX headers will cause the check to fail.
+The CI workflow includes REUSE validation. Any file without proper SPDX headers will cause the check to fail.
 
 ### Gate A
 REUSE compliance is a repository gate documented in `../TESTING.md`. No file can be merged without

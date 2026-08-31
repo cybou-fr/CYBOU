@@ -36,7 +36,7 @@ The target production tree contains pure Rust, WebAssembly, and standard web con
 WebAssembly tooling may emit a minimal JavaScript loader; it is generated output, not an authored
 application layer and is never edited or treated as an authority boundary.
 
-Nix expressions, systemd declarations, schemas, interface descriptions, SQL migrations, HTML
+Systemd declarations, schemas, interface descriptions, SQL migrations, HTML
 metadata, CSS/design tokens, documentation, test fixtures/data, and third-party code are
 declarative or external artifacts rather than authored executable-language exceptions. Existing
 Python, shell, and website JavaScript may remain only until their Rust replacement phase; new

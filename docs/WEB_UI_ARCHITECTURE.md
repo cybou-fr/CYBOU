@@ -92,8 +92,8 @@ crates/
   desktop-shell/         Chromium/session policy launcher
 
 modules/
-  web-gateway.nix
-  desktop-web.nix
+  cybou-web-gateway.service
+  living-canvas.service
 
 packages/
   cybou-web-ui/
@@ -455,12 +455,12 @@ The spatial desktop replaces traditional desktop environments with a native sove
 | input methods | test keyboard layouts, compose, IME, touch, and accessibility input |
 | accessibility | Chromium accessibility tree plus product-level keyboard/focus semantics |
 | crash recovery | compositor restarts renderer/gateway without restarting Mind |
-| updates | Nix generation candidate, verification, switch, and rollback presentation |
+| updates | Service update candidate, verification, and rollback presentation |
 
 The first appliance may intentionally be single-display and single-surface. That scope must be
 declared; it cannot be presented as general desktop parity.
 
-## NixOS integration
+## Host system integration
 
 Target modules:
 
@@ -507,7 +507,7 @@ when distinctions are removed.
 
 Implementation status: the read-only Rust gateway binary, fixture adapter, Linux zbus
 `Presence1.Snapshot` adapter, outer request budget, security headers, same-origin static delivery,
-live `GatewayMindClient`, immutable frontend derivation, and disabled-by-default NixOS user module
+live `GatewayMindClient`, immutable frontend bundle, and systemd user units
 exist. Cursor-aware SSE snapshot delivery now provides reconnect and duplicate suppression through
 `Last-Event-ID`. The Linux source retains a native `Presence1.Changed` zbus stream; deterministic
 fixtures use a bounded two-second polling fallback. Authenticated bootstrap remains before the read-only
@@ -651,7 +651,7 @@ Deliverables:
 - Rust `MindClient` trait and `MockMindClient` in the WASM crate;
 - state vocabulary tests for known/empty/stale/unavailable/unknown;
 - gateway threat-model test plan;
-- Nix package skeletons without enabling the new session by default.
+- Package definitions without enabling the new session by default.
 
 The initial Rust types, fixtures, mock client, and browser shell now create that reviewable seam.
 It is not complete until current `Presence1` projections and canonical cross-language values are

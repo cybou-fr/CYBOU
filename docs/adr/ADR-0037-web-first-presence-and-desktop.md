@@ -119,7 +119,7 @@ a separately established transport/session.
 The target local graphical environment is:
 
 ```text
-NixOS
+Debian 13
   - systemd --user Mind services
   - cybou-web-gateway (loopback only)
   - minimal Wayland compositor

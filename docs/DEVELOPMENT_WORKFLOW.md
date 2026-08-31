@@ -14,7 +14,7 @@ problem or capability
 → focused failing/missing test
 → implementation
 → local cargo test
-→ pinned Nix package/check
+→ workspace cargo test and CI checks
 → documentation/status update
 → review and green CI
 ```

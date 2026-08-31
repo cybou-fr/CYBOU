@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 ## Assets
 
 Identity, Journal, intentions, private observations, provenance, epistemic state, retention/erasure
-obligations, lifecycle records, Nix configuration, credentials, D-Bus interfaces, migration
+obligations, lifecycle records, host configuration, credentials, D-Bus interfaces, migration
 backups, and future inter-node messages.
 
 ## Trust boundaries

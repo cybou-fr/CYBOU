@@ -7,43 +7,39 @@ SPDX-License-Identifier: MIT
 
 ## Maturity warning
 
-Cybou images are development artifacts unless a release explicitly states otherwise. Do not use a
-development image as the only copy of important data. Continuity and the documented v0/v1
+Cybou images and packages are development artifacts unless a release explicitly states otherwise. Do not use a
+development preview as the only copy of important data. Continuity and the documented v0/v1
 lifecycle-state migration are implemented and tested, but general in-place system-upgrade,
 rollback, installer-migration, and stable-release compatibility guarantees are not.
 
 ## Recommended evaluation path
 
-Use the development VM first:
+Build and run the workspace services locally on Debian 13 Linux or WSL2:
 
 ```bash
-nix build .#nixosConfigurations.cybou-vm.config.system.build.vm --print-build-logs
-./result/bin/run-cybou-vm
+cargo build --workspace --release --locked
+cargo test --workspace --locked
 ```
 
 This evaluates the Living Canvas spatial surface, the fifteen-process Mind package, D-Bus/systemd activation, and
-persistent state without installing to a physical disk. Individual VM gates activate the service
-subgraph required by their scenario; see [Testing](TESTING.md) for exact coverage. Development
-login details are defined in `systems/vm.nix` and intentionally not duplicated here.
+persistent state without installing to a physical disk. Individual test gates activate the service
+subgraph required by their scenario; see [Testing](TESTING.md) for exact coverage.
 
-## Available image targets
+## Available targets
 
-| Target | Build output | Intended use |
+| Target | Build command | Intended use |
 |---|---|---|
-| QEMU/KVM VM | `cybou-vm.config.system.build.vm` | development/evaluation and the KVM gates |
+| Cargo Workspace | `cargo build --workspace --release` | Local evaluation, development, and unit/integration test gates |
+| Living Canvas WASM | `trunk build crates/living-canvas/index.html` | Client-side spatial desktop WebAssembly application |
+| Web Gateway | `cargo run -p cybou-web-gateway` | Local HTTP/WebSocket gateway server on port 8080 |
+| Debian VPS Deploy | `./scripts/deploy-vps.sh` | Remote deployment to a Debian 13 host with systemd user units |
 
-One target, and it is a test harness rather than a product. The live ISO, its Calamares installer,
-and the Hyper-V image were removed: they installed NixOS, and [ADR-0038](adr/ADR-0038-rust-first-codebase.md)
-makes Debian 13 the deployment target. Keeping an installer for a system nothing is aimed at would
-have meant maintaining an install path no gate exercised and no release intended anyone to use.
+There is currently no standalone desktop ISO. Deployment onto Debian 13 is tracked in
+[Deployment](DEPLOYMENT.md).
 
-There is currently no installable Cybou image. The Debian packaging that replaces it is tracked in
-[Deployment](DEPLOYMENT.md); until it exists, evaluation means the VM above or the deployed web
-preview, not an installation.
+## Service diagnostics
 
-## After boot
-
-For service diagnostics:
+For systemd user service diagnostics:
 
 ```bash
 systemctl --user status cybou-presenced.service

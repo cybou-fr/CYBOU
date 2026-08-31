@@ -197,7 +197,7 @@ claim would gain standing by being associated with something relevant, which is 
 
 ## First source
 
-Current NixOS system generation and build identity. Local, non-sensitive, cheaply verifiable, and
+Current host system state and build identity. Local, non-sensitive, cheaply verifiable, and
 naturally contradictory — the generation changes while an earlier observation still claims to be
 current, which exercises staleness and supersession without any privacy question to answer first.
 

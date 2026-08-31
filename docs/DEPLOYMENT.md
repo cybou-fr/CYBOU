@@ -8,11 +8,10 @@ SPDX-License-Identifier: MIT
 ## Sole active environment
 
 The only active Linux build and deployment environment is Debian 13 at
-`debian@vps-d0669a91.vps.ovh.net`. Windows is an editing and Git workstation only. WSL and NixOS
-are not valid build, test, packaging, or deployment evidence.
+`debian@vps-d0669a91.vps.ovh.net`. Windows is an editing and Git workstation only. All release builds and deployments run on Debian 13.
 
 The target is Debian 13, systemd, D-Bus, Wayland, Chromium, SQLite, libsodium, Rust, and WASM.
-Never attempt another in-place Debian-to-NixOS conversion on this host.
+The host runs pure Debian 13 with native systemd user services.
 
 Bootstrap the clean server once:
 
@@ -137,8 +136,7 @@ start the same runtime without turning absent policy into permission.
 
 ## Safety boundary
 
-- There is no NixOS conversion path. The retired `prepare-vps-nixos.sh` has been removed rather
-  than left in the tree as a script whose only behaviour was to refuse to run.
+- Deployments strictly target standard Debian 13 installations with native systemd user services.
 - Deployment does not modify the bootloader or replace Debian.
 - Package/service activation will be added as part of the Debian hard cutover.
 - Public access is unauthenticated by decision, behind TLS, and shows live Mind state with

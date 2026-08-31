@@ -30,7 +30,7 @@ million rows and would measure nothing that the append sample does not already m
 
 ## Measured baseline
 
-Recorded 2026-08-11 on the development host (x86_64, NixOS, SSD). Absolute values are
+Recorded 2026-08-11 on the development host (x86_64, Linux, SSD). Absolute values are
 machine-specific; the per-contribution costs and their linearity are the transferable part.
 
 | Measure | 10k | 100k | 1m | Per contribution |

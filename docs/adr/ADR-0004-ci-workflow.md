@@ -12,7 +12,7 @@ Accepted
 Cybou needs a Continuous Integration workflow to ensure code quality and catch issues early. The workflow should:
 - Run quickly on every push (fast feedback)
 - Be comprehensive on releases (full validation)
-- Not duplicate what `nix flake check` already does
+- Ensure fast, reliable, reproducible CI execution
 - Work within GitHub Actions constraints (14GB disk, no KVM)
 
 ## Decision
@@ -20,15 +20,15 @@ Cybou needs a Continuous Integration workflow to ensure code quality and catch i
 
 ### Fast Job (every push)
 Runs on every push and pull request:
-- Nix formatting validation (`nix fmt`)
+- Cargo formatting validation (`cargo fmt --check`)
 - REUSE license compliance (`reuse lint`)
 - Package metadata validation (`scripts/validate-packages.py`)
 - Rust workspace compilation (`cargo build --workspace`)
-- Formatting check (`nix fmt && git diff --exit-code`)
+- Formatting check (`cargo fmt --check`)
 
 ### Full Job (tags only)
 Runs only when a tag is pushed:
-- Complete `nix flake check`
+- Complete workspace tests (`cargo test --workspace`)
 - VM build (requires KVM, will fail on hosted runners without KVM)
 
 ## Rationale
@@ -46,7 +46,7 @@ Runs only when a tag is pushed:
 - Would train developers to ignore red CI (false failures)
 
 ### Why Not Duplicate Checks?
-`nix flake check` already runs formatting, REUSE, and package-metadata validation. Running these separately would create a second source of truth that could drift.
+The CI pipeline runs cargo fmt, cargo clippy, REUSE, and workspace test suites.
 
 ## Implementation
 
@@ -56,19 +56,14 @@ jobs:
   fast:
     runs-on: ubuntu-latest
     steps:
-      - nix build .#checks.x86_64-linux.formatting
-      - nix build .#checks.x86_64-linux.reuse
-      - nix build .#checks.x86_64-linux.package-metadata
-      - nix build .#packages.x86_64-linux.cybou-mind
-      - nix build .#packages.x86_64-linux.cybou-presence-applet
-      - nix fmt && git diff --exit-code
-
-  full:
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - nix flake check
-      - nix build .#nixosConfigurations.cybou-vm.config.system.build.vm
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets --locked
+      - run: cargo test --workspace --locked
+      - run: cargo check --target wasm32-unknown-unknown -p living-canvas
+      - run: reuse lint
+      - run: python scripts/validate-cognitive-docs.py
+      - run: python scripts/validate-doc-links.py
+      - run: python scripts/sync-site-i18n.py --check
 ```
 
 ### Not in CI
@@ -91,5 +86,5 @@ jobs:
 
 ## Related
 - .github/workflows/checks.yml - CI configuration
-- ADR-0005 - Calamares installer (ISO built locally, not in CI)
+- ADR-0039 - Debian 13 Base System
 - ADR-0006 - State version pinning (affects what CI tests)

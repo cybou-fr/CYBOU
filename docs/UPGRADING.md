@@ -5,12 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Upgrading
 
-Build and test a NixOS generation before switching:
+To update a local or remote Cybou installation on Debian 13:
 
 ```bash
-sudo nixos-rebuild build --flake .
-sudo nixos-rebuild test --flake .
-sudo nixos-rebuild switch --flake .
+git pull origin main
+cargo build --workspace --release --locked
+systemctl --user restart 'cybou-*'
 ```
 
 ## Current Journal migration
@@ -53,20 +53,3 @@ Still pending:
 - release-level continuity guarantees.
 
 Back up persistent Cybou state before testing pre-release architecture transitions.
-
-## Target architecture migration
-
-Future process/state migrations should follow:
-
-```text
-backup
-→ validate current state
-→ migrate transactionally
-→ verify Journal and identity
-→ reconstruct active commitments
-→ start the new ownership topology
-→ verify continuity
-→ record transition outcome
-```
-
-If verification fails, do not create replacement identity or silently claim continuity.

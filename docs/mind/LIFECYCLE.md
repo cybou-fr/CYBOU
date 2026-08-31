@@ -126,7 +126,7 @@ and fails closed if any reference is absent. Lifecycle1 state commits emit `Chan
 projects mode, run status/state, and lifecycled health through Presence1, while the desktop client keeps
 runtime availability (`awake`) separate from lifecycle mode. The process suite covers crashes after owner and terminal Event1
 commit but before the corresponding lifecycle state commit; deterministic replay creates no second
-contribution. The headless NixOS gate promotes both split-commit windows to real reboot recovery
+contribution. The automated test gate promotes both split-commit windows to real reboot recovery
 and proves replay leaves Event1 count unchanged; the P3 transaction exit gate is complete.
 
 Owner computation is also bounded by that mark: Predictor and Workspace reconstruct the data used
@@ -166,7 +166,7 @@ when no run timestamp exists. These thresholds describe projection age, not evid
 
 The desktop client sends user interruption asynchronously to Presence1 and exposes a read-only pending
 flag. Presence1 validates that a run is active and asks Lifecycle1 to persist `Interrupted`; neither
-the applet nor presenced writes lifecycle state. The five-second transport timeout completes as an
+the client nor presenced writes lifecycle state. The five-second transport timeout completes as an
 `UnknownOutcome` error without blocking the client event loop. Inside Presence1, validation and
 `FinishRun` share one monotonic server budget, and expiry before the terminal call prevents the
 mutation from being sent.
@@ -192,7 +192,7 @@ is ignored for lifecycle progress and cannot produce a false successful terminal
 | corrupt lifecycle state | startup fails closed | backup/operator recovery policy |
 | identity continuity | simulated login and booted reboot preserve UUID and increment logical session | none for P2 scope |
 | open intentions | simulated login reconstructs accepted commitment | booted reboot proof |
-| system reboot | focused NixOS gate preserves identity and exact run blob, then enters `Recovering` | none for P2 scope |
+| system reboot | automated test gate preserves identity and exact run blob, then enters `Recovering` | none for P2 scope |
 | architecture upgrade | legacy v0/v1 backup+migration to v2; future schema fails closed | multi-version migrations |
 
 ## Related documents
