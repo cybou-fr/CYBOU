@@ -79,10 +79,14 @@ pub fn CanvasViewport(
     let view_mode = use_context::<RwSignal<DesktopViewMode>>()
         .unwrap_or_else(|| RwSignal::new(DesktopViewMode::Spatial));
 
-    let is_lod_overview = move || zoom.get() <= 0.35;
-    let is_lod_glance = move || zoom.get() > 0.35 && zoom.get() <= 0.75;
-    let is_lod_standard = move || zoom.get() > 0.75 && zoom.get() <= 1.25;
-    let is_lod_detail = move || zoom.get() > 1.25;
+    // Asked of `layout::camera`, which the card frame asks too. These were four inline
+    // comparisons here and nowhere else, so the frame had no way to know what the stylesheet had
+    // decided about the same zoom.
+    let detail = move || crate::layout::camera::detail_at(zoom.get());
+    let is_lod_overview = move || detail() == crate::layout::camera::Detail::Overview;
+    let is_lod_glance = move || detail() == crate::layout::camera::Detail::Glance;
+    let is_lod_standard = move || detail() == crate::layout::camera::Detail::Standard;
+    let is_lod_detail = move || detail() == crate::layout::camera::Detail::Detail;
 
     view! {
         <section

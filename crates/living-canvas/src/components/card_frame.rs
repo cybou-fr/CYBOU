@@ -69,6 +69,29 @@ pub fn CardFrame(
         card.title()
     );
 
+    // Collapsed by a person, or far enough away that the whole card is its own headline. The two
+    // are drawn the same and are not the same thing: this one is undone by moving the camera, and
+    // it never touches what the person chose, so zooming back in returns exactly what they left.
+    //
+    // A focused card is exempt. Focus fills the window with one card because somebody wants to
+    // read it, and the canvas transform is off while it does — the zoom underneath is not a
+    // statement about how far away this card is any more.
+    let shows_body = move || {
+        if layout.get().presentation(card).collapsed {
+            return false;
+        }
+        let focused = use_context::<RwSignal<crate::DesktopViewMode>>().is_some_and(|mode| {
+            matches!(
+                mode.get(),
+                crate::DesktopViewMode::Focus(crate::DesktopItemId::Card(focused)) if focused == card
+            )
+        });
+        if focused {
+            return true;
+        }
+        camera.is_none_or(|camera| crate::layout::camera::detail_at(camera.zoom.get()).shows_body())
+    };
+
     let kicker = StoredValue::new(kicker_icon);
     let collapsed = StoredValue::new(collapsed_summary);
     let render_children = StoredValue::new(children);
@@ -113,7 +136,7 @@ pub fn CardFrame(
 
                 <Show when=is_drawable>
                     <Show
-                        when=move || !layout.get().presentation(card).collapsed
+                        when=shows_body
                         fallback=move || collapsed.with_value(|c| c())
                     >
                         {move || render_children.with_value(|rc| rc())}

@@ -281,6 +281,47 @@ pub fn apply_camera_fly_to(
 }
 
 #[cfg(test)]
+mod detail_tests {
+    use super::{Detail, detail_at};
+
+    #[test]
+    fn the_thresholds_are_where_the_stylesheet_had_them() {
+        // These were three inline comparisons in the viewport. Moving them has to move them
+        // exactly: a card that changed state at a different zoom from its own CSS class would be
+        // dressed as one thing and drawn as another.
+        assert_eq!(detail_at(0.35), Detail::Overview);
+        assert_eq!(detail_at(0.36), Detail::Glance);
+        assert_eq!(detail_at(0.75), Detail::Glance);
+        assert_eq!(detail_at(0.76), Detail::Standard);
+        assert_eq!(detail_at(1.25), Detail::Standard);
+        assert_eq!(detail_at(1.26), Detail::Detail);
+    }
+
+    #[test]
+    fn far_away_a_card_is_its_own_headline() {
+        // The whole point of the change: distance decides what a card says, not how small it says
+        // it. Read as a claim about the two states, so that adding a level cannot quietly leave a
+        // card drawing a body nobody can read.
+        assert!(!detail_at(0.2).shows_body());
+        assert!(!detail_at(0.6).shows_body());
+        assert!(detail_at(1.0).shows_body());
+        assert!(detail_at(2.0).shows_body());
+    }
+
+    #[test]
+    fn every_level_dresses_the_canvas_as_itself() {
+        for (zoom, class) in [
+            (0.2, "lod-overview"),
+            (0.6, "lod-glance"),
+            (1.0, "lod-standard"),
+            (2.0, "lod-detail"),
+        ] {
+            assert_eq!(detail_at(zoom).css_class(), class);
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -478,6 +519,60 @@ mod culling_tests {
 ///
 /// The same pair the wheel and the camera flights already use, written once here so a gesture and a
 /// keystroke cannot disagree about how far out the desktop goes.
+/// How much of itself a card shows, decided by how far away the camera is.
+///
+/// The thresholds were three comparisons written inline in the viewport, used only to pick a CSS
+/// class. They are here, named, because the frame now asks the same question to decide what to
+/// draw — and a stylesheet and a component answering "how far away is this" differently would put
+/// a card in one state and dress it as another.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Detail {
+    /// Far enough that a card is a label. Its own summary line, and nothing else.
+    Overview,
+    /// Close enough to tell cards apart, not to read them. Still the summary.
+    Glance,
+    /// The card as it is meant to be read.
+    Standard,
+    /// Closer than that, for work inside one card.
+    Detail,
+}
+
+impl Detail {
+    /// Whether a card at this distance draws its contents or its one-line summary.
+    ///
+    /// The summary is what the card already hands over for being collapsed by hand. Far away it is
+    /// not a degraded card; it is the card, said shorter.
+    #[must_use]
+    pub const fn shows_body(self) -> bool {
+        matches!(self, Self::Standard | Self::Detail)
+    }
+
+    /// The class the canvas wears, so the stylesheet and the frame agree by construction.
+    #[must_use]
+    pub const fn css_class(self) -> &'static str {
+        match self {
+            Self::Overview => "lod-overview",
+            Self::Glance => "lod-glance",
+            Self::Standard => "lod-standard",
+            Self::Detail => "lod-detail",
+        }
+    }
+}
+
+/// How much of a card is worth drawing at this zoom.
+#[must_use]
+pub fn detail_at(zoom: f64) -> Detail {
+    if zoom <= 0.35 {
+        Detail::Overview
+    } else if zoom <= 0.75 {
+        Detail::Glance
+    } else if zoom <= 1.25 {
+        Detail::Standard
+    } else {
+        Detail::Detail
+    }
+}
+
 pub const MIN_ZOOM: f64 = 0.4;
 /// See [`MIN_ZOOM`].
 pub const MAX_ZOOM: f64 = 2.0;
