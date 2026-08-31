@@ -19,6 +19,12 @@ use super::DesktopLayout;
 /// card behind a toolbar. Measured against the dock's own height plus the room it leaves.
 const DOCK_RESERVE: f64 = 96.0;
 
+/// The corner the canvas controls occupy: the minimap, the zoom buttons and what sits with them.
+///
+/// They are fixed to the window rather than to the canvas — a control that moves the canvas cannot
+/// itself scroll away — so a card placed under them is a card with a hole in it.
+const CHROME_RESERVE: (f64, f64) = (260.0, 200.0);
+
 /// The shortest a column is allowed to be before the spillover rule gives up on it.
 ///
 /// On a window too short to hold anything, refusing to place cards would be worse than placing
@@ -301,6 +307,14 @@ impl DesktopLayout {
             .collect();
 
         let mut placed_rects: Vec<Rect> = pinned_rects;
+        // The controls in the bottom-right corner are an obstacle like a pinned card is, and are
+        // given to the same rule rather than to one of their own.
+        placed_rects.push(Rect::new(
+            viewport.width - CHROME_RESERVE.0,
+            viewport.height - DOCK_RESERVE - CHROME_RESERVE.1,
+            CHROME_RESERVE.0,
+            CHROME_RESERVE.1,
+        ));
 
         let col_width = 380.0;
         let col_gap = 24.0;
@@ -377,12 +391,41 @@ impl DesktopLayout {
                 let eff_w = item.geometry.width;
                 let eff_h = item.effective_height();
 
+                // Where the card would come to rest in a column, given everything already placed.
+                // Asking the cursor alone was not enough once the controls' corner became an
+                // obstacle: a column could look empty and still push the card past the fold.
+                let settle = |x: f64, from: f64, placed: &[Rect]| {
+                    let mut y = from;
+                    loop {
+                        let candidate = Rect::new(x, y, eff_w, eff_h);
+                        let Some(hit) = placed.iter().find(|obst| candidate.intersects(obst))
+                        else {
+                            return y;
+                        };
+                        y = hit.bottom() + row_gap;
+                    }
+                };
+
+                // A column a card is moved *into* must hold it without spilling into the next
+                // one. A column is only as wide as its own members, so a wide card relocated into
+                // a narrow one stands across the boundary and every later card has to settle
+                // around it — which is how a five-card desktop on a 1440-wide window ended up
+                // with a card below the fold and two columns half empty.
+                let fits = |idx: usize, bands: &[f64], cursors: &[f64], placed: &[Rect]| {
+                    let room = bands.get(idx + 1).copied().unwrap_or(viewport.width);
+                    bands[idx] + eff_w <= room
+                        && settle(bands[idx], cursors[idx], placed) + eff_h <= floor
+                };
+
                 // Its own column first, then every other, left to right.
-                let mut chosen = (cursors[c_idx] + eff_h <= floor).then_some(c_idx);
+                // Its own column is where it was sized to belong, so overhanging there is
+                // expected and only the fold is asked about.
+                let mut chosen = (settle(bands[c_idx], cursors[c_idx], &placed_rects) + eff_h
+                    <= floor)
+                    .then_some(c_idx);
                 if chosen.is_none() {
-                    chosen = (0..bands.len()).find(|&idx| {
-                        cursors[idx] + eff_h <= floor && bands[idx] + eff_w <= viewport.width
-                    });
+                    chosen =
+                        (0..bands.len()).find(|&idx| fits(idx, &bands, &cursors, &placed_rects));
                 }
                 // A new column, but only one the window can show. Off the right-hand edge is not
                 // better than below the fold: both are invisible, and below is the direction a
@@ -405,21 +448,7 @@ impl DesktopLayout {
                 let idx = chosen.unwrap_or(c_idx);
 
                 let col_x = bands[idx];
-                let mut cur_y = cursors[idx];
-                loop {
-                    let candidate = Rect::new(col_x, cur_y, eff_w, eff_h);
-                    let mut collides = false;
-                    for obst in &placed_rects {
-                        if candidate.intersects(obst) {
-                            cur_y = obst.bottom() + row_gap;
-                            collides = true;
-                            break;
-                        }
-                    }
-                    if !collides {
-                        break;
-                    }
-                }
+                let cur_y = settle(col_x, cursors[idx], &placed_rects);
 
                 self.update_item_position(&item.id, col_x, cur_y);
                 placed_rects.push(Rect::new(col_x, cur_y, eff_w, eff_h));
