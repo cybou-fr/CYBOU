@@ -40,7 +40,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="event-journal-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
+        <div class="event-journal-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
             // Header
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -102,7 +102,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                                             {entry.timestamp}
                                         </span>
                                     </div>
-                                    <div style="font-size: 12px; color: var(--text-main); margin-top: 2px;">
+                                    <div style="font-size: 12px; margin-top: 2px;">
                                         {entry.summary}
                                     </div>
                                     <div style="font-size: 10px; font-family: monospace; color: var(--text-dim); background: rgba(0,0,0,0.25); padding: 4px 6px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">

@@ -131,7 +131,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="learning-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow: hidden;">
+        <div class="learning-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
             // Header
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">

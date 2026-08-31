@@ -101,6 +101,40 @@ mod tests {
     }
 
     #[test]
+    fn a_card_may_be_left_of_where_the_canvas_starts() {
+        // The origin is not a corner. Dragging clamped to twelve pixels from it and normalizing
+        // clamped to zero, so a plane described as unbounded had a wall in one corner that nothing
+        // on screen explained — and a card dragged past it snapped back on the next load.
+        let mut layout = DesktopLayout::load();
+        layout.set_position(CardId::Identity, -420.0, -260.0);
+
+        layout.validate_and_normalize();
+
+        let geometry = layout.geometry(CardId::Identity);
+        assert!(
+            (geometry.x - -420.0).abs() < f64::EPSILON
+                && (geometry.y - -260.0).abs() < f64::EPSILON,
+            "a card left of the origin was moved back to {},{}",
+            geometry.x,
+            geometry.y
+        );
+    }
+
+    #[test]
+    fn a_coordinate_from_nowhere_is_still_refused() {
+        // The far bound is a guard against a corrupted layout rather than a fence: a desktop that
+        // cannot be drawn is worse than one somebody has to pan to.
+        let mut layout = DesktopLayout::load();
+        layout.set_position(CardId::Identity, 1e300, -1e300);
+
+        layout.validate_and_normalize();
+
+        let geometry = layout.geometry(CardId::Identity);
+        assert!(geometry.x.is_finite() && geometry.y.is_finite());
+        assert!(geometry.x.abs() <= 100_000.0 && geometry.y.abs() <= 100_000.0);
+    }
+
+    #[test]
     fn a_card_somebody_closed_stays_closed() {
         // Normalizing used to treat a missing System card as damage and put it back, so closing
         // one lasted until the next reload and then reappeared at 60,60 on top of whatever was

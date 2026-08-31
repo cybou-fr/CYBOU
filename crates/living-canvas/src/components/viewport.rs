@@ -228,7 +228,7 @@ pub fn CanvasViewport(
                     let cur_y = f64::from(event.client_y());
                     set_pan.set((init_px + (cur_x - start_x), init_py + (cur_y - start_y)));
                 }
-                move_drag(event.clone(), layout, dragging, snap_guides);
+                move_drag(event.clone(), layout, dragging, snap_guides, zoom.get_untracked());
                 move_resize(event, layout, resizing);
             }
             on:pointerup=move |event: PointerEvent| {

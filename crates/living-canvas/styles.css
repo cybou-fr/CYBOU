@@ -1450,7 +1450,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 /* The action attached to the selected card. Absolute, because it belongs to the card rather than
    to the window, and hidden outright when nothing selectable is selected. */
-.selection-actions { position: absolute; display: flex; gap: 4px; }
 .action-btn {
   display: inline-flex;
   align-items: center;

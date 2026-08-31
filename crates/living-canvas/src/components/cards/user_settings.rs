@@ -117,7 +117,7 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="user-settings-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif; overflow-y: auto;">
+        <div class="user-settings-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
             // Header
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">

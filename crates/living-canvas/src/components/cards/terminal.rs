@@ -147,6 +147,16 @@ fn connect(signals: crate::tool_state::TerminalSignals) {
     on_message.forget();
 
     let on_close = Closure::<dyn FnMut(CloseEvent)>::new(move |_| {
+        // A socket that closes without ever having opened was refused by the gateway, and the
+        // browser is not allowed to say why — the status code of a failed upgrade is not visible to
+        // it. What can be said honestly is which of the two happened, and pressing Connect and
+        // watching nothing change was the alternative.
+        if signals.status.get_untracked() == "Connecting…" {
+            signals.refusal.set(Some(
+                "No terminal answered on this host. The per-account terminal service may not be                  running here."
+                    .to_owned(),
+            ));
+        }
         signals.status.set("Closed".to_owned());
         signals.socket.set(None);
     });

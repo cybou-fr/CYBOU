@@ -71,27 +71,6 @@ pub struct ResizeState {
 /// The topbar and the dock are subtracted because a card placed under either is a card the person
 /// cannot reach.
 #[must_use]
-/// The part of the canvas the window is currently showing, in canvas coordinates.
-///
-/// The stage is translated by the pan and scaled about its own origin, so a window pixel `s` is the
-/// canvas point `(s - pan) / zoom`. Everything that has to place something where a person is
-/// looking needs this, and computing it twice in two files is how the two would come to disagree.
-#[must_use]
-pub fn visible_canvas_rect(pan: (f64, f64), zoom: f64) -> crate::layout::model::Rect {
-    let viewport = usable_viewport();
-    let zoom = if zoom.is_finite() && zoom > 0.0 {
-        zoom
-    } else {
-        1.0
-    };
-    crate::layout::model::Rect::new(
-        -pan.0 / zoom,
-        -pan.1 / zoom,
-        viewport.width / zoom,
-        viewport.height / zoom,
-    )
-}
-
 pub fn usable_viewport() -> UsableViewport {
     const TOPBAR: f64 = 64.0;
     const DOCK: f64 = 72.0;
@@ -118,6 +97,27 @@ pub fn usable_viewport() -> UsableViewport {
         width: (width - 48.0).max(640.0),
         height: (height - TOPBAR - DOCK).max(480.0),
     }
+}
+
+/// The part of the canvas the window is currently showing, in canvas coordinates.
+///
+/// The stage is translated by the pan and scaled about its own origin, so a window pixel `s` is the
+/// canvas point `(s - pan) / zoom`. Everything that has to place something where a person is
+/// looking needs this, and computing it twice in two files is how the two would come to disagree.
+#[must_use]
+pub fn visible_canvas_rect(pan: (f64, f64), zoom: f64) -> crate::layout::model::Rect {
+    let viewport = usable_viewport();
+    let zoom = if zoom.is_finite() && zoom > 0.0 {
+        zoom
+    } else {
+        1.0
+    };
+    crate::layout::model::Rect::new(
+        -pan.0 / zoom,
+        -pan.1 / zoom,
+        viewport.width / zoom,
+        viewport.height / zoom,
+    )
 }
 
 /// Generate CSS inline style for a card item given current layout and focus mode.
@@ -165,19 +165,6 @@ pub fn card_style(layout: DesktopLayout, card: CardId) -> String {
 ///
 /// The arithmetic is in [`crate::layout::selection`], where it can be tested without a browser —
 /// this used to resolve the selection through a kind key, so clicking the third Shell card acted on
-/// the first, and nothing native could see it.
-#[must_use]
-pub fn selection_actions_style(layout: &DesktopLayout, selected: Option<&DesktopItemId>) -> String {
-    let Some(rect) = crate::selected_rect(layout, selected) else {
-        return "display:none".to_owned();
-    };
-    format!(
-        "left:{:.1}px;top:{:.1}px;z-index:{}",
-        rect.x + 18.0,
-        rect.y + rect.height,
-        crate::selected_z(layout, selected) + 1
-    )
-}
 
 /// Compute start, end, and label center coordinates for a relationship edge between two cards.
 #[must_use]
@@ -332,6 +319,7 @@ pub fn move_drag(
     layout: RwSignal<DesktopLayout>,
     dragging: RwSignal<Option<DragState>>,
     snap_guides: RwSignal<Vec<SnapGuide>>,
+    zoom: f64,
 ) {
     let Some(drag) = dragging.get_untracked() else {
         return;
@@ -343,8 +331,17 @@ pub fn move_drag(
         return;
     };
     let bounds = surface.get_bounding_client_rect();
-    let raw_x = (f64::from(event.client_x()) - bounds.left() - drag.offset_x).max(12.0);
-    let raw_y = (f64::from(event.client_y()) - bounds.top() - drag.offset_y).max(12.0);
+    // The surface carries the canvas transform, so the distance from its edge is in screen pixels
+    // and the card lives in canvas ones. Without dividing, a card dragged at 40% zoom moved two and
+    // a half times as far as the pointer — and the offset the grab started with is in the same
+    // screen pixels, so it is converted with it.
+    let scale = if zoom.is_finite() && zoom > 0.0 {
+        zoom
+    } else {
+        1.0
+    };
+    let raw_x = (f64::from(event.client_x()) - bounds.left() - drag.offset_x) / scale;
+    let raw_y = (f64::from(event.client_y()) - bounds.top() - drag.offset_y) / scale;
 
     let target_id = match &drag.target {
         DragTarget::Card(card) => DesktopItemId::Card(*card),
@@ -356,8 +353,11 @@ pub fn move_drag(
             .get_untracked()
             .compute_snap(&target_id, raw_x, raw_y, drag.width, drag.height, 8.0);
 
-    let x = snap.snapped_x.max(12.0);
-    let y = snap.snapped_y.max(12.0);
+    // No floor. The canvas is unbounded in every direction and the origin is not a corner of
+    // anything a person can see; clamping here put a wall twelve pixels from it that nothing on
+    // screen explained.
+    let x = snap.snapped_x;
+    let y = snap.snapped_y;
     snap_guides.set(snap.guides);
 
     match &drag.target {

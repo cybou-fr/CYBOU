@@ -106,7 +106,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
     };
 
     view! {
-        <div class="operations-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="operations-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; ">
             // Toolbar
             <div class="ops-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; gap: 8px;">

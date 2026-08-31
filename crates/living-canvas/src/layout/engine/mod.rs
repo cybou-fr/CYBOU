@@ -50,6 +50,13 @@ pub struct DesktopLayout {
     pub closed: Vec<CardId>,
 }
 
+/// How far from the origin anything may be placed, in either direction.
+///
+/// The canvas is unbounded as far as anybody using it is concerned; this exists so that a layout
+/// arriving from storage with a coordinate of 1e300 cannot make the desktop undrawable. It is a
+/// guard against nonsense, not a fence.
+const CANVAS_REACH: f64 = 100_000.0;
+
 impl Default for DesktopLayout {
     fn default() -> Self {
         Self::canonical(None)
@@ -310,8 +317,11 @@ impl DesktopLayout {
             let spec = card.id.spec();
             card.geometry.width = card.geometry.width.clamp(spec.min_size.0, spec.max_size.0);
             card.geometry.height = card.geometry.height.clamp(spec.min_size.1, spec.max_size.1);
-            card.geometry.x = card.geometry.x.clamp(0.0, 10000.0);
-            card.geometry.y = card.geometry.y.clamp(0.0, 10000.0);
+            // Bounded far away rather than at zero. This is here to catch a corrupted layout
+            // rather than to fence a person in: a card dragged left of the origin is where they
+            // put it, and clamping it to zero on the next load would take it back.
+            card.geometry.x = card.geometry.x.clamp(-CANVAS_REACH, CANVAS_REACH);
+            card.geometry.y = card.geometry.y.clamp(-CANVAS_REACH, CANVAS_REACH);
         }
 
         // 3. Validate decks and resolve multi-deck card conflicts
@@ -323,8 +333,8 @@ impl DesktopLayout {
             deck.card_ids.retain(|c| assigned_cards.insert(*c));
 
             if deck.validate_and_normalize() {
-                deck.geometry.x = deck.geometry.x.clamp(0.0, 10000.0);
-                deck.geometry.y = deck.geometry.y.clamp(0.0, 10000.0);
+                deck.geometry.x = deck.geometry.x.clamp(-CANVAS_REACH, CANVAS_REACH);
+                deck.geometry.y = deck.geometry.y.clamp(-CANVAS_REACH, CANVAS_REACH);
                 deck.geometry.width = deck.geometry.width.clamp(280.0, 2000.0);
                 deck.geometry.height = deck.geometry.height.clamp(160.0, 1600.0);
                 valid_decks.push(deck);

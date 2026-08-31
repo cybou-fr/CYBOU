@@ -93,7 +93,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
     };
 
     view! {
-        <div class="packages-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--bg-card); color: var(--text-main); font-family: system-ui, -apple-system, sans-serif;">
+        <div class="packages-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; ">
             // Header & Tabs
             <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
                 <div style="display: flex; align-items: center; justify-content: space-between;">

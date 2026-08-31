@@ -79,6 +79,17 @@ pub fn CardControls(card: CardId, layout: RwSignal<DesktopLayout>) -> impl IntoV
                 <IconLayers size=12 />
             </button>
             <button
+                class="card-control-btn raise-btn"
+                title="Bring to the front"
+                aria-label="Bring to the front"
+                on:click=move |_| {
+                    layout.update(|current| current.bring_forward(card));
+                    layout.get_untracked().save();
+                }
+            >
+                <lucide_leptos::ArrowUp size=12 />
+            </button>
+            <button
                 class:active=is_pinned
                 class="card-control-btn pin-btn"
                 title=move || if is_pinned() { "Unpin card" } else { "Pin card (lock position)" }

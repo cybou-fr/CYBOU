@@ -72,9 +72,9 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
     );
 
     view! {
-        <div class="system-logs-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: #131418; color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+        <div class="system-logs-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: #131418; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
             // Control Toolbar
-            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken-strong); border-bottom: 1px solid var(--line); font-family: system-ui, -apple-system, sans-serif;">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken-strong); border-bottom: 1px solid var(--line); ">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-weight: 600; font-size: 13px;">"System Logs & Journal"</span>

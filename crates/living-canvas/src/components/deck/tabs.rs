@@ -90,6 +90,18 @@ pub fn DeckTabs(
             </div>
             <button
                 class="deck-detach-btn"
+                title="Bring this deck to the front"
+                aria-label="Bring to the front"
+                on:pointerdown=move |e: PointerEvent| e.stop_propagation()
+                on:click=move |_| {
+                    layout.update(|l| l.bring_deck_forward(&d_id.get_value()));
+                    layout.get_untracked().save();
+                }
+            >
+                <lucide_leptos::ArrowUp size=12 />
+            </button>
+            <button
+                class="deck-detach-btn"
                 title="Detach active card into standalone spatial card"
                 aria-label="Detach card"
                 on:pointerdown=move |e: PointerEvent| e.stop_propagation()

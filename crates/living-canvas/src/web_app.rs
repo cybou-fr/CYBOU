@@ -16,7 +16,7 @@ use living_canvas::{
         AuthModal, CanvasViewport, CommandPalette, DesktopDock, IconGrid, IconMaximize, Minimap,
         SignInView, Topbar,
     },
-    interaction::{DragState, ResizeState, apply_redo, apply_undo, selection_actions_style},
+    interaction::{DragState, ResizeState, apply_redo, apply_undo},
     state::{DesktopRuntimeSubscription, RuntimeState},
     tool_state::{EditorTab, ToolCardStates},
 };
@@ -416,31 +416,6 @@ pub fn App() -> impl IntoView {
                 auth_modal_open=auth_modal_open
                 runtime=runtime
             />
-
-            <div class="selection-actions" style=move || selection_actions_style(&layout.get(), selected.get().as_ref())>
-                <button
-                    class="action-btn"
-                    title="Bring forward in Z-order"
-                    aria-label="Bring forward"
-                    on:click=move |_| {
-                        // Whatever is selected, including a deck. It used to resolve the selection
-                        // through a kind key, so clicking Shell(2) brought Shell(0) forward.
-                        match selected.get() {
-                            Some(living_canvas::DesktopItemId::Card(card)) => {
-                                layout.update(|l| l.bring_forward(card));
-                                layout.get_untracked().save();
-                            }
-                            Some(living_canvas::DesktopItemId::Deck(deck)) => {
-                                layout.update(|l| l.bring_deck_forward(&deck));
-                                layout.get_untracked().save();
-                            }
-                            None => {}
-                        }
-                    }
-                >
-                    <IconMaximize size=12 />
-                </button>
-            </div>
 
             <section class="canvas-controls" aria-label="Canvas viewport navigation">
                 <Show when=move || minimap_visible.get()>
