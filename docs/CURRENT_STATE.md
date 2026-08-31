@@ -1137,6 +1137,25 @@ The CYBOU Living Canvas ([ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.
 - **Core Desktop Pack**: Multi-tab Text Editor with active line/column cursor positioning, in-editor Search & Replace (<kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Ctrl</kbd>+<kbd>H</kbd>), and safe structured Markdown preview; standalone Universal Diff Viewer; sandboxed File Manager with interactive path breadcrumbs, instant in-directory name filtering, multi-criteria sorting (Name, Size, Type), exclusive file creation dialog, and rich preview metadata (SHA digest, human-readable sizes, authority badge); and bounded Safe Shell with zero-unsafe ANSI SGR color/formatting rendering, terminal session toolbar (Clear, Copy All), command execution status badges with per-entry output copy, and quick starter suggestion chips. Files opened from the Safe Shell jail can be conditionally saved with an owner-issued location, expected SHA-256 conflict check, bounded write, and post-write verification; host and system locations remain unwritable. A stale write is stopped, the current server version is re-read under the same authority reference, and a read-only Diff Viewer compares it with the preserved editor buffer. Save remains disabled until the person either explicitly adopts the verified server version (with destructive confirmation) or accepts its digest as the base for a subsequent conditional save; the viewer claims no commit action.
 - **Editor buffer safety**: Closing a dirty or conflicted tab requires explicit destructive confirmation and states that no file is changed. The same guard covers closing the entire Editor panel when any tab is dirty or conflicted. Closing the final clean tab replaces it with a new editor-local draft; every new draft has a distinct identity rather than aliasing every `untitled` buffer.
 - **Files → Editor admission**: Opening the same owner-issued `LocationRef` again focuses its existing tab and never replaces that tab's local contents. The first file replaces only a pristine empty draft; otherwise it opens in a new tab. The Editor panel is brought forward and selected.
+- **The desktop follows the account**: the card arrangement is stored per authenticated seat in the
+same private SQLite database as drafts (`GET`/`PUT /api/v1/desktop/layout`), and `localStorage` is
+now a cache in front of it rather than the only copy. The gateway keeps the layout as an opaque
+string: parsing it there would be a second implementation of a schema the frontend owns. A seat that
+has never saved gets `null` rather than an empty desktop, so a first sign-in does not wipe what a
+browser already had, and a reader with no seat is refused rather than handed a shared arrangement.
+
+- **The tool panels say how old they are**: Monitor, Services, Processes and the log viewer re-read
+on their own timers and render the age of the last reading. The `auto_refresh` flag that had been on
+`MonitorSignals` since it was written, defaulting to `true` and read by nothing, is read now.
+`scripts/validate-panel-freshness.py` refuses a panel that offers the flag and either installs no
+timer or shows no age.
+
+- **A first visit is five cards**: Identity, Session, Capabilities, Journal and Insight. The other
+nine System cards are one click away in the Dock and the command palette and are unchanged; what
+changed is that fourteen panels of unfamiliar vocabulary no longer open at once. Each card header
+now names the card in words with the composing organ beside it in small type, rather than showing
+`IDENTITY1` alone.
+
 - **Refresh boundary & Draft Recovery**: Browser navigation, refresh, or tab closure triggers the platform's unload confirmation while any editor instance holds a dirty or conflicted buffer. File contents are strictly kept out of `localStorage`. Unsaved and file-backed editor buffers are debounced per-tab and persisted to a durable, user-scoped SQLite store outside the file jail (`$XDG_STATE_HOME/cybou/drafts.sqlite3`), partitioned by authenticated seat (`linux-account:<user>`). On desktop reload, drafts are restored at desktop bootstrap with server-established authority and verified against current file digests, discovering conflicts without trusting stale browser state.
 - **System journal**: `GET /api/v1/system/logs` reads the real systemd journal through `journalctl
   --output=json`, with a unit filter, a syslog-severity floor, and a bounded substring search. The
