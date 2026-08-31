@@ -215,6 +215,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     asked_and_done(&action, &executor, "service.start", &target).await?;
     settles_at(&unit, "active").await?;
 
+    // ------------------------------------------------------------------ and a real process
+    // Signalling is the first operation whose adapter refuses on its own account: it reads /proc
+    // at the moment it acts and compares the owner against the one the permit was decided for. So
+    // this asks twice. Once about a uid that owns nothing here, which must be refused by the
+    // executor even though Action1 granted it — and once truthfully, which must end the process.
+    if let (Ok(pid), Ok(uid)) = (
+        std::env::var("CYBOU_GATE_VICTIM_PID"),
+        std::env::var("CYBOU_GATE_VICTIM_UID"),
+    ) {
+        let wrong_owner = format!("process:{}:{pid}", u32::MAX - 1);
+        let (encoded, permit_id): (Vec<u8>, String) = action
+            .call(
+                "Request",
+                &("process.terminate".to_owned(), wrong_owner, SEAT.to_owned()),
+            )
+            .await?;
+        let record: ActionRecord = decode(&encoded)?;
+        if !matches!(
+            record.decision.verdict,
+            AuthorizationVerdict::GrantedOnConfirmation { .. }
+        ) {
+            return Err("Action1 refused a well-formed request before the executor could".into());
+        }
+        let encoded: Vec<u8> = executor.call("Execute", &(permit_id)).await?;
+        let attempt: ExecutionAttempt = decode(&encoded)?;
+        match &attempt.report {
+            AttemptReport::Failed { because } if because.contains("belongs to uid") => {}
+            other => {
+                return Err(format!(
+                    "the executor accepted a permit naming the wrong owner: {other:?}"
+                )
+                .into());
+            }
+        }
+
+        asked_and_done(
+            &action,
+            &executor,
+            "process.terminate",
+            &format!("process:{uid}:{pid}"),
+        )
+        .await?;
+    }
+
     // Reload has no state of its own to observe from outside: a unit that re-read its configuration
     // looks exactly like one that did not. What is checked is that it was permitted, carried out
     // and reported under its own name, and that the unit is still up afterwards — a reload wired to
@@ -222,6 +266,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     asked_and_done(&action, &executor, "service.reload", &target).await?;
     settles_at(&unit, "active").await?;
 
-    println!("{SEAT} asked → permit → restart, stop, start, reload → independent observation");
+    println!(
+        "{SEAT} asked → permit → restart, stop, start, reload{} → independent observation",
+        if std::env::var_os("CYBOU_GATE_VICTIM_PID").is_some() {
+            ", terminate"
+        } else {
+            ""
+        }
+    );
     Ok(())
 }

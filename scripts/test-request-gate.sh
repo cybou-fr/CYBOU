@@ -151,7 +151,26 @@ done
 busctl --system --list | grep -q org.cybou.Mind.Action1
 busctl --system --list | grep -q org.cybou.Body.Executor1
 
+# A real process for the roundtrip to end. It is a sleep owned by whoever runs this gate, and the
+# roundtrip is told its pid and its owner separately so that the executor's own check — which reads
+# /proc rather than believing either number — has something true to agree with.
+sleep 600 &
+victim_pid=$!
+CYBOU_GATE_VICTIM_PID="$victim_pid"
+CYBOU_GATE_VICTIM_UID="$(id -u)"
+export CYBOU_GATE_VICTIM_PID CYBOU_GATE_VICTIM_UID
+
 "$ROUNDTRIP"
+
+echo "=== The process the person asked about is gone ==="
+if kill -0 "$victim_pid" 2>/dev/null; then
+    # `kill -0` asks whether the pid can be signalled, which is how to ask whether it is still
+    # there without sending anything to it.
+    echo "ERROR: pid $victim_pid is still running after a granted process.terminate" >&2
+    exit 1
+fi
+wait "$victim_pid" 2>/dev/null || true
+echo "    ok      pid $victim_pid ended, and an independent check says so"
 
 # The lifecycle is not only in the owner's memory, and for a person's request that took a fix: the
 # Journal refuses a proposal with no cause, and a person's request has none, so until the asking
