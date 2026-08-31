@@ -74,7 +74,7 @@
 
 use cybou_protocol::action::{
     ActionOutcome, ActionProposal, AuthorizationDecision, CriticismCheck, ExecutionAttempt,
-    ExecutionStarted,
+    ExecutionStarted, Proposer,
 };
 use cybou_protocol::admission::Kind;
 use cybou_protocol::canonical::CanonicalEnvelope;
@@ -91,6 +91,12 @@ const ORIGIN: &str = "actiond";
 const SCHEMA: u16 = 3;
 
 /// Namespace for the contribution that marks an attempt as able to begin.
+/// Derives the identity of the contribution recording that somebody asked.
+///
+/// From the proposal, so re-recording a lifecycle that has grown a step offers the same identity
+/// again and the Journal recognises it rather than admitting a second root for one request.
+const ASKED_NAMESPACE: Uuid = Uuid::from_u128(0x7ab3_1f60_9d24_4e11_8c05_6f2a_51db_9e07);
+
 const EXECUTION_STARTED_NAMESPACE: Uuid =
     Uuid::from_u128(0x0063_7962_6f75_5f73_7461_7274_6564_5f31);
 
@@ -98,6 +104,20 @@ const EXECUTION_STARTED_NAMESPACE: Uuid =
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "step")]
 pub enum LifecycleStep {
+    /// Somebody asked this host for something.
+    ///
+    /// The one contribution in an episode that records something which happened outside the
+    /// Journal, which is what a root is. A proposal from Mind cites the finding it was made from
+    /// and is therefore never a root; a person's request was made from a person, and until they
+    /// asked there was nothing in here to cite.
+    Asked {
+        /// Who asked, as the boundary that authenticated them established it.
+        by: Box<Proposer>,
+        /// What they asked for.
+        operation: String,
+        /// What they asked for it on.
+        target: String,
+    },
     /// What was proposed.
     Proposed {
         /// The proposal exactly as Action1 formed it.
@@ -178,15 +198,39 @@ pub fn contributions(
     now: OffsetDateTime,
 ) -> Result<Vec<CanonicalEnvelope>, CannotRecord> {
     let episode = record.proposal.proposal_id;
-    let cause = record
-        .proposal
-        .cause_id
-        .ok_or(CannotRecord::ProposalHasNoCause(episode))?;
-    let mut out = Vec::with_capacity(2 + record.checks.len());
+    let mut out = Vec::with_capacity(3 + record.checks.len());
 
-    // The proposal cites what gave rise to it. It is not a root: only a contribution recording
-    // something that happened outside the Journal is one, and a proposal is a conclusion about a
-    // finding that is already in there.
+    // What gave rise to the proposal, which is one of two things.
+    //
+    // A proposal from Mind cites a finding the Journal already holds. A person's request cites
+    // nothing, because until they asked there was nothing in here to cite — so the asking itself
+    // is written down first, as the root it is: a contribution recording something that happened
+    // outside the Journal. Without this the lifecycle of every request a person makes is refused
+    // by admission and their actions are the ones the Journal cannot account for, which is the
+    // opposite of what opening that door was for.
+    let cause = match record.proposal.cause_id {
+        Some(cause) => cause,
+        None if record.proposal.proposed_by.is_a_person() => {
+            let asked = Uuid::new_v5(&ASKED_NAMESPACE, episode.as_bytes());
+            out.push(envelope(
+                asked,
+                episode,
+                // A root cites nothing, and admission refuses one that does.
+                Uuid::nil(),
+                Kind::Observation,
+                &LifecycleStep::Asked {
+                    by: Box::new(record.proposal.proposed_by.clone()),
+                    operation: record.proposal.operation.clone(),
+                    target: record.proposal.target_resource.clone(),
+                },
+                now,
+            ));
+            asked
+        }
+        None => return Err(CannotRecord::ProposalHasNoCause(episode)),
+    };
+
+    // The proposal cites what gave rise to it, whichever of the two that was.
     out.push(envelope(
         episode,
         episode,
@@ -433,7 +477,11 @@ pub fn replay(envelopes: &[CanonicalEnvelope]) -> Result<Vec<ActionRecord>, Cann
             LifecycleStep::Proposed { proposal } => {
                 proposals.push((envelope.correlation_id, *proposal));
             }
-            LifecycleStep::Objected { .. } => {}
+            // The request is already carried by the proposal that cites it, so replaying it
+            // adds nothing a reader does not have. It is written for the Journal's sake — an
+            // episode whose first contribution is a person needs that person on the record —
+            // rather than for this reconstruction's.
+            LifecycleStep::Asked { .. } | LifecycleStep::Objected { .. } => {}
             LifecycleStep::Started { execution } => {
                 if let Some(record) = records.iter_mut().find(|record: &&mut ActionRecord| {
                     record.proposal.proposal_id == execution.proposal_id
@@ -807,6 +855,51 @@ mod tests {
                 0x0a01
             )))
         );
+    }
+
+    #[test]
+    fn a_person_asking_is_the_root_of_their_own_episode() {
+        // A proposal from Mind cites a finding the Journal already holds, so it is never a root. A
+        // person's request cites nothing, because until they asked there was nothing in here to
+        // cite — and admission refuses a derived contribution that cites neither a cause nor
+        // evidence. Without a root for the asking, the entire lifecycle of every request a person
+        // makes is refused, and their actions become the ones the Journal cannot account for.
+        let mut record = record(true);
+        record.proposal.cause_id = None;
+        record.proposal.proposed_by = Proposer::Person {
+            seat: "linux-account:alice".to_owned(),
+        };
+
+        let written = contributions(&record, OffsetDateTime::UNIX_EPOCH).expect("a lifecycle");
+
+        let first = &written[0];
+        assert_eq!(first.kind, Kind::Observation as u16);
+        // A root cites nothing, and admission refuses one that does.
+        assert_eq!(first.causation_id, Uuid::nil());
+        assert!(first.evidence.is_empty());
+
+        // And the proposal hangs from it, so a reader arriving at the restart can walk back to the
+        // person who asked for it.
+        let proposal = &written[1];
+        assert_eq!(proposal.kind, Kind::PlanProposal as u16);
+        assert_eq!(proposal.causation_id, first.message_id);
+    }
+
+    #[test]
+    fn the_same_request_recorded_twice_offers_one_root_rather_than_two() {
+        // A lifecycle is written whole every time it grows a step, so the asking is offered again
+        // each time. Its identity is derived from the proposal, which is what lets the Journal
+        // recognise it as the one it already holds instead of admitting a second person asking.
+        let mut record = record(true);
+        record.proposal.cause_id = None;
+        record.proposal.proposed_by = Proposer::Person {
+            seat: "linux-account:alice".to_owned(),
+        };
+
+        let first = contributions(&record, OffsetDateTime::UNIX_EPOCH).expect("a lifecycle");
+        let again = contributions(&record, OffsetDateTime::UNIX_EPOCH).expect("a lifecycle");
+
+        assert_eq!(first[0].message_id, again[0].message_id);
     }
 
     #[test]

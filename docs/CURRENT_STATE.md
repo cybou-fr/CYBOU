@@ -1044,6 +1044,17 @@ property that lets the gateway carry it at all. What the browser gets back is th
 record rather than a sentence — a refusal is a record too, carrying the reason the boundary
 gave rather than one the gateway composed.
 
+**A person's asking is written down as the root of its own episode.** A proposal from Mind
+cites the finding it was made from and is never a root; a person's request cites nothing,
+because until they asked there was nothing in the Journal to cite — and admission refuses a
+derived contribution citing neither a cause nor evidence. So the asking is recorded first, as
+an `Observation`, which is what a root is: a contribution recording something that happened
+outside the Journal. Without it the lifecycle of every request a person makes is refused at
+admission and their actions become the ones the Journal cannot account for, which is the
+opposite of what opening that door was for. Its identity is derived from the proposal, so a
+lifecycle rewritten as it grows offers the same root again rather than a second person
+asking.
+
 **One of the Services panel's six buttons does something.** Restart is in the closed
 operation table with an executor adapter behind it; start, stop, enable and disable are not
 in the table at all, and reload is in it with no adapter. Each of those five is refused by
