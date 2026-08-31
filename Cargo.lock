@@ -1379,19 +1379,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cybou-shelld"
-version = "0.1.0"
-dependencies = [
- "cybou-jailfs",
- "cybou-protocol",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
-]
-
-[[package]]
 name = "cybou-storage"
 version = "0.1.0"
 dependencies = [
@@ -1445,7 +1432,6 @@ dependencies = [
  "cybou-perception",
  "cybou-protocol",
  "cybou-remediation",
- "cybou-shelld",
  "cybou-telemetryd",
  "cybou-web-contracts",
  "futures-core",

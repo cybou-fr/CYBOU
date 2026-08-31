@@ -47,7 +47,6 @@ cybou_ssh "
     cybou-lifecycled
     cybou-selfd
     cybou-presenced
-    cybou-shelld
     cybou-actiond
     cybou-remediationd
     cybou-executord

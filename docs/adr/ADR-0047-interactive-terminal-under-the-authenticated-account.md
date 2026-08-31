@@ -146,8 +146,20 @@ browser profile.
 
 ### Neutral
 
-- The sandboxed Safe Shell does not go away and is not deprecated. It remains what a deployment
-  serves where no terminal has been enabled.
+- ~~The sandboxed Safe Shell does not go away and is not deprecated. It remains what a deployment
+  serves where no terminal has been enabled.~~ **Reversed on 2026-09-01.** The Safe Shell has been
+  removed: the card, the two routes, `cybou-shelld` and its unit.
+
+  The argument for keeping it was that a host with no terminal enabled should still have a command
+  surface that does something honest. What it produced was two cards a person cannot tell apart by
+  looking, one of which answers six builtins inside a demonstration root and calls itself a shell.
+  That is not honest; it is a thing shaped like a shell, and the confusion it causes is the same
+  confusion this ADR refused to accept in the other direction — "a person who believes they are on
+  the host and is not would run the right command in the wrong place".
+
+  A deployment with no terminal enabled now says so, which is what the paragraph above this one
+  already promised it would do. The seat identity that lived in the same module stays: telling a
+  local desktop session from a network one is a different thing that was wearing the same word.
 
 ## Open
 

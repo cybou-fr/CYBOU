@@ -14,7 +14,6 @@ use crate::{
             AgentsCard, AttentionCard, BeliefsCard, CapabilitiesCard, CommitmentsCard, ContextCard,
             DiffCard, DisclosureCard, EditorCard, FileManagerCard, GenericToolCard, IdentityCard,
             InsightCard, InspectorCard, JournalCard, JournalFeedCard, LifecycleCard, OutlineCard,
-            PerceptionCard, SelfModelCard, SessionCard, ShellCard,
         },
         deck::DeckContainerView,
         relations::RelationshipsLayer,
@@ -342,7 +341,6 @@ pub fn CanvasViewport(
                 each=move || shell_instances(&layout.get())
                 key=|instance| *instance
                 children=move |instance| view! {
-                    <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth_modal_open runtime=runtime instance=instance />
                 }
             />
             <For

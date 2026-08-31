@@ -18,7 +18,6 @@ pub mod meaning;
 pub mod notifications;
 pub mod operations;
 pub mod personal;
-pub mod shell;
 pub mod snapshot;
 pub mod system;
 pub mod terminal;
@@ -60,7 +59,6 @@ pub use personal::{
     create_calendar_event, create_contact, create_note, get_calendar, get_contacts, get_mail,
     get_notes, send_mail, update_note,
 };
-pub use shell::{shell_close_handler, shell_exec_handler};
 pub use snapshot::{mind_handler, snapshot_handler};
 pub use system::{
     add_ssh_key, apply_system_updates, connect_network, create_snapshot, create_user,

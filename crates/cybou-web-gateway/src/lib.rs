@@ -62,7 +62,7 @@ pub use access::{
 pub use disclose::Disclosures;
 pub use learning_hub as learning;
 pub use meaning_hub as meaning;
-pub use shells::{SHELL_IDLE_LIFETIME, ShellOwner, Shells, sandbox_root};
+pub use shells::{ShellOwner, sandbox_root};
 pub use state::{
     Delivered, DisclosureSink, EVENT_POLL_INTERVAL, GatewayError, PresenceSource, SNAPSHOT_BUDGET,
     SessionContext,
@@ -87,9 +87,9 @@ use routes::{
     query_cognitive_graph, read_file_handler, read_host_file_handler, recent_actions_handler,
     rename_host_path_handler, restore_archive, restore_snapshot, revoke_artifact_handler,
     save_draft_handler, save_layout_handler, send_mail, send_process_signal, session_handler,
-    shell_close_handler, shell_exec_handler, snapshot_handler, stop_agent_handler,
-    terminal_handler, trigger_backup, update_backup_schedule, update_note, update_security_policy,
-    upload_file_handler, write_file_handler, write_host_file_handler,
+    snapshot_handler, stop_agent_handler, terminal_handler, trigger_backup, update_backup_schedule,
+    update_note, update_security_policy, upload_file_handler, write_file_handler,
+    write_host_file_handler,
 };
 use state::GatewayState;
 
@@ -202,7 +202,6 @@ pub(crate) fn router_in_sandbox(
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into());
 
     let jail = cybou_jailfs::JailFs::new(sandbox_path).expect("initialize gateway sandbox jail");
-    let shells = Arc::new(shells::Shells::new(jail.clone()));
     #[cfg(test)]
     let drafts = Arc::new(crate::routes::UserDraftStore::new());
     #[cfg(not(test))]
@@ -243,7 +242,6 @@ pub(crate) fn router_in_sandbox(
             consumer_id: session_context.consumer_id,
             expires_at,
         },
-        shells,
         files: jail,
         host_user_files: host_user_files_source(),
         drafts,
@@ -286,8 +284,6 @@ pub(crate) fn router_in_sandbox(
             "/api/v1/agents/{capsule_id}/telemetry",
             get(capsule_telemetry_handler),
         )
-        .route("/api/v1/shell/exec", post(shell_exec_handler))
-        .route("/api/v1/shell/close", post(shell_close_handler))
         .route("/api/v1/files/list", post(list_directory_handler))
         .route("/api/v1/files/read", post(read_file_handler))
         .route("/api/v1/files/write", post(write_file_handler))
@@ -482,8 +478,8 @@ mod tests {
     };
     use cybou_protocol::{KnowledgeState, agent::LaunchRequest};
     use cybou_web_contracts::{
-        DisclosureProjection, MindProjection, SessionMode, SessionProjection, ShellExecRequest,
-        ShellExecResponse, SnapshotProjection, UserDraftListProjection,
+        DisclosureProjection, MindProjection, SessionMode, SessionProjection, SnapshotProjection,
+        UserDraftListProjection,
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
@@ -1418,104 +1414,6 @@ mod tests {
         assert_eq!(unknown_api.status(), StatusCode::NOT_FOUND);
     }
 
-    #[tokio::test]
-    async fn shell_exec_runs_in_local_desktop_mode() {
-        let app = router(Arc::new(FixturePresenceSource::nominal()));
-        let payload = serde_json::to_vec(&ShellExecRequest {
-            command: "pwd".into(),
-            instance: 0,
-        })
-        .expect("serialize request");
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/shell/exec")
-                    .header("content-type", "application/json")
-                    .body(Body::from(payload))
-                    .expect("request"),
-            )
-            .await
-            .expect("response");
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let body_bytes = response
-            .into_body()
-            .collect()
-            .await
-            .expect("body")
-            .to_bytes();
-        let parsed: ShellExecResponse =
-            serde_json::from_slice(&body_bytes).expect("deserialize shell response");
-        assert_eq!(parsed.exit_code, 0);
-        assert_eq!(parsed.stdout.trim(), "/");
-    }
-
-    /// Run one command as the holder of this cookie, and return what the shell said.
-    async fn shell_exec_as(app: &Router, cookie: &str, command: &str) -> ShellExecResponse {
-        shell_exec_instance(app, cookie, command, 0).await
-    }
-
-    /// Run one command in a named shell of the seat this cookie holds.
-    async fn shell_exec_instance(
-        app: &Router,
-        cookie: &str,
-        command: &str,
-        instance: u32,
-    ) -> ShellExecResponse {
-        let payload = serde_json::to_vec(&ShellExecRequest {
-            command: command.into(),
-            instance,
-        })
-        .expect("serialize request");
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/shell/exec")
-                    .header("content-type", "application/json")
-                    .header("cookie", cookie)
-                    .body(Body::from(payload))
-                    .expect("a request"),
-            )
-            .await
-            .expect("a response");
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = response
-            .into_body()
-            .collect()
-            .await
-            .expect("a body")
-            .to_bytes();
-        serde_json::from_slice(&body).expect("a shell response")
-    }
-
-    #[tokio::test]
-    async fn one_session_does_not_move_another_sessions_shell() {
-        // Two sign-ins are two seats even when they are the same account, because a shell is where
-        // one person is standing. Before shells were split per session, the `cd` below moved the
-        // second caller too, and its `pwd` answered for somebody else.
-        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
-
-        let first = sign_in(&app, "alice", "hunter2").await.expect("a session");
-        let second = sign_in(&app, "alice", "hunter2").await.expect("a session");
-        assert_ne!(first, second, "two sign-ins must be two sessions");
-
-        let moved = shell_exec_as(&app, &first, "cd somewhere").await;
-        assert_eq!(moved.exit_code, 0);
-        assert_eq!(moved.cwd, "/somewhere");
-
-        let untouched = shell_exec_as(&app, &second, "pwd").await;
-        assert_eq!(untouched.stdout.trim(), "/");
-        assert_eq!(untouched.cwd, "/");
-
-        // And the session that moved is still where it put itself.
-        let still_there = shell_exec_as(&app, &first, "pwd").await;
-        assert_eq!(still_there.stdout.trim(), "/somewhere");
-    }
-
     /// Ask a typed filesystem route as whoever holds this cookie.
     async fn files_post(
         app: &Router,
@@ -2070,158 +1968,6 @@ mod tests {
             )
             .await
             .expect("a response");
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    }
-
-    #[tokio::test]
-    async fn two_shells_in_one_session_are_two_places_to_stand() {
-        // `CardSpec` says a Shell card is not a singleton. Until the instance reached the gateway
-        // that was a promise the backend could not keep: every card in a session drove one engine,
-        // so opening a second Shell gave you a second view of the first one's working directory.
-        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
-        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
-
-        let moved = shell_exec_instance(&app, &cookie, "cd somewhere", 0).await;
-        assert_eq!(moved.cwd, "/somewhere");
-
-        let other = shell_exec_instance(&app, &cookie, "pwd", 1).await;
-        assert_eq!(
-            other.cwd, "/",
-            "a second Shell card inherited the first one's cwd"
-        );
-        assert_eq!(other.stdout.trim(), "/");
-
-        // And the first is still where it put itself.
-        assert_eq!(
-            shell_exec_instance(&app, &cookie, "pwd", 0).await.cwd,
-            "/somewhere"
-        );
-    }
-
-    #[tokio::test]
-    async fn signing_out_ends_every_shell_the_session_opened() {
-        // Not just the one numbered zero: a person who opened three shells and signed out left
-        // three working directories behind, and only one of them was being forgotten.
-        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
-        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
-
-        for instance in 0..3 {
-            assert_eq!(
-                shell_exec_instance(&app, &cookie, "cd somewhere", instance)
-                    .await
-                    .cwd,
-                "/somewhere"
-            );
-        }
-
-        let signed_out = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/logout")
-                    .header("cookie", cookie.clone())
-                    .body(Body::empty())
-                    .expect("a request"),
-            )
-            .await
-            .expect("a response");
-        assert_eq!(signed_out.status(), StatusCode::OK);
-
-        for instance in 0..3 {
-            let payload = serde_json::to_vec(&ShellExecRequest {
-                command: "pwd".into(),
-                instance,
-            })
-            .expect("serialize request");
-            let refused = app
-                .clone()
-                .oneshot(
-                    Request::builder()
-                        .method("POST")
-                        .uri("/api/v1/shell/exec")
-                        .header("content-type", "application/json")
-                        .header("cookie", cookie.clone())
-                        .body(Body::from(payload))
-                        .expect("a request"),
-                )
-                .await
-                .expect("a response");
-            assert_eq!(refused.status(), StatusCode::FORBIDDEN);
-        }
-    }
-
-    #[tokio::test]
-    async fn signing_out_forgets_where_the_session_was_standing() {
-        let (app, _sandbox) = shell_router_over_a_temporary_sandbox();
-
-        let cookie = sign_in(&app, "alice", "hunter2").await.expect("a session");
-        assert_eq!(
-            shell_exec_as(&app, &cookie, "cd somewhere").await.cwd,
-            "/somewhere"
-        );
-
-        let signed_out = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/logout")
-                    .header("cookie", cookie.clone())
-                    .body(Body::empty())
-                    .expect("a request"),
-            )
-            .await
-            .expect("a response");
-        assert_eq!(signed_out.status(), StatusCode::OK);
-
-        // The cookie no longer names a session, so the shell surface refuses rather than handing
-        // the caller whatever shell that token used to own.
-        let payload = serde_json::to_vec(&ShellExecRequest {
-            command: "pwd".into(),
-            instance: 0,
-        })
-        .expect("serialize request");
-        let refused = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/shell/exec")
-                    .header("content-type", "application/json")
-                    .header("cookie", cookie)
-                    .body(Body::from(payload))
-                    .expect("a request"),
-            )
-            .await
-            .expect("a response");
-        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
-    }
-
-    #[tokio::test]
-    async fn shell_exec_is_strictly_forbidden_in_public_preview() {
-        let app = router_with_assets_and_session(
-            Arc::new(FixturePresenceSource::nominal()),
-            None,
-            SessionContext::public_preview(),
-        );
-        let payload = serde_json::to_vec(&ShellExecRequest {
-            command: "pwd".into(),
-            instance: 0,
-        })
-        .expect("serialize request");
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/shell/exec")
-                    .header("content-type", "application/json")
-                    .body(Body::from(payload))
-                    .expect("request"),
-            )
-            .await
-            .expect("response");
-
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 

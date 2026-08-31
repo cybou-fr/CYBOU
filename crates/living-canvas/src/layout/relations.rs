@@ -341,7 +341,7 @@ mod tests {
     fn a_tool_card_sits_after_every_organ() {
         // Tool cards consume what the organs produce and feed none of it back, so the graph does
         // not mention them and the layout puts them last rather than first.
-        let tool = DesktopRelationshipGraph::layer_for_card(CardId::Shell(0));
+        let tool = DesktopRelationshipGraph::layer_for_card(CardId::Terminal(0));
         for organ in CardId::ALL_SYSTEM_CARDS {
             assert!(
                 tool >= DesktopRelationshipGraph::layer_for_card(organ),
@@ -358,6 +358,6 @@ mod tests {
         for card in CardId::ALL_SYSTEM_CARDS {
             assert!(DesktopRelationshipGraph::layer_for_card(card) < layers);
         }
-        assert!(DesktopRelationshipGraph::layer_for_card(CardId::Shell(0)) < layers);
+        assert!(DesktopRelationshipGraph::layer_for_card(CardId::Terminal(0)) < layers);
     }
 }

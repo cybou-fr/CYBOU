@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 use crate::access::{self, CredentialVerifier, Session, Sessions};
 use crate::disclose::Disclosures;
-use crate::shells::{ShellOwner, Shells};
+use crate::shells::ShellOwner;
 
 /// Maximum time the gateway permits one Presence projection request to occupy.
 pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(1_500);
@@ -235,8 +235,6 @@ pub struct GatewayState {
     pub journal: Option<Arc<dyn DisclosureSink>>,
     /// Baseline session projection.
     pub session: SessionProjection,
-    /// One sandboxed shell per session, rather than one for the whole process.
-    pub shells: Arc<Shells>,
     /// The sandbox itself, for surfaces that read it as structure rather than through a shell.
     pub files: cybou_jailfs::JailFs,
     /// Optional per-user filesystem owner. The gateway itself must never impersonate a PAM user.

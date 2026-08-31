@@ -23,7 +23,6 @@ cybou-host-filesd = { path = "../cybou-host-filesd" }
 cybou-meaning = { path = "../cybou-meaning" }
 cybou-protocol = { path = "../cybou-protocol" }
 cybou-remediation = { path = "../cybou-remediation" }
-cybou-shelld = { path = "../cybou-shelld" }
 cybou-telemetryd = { path = "../cybou-telemetryd" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
 futures-core.workspace = true

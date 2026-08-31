@@ -41,8 +41,6 @@ pub enum CardId {
     Insight,
     /// Agent1: what is running in a capsule, on whose say-so, and with what left to spend.
     Agents,
-    /// Dynamic bounded CYBOU Shell instance (Zone 3 `DemoReadOnly` capability).
-    Shell(u32),
     /// Interactive terminal running as the signed-in account (ADR-0047).
     ///
     /// Deliberately a separate kind from [`Self::Shell`] and not a mode of it. One is a bounded
@@ -133,7 +131,6 @@ impl CardId {
                 | Self::Insight
                 | Self::Agents
                 | Self::Outline
-                | Self::Shell(_)
                 | Self::FileManager(_)
                 | Self::JournalFeed(_)
                 | Self::Editor(_)
@@ -178,7 +175,6 @@ impl CardId {
             Self::Disclosure => "disclosure",
             Self::Insight => "insight",
             Self::Agents => "agents",
-            Self::Shell(_) => "shell",
             Self::Terminal(_) => "terminal",
             Self::FileManager(_) => "files",
             Self::JournalFeed(_) => "journal-feed",
@@ -217,8 +213,7 @@ impl CardId {
     #[must_use]
     pub fn instance_key(self) -> String {
         match self {
-            Self::Shell(instance)
-            | Self::Terminal(instance)
+            Self::Terminal(instance)
             | Self::FileManager(instance)
             | Self::JournalFeed(instance)
             | Self::Editor(instance)
@@ -276,7 +271,6 @@ impl CardId {
             Self::Disclosure => "Disclosure",
             Self::Insight => "System Insight",
             Self::Agents => "Agents",
-            Self::Shell(_) => "Shell",
             Self::Terminal(_) => "Terminal",
             Self::FileManager(_) => "File Manager",
             Self::JournalFeed(_) => "Presence Stream",
@@ -326,7 +320,6 @@ impl CardId {
             "disclosure" => Some(Self::Disclosure),
             "insight" => Some(Self::Insight),
             "agents" => Some(Self::Agents),
-            "shell" => Some(Self::Shell(0)),
             "terminal" => Some(Self::Terminal(0)),
             "files" => Some(Self::FileManager(0)),
             "journal-feed" => Some(Self::JournalFeed(0)),
@@ -576,18 +569,6 @@ impl CardId {
                 default_size: (720.0, 460.0),
                 min_size: (420.0, 220.0),
                 max_size: (1600.0, 1200.0),
-            },
-            Self::Shell(_) => CardSpec {
-                kind: CardKind::Tool,
-                singleton: false,
-                movable: true,
-                resizable: true,
-                collapsible: true,
-                closable: true,
-                deckable: true,
-                default_size: (440.0, 290.0),
-                min_size: (320.0, 200.0),
-                max_size: (800.0, 600.0),
             },
             Self::FileManager(_) => CardSpec {
                 kind: CardKind::Tool,
@@ -1252,8 +1233,8 @@ mod dedicated_view_tests {
         // A second Shell is still a Shell. An answer that varied by instance would draw one of
         // them twice and the other not at all.
         assert_eq!(
-            CardId::Shell(0).has_dedicated_view(),
-            CardId::Shell(7).has_dedicated_view()
+            CardId::Terminal(0).has_dedicated_view(),
+            CardId::Terminal(7).has_dedicated_view()
         );
         assert_eq!(
             CardId::Services(0).has_dedicated_view(),

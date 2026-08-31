@@ -65,8 +65,14 @@ Beside them, and deliberately not among them:
 | `cybou-web-gateway` | the HTTP boundary; not a Mind owner and holds no cognitive state |
 | `cybou-agentd` | `org.cybou.Runtime.Agent1` — owns bounded agent launches, live sessions, teardown and recent final views; not Mind |
 
-`cybou-shelld` is a library with no binary. Its unit exists, describes a process that does not run,
-and is excluded from the deploy and from `cybou-mind.target`.
+**The sandboxed Safe Shell is gone**, and ADR-0047's Neutral note that kept it is reversed there.
+The card, the two routes, `cybou-shelld` and its unit are removed. Keeping it produced two cards a
+person could not tell apart by looking, one of which answered six builtins inside a demonstration
+root and called itself a shell — the same confusion this system refuses in the other direction. A
+host with no terminal enabled says so; it does not offer a thing shaped like a shell instead.
+
+The seat identity that shared the module stays: telling a local desktop session from a network one
+is a different thing that was wearing the same word.
 
 Every organ is a separate process that fails separately, so a silent organ is a gap on a page rather
 than an outage. A projection that could not be read reports *unknown*, never *empty*.

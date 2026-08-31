@@ -13,7 +13,6 @@ use cybou_web_contracts::{SessionMode, SessionProjection, WEB_SCHEMA_V1};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 use crate::access::{self, LoginOutcome, LoginRequest};
-use crate::shells::ShellOwner;
 use crate::state::{ErrorBody, GatewayState};
 
 /// Read back active session projection.
@@ -94,13 +93,6 @@ pub async fn logout_handler(
         .and_then(access::token_in)
     {
         state.sessions.end(token);
-        // Every shell the session opened goes with it, not the one that happens to be numbered
-        // zero. Leaving them behind would keep working directories for a token nobody holds, and
-        // hand them back if that token were ever issued again.
-        state.shells.end_seat(&ShellOwner::Session {
-            session: access::digest(token),
-            instance: 0,
-        });
     }
     (
         StatusCode::OK,

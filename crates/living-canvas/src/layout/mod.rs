@@ -214,8 +214,8 @@ mod tests {
         layout.set_position(CardId::Identity, 40.0, 40.0);
         layout.set_pinned(CardId::Identity, true);
 
-        // Add a wide Tool card (Shell)
-        layout.open_card(CardId::Shell(1), 500.0, 500.0);
+        // Add a wide Tool card
+        layout.open_card(CardId::Terminal(1), 500.0, 500.0);
 
         let vp = UsableViewport {
             width: 1200.0,

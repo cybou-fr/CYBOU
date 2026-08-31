@@ -42,7 +42,6 @@ members = [
     "crates/cybou-remediationd",
     "crates/cybou-runtime",
     "crates/cybou-selfd",
-    "crates/cybou-shelld",
     "crates/cybou-storage",
     "crates/cybou-telemetryd",
     "crates/cybou-web-contracts",
@@ -64,7 +63,6 @@ agent-client-protocol = "2.0.0"
 # One file transfer carries its bytes in a JSON field, so it carries them base64.
 base64 = "0.22.1"
 cybou-jailfs = { path = "crates/cybou-jailfs" }
-cybou-shelld = { path = "crates/cybou-shelld" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
