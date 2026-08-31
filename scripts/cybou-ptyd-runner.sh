@@ -31,6 +31,16 @@ if [ ! -x "$USER_SHELL" ]; then
     exit 1
 fi
 
+# The parent, explicitly. The unit runs with `UMask=0077`, so a `mkdir -p` that creates
+# `/run/cybou-pty` leaves it `drwx------ root root` — and the account cannot enter the directory
+# made for it one level down. The owner then fails to bind its socket with `Permission denied`,
+# which reads exactly like a broken daemon and is a directory bit.
+#
+# 0755 rather than 0700: this level holds nothing but per-uid directories, and each of those is
+# `0750 <account>:cybou`, which is where the boundary actually is.
+mkdir -p /run/cybou-pty
+chmod 0755 /run/cybou-pty
+
 mkdir -p "/run/cybou-pty/$USER_UID"
 chown "$USER_NAME:cybou" "/run/cybou-pty/$USER_UID"
 chmod 0750 "/run/cybou-pty/$USER_UID"

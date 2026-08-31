@@ -103,6 +103,22 @@ for _ in $(seq 1 50); do [ -S "$SOCKET_DIR/$ACCOUNT_UID/owner.sock" ] && break; 
     exit 1
 }
 
+echo "=== The directory is the boundary, and it says so ==="
+# The socket itself is world-writable on purpose: what stops a stranger is that they cannot reach
+# the path. That makes these two modes the whole of the access control, and a deployment that
+# loosened one while trusting the other would be open without anything looking different.
+parent_mode="$(stat -c '%a' "$SOCKET_DIR")"
+own_mode="$(stat -c '%a %U:%G' "$SOCKET_DIR/$ACCOUNT_UID")"
+if [ "$parent_mode" != "755" ] && [ "$parent_mode" != "711" ]; then
+    echo "ERROR: $SOCKET_DIR is $parent_mode; the account cannot reach its own directory" >&2
+    exit 1
+fi
+if [ "$own_mode" != "750 $ACCOUNT:cybou" ]; then
+    echo "ERROR: the account's socket directory is '$own_mode', not '750 $ACCOUNT:cybou'" >&2
+    exit 1
+fi
+echo "    ok      $parent_mode above, '$own_mode' below"
+
 # ------------------------------------------------------------------ the owner, on its own
 echo "=== A pseudoterminal runs the account's own shell ==="
 CYBOU_PTY_GATE_SOCKET="$SOCKET_DIR/$ACCOUNT_UID/owner.sock" \

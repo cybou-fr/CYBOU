@@ -50,6 +50,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let listener = tokio::net::UnixListener::bind(&socket)?;
+    // The directory is the boundary, not this mode. The socket sits in `<dir>/<uid>/`, which the
+    // runner makes `0750 <account>:cybou`: the account owns it and the gateway's group may enter,
+    // and nobody else can reach this path to connect to it whatever it says here.
+    //
+    // Worth stating because the two are easy to confuse and the failure mode is silent. On
+    // 2026-09-01 the parent directory was created under `UMask=0077` and came out `0700 root`, so
+    // the account could not enter the directory made for it and the owner died with `Permission
+    // denied` — a directory bit that read exactly like a broken daemon. The gate now asserts the
+    // modes so a change to either side has to face the other.
     std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o666))?;
     eprintln!(
         "[cybou-ptyd] terminal owner listening at {}",
