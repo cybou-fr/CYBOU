@@ -168,9 +168,33 @@ impl Body for LinuxBody {
     }
 
     async fn restart_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        self.unit_job("RestartUnit", unit).await
+    }
+
+    async fn start_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        self.unit_job("StartUnit", unit).await
+    }
+
+    async fn stop_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        self.unit_job("StopUnit", unit).await
+    }
+
+    async fn reload_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        self.unit_job("ReloadUnit", unit).await
+    }
+}
+
+impl LinuxBody {
+    /// Ask systemd to do one named thing to one named unit.
+    ///
+    /// The method name is chosen here from a closed set of adapters and never travels from a
+    /// caller, so this is four adapters sharing a call rather than one adapter taking an
+    /// instruction. `replace` is systemd's own word for "supersede whatever job is queued for this
+    /// unit", which is what somebody pressing a button a second time means.
+    async fn unit_job(&self, job: &str, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
         let manager = self.manager().await?;
         let _: zbus::zvariant::OwnedObjectPath = manager
-            .call("RestartUnit", &(unit, "replace"))
+            .call(job, &(unit, "replace"))
             .await
             .map_err(|error| ExecutorError::Adapter(error.to_string()))?;
         Ok(Vec::new())

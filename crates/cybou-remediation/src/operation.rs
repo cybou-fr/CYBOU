@@ -39,6 +39,10 @@ pub enum Operation {
     ReloadService,
     /// Restart a unit.
     RestartService,
+    /// Start a unit that is not running.
+    StartService,
+    /// Stop a unit that is.
+    StopService,
     /// Delete downloaded package archives that can be fetched again.
     CleanPackageCache,
     /// Rotate and compress logs that are past their retention.
@@ -58,6 +62,8 @@ pub const ALL_OPERATIONS: &[Operation] = &[
     Operation::InspectServiceStatus,
     Operation::ReloadService,
     Operation::RestartService,
+    Operation::StartService,
+    Operation::StopService,
     Operation::CleanPackageCache,
     Operation::RotateLogs,
     Operation::TrimTemporaryFiles,
@@ -74,6 +80,8 @@ impl Operation {
             Self::InspectServiceStatus => "service.status",
             Self::ReloadService => "service.reload",
             Self::RestartService => "service.restart",
+            Self::StartService => "service.start",
+            Self::StopService => "service.stop",
             Self::CleanPackageCache => "package.cache.clean",
             Self::RotateLogs => "log.rotate",
             Self::TrimTemporaryFiles => "tmp.trim",
@@ -91,9 +99,18 @@ impl Operation {
     pub const fn risk(self) -> RiskLevel {
         match self {
             Self::InspectServiceStatus | Self::ReloadService => RiskLevel::Low,
+            // Starting something that was not running changes what this host is doing, and the
+            // unit decides what that means. Lower than stopping one, because what a start
+            // interrupts is nothing.
+            Self::StartService => RiskLevel::Low,
             // Reversible and not harmless: the service comes back, and every connection it was
             // holding is gone.
-            Self::RestartService | Self::CleanPackageCache | Self::RotateLogs => RiskLevel::Medium,
+            // A stop is a restart without the second half: everything the service was holding is
+            // gone and nothing takes it up again.
+            Self::RestartService
+            | Self::StopService
+            | Self::CleanPackageCache
+            | Self::RotateLogs => RiskLevel::Medium,
             // Higher than the cache because something may be using a temporary file this cannot see.
             Self::TrimTemporaryFiles => RiskLevel::High,
             Self::DeleteServiceData | Self::FormatFilesystem | Self::PowerOff => {
@@ -109,9 +126,16 @@ impl Operation {
     /// still costs every connection it was holding.
     #[must_use]
     pub const fn reversible(self) -> bool {
+        // A start is undone by a stop and a stop by a start, in the sense this word is used
+        // here: the system can put the unit back the way it was. What a stop cost while it was
+        // down is not undone by anything, which is what `reversible` deliberately does not mean.
         matches!(
             self,
-            Self::InspectServiceStatus | Self::ReloadService | Self::RestartService
+            Self::InspectServiceStatus
+                | Self::ReloadService
+                | Self::RestartService
+                | Self::StartService
+                | Self::StopService
         )
     }
 
@@ -142,6 +166,11 @@ impl Operation {
                 Finding::MemoryPressure,
             ],
             Self::ReloadService => &[Finding::ServiceFailure, Finding::ServiceInactive],
+            // A unit that is not running is the one thing starting it fixes. Stopping one relieves
+            // nothing: it is a thing a person wants done, not a remedy for a finding, and offering
+            // it as one would let a host reach for it while nobody is present.
+            Self::StartService => &[Finding::ServiceInactive],
+            Self::StopService => &[],
             // Reading a unit's state relieves nothing and is worth proposing anyway: it is how a
             // person finds out more without changing anything, and a system that could only offer
             // mutations would push every investigation toward one. The forbidden three relieve

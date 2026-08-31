@@ -226,6 +226,21 @@ pub enum ExecutableAction {
         /// A concrete unit name ending in `.service`.
         unit: String,
     },
+    /// Start one concrete systemd service.
+    ServiceStart {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
+    /// Stop one concrete systemd service.
+    ServiceStop {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
+    /// Ask one concrete systemd service to re-read its configuration.
+    ServiceReload {
+        /// A concrete unit name ending in `.service`.
+        unit: String,
+    },
 }
 
 /// A short-lived, single-use capability minted from one granted decision.
@@ -292,6 +307,11 @@ impl ExecutionStarted {
             }
             ExecutableAction::ServiceRestart { unit } => {
                 ("service.restart", format!("systemd:{unit}"))
+            }
+            ExecutableAction::ServiceStart { unit } => ("service.start", format!("systemd:{unit}")),
+            ExecutableAction::ServiceStop { unit } => ("service.stop", format!("systemd:{unit}")),
+            ExecutableAction::ServiceReload { unit } => {
+                ("service.reload", format!("systemd:{unit}"))
             }
         };
         Self {

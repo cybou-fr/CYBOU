@@ -269,23 +269,25 @@ mod tests {
         let svcs = hub.list_services();
         assert!(!svcs.services.is_empty());
 
-        // Restart is the one service action this build can carry out: it is in the closed
-        // operation table and the executor has an adapter for it. The other five are refused
-        // here, by name, rather than proposed and refused three layers down.
-        assert_eq!(
-            SystemHub::verb_for(ServiceAction::Restart).expect("restart is expressible"),
-            "service.restart"
-        );
-        for unbuilt in [
-            ServiceAction::Start,
-            ServiceAction::Stop,
-            ServiceAction::Reload,
-            ServiceAction::Enable,
-            ServiceAction::Disable,
+        // Four of the six name an operation with an adapter behind it. The table and the adapter
+        // are checked where they live; what this holds is that the panel's buttons reach the right
+        // verb — a Stop that asked for `service.restart` would look, to the person who pressed it,
+        // exactly like it worked.
+        for (action, verb) in [
+            (ServiceAction::Restart, "service.restart"),
+            (ServiceAction::Start, "service.start"),
+            (ServiceAction::Stop, "service.stop"),
+            (ServiceAction::Reload, "service.reload"),
         ] {
+            assert_eq!(
+                SystemHub::verb_for(action).expect("this build can express it"),
+                verb
+            );
+        }
+        for unbuilt in [ServiceAction::Enable, ServiceAction::Disable] {
             assert!(
                 SystemHub::verb_for(unbuilt).is_err(),
-                "{unbuilt:?} has no operation and no adapter, and must be refused as such"
+                "{unbuilt:?} changes what happens at the next boot and has no verb yet"
             );
         }
         assert_eq!(

@@ -39,7 +39,9 @@ pub trait PermitSource: Send + Sync {
     async fn record_attempt(&self, attempt: &ExecutionAttempt) -> Result<(), ExecutorError>;
 }
 
-/// The three physical adapters. There is intentionally no program-and-arguments method.
+/// The physical adapters, one method each. There is intentionally no program-and-arguments method:
+/// a trait that could be handed a command line would be a shell with extra steps, and every check
+/// above it would be checking a string.
 #[async_trait]
 pub trait Body: Send + Sync {
     /// Read one concrete service's state.
@@ -48,6 +50,31 @@ pub trait Body: Send + Sync {
     async fn clean_package_cache(&self) -> Result<Vec<BodyReading>, ExecutorError>;
     /// Restart one concrete service.
     async fn restart_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Start one concrete service that is not running.
+    async fn start_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Stop one concrete service that is.
+    async fn stop_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Ask one concrete service to re-read its configuration.
+    async fn reload_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+}
+
+/// Send one typed action to the one adapter that performs it.
+///
+/// Separate from [`execute`] so the mapping can be exercised on its own. Four of these differ by a
+/// single word to systemd, and a dispatch that sent two of them to the same adapter would be a Stop
+/// button that restarts — which looks, to the person who pressed it, exactly like it worked.
+async fn perform(
+    body: &impl Body,
+    action: &ExecutableAction,
+) -> Result<Vec<BodyReading>, ExecutorError> {
+    match action {
+        ExecutableAction::ServiceStatus { unit } => body.service_status(unit).await,
+        ExecutableAction::PackageCacheClean => body.clean_package_cache().await,
+        ExecutableAction::ServiceRestart { unit } => body.restart_service(unit).await,
+        ExecutableAction::ServiceStart { unit } => body.start_service(unit).await,
+        ExecutableAction::ServiceStop { unit } => body.stop_service(unit).await,
+        ExecutableAction::ServiceReload { unit } => body.reload_service(unit).await,
+    }
 }
 
 /// Claim and carry out exactly one permit.
@@ -62,11 +89,7 @@ pub async fn execute(
     permit_id: Uuid,
 ) -> Result<ExecutionAttempt, ExecutorError> {
     let claim = permits.claim(permit_id).await?;
-    let result = match &claim.permit.action {
-        ExecutableAction::ServiceStatus { unit } => body.service_status(unit).await,
-        ExecutableAction::PackageCacheClean => body.clean_package_cache().await,
-        ExecutableAction::ServiceRestart { unit } => body.restart_service(unit).await,
-    };
+    let result = perform(body, &claim.permit.action).await;
     let (report, body_readings) = match result {
         Ok(readings) => (AttemptReport::Completed, readings),
         Err(error) => (
@@ -162,6 +185,67 @@ mod tests {
                 .expect("body lock")
                 .push(format!("restart:{unit}"));
             Ok(Vec::new())
+        }
+        async fn start_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("start:{unit}"));
+            Ok(Vec::new())
+        }
+        async fn stop_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("stop:{unit}"));
+            Ok(Vec::new())
+        }
+        async fn reload_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("reload:{unit}"));
+            Ok(Vec::new())
+        }
+    }
+
+    #[tokio::test]
+    async fn every_action_reaches_the_adapter_it_names_and_no_other() {
+        // Four unit operations that differ only in one word to systemd. A dispatch that sent two of
+        // them to the same adapter would be a Stop button that restarts, which looks like it worked.
+        for (action, expected) in [
+            (
+                ExecutableAction::ServiceRestart {
+                    unit: "a.service".to_owned(),
+                },
+                "restart:a.service",
+            ),
+            (
+                ExecutableAction::ServiceStart {
+                    unit: "b.service".to_owned(),
+                },
+                "start:b.service",
+            ),
+            (
+                ExecutableAction::ServiceStop {
+                    unit: "c.service".to_owned(),
+                },
+                "stop:c.service",
+            ),
+            (
+                ExecutableAction::ServiceReload {
+                    unit: "d.service".to_owned(),
+                },
+                "reload:d.service",
+            ),
+        ] {
+            let body = RecordingBody::default();
+            perform(&body, &action).await.expect("the adapter runs");
+            assert_eq!(
+                body.0.lock().expect("body lock").as_slice(),
+                [expected.to_owned()],
+                "{action:?} reached the wrong adapter"
+            );
         }
     }
 

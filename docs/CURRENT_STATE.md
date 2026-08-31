@@ -1064,12 +1064,27 @@ permit, and a verb outside the table is refused as not an operation. Nothing obs
 in that run and no finding is written, so the four `Observation` roots the Journal ends up
 holding are four askings, and their absence would be a restart that traces back to nobody.
 
-**One of the Services panel's six buttons does something.** Restart is in the closed
-operation table with an executor adapter behind it; start, stop, enable and disable are not
-in the table at all, and reload is in it with no adapter. Each of those five is refused by
-name at the gateway rather than proposed and refused three layers down, because a refusal
-that says what is missing is worth more than one that arrives from somewhere else. Opening
-the door did not furnish the room, and the other thirteen `SystemHub` refusals are unchanged.
+**Four of the Services panel's six buttons do something.** Restart, start, stop and reload are
+each in the closed operation table with an executor adapter behind them. Start is `Low` risk
+and stop is `Medium`, because a stop is a restart without the second half: everything the
+service was holding is gone and nothing takes it up again. Both are reversible in the sense
+this table uses — the system can put the unit back — which deliberately does not mean what a
+stop cost while it was down. Starting a unit relieves `ServiceInactive`; stopping one
+relieves nothing, because it is a thing a person wants done rather than a remedy, and
+offering it as one would let a host reach for it while nobody is present.
+
+Enable and disable are refused, and not because they were forgotten: they change what happens
+at the next boot rather than what is happening now, so nobody is present when they take
+effect. That is a different act and wants its own decision about risk before it gets a verb.
+They are refused by name at the gateway rather than three layers down.
+
+The four systemd adapters share one call whose method name is chosen from a closed set here
+and never travels from a caller, so they are four adapters sharing a call rather than one
+adapter taking an instruction. The dispatch is its own function with a test that walks all
+four, because a dispatch sending two of them to the same adapter would be a Stop button that
+restarts — which looks, to the person who pressed it, exactly like it worked.
+
+The other thirteen `SystemHub` refusals are unchanged.
 
 **A browser can now answer.** `POST /api/v1/actions/confirm` carries a person's answer to
 `Action1.Confirm` and is the first write the gateway makes against the action boundary. It remains

@@ -90,19 +90,23 @@ impl SystemHub {
     /// is `Action1`'s to answer. What this settles is narrower and is the whole of what the panel's
     /// six buttons come down to — only one of them names an operation with an adapter behind it.
     ///
-    /// ADR-0048 opened the door for a person to ask; it did not furnish the room. Start, stop,
-    /// enable and disable are not in the closed operation table at all, and reload is in it with no
-    /// executor adapter, so each of them is refused here rather than proposed and refused deeper
-    /// down — a refusal that names what is missing is worth more than one that arrives from three
-    /// layers away.
+    /// Four of the six are in the closed operation table with an executor adapter behind each.
+    /// Enable and disable are not, and the reason is not that they were forgotten: they change what
+    /// happens at the next boot rather than what is happening now, so nobody is present when they
+    /// take effect. That is a different act and wants its own decision about risk before it gets a
+    /// verb. They are refused here by name rather than proposed and refused three layers down,
+    /// because a refusal that says what is missing is worth more than one that arrives from
+    /// somewhere else.
     pub fn verb_for(action: ServiceAction) -> Result<&'static str, GatewayError> {
         match action {
             ServiceAction::Restart => Ok("service.restart"),
-            ServiceAction::Start
-            | ServiceAction::Stop
-            | ServiceAction::Reload
-            | ServiceAction::Enable
-            | ServiceAction::Disable => Err(GatewayError::Refused),
+            ServiceAction::Start => Ok("service.start"),
+            ServiceAction::Stop => Ok("service.stop"),
+            ServiceAction::Reload => Ok("service.reload"),
+            // Enable and disable change what happens at the next boot rather than what is happening
+            // now, which is a different kind of act: nobody is present when it takes effect. They
+            // are not in the operation table and are refused here by name.
+            ServiceAction::Enable | ServiceAction::Disable => Err(GatewayError::Refused),
         }
     }
 

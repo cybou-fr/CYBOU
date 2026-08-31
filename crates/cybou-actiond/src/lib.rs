@@ -669,6 +669,15 @@ fn executable_action(
         Operation::RestartService => ExecutableAction::ServiceRestart {
             unit: concrete_service(&proposal.target_resource)?,
         },
+        Operation::StartService => ExecutableAction::ServiceStart {
+            unit: concrete_service(&proposal.target_resource)?,
+        },
+        Operation::StopService => ExecutableAction::ServiceStop {
+            unit: concrete_service(&proposal.target_resource)?,
+        },
+        Operation::ReloadService => ExecutableAction::ServiceReload {
+            unit: concrete_service(&proposal.target_resource)?,
+        },
         _ => return Err(ActionError::UnknownOperation(proposal.operation.clone())),
     })
 }
@@ -1148,19 +1157,39 @@ mod tests {
     }
 
     #[test]
-    fn operation_without_one_of_the_three_adapters_is_denied() {
-        let core = ActionCore::new(StandingPolicy {
-            pre_authorized: vec![Operation::ReloadService],
-            pre_authorized_for_agents: Vec::new(),
-        });
+    fn an_operation_the_executor_cannot_perform_is_denied_however_it_was_granted() {
+        // The operation table and the executor's adapters are two lists, and this is what stops
+        // them drifting apart into a permit for something nothing can carry out. It used to reach
+        // for `service.reload` as its example, which stopped being one on 2026-08-31 when reload
+        // gained an adapter — so it asks about log rotation, which is in the table and has none.
+        //
+        // Asked through a person's request rather than through a finding, because `evaluate_insight`
+        // only ever decides operations the proposer offered for that finding, and a service being
+        // inactive does not suggest rotating logs. The invariant is about the two lists and not
+        // about which door the operation arrived through.
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
         let record = core
-            .evaluate_insight(&insight(), "service.reload", OffsetDateTime::UNIX_EPOCH)
-            .expect("refusal record");
+            .request(
+                "log.rotate",
+                "journald:logs",
+                "linux-account:alice",
+                OffsetDateTime::UNIX_EPOCH,
+            )
+            .expect("a refusal is still a lifecycle record");
         assert!(matches!(
             record.decision.verdict,
             AuthorizationVerdict::Denied { .. }
         ));
         assert!(record.permit_id.is_none());
+
+        // And the objection names the missing half rather than the operation, so a reader is sent
+        // to the executor rather than told the table is wrong.
+        assert!(
+            record
+                .checks
+                .iter()
+                .any(|check| check.rule_id == "executor-adapter-exists" && !check.passed)
+        );
     }
 
     #[test]

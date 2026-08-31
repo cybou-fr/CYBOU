@@ -106,6 +106,8 @@ fn target_for(operation: Operation, insight: &SystemInsight) -> String {
         Operation::InspectServiceStatus
         | Operation::ReloadService
         | Operation::RestartService
+        | Operation::StartService
+        | Operation::StopService
         | Operation::DeleteServiceData => about.unwrap_or_else(|| "systemd:<unit>".to_owned()),
         Operation::FormatFilesystem => "filesystem:<device>".to_owned(),
         Operation::PowerOff => "system:self".to_owned(),
