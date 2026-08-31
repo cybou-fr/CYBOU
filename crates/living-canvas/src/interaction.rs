@@ -241,6 +241,9 @@ pub fn start_drag(
     if event.button() != 0 {
         return;
     }
+    if went_down_on_a_control(&event) {
+        return;
+    }
     if layout.get_untracked().presentation(card).pinned {
         return;
     }
@@ -265,6 +268,29 @@ pub fn start_drag(
     event.prevent_default();
 }
 
+/// Whether this press landed on something that is there to be pressed.
+///
+/// A drag captures the pointer, and a captured pointer delivers its `pointerup` and its `click` to
+/// the capturing element. So a card that starts dragging on every press swallows the click of every
+/// button inside it — which is what happened to Restart, to the process table's sort controls, and
+/// to every filter chip in every panel. They were not broken; their clicks were being delivered
+/// somewhere else.
+///
+/// Asked of the element the press landed on rather than of the card, and by `closest`, because a
+/// press usually lands on an icon or a span inside the control rather than on the control itself.
+///
+/// A drag still starts anywhere else on the card: the header, the padding, the space between rows.
+fn went_down_on_a_control(event: &PointerEvent) -> bool {
+    // Deck tabs are not `<button>` and are pressed like one, so they are named here with the rest.
+    const CONTROLS: &str = "button, a, input, select, textarea, label, [role='button'],          [contenteditable='true'], .deck-tab, .deck-controls";
+
+    event
+        .target()
+        .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+        .and_then(|element| element.closest(CONTROLS).ok().flatten())
+        .is_some()
+}
+
 /// Start dragging a deck grouping.
 pub fn start_deck_drag(
     event: PointerEvent,
@@ -275,15 +301,10 @@ pub fn start_deck_drag(
     if event.button() != 0 {
         return;
     }
-    if let Some(target_el) = event
-        .target()
-        .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
-        && target_el
-            .closest("button, .deck-tab, .deck-tab-detach, .deck-controls, .card-control-btn")
-            .ok()
-            .flatten()
-            .is_some()
-    {
+    // The same guard the card drag needs, which this one has had all along — and which the card
+    // drag went without, so every button inside every panel had its click swallowed by a pointer
+    // capture while every button inside a deck worked. One lesson, learned once.
+    if went_down_on_a_control(&event) {
         return;
     }
     let current_layout = layout.get_untracked();
