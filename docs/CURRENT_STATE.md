@@ -1073,10 +1073,19 @@ stop cost while it was down. Starting a unit relieves `ServiceInactive`; stoppin
 relieves nothing, because it is a thing a person wants done rather than a remedy, and
 offering it as one would let a host reach for it while nobody is present.
 
-Enable and disable are refused, and not because they were forgotten: they change what happens
-at the next boot rather than what is happening now, so nobody is present when they take
-effect. That is a different act and wants its own decision about risk before it gets a verb.
-They are refused by name at the gateway rather than three layers down.
+**All six buttons now.** Enable and disable were refused by name until the act of changing what
+happens at the next boot had been priced rather than assumed. Both are `Medium`, and the delay
+is the reason: neither changes anything a person can see today, and a unit disabled by mistake
+is an outage weeks later with nothing connecting it back to the moment somebody clicked. Both
+are reversible, since the pair undoes itself. Neither relieves a finding — enabling does not
+start anything, so a host that answered `ServiceInactive` by enabling a unit would have changed
+the next boot and left the finding standing.
+
+The enable adapter refuses a unit with no `[Install]` section rather than reporting a success
+that means nothing: systemd will enable such a unit and it still will not start at boot. Both
+adapters then ask systemd to re-read its unit files, which `systemctl` does for you and the bus
+API does not — without it the change sits on disk while systemd keeps answering from what it
+loaded earlier.
 
 The four systemd adapters share one call whose method name is chosen from a closed set here
 and never travels from a caller, so they are four adapters sharing a call rather than one
@@ -1098,7 +1107,8 @@ deciding and acting is long enough for one to be handed to something else. pid 1
 places. The live request gate walks both paths — the wrong owner is granted by Action1 and refused
 by the executor, the right one ends a real process.
 
-The other twelve `SystemHub` refusals are unchanged.
+Seven verbs pass through the live request gate. The other twelve `SystemHub` refusals — snapshots,
+network, packages, updates, users, SSH keys, security policy and backups — are unchanged.
 
 **A browser can now answer.** `POST /api/v1/actions/confirm` carries a person's answer to
 `Action1.Confirm` and is the first write the gateway makes against the action boundary. It remains
