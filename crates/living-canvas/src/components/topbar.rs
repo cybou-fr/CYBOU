@@ -75,6 +75,40 @@ pub fn Topbar(
         RuntimeState::Error(message) => message,
     };
 
+    // A session with an account behind it. `PublicPreview` is deliberately not one: it is a surface
+    // anybody can reach, and offering it a way to sign out would be offering to end nothing.
+    let signed_in = move || {
+        matches!(
+            runtime.get(),
+            RuntimeState::Ready {
+                mode: SessionMode::LocalDesktop | SessionMode::RemoteBrowser,
+                ..
+            }
+        )
+    };
+
+    // `consumer_id` is the account: the gateway copies the signed-in username into it when the
+    // session is established, and the Session card has been showing it all along.
+    let account = move || match runtime.get() {
+        RuntimeState::Ready { session, .. } if !session.consumer_id.is_empty() => {
+            session.consumer_id
+        }
+        _ => "this account".to_owned(),
+    };
+
+    let sign_out = move || {
+        leptos::task::spawn_local(async move {
+            // The reload is the point: signing out has to reach the whole surface, and every card
+            // holding a projection from the session that just ended has to lose it rather than keep
+            // drawing what it happens to remember.
+            if crate::GatewayMindClient.logout().await.is_ok()
+                && let Some(window) = web_sys::window()
+            {
+                let _ = window.location().reload();
+            }
+        });
+    };
+
     let navigate_from_menu = move |panel: &'static str| {
         // A named panel is always a system card, and a system card is a singleton, so its key
         // does identify it. Tool cards are never reached this way.
@@ -238,15 +272,34 @@ pub fn Topbar(
                     </Show>
                 </div>
 
-                <button
-                    class="auth-trigger-btn"
-                    title="Sign in with an account on this machine"
-                    aria-label="Sign in"
-                    on:click=move |_| auth_modal_open.set(true)
+                // Signed in, or not. The same button used to say Sign in either way, beside a
+                // status line that had just said the opposite — and pressing it opened a form
+                // asking for credentials the session already had.
+                <Show
+                    when=move || signed_in()
+                    fallback=move || view! {
+                        <button
+                            class="auth-trigger-btn"
+                            title="Sign in with an account on this machine"
+                            aria-label="Sign in"
+                            on:click=move |_| auth_modal_open.set(true)
+                        >
+                            <FolderOpen size=14 />
+                            <span>"Sign in"</span>
+                        </button>
+                    }
                 >
-                    <FolderOpen size=14 />
-                    <span>"Sign in"</span>
-                </button>
+                    <button
+                        class="auth-trigger-btn signed-in"
+                        title=move || format!("Signed in as {}. Click to sign out.", account())
+                        aria-label=move || format!("Signed in as {}. Sign out.", account())
+                        on:click=move |_| sign_out()
+                    >
+                        <FolderOpen size=14 />
+                        <span>{move || account()}</span>
+                        <span class="auth-sign-out">"Sign out"</span>
+                    </button>
+                </Show>
             </div>
         </header>
     }

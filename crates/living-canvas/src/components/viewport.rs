@@ -20,6 +20,7 @@ use crate::{
         relations::RelationshipsLayer,
     },
     interaction::{DragState, ResizeState, finish_drag, finish_resize, move_drag, move_resize},
+    layout::camera::{MAX_ZOOM, MIN_ZOOM},
     state::RuntimeState,
 };
 
@@ -107,16 +108,59 @@ pub fn CanvasViewport(
                     )
                 }
             }
+            // The wheel zooms, and it zooms at the pointer.
+            //
+            // It used to pan, with zoom behind Ctrl. That is the right way round for a document
+            // and the wrong way round for a canvas: on a mouse, the wheel is the only continuous
+            // control there is, and reaching for a modifier to change scale on a spatial desktop
+            // makes scale feel like a setting rather than a way of looking.
+            //
+            // A trackpad still pans. Two fingers send a wheel event with a horizontal component or
+            // a fractional vertical one; a mouse notch sends whole steps down one axis. The
+            // difference is a heuristic and it is allowed to be, because being wrong costs a pan
+            // where a zoom was meant and Shift is there for the other axis either way.
             on:wheel=move |event: WheelEvent| {
-                if event.ctrl_key() || event.meta_key() {
-                    event.prevent_default();
-                    let delta = -event.delta_y() * 0.0015;
-                    set_zoom.update(|z| *z = (*z + delta).clamp(0.4, 2.0));
-                } else {
-                    event.prevent_default();
+                event.prevent_default();
+                let (dx, dy) = (event.delta_x(), event.delta_y());
+                let from_a_mouse = dx == 0.0 && dy.abs() >= 20.0 && dy.fract() == 0.0;
+                let zooming = event.ctrl_key() || event.meta_key() || from_a_mouse;
+
+                if !zooming {
+                    let (dx, dy) = if event.shift_key() { (dy, dx) } else { (dx, dy) };
                     set_pan.update(|(px, py)| {
-                        *px -= event.delta_x() * 0.8;
-                        *py -= event.delta_y() * 0.8;
+                        *px -= dx * 0.8;
+                        *py -= dy * 0.8;
+                    });
+                    return;
+                }
+
+                let before = zoom.get_untracked();
+                let after = (before - dy * 0.0015).clamp(MIN_ZOOM, MAX_ZOOM);
+                if (after - before).abs() < f64::EPSILON {
+                    return;
+                }
+
+                // Keep whatever is under the pointer under the pointer. The stage is translated by
+                // the pan and scaled about its own origin, so its box already sits at the pan: the
+                // offset from its left edge is the only measurement this needs, and the correction
+                // falls out as `pan + offset * (1 - after / before)`.
+                let anchored = event
+                    .current_target()
+                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                    .map(|element| {
+                        let rect = element.get_bounding_client_rect();
+                        (
+                            f64::from(event.client_x()) - rect.left(),
+                            f64::from(event.client_y()) - rect.top(),
+                        )
+                    });
+
+                set_zoom.set(after);
+                if let Some((offset_x, offset_y)) = anchored {
+                    let scale = 1.0 - after / before;
+                    set_pan.update(|(px, py)| {
+                        *px += offset_x * scale;
+                        *py += offset_y * scale;
                     });
                 }
             }

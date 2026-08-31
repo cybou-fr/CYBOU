@@ -8,7 +8,7 @@
 //! what makes each of these methods short enough to read at once.
 
 use crate::card::{CardGeometry, CardId, CardInstance, CardPresentation};
-use crate::layout::model::DesktopItemId;
+use crate::layout::model::{DesktopItem, DesktopItemId, Rect};
 
 use super::DesktopLayout;
 
@@ -140,6 +140,51 @@ impl DesktopLayout {
         });
     }
 
+    /// Somewhere inside `view` that no open item covers, for a card of `size`.
+    ///
+    /// `view` is in canvas coordinates: what the window currently shows, which is the only part of
+    /// an unbounded plane a person can be surprised by. A card placed outside it is a card that
+    /// opened somewhere the person is not looking, which is the same as not opening.
+    ///
+    /// Searched in reading order, coarse steps, first fit. Not a packing algorithm: the desktop is
+    /// arranged by a person and this only has to answer "where is there room right now" fast enough
+    /// to run on a click, for a canvas holding tens of cards rather than thousands.
+    #[must_use]
+    pub fn free_spot_in(&self, size: (f64, f64), view: Rect) -> (f64, f64) {
+        const STEP: f64 = 32.0;
+        const MARGIN: f64 = 24.0;
+
+        let taken: Vec<Rect> = self
+            .desktop_items()
+            .iter()
+            .map(DesktopItem::effective_rect)
+            .collect();
+
+        let left = view.x + MARGIN;
+        let top = view.y + MARGIN;
+        let right = view.x + view.width - MARGIN;
+        let bottom = view.y + view.height - MARGIN;
+
+        let mut y = top;
+        while y + size.1 <= bottom {
+            let mut x = left;
+            while x + size.0 <= right {
+                let candidate = Rect::new(x, y, size.0, size.1);
+                if !taken.iter().any(|item| candidate.intersects(item)) {
+                    return (x, y);
+                }
+                x += STEP;
+            }
+            y += STEP;
+        }
+
+        // Nothing is free: cascade from the top-left of the view by however many cards are already
+        // out, so a fourth card does not land exactly under the third. Overlapping deliberately,
+        // in view, beats a tidy coordinate nobody can see.
+        let overlap = (taken.len() % 8) as f64 * STEP;
+        (left + overlap, top + overlap)
+    }
+
     /// Close and remove a card from the layout if closable.
     pub fn close_card(&mut self, id: CardId) {
         if id.spec().closable {
@@ -153,5 +198,62 @@ impl DesktopLayout {
             }
             self.decks.retain(|d| !d.is_empty());
         }
+    }
+}
+
+#[cfg(test)]
+mod free_spot_tests {
+    use crate::card::CardId;
+    use crate::layout::engine::DesktopLayout;
+    use crate::layout::model::Rect;
+
+    #[test]
+    fn a_card_opens_where_nothing_else_is() {
+        // Every card used to open at a coordinate written into the call site, so the third one
+        // opened under the second and the fourth under both.
+        let mut layout = DesktopLayout::new();
+        let view = Rect::new(0.0, 0.0, 1440.0, 800.0);
+        let size = (380.0, 300.0);
+
+        let first = layout.free_spot_in(size, view);
+        layout.open_card(CardId::Services(0), first.0, first.1);
+        let second = layout.free_spot_in(size, view);
+
+        assert_ne!(first, second, "the second card opened on top of the first");
+        let a = Rect::new(first.0, first.1, size.0, size.1);
+        let b = Rect::new(second.0, second.1, size.0, size.1);
+        assert!(!a.intersects(&b), "the two cards overlap");
+    }
+
+    #[test]
+    fn a_spot_is_inside_the_part_of_the_canvas_being_looked_at() {
+        // The view travels with the camera. A card opened at the canvas origin while somebody is
+        // three thousand pixels away has not opened as far as they are concerned.
+        let layout = DesktopLayout::new();
+        let view = Rect::new(3000.0, 1200.0, 1440.0, 800.0);
+        let (x, y) = layout.free_spot_in((380.0, 300.0), view);
+
+        assert!(
+            x >= view.x && x + 380.0 <= view.x + view.width,
+            "x {x} is outside the view"
+        );
+        assert!(
+            y >= view.y && y + 300.0 <= view.y + view.height,
+            "y {y} is outside the view"
+        );
+    }
+
+    #[test]
+    fn a_full_view_still_answers_with_somewhere_visible() {
+        // When there is genuinely no room, overlapping deliberately and in view beats a tidy
+        // coordinate nobody is looking at. What it must never do is fail to answer.
+        let mut layout = DesktopLayout::new();
+        let view = Rect::new(0.0, 0.0, 600.0, 400.0);
+        layout.open_card(CardId::Services(0), 0.0, 0.0);
+        layout.open_card(CardId::Processes(0), 0.0, 0.0);
+
+        let (x, y) = layout.free_spot_in((560.0, 360.0), view);
+        assert!(x >= view.x && y >= view.y);
+        assert!(x < view.x + view.width && y < view.y + view.height);
     }
 }

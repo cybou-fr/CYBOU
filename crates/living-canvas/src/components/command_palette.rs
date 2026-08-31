@@ -593,10 +593,22 @@ pub fn CommandPalette(
         }
     });
 
-    let focus_or_open_card = move |card: CardId, default_w: f64, default_h: f64| {
+    // The camera, so a card opens where this person is looking rather than where the canvas
+    // happens to begin. Optional because the palette is mounted in tests without one.
+    let camera_pan = use_context::<ReadSignal<(f64, f64)>>();
+    let camera_zoom = use_context::<ReadSignal<f64>>();
+
+    let focus_or_open_card = move |card: CardId| {
         set_selected.set(Some(DesktopItemId::Card(card)));
         if !layout.get().contains_card(card) {
-            layout.update(|l| l.open_card(card, default_w, default_h));
+            let view = crate::interaction::visible_canvas_rect(
+                camera_pan.map_or((0.0, 0.0), |signal| signal.get()),
+                camera_zoom.map_or(1.0, |signal| signal.get()),
+            );
+            let spot = layout
+                .get_untracked()
+                .free_spot_in(card.spec().default_size, view);
+            layout.update(|l| l.open_card(card, spot.0, spot.1));
         } else if layout.get().presentation(card).collapsed {
             layout.update(|l| l.set_collapsed(card, false));
         }
@@ -607,22 +619,22 @@ pub fn CommandPalette(
     };
 
     let execute_action = move |action_id: &'static str| match action_id {
-        "shell" => focus_or_open_card(CardId::Shell(0), 400.0, 160.0),
-        "files" => focus_or_open_card(CardId::FileManager(0), 380.0, 120.0),
-        "editor" => focus_or_open_card(CardId::Editor(0), 400.0, 140.0),
-        "diff" => focus_or_open_card(CardId::Diff(0), 420.0, 160.0),
-        "inspector" => focus_or_open_card(CardId::Inspector(0), 380.0, 150.0),
-        "services" => focus_or_open_card(CardId::Services(0), 580.0, 420.0),
-        "processes" => focus_or_open_card(CardId::Processes(0), 620.0, 440.0),
-        "monitor" => focus_or_open_card(CardId::Monitor(0), 560.0, 460.0),
-        "terminal" => focus_or_open_card(CardId::Terminal(0), 720.0, 460.0),
-        "system-logs" => focus_or_open_card(CardId::SystemLogs(0), 600.0, 420.0),
-        "storage" => focus_or_open_card(CardId::Storage(0), 580.0, 440.0),
-        "network" => focus_or_open_card(CardId::Network(0), 560.0, 420.0),
-        "packages" => focus_or_open_card(CardId::Packages(0), 600.0, 460.0),
-        "updates" => focus_or_open_card(CardId::Updates(0), 560.0, 420.0),
-        "outline" => focus_or_open_card(CardId::Outline, 320.0, 120.0),
-        "journal-feed" => focus_or_open_card(CardId::JournalFeed(0), 420.0, 150.0),
+        "shell" => focus_or_open_card(CardId::Shell(0)),
+        "files" => focus_or_open_card(CardId::FileManager(0)),
+        "editor" => focus_or_open_card(CardId::Editor(0)),
+        "diff" => focus_or_open_card(CardId::Diff(0)),
+        "inspector" => focus_or_open_card(CardId::Inspector(0)),
+        "services" => focus_or_open_card(CardId::Services(0)),
+        "processes" => focus_or_open_card(CardId::Processes(0)),
+        "monitor" => focus_or_open_card(CardId::Monitor(0)),
+        "terminal" => focus_or_open_card(CardId::Terminal(0)),
+        "system-logs" => focus_or_open_card(CardId::SystemLogs(0)),
+        "storage" => focus_or_open_card(CardId::Storage(0)),
+        "network" => focus_or_open_card(CardId::Network(0)),
+        "packages" => focus_or_open_card(CardId::Packages(0)),
+        "updates" => focus_or_open_card(CardId::Updates(0)),
+        "outline" => focus_or_open_card(CardId::Outline),
+        "journal-feed" => focus_or_open_card(CardId::JournalFeed(0)),
         "auth-modal" => {
             auth_modal_open.set(true);
             set_command_open.set(false);
@@ -714,7 +726,7 @@ pub fn CommandPalette(
         }
         organ_key => {
             if let Some(card) = CardId::from_key(organ_key) {
-                focus_or_open_card(card, 380.0, 480.0);
+                focus_or_open_card(card);
             } else {
                 set_command_open.set(false);
                 set_command_query.set(String::new());
@@ -744,7 +756,7 @@ pub fn CommandPalette(
                                             <button
                                                 type="button"
                                                 class="ask-cybou-action-btn"
-                                                on:click=move |_| focus_or_open_card(card, 380.0, 480.0)
+                                                on:click=move |_| focus_or_open_card(card)
                                             >
                                                 {label}
                                             </button>
@@ -827,7 +839,7 @@ pub fn CommandPalette(
                                 execute_action(action.id);
                             } else if let Some(ans) = ask_answer()
                                 && let Some((_, card)) = ans.target {
-                                    focus_or_open_card(card, 380.0, 480.0);
+                                    focus_or_open_card(card);
                                 }
                         } else if key == "Escape" {
                             set_command_open.set(false);

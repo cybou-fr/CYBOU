@@ -86,9 +86,21 @@ pub fn DesktopDock(
         RuntimeState::Error(_) => "offline ✕".to_string(),
     };
 
-    let open_or_focus = move |card_id: CardId, def_w: f64, def_h: f64| {
+    // Where a card opens is decided when it opens, from what is on the canvas and what the window
+    // is showing. It used to be decided at the call site, in numbers named `def_w` and `def_h` that
+    // were passed into `open_card(id, x, y)` — sizes by name, positions by use, identical in the
+    // Dock and the palette, so Operations always landed in the same place on top of whatever was
+    // already there.
+    let open_or_focus = move |card_id: CardId| {
         if !layout.get().contains_card(card_id) {
-            layout.update(|l| l.open_card(card_id, def_w, def_h));
+            let view = crate::interaction::visible_canvas_rect(
+                pan.map_or((0.0, 0.0), |signal| signal.get()),
+                zoom.map_or(1.0, |signal| signal.get()),
+            );
+            let spot = layout
+                .get_untracked()
+                .free_spot_in(card_id.spec().default_size, view);
+            layout.update(|l| l.open_card(card_id, spot.0, spot.1));
         } else if layout.get().presentation(card_id).collapsed {
             layout.update(|l| l.set_collapsed(card_id, false));
         }
@@ -146,7 +158,7 @@ pub fn DesktopDock(
                         title="Home / System Overview"
                         on:click=move |_| {
                             layout.update(|l| l.apply_arrangement(ArrangementMode::Home, None));
-                            open_or_focus(CardId::Insight, 380.0, 480.0);
+                            open_or_focus(CardId::Insight);
                         }
                     >
                         <IconHome size=18 />
@@ -158,7 +170,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "files"))
                         title="File Manager"
-                        on:click=move |_| open_or_focus(CardId::FileManager(0), 380.0, 320.0)
+                        on:click=move |_| open_or_focus(CardId::FileManager(0))
                     >
                         <IconFolder size=18 />
                         <span class="dock-tooltip">"Files"</span>
@@ -167,7 +179,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "editor"))
                         title="Text Editor"
-                        on:click=move |_| open_or_focus(CardId::Editor(0), 400.0, 200.0)
+                        on:click=move |_| open_or_focus(CardId::Editor(0))
                     >
                         <lucide_leptos::FilePen size=18 />
                         <span class="dock-tooltip">"Editor"</span>
@@ -176,7 +188,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "diff"))
                         title="Diff Viewer"
-                        on:click=move |_| open_or_focus(CardId::Diff(0), 420.0, 220.0)
+                        on:click=move |_| open_or_focus(CardId::Diff(0))
                     >
                         <lucide_leptos::GitCompare size=18 />
                         <span class="dock-tooltip">"Diff"</span>
@@ -185,7 +197,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "terminal"))
                         title="Terminal — runs as your account"
-                        on:click=move |_| open_or_focus(CardId::Terminal(0), 720.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Terminal(0))
                     >
                         <lucide_leptos::SquareTerminal size=18 />
                         <span class="dock-tooltip">"Terminal"</span>
@@ -194,7 +206,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "shell"))
                         title="Shell"
-                        on:click=move |_| open_or_focus(CardId::Shell(0), 400.0, 240.0)
+                        on:click=move |_| open_or_focus(CardId::Shell(0))
                     >
                         <lucide_leptos::SquareChevronRight size=18 />
                         <span class="dock-tooltip">"Shell"</span>
@@ -203,7 +215,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "inspector"))
                         title="Universal Inspector"
-                        on:click=move |_| open_or_focus(CardId::Inspector(0), 380.0, 480.0)
+                        on:click=move |_| open_or_focus(CardId::Inspector(0))
                     >
                         <lucide_leptos::Search size=18 />
                         <span class="dock-tooltip">"Inspector"</span>
@@ -214,7 +226,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "services"))
                         title="Services Manager"
-                        on:click=move |_| open_or_focus(CardId::Services(0), 580.0, 420.0)
+                        on:click=move |_| open_or_focus(CardId::Services(0))
                     >
                         <lucide_leptos::Cog size=18 />
                         <span class="dock-tooltip">"Services"</span>
@@ -223,7 +235,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "processes"))
                         title="Process Manager"
-                        on:click=move |_| open_or_focus(CardId::Processes(0), 600.0, 440.0)
+                        on:click=move |_| open_or_focus(CardId::Processes(0))
                     >
                         <lucide_leptos::Server size=18 />
                         <span class="dock-tooltip">"Processes"</span>
@@ -232,7 +244,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "monitor"))
                         title="System Monitor"
-                        on:click=move |_| open_or_focus(CardId::Monitor(0), 560.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Monitor(0))
                     >
                         <lucide_leptos::SquareActivity size=18 />
                         <span class="dock-tooltip">"Monitor"</span>
@@ -241,7 +253,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "system-logs"))
                         title="System Logs"
-                        on:click=move |_| open_or_focus(CardId::SystemLogs(0), 600.0, 420.0)
+                        on:click=move |_| open_or_focus(CardId::SystemLogs(0))
                     >
                         <lucide_leptos::ScrollText size=18 />
                         <span class="dock-tooltip">"Logs"</span>
@@ -250,7 +262,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "storage"))
                         title="Storage & Snapshots"
-                        on:click=move |_| open_or_focus(CardId::Storage(0), 580.0, 440.0)
+                        on:click=move |_| open_or_focus(CardId::Storage(0))
                     >
                         <lucide_leptos::HardDrive size=18 />
                         <span class="dock-tooltip">"Storage"</span>
@@ -259,7 +271,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "network"))
                         title="Network Connections"
-                        on:click=move |_| open_or_focus(CardId::Network(0), 560.0, 420.0)
+                        on:click=move |_| open_or_focus(CardId::Network(0))
                     >
                         <lucide_leptos::Network size=18 />
                         <span class="dock-tooltip">"Network"</span>
@@ -268,7 +280,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "packages"))
                         title="Package Manager"
-                        on:click=move |_| open_or_focus(CardId::Packages(0), 600.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Packages(0))
                     >
                         <lucide_leptos::Package size=18 />
                         <span class="dock-tooltip">"Packages"</span>
@@ -277,7 +289,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "updates"))
                         title="System Updates"
-                        on:click=move |_| open_or_focus(CardId::Updates(0), 560.0, 420.0)
+                        on:click=move |_| open_or_focus(CardId::Updates(0))
                     >
                         <IconRefresh size=18 />
                         <span class="dock-tooltip">"Updates"</span>
@@ -286,7 +298,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "user-settings"))
                         title="Users & SSH Keys"
-                        on:click=move |_| open_or_focus(CardId::UserSettings(0), 580.0, 440.0)
+                        on:click=move |_| open_or_focus(CardId::UserSettings(0))
                     >
                         <lucide_leptos::IdCard size=18 />
                         <span class="dock-tooltip">"Users"</span>
@@ -295,7 +307,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "security"))
                         title="Security & Sandboxing"
-                        on:click=move |_| open_or_focus(CardId::Security(0), 560.0, 440.0)
+                        on:click=move |_| open_or_focus(CardId::Security(0))
                     >
                         <IconShield size=18 />
                         <span class="dock-tooltip">"Security"</span>
@@ -304,7 +316,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "backup"))
                         title="Backup Vault"
-                        on:click=move |_| open_or_focus(CardId::Backup(0), 580.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Backup(0))
                     >
                         <lucide_leptos::Archive size=18 />
                         <span class="dock-tooltip">"Backup"</span>
@@ -315,7 +327,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "mail"))
                         title="Mail & Messages"
-                        on:click=move |_| open_or_focus(CardId::Mail(0), 640.0, 480.0)
+                        on:click=move |_| open_or_focus(CardId::Mail(0))
                     >
                         <lucide_leptos::Mail size=18 />
                         <span class="dock-tooltip">"Mail"</span>
@@ -324,7 +336,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "calendar"))
                         title="Calendar & Schedule"
-                        on:click=move |_| open_or_focus(CardId::Calendar(0), 600.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Calendar(0))
                     >
                         <lucide_leptos::Calendar size=18 />
                         <span class="dock-tooltip">"Calendar"</span>
@@ -333,7 +345,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notes"))
                         title="Notes & Ideas"
-                        on:click=move |_| open_or_focus(CardId::Notes(0), 580.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Notes(0))
                     >
                         <lucide_leptos::StickyNote size=18 />
                         <span class="dock-tooltip">"Notes"</span>
@@ -342,7 +354,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "contacts"))
                         title="Contacts Directory"
-                        on:click=move |_| open_or_focus(CardId::Contacts(0), 560.0, 440.0)
+                        on:click=move |_| open_or_focus(CardId::Contacts(0))
                     >
                         <lucide_leptos::Contact size=18 />
                         <span class="dock-tooltip">"Contacts"</span>
@@ -353,7 +365,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "agents"))
                         title="Agents"
-                        on:click=move |_| open_or_focus(CardId::Agents, 460.0, 480.0)
+                        on:click=move |_| open_or_focus(CardId::Agents)
                     >
                         <lucide_leptos::UsersRound size=18 />
                         <span class="dock-tooltip">"Agents"</span>
@@ -362,7 +374,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "meaning"))
                         title="Meaning & Dialogue Assistant"
-                        on:click=move |_| open_or_focus(CardId::Meaning(0), 600.0, 480.0)
+                        on:click=move |_| open_or_focus(CardId::Meaning(0))
                     >
                         <IconBot size=18 />
                         <span class="dock-tooltip">"Meaning"</span>
@@ -371,7 +383,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "cognitive-graph"))
                         title="Cognitive Graph & Causal DAG"
-                        on:click=move |_| open_or_focus(CardId::CognitiveGraph(0), 680.0, 500.0)
+                        on:click=move |_| open_or_focus(CardId::CognitiveGraph(0))
                     >
                         <lucide_leptos::Waypoints size=18 />
                         <span class="dock-tooltip">"Cognitive Graph"</span>
@@ -380,7 +392,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "event-journal"))
                         title="Canonical Event1 Journal"
-                        on:click=move |_| open_or_focus(CardId::EventJournal(0), 640.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::EventJournal(0))
                     >
                         <lucide_leptos::BookOpen size=18 />
                         <span class="dock-tooltip">"Event Journal"</span>
@@ -389,7 +401,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "learning"))
                         title="Lifelong Learning & Governance"
-                        on:click=move |_| open_or_focus(CardId::Learning(0), 620.0, 480.0)
+                        on:click=move |_| open_or_focus(CardId::Learning(0))
                     >
                         <lucide_leptos::BookOpenCheck size=18 />
                         <span class="dock-tooltip">"Learning"</span>
@@ -398,7 +410,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "outline"))
                         title="Canvas Outline"
-                        on:click=move |_| open_or_focus(CardId::Outline, 300.0, 460.0)
+                        on:click=move |_| open_or_focus(CardId::Outline)
                     >
                         <lucide_leptos::ListTree size=18 />
                         <span class="dock-tooltip">"Outline"</span>
@@ -408,7 +420,7 @@ pub fn DesktopDock(
                         title="Mind Explorer"
                         on:click=move |_| {
                             layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, None));
-                            open_or_focus(CardId::Context, 380.0, 360.0);
+                            open_or_focus(CardId::Context);
                         }
                     >
                         <lucide_leptos::Brain size=18 />
@@ -418,7 +430,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "operations"))
                         title="Operations Monitor"
-                        on:click=move |_| open_or_focus(CardId::Operations(0), 560.0, 420.0)
+                        on:click=move |_| open_or_focus(CardId::Operations(0))
                     >
                         <lucide_leptos::Workflow size=18 />
                         <span class="dock-tooltip">"Operations"</span>
@@ -427,7 +439,7 @@ pub fn DesktopDock(
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notifications"))
                         title="Notifications Center"
-                        on:click=move |_| open_or_focus(CardId::Notifications(0), 520.0, 440.0)
+                        on:click=move |_| open_or_focus(CardId::Notifications(0))
                     >
                         <IconBell size=18 />
                         <span class="dock-tooltip">"Notifications"</span>

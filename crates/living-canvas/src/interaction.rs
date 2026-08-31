@@ -71,6 +71,27 @@ pub struct ResizeState {
 /// The topbar and the dock are subtracted because a card placed under either is a card the person
 /// cannot reach.
 #[must_use]
+/// The part of the canvas the window is currently showing, in canvas coordinates.
+///
+/// The stage is translated by the pan and scaled about its own origin, so a window pixel `s` is the
+/// canvas point `(s - pan) / zoom`. Everything that has to place something where a person is
+/// looking needs this, and computing it twice in two files is how the two would come to disagree.
+#[must_use]
+pub fn visible_canvas_rect(pan: (f64, f64), zoom: f64) -> crate::layout::model::Rect {
+    let viewport = usable_viewport();
+    let zoom = if zoom.is_finite() && zoom > 0.0 {
+        zoom
+    } else {
+        1.0
+    };
+    crate::layout::model::Rect::new(
+        -pan.0 / zoom,
+        -pan.1 / zoom,
+        viewport.width / zoom,
+        viewport.height / zoom,
+    )
+}
+
 pub fn usable_viewport() -> UsableViewport {
     const TOPBAR: f64 = 64.0;
     const DOCK: f64 = 72.0;

@@ -4291,3 +4291,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   border-radius: 4px;
   padding: 1px 4px;
 }
+
+/* The account button, when there is an account. The name is what a person looks for; the way out
+   is beside it rather than hidden in a menu, because a session that cannot be ended from the
+   surface it belongs to is a session somebody has to close the browser to leave. */
+.auth-trigger-btn.signed-in .auth-sign-out {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.auth-trigger-btn.signed-in:hover .auth-sign-out {
+  color: var(--text-main);
+}
