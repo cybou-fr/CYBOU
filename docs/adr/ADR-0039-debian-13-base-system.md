@@ -34,7 +34,7 @@ Key architecture and operational decisions:
    identity files (`/etc/os-release`, `/etc/machine-id`, `/proc/sys/kernel/random/boot_id`).
 4. **Desktop presentation**: Wayland compositor with a lightweight Chromium runtime or browser-native
    client displaying the Living Canvas Rust/WASM bundle.
-5. **NixOS status**: NixOS expressions, flake definitions, and legacy C++/Qt packages are frozen as
+5. **Debian 13 status**: Debian 13 is the native production target for all packages and
    compatibility evidence and legacy oracles only, not as active deployment targets.
 
 ## Consequences

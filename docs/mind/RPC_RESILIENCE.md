@@ -67,10 +67,10 @@ set and do not alter retry classification.
 
 ## First production consumer
 
-The Plasma Presence lifecycle interruption command uses `AsyncRpcClient` with
+The Living Canvas lifecycle interruption command uses `AsyncRpcClient` with
 `NonIdempotentMutation`, a five-second deadline, and boolean acceptance. Timeout therefore:
 
-- does not block the Plasma event loop;
+- does not block the client event loop;
 - reports `unknown-outcome` rather than invented failure;
 - does not retry the mutation;
 - leaves terminal lifecycle ownership in lifecycled;

@@ -30,7 +30,7 @@ history through versioned Event1 D-Bus IPC.
 - emits Event1 `Accepted` only after Journal COMMIT.
 
 Direct Journal construction remains permitted in isolated unit tests and explicit temporary test
-runtimes; it is not the installed QML production path.
+runtimes; it is not a frontend presentation path.
 
 ## Consequences
 

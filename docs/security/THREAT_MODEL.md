@@ -32,7 +32,7 @@ backups, and future inter-node messages.
 - replay of old messages;
 - duplicate or invalid lifecycle outcomes;
 - migration rewriting or partial completion;
-- QML authority confusion and duplicate Presence instances;
+- Client UI authority confusion and duplicate Presence instances;
 - action escalation from uncertain cognition to privileged mutation.
 - forged provenance or stale input presented as current observation;
 - consolidation rewriting history or reporting false completion;
@@ -67,7 +67,7 @@ backups, and future inter-node messages.
 - security and concurrency tests.
 
 The proposed web-first Presence adds the following target controls. They are architectural gates,
-not claims about the currently shipped Plasma surface:
+not claims about the presentation surface:
 
 - a dedicated `cybou-web-gateway` with an explicit, versioned HTTP/event contract rather than a
   generic D-Bus, shell, or filesystem bridge;
@@ -97,7 +97,7 @@ not claims about the currently shipped Plasma surface:
 - user-service hardening does not yet define a least-privilege filesystem/network sandbox for
   every daemon;
 - the web gateway, Chromium desktop session, remote authentication, cache/erasure enforcement, and
-  the web-specific controls above are proposed and are not present in the current Plasma/QML
+  the web-specific controls above are enforced by cybou-web-gateway and the Living Canvas desktop
   implementation;
 - Mind binaries retain environment-triggered fault-injection hooks, which the reboot and
   split-commit gates set against the installed package. This is accepted rather than outstanding: a

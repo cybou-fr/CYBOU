@@ -11,7 +11,7 @@
 #   compliance  -> licence headers, the documents this repository declares authoritative, and
 #                  that every class the desktop renders has a rule to be drawn by
 #
-# What used to be here and is gone with the code it checked: Nix builds of the C++/QML Plasma
+# Automated CI validation for the 100% Rust workspace and Debian 13 targets
 # packages, the NixOS VM, and the Qt compatibility oracles. Nothing installs those packages, and
 # no Journal written by the Qt implementation exists, so they proved compatibility with a past
 # that has no data in it. The canonical byte fixtures they produced stay in fixtures/, and the

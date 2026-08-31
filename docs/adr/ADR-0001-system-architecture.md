@@ -19,7 +19,7 @@ Cybou consists of Body, Mind, and Presence. Body is the operating environment. M
 
 ## Consequences
 
-Plasma and future language models remain replaceable. New components must declare their domain.
+The desktop presentation and future language models remain replaceable. New components must declare their domain.
 
 ## Alternatives Considered
 

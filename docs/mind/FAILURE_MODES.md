@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 
 | Failure | Current behavior |
 |---|---|
-| QML Presence destroyed | cognitive services remain independent |
+| Living Canvas disconnected | cognitive services remain independent |
 | presenced restarts | organ processes and identity session remain |
 | identityd restarts in same login | persistent identity resumes without incrementing session |
 | workspaced restarts | bounded attention can rehydrate from Event1 history |
@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
 | eventd write rejected | no accepted event enters Workspace |
 | duplicate D-Bus owner | second daemon instance fails service-name acquisition |
 | lifecycled split commit | deterministic Event1 effect is reused after process restart or reboot |
-| Plasma recreation | lifecycle run and Event1 count remain unchanged |
+| Desktop client recreation | lifecycle run and Event1 count remain unchanged |
 | optional owner unavailable | only dependent capabilities and commands become unavailable |
 | required eventd unavailable | dependent mutations fail before Journal acceptance; other processes remain alive |
 | owner registered but unresponsive | compound Presence operation exhausts one shared deadline and returns bounded partial/typed failure |
@@ -34,7 +34,7 @@ unavailable, rejected, and unknown non-idempotent outcomes; retries are limited 
 semantics permit them.
 
 The current gates cover optional predictor/self/workspace loss, required eventd loss, lifecycled
-and presenced loss, owner timeouts, recovery, split commits, Plasma recreation, and reboot
+and presenced loss, owner timeouts, recovery, split commits, desktop client recreation, and reboot
 continuity. They do not imply that distributed failure policies exist.
 
 ## Future lifecycle and epistemic failures

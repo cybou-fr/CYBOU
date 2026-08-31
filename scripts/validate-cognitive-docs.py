@@ -300,7 +300,7 @@ def main(argv: list[str]) -> int:
         require(paths["adr38"], label, needle)
 
     # What this section used to pin belonged to the migration: the sections of RUST_MIGRATION and
-    # a notice in BUILDING that the commands described the C++/Qt implementation. The migration is
+    # a notice in BUILDING describing build requirements. The migration is
     # over and that implementation is gone, so pinning either would hold a finished transition open.
     # BUILDING is now checked for what it must always answer: how to build the thing that ships.
     require(
@@ -523,7 +523,7 @@ def main(argv: list[str]) -> int:
         ("health owner", "## healthd"),
         ("lifecycle owner", "## lifecycled"),
         ("presentation owner", "## presenced"),
-        ("QML non-owner", "## QML Presence proxy"),
+        ("Living Canvas non-owner", "## Living Canvas Presence proxy"),
     ):
         require(paths["organ_contracts"], label, needle)
 

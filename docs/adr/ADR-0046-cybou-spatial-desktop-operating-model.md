@@ -13,7 +13,7 @@ Following [ADR-0037](ADR-0037-web-first-presence-and-desktop.md) (Web-First Pres
 
 However, moving from individual panels to a complete operating model requires formalizing the entire operational lifecycle: from session authentication to multi-day uninterrupted workflows, background task survivability, clipboard and drag/drop typing, cross-panel inspection, epistemic state representation, multi-user isolation, performance virtualization, and strict hostile-content security boundaries.
 
-CYBOU is neither a traditional desktop environment (like GNOME or KDE ported to HTML) nor a generic web dashboard. It is a spatial living model of the computer in which files, tools, communications, system daemons, autonomous agents, and cognitive Mind faculties coexist on a single infinite 2D plane.
+CYBOU is neither a traditional desktop environment (like legacy desktop environments ported to HTML) nor a generic web dashboard. It is a spatial living model of the computer in which files, tools, communications, system daemons, autonomous agents, and cognitive Mind faculties coexist on a single infinite 2D plane.
 
 ## Decision
 

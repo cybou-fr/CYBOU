@@ -36,7 +36,7 @@ This representation is not canonical Journal hashing.
 
 Presence1 `Snapshot` includes both raw Health1-derived capability deficits and a grouped
 `capabilityDetails` map for presentation. Grouping does not transfer health ownership to Presence;
-it prevents QML clients from ranking states or reconstructing recovery explanations themselves.
+it prevents web clients from ranking states or reconstructing recovery explanations themselves.
 
 ## Baseline service contract
 
@@ -94,4 +94,4 @@ non-idempotent timeout remains `UnknownOutcome` and is never automatically repla
 ## Presentation signal ordering
 
 workspaced emits `Workspace1.Changed` after it admits an Event1 accepted contribution.
-presenced converts that to `Presence1.Changed`. QML then refreshes its cached snapshot.
+presenced converts that to `Presence1.Changed`. Living Canvas then refreshes its cached snapshot.

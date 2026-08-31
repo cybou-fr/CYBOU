@@ -45,9 +45,9 @@ eventd
 
 The services are D-Bus activated and stop with the graphical session.
 
-## QML
+## Living Canvas
 
-`plasmashell` owns only a Presence proxy. Recreating the visual surface does not construct or
+The web client owns only a Presence proxy. Recreating the visual surface does not construct or
 destroy cognitive organ processes.
 
 ## Health

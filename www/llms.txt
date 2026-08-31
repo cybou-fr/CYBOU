@@ -1,21 +1,21 @@
-# CYBOU — Sovereign Agent-Native Operating Environment & Cognitive Desktop
+# CYBOU — Sovereign Agent-Native Operating Environment & Spatial Canvas
 
-> Debian 13 · 100% Rust & WebAssembly · Zero-Trust Host Sandboxing · Local-Sufficient
+> Pre-Release Developer Preview · Debian 13 · 100% Rust & WebAssembly · Zero-Trust Kernel Sandboxing · Local-Sufficient
 
-CYBOU is a next-generation, agent-native operating environment and cognitive desktop platform built in 100% Rust for Debian 13 Linux (servers, containers, edge nodes, and workstations).
+CYBOU is an open-source, agent-native operating environment and spatial desktop in active development, built in 100% Rust for Debian 13 Linux (servers, containers, edge nodes, and workstations). It provides a deterministic local cognitive control plane, kernel-enforced agent sandboxing, two-phase action governance, and a tamper-evident cryptographic event ledger.
 
-## Fundamental Architecture & Invariants
+## Fundamental Architecture & Core Invariants
 
-1. **Model ≠ Identity**: An LLM is a replaceable computational faculty, never the owner of memory, biography, or identity.
-2. **Agent ≠ Mind**: Autonomous agents execute as untrusted guests inside kernel-enforced sandboxes (cgroups v2, Landlock LSM, mount namespaces, mediated network egress).
-3. **Tool Access ≠ Permission**: Tools and capabilities are governed by a strict two-phase Action1 / Executor1 pipeline requiring typed proposals, empirical policy evaluation, and opaque single-use permits.
+1. **Model ≠ Mind**: An LLM is a replaceable computational faculty, never the owner of memory, biography, or identity.
+2. **Kernel-Bounded Agent Capsules**: Autonomous agents execute as untrusted guests inside kernel-enforced sandboxes (Linux cgroups v2, Landlock LSM, mount namespaces, mediated network egress).
+3. **Two-Phase Action Governance**: Tools and capabilities are governed by a strict two-phase Action1 / Executor1 pipeline (Action Proposal → Empirical Policy Permit → Executor1 → Independent Telemetry Re-Observation).
 4. **Perception ≠ Truth**: Observations from Linux `/proc`, `statvfs`, and systemd are hypotheses carrying their exact measurements; all facts are committed to an append-only, SHA-256 hash-chained SQLite v3 journal (`Event1`).
-5. **Local-Sufficient Operation**: Core cognition, dialogue meaning parsing (`cybou-meaningd`), associative context (`cybou-contextd`), and the Living Canvas spatial desktop require zero cloud connectivity, no GPU accelerator, and no API keys.
+5. **100% Local-Sufficient Operation**: Core cognition, dialogue meaning parsing (`cybou-meaningd`), associative context (`cybou-contextd`), and the Living Canvas spatial desktop require zero cloud connectivity, no GPU accelerator, and no external API keys.
 
 ## Core Subsystems
 
 - **Mind Control Plane**: 14 process-isolated D-Bus micro-daemons (`org.cybou.Mind.*`): `cybou-eventd` (canonical Journal writer), `cybou-presenced`, `cybou-epistemicd`, `cybou-contextd`, `cybou-meaningd`, `cybou-identityd`, `cybou-intentiond`, `cybou-predictord`, `cybou-selfd`, `cybou-healthd`, `cybou-telemetryd`, `cybou-actiond`, `cybou-executord`, and `cybou-agentd`.
-- **Living Canvas**: Infinite-plane spatial desktop UI written in Leptos and WebAssembly with 20+ specialized reactive cards (Terminal, File Manager, Editor, Cognitive Graph, Event Stream, Notes, Calendar, Contacts, Mind Inspector, System Monitor) compiling with 0 warnings.
+- **Living Canvas Spatial Desktop**: Infinite 2D spatial canvas written in Leptos and WebAssembly with 20+ specialized reactive cards (Terminal, Files, Editor, Cognitive Graph, Event Stream, Notes, Calendar, Contacts, Mind Inspector, System Monitor) compiling with 0 compiler warnings.
 - **Security & Privilege Separation**: PAM credential authentication (`cybou-authd`), unprivileged per-UID host file daemon (`cybou-host-filesd@<uid>`), private `/run/cybou-host-files/<uid>/owner.sock` sockets, and per-session sandboxed shells (`cybou-shelld`).
 - **Sovereign Persistence & Lifelong Learning**: Atomic local storage for notes, contacts, calendar schedules, and multi-layer learning candidate induction with empirical promotion gates and durable artifact lineages.
 

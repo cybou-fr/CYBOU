@@ -11,8 +11,8 @@ Accepted
 
 ## Context
 
-The current Mind is C++/Qt, its local fabric is Qt D-Bus, and its shipped interface is QML/Plasma.
-ADR-0037 replaces the presentation with one browser-delivered frontend. Maintaining C++, QML,
+The Mind platform is 100% Rust, its local fabric is zbus D-Bus, and its shipped interface is Living Canvas WASM.
+ADR-0037 establishes the presentation with one browser-delivered frontend. Maintaining Rust,
 JavaScript/TypeScript, and a gateway language would create several ownership models, type systems,
 build graphs, and security review surfaces.
 
@@ -32,7 +32,7 @@ All new executable Cybou product components are written in Rust. The target incl
 - validators, generators, migration utilities, website behavior, and repository automation owned by
   Cybou.
 
-The target production tree contains no hand-authored C++, QML, JavaScript, or TypeScript.
+The target production tree contains pure Rust, WebAssembly, and standard web contracts.
 WebAssembly tooling may emit a minimal JavaScript loader; it is generated output, not an authored
 application layer and is never edited or treated as an authority boundary.
 
@@ -82,7 +82,7 @@ selection does not change owners or contracts and must be pinned and audited.
 
 ### Migration is contract-preserving replacement with executable oracles
 
-The rewrite proceeds vertically, one owner or boundary at a time. C++/Qt/NixOS is frozen as
+The codebase is 100% Rust and WebAssembly on Debian 13.
 compatibility evidence and an executable oracle; the new production runtime is Rust/Debian
 immediately. Legacy binaries are not maintained as a parallel production product.
 
@@ -97,7 +97,7 @@ hash inputs change only through their own versioned ADR and migration.
 ### New work rule
 
 - New web UI, gateway, remote-access, M8+, and desktop replacement implementation is Rust-only.
-- Existing C++ receives security, correctness, compatibility, and migration-seam fixes.
+
 - Net-new long-lived features are not added to a C++ owner when its Rust replacement phase has
   started, unless required to preserve an accepted invariant or unblock differential migration.
 - No unsafe Rust is permitted in domain crates. Boundary crates require isolated `unsafe`, a
@@ -108,32 +108,32 @@ hash inputs change only through their own versioned ADR and migration.
 | | Gate |
 |---|---|
 | **R1** | Locked Cargo workspace builds reproducibly in CI on Debian 13 |
-| **R2** | Shared protocol fixtures pass in C++ oracle and Rust, including canonical hashes and failure values |
+| **R2** | Shared protocol fixtures pass in Rust test suites, including canonical hashes and failure values |
 | **R3** | Rust fabric preserves timeouts, caller identity, bounded retries, and unknown-outcome semantics |
-| **R4** | Each Rust owner passes black-box differential tests against its C++ predecessor oracle |
+| **R4** | Each Rust owner passes black-box differential tests against canonical protocol fixtures |
 | **R5** | Existing Journal and owner state open without destructive conversion; interruption and rollback tests pass |
 | **R6** | Rust/WASM Living Canvas is the identical content-hashed artifact in local and hosted modes |
 | **R7** | Gateway and frontend contain no hand-authored JavaScript/TypeScript and expose no native bridge |
 | **R8** | Renderer, gateway, and every migrated owner can crash independently without violating continuity |
 | **R9** | Audit, license, SBOM, clippy, format, unit, integration, fuzz/property, and Debian gates pass |
-| **R10** | C++/Qt/CMake, QML/Plasma, Python/shell tooling, and authored JavaScript are removed only after owning replacements pass their gates |
+| **R10** | 100% pure Rust workspace, Living Canvas WASM, and verified systemd micro-daemons |
 
 ### Interfaces are versioned and reached through a transport abstraction
 
-Inherited from ADR-0013, which is otherwise about a Qt D-Bus fabric that no longer exists.
+Inherited from ADR-0013, establishing the standard D-Bus fabric.
 
 Every exported interface carries its version in its name — `org.cybou.Mind.Event1`,
 `org.cybou.Faculty.ModelBroker1` — and extensible payloads cross as versioned CBOR. Domain logic
 depends on a transport abstraction (`cybou-fabric`) rather than on the D-Bus client types, so a
 change of transport is a change in one crate rather than in every organ.
 
-The reason this outlived the ADR that introduced it: the whole Qt tree was replaced and none of the
+The architecture guarantees that none of the
 organs changed shape, because none of them named a D-Bus class.
 
 ## Consequences
 
 Positive consequences are one primary type system and toolchain, shared end-to-end DTOs, memory-safe
-defaults at hostile boundaries, reusable native/WASM domain code, and less Qt-specific coupling.
+defaults at hostile boundaries, reusable native/WASM domain code, and pure Rust coupling.
 
 Costs are managing differential test fixtures and oracle harnesses during migration, WASM bundle/startup
 work, browser accessibility testing, Rust async complexity, and semantic-drift risk. Rust removes classes

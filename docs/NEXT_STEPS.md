@@ -722,7 +722,7 @@ capsule and is not given the means to nest.
 
 ## What not to do
 
-Do not restore anything from the removed C++/Qt/Nix tree. Nothing installed those packages and no
+The codebase is 100% Rust and WebAssembly on Debian 13. Maintain strict single-language discipline and no
 Journal written by that implementation exists; the canonical byte fixtures it produced are checked
 in and the tests verify against them.
 

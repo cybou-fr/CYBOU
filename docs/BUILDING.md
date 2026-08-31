@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 # Building
 
 One toolchain builds everything that ships: Rust 1.95.0, pinned by `rust-toolchain.toml`. There is
-no second build system. The C++/Qt implementation and the Nix packaging that used to live beside it
+no second build system. The entire platform is built with Cargo in pure Rust and WebAssembly.
 were removed on 2026-08-20; see [Current State](CURRENT_STATE.md) for why.
 
 ## Prerequisites

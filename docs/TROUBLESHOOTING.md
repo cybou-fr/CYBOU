@@ -5,26 +5,21 @@ SPDX-License-Identifier: MIT
 
 # Troubleshooting
 
-## QML configure errors
+## Living Canvas connection errors
 
-Use relative QML resource paths or explicit resource aliases. Avoid duplicate visual QML trees.
+If Living Canvas reports connection errors or failed SSE/WebSocket streams:
+1. Verify `cybou-web-gateway.service` is active (`systemctl --user status cybou-web-gateway`).
+2. Check that the port (default 8080) is listening on localhost (`ss -tulpn | grep 8080`).
+3. Ensure user credentials and PAM authentication via `cybou-authd` succeed.
 
-## `org.cybou.presence` not installed
+## D-Bus Daemon and Journal issues
 
-Verify the QML plugin, exact URI, runtime import path, and Plasma applet package.
+If daemon states do not update:
+1. Check Journal permissions under `~/.local/share/cybou/journal.db`.
+2. Inspect daemon logs with `journalctl --user -u 'cybou-*' -f`.
+3. Verify that `cybou-eventd` is running and accepting Event1 transactions.
 
-## Presence blank
+## Repairing Living Canvas state
 
-Check Journal path and permissions, QML loading, `plasmashell` logs, awake state, and schema compatibility.
-
-## Database locked
-
-Avoid multiple Presence instances. The target fix is a single-writer eventd.
-
-## VM black screen
-
-Use safe graphics only when required. Do not force software rendering on normal hardware.
-
-## Repairing Plasma
-
-Back up Plasma configuration and do not delete cognitive state while resetting the desktop.
+1. Clear browser local storage / cache if schema migrations encounter stale local state.
+2. Cognitive state and Journal history remain persistent in `~/.local/share/cybou/journal.db` and are unaffected by browser refreshes.

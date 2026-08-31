@@ -12,7 +12,7 @@ Accepted
 ## Context
 
 Before M4, Identity, Intentions, Predictor, SelfModel, Workspace, and Presence lived as one
-Presence-owned object graph inside `plasmashell`. M3 isolated only eventd.
+Presence-owned object graph inside the presentation shell. M3 isolated only eventd.
 
 ## Decision
 
@@ -30,15 +30,15 @@ cybou-presenced
 
 Each owns one versioned D-Bus name.
 
-Shared libraries contain protocol/domain logic and transport helpers, but QML does not instantiate
-hidden mutable organ state. The QML Presence type is a proxy to presenced.
+Shared libraries contain protocol/domain logic and transport helpers, but the presentation client does not instantiate
+hidden mutable organ state. The Living Canvas Presence client is a proxy to presenced.
 
 Identity uses a volatile runtime-session marker so restarting identityd inside one user login
 resumes rather than increments the same logical session.
 
 ## Consequences
 
-- Plasma can restart independently of Mind.
+- The presentation client can restart independently of Mind.
 - individual organs can fail independently;
 - IPC/lifecycle contracts are mandatory;
 - M6 can express capability deficits using real process health;
@@ -55,5 +55,5 @@ The VM smoke gate verifies the installed systemd user-service graph.
 
 A permanent `cybou-mindd` monolith was rejected.
 
-Keeping an in-process fallback behind the QML Presence proxy was rejected because it would make
+Keeping an in-process fallback behind the desktop Presence proxy was rejected because it would make
 ownership ambiguous again.

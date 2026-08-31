@@ -23,7 +23,7 @@ Runs on every push and pull request:
 - Nix formatting validation (`nix fmt`)
 - REUSE license compliance (`reuse lint`)
 - Package metadata validation (`scripts/validate-packages.py`)
-- C++ package compilation (`cybou-mind`, `cybou-presence-applet`)
+- Rust workspace compilation (`cargo build --workspace`)
 - Formatting check (`nix fmt && git diff --exit-code`)
 
 ### Full Job (tags only)

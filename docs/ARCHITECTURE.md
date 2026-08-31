@@ -72,9 +72,9 @@ This split is a state-ownership boundary, not an analogy to biological brain ana
 ## Shared libraries
 
 Shared libraries contain protocol/domain code and IPC utilities. They do not create a hidden
-second Mind behind the QML surface.
+second Mind behind the Living Canvas desktop surface.
 
-The QML Presence library links only fabric/runtime client code; it no longer owns domain organ
+The Living Canvas client library links only fabric/runtime client code; it does not own domain organ
 objects.
 
 Future faculties must follow the same rule: shared code may implement protocols and algorithms,
@@ -125,7 +125,7 @@ a cycle. Aggregate/per-capability state and raw deficits remain a separate proje
 Health1; Presence additionally groups them into UI-ready details with causes, impact, verification
 time, and recovery progress. Consequently loss of predictord disables Observe/Predict while identity,
 commitments, biography, attention, lifecycle control, and the Presence endpoint remain usable.
-Presence also publishes the command-to-capability mapping for QML, while every backend command
+Presence also publishes the command-to-capability mapping for the desktop client, while every backend command
 independently enforces the same gate. Lifecycle mode and aggregate health remain separate axes.
 
 ## Durable-to-visible ordering
@@ -142,7 +142,7 @@ command
 → workspaced admission
 → Workspace1 Changed
 → presenced Changed
-→ QML proxy refresh
+→ Living Canvas proxy refresh
 ```
 
 This ordering implements the **durable before visible** invariant described in `MIND_MODEL.md`.
@@ -175,13 +175,13 @@ Current restart/reboot and capability-specific recovery semantics are documented
 It may combine organ projections into a snapshot for Presence, but ownership remains with the
 organ process that defines the state.
 
-The Plasma Presence QObject is a remote proxy/cache only.
+The Living Canvas Presence client is a remote proxy/cache only.
 
 Therefore:
 
 ```text
-Plasma restart         ≠ identity restart
-QML object recreation  ≠ biography reset
+Desktop client restart ≠ identity restart
+Browser session reset  ≠ biography reset
 Presence refresh       ≠ cognitive event
 ```
 
@@ -189,7 +189,7 @@ Future presentation surfaces must preserve the same boundary.
 
 ### Proposed web-first presentation boundary
 
-[ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md) proposes replacing the Plasma/QML
+[ADR-0037](adr/ADR-0037-web-first-presence-and-desktop.md) establishes the Living Canvas
 surface with one Living Canvas frontend delivered through a dedicated browser/network gateway.
 This is target architecture, not the current process topology above.
 
@@ -254,7 +254,7 @@ history is never rewritten into a more convenient past; summaries, calibration, 
 expiry decisions remain derived records with evidence.
 
 Lifecycle1, persistent run state, recovery, owner dispatch, durable owner results, accepted
-terminal outcomes, Presence projection, and process/Plasma/reboot fault-injection gates form the
+terminal outcomes, Presence projection, and process/desktop/reboot fault-injection gates form the
 implemented lifecycle boundary. Capability-aware scheduling, degraded operation and
 recovery without moving state ownership into Lifecycle1. ADR-0024 and ADR-0026 are normative.
 

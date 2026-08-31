@@ -48,7 +48,7 @@ durable
 
 ## Ownership
 
-No Workspace copy is owned by presenced or the QML proxy. Tests may still construct a local
+No Workspace copy is owned by presenced or the Living Canvas client. Tests may still construct a local
 Workspace against a temporary EventStore as a unit-test seam.
 
 ## Direction

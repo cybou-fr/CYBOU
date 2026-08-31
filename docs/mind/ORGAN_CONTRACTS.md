@@ -87,8 +87,8 @@ It talks to the organ interfaces and Event1. It projects Health1 capability stat
 by dependency, and applies one monotonic deadline to every compound read or mutation. It does not
 construct domain organ objects or open persistent cognitive stores.
 
-## QML Presence proxy
+## Living Canvas Presence proxy
 
-Not an organ. It caches Presence1 Snapshot data and forwards commands for Plasma/QML.
+Not an organ. It caches Presence1 Snapshot data and forwards commands for Living Canvas.
 
 Opening another surface creates another proxy, not another Mind.

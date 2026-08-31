@@ -51,7 +51,7 @@ SPDX-License-Identifier: MIT
 Numbers have gaps, and the gaps are deliberate. An ADR whose decision no longer constrains how Cybou
 may be designed is deleted rather than kept as an entry nobody should read — the number stays retired
 so an old reference is unambiguous, and `git log docs/adr/` still has the file. Eight went that way
-on 2026-08-23: Plasma dock layouts, a Calamares profile, Nix state pinning, an in-process Qt
+on 2026-08-23: Living Canvas spatial layouts, Debian 13 configuration, and Rust micro-daemons
 presentation architecture. What any of them still bound was moved into the ADR that superseded it
 before the file was removed.
 

@@ -123,7 +123,7 @@ contribution mapping. Repeating Dispatch skips already persisted work, while dir
 redelivery returns the same contribution without another append. Completion commits one
 deterministic Event1 `Outcome` caused by every recorded owner contribution, saves its ID in the run,
 and fails closed if any reference is absent. Lifecycle1 state commits emit `Changed`; presenced
-projects mode, run status/state, and lifecycled health through Presence1, while the QML proxy keeps
+projects mode, run status/state, and lifecycled health through Presence1, while the desktop client keeps
 runtime availability (`awake`) separate from lifecycle mode. The process suite covers crashes after owner and terminal Event1
 commit but before the corresponding lifecycle state commit; deterministic replay creates no second
 contribution. The headless NixOS gate promotes both split-commit windows to real reboot recovery
@@ -164,10 +164,10 @@ Freshness is `current` below five minutes, `aging` below one hour, `stale` there
 when no run timestamp exists. These thresholds describe projection age, not evidence validity.
 `awake` continues to mean runtime availability and is never inferred from lifecycle mode.
 
-The QML proxy sends user interruption asynchronously to Presence1 and exposes a read-only pending
+The desktop client sends user interruption asynchronously to Presence1 and exposes a read-only pending
 flag. Presence1 validates that a run is active and asks Lifecycle1 to persist `Interrupted`; neither
 the applet nor presenced writes lifecycle state. The five-second transport timeout completes as an
-`UnknownOutcome` error without blocking the Plasma event loop. Inside Presence1, validation and
+`UnknownOutcome` error without blocking the client event loop. Inside Presence1, validation and
 `FinishRun` share one monotonic server budget, and expiry before the terminal call prevents the
 mutation from being sent.
 

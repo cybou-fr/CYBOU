@@ -47,7 +47,7 @@ sentient, or biologically equivalent to a human mind.
 
 ```text
 Body
-  NixOS, Plasma, hardware, processes, devices, network/system state, executors
+  Debian 13, Linux kernel, hardware, processes, devices, network/system state, executors
 
 Mind
   persistent cognitive substrate/control plane
@@ -57,7 +57,7 @@ Presence
 ```
 
 ```text
-Plasma ≠ Mind
+Desktop Surface ≠ Mind
 Journal ≠ Mind
 presenced ≠ Mind
 model ≠ Mind

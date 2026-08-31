@@ -16,7 +16,7 @@ SPDX-License-Identifier: MIT
 | volatile identity login marker | `cybou-identityd` |
 | bounded Workspace | `cybou-workspaced` |
 | presentation aggregation | `cybou-presenced` |
-| visual cache | QML Presence proxy |
+| visual cache | Living Canvas Presence proxy |
 
 Intentions, Predictor, and Self derive their state from Event1 plus their narrow operation logic.
 
@@ -38,7 +38,7 @@ The runtime identity marker prevents a daemon restart from being confused with a
 
 ## Invariants
 
-- Plasma does not own cognitive persistence.
+- Living Canvas does not own cognitive persistence.
 - presenced does not open `journal.db`.
 - only identityd writes `identity.json`;
 - only workspaced owns live bounded attention;

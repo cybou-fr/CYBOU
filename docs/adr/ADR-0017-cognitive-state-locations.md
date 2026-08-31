@@ -14,7 +14,7 @@ state to the canonical location rather than leaving two.
 
 ## Context
 
-State paths derived from the hosting Plasma process are unstable.
+State paths derived from the transient presentation process are unstable.
 
 ## Decision
 
@@ -26,4 +26,4 @@ State remains stable when process names and UI hosts change.
 
 ## Alternatives Considered
 
-Using plasmashell application-data paths was rejected.
+Using transient presentation application-data paths was rejected.

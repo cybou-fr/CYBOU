@@ -13,9 +13,9 @@ The real backend is `cybou-presenced` on:
 org.cybou.Mind.Presence1
 ```
 
-The C++ `Presence` type exported to QML is only a proxy/cache.
+The Presence client interface in Living Canvas is only a proxy/cache.
 
-## QML properties
+## Presence client properties
 
 ```text
 awake
@@ -46,7 +46,7 @@ lifecycleCommandPending
 ```
 
 `awake` is a compatibility alias for presentation reachability, not a global capability grant.
-`hasCapability(id)` is the QML command gate. `lifecycleScheduling` is the read-only Lifecycle1
+`hasCapability(id)` is the client command gate. `lifecycleScheduling` is the read-only Lifecycle1
 policy evaluation and explains why automatic work is blocked or deferred.
 
 `capabilityDetails[id]` is the UI-ready explanation for one capability. It contains `state`,
@@ -55,10 +55,10 @@ policy evaluation and explains why automatic work is blocked or deferred.
 not need to group or rank those records itself.
 
 `commandAvailability[id]` contains `available`, `requiredCapabilities`, and
-`missingCapabilities`. `canCommand(id)` is the corresponding QML convenience gate. Presence owns
+`missingCapabilities`. `canCommand(id)` is the corresponding client convenience gate. Presence owns
 this presentation mapping; the target organ still enforces the same capability requirements.
 
-`lastError` is presentation diagnostics for connection/retry UX. It does not make QML the owner of
+`lastError` is presentation diagnostics for connection/retry UX. It does not make the client the owner of
 the failing organ or storage resource.
 
 ## Commands
@@ -83,7 +83,7 @@ available for stale-state presentation. A later successful `wake()` replaces it 
 presenced routes cognitive operations to the organ that owns them; it does not construct domain
 organ objects itself.
 
-Creating another QML Presence object creates another proxy only.
+Creating another client Presence proxy creates another proxy only.
 
 ## Proposed web mapping
 
@@ -100,7 +100,7 @@ preserving:
 - freshness and degraded causes;
 - one bounded request budget;
 - backend enforcement for every command;
-- QML/browser recreation as projection recreation, not identity or biography restart.
+- Browser / desktop recreation as projection recreation, not identity or biography restart.
 
 The web schema is defined and tested independently so internal D-Bus evolution does not become a
 public network protocol by accident.

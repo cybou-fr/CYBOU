@@ -35,7 +35,7 @@ the frontend, validates versioned web requests, enforces transport policy, and m
 operations to local Presence/Mind APIs. It is not a cognitive state owner.
 
 **Rust-first** — Target policy that Cybou-authored executable product components, including Living
-Canvas compiled to WebAssembly, are implemented in Rust. It does not describe the current C++/Qt
+Canvas compiled to WebAssembly, are implemented in pure Rust.
 tree or exempt a rewrite from compatibility and continuity gates.
 
 **Body** — Debian 13, hardware, kernel, storage, processes, and system/external state that Cybou can observe or
@@ -45,7 +45,7 @@ eventually affect through explicit capabilities.
 commitments, prediction/calibration, self projection, and bounded attention. A language model or
 one daemon is not Mind by itself.
 
-**Presence** — the outward presentation/projection boundary. Current Plasma Presence is a remote
+**Presence** — the outward presentation/projection boundary. Living Canvas Presence is a remote
 proxy/cache rather than a cognitive state owner.
 
 **Organ** — a component with one narrow cognitive responsibility and explicit state ownership.

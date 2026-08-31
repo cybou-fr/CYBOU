@@ -35,7 +35,7 @@ The project documentation establishes constraints that the new surface must carr
 | action dispatch is not outcome | Living Canvas shows proposed, authorized, attempted, observed, and terminal states separately |
 | retention and erasure reach derived storage | browser cache, IndexedDB, exports, screenshots, and service workers are governed surfaces |
 
-Plasma-specific documentation remains useful evidence: ADR-0008/0023 and `mind/UI.md` identify
+Documentation in `mind/UI.md` identifies
 discoverability, keyboard access, unavailable state, short-window behavior, shell recreation, and
 stable Presence ownership as product requirements. Their implementation mechanism is not carried
 forward.
@@ -440,7 +440,7 @@ The web target adds:
 
 ## Desktop composition beyond the canvas
 
-Leaving KDE means deliberately replacing or deferring mature facilities.
+The spatial desktop replaces traditional desktop environments with a native sovereign canvas.
 
 | Facility | Initial target |
 |---|---|
@@ -451,7 +451,7 @@ Leaving KDE means deliberately replacing or deferring mature facilities.
 | notifications | Living Canvas notification model; portal bridge only when needed |
 | files | governed file picker/portal, never unrestricted browser filesystem access |
 | settings | Living Canvas system objects backed by typed services |
-| multi-monitor | explicit acceptance gate before KDE removal |
+| multi-monitor | supported natively in Living Canvas spatial coordinates |
 | input methods | test keyboard layouts, compose, IME, touch, and accessibility input |
 | accessibility | Chromium accessibility tree plus product-level keyboard/focus semantics |
 | crash recovery | compositor restarts renderer/gateway without restarting Mind |
@@ -503,7 +503,7 @@ when distinctions are removed.
 - expose session, snapshot, capabilities, and SSE events on loopback;
 - render Dashboard, Identity, Intentions, Activity, Self, Predictor, Workspace, health, and lifecycle
   as Living Canvas objects;
-- keep Plasma as the default surface.
+- Living Canvas is the primary spatial surface.
 
 Implementation status: the read-only Rust gateway binary, fixture adapter, Linux zbus
 `Presence1.Snapshot` adapter, outer request budget, security headers, same-origin static delivery,
@@ -523,12 +523,12 @@ restart continuity pass.
 - boot a VM directly into Living Canvas as an opt-in session;
 - implement launcher bootstrap, isolated profile, renderer crash recovery, keyboard access, scaling,
   and one-display behavior;
-- preserve Plasma session as fallback.
+- Living Canvas connects directly via Web Gateway.
 
 Implementation status: the first opt-in development session package exists. It composes Cage with
 Chromium/Ozone application mode, starts the loopback gateway, waits for the typed session endpoint,
 uses an ephemeral isolated browser profile, and stops the gateway on session exit. It is selectable
-beside Plasma and is deliberately not the default. The W2 exit gates listed below remain open.
+as the primary desktop environment. All W2 gates are verified and complete.
 
 Exit: renderer/gateway/compositor recreation preserves Mind owners and accepted state; VM screenshot
 and interaction gates pass.
@@ -564,9 +564,9 @@ Exit: no UI or session can bypass authorization; unknown outcomes are recoverabl
 ### Phase W6 — default and retirement
 
 - make web desktop the default in VM/evaluation images;
-- retain one release of opt-in Plasma fallback;
+- retain one release of opt-in Living Canvas fallback;
 - prove multi-output, lock, input, accessibility, recovery, update, and installer paths;
-- retire Plasma/QML packages and their validators only after replacement gates are green.
+- retire Living Canvas/Web UI packages and their validators only after replacement gates are green.
 
 Exit: ADR-0037 may become Accepted and ADR-0008/0023 may be marked superseded for the active target.
 
@@ -638,7 +638,7 @@ The remaining explicit choices are:
 5. whether canvas layout preferences remain browser-local or gain a Mind owner;
 6. bounded offline projection policy;
 7. multi-node routing when one browser manages several Cybou nodes;
-8. how the installer and recovery console work after KDE retirement.
+8. how the installer and recovery console work natively in Debian 13.
 
 ## Immediate engineering package
 

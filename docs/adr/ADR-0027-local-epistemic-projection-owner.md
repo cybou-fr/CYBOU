@@ -156,7 +156,7 @@ Measured, not guessed:
 - **Presence**: the epistemic section joins the existing single monotonic budget. It adds no second
   deadline.
 
-### QML remains read-only for epistemic authority
+### Frontend remains read-only for epistemic authority
 
 The UI shows `unknown`, `stale` and `disputed` distinctly, and cannot resolve a contradiction.
 

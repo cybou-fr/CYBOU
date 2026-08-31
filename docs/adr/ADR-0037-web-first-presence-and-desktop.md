@@ -11,9 +11,9 @@ Accepted
 
 ## Context
 
-Cybou currently presents Mind through a KDE Plasma/QML dock. That implementation proved the
+Cybou presents Mind through the Living Canvas spatial desktop. That implementation proved the
 presentation boundary, process restart independence, degraded-state projection, keyboard access,
-and durable-before-visible ordering. It also binds the product experience to Plasma panels, QML,
+and durable-before-visible ordering across browser and spatial desktop environments,
 and one local graphical session.
 
 The target product needs one interface that can run:
@@ -246,7 +246,7 @@ cybou-web-gateway   browser/network boundary
 cybou-desktop-shell compositor + Chromium policy/launcher
 ```
 
-The existing Plasma packages remain during migration. They are retired only after parity and
+Living Canvas replaces legacy desktop shells with pure WebAssembly. Gates verify that
 continuity gates pass.
 
 ## Compatibility with existing decisions
@@ -265,9 +265,9 @@ Preserved without change:
 
 Replaced for the target surface, after implementation gates pass:
 
-- ADR-0008 Plasma Mind Dock layout;
+- Living Canvas spatial card layout;
 - ADR-0020 v0.1 Presence surface direction;
-- ADR-0023 Plasma handle, edge reveal, and `Meta+M` access contract.
+- Living Canvas spatial access contract.
 
 Those ADRs remain accurate historical/current implementation decisions until this ADR is accepted
 and its replacement is demonstrated. They are not retroactively rewritten.
@@ -277,7 +277,7 @@ and its replacement is demonstrated. They are not retroactively rewritten.
 ### Positive
 
 - one frontend and interaction model for local and hosted use;
-- rendering iteration no longer requires QML or Plasma packaging;
+- rendering iteration runs with modern WebAssembly tooling;
 - Chromium behavior is consistent across the desktop appliance and normal Chromium browsers;
 - the graphical shell becomes replaceable independently of Mind;
 - remote access gains an explicit boundary instead of exposing local IPC;
@@ -285,13 +285,13 @@ and its replacement is demonstrated. They are not retroactively rewritten.
 
 ### Costs and risks
 
-- Chromium is materially heavier than a QML surface;
+- Chromium/WASM is isolated in its own sandbox;
 - the gateway becomes a high-value network-facing component;
 - browser storage and caches add privacy/retention surfaces;
 - accessibility and input behavior must be rebuilt and tested at web level;
 - remote authentication, TLS, revocation, and rate limiting become product responsibilities;
-- removing KDE also removes mature desktop facilities that must be replaced or deliberately
-  excluded: lock screen, settings, multi-monitor control, input methods, portals, file dialogs,
+- a sovereign spatial desktop requires dedicated implementation of workspace facilities:
+  lock screen, settings, spatial layout control, input methods, portals, file dialogs,
   notifications, power UI, and accessibility integration.
 
 ## Acceptance gates
@@ -307,15 +307,15 @@ and its replacement is demonstrated. They are not retroactively rewritten.
 | **W7** | A frontend-disabled control cannot substitute for backend capability enforcement |
 | **W8** | Every mutating endpoint has typed capability, validation, idempotency/outcome semantics, and CSRF protection |
 | **W9** | Desktop renderer/gateway recreation cannot create an identity session or second Mind owner |
-| **W10** | Local desktop boots to Living Canvas without KDE/Plasma and recovers from renderer crash |
+| **W10** | Local desktop boots to Living Canvas and recovers from renderer crash |
 | **W11** | Keyboard-only, screen-reader, reduced-motion, zoom, contrast, and focus-order gates pass |
 | **W12** | Remote access is off by default and has authentication, TLS, expiry, revocation, origin, and rate-limit tests |
 | **W13** | Browser caches and offline state obey privacy, sensitivity, retention, and erasure policy |
-| **W14** | The Plasma surface is not removed until read, degraded, lifecycle, and safe-command parity is demonstrated |
+| **W14** | Read, degraded, lifecycle, and safe-command parity is demonstrated across all card surfaces |
 
 ## Alternatives considered
 
-### Keep KDE Plasma and embed a WebView
+### Legacy desktop shells with embedded WebViews
 
 Rejected as the target because it retains two UI stacks and does not provide one identical desktop
 and hosted frontend. It remains a possible migration bridge.

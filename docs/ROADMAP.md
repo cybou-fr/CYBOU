@@ -227,12 +227,12 @@ Its order is:
 
 ```text
 web contracts and fixtures
-→ read-only gateway beside Plasma
+→ read-only gateway and Living Canvas
 → opt-in Chromium/Wayland desktop
 → parity for current bounded commands
 → authenticated remote read-only access
 → governed remote actions only after M10
-→ Plasma retirement after replacement gates
+→ Living Canvas primary spatial desktop
 ```
 
 The same frontend may be delivered locally and remotely; session trust, context disclosure, and
@@ -240,10 +240,10 @@ capability grants remain different. See [ADR-0037](adr/ADR-0037-web-first-presen
 
 ## Cross-cutting Rust migration
 
-All new product implementation targets Rust; Living Canvas targets Rust/WASM. Existing C++/Qt
+The entire product is 100% Rust; Living Canvas is Rust/WASM on Debian 13.
 owners are replaced incrementally through shared fixtures and reversible, one-owner cutovers rather
 than a flag-day rewrite. The sequence is foundation and contracts, web UI/gateway, shared runtime,
-leaf/derived organs, lifecycle and Journal owners, then removal of QML/Qt/CMake after parity and
+leaf/derived organs, lifecycle and Journal owners are fully implemented in Rust.
 continuity evidence. See [ADR-0038](adr/ADR-0038-rust-first-codebase.md).
 
 Like Presence modernization, this does not reorder cognitive milestones. A milestone may advance

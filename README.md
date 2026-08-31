@@ -121,19 +121,19 @@ graph TD
 
 | Subsystem | Daemon / Component | Status | Architectural Invariant |
 |---|---|---|---|
-| **Cognitive Journal** | `cybou-eventd` (`Event1`) | **Production Live** | Append-only, SHA-256 hash-chained SQLite v3 ledger; single canonical writer. |
-| **Cognitive Graph** | `cybou-presenced` (`Presence1`) | **Production Live** | Dynamic synthesis of systemd units, `/proc` processes, and epistemic beliefs. |
-| **Epistemic Truth** | `cybou-epistemicd` (`Epistemic1`) | **Production Live** | Explicit distinction between *observed fact*, *hypothesis*, and *disputed belief*. |
-| **Dialogue & Meaning** | `cybou-meaningd` (`Meaning1`) | **Production Live** | Deterministic cognitive act parsing & response planning without cloud LLMs. |
-| **Associative Context** | `cybou-contextd` (`Context1`) | **Production Live** | Bounded graph activation from explicit cognitive seeds. |
-| **Identity & Biography**| `cybou-identityd` (`Identity1`) | **Production Live** | Subject continuity preserved across daemon restarts and machine reboots. |
-| **Agent Capsules** | `cybou-agentd` (`Agent1`) | **Production Live** | Kernel-enforced Landlock + cgroups v2 sandbox with ACP agent pack integration. |
-| **Action & Governance** | `cybou-actiond` / `executord` | **Production Live** | Typed proposal &rarr; policy evaluation &rarr; opaque single-use permit &rarr; execution. |
-| **Host Files Boundary**| `cybou-host-filesd@<uid>` | **Production Live** | Unprivileged per-UID socket (`/run/cybou-host-files/<uid>/owner.sock`). |
-| **Sandboxed Shell** | `cybou-shelld` / `cybou-jailfs` | **Production Live** | Per-session isolated working directory state; zero state leakage across seats. |
-| **Lifelong Learning** | `LearningHub` (`learning-store`)| **Production Live** | Layered candidate induction, empirical promotion gates, durable artifact lineages. |
-| **Personal Hub** | `PersonalHub` (`personal-store`)| **Production Live** | Sovereign local persistence for notes, contacts, calendar events, and mail. |
-| **Living Canvas UI** | `living-canvas` (WASM) | **Production Live** | Zero-warning Leptos spatial desktop with 20+ responsive cards & snap guides. |
+| **Cognitive Journal** | `cybou-eventd` (`Event1`) | **Implemented & Tested** | Append-only, SHA-256 hash-chained SQLite v3 ledger; single canonical writer. |
+| **Cognitive Graph** | `cybou-presenced` (`Presence1`) | **Implemented & Tested** | Dynamic synthesis of systemd units, `/proc` processes, and epistemic beliefs. |
+| **Epistemic Truth** | `cybou-epistemicd` (`Epistemic1`) | **Implemented & Tested** | Explicit distinction between *observed fact*, *hypothesis*, and *disputed belief*. |
+| **Dialogue & Meaning** | `cybou-meaningd` (`Meaning1`) | **Implemented & Tested** | Deterministic cognitive act parsing & response planning without cloud LLMs. |
+| **Associative Context** | `cybou-contextd` (`Context1`) | **Implemented & Tested** | Bounded graph activation from explicit cognitive seeds. |
+| **Identity & Biography**| `cybou-identityd` (`Identity1`) | **Implemented & Tested** | Subject continuity preserved across daemon restarts and machine reboots. |
+| **Agent Capsules** | `cybou-agentd` (`Agent1`) | **Implemented & Tested** | Kernel-enforced Landlock + cgroups v2 sandbox with ACP agent pack integration. |
+| **Action & Governance** | `cybou-actiond` / `executord` | **Implemented & Tested** | Typed proposal &rarr; policy evaluation &rarr; opaque single-use permit &rarr; execution. |
+| **Host Files Boundary**| `cybou-host-filesd@<uid>` | **Implemented & Tested** | Unprivileged per-UID socket (`/run/cybou-host-files/<uid>/owner.sock`). |
+| **Sandboxed Shell** | `cybou-shelld` / `cybou-jailfs` | **Implemented & Tested** | Per-session isolated working directory state; zero state leakage across seats. |
+| **Lifelong Learning** | `LearningHub` (`learning-store`)| **Implemented & Tested** | Layered candidate induction, empirical promotion gates, durable artifact lineages. |
+| **Personal Hub** | `PersonalHub` (`personal-store`)| **Implemented & Tested** | Sovereign local persistence for notes, contacts, calendar events, and mail. |
+| **Living Canvas UI** | `living-canvas` (WASM) | **Implemented & Tested** | Zero-warning Leptos spatial desktop with 20+ responsive cards & snap guides. |
 
 ---
 

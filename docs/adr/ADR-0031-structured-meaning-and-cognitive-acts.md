@@ -148,7 +148,7 @@ Constraint
 Negation
 ```
 
-The exact C++ representation is an implementation decision, but free-form model text is not an
+The exact representation is an implementation decision, but free-form model text is not an
 acceptable substitute for the typed act once a request crosses into Mind.
 
 ### References are first-class and inspectable

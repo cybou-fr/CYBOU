@@ -13,7 +13,7 @@ problem or capability
 → ADR if ownership, protocol, persistence, privacy, or authorization changes
 → focused failing/missing test
 → implementation
-→ local CMake tests
+→ local cargo test
 → pinned Nix package/check
 → documentation/status update
 → review and green CI
