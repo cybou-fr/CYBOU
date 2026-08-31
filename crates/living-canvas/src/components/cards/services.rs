@@ -40,8 +40,22 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
     let trigger_action = move |name: String, action: ServiceAction| {
         leptos::task::spawn_local(async move {
             match client.execute_service_action(&name, action).await {
-                Ok(outcome) => {
-                    signals.status_msg.set(Some(outcome));
+                Ok(record) => {
+                    // The boundary's own words. A card that composed its own sentence here would
+                    // be reporting what it asked for rather than what was decided — and a refusal
+                    // is a record too, with the reason the boundary gave.
+                    let said = match record.verdict.as_str() {
+                        "granted-on-confirmation" | "granted" => {
+                            record.attempt.as_ref().map_or_else(
+                                || format!("{name}: authorized, waiting to be carried out."),
+                                |attempt| format!("{name}: {}.", attempt.report),
+                            )
+                        }
+                        _ => record.verdict_reason.clone().unwrap_or_else(|| {
+                            format!("{name}: refused, and no reason was given.")
+                        }),
+                    };
+                    signals.status_msg.set(Some(said));
                     load_services();
                 }
                 Err(err) => {

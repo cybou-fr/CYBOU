@@ -247,9 +247,12 @@ impl ZbusPresenceSource {
             return Some(body);
         }
 
-        // On production Linux deployments, Action1 is on the system bus so the root executor can
-        // authenticate with it. If the session bus call failed and the target is Action1, try system bus.
-        if endpoint.service == cybou_fabric::ACTION.service {
+        // On production Linux deployments, Action1 and the executor are both on the system bus,
+        // so the root executor and the unprivileged owner can authenticate with each other. If
+        // the session bus call failed and the target is one of those two, try the system bus.
+        if endpoint.service == cybou_fabric::ACTION.service
+            || endpoint.service == cybou_fabric::EXECUTOR.service
+        {
             let system = zbus::Connection::system().await.ok()?;
             let reply = system
                 .call_method(
@@ -324,6 +327,15 @@ impl PresenceSource for ZbusPresenceSource {
         confirmed_by: &str,
     ) -> Option<cybou_web_contracts::ActionRecordProjection> {
         Self::confirm_action(self, proposal_id, decision_seen, confirmed_by).await
+    }
+
+    async fn request_action(
+        &self,
+        verb: &str,
+        target: &str,
+        seat: &str,
+    ) -> Option<cybou_web_contracts::ActionRecordProjection> {
+        Self::request_action(self, verb, target, seat).await
     }
 
     async fn wait_for_change(&self) -> Result<(), GatewayError> {

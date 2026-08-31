@@ -84,15 +84,35 @@ impl SystemHub {
         system_reader::read_real_services()
     }
 
-    /// Execute an action on a service through governed authority.
+    /// Which operation, if any, this build can actually carry out for a service action.
     ///
-    /// Direct in-memory simulation is prohibited: privileged execution requires Action1 proposal.
-    pub fn execute_service_action(
-        &self,
-        _name: &str,
-        _action: ServiceAction,
-    ) -> Result<String, GatewayError> {
-        Err(GatewayError::Refused)
+    /// A pure mapping and nothing more: the hub decides nothing about whether it may happen, which
+    /// is `Action1`'s to answer. What this settles is narrower and is the whole of what the panel's
+    /// six buttons come down to — only one of them names an operation with an adapter behind it.
+    ///
+    /// ADR-0048 opened the door for a person to ask; it did not furnish the room. Start, stop,
+    /// enable and disable are not in the closed operation table at all, and reload is in it with no
+    /// executor adapter, so each of them is refused here rather than proposed and refused deeper
+    /// down — a refusal that names what is missing is worth more than one that arrives from three
+    /// layers away.
+    pub fn verb_for(action: ServiceAction) -> Result<&'static str, GatewayError> {
+        match action {
+            ServiceAction::Restart => Ok("service.restart"),
+            ServiceAction::Start
+            | ServiceAction::Stop
+            | ServiceAction::Reload
+            | ServiceAction::Enable
+            | ServiceAction::Disable => Err(GatewayError::Refused),
+        }
+    }
+
+    /// How a service name reaches the executor.
+    ///
+    /// The prefix is what tells `Action1` this names a systemd unit rather than something else with
+    /// the same spelling, and the executor refuses a target that is not concrete.
+    #[must_use]
+    pub fn service_target(name: &str) -> String {
+        format!("systemd:{name}")
     }
 
     /// List real running operating system processes from /proc.

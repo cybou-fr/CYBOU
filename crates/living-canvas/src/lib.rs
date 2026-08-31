@@ -339,11 +339,19 @@ pub trait MindClient {
     ) -> Result<cybou_web_contracts::ServicesListProjection, ClientError>;
 
     /// Execute a state action on a system service.
+    /// Ask for a service action, and receive what Action1 decided about it.
+    ///
+    /// A lifecycle record rather than a sentence: a refusal is a record too, and the reason it
+    /// carries is the one the boundary gave rather than one this client composed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] when the request could not be put or the answer not read.
     async fn execute_service_action(
         &self,
         name: &str,
         action: cybou_protocol::system::ServiceAction,
-    ) -> Result<String, ClientError>;
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError>;
 
     /// List active operating system processes.
     async fn list_processes(
@@ -1048,8 +1056,10 @@ impl MindClient for MockMindClient {
         &self,
         name: &str,
         _action: cybou_protocol::system::ServiceAction,
-    ) -> Result<String, ClientError> {
-        Ok(format!("Mock executed action on {name}"))
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
+        Err(ClientError::ProjectionUnavailable(format!(
+            "mock service actions are unavailable, so {name} was not asked for"
+        )))
     }
 
     async fn list_processes(

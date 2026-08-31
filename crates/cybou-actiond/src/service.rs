@@ -56,6 +56,35 @@ impl Action1Service {
         Ok((encoded, permit_id))
     }
 
+    /// Carry out what a person asked for, if the boundary allows it.
+    ///
+    /// `seat` is established by whatever authenticated the person — a browser session's PAM
+    /// account, a local seat — and is never a value that party supplied about itself. The verb and
+    /// the target are theirs; everything decided about them is this owner's.
+    ///
+    /// Returns the lifecycle record and, when the request was granted, the permit that follows it.
+    /// The permit is the caller's to present to the executor and nothing else: it names no
+    /// operation, so a courier carrying one cannot choose what it is for.
+    async fn request(
+        &self,
+        verb: String,
+        target: String,
+        seat: String,
+    ) -> fdo::Result<(Vec<u8>, String)> {
+        let now = OffsetDateTime::now_utc();
+        let record = self
+            .core
+            .request(&verb, &target, &seat, now)
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        record_lifecycle(&record, now).await;
+
+        let permit_id = record
+            .permit_id
+            .map_or_else(String::new, |id| id.to_string());
+        let encoded = encode(&record).map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        Ok((encoded, permit_id))
+    }
+
     /// Answer a proposal that was waiting on a person, and mint the permit that follows.
     ///
     /// `decision_seen` is the decision the person was actually shown. Passing it is what makes

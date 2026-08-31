@@ -136,6 +136,19 @@ pub trait PresenceSource: Send + Sync + 'static {
     ) -> Option<cybou_web_contracts::ActionRecordProjection> {
         None
     }
+
+    /// Ask Action1 for what a person asked for, or None if Action1 is unreachable or refused it.
+    ///
+    /// The gateway supplies the seat, which is the one fact neither end can establish for itself,
+    /// and carries a permit it cannot read. It decides nothing.
+    async fn request_action(
+        &self,
+        _verb: &str,
+        _target: &str,
+        _seat: &str,
+    ) -> Option<cybou_web_contracts::ActionRecordProjection> {
+        None
+    }
 }
 
 /// Failure response safe to expose at the browser boundary.

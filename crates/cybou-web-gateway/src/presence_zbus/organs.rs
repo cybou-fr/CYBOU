@@ -15,8 +15,8 @@ use super::wire::{
     kind_name, millis_to_rfc3339,
 };
 use cybou_fabric::{
-    ACTION, CONTEXT, EPISTEMIC, EVENT, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, SELF, TELEMETRY,
-    WORKSPACE, decode,
+    ACTION, CONTEXT, EPISTEMIC, EVENT, EXECUTOR, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, SELF,
+    TELEMETRY, WORKSPACE, decode,
 };
 use cybou_protocol::{KnowledgeState, canonical::CanonicalEnvelope, disclosure::WithheldBecause};
 use cybou_web_contracts::{
@@ -434,6 +434,65 @@ impl ZbusPresenceSource {
             .or_else(|_| ciborium::from_reader(encoded.as_slice()))
             .ok()?;
         Some(records.iter().map(project_action_record).collect())
+    }
+
+    /// Ask Action1 for something a person asked for, and carry the permit to the executor.
+    ///
+    /// Two calls and no decision of its own. `Action1` decides whether the request is allowed and
+    /// mints a permit; the executor claims that permit from `Action1` and performs the action
+    /// stored there. What travels through this function is an opaque identity, so a courier
+    /// carrying one cannot choose what it is for — which is the property that lets the gateway
+    /// carry it at all (ADR-0048).
+    ///
+    /// Returns the record either way. A refusal is a lifecycle record and the person asked for
+    /// this, so what they get back is what was decided rather than nothing.
+    pub(super) async fn request_action(
+        &self,
+        verb: &str,
+        target: &str,
+        seat: &str,
+    ) -> Option<cybou_web_contracts::ActionRecordProjection> {
+        let (encoded, permit_id) = self
+            .read_with::<(Vec<u8>, String), (String, String, String)>(
+                ACTION,
+                "Request",
+                &(verb.to_owned(), target.to_owned(), seat.to_owned()),
+            )
+            .await?;
+        let record: cybou_protocol::action::ActionRecord = decode(&encoded)
+            .or_else(|_| ciborium::from_reader(encoded.as_slice()))
+            .ok()?;
+
+        if permit_id.is_empty() {
+            // Refused, and the record says why. Nothing to carry.
+            return Some(project_action_record(&record));
+        }
+
+        // The attempt is deliberately not merged into the record returned here. What the executor
+        // reports is its own account of what it did, and `Action1` holds the durable one; a
+        // gateway that stitched them together would be answering "did it work" with the word of
+        // the party that did it.
+        let _: Option<Vec<u8>> = self
+            .read_with::<Vec<u8>, (String,)>(EXECUTOR, "Execute", &(permit_id,))
+            .await;
+
+        // Read back, so what the browser is told is what Action1 recorded rather than what this
+        // function remembers having asked for.
+        let settled = self
+            .read_with::<Vec<u8>, (String,)>(
+                ACTION,
+                "Record",
+                &(record.proposal.proposal_id.to_string(),),
+            )
+            .await
+            .and_then(|encoded| {
+                decode::<cybou_protocol::action::ActionRecord>(&encoded)
+                    .or_else(|_| ciborium::from_reader(encoded.as_slice()))
+                    .ok()
+            })
+            .unwrap_or(record);
+
+        Some(project_action_record(&settled))
     }
 
     /// Carry one person's confirmation to Action1 and return what it decided.

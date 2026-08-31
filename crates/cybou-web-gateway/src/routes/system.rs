@@ -6,7 +6,10 @@
 use axum::{
     Json,
     extract::{Query, State},
+    http::HeaderMap,
 };
+
+use crate::system_hub::SystemHub;
 use cybou_web_contracts::{
     AddSshKeyRequest, ApplyUpdatesRequest, BackupArchiveRecord, BackupScheduleRecord,
     BackupSettingsProjection, CreateSnapshotRequest, CreateUserRequest, DeleteSshKeyRequest,
@@ -31,12 +34,23 @@ pub async fn list_services(
 /// POST `/api/v1/system/services/action`
 pub async fn execute_service_action(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
     Json(request): Json<ServiceActionRequest>,
-) -> Result<Json<serde_json::Value>, GatewayError> {
-    let outcome = state
-        .system
-        .execute_service_action(&request.name, request.action)?;
-    Ok(Json(serde_json::json!({ "outcome": outcome })))
+) -> Result<Json<cybou_web_contracts::ActionRecordProjection>, GatewayError> {
+    // The seat, which is the one thing neither `Action1` nor the executor can establish for
+    // itself. Everything else on this path — whether the operation exists, whether it is
+    // forbidden, whether a permit follows — belongs to `Action1` (ADR-0048).
+    let seat = state
+        .authenticated_principal(&headers)
+        .ok_or(GatewayError::Refused)?;
+    let verb = SystemHub::verb_for(request.action)?;
+
+    state
+        .presence
+        .request_action(verb, &SystemHub::service_target(&request.name), &seat)
+        .await
+        .map(Json)
+        .ok_or(GatewayError::Unavailable)
 }
 
 /// GET `/api/v1/system/processes`
@@ -255,10 +269,29 @@ mod tests {
         let svcs = hub.list_services();
         assert!(!svcs.services.is_empty());
 
-        // Privileged mutations must fail-closed requiring Action1
-        let restart_res =
-            hub.execute_service_action("cybou-web-gateway.service", ServiceAction::Restart);
-        assert!(restart_res.is_err());
+        // Restart is the one service action this build can carry out: it is in the closed
+        // operation table and the executor has an adapter for it. The other five are refused
+        // here, by name, rather than proposed and refused three layers down.
+        assert_eq!(
+            SystemHub::verb_for(ServiceAction::Restart).expect("restart is expressible"),
+            "service.restart"
+        );
+        for unbuilt in [
+            ServiceAction::Start,
+            ServiceAction::Stop,
+            ServiceAction::Reload,
+            ServiceAction::Enable,
+            ServiceAction::Disable,
+        ] {
+            assert!(
+                SystemHub::verb_for(unbuilt).is_err(),
+                "{unbuilt:?} has no operation and no adapter, and must be refused as such"
+            );
+        }
+        assert_eq!(
+            SystemHub::service_target("nginx.service"),
+            "systemd:nginx.service"
+        );
 
         let procs = hub.list_processes();
         assert_eq!(procs.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);

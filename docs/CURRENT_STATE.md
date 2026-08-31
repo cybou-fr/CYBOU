@@ -1037,8 +1037,19 @@ asking for. And a person brings no evidence, so `brings_its_own_evidence` answer
 them and the proposal cites no cause — inventing a finding to point at would be this host
 claiming it had concluded something.
 
-**Nothing reaches it yet.** There is no bus method and no route, so no button is connected;
-that is the next step and is stated as an absence.
+`Action1.Request` carries it, and `POST /api/v1/system/services/action` reaches that. The
+gateway supplies the seat and carries the permit to the executor, deciding nothing: a permit
+names no operation, so a courier holding one cannot choose what it is for, which is the
+property that lets the gateway carry it at all. What the browser gets back is the lifecycle
+record rather than a sentence — a refusal is a record too, carrying the reason the boundary
+gave rather than one the gateway composed.
+
+**One of the Services panel's six buttons does something.** Restart is in the closed
+operation table with an executor adapter behind it; start, stop, enable and disable are not
+in the table at all, and reload is in it with no adapter. Each of those five is refused by
+name at the gateway rather than proposed and refused three layers down, because a refusal
+that says what is missing is worth more than one that arrives from somewhere else. Opening
+the door did not furnish the room, and the other thirteen `SystemHub` refusals are unchanged.
 
 **A browser can now answer.** `POST /api/v1/actions/confirm` carries a person's answer to
 `Action1.Confirm` and is the first write the gateway makes against the action boundary. It remains
