@@ -56,6 +56,30 @@ pub trait Body: Send + Sync {
     async fn stop_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
     /// Ask one concrete service to re-read its configuration.
     async fn reload_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Ask one process to exit, and let it decide how.
+    async fn terminate_process(
+        &self,
+        pid: u32,
+        owner_uid: u32,
+    ) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// End one process without asking it.
+    async fn kill_process(
+        &self,
+        pid: u32,
+        owner_uid: u32,
+    ) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Suspend one process where it stands.
+    async fn pause_process(
+        &self,
+        pid: u32,
+        owner_uid: u32,
+    ) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Let one suspended process continue.
+    async fn resume_process(
+        &self,
+        pid: u32,
+        owner_uid: u32,
+    ) -> Result<Vec<BodyReading>, ExecutorError>;
 }
 
 /// Send one typed action to the one adapter that performs it.
@@ -74,6 +98,18 @@ async fn perform(
         ExecutableAction::ServiceStart { unit } => body.start_service(unit).await,
         ExecutableAction::ServiceStop { unit } => body.stop_service(unit).await,
         ExecutableAction::ServiceReload { unit } => body.reload_service(unit).await,
+        ExecutableAction::ProcessTerminate { pid, owner_uid } => {
+            body.terminate_process(*pid, *owner_uid).await
+        }
+        ExecutableAction::ProcessKill { pid, owner_uid } => {
+            body.kill_process(*pid, *owner_uid).await
+        }
+        ExecutableAction::ProcessPause { pid, owner_uid } => {
+            body.pause_process(*pid, *owner_uid).await
+        }
+        ExecutableAction::ProcessResume { pid, owner_uid } => {
+            body.resume_process(*pid, *owner_uid).await
+        }
     }
 }
 
@@ -207,6 +243,50 @@ mod tests {
                 .push(format!("reload:{unit}"));
             Ok(Vec::new())
         }
+        async fn terminate_process(
+            &self,
+            pid: u32,
+            owner_uid: u32,
+        ) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("terminate:{owner_uid}:{pid}"));
+            Ok(Vec::new())
+        }
+        async fn kill_process(
+            &self,
+            pid: u32,
+            owner_uid: u32,
+        ) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("kill:{owner_uid}:{pid}"));
+            Ok(Vec::new())
+        }
+        async fn pause_process(
+            &self,
+            pid: u32,
+            owner_uid: u32,
+        ) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("pause:{owner_uid}:{pid}"));
+            Ok(Vec::new())
+        }
+        async fn resume_process(
+            &self,
+            pid: u32,
+            owner_uid: u32,
+        ) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("resume:{owner_uid}:{pid}"));
+            Ok(Vec::new())
+        }
     }
 
     #[tokio::test]
@@ -237,6 +317,36 @@ mod tests {
                     unit: "d.service".to_owned(),
                 },
                 "reload:d.service",
+            ),
+            // The four signals are one call apart from each other, and the difference between two
+            // of them is whether the process gets to save what it was holding.
+            (
+                ExecutableAction::ProcessTerminate {
+                    pid: 4321,
+                    owner_uid: 1000,
+                },
+                "terminate:1000:4321",
+            ),
+            (
+                ExecutableAction::ProcessKill {
+                    pid: 4322,
+                    owner_uid: 1000,
+                },
+                "kill:1000:4322",
+            ),
+            (
+                ExecutableAction::ProcessPause {
+                    pid: 4323,
+                    owner_uid: 1000,
+                },
+                "pause:1000:4323",
+            ),
+            (
+                ExecutableAction::ProcessResume {
+                    pid: 4324,
+                    owner_uid: 1000,
+                },
+                "resume:1000:4324",
             ),
         ] {
             let body = RecordingBody::default();

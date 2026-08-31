@@ -241,6 +241,35 @@ pub enum ExecutableAction {
         /// A concrete unit name ending in `.service`.
         unit: String,
     },
+    /// Ask one process to exit.
+    ProcessTerminate {
+        /// The process to signal.
+        pid: u32,
+        /// The user id the proposal established owns it. The executor reads `/proc` again rather
+        /// than trusting this, because a pid can be recycled between the decision and the act.
+        owner_uid: u32,
+    },
+    /// End one process without asking it.
+    ProcessKill {
+        /// The process to signal.
+        pid: u32,
+        /// The user id the proposal established owns it.
+        owner_uid: u32,
+    },
+    /// Suspend one process.
+    ProcessPause {
+        /// The process to signal.
+        pid: u32,
+        /// The user id the proposal established owns it.
+        owner_uid: u32,
+    },
+    /// Let one suspended process continue.
+    ProcessResume {
+        /// The process to signal.
+        pid: u32,
+        /// The user id the proposal established owns it.
+        owner_uid: u32,
+    },
 }
 
 /// A short-lived, single-use capability minted from one granted decision.
@@ -312,6 +341,18 @@ impl ExecutionStarted {
             ExecutableAction::ServiceStop { unit } => ("service.stop", format!("systemd:{unit}")),
             ExecutableAction::ServiceReload { unit } => {
                 ("service.reload", format!("systemd:{unit}"))
+            }
+            ExecutableAction::ProcessTerminate { pid, owner_uid } => {
+                ("process.terminate", format!("process:{owner_uid}:{pid}"))
+            }
+            ExecutableAction::ProcessKill { pid, owner_uid } => {
+                ("process.kill", format!("process:{owner_uid}:{pid}"))
+            }
+            ExecutableAction::ProcessPause { pid, owner_uid } => {
+                ("process.pause", format!("process:{owner_uid}:{pid}"))
+            }
+            ExecutableAction::ProcessResume { pid, owner_uid } => {
+                ("process.resume", format!("process:{owner_uid}:{pid}"))
             }
         };
         Self {

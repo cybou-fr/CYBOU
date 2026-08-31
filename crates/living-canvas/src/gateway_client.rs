@@ -723,7 +723,7 @@ impl MindClient for GatewayMindClient {
         &self,
         pid: u32,
         signal: cybou_protocol::system::ProcessSignal,
-    ) -> Result<String, ClientError> {
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
         let response = Request::post("/api/v1/system/processes/signal")
             .json(&cybou_web_contracts::ProcessSignalRequest { pid, signal })
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
@@ -736,14 +736,10 @@ impl MindClient for GatewayMindClient {
                 response.status()
             )));
         }
-        let outcome: serde_json::Value = response
+        response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"]
-            .as_str()
-            .unwrap_or("Signal delivered")
-            .to_owned())
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
     async fn get_system_monitor(

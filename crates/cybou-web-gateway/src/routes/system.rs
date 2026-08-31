@@ -61,14 +61,32 @@ pub async fn list_processes(
 }
 
 /// POST `/api/v1/system/processes/signal`
+///
+/// Signalling a process is an authorized action like any other, and this route does the one part
+/// of it that only the gateway can do: establish who is asking, and that the process they named is
+/// theirs. Everything after that — whether the verb exists, what it costs, whether a permit
+/// follows — belongs to `Action1` (ADR-0048).
 pub async fn send_process_signal(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
     Json(request): Json<ProcessSignalRequest>,
-) -> Result<Json<serde_json::Value>, GatewayError> {
-    let outcome = state
-        .system
-        .send_process_signal(request.pid, request.signal)?;
-    Ok(Json(serde_json::json!({ "outcome": outcome })))
+) -> Result<Json<cybou_web_contracts::ActionRecordProjection>, GatewayError> {
+    let seat = state
+        .authenticated_principal(&headers)
+        .ok_or(GatewayError::Refused)?;
+    let owner_uid = SystemHub::signalling_seat_owns(&seat, request.pid)?;
+    let verb = SystemHub::verb_for_signal(request.signal);
+
+    state
+        .presence
+        .request_action(
+            verb,
+            &SystemHub::process_target(owner_uid, request.pid),
+            &seat,
+        )
+        .await
+        .map(Json)
+        .ok_or(GatewayError::Unavailable)
 }
 
 /// GET `/api/v1/system/monitor`
@@ -298,8 +316,21 @@ mod tests {
         let procs = hub.list_processes();
         assert_eq!(procs.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
 
-        let signal_res = hub.send_process_signal(1024, ProcessSignal::Terminate);
-        assert!(signal_res.is_err());
+        // Four signals, four verbs. One verb with the signal as an argument would have forced the
+        // operation table to price a request the process can catch and a kill it cannot as the
+        // same act.
+        assert_eq!(
+            SystemHub::verb_for_signal(ProcessSignal::Terminate),
+            "process.terminate"
+        );
+        assert_eq!(
+            SystemHub::verb_for_signal(ProcessSignal::Kill),
+            "process.kill"
+        );
+        assert_eq!(SystemHub::process_target(1000, 4321), "process:1000:4321");
+        // A seat this gateway cannot resolve to a uid signals nothing. `local-desktop` is a real
+        // seat for reading and has no Linux account behind it to own a process.
+        assert!(SystemHub::signalling_seat_owns("local-desktop", 1024).is_err());
 
         let mon = hub.get_monitor();
         assert_eq!(mon.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);

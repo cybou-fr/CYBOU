@@ -360,12 +360,15 @@ pub trait MindClient {
         &self,
     ) -> Result<cybou_web_contracts::ProcessesListProjection, ClientError>;
 
-    /// Deliver a signal to an operating system process.
+    /// Ask the action boundary to deliver a signal to an operating system process.
+    ///
+    /// Returns the record, not a sentence: a refusal is a record too, and a caller that received a
+    /// string could not tell one from a success without reading the English in it.
     async fn send_process_signal(
         &self,
         pid: u32,
         signal: cybou_protocol::system::ProcessSignal,
-    ) -> Result<String, ClientError>;
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError>;
 
     /// Get current hardware telemetry & resource monitor metrics.
     async fn get_system_monitor(
@@ -1080,8 +1083,12 @@ impl MindClient for MockMindClient {
         &self,
         pid: u32,
         _signal: cybou_protocol::system::ProcessSignal,
-    ) -> Result<String, ClientError> {
-        Ok(format!("Mock sent signal to PID {pid}"))
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
+        // Refused rather than pretended. The mock used to answer "Mock sent signal to PID 42",
+        // which is a claim that a process was signalled, made by something that cannot signal one.
+        Err(ClientError::ProjectionUnavailable(format!(
+            "mock process signals are unavailable, so pid {pid} was not asked about"
+        )))
     }
 
     async fn get_system_monitor(

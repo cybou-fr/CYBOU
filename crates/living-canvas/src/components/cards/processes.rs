@@ -50,8 +50,22 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
     let send_signal = move |pid: u32, sig: ProcessSignal| {
         leptos::task::spawn_local(async move {
             match client.send_process_signal(pid, sig).await {
-                Ok(outcome) => {
-                    signals.status_msg.set(Some(outcome));
+                Ok(record) => {
+                    // The boundary's own words, the way the Services panel reports them. This
+                    // panel used to print "Signal delivered" whatever came back, which was a
+                    // sentence about what the button meant rather than about what happened.
+                    let said = match record.verdict.as_str() {
+                        "granted-on-confirmation" | "granted" => {
+                            record.attempt.as_ref().map_or_else(
+                                || format!("Process {pid}: authorized, waiting to be carried out."),
+                                |attempt| format!("Process {pid}: {}.", attempt.report),
+                            )
+                        }
+                        _ => record.verdict_reason.clone().unwrap_or_else(|| {
+                            format!("Process {pid}: refused, and no reason was given.")
+                        }),
+                    };
+                    signals.status_msg.set(Some(said));
                     load_processes();
                 }
                 Err(err) => {

@@ -41,6 +41,14 @@ pub enum Operation {
     RestartService,
     /// Start a unit that is not running.
     StartService,
+    /// Ask a process to exit, and let it decide how.
+    TerminateProcess,
+    /// End a process without asking.
+    KillProcess,
+    /// Suspend a process where it stands.
+    PauseProcess,
+    /// Let a suspended process continue.
+    ResumeProcess,
     /// Stop a unit that is.
     StopService,
     /// Delete downloaded package archives that can be fetched again.
@@ -64,6 +72,10 @@ pub const ALL_OPERATIONS: &[Operation] = &[
     Operation::RestartService,
     Operation::StartService,
     Operation::StopService,
+    Operation::TerminateProcess,
+    Operation::KillProcess,
+    Operation::PauseProcess,
+    Operation::ResumeProcess,
     Operation::CleanPackageCache,
     Operation::RotateLogs,
     Operation::TrimTemporaryFiles,
@@ -81,6 +93,10 @@ impl Operation {
             Self::ReloadService => "service.reload",
             Self::RestartService => "service.restart",
             Self::StartService => "service.start",
+            Self::TerminateProcess => "process.terminate",
+            Self::KillProcess => "process.kill",
+            Self::PauseProcess => "process.pause",
+            Self::ResumeProcess => "process.resume",
             Self::StopService => "service.stop",
             Self::CleanPackageCache => "package.cache.clean",
             Self::RotateLogs => "log.rotate",
@@ -103,6 +119,17 @@ impl Operation {
             // unit decides what that means. Lower than stopping one, because what a start
             // interrupts is nothing.
             Self::StartService => RiskLevel::Low,
+            // Continuing a process that was suspended puts it back where it was.
+            Self::ResumeProcess => RiskLevel::Low,
+            // SIGTERM is a request. The process gets to write what it was holding and close what
+            // it had open, which is the whole difference between this and the next one.
+            Self::TerminateProcess => RiskLevel::Medium,
+            // Suspending is reversible, and a suspended process still holds every lock and socket
+            // it had. Pausing the wrong one is an outage that looks like a hang.
+            Self::PauseProcess => RiskLevel::Medium,
+            // SIGKILL cannot be caught, blocked or ignored. Whatever was in memory is gone, and no
+            // amount of care afterwards brings it back.
+            Self::KillProcess => RiskLevel::High,
             // Reversible and not harmless: the service comes back, and every connection it was
             // holding is gone.
             // A stop is a restart without the second half: everything the service was holding is
@@ -129,6 +156,10 @@ impl Operation {
         // A start is undone by a stop and a stop by a start, in the sense this word is used
         // here: the system can put the unit back the way it was. What a stop cost while it was
         // down is not undone by anything, which is what `reversible` deliberately does not mean.
+        //
+        // Pausing and resuming are the same kind of pair. Terminating and killing are not in it:
+        // a process that has exited is not something the system can put back, under any reading of
+        // the word, and saying otherwise here would let a caller treat the two as interchangeable.
         matches!(
             self,
             Self::InspectServiceStatus
@@ -136,6 +167,8 @@ impl Operation {
                 | Self::RestartService
                 | Self::StartService
                 | Self::StopService
+                | Self::PauseProcess
+                | Self::ResumeProcess
         )
     }
 
@@ -171,6 +204,15 @@ impl Operation {
             // it as one would let a host reach for it while nobody is present.
             Self::StartService => &[Finding::ServiceInactive],
             Self::StopService => &[],
+            // None of these relieves anything, and that is the entry, not an omission. A finding
+            // listed here is a licence for the host to reach for the operation on its own when it
+            // concludes something — and a host that may kill processes to relieve a conclusion it
+            // reached about memory pressure is a host that ends somebody's work while they are
+            // away from the keyboard. These are things a person does, deliberately, present.
+            Self::TerminateProcess
+            | Self::KillProcess
+            | Self::PauseProcess
+            | Self::ResumeProcess => &[],
             // Reading a unit's state relieves nothing and is worth proposing anyway: it is how a
             // person finds out more without changing anything, and a system that could only offer
             // mutations would push every investigation toward one. The forbidden three relieve

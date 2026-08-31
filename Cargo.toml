@@ -76,7 +76,10 @@ async-trait = "0.1.92"
 # both directions at once (ADR-0047).
 axum = { version = "0.8.9", features = ["ws"] }
 reqwest = { version = "0.12.23", default-features = false, features = ["rustls-tls"] }
-rustix = { version = "1.1.4", features = ["fs"] }
+# `process` is here for one call: sending a signal without writing `unsafe` in a workspace
+# that forbids it, and without shelling out to `kill`, which would be a command line in a
+# place that deliberately has none.
+rustix = { version = "1.1.4", features = ["fs", "process"] }
 ciborium = "0.2.2"
 http-body-util = "0.1.5"
 hyper = { version = "1.11.0", features = ["http1", "server"] }

@@ -109,6 +109,13 @@ fn target_for(operation: Operation, insight: &SystemInsight) -> String {
         | Operation::StartService
         | Operation::StopService
         | Operation::DeleteServiceData => about.unwrap_or_else(|| "systemd:<unit>".to_owned()),
+        // A placeholder rather than a guess. Nothing a host concludes about itself names a
+        // process to signal — none of these relieves any finding — so this arm exists to keep the
+        // match total, and the target it produces is one `concrete_process` refuses.
+        Operation::TerminateProcess
+        | Operation::KillProcess
+        | Operation::PauseProcess
+        | Operation::ResumeProcess => "process:<uid>:<pid>".to_owned(),
         Operation::FormatFilesystem => "filesystem:<device>".to_owned(),
         Operation::PowerOff => "system:self".to_owned(),
     }

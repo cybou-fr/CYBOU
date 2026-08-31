@@ -636,6 +636,26 @@ fn concrete_service(target: &str) -> Result<String, ActionError> {
     Ok(unit.to_owned())
 }
 
+/// Read `process:<uid>:<pid>` and refuse anything else.
+///
+/// Both halves are numbers because both are facts the proposer read from `/proc`. A name here would
+/// have to be resolved somewhere, and the place it would be resolved is the executor — which is the
+/// one party in this chain with no business deciding who anybody is.
+///
+/// pid 1 is refused outright. It is init: signalling it is not an act with a risk level, it is the
+/// end of the session, the desktop, and the executor doing the signalling.
+fn concrete_process(target: &str) -> Result<(u32, u32), ActionError> {
+    let invalid = || ActionError::InvalidTarget(target.to_owned());
+    let rest = target.strip_prefix("process:").ok_or_else(invalid)?;
+    let (uid, pid) = rest.split_once(':').ok_or_else(invalid)?;
+    let uid: u32 = uid.parse().map_err(|_| invalid())?;
+    let pid: u32 = pid.parse().map_err(|_| invalid())?;
+    if pid <= 1 {
+        return Err(invalid());
+    }
+    Ok((uid, pid))
+}
+
 fn permit_for(
     proposal: &ActionProposal,
     decision: &AuthorizationDecision,
@@ -678,6 +698,22 @@ fn executable_action(
         Operation::ReloadService => ExecutableAction::ServiceReload {
             unit: concrete_service(&proposal.target_resource)?,
         },
+        Operation::TerminateProcess => {
+            let (owner_uid, pid) = concrete_process(&proposal.target_resource)?;
+            ExecutableAction::ProcessTerminate { pid, owner_uid }
+        }
+        Operation::KillProcess => {
+            let (owner_uid, pid) = concrete_process(&proposal.target_resource)?;
+            ExecutableAction::ProcessKill { pid, owner_uid }
+        }
+        Operation::PauseProcess => {
+            let (owner_uid, pid) = concrete_process(&proposal.target_resource)?;
+            ExecutableAction::ProcessPause { pid, owner_uid }
+        }
+        Operation::ResumeProcess => {
+            let (owner_uid, pid) = concrete_process(&proposal.target_resource)?;
+            ExecutableAction::ProcessResume { pid, owner_uid }
+        }
         _ => return Err(ActionError::UnknownOperation(proposal.operation.clone())),
     })
 }

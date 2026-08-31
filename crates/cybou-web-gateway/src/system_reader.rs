@@ -697,6 +697,50 @@ fn read_network_interfaces() -> Vec<NetworkInterfaceInfo> {
 }
 
 #[cfg(target_os = "linux")]
+/// The user id `/etc/passwd` gives this account name, if it names one.
+///
+/// The seat arrives as a name because that is what somebody signs in as; every check further down
+/// is about a number, because that is what `/proc` reports. This is the one place the two meet.
+#[must_use]
+pub fn uid_for_user(name: &str) -> Option<u32> {
+    #[cfg(target_os = "linux")]
+    {
+        let content = fs::read_to_string("/etc/passwd").ok()?;
+        content.lines().find_map(|line| {
+            let mut parts = line.split(':');
+            let user = parts.next()?;
+            let _password = parts.next()?;
+            let uid = parts.next()?;
+            (user == name).then(|| uid.parse().ok())?
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = name;
+        None
+    }
+}
+
+/// The user id `/proc` reports as the real owner of a running process.
+#[must_use]
+pub fn owner_of_process(pid: u32) -> Option<u32> {
+    #[cfg(target_os = "linux")]
+    {
+        let status = fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+        status
+            .lines()
+            .find_map(|line| line.strip_prefix("Uid:"))
+            .and_then(|rest| rest.split_whitespace().next())
+            .and_then(|uid| uid.parse().ok())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn load_users_map() -> HashMap<u32, String> {
     let mut map = HashMap::new();
     if let Ok(content) = fs::read_to_string("/etc/passwd") {

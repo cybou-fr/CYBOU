@@ -125,15 +125,47 @@ impl SystemHub {
         system_reader::read_real_processes()
     }
 
-    /// Send a signal to an operating system process.
+    /// The operation table's name for one of the four signals a person may send.
     ///
-    /// Direct in-memory simulation is prohibited: privileged process termination requires Action1 or unprivileged self ownership.
-    pub fn send_process_signal(
-        &self,
-        _pid: u32,
-        _signal: ProcessSignal,
-    ) -> Result<String, GatewayError> {
-        Err(GatewayError::Refused)
+    /// Four verbs rather than one with an argument, because they are four different acts with four
+    /// different risks: `SIGTERM` lets a process save what it was holding and `SIGKILL` does not,
+    /// and a table that could not tell them apart would have to price both as the worse one.
+    #[must_use]
+    pub const fn verb_for_signal(signal: ProcessSignal) -> &'static str {
+        match signal {
+            ProcessSignal::Terminate => "process.terminate",
+            ProcessSignal::Kill => "process.kill",
+            ProcessSignal::Pause => "process.pause",
+            ProcessSignal::Resume => "process.resume",
+        }
+    }
+
+    /// How a process reaches the executor: the uid that owns it and the pid, both as numbers.
+    ///
+    /// The uid is carried so that the executor can disagree. It reads `/proc` again at the moment
+    /// it acts, and a pid the kernel has recycled in the meantime no longer matches.
+    #[must_use]
+    pub fn process_target(owner_uid: u32, pid: u32) -> String {
+        format!("process:{owner_uid}:{pid}")
+    }
+
+    /// The uid this seat runs as, and the uid that owns this process, if both can be established.
+    ///
+    /// Refuses rather than guesses. A signal aimed at a process whose owner cannot be read is a
+    /// signal aimed at something nobody can name.
+    pub fn signalling_seat_owns(seat: &str, pid: u32) -> Result<u32, GatewayError> {
+        let account = seat
+            .strip_prefix("linux-account:")
+            .ok_or(GatewayError::Refused)?;
+        let seat_uid = system_reader::uid_for_user(account).ok_or(GatewayError::Refused)?;
+        let owner = system_reader::owner_of_process(pid).ok_or(GatewayError::Refused)?;
+        // The one rule the gateway is in a position to enforce, because it is the only party that
+        // knows who is asking. A person may end their own processes; ending somebody else's is a
+        // different act and does not have a door here.
+        if owner != seat_uid {
+            return Err(GatewayError::Refused);
+        }
+        Ok(owner)
     }
 
     /// Read real system hardware and telemetry metrics from /proc and /sys.
