@@ -23,5 +23,4 @@ CYBOU is an open-source, agent-native operating environment and spatial desktop 
 
 - Website: https://cybou.fr
 - GitHub: https://github.com/cybou-fr/CYBOU
-- Technical Blueprint: https://cybou.fr/blueprint.html
 - Architecture Decisions: https://github.com/cybou-fr/CYBOU/tree/main/docs/adr
