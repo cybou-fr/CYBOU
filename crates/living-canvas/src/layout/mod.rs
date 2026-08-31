@@ -61,13 +61,38 @@ mod tests {
     }
 
     #[test]
-    fn default_layout_has_all_system_cards() {
+    fn the_first_desktop_is_a_chosen_few_and_every_other_card_is_still_reachable() {
+        // This used to require the default layout to hold all fourteen System cards, and it did:
+        // a first visit opened fourteen panels of unfamiliar vocabulary at once. The five below
+        // are a decision about what somebody arrives wanting to know, not a claim that the rest
+        // stopped mattering — so the second half of this test is the half that protects them.
         let layout = DesktopLayout::default();
         assert_eq!(layout.schema_version, 9);
-        assert_eq!(layout.cards.len(), CardId::ALL_SYSTEM_CARDS.len());
 
+        let expected = [
+            CardId::Identity,
+            CardId::Session,
+            CardId::Capabilities,
+            CardId::Journal,
+            CardId::Insight,
+        ];
+        assert_eq!(layout.cards.len(), expected.len());
+        for card in expected {
+            assert!(
+                layout.contains_card(card),
+                "{card:?} opens on a first visit"
+            );
+        }
+
+        // Nothing was dropped on the way. Every System card still has its own view to be drawn by
+        // and its own key to be restored under, which is what makes opening it from the Dock or
+        // the command palette work rather than silently do nothing.
         for sys_id in CardId::ALL_SYSTEM_CARDS {
-            assert!(layout.contains_card(sys_id));
+            assert!(
+                sys_id.has_dedicated_view(),
+                "{sys_id:?} is openable and must still draw something"
+            );
+            assert_eq!(CardId::from_key(sys_id.key()), Some(sys_id));
         }
     }
 
@@ -106,7 +131,7 @@ mod tests {
         // L8: Desktop items exclude cards docked in decks
         let items = layout.desktop_items();
         // Two cards went into the deck, so they are one item between them.
-        assert_eq!(items.len(), CardId::ALL_SYSTEM_CARDS.len() - 1);
+        assert_eq!(items.len(), layout.cards.len() - 1);
         assert!(
             !items
                 .iter()
@@ -121,7 +146,7 @@ mod tests {
         // Detach card and dissolve
         layout.detach_from_deck(&d_id, CardId::Identity, None);
         assert_eq!(layout.decks.len(), 0); // dissolved
-        assert_eq!(layout.desktop_items().len(), CardId::ALL_SYSTEM_CARDS.len());
+        assert_eq!(layout.desktop_items().len(), layout.cards.len());
     }
 
     #[test]

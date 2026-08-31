@@ -61,7 +61,18 @@ impl DesktopLayout {
         }
     }
 
-    /// Construct the canonical Desktop layout containing all 12 system cards in Home arrangement.
+    /// Construct the Desktop layout a person meets on their first visit.
+    ///
+    /// Five cards rather than all fourteen. The other nine are not gone and were never optional to
+    /// build: every one of them is one click away in the Dock, in the command palette, and in
+    /// [`CardId::ALL_SYSTEM_CARDS`], which is still what the desktop is checked against. What
+    /// changed is what happens before anybody has chosen anything. Fourteen panels of unfamiliar
+    /// vocabulary opening at once is not a demonstration of what this host knows about itself; it
+    /// is a wall, and the first thing it teaches is that the desktop is not for you.
+    ///
+    /// These five answer the questions somebody actually arrives with. Who am I here and is this
+    /// session real (Identity, Session); what is this host able to do right now (Capabilities);
+    /// what has it been doing (Journal); and what does it currently think is wrong (Insight).
     #[must_use]
     pub fn canonical(viewport: Option<UsableViewport>) -> Self {
         let mut layout = Self::new();
@@ -70,16 +81,7 @@ impl DesktopLayout {
             CardId::Session,
             CardId::Capabilities,
             CardId::Journal,
-            CardId::Lifecycle,
-            CardId::Commitments,
-            CardId::SelfModel,
-            CardId::Attention,
-            CardId::Beliefs,
-            CardId::Perception,
-            CardId::Context,
-            CardId::Disclosure,
             CardId::Insight,
-            CardId::Agents,
         ];
         for (idx, card_id) in canonical_cards.iter().enumerate() {
             let spec = card_id.spec();

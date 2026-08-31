@@ -451,8 +451,8 @@ mod tests {
         let layout = DesktopLayout::canonical(Some(viewport));
         assert_eq!(
             layout.cards.len(),
-            14,
-            "every canonical card is still on the desktop"
+            5,
+            "every card the first desktop opens with is still on it"
         );
         for card in &layout.cards {
             assert!(

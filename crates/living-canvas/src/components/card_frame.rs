@@ -95,7 +95,18 @@ pub fn CardFrame(
                 <header class="card-header">
                     <small class="panel-kicker">
                         {move || kicker.with_value(|k| k())}
-                        <span>{kicker_title}</span>
+                        // What the card is, in words, and then which organ composed it. Every
+                        // System card used to hand over the organ name alone, so the desktop
+                        // greeted a first-time reader with IDENTITY1, HEALTH1 and EPISTEMIC1 and
+                        // left them to guess. The organ still has to be visible — it is how this
+                        // desktop can say who composed an answer rather than implying the page
+                        // did — so it is kept, in small type, beside a title anyone can read.
+                        <span class="panel-title">{card.title()}</span>
+                        <Show when=move || kicker_title != card.title()>
+                            <span class="panel-organ" title="The organ that composed this">
+                                {kicker_title}
+                            </span>
+                        </Show>
                     </small>
                     <CardControls card=card layout=layout />
                 </header>

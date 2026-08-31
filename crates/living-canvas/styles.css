@@ -4271,3 +4271,23 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   padding-left: 8px;
   border-left: 1px solid var(--line);
 }
+
+/* A card header names the card first and the organ that composed it second. The organ used to be
+   the only thing there, which is how a first-time reader met a desktop of IDENTITY1 and EPISTEMIC1
+   and learned nothing from either. */
+.panel-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Small, quiet and still present: this is the desktop's claim about who composed the answer, and
+   dropping it to make the header prettier would drop the claim with it. */
+.panel-organ {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
