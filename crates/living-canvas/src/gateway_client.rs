@@ -1606,18 +1606,9 @@ impl MindClient for GatewayMindClient {
     async fn evaluate_learning_candidate(
         &self,
         candidate_id: uuid::Uuid,
-        req: Option<&cybou_web_contracts::EvaluateCandidateRequest>,
     ) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
         let url = format!("/api/v1/learning/candidates/{candidate_id}/evaluate");
-        let builder = Request::post(&url);
-        let request = if let Some(r) = req {
-            builder.json(r)
-        } else {
-            builder.json(&serde_json::Value::Null)
-        }
-        .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-
-        let response = request
+        let response = Request::post(&url)
             .send()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;

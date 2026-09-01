@@ -17,9 +17,18 @@ pub fn SecurityContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.get_security_settings().await {
                 Ok(proj) => {
-                    signals.policy.set(Some(proj.policy));
+                    signals.policy.set(proj.policy);
                     signals.audit_log.set(proj.audit_log);
-                    signals.status_msg.set(None);
+                    signals.status_msg.set(match proj.state {
+                        cybou_web_contracts::SystemSurfaceState::Known => None,
+                        cybou_web_contracts::SystemSurfaceState::Unknown => Some(
+                            "Security state is unknown: no host reader established these controls."
+                                .to_owned(),
+                        ),
+                        cybou_web_contracts::SystemSurfaceState::NotConfigured => {
+                            Some("Security reader is not configured.".to_owned())
+                        }
+                    });
                 }
                 Err(err) => {
                     signals
@@ -33,17 +42,12 @@ pub fn SecurityContent(card: CardId) -> impl IntoView {
 
     let toggle_policy =
         move |update_fn: Box<dyn FnOnce(&mut cybou_protocol::system::SecurityPolicyRecord)>| {
-            let mut cur =
-                signals
-                    .policy
-                    .get()
-                    .unwrap_or(cybou_protocol::system::SecurityPolicyRecord {
-                        landlock_enabled: true,
-                        bubblewrap_enabled: true,
-                        apparmor_enforcing: true,
-                        seccomp_strict: true,
-                        egress_firewall_strict: true,
-                    });
+            let Some(mut cur) = signals.policy.get() else {
+                signals.status_msg.set(Some(
+                    "Cannot change a security control whose host state is unknown.".to_owned(),
+                ));
+                return;
+            };
             update_fn(&mut cur);
             let req = cybou_web_contracts::UpdateSecurityPolicyRequest {
                 landlock_enabled: cur.landlock_enabled,

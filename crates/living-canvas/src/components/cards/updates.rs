@@ -17,8 +17,16 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.get_system_updates().await {
                 Ok(proj) => {
-                    signals.updates.set(Some(proj));
-                    signals.status_msg.set(None);
+                    if proj.state == cybou_web_contracts::SystemSurfaceState::Known {
+                        signals.updates.set(Some(proj));
+                        signals.status_msg.set(None);
+                    } else {
+                        signals.updates.set(None);
+                        signals.status_msg.set(Some(
+                            "Update state is unknown: no update provider is implemented."
+                                .to_owned(),
+                        ));
+                    }
                 }
                 Err(err) => {
                     signals

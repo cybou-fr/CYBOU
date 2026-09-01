@@ -575,7 +575,6 @@ pub trait MindClient {
     async fn evaluate_learning_candidate(
         &self,
         candidate_id: uuid::Uuid,
-        req: Option<&cybou_web_contracts::EvaluateCandidateRequest>,
     ) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError>;
 
     /// Retrieve promoted durable artifacts and lineages.
@@ -812,22 +811,32 @@ impl MindClient for MockMindClient {
         &self,
         capsule_id: uuid::Uuid,
     ) -> Result<cybou_web_contracts::CapsuleTelemetryProjection, ClientError> {
+        let observed_at = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::CapsuleTelemetryProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             telemetry: cybou_protocol::agent::CapsuleTelemetryRecord {
                 capsule_id,
                 standing: cybou_protocol::agent::Standing::Running,
-                pids_count: 3,
-                memory_used_mib: 64,
-                memory_max_mib: 512,
-                cpu_usage_pct: 2.5,
-                egress_requests_count: 8,
-                egress_denied_count: 0,
-                files_modified_count: 2,
-                tokens_in: 600,
-                tokens_out: 180,
-                active_tool: Some("read_file".to_string()),
-                recent_activity: vec!["Capsule boundary verified".to_string()],
+                pids_count: cybou_protocol::agent::AgentMetric::known(3, observed_at),
+                pids_current: cybou_protocol::agent::AgentMetric::known(3, observed_at),
+                pids_max: cybou_protocol::agent::AgentMetric::known(512, observed_at),
+                memory_used_mib: cybou_protocol::agent::AgentMetric::known(64, observed_at),
+                memory_max_mib: cybou_protocol::agent::AgentMetric::known(512, observed_at),
+                cpu_usage_pct: cybou_protocol::agent::AgentMetric::known(2.5, observed_at),
+                cpu_usage_usec: cybou_protocol::agent::AgentMetric::known(42_000, observed_at),
+                egress_requests_count: cybou_protocol::agent::AgentMetric::known(8, observed_at),
+                egress_denied_count: cybou_protocol::agent::AgentMetric::known(0, observed_at),
+                files_modified_count: cybou_protocol::agent::AgentMetric::known(2, observed_at),
+                tokens_in: cybou_protocol::agent::AgentMetric::known(600, observed_at),
+                tokens_out: cybou_protocol::agent::AgentMetric::known(180, observed_at),
+                active_tool: cybou_protocol::agent::AgentMetric::known(
+                    "read_file".to_string(),
+                    observed_at,
+                ),
+                recent_activity: cybou_protocol::agent::AgentMetric::known(
+                    vec!["Capsule boundary verified".to_string()],
+                    observed_at,
+                ),
             },
         })
     }
@@ -1055,6 +1064,8 @@ impl MindClient for MockMindClient {
         Ok(cybou_web_contracts::ProcessesListProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             total_count: 0,
+            showing_count: 0,
+            truncated: false,
             total_cpu_percent: 0.0,
             total_memory_bytes: 0,
             processes: Vec::new(),
@@ -1109,6 +1120,7 @@ impl MindClient for MockMindClient {
     async fn get_storage(&self) -> Result<cybou_web_contracts::StorageProjection, ClientError> {
         Ok(cybou_web_contracts::StorageProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            state: cybou_web_contracts::SystemSurfaceState::Known,
             subvolumes: Vec::new(),
             snapshots: Vec::new(),
             total_space_bytes: 1_000_000_000_000,
@@ -1139,6 +1151,7 @@ impl MindClient for MockMindClient {
     async fn get_network(&self) -> Result<cybou_web_contracts::NetworkProjection, ClientError> {
         Ok(cybou_web_contracts::NetworkProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            state: cybou_web_contracts::SystemSurfaceState::Known,
             connections: Vec::new(),
         })
     }
@@ -1154,6 +1167,7 @@ impl MindClient for MockMindClient {
     async fn get_packages(&self) -> Result<cybou_web_contracts::PackagesProjection, ClientError> {
         Ok(cybou_web_contracts::PackagesProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            state: cybou_web_contracts::SystemSurfaceState::Known,
             installed_count: 0,
             upgradable_count: 0,
             packages: Vec::new(),
@@ -1173,6 +1187,7 @@ impl MindClient for MockMindClient {
     ) -> Result<cybou_web_contracts::SystemUpdatesProjection, ClientError> {
         Ok(cybou_web_contracts::SystemUpdatesProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            state: cybou_web_contracts::SystemSurfaceState::Known,
             summary: cybou_protocol::system::SystemUpdatesSummary {
                 pending_count: 0,
                 security_updates_count: 0,
@@ -1196,6 +1211,7 @@ impl MindClient for MockMindClient {
     ) -> Result<cybou_web_contracts::UsersSettingsProjection, ClientError> {
         Ok(cybou_web_contracts::UsersSettingsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            state: cybou_web_contracts::SystemSurfaceState::Known,
             users: Vec::new(),
             ssh_keys: Vec::new(),
         })
@@ -1243,13 +1259,14 @@ impl MindClient for MockMindClient {
     ) -> Result<cybou_web_contracts::SecuritySettingsProjection, ClientError> {
         Ok(cybou_web_contracts::SecuritySettingsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-            policy: cybou_protocol::system::SecurityPolicyRecord {
+            state: cybou_web_contracts::SystemSurfaceState::Known,
+            policy: Some(cybou_protocol::system::SecurityPolicyRecord {
                 landlock_enabled: true,
                 bubblewrap_enabled: true,
                 apparmor_enforcing: true,
                 seccomp_strict: true,
                 egress_firewall_strict: true,
-            },
+            }),
             audit_log: Vec::new(),
         })
     }
@@ -1272,7 +1289,8 @@ impl MindClient for MockMindClient {
     ) -> Result<cybou_web_contracts::BackupSettingsProjection, ClientError> {
         Ok(cybou_web_contracts::BackupSettingsProjection {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-            repository: cybou_protocol::system::BackupRepositoryRecord {
+            state: cybou_web_contracts::SystemSurfaceState::Known,
+            repository: Some(cybou_protocol::system::BackupRepositoryRecord {
                 id: "mock-repo".to_owned(),
                 name: "Mock Vault".to_owned(),
                 destination: "/var/backups".to_owned(),
@@ -1280,15 +1298,15 @@ impl MindClient for MockMindClient {
                 last_backup_time: None,
                 total_archives: 0,
                 total_size_bytes: 0,
-            },
+            }),
             archives: Vec::new(),
-            schedule: cybou_protocol::system::BackupScheduleRecord {
+            schedule: Some(cybou_protocol::system::BackupScheduleRecord {
                 enabled: true,
                 frequency: "daily".to_owned(),
                 retention_daily: 7,
                 retention_weekly: 4,
                 retention_monthly: 12,
-            },
+            }),
         })
     }
 
@@ -1571,7 +1589,6 @@ impl MindClient for MockMindClient {
     async fn evaluate_learning_candidate(
         &self,
         candidate_id: uuid::Uuid,
-        _req: Option<&cybou_web_contracts::EvaluateCandidateRequest>,
     ) -> Result<cybou_web_contracts::CandidateEvaluationProjection, ClientError> {
         let now = time::OffsetDateTime::now_utc();
         Ok(cybou_web_contracts::CandidateEvaluationProjection {

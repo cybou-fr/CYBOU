@@ -3986,13 +3986,55 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   gap: 4px;
 }
 
-.agent-pause,
-.agent-quarantine,
+.agent-freeze,
 .agent-resume {
+  border: 1px solid var(--caution-line);
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: 10px;
+  color: var(--caution);
+  background: var(--caution-fill-strong);
   cursor: pointer;
+}
+
+.agent-quarantine {
+  border: 1px solid var(--danger-line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--danger);
+  background: var(--danger-fill-strong);
+  cursor: pointer;
+}
+
+.agent-telemetry {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--fill-subtle);
+}
+
+.agent-telemetry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 6px;
+}
+
+.agent-telemetry-grid span {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-telemetry-grid small,
+.agent-telemetry-observed,
+.agent-telemetry-unavailable {
+  color: var(--text-muted);
 }
 
 .ops-toolbar {

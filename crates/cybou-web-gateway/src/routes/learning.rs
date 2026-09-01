@@ -11,9 +11,8 @@ use axum::{
 };
 use cybou_protocol::learning::LearningLayer;
 use cybou_web_contracts::{
-    CandidateEvaluationProjection, EvaluateCandidateRequest, GovernanceScopesProjection,
-    LearnedArtifactsProjection, LearningCandidatesProjection, ProposeLearningCandidateRequest,
-    RevokeArtifactRequest,
+    CandidateEvaluationProjection, GovernanceScopesProjection, LearnedArtifactsProjection,
+    LearningCandidatesProjection, ProposeLearningCandidateRequest, RevokeArtifactRequest,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -76,17 +75,12 @@ pub async fn evaluate_candidate_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
     Path(candidate_id): Path<Uuid>,
-    Json(request): Json<Option<EvaluateCandidateRequest>>,
 ) -> Result<Json<CandidateEvaluationProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
     if !state.may_read_mind(&headers) {
         return Err(GatewayState::sign_in_required());
     }
 
-    let supplied_outcomes = request.map(|r| r.outcomes);
-    match state
-        .learning
-        .evaluate_candidate(candidate_id, supplied_outcomes)
-    {
+    match state.learning.evaluate_candidate(candidate_id) {
         Ok(projection) => Ok(Json(projection)),
         Err(_) => Err((
             StatusCode::NOT_FOUND,

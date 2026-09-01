@@ -653,6 +653,14 @@ impl ServicesSignals {
 pub struct ProcessesSignals {
     /// Listed operating system processes.
     pub processes: RwSignal<Vec<cybou_protocol::system::ProcessRecord>>,
+    /// Full number observed before response truncation.
+    pub total_count: RwSignal<usize>,
+    /// Whether the current response omitted additional processes.
+    pub truncated: RwSignal<bool>,
+    /// Aggregate CPU across every observed process.
+    pub total_cpu_percent: RwSignal<f32>,
+    /// Aggregate resident memory across every observed process.
+    pub total_memory_bytes: RwSignal<u64>,
     /// Selected Process ID.
     pub selected_pid: RwSignal<Option<u32>>,
     /// Search filter string.
@@ -671,6 +679,10 @@ impl ProcessesSignals {
     fn new() -> Self {
         Self {
             processes: RwSignal::new(Vec::new()),
+            total_count: RwSignal::new(0),
+            truncated: RwSignal::new(false),
+            total_cpu_percent: RwSignal::new(0.0),
+            total_memory_bytes: RwSignal::new(0),
             selected_pid: RwSignal::new(None),
             search_query: RwSignal::new(String::new()),
             sort_by: RwSignal::new("cpu".to_owned()),

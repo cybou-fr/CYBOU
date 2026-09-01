@@ -27,7 +27,9 @@
 //! that is not there would tick confidently and be wrong. The two instants are shown instead, which
 //! is less and is true.
 
-use cybou_protocol::agent::{LaunchRequest, SessionView, SpendView, Standing};
+use cybou_protocol::agent::{
+    AgentMetric, AgentMetricState, LaunchRequest, SessionView, SpendView, Standing,
+};
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use lucide_leptos::UsersRound;
@@ -67,22 +69,7 @@ fn replace_agents(runtime: RwSignal<RuntimeState>, sessions: Vec<SessionView>) {
     });
 }
 
-fn request_stop(
-    runtime: RwSignal<RuntimeState>,
-    capsule_id: Uuid,
-    error: RwSignal<Option<String>>,
-    mounted: Arc<AtomicBool>,
-) {
-    request_action(
-        runtime,
-        capsule_id,
-        cybou_protocol::agent::CapsuleAction::Stop,
-        error,
-        mounted,
-    );
-}
-
-fn request_action(
+fn request_control(
     runtime: RwSignal<RuntimeState>,
     capsule_id: Uuid,
     action: cybou_protocol::agent::CapsuleAction,
@@ -183,6 +170,75 @@ fn spend_line(session: &SessionView) -> Option<String> {
     }
 }
 
+fn metric_text<T: core::fmt::Display>(metric: &AgentMetric<T>, suffix: &str) -> String {
+    match (metric.state, metric.value.as_ref()) {
+        (AgentMetricState::Known, Some(value)) => format!("{value}{suffix}"),
+        (AgentMetricState::Stale, Some(value)) => format!("{value}{suffix} (stale)"),
+        _ => "Unavailable".to_owned(),
+    }
+}
+
+#[component]
+fn AgentTelemetry(capsule_id: Uuid) -> impl IntoView {
+    let result =
+        RwSignal::new(None::<Result<cybou_web_contracts::CapsuleTelemetryProjection, String>>);
+    let loading = RwSignal::new(false);
+
+    let load = Callback::new(move |()| {
+        if loading.get_untracked() {
+            return;
+        }
+        loading.set(true);
+        spawn_local(async move {
+            result.set(Some(
+                GatewayMindClient
+                    .agent_telemetry(capsule_id)
+                    .await
+                    .map_err(|error| error.to_string()),
+            ));
+            loading.set(false);
+        });
+    });
+    Effect::new(move |_| load.run(()));
+
+    view! {
+        <div class="agent-telemetry">
+            <div class="agent-telemetry-head">
+                <small>"Kernel telemetry"</small>
+                <button type="button" on:click=move |_| load.run(()) disabled=move || loading.get()>
+                    {move || if loading.get() { "Reading…" } else { "Refresh" }}
+                </button>
+            </div>
+            {move || match result.get() {
+                None => view! { <small class="agent-telemetry-unavailable">"Not read yet"</small> }.into_any(),
+                Some(Err(error)) => view! {
+                    <small class="agent-telemetry-unavailable">{format!("Telemetry unavailable: {error}")}</small>
+                }.into_any(),
+                Some(Ok(projection)) => {
+                    let telemetry = projection.telemetry;
+                    let observed = telemetry
+                        .memory_used_mib
+                        .observed_at
+                        .or(telemetry.pids_current.observed_at)
+                        .or(telemetry.cpu_usage_usec.observed_at)
+                        .map(moment);
+                    view! {
+                        <div class="agent-telemetry-grid">
+                            <span><small>"Memory"</small><b>{metric_text(&telemetry.memory_used_mib, " MiB")}</b></span>
+                            <span><small>"Memory max"</small><b>{metric_text(&telemetry.memory_max_mib, " MiB")}</b></span>
+                            <span><small>"Processes"</small><b>{metric_text(&telemetry.pids_count, "")}</b></span>
+                            <span><small>"Tasks"</small><b>{metric_text(&telemetry.pids_current, "")}</b></span>
+                            <span><small>"Tasks max"</small><b>{metric_text(&telemetry.pids_max, "")}</b></span>
+                            <span><small>"CPU time"</small><b>{metric_text(&telemetry.cpu_usage_usec, " µs")}</b></span>
+                        </div>
+                        {observed.map(|at| view! { <small class="agent-telemetry-observed">{format!("Observed {at}")}</small> })}
+                    }.into_any()
+                }
+            }}
+        </div>
+    }
+}
+
 /// One session, drawn.
 fn session_line(
     session: SessionView,
@@ -210,84 +266,80 @@ fn session_line(
     let ended = session.ended_at.map(moment);
     let because = session.ended_because.clone();
     let capsule_id = session.capsule_id;
+    let telemetry_view = session
+        .is_live()
+        .then(|| view! { <AgentTelemetry capsule_id=capsule_id /> });
     let controls = session.is_live().then(|| {
-        let mounted_pause = Arc::clone(&mounted);
+        let standing = session.standing;
+        let mounted_freeze = Arc::clone(&mounted);
         let mounted_resume = Arc::clone(&mounted);
         let mounted_quarantine = Arc::clone(&mounted);
         let mounted_stop = Arc::clone(&mounted);
 
         view! {
             <div class="agent-controls" style="display: inline-flex; gap: 4px; align-items: center;">
-                {match session.standing {
+                {match standing {
                     Standing::Running => view! {
                         <button
                             type="button"
-                            class="agent-pause"
-                            style="background: var(--caution-fill-strong); color: var(--caution); border: 1px solid var(--caution-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
-                            title="Freeze cgroup processes"
-                            on:click=move |_| {
-                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Freeze, error, Arc::clone(&mounted_pause));
-                            }
-                        >
-                            "Pause"
-                        </button>
-                        <button
-                            type="button"
-                            class="agent-quarantine"
-                            style="background: var(--danger-fill-strong); color: var(--danger); border: 1px solid var(--danger-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
-                            title="Freeze & revoke network egress"
-                            on:click=move |_| {
-                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Quarantine, error, Arc::clone(&mounted_quarantine));
-                            }
-                        >
-                            "Quarantine"
-                        </button>
+                            class="agent-freeze"
+                            title="Freeze the capsule cgroup and verify cgroup.freeze"
+                            on:click=move |_| request_control(
+                                runtime,
+                                capsule_id,
+                                cybou_protocol::agent::CapsuleAction::Freeze,
+                                error,
+                                Arc::clone(&mounted_freeze),
+                            )
+                        >"Pause"</button>
                     }.into_any(),
                     Standing::Paused => view! {
                         <button
                             type="button"
                             class="agent-resume"
-                            style="background: var(--ok-fill); color: var(--ok); border: 1px solid var(--ok-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
-                            title="Thaw / resume cgroup processes"
-                            on:click=move |_| {
-                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Resume, error, Arc::clone(&mounted_resume));
-                            }
-                        >
-                            "Resume"
-                        </button>
-                        <button
-                            type="button"
-                            class="agent-quarantine"
-                            style="background: var(--danger-fill-strong); color: var(--danger); border: 1px solid var(--danger-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
-                            title="Freeze & revoke network egress"
-                            on:click=move |_| {
-                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Quarantine, error, Arc::clone(&mounted_quarantine));
-                            }
-                        >
-                            "Quarantine"
-                        </button>
-                    }.into_any(),
-                    Standing::Quarantined => view! {
-                        <button
-                            type="button"
-                            class="agent-resume"
-                            style="background: var(--ok-fill); color: var(--ok); border: 1px solid var(--ok-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
-                            title="Release quarantine & resume"
-                            on:click=move |_| {
-                                request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Resume, error, Arc::clone(&mounted_resume));
-                            }
-                        >
-                            "Release"
-                        </button>
+                            title="Thaw the capsule cgroup and verify cgroup.freeze"
+                            on:click=move |_| request_control(
+                                runtime,
+                                capsule_id,
+                                cybou_protocol::agent::CapsuleAction::Resume,
+                                error,
+                                Arc::clone(&mounted_resume),
+                            )
+                        >"Resume"</button>
                     }.into_any(),
                     _ => view! { <span></span> }.into_any(),
                 }}
+                {matches!(standing, Standing::Running | Standing::Paused).then(|| view! {
+                    <button
+                        type="button"
+                        class="agent-quarantine"
+                        title="Freeze the capsule and revoke its egress broker"
+                        on:click=move |_| request_control(
+                            runtime,
+                            capsule_id,
+                            cybou_protocol::agent::CapsuleAction::Quarantine,
+                            error,
+                            Arc::clone(&mounted_quarantine),
+                        )
+                    >"Quarantine"</button>
+                })}
+                {matches!(standing, Standing::Quarantined).then(|| view! {
+                    <span class="agent-kernel-controls-unavailable" title="Revoked egress is not restarted automatically">
+                        "Release unavailable; stop to end"
+                    </span>
+                })}
                 <button
                     type="button"
                     class="agent-stop"
                     style="background: var(--line); color: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                     on:click=move |_| {
-                        request_stop(runtime, capsule_id, error, Arc::clone(&mounted_stop));
+                        request_control(
+                            runtime,
+                            capsule_id,
+                            cybou_protocol::agent::CapsuleAction::Stop,
+                            error,
+                            Arc::clone(&mounted_stop),
+                        );
                     }
                 >
                     "Stop"
@@ -379,6 +431,7 @@ fn session_line(
                     )}
             </span>
             {because.map(|because| view! { <small class="agent-because">{because}</small> })}
+            {telemetry_view}
             {task_view}
             <div class="agent-units">
                 {session
@@ -816,6 +869,30 @@ mod tests {
         // says the surface could not be asked and the other says somebody's agents have stopped.
         assert_eq!(headline(None), "Runtime did not answer");
         assert_eq!(headline(Some(&Vec::new())), "Nothing running");
+    }
+
+    #[test]
+    fn telemetry_text_keeps_unavailable_and_stale_distinct_from_known_zero() {
+        let observed_at = at(0);
+        assert_eq!(
+            metric_text(&AgentMetric::known(0_u64, observed_at), " MiB"),
+            "0 MiB"
+        );
+        assert_eq!(
+            metric_text(&AgentMetric::<u64>::unavailable(), " MiB"),
+            "Unavailable"
+        );
+        assert_eq!(
+            metric_text(
+                &AgentMetric {
+                    value: Some(12_u64),
+                    observed_at: Some(observed_at),
+                    state: AgentMetricState::Stale,
+                },
+                " MiB",
+            ),
+            "12 MiB (stale)"
+        );
     }
 
     #[test]

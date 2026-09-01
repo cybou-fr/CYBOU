@@ -23,8 +23,16 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.get_network().await {
                 Ok(proj) => {
-                    signals.connections.set(proj.connections);
-                    signals.status_msg.set(None);
+                    if proj.state == cybou_web_contracts::SystemSurfaceState::Known {
+                        signals.connections.set(proj.connections);
+                        signals.status_msg.set(None);
+                    } else {
+                        signals.connections.set(Vec::new());
+                        signals.status_msg.set(Some(
+                            "Network state is unknown: no host network reader is implemented."
+                                .to_owned(),
+                        ));
+                    }
                 }
                 Err(err) => {
                     signals

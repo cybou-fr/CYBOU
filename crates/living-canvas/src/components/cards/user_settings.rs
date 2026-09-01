@@ -17,9 +17,18 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.get_users_settings().await {
                 Ok(proj) => {
-                    signals.users.set(proj.users);
-                    signals.ssh_keys.set(proj.ssh_keys);
-                    signals.status_msg.set(None);
+                    if proj.state == cybou_web_contracts::SystemSurfaceState::Known {
+                        signals.users.set(proj.users);
+                        signals.ssh_keys.set(proj.ssh_keys);
+                        signals.status_msg.set(None);
+                    } else {
+                        signals.users.set(Vec::new());
+                        signals.ssh_keys.set(Vec::new());
+                        signals.status_msg.set(Some(
+                            "User state is unknown: no NSS/account reader is implemented."
+                                .to_owned(),
+                        ));
+                    }
                 }
                 Err(err) => {
                     signals

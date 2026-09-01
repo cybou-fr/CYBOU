@@ -179,7 +179,6 @@ impl LearningHub {
     pub fn evaluate_candidate(
         &self,
         candidate_id: Uuid,
-        supplied_outcomes: Option<Vec<DemonstratedOutcome>>,
     ) -> Result<CandidateEvaluationProjection, String> {
         let candidates = self
             .candidates
@@ -192,9 +191,9 @@ impl LearningHub {
             .ok_or_else(|| format!("Candidate {candidate_id} not found"))?;
         drop(candidates);
 
-        let outcomes = if let Some(outs) = supplied_outcomes {
-            outs
-        } else {
+        // Demonstrations are owner-held evidence. The browser may ask for evaluation, but it
+        // must never be able to supply the facts used by the promotion gate in that request.
+        let outcomes = {
             let demos = self
                 .demonstrations
                 .lock()
@@ -336,5 +335,26 @@ mod tests {
         assert_eq!(candidates[0].candidate_id, candidate.candidate_id);
 
         let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn evaluation_cannot_promote_without_owner_held_demonstrations() {
+        let hub = LearningHub::with_optional_store(None);
+        let candidate = hub.propose_candidate(ProposeLearningCandidateRequest {
+            layer: LearningLayer::Behavioral,
+            source_evidence: vec![Uuid::new_v4()],
+            outcome_evidence: vec![Uuid::new_v4(), Uuid::new_v4()],
+            generalization: "Never trust caller-asserted success".to_owned(),
+            scope: "test".to_owned(),
+        });
+
+        let evaluation = hub
+            .evaluate_candidate(candidate.candidate_id)
+            .expect("candidate exists");
+
+        assert!(evaluation.promoted.is_none());
+        assert!(evaluation.artifact.is_none());
+        assert!(evaluation.refused.is_some());
+        assert!(hub.get_artifacts().artifacts.is_empty());
     }
 }

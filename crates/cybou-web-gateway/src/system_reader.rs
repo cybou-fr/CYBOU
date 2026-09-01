@@ -102,9 +102,6 @@ pub fn read_real_processes() -> ProcessesListProjection {
                     && let Some(proc) = read_single_process(pid, &users_map)
                 {
                     processes.push(proc);
-                    if processes.len() >= 500 {
-                        break;
-                    }
                 }
             }
         }
@@ -114,10 +111,14 @@ pub fn read_real_processes() -> ProcessesListProjection {
         let total_cpu = processes.iter().map(|p| p.cpu_percent).sum();
         let total_mem = processes.iter().map(|p| p.memory_bytes).sum();
         let total_count = processes.len();
+        processes.truncate(500);
+        let showing_count = processes.len();
 
         ProcessesListProjection {
             schema_version: WEB_SCHEMA_V1,
             total_count,
+            showing_count,
+            truncated: showing_count < total_count,
             total_cpu_percent: total_cpu,
             total_memory_bytes: total_mem,
             processes,
@@ -129,6 +130,8 @@ pub fn read_real_processes() -> ProcessesListProjection {
         ProcessesListProjection {
             schema_version: WEB_SCHEMA_V1,
             total_count: 0,
+            showing_count: 0,
+            truncated: false,
             total_cpu_percent: 0.0,
             total_memory_bytes: 0,
             processes: Vec::new(),

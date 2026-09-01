@@ -341,31 +341,49 @@ mod tests {
 
         let storage = hub.get_storage();
         assert_eq!(storage.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
+        assert_eq!(
+            storage.state,
+            cybou_web_contracts::SystemSurfaceState::Unknown
+        );
         let snap = hub.create_snapshot("@home", "test-backup", true);
         assert!(snap.is_err());
 
         let network = hub.get_network();
         assert_eq!(network.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
+        assert_eq!(
+            network.state,
+            cybou_web_contracts::SystemSurfaceState::Unknown
+        );
         let conn_res = hub.connect_network("conn-wg0", true);
         assert!(conn_res.is_err());
 
         let pkgs = hub.get_packages();
         assert_eq!(pkgs.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
+        assert_eq!(pkgs.state, cybou_web_contracts::SystemSurfaceState::Unknown);
         let pkg_res = hub.execute_package_action("borgbackup", PackageActionKind::Install);
         assert!(pkg_res.is_err());
 
         let updates = hub.get_system_updates();
         assert_eq!(updates.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
+        assert_eq!(
+            updates.state,
+            cybou_web_contracts::SystemSurfaceState::Unknown
+        );
         let update_res = hub.apply_system_updates(None);
         assert!(update_res.is_err());
 
         let users = hub.get_users_settings();
         assert_eq!(users.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
+        assert_eq!(
+            users.state,
+            cybou_web_contracts::SystemSurfaceState::Unknown
+        );
         let new_user = hub.create_user("bob", "Bob Smith", false);
         assert!(new_user.is_err());
 
         let sec = hub.get_security_settings();
-        assert!(sec.policy.landlock_enabled);
+        assert_eq!(sec.state, cybou_web_contracts::SystemSurfaceState::Unknown);
+        assert!(sec.policy.is_none());
         let update_sec = hub.update_security_policy(UpdateSecurityPolicyRequest {
             landlock_enabled: true,
             bubblewrap_enabled: true,
@@ -376,7 +394,12 @@ mod tests {
         assert!(update_sec.is_err());
 
         let backup = hub.get_backup_settings();
-        assert_eq!(backup.repository.destination, "/var/lib/cybou/backup-vault");
+        assert_eq!(
+            backup.state,
+            cybou_web_contracts::SystemSurfaceState::NotConfigured
+        );
+        assert!(backup.repository.is_none());
+        assert!(backup.schedule.is_none());
         let trig = hub.trigger_backup(None);
         assert!(trig.is_err());
         let sched = hub.update_backup_schedule(UpdateBackupScheduleRequest {

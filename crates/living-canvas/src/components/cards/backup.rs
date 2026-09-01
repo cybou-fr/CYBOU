@@ -17,8 +17,22 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.get_backup_settings().await {
                 Ok(proj) => {
-                    signals.backup_settings.set(Some(proj));
-                    signals.status_msg.set(None);
+                    if proj.state != cybou_web_contracts::SystemSurfaceState::Known {
+                        signals.backup_settings.set(None);
+                        signals.status_msg.set(Some(match proj.state {
+                            cybou_web_contracts::SystemSurfaceState::NotConfigured => {
+                                "Backup is not configured. No repository or provider is available."
+                            }
+                            cybou_web_contracts::SystemSurfaceState::Unknown => {
+                                "Backup state is unknown: no provider answered."
+                            }
+                            cybou_web_contracts::SystemSurfaceState::Known => unreachable!(),
+                        }
+                        .to_owned()));
+                    } else {
+                        signals.backup_settings.set(Some(proj));
+                        signals.status_msg.set(None);
+                    }
                 }
                 Err(err) => {
                     signals
@@ -83,7 +97,10 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                 retention_weekly: 4,
                 retention_monthly: 12,
             },
-            |s| s.schedule,
+            |s| {
+                s.schedule
+                    .expect("a known backup projection has a schedule")
+            },
         );
         let req = cybou_web_contracts::UpdateBackupScheduleRequest {
             enabled,
@@ -142,9 +159,9 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
             })}
 
             {move || signals.backup_settings.get().map(|bs| {
-                let repo = bs.repository;
+                let repo = bs.repository.expect("a known backup projection has a repository");
                 let archives = bs.archives;
-                let schedule = bs.schedule;
+                let schedule = bs.schedule.expect("a known backup projection has a schedule");
                 let size_gb = repo.total_size_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
                 let is_sched_enabled = schedule.enabled;
 

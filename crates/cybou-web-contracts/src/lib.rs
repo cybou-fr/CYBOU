@@ -1272,6 +1272,10 @@ pub struct ProcessesListProjection {
     pub schema_version: SchemaVersion,
     /// Total active process count.
     pub total_count: usize,
+    /// Number of process records included in this bounded response.
+    pub showing_count: usize,
+    /// Whether additional observed processes were omitted from the response.
+    pub truncated: bool,
     /// Aggregate CPU utilization percentage across all processes.
     pub total_cpu_percent: f32,
     /// Total resident memory in bytes consumed by listed processes.
@@ -1374,6 +1378,8 @@ pub use cybou_protocol::system::{
 pub struct StorageProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether a storage owner established the complete projection.
+    pub state: SystemSurfaceState,
     /// Btrfs subvolumes.
     pub subvolumes: Vec<BtrfsSubvolumeRecord>,
     /// Snapshots list.
@@ -1410,6 +1416,8 @@ pub struct RestoreSnapshotRequest {
 pub struct NetworkProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether a host network reader established this list.
+    pub state: SystemSurfaceState,
     /// Active and configured network connections.
     pub connections: Vec<NetworkConnectionRecord>,
 }
@@ -1430,6 +1438,8 @@ pub struct NetworkConnectRequest {
 pub struct PackagesProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether a package database reader established these values.
+    pub state: SystemSurfaceState,
     /// Total installed packages count.
     pub installed_count: usize,
     /// Total upgradable packages count.
@@ -1454,6 +1464,8 @@ pub struct PackageActionRequest {
 pub struct SystemUpdatesProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether an update provider established this summary.
+    pub state: SystemSurfaceState,
     /// Update status summary.
     pub summary: SystemUpdatesSummary,
 }
@@ -1481,6 +1493,8 @@ pub use cybou_protocol::system::{
 pub struct UsersSettingsProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether an NSS/account reader established these lists.
+    pub state: SystemSurfaceState,
     /// Configured user accounts.
     pub users: Vec<UserAccountRecord>,
     /// Authorized SSH public keys for active user.
@@ -1518,13 +1532,27 @@ pub struct DeleteSshKeyRequest {
 }
 
 /// Projection describing sandbox confinement policies and security audit events.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SystemSurfaceState {
+    /// A reader/provider established the returned state.
+    Known,
+    /// No reader could establish the host state.
+    Unknown,
+    /// The operator has not configured a provider for this surface.
+    NotConfigured,
+}
+
+/// Projection describing sandbox confinement policies and security audit events.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecuritySettingsProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether a host reader established this projection.
+    pub state: SystemSurfaceState,
     /// Confinement policy rules.
-    pub policy: SecurityPolicyRecord,
+    pub policy: Option<SecurityPolicyRecord>,
     /// Recent security audit events.
     pub audit_log: Vec<SecurityAuditEntry>,
 }
@@ -1555,12 +1583,14 @@ pub struct UpdateSecurityPolicyRequest {
 pub struct BackupSettingsProjection {
     /// Web contract schema version.
     pub schema_version: SchemaVersion,
+    /// Whether an operator configured a backup provider.
+    pub state: SystemSurfaceState,
     /// Target backup repository metadata.
-    pub repository: BackupRepositoryRecord,
+    pub repository: Option<BackupRepositoryRecord>,
     /// Historical snapshot archives in repository.
     pub archives: Vec<BackupArchiveRecord>,
     /// Retention and automation schedule.
-    pub schedule: BackupScheduleRecord,
+    pub schedule: Option<BackupScheduleRecord>,
 }
 
 /// Request to trigger an immediate backup snapshot.
@@ -1894,16 +1924,6 @@ pub struct ProposeLearningCandidateRequest {
     pub outcome_evidence: Vec<Uuid>,
 }
 
-/// Request to evaluate a candidate against demonstrated episodic outcomes.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EvaluateCandidateRequest {
-    /// Target candidate identifier.
-    pub candidate_id: Uuid,
-    /// Demonstrated episodic outcomes to verify repeatability and empirical success rate.
-    pub outcomes: Vec<DemonstratedOutcome>,
-}
-
 /// Detailed result of evaluating a candidate against promotion criteria.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2127,8 +2147,8 @@ mod tests {
             ProcessesListProjection, SecurityAuditEntry, SecurityPolicyRecord,
             SecuritySettingsProjection, ServiceRecord, ServiceState, ServiceUnitType,
             ServicesListProjection, SnapshotRecord, SshKeyRecord, StorageProjection,
-            SystemLogEntry, SystemLogsProjection, SystemMonitorProjection, UserAccountRecord,
-            UsersSettingsProjection,
+            SystemLogEntry, SystemLogsProjection, SystemMonitorProjection, SystemSurfaceState,
+            UserAccountRecord, UsersSettingsProjection,
         };
 
         let services = ServicesListProjection {
@@ -2154,6 +2174,8 @@ mod tests {
         let procs = ProcessesListProjection {
             schema_version: WEB_SCHEMA_V1,
             total_count: 1,
+            showing_count: 1,
+            truncated: false,
             total_cpu_percent: 1.2,
             total_memory_bytes: 38_000_000,
             processes: vec![ProcessRecord {
@@ -2229,6 +2251,7 @@ mod tests {
 
         let storage = StorageProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Known,
             subvolumes: vec![BtrfsSubvolumeRecord {
                 id: 256,
                 path: "@home".to_string(),
@@ -2254,6 +2277,7 @@ mod tests {
 
         let network = NetworkProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Known,
             connections: vec![NetworkConnectionRecord {
                 id: "conn-eth0".to_string(),
                 name: "eth0".to_string(),
@@ -2273,6 +2297,7 @@ mod tests {
 
         let packages = PackagesProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Known,
             installed_count: 1,
             upgradable_count: 0,
             packages: vec![PackageRecord {
@@ -2293,6 +2318,7 @@ mod tests {
 
         let users = UsersSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Known,
             users: vec![UserAccountRecord {
                 uid: 1000,
                 username: "cybou".to_string(),
@@ -2319,13 +2345,14 @@ mod tests {
 
         let security = SecuritySettingsProjection {
             schema_version: WEB_SCHEMA_V1,
-            policy: SecurityPolicyRecord {
+            state: SystemSurfaceState::Known,
+            policy: Some(SecurityPolicyRecord {
                 landlock_enabled: true,
                 bubblewrap_enabled: true,
                 apparmor_enforcing: true,
                 seccomp_strict: true,
                 egress_firewall_strict: true,
-            },
+            }),
             audit_log: vec![SecurityAuditEntry {
                 timestamp: "2026-08-28T22:30:00Z".to_string(),
                 severity: "info".to_string(),
@@ -2340,7 +2367,8 @@ mod tests {
 
         let backup = BackupSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
-            repository: BackupRepositoryRecord {
+            state: SystemSurfaceState::Known,
+            repository: Some(BackupRepositoryRecord {
                 id: "repo-01".to_string(),
                 name: "CYBOU Local Vault".to_string(),
                 destination: "/var/backups/cybou.borg".to_string(),
@@ -2348,7 +2376,7 @@ mod tests {
                 last_backup_time: Some("2026-08-28T20:00:00Z".to_string()),
                 total_archives: 12,
                 total_size_bytes: 45_000_000_000,
-            },
+            }),
             archives: vec![BackupArchiveRecord {
                 id: "arch-01".to_string(),
                 name: "nightly-2026-08-28".to_string(),
@@ -2356,13 +2384,13 @@ mod tests {
                 size_bytes: 3_200_000_000,
                 duration_seconds: 42,
             }],
-            schedule: BackupScheduleRecord {
+            schedule: Some(BackupScheduleRecord {
                 enabled: true,
                 frequency: "daily".to_string(),
                 retention_daily: 7,
                 retention_weekly: 4,
                 retention_monthly: 12,
-            },
+            }),
         };
         let encoded_backup = serde_json::to_string(&backup).expect("serialize backup");
         let decoded_backup: BackupSettingsProjection =
@@ -2556,7 +2584,8 @@ mod tests {
             CapsuleAction, CapsuleControlRequest, CapsuleTelemetryProjection,
             CapsuleTelemetryRecord, WEB_SCHEMA_V1,
         };
-        use cybou_protocol::agent::Standing;
+        use cybou_protocol::agent::{AgentMetric, Standing};
+        use time::OffsetDateTime;
         use uuid::Uuid;
 
         let req = CapsuleControlRequest {
@@ -2568,22 +2597,29 @@ mod tests {
         assert_eq!(decoded_req, req);
 
         let cap_id = Uuid::new_v4();
+        let observed_at = OffsetDateTime::now_utc();
         let telemetry = CapsuleTelemetryProjection {
             schema_version: WEB_SCHEMA_V1,
             telemetry: CapsuleTelemetryRecord {
                 capsule_id: cap_id,
                 standing: Standing::Running,
-                pids_count: 4,
-                memory_used_mib: 128,
-                memory_max_mib: 512,
-                cpu_usage_pct: 12.5,
-                egress_requests_count: 42,
-                egress_denied_count: 0,
-                files_modified_count: 7,
-                tokens_in: 1540,
-                tokens_out: 420,
-                active_tool: Some("edit_file".to_string()),
-                recent_activity: vec!["Opened workspace AST".to_string()],
+                pids_count: AgentMetric::known(4, observed_at),
+                pids_current: AgentMetric::known(4, observed_at),
+                pids_max: AgentMetric::known(512, observed_at),
+                memory_used_mib: AgentMetric::known(128, observed_at),
+                memory_max_mib: AgentMetric::known(512, observed_at),
+                cpu_usage_pct: AgentMetric::known(12.5, observed_at),
+                cpu_usage_usec: AgentMetric::known(84_000, observed_at),
+                egress_requests_count: AgentMetric::known(42, observed_at),
+                egress_denied_count: AgentMetric::known(0, observed_at),
+                files_modified_count: AgentMetric::known(7, observed_at),
+                tokens_in: AgentMetric::known(1540, observed_at),
+                tokens_out: AgentMetric::known(420, observed_at),
+                active_tool: AgentMetric::known("edit_file".to_string(), observed_at),
+                recent_activity: AgentMetric::known(
+                    vec!["Opened workspace AST".to_string()],
+                    observed_at,
+                ),
             },
         };
         let encoded_tel = serde_json::to_string(&telemetry).expect("serialize telemetry");

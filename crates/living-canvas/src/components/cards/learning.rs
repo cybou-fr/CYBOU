@@ -41,7 +41,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
     let evaluate_candidate = move |candidate_id: uuid::Uuid| {
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
-            match client.evaluate_learning_candidate(candidate_id, None).await {
+            match client.evaluate_learning_candidate(candidate_id).await {
                 Ok(eval_proj) => {
                     signals.evaluation.set(Some(eval_proj));
                     signals.status_msg.set(Some(

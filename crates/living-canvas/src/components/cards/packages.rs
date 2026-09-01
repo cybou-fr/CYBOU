@@ -24,8 +24,16 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.get_packages().await {
                 Ok(proj) => {
-                    signals.packages.set(proj.packages);
-                    signals.status_msg.set(None);
+                    if proj.state == cybou_web_contracts::SystemSurfaceState::Known {
+                        signals.packages.set(proj.packages);
+                        signals.status_msg.set(None);
+                    } else {
+                        signals.packages.set(Vec::new());
+                        signals.status_msg.set(Some(
+                            "Package state is unknown: no package database reader is implemented."
+                                .to_owned(),
+                        ));
+                    }
                 }
                 Err(err) => {
                     signals

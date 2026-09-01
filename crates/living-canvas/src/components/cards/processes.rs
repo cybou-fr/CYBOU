@@ -33,6 +33,12 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
         leptos::task::spawn_local(async move {
             match client.list_processes().await {
                 Ok(projection) => {
+                    signals.total_count.set(projection.total_count);
+                    signals.truncated.set(projection.truncated);
+                    signals.total_cpu_percent.set(projection.total_cpu_percent);
+                    signals
+                        .total_memory_bytes
+                        .set(projection.total_memory_bytes);
                     signals.processes.set(projection.processes);
                     signals.status_msg.set(None);
                     freshness.arrived();
@@ -125,12 +131,9 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
         list
     };
 
-    let total_cpu = move || {
-        let sum: f32 = signals.processes.get().iter().map(|p| p.cpu_percent).sum();
-        format!("{sum:.1}%")
-    };
+    let total_cpu = move || format!("{:.1}%", signals.total_cpu_percent.get());
     let total_mem_mb = move || {
-        let bytes: u64 = signals.processes.get().iter().map(|p| p.memory_bytes).sum();
+        let bytes = signals.total_memory_bytes.get();
         format!("{} MB", bytes / (1024 * 1024))
     };
 
@@ -142,7 +145,11 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-weight: 600; font-size: 13px;">"Process Manager"</span>
                         <span style="font-size: 11px; background: var(--fill-subtle); padding: 2px 6px; border-radius: 8px;">
-                            {move || format!("{} Processes", signals.processes.get().len())}
+                            {move || if signals.truncated.get() {
+                                format!("Showing {} of {}", signals.processes.get().len(), signals.total_count.get())
+                            } else {
+                                format!("{} Processes", signals.total_count.get())
+                            }}
                         </span>
                         <span style="font-size: 11px; color: var(--accent-light); font-weight: 600;">
                             {move || format!("CPU: {}", total_cpu())}

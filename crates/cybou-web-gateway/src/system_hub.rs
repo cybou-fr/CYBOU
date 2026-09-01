@@ -4,14 +4,14 @@
 //! Grounded provider and Action1 boundary for system services, processes, telemetry, logs, storage, network, packages, users, security, and backups.
 
 use cybou_protocol::system::{
-    BackupArchiveRecord, BackupRepositoryRecord, BackupScheduleRecord, NetworkConnectionRecord,
-    PackageRecord, ProcessSignal, SecurityAuditEntry, SecurityPolicyRecord, ServiceAction,
-    SnapshotRecord, SshKeyRecord, SystemUpdatesSummary, UserAccountRecord,
+    BackupArchiveRecord, BackupScheduleRecord, NetworkConnectionRecord, PackageRecord,
+    ProcessSignal, SecurityAuditEntry, SecurityPolicyRecord, ServiceAction, SnapshotRecord,
+    SshKeyRecord, SystemUpdatesSummary, UserAccountRecord,
 };
 use cybou_web_contracts::{
     BackupSettingsProjection, NetworkProjection, PackagesProjection, ProcessesListProjection,
     SecuritySettingsProjection, ServicesListProjection, StorageProjection, SystemLogsProjection,
-    SystemLogsQueryRequest, SystemMonitorProjection, SystemUpdatesProjection,
+    SystemLogsQueryRequest, SystemMonitorProjection, SystemSurfaceState, SystemUpdatesProjection,
     UpdateBackupScheduleRequest, UpdateSecurityPolicyRequest, UsersSettingsProjection,
     WEB_SCHEMA_V1,
 };
@@ -27,11 +27,8 @@ pub struct SystemHub {
     packages: RwLock<Vec<PackageRecord>>,
     users: RwLock<Vec<UserAccountRecord>>,
     ssh_keys: RwLock<Vec<SshKeyRecord>>,
-    security_policy: RwLock<SecurityPolicyRecord>,
     security_audit: RwLock<Vec<SecurityAuditEntry>>,
-    backup_repo: RwLock<BackupRepositoryRecord>,
     backup_archives: RwLock<Vec<BackupArchiveRecord>>,
-    backup_schedule: RwLock<BackupScheduleRecord>,
 }
 
 impl Default for SystemHub {
@@ -50,31 +47,8 @@ impl SystemHub {
             packages: RwLock::new(Vec::new()),
             users: RwLock::new(Vec::new()),
             ssh_keys: RwLock::new(Vec::new()),
-            security_policy: RwLock::new(SecurityPolicyRecord {
-                landlock_enabled: true,
-                bubblewrap_enabled: true,
-                apparmor_enforcing: true,
-                seccomp_strict: true,
-                egress_firewall_strict: true,
-            }),
             security_audit: RwLock::new(Vec::new()),
-            backup_repo: RwLock::new(BackupRepositoryRecord {
-                id: "repo-primary".to_owned(),
-                name: "Primary Backup Vault".to_owned(),
-                destination: "/var/lib/cybou/backup-vault".to_owned(),
-                encryption: "repokey-blake2".to_owned(),
-                last_backup_time: None,
-                total_archives: 0,
-                total_size_bytes: 0,
-            }),
             backup_archives: RwLock::new(Vec::new()),
-            backup_schedule: RwLock::new(BackupScheduleRecord {
-                enabled: false,
-                frequency: "daily".to_owned(),
-                retention_daily: 7,
-                retention_weekly: 4,
-                retention_monthly: 6,
-            }),
         }
     }
 
@@ -224,6 +198,7 @@ impl SystemHub {
 
         StorageProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Unknown,
             subvolumes: Vec::new(),
             snapshots,
             total_space_bytes,
@@ -257,6 +232,7 @@ impl SystemHub {
 
         NetworkProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Unknown,
             connections,
         }
     }
@@ -281,6 +257,7 @@ impl SystemHub {
         let installed_count = packages.len();
         PackagesProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Unknown,
             installed_count,
             upgradable_count: 0,
             packages,
@@ -301,6 +278,7 @@ impl SystemHub {
     pub fn get_system_updates(&self) -> SystemUpdatesProjection {
         SystemUpdatesProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Unknown,
             summary: SystemUpdatesSummary {
                 pending_count: 0,
                 security_updates_count: 0,
@@ -335,6 +313,7 @@ impl SystemHub {
             .clone();
         UsersSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
+            state: SystemSurfaceState::Unknown,
             users,
             ssh_keys,
         }
@@ -367,11 +346,6 @@ impl SystemHub {
     /// Get security settings and policy.
     #[must_use]
     pub fn get_security_settings(&self) -> SecuritySettingsProjection {
-        let policy = self
-            .security_policy
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
         let audit_log = self
             .security_audit
             .read()
@@ -379,7 +353,8 @@ impl SystemHub {
             .clone();
         SecuritySettingsProjection {
             schema_version: WEB_SCHEMA_V1,
-            policy,
+            state: SystemSurfaceState::Unknown,
+            policy: None,
             audit_log,
         }
     }
@@ -395,26 +370,17 @@ impl SystemHub {
     /// Get backup repository settings.
     #[must_use]
     pub fn get_backup_settings(&self) -> BackupSettingsProjection {
-        let repository = self
-            .backup_repo
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
         let archives = self
             .backup_archives
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        let schedule = self
-            .backup_schedule
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
         BackupSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
-            repository,
+            state: SystemSurfaceState::NotConfigured,
+            repository: None,
             archives,
-            schedule,
+            schedule: None,
         }
     }
 
