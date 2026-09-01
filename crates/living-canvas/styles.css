@@ -20,7 +20,7 @@
      twenty call sites and `var(--text-main, #e0e0e0)` at twenty-three, and neither token was ever
      defined — so every one of them has been drawing its fallback, and the fallback is what a
      theme cannot change. Defining them is what makes the next stage possible at all. */
-  --bg-card: #1e1e24;
+  --bg-card: transparent;
   --text-main: #e0e0e0;
   --text-muted: #94a3b8;
 
@@ -2532,14 +2532,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0d131c;
+  background: transparent;
   position: relative;
 }
 .editor-tab-bar {
   display: flex;
   align-items: center;
-  background: #090e15;
-  border-bottom: 1px solid rgba(154, 167, 184, 0.16);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line);
   padding: 0 4px;
 }
 .editor-tabs {
@@ -2564,9 +2564,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 }
 .editor-tab.active {
   color: #fff;
-  background: #0d131c;
-  border-color: rgba(154, 167, 184, 0.2);
-  border-bottom-color: #0d131c;
+  background: var(--fill-subtle);
+  border-color: var(--line-strong);
+  border-bottom-color: transparent;
 }
 .editor-tab-name { font-weight: 500; }
 .editor-dirty-dot { color: var(--accent); font-size: 9px; }
@@ -2909,8 +2909,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   padding: 4px 10px;
   font-size: 10px;
   color: var(--muted);
-  border-top: 1px solid rgba(154, 167, 184, 0.14);
-  background: #090e15;
+  border-top: 1px solid var(--line);
+  background: var(--bg-sunken);
 }
 .editor-status-left {
   display: flex;
@@ -2944,7 +2944,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   z-index: 10;
 }
 .editor-modal-card {
-  background: #0f1723;
+  background: var(--surface);
   border: 1px solid rgba(154, 167, 184, 0.3);
   border-radius: 12px;
   padding: 20px;
@@ -2998,7 +2998,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 }
 .editor-save-as-path {
   width: 100%;
-  background: #04090e;
+  background: var(--bg-sunken-strong);
   border: 1px solid rgba(154, 167, 184, 0.2);
   border-radius: 6px;
   padding: 8px 12px;
@@ -3017,15 +3017,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0d131c;
+  background: transparent;
 }
 .diff-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(154, 167, 184, 0.16);
-  background: #090e15;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-sunken);
 }
 .diff-title-box {
   display: flex;
@@ -3140,8 +3140,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .diff-status-bar {
   padding: 6px 12px;
   font-size: 11px;
-  background: #090e15;
-  border-top: 1px solid rgba(154, 167, 184, 0.16);
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--line);
   color: var(--accent);
 }
 
@@ -3150,7 +3150,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0d131c;
+  background: transparent;
   padding: 12px;
   gap: 10px;
   overflow-y: auto;
@@ -3451,7 +3451,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0d131c;
+  background: transparent;
   padding: 12px;
   gap: 12px;
   overflow-y: auto;
@@ -3465,7 +3465,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   font-size: 12px;
   font-weight: 600;
   color: #fff;
-  border-bottom: 1px solid rgba(154, 167, 184, 0.16);
+  border-bottom: 1px solid var(--line);
   padding-bottom: 8px;
 }
 .outline-header-left {
@@ -3489,7 +3489,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #090e15;
+  background: var(--bg-sunken-strong);
   border: 1px solid rgba(154, 167, 184, 0.2);
   border-radius: 6px;
   padding: 4px 8px;
@@ -3850,7 +3850,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
      grows past the edge it was resized to. */
   min-height: 0;
   color: var(--text-main, #e0e0e0);
-  background: var(--bg-card, #1e1e24);
+  background: transparent;
   font-family: system-ui, -apple-system, sans-serif;
 }
 
@@ -4034,8 +4034,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 .agent-telemetry-grid small,
 .agent-telemetry-observed,
-.agent-telemetry-unavailable {
+.agent-telemetry-unavailable,
+.agent-kernel-controls-unavailable {
   color: var(--text-muted);
+}
+
+.raise-btn {
+  /* Inherits card-control-btn styling */
 }
 
 .ops-toolbar {
