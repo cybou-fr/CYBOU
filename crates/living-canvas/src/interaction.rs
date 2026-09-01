@@ -281,8 +281,11 @@ pub fn start_drag(
 ///
 /// A drag still starts anywhere else on the card: the header, the padding, the space between rows.
 fn went_down_on_a_control(event: &PointerEvent) -> bool {
-    // Deck tabs are not `<button>` and are pressed like one, so they are named here with the rest.
-    const CONTROLS: &str = "button, a, input, select, textarea, label, [role='button'],          [contenteditable='true'], .deck-tab, .deck-controls";
+    // Deck tabs are not `<button>` and are pressed like one. The terminal screen is a `div` that
+    // takes focus and reads keystrokes, which is a control by every meaning except its tag name —
+    // and while it went unnamed here, pressing it dragged the card and captured the pointer, so the
+    // screen never received the focus a keystroke needs and nothing could be typed into it.
+    const CONTROLS: &str = "button, a, input, select, textarea, label, [role='button'], [contenteditable='true'], .deck-tab, .deck-controls, .terminal-screen";
 
     event
         .target()

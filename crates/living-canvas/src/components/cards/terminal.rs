@@ -15,7 +15,7 @@ use web_sys::{BinaryType, CloseEvent, KeyboardEvent, MessageEvent, WebSocket};
 
 use crate::{
     CardId,
-    terminal::{Cell, TerminalScreen, cell_style, fitting_window, key_to_bytes},
+    terminal::{TerminalScreen, cell_style, fitting_window, key_to_bytes},
     tool_state::ToolCardStates,
 };
 
@@ -25,20 +25,6 @@ use crate::{
 /// animation frame would be a drag that asks a shell to re-lay-out a hundred times. Slow enough to
 /// be cheap, fast enough that letting go feels immediate.
 const RESIZE_INTERVAL_MS: u32 = 150;
-
-/// One row, as a string, for a reader that only wants the text.
-#[must_use]
-fn row_text(row: &[Cell]) -> String {
-    row.iter()
-        .map(|cell| {
-            if cell.text.is_empty() {
-                " "
-            } else {
-                cell.text.as_str()
-            }
-        })
-        .collect()
-}
 
 /// The address this page's terminal socket is at.
 ///
@@ -244,6 +230,35 @@ pub fn TerminalContent(
         signals.screen.with(TerminalScreen::rows)
     };
 
+    // Where to draw the block, or `None` when the program asked for no cursor — which `vi` and
+    // every full-screen program do while they repaint, and drawing one anyway would put a block in
+    // the middle of somebody's text.
+    let cursor_at = move || {
+        let _ = signals.generation.get();
+        signals.screen.with(|screen| {
+            if screen.cursor_hidden() {
+                None
+            } else {
+                Some(screen.cursor())
+            }
+        })
+    };
+
+    // The keyboard goes to whatever has focus, and a terminal that opened without it silently
+    // swallowed the first thing anybody typed. Asked for once, when the session opens, rather than
+    // on every frame: stealing focus from a person who has clicked elsewhere would be worse than
+    // the problem it fixes.
+    Effect::new(move |focused_once: Option<bool>| {
+        let connected = signals.socket.get().is_some();
+        if connected && focused_once != Some(true) {
+            if let Some(screen) = screen_ref.get() {
+                let _ = screen.focus();
+            }
+            return true;
+        }
+        connected && focused_once == Some(true)
+    });
+
     view! {
         <div class="terminal-panel">
             <div class="terminal-bar">
@@ -278,25 +293,38 @@ pub fn TerminalContent(
                 // with the theme, the zoom level and whichever fallback the platform supplied.
                 <span class="terminal-probe" node_ref=probe_ref aria-hidden="true">"M"</span>
 
-                <For
-                    each=rows
-                    key=|row| row_text(row)
-                    children=move |row| {
-                        view! {
-                            <div class="terminal-row">
-                                {row.iter().map(|cell| {
-                                    let style = cell_style(cell);
-                                    let text = if cell.text.is_empty() {
-                                        " ".to_owned()
-                                    } else {
-                                        cell.text.clone()
-                                    };
-                                    view! { <span style=style>{text}</span> }
-                                }).collect_view()}
-                            </div>
-                        }
-                    }
-                />
+                // Indexed rather than keyed by content: the cursor is a position, and two
+                // identical rows have to be told apart for it to land on the right one.
+                {move || {
+                    let grid = rows();
+                    let cursor = cursor_at();
+                    grid.into_iter()
+                        .enumerate()
+                        .map(|(row_index, row)| {
+                            let cursor_column = cursor.and_then(|(cursor_row, column)| {
+                                (usize::from(cursor_row) == row_index).then_some(usize::from(column))
+                            });
+                            view! {
+                                <div class="terminal-row">
+                                    {row.iter().enumerate().map(|(column, cell)| {
+                                        let style = cell_style(cell);
+                                        let text = if cell.text.is_empty() {
+                                            " ".to_owned()
+                                        } else {
+                                            cell.text.clone()
+                                        };
+                                        let here = cursor_column == Some(column);
+                                        view! {
+                                            <span class:terminal-cursor=here style=style>
+                                                {text}
+                                            </span>
+                                        }
+                                    }).collect_view()}
+                                </div>
+                            }
+                        })
+                        .collect_view()
+                }}
             </div>
         </div>
     }

@@ -4352,3 +4352,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .canvas.lod-glance .card-controls {
   display: none;
 }
+
+/* Where the next character will land. A block rather than a bar: this is a character grid and the
+   cell is the unit the program is thinking in. It inverts rather than tints, so it stays legible
+   over whatever the cell already holds. */
+.terminal-cursor {
+  background: var(--text-bright);
+  color: var(--surface);
+}
+
+/* Hollow while the terminal does not have the keyboard. A filled block on an unfocused terminal
+   claims the keystrokes of somebody who is typing somewhere else. */
+.terminal-screen:not(:focus) .terminal-cursor {
+  background: transparent;
+  color: inherit;
+  box-shadow: inset 0 0 0 1px var(--text-dim);
+}
