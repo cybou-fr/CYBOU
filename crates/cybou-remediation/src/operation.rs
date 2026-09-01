@@ -119,6 +119,7 @@ impl Operation {
     ///
     /// A property of the operation, not of the argument for it. There is no path by which a
     /// proposer supplies this.
+    #[allow(clippy::match_same_arms)]
     #[must_use]
     pub const fn risk(self) -> RiskLevel {
         match self {
@@ -202,6 +203,7 @@ impl Operation {
     ///
     /// An operation that relieves nothing is not a remedy, and a proposal citing a finding this
     /// does not address is what the critic exists to catch.
+    #[allow(clippy::match_same_arms)]
     #[must_use]
     pub fn relieves(self) -> &'static [Finding] {
         match self {

@@ -303,11 +303,11 @@ impl Owner {
         }
     }
 
-    fn rename_path(&self, from_req: &str, to_req: &str) -> Option<()> {
-        let from_rel = self.relative_path(from_req)?;
-        let to_rel = self.relative_path(to_req)?;
+    fn rename_path(&self, source_path: &str, destination_path: &str) -> Option<()> {
+        let source_relative = self.relative_path(source_path)?;
+        let destination_relative = self.relative_path(destination_path)?;
         self.jail
-            .rename_path(from_rel.to_str()?, to_rel.to_str()?)
+            .rename_path(source_relative.to_str()?, destination_relative.to_str()?)
             .ok()
     }
 
@@ -316,11 +316,11 @@ impl Owner {
         self.jail.remove_path(relative.to_str()?, recursive).ok()
     }
 
-    fn copy_path(&self, from_req: &str, to_req: &str) -> Option<()> {
-        let from_rel = self.relative_path(from_req)?;
-        let to_rel = self.relative_path(to_req)?;
+    fn copy_path(&self, source_path: &str, destination_path: &str) -> Option<()> {
+        let source_relative = self.relative_path(source_path)?;
+        let destination_relative = self.relative_path(destination_path)?;
         self.jail
-            .copy_path(from_rel.to_str()?, to_rel.to_str()?)
+            .copy_path(source_relative.to_str()?, destination_relative.to_str()?)
             .ok()
     }
 }

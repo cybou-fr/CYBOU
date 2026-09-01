@@ -115,6 +115,27 @@ pub trait Teardown: Send + Sync {
     fn tear_down(&self, plan: &crate::plan::SessionPlan) -> Ended;
 }
 
+/// Host boundary that changes and verifies one capsule's cgroup freeze state.
+pub trait KernelControl: Send + Sync {
+    /// Apply the requested state and return only after the kernel reading agrees.
+    fn set_freeze_state(&self, unit: &str, state: crate::telemetry::FreezeState) -> bool;
+
+    /// Stop the egress broker and return only after systemd reports it inactive.
+    fn revoke_egress(&self, unit: &str) -> bool;
+}
+
+struct SystemdKernelControl;
+
+impl KernelControl for SystemdKernelControl {
+    fn set_freeze_state(&self, unit: &str, state: crate::telemetry::FreezeState) -> bool {
+        crate::telemetry::set_freeze_state(unit, state)
+    }
+
+    fn revoke_egress(&self, unit: &str) -> bool {
+        crate::telemetry::revoke_egress(unit)
+    }
+}
+
 /// Whether a session's units are actually gone.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Ended {
@@ -131,6 +152,7 @@ pub enum Ended {
 pub struct Agent1Service {
     registry: Arc<Mutex<SessionRegistry>>,
     teardown: Arc<dyn Teardown>,
+    kernel_control: Arc<dyn KernelControl>,
     launch: Option<(HostCapacity, Arc<dyn Launcher>)>,
 }
 
@@ -141,6 +163,7 @@ impl Agent1Service {
         Self {
             registry,
             teardown,
+            kernel_control: Arc::new(SystemdKernelControl),
             launch: None,
         }
     }
@@ -156,7 +179,120 @@ impl Agent1Service {
         Self {
             registry,
             teardown,
+            kernel_control: Arc::new(SystemdKernelControl),
             launch: Some((capacity, launcher)),
+        }
+    }
+
+    #[cfg(test)]
+    fn with_kernel_control(mut self, kernel_control: Arc<dyn KernelControl>) -> Self {
+        self.kernel_control = kernel_control;
+        self
+    }
+
+    async fn change_freeze_state(
+        &self,
+        capsule_id: Uuid,
+        state: crate::telemetry::FreezeState,
+    ) -> fdo::Result<bool> {
+        let unit = {
+            let registry = self.registry.lock().map_err(|_| {
+                fdo::Error::Failed("the session registry is unavailable".to_owned())
+            })?;
+            let Some(live) = registry.get(capsule_id) else {
+                return Ok(false);
+            };
+            if matches!(
+                live.session.state(),
+                &crate::session::SessionState::Quarantined
+            ) {
+                return Err(fdo::Error::Failed(
+                    "quarantine cannot be released without restoring its revoked boundaries"
+                        .to_owned(),
+                ));
+            }
+            format!("{}.service", live.plan.capsule_unit)
+        };
+        let control = Arc::clone(&self.kernel_control);
+        let established =
+            tokio::task::spawn_blocking(move || control.set_freeze_state(&unit, state))
+                .await
+                .unwrap_or(false);
+        if !established {
+            return Err(fdo::Error::Failed(
+                "the requested cgroup freeze state was not established".to_owned(),
+            ));
+        }
+
+        let mut registry = self
+            .registry
+            .lock()
+            .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
+        let Some(live) = registry.get_mut(capsule_id) else {
+            return Ok(false);
+        };
+        match state {
+            crate::telemetry::FreezeState::Frozen => live.session.pause(),
+            crate::telemetry::FreezeState::Running => live.session.running(),
+        }
+        .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        Ok(true)
+    }
+
+    async fn quarantine(&self, capsule_id: Uuid) -> fdo::Result<bool> {
+        let (capsule_unit, egress_unit) = {
+            let registry = self.registry.lock().map_err(|_| {
+                fdo::Error::Failed("the session registry is unavailable".to_owned())
+            })?;
+            let Some(live) = registry.get(capsule_id) else {
+                return Ok(false);
+            };
+            (
+                format!("{}.service", live.plan.capsule_unit),
+                (!live.plan.hosts.is_empty()).then(|| format!("{}.service", live.plan.egress_unit)),
+            )
+        };
+
+        let control = Arc::clone(&self.kernel_control);
+        let frozen = tokio::task::spawn_blocking(move || {
+            control.set_freeze_state(&capsule_unit, crate::telemetry::FreezeState::Frozen)
+        })
+        .await
+        .unwrap_or(false);
+        if !frozen {
+            return Err(fdo::Error::Failed(
+                "quarantine did not establish the cgroup freeze".to_owned(),
+            ));
+        }
+
+        let egress_revoked = if let Some(unit) = egress_unit {
+            let control = Arc::clone(&self.kernel_control);
+            tokio::task::spawn_blocking(move || control.revoke_egress(&unit))
+                .await
+                .unwrap_or(false)
+        } else {
+            true
+        };
+
+        let mut registry = self
+            .registry
+            .lock()
+            .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
+        let Some(live) = registry.get_mut(capsule_id) else {
+            return Ok(false);
+        };
+        if egress_revoked {
+            live.session
+                .quarantine()
+                .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+            Ok(true)
+        } else {
+            live.session
+                .pause()
+                .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+            Err(fdo::Error::Failed(
+                "capsule frozen, but egress revocation was not established".to_owned(),
+            ))
         }
     }
 }
@@ -291,7 +427,7 @@ impl Agent1Service {
         Ok(true)
     }
 
-    /// Perform a lifecycle or control action on a live session (Freeze, Resume, Quarantine, Stop).
+    /// Stop a live session, refusing controls whose kernel effects are not yet established.
     async fn action(&self, capsule_id: String, action: String) -> fdo::Result<bool> {
         let cap_id = identity(&capsule_id)?;
         let action: cybou_protocol::agent::CapsuleAction =
@@ -301,76 +437,81 @@ impl Agent1Service {
         match action {
             cybou_protocol::agent::CapsuleAction::Stop => self.stop(capsule_id).await,
             cybou_protocol::agent::CapsuleAction::Freeze => {
-                let mut registry = self.registry.lock().map_err(|_| {
-                    fdo::Error::Failed("the session registry is unavailable".to_owned())
-                })?;
-                let Some(live) = registry.get_mut(cap_id) else {
-                    return Ok(false);
-                };
-                live.session
-                    .pause()
-                    .map_err(|e| fdo::Error::Failed(e.to_string()))?;
-                Ok(true)
+                self.change_freeze_state(cap_id, crate::telemetry::FreezeState::Frozen)
+                    .await
             }
             cybou_protocol::agent::CapsuleAction::Resume => {
-                let mut registry = self.registry.lock().map_err(|_| {
-                    fdo::Error::Failed("the session registry is unavailable".to_owned())
-                })?;
-                let Some(live) = registry.get_mut(cap_id) else {
-                    return Ok(false);
-                };
-                live.session
-                    .running()
-                    .map_err(|e| fdo::Error::Failed(e.to_string()))?;
-                Ok(true)
+                self.change_freeze_state(cap_id, crate::telemetry::FreezeState::Running)
+                    .await
             }
-            cybou_protocol::agent::CapsuleAction::Quarantine => {
-                let mut registry = self.registry.lock().map_err(|_| {
-                    fdo::Error::Failed("the session registry is unavailable".to_owned())
-                })?;
-                let Some(live) = registry.get_mut(cap_id) else {
-                    return Ok(false);
-                };
-                live.session
-                    .quarantine()
-                    .map_err(|e| fdo::Error::Failed(e.to_string()))?;
-                Ok(true)
-            }
+            cybou_protocol::agent::CapsuleAction::Quarantine => self.quarantine(cap_id).await,
         }
     }
 
     /// Get live telemetry snapshot for a capsule session.
     async fn telemetry(&self, capsule_id: String) -> fdo::Result<Vec<u8>> {
         let cap_id = identity(&capsule_id)?;
-        let registry = self
-            .registry
-            .lock()
-            .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
-
-        let view = registry
-            .views()
-            .into_iter()
-            .find(|v| v.capsule_id == cap_id)
-            .ok_or_else(|| fdo::Error::FileNotFound("no such session".to_owned()))?;
+        let (view, capsule_unit) = {
+            let registry = self.registry.lock().map_err(|_| {
+                fdo::Error::Failed("the session registry is unavailable".to_owned())
+            })?;
+            let view = registry
+                .views()
+                .into_iter()
+                .find(|v| v.capsule_id == cap_id)
+                .ok_or_else(|| fdo::Error::FileNotFound("no such session".to_owned()))?;
+            let capsule_unit = registry
+                .get(cap_id)
+                .map(|live| format!("{}.service", live.plan.capsule_unit));
+            (view, capsule_unit)
+        };
+        let readings = if let Some(unit) = capsule_unit {
+            tokio::task::spawn_blocking(move || crate::telemetry::read_unit(&unit))
+                .await
+                .unwrap_or_default()
+        } else {
+            crate::telemetry::CgroupReadings::default()
+        };
+        let observed_at = OffsetDateTime::now_utc();
 
         let telemetry = cybou_protocol::agent::CapsuleTelemetryRecord {
             capsule_id: cap_id,
             standing: view.standing,
-            pids_count: u32::from(view.is_live()),
-            memory_used_mib: 0,
-            memory_max_mib: 512,
-            cpu_usage_pct: 0.0,
-            egress_requests_count: 0,
-            egress_denied_count: 0,
-            files_modified_count: 0,
-            tokens_in: 0,
-            tokens_out: 0,
-            active_tool: None,
-            recent_activity: Vec::new(),
+            pids_count: metric(readings.process_count, observed_at),
+            pids_current: metric(readings.pids_current, observed_at),
+            pids_max: metric(readings.pids_max, observed_at),
+            memory_used_mib: metric(
+                readings
+                    .memory_current_bytes
+                    .map(|bytes| bytes / 1024 / 1024),
+                observed_at,
+            ),
+            memory_max_mib: metric(
+                readings.memory_max_bytes.map(|bytes| bytes / 1024 / 1024),
+                observed_at,
+            ),
+            cpu_usage_pct: cybou_protocol::agent::AgentMetric::unavailable(),
+            cpu_usage_usec: metric(readings.cpu_usage_usec, observed_at),
+            egress_requests_count: cybou_protocol::agent::AgentMetric::unavailable(),
+            egress_denied_count: cybou_protocol::agent::AgentMetric::unavailable(),
+            files_modified_count: cybou_protocol::agent::AgentMetric::unavailable(),
+            tokens_in: cybou_protocol::agent::AgentMetric::unavailable(),
+            tokens_out: cybou_protocol::agent::AgentMetric::unavailable(),
+            active_tool: cybou_protocol::agent::AgentMetric::unavailable(),
+            recent_activity: cybou_protocol::agent::AgentMetric::unavailable(),
         };
 
         encode(&telemetry).map_err(|error| fdo::Error::Failed(error.to_string()))
     }
+}
+
+fn metric<T>(
+    value: Option<T>,
+    observed_at: OffsetDateTime,
+) -> cybou_protocol::agent::AgentMetric<T> {
+    value.map_or_else(cybou_protocol::agent::AgentMetric::unavailable, |value| {
+        cybou_protocol::agent::AgentMetric::known(value, observed_at)
+    })
 }
 
 fn identity(value: &str) -> fdo::Result<Uuid> {
@@ -465,6 +606,33 @@ mod tests {
             _registry: Arc<Mutex<SessionRegistry>>,
         ) -> Result<(), String> {
             Err("the launch task could not be owned".to_owned())
+        }
+    }
+
+    struct RecordingControl {
+        establishes: bool,
+        revokes_egress: bool,
+        calls: Mutex<Vec<crate::telemetry::FreezeState>>,
+    }
+
+    impl RecordingControl {
+        fn establishing() -> Self {
+            Self {
+                establishes: true,
+                revokes_egress: true,
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl KernelControl for RecordingControl {
+        fn set_freeze_state(&self, _unit: &str, state: crate::telemetry::FreezeState) -> bool {
+            self.calls.lock().expect("calls").push(state);
+            self.establishes
+        }
+
+        fn revoke_egress(&self, _unit: &str) -> bool {
+            self.revokes_egress
         }
     }
 
@@ -579,6 +747,127 @@ mod tests {
         assert!(!service.stop(CAPSULE.to_string()).await.expect("answers"));
 
         assert_eq!(teardown.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn quarantine_requires_both_freeze_and_egress_revocation() {
+        let (service, _, registry) = serving();
+        let control = Arc::new(RecordingControl::establishing());
+        let service = service.with_kernel_control(control);
+
+        assert!(
+            service
+                .action(CAPSULE.to_string(), "quarantine".to_owned())
+                .await
+                .expect("both boundaries were established")
+        );
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Quarantined,
+        );
+    }
+
+    #[tokio::test]
+    async fn partial_quarantine_is_reported_as_paused_not_quarantined() {
+        let (service, _, registry) = serving();
+        let control = Arc::new(RecordingControl {
+            establishes: true,
+            revokes_egress: false,
+            calls: Mutex::new(Vec::new()),
+        });
+        let service = service.with_kernel_control(control);
+
+        service
+            .action(CAPSULE.to_string(), "quarantine".to_owned())
+            .await
+            .expect_err("egress revocation was not established");
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Paused,
+        );
+    }
+
+    #[tokio::test]
+    async fn freeze_and_resume_are_projected_only_after_kernel_confirmation() {
+        let (service, _, registry) = serving();
+        let control = Arc::new(RecordingControl::establishing());
+        let service = service.with_kernel_control(Arc::clone(&control) as Arc<dyn KernelControl>);
+
+        assert!(
+            service
+                .action(CAPSULE.to_string(), "freeze".to_owned())
+                .await
+                .expect("freeze is confirmed")
+        );
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Paused
+        );
+        assert!(
+            service
+                .action(CAPSULE.to_string(), "resume".to_owned())
+                .await
+                .expect("thaw is confirmed")
+        );
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Running
+        );
+        assert_eq!(
+            *control.calls.lock().expect("calls"),
+            vec![
+                crate::telemetry::FreezeState::Frozen,
+                crate::telemetry::FreezeState::Running
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn unconfirmed_freeze_does_not_change_the_registry_projection() {
+        let (service, _, registry) = serving();
+        let control = Arc::new(RecordingControl {
+            establishes: false,
+            revokes_egress: false,
+            calls: Mutex::new(Vec::new()),
+        });
+        let service = service.with_kernel_control(control);
+
+        service
+            .action(CAPSULE.to_string(), "freeze".to_owned())
+            .await
+            .expect_err("an unconfirmed freeze is a failure");
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Running
+        );
+    }
+
+    #[tokio::test]
+    async fn unread_runtime_metrics_are_unavailable_not_copied_from_the_grant() {
+        let (service, _, _) = serving();
+        let encoded = service
+            .telemetry(CAPSULE.to_string())
+            .await
+            .expect("the owner answers");
+        let telemetry: cybou_protocol::agent::CapsuleTelemetryRecord =
+            cybou_fabric::decode(&encoded).expect("typed telemetry");
+
+        assert_eq!(
+            telemetry.memory_used_mib.state,
+            cybou_protocol::agent::AgentMetricState::Unavailable
+        );
+        assert_eq!(telemetry.memory_used_mib.value, None);
+        assert_eq!(
+            telemetry.pids_count.state,
+            cybou_protocol::agent::AgentMetricState::Unavailable
+        );
+        assert_eq!(telemetry.pids_count.value, None);
+        assert_eq!(
+            telemetry.memory_max_mib.state,
+            cybou_protocol::agent::AgentMetricState::Unavailable
+        );
+        assert_eq!(telemetry.memory_max_mib.value, None);
+        assert_eq!(telemetry.pids_max.value, None);
     }
 
     #[tokio::test]

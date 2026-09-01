@@ -44,6 +44,8 @@ pub mod runtime;
 #[cfg(target_os = "linux")]
 pub mod service;
 pub mod session;
+#[cfg(target_os = "linux")]
+pub mod telemetry;
 pub mod view;
 
 pub use capacity::{HostCapacity, NotAdmitted, Reserved, admits};

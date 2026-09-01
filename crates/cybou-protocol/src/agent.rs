@@ -255,6 +255,52 @@ pub enum CapsuleAction {
     Stop,
 }
 
+/// Whether an agent metric was established by its owner.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentMetricState {
+    /// The value was measured or read from an authoritative grant.
+    Known,
+    /// No owner-backed reader could establish a value.
+    Unavailable,
+    /// A prior value exists but is outside its freshness budget.
+    Stale,
+}
+
+/// One agent metric together with the epistemic state of that value.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentMetric<T> {
+    /// Value when the metric is known or stale; absent when unavailable.
+    pub value: Option<T>,
+    /// When the owner observed the value, if it was observed.
+    pub observed_at: Option<OffsetDateTime>,
+    /// Whether the value is known, unavailable, or stale.
+    pub state: AgentMetricState,
+}
+
+impl<T> AgentMetric<T> {
+    /// A value established by its owner at the supplied instant.
+    #[must_use]
+    pub const fn known(value: T, observed_at: OffsetDateTime) -> Self {
+        Self {
+            value: Some(value),
+            observed_at: Some(observed_at),
+            state: AgentMetricState::Known,
+        }
+    }
+
+    /// A value for which no owner-backed reader is available.
+    #[must_use]
+    pub const fn unavailable() -> Self {
+        Self {
+            value: None,
+            observed_at: None,
+            state: AgentMetricState::Unavailable,
+        }
+    }
+}
+
 /// Fine-grained live telemetry snapshot from within an agent capsule's boundary.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -264,27 +310,33 @@ pub struct CapsuleTelemetryRecord {
     /// Current standing of the capsule.
     pub standing: Standing,
     /// Total process count currently active in cgroup.
-    pub pids_count: u32,
+    pub pids_count: AgentMetric<u32>,
+    /// Current task count reported by `pids.current`.
+    pub pids_current: AgentMetric<u32>,
+    /// Kernel-enforced task ceiling reported by `pids.max`.
+    pub pids_max: AgentMetric<u32>,
     /// Memory used in megabytes.
-    pub memory_used_mib: u64,
+    pub memory_used_mib: AgentMetric<u64>,
     /// Memory ceiling in megabytes.
-    pub memory_max_mib: u64,
+    pub memory_max_mib: AgentMetric<u64>,
     /// CPU usage percentage in [0.0, 100.0].
-    pub cpu_usage_pct: f32,
+    pub cpu_usage_pct: AgentMetric<f32>,
+    /// Cumulative cgroup CPU time in microseconds.
+    pub cpu_usage_usec: AgentMetric<u64>,
     /// Number of network egress requests mediated.
-    pub egress_requests_count: u64,
+    pub egress_requests_count: AgentMetric<u64>,
     /// Number of denied network egress attempts.
-    pub egress_denied_count: u64,
+    pub egress_denied_count: AgentMetric<u64>,
     /// Number of files modified in the workspace.
-    pub files_modified_count: u64,
+    pub files_modified_count: AgentMetric<u64>,
     /// Input prompt tokens consumed.
-    pub tokens_in: u64,
+    pub tokens_in: AgentMetric<u64>,
     /// Output completion tokens generated.
-    pub tokens_out: u64,
+    pub tokens_out: AgentMetric<u64>,
     /// Currently executing tool name or thought turn, if any.
-    pub active_tool: Option<String>,
+    pub active_tool: AgentMetric<String>,
     /// Recent security and activity events.
-    pub recent_activity: Vec<String>,
+    pub recent_activity: AgentMetric<Vec<String>>,
 }
 
 #[cfg(test)]
