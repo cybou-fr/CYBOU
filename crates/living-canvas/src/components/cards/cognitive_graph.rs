@@ -186,7 +186,11 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                     <div style="font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
                                         <div style="color: var(--text-second);">"Category: " <b style="color: var(--text-bright);">{node.node_type.category_name()}</b></div>
                                         <div style="color: var(--text-second);">"Confidence: " <b style="color: var(--text-bright);">{format!("{:.1}%", node.confidence * 100.0)}</b></div>
-                                        <div style="color: var(--text-second);">"Standing: " <b style="color: var(--ok);">"Observed"</b></div>
+                                        <div style="color: var(--text-second);">"Provenance: " <b style="color: var(--ok);">{node.provenance.label()}</b></div>
+                                        <div style="color: var(--text-second);">"Evidence: " <b style="color: var(--text-bright);">{node.evidence_ids.len()}</b></div>
+                                        {node.observed_at.as_ref().map(|observed| view! {
+                                            <div style="color: var(--text-second);">"Observed at: " <b style="color: var(--text-bright);">{observed.clone()}</b></div>
+                                        })}
                                     </div>
                                     {if node.metadata.is_empty() {
                                         view! { <div></div> }.into_any()

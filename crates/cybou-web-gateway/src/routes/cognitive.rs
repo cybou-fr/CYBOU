@@ -107,68 +107,52 @@ pub async fn get_event_journal(
     State(state): State<GatewayState>,
     Query(query): Query<JournalQuery>,
 ) -> Result<Json<EventJournalProjection>, GatewayError> {
-    let mut journal_proj = state.cognitive.get_journal(query.limit, query.offset);
+    let mind = state.presence.mind().await?;
+    let journal = &mind.journal;
+    let total_count = journal
+        .contribution_count
+        .map_or(journal.recent.len(), |count| count as usize);
+    let entries = journal
+        .recent
+        .iter()
+        .rev()
+        .skip(query.offset.unwrap_or(0))
+        .take(query.limit.unwrap_or(50))
+        .map(|contribution| EventJournalEntry {
+            event_id: contribution.message_id.clone(),
+            causation_id: None,
+            correlation_id: contribution.message_id.clone(),
+            origin_organ: contribution.origin_organ.clone(),
+            event_type: contribution.kind.clone(),
+            summary: format!(
+                "{} contribution from {}",
+                contribution.kind, contribution.origin_organ
+            ),
+            payload_preview: "Canonical Event1 Journal Contribution".to_owned(),
+            timestamp: contribution.recorded_at.clone(),
+            subject: None,
+            epistemic_status: cybou_protocol::epistemic::EpistemicStatus::Observed,
+        })
+        .collect();
 
-    if let Ok(mind) = state.presence.mind().await {
-        let journal = &mind.journal;
-        let total = journal
-            .contribution_count
-            .map_or(journal.recent.len(), |c| c as usize);
-        if journal_proj.entries.is_empty() && !journal.recent.is_empty() {
-            let mapped: Vec<EventJournalEntry> = journal
-                .recent
-                .iter()
-                .map(|c| EventJournalEntry {
-                    event_id: c.message_id.clone(),
-                    causation_id: None,
-                    correlation_id: c.message_id.clone(),
-                    origin_organ: c.origin_organ.clone(),
-                    event_type: c.kind.clone(),
-                    summary: format!("{} contribution from {}", c.kind, c.origin_organ),
-                    payload_preview: "Canonical Event1 Journal Contribution".to_owned(),
-                    timestamp: c.recorded_at.clone(),
-                    subject: None,
-                    epistemic_status: cybou_protocol::epistemic::EpistemicStatus::Observed,
-                })
-                .collect();
-            journal_proj.total_count = total.max(mapped.len());
-            journal_proj.entries = mapped;
-        }
-    }
-
-    Ok(Json(journal_proj))
+    Ok(Json(EventJournalProjection {
+        schema_version: WEB_SCHEMA_V1,
+        entries,
+        total_count,
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::cognitive_hub::CognitiveHub;
-    use cybou_protocol::cognitive::EventJournalEntry;
-    use cybou_protocol::epistemic::EpistemicStatus;
     use cybou_web_contracts::CognitiveQueryRequest;
 
     #[test]
-    fn cognitive_hub_serves_graph_and_journal() {
+    fn cognitive_hub_starts_with_no_unowned_graph_state() {
         let hub = CognitiveHub::new();
 
         let graph = hub.get_graph(None);
         assert!(graph.graph.nodes.is_empty());
-
-        hub.record_event(EventJournalEntry {
-            event_id: "evt-001".to_owned(),
-            causation_id: None,
-            correlation_id: "corr-001".to_owned(),
-            origin_organ: "systemd".to_owned(),
-            event_type: "UnitActive".to_owned(),
-            summary: "Service started".to_owned(),
-            payload_preview: "{}".to_owned(),
-            timestamp: "2026-08-29T12:00:00Z".to_owned(),
-            subject: None,
-            epistemic_status: EpistemicStatus::Observed,
-        });
-
-        let journal = hub.get_journal(Some(10), None);
-        assert_eq!(journal.total_count, 1);
-        assert_eq!(journal.entries[0].event_id, "evt-001");
 
         let queried = hub.query_graph(CognitiveQueryRequest {
             query: "OpenCode".to_owned(),
@@ -180,6 +164,6 @@ mod tests {
 
         // Test grounded graph construction
         let grounded = hub.build_grounded_graph(&[], &[], None, None);
-        assert!(!grounded.graph.nodes.is_empty());
+        assert!(grounded.graph.nodes.is_empty());
     }
 }

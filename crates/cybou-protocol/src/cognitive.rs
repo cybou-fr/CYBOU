@@ -134,6 +134,37 @@ impl CognitiveNodeType {
 }
 
 /// A node in the Cognitive Graph.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CognitiveProvenance {
+    /// Read directly from the runtime or an owning observation surface.
+    Observed,
+    /// Declared by operator-controlled configuration, but not necessarily present now.
+    Configured,
+    /// A design relationship declared by the architecture.
+    Architectural,
+    /// Computed from named evidence.
+    Derived,
+    /// A conclusion that is neither directly observed nor configured.
+    #[default]
+    Inferred,
+}
+
+impl CognitiveProvenance {
+    /// Stable human-readable provenance label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Observed => "Observed",
+            Self::Configured => "Configured",
+            Self::Architectural => "Architectural",
+            Self::Derived => "Derived",
+            Self::Inferred => "Inferred",
+        }
+    }
+}
+
+/// A node in the Cognitive Graph.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CognitiveNodeRecord {
@@ -147,6 +178,15 @@ pub struct CognitiveNodeRecord {
     pub epistemic_status: EpistemicStatus,
     /// Confidence metric (0.0 to 1.0).
     pub confidence: f64,
+    /// How this record entered the graph.
+    #[serde(default)]
+    pub provenance: CognitiveProvenance,
+    /// Canonical evidence identifiers supporting this record.
+    #[serde(default)]
+    pub evidence_ids: Vec<String>,
+    /// When the underlying runtime fact was observed, when applicable.
+    #[serde(default)]
+    pub observed_at: Option<String>,
     /// Optional underlying `SubjectRef` for desktop deep-linking.
     pub subject: Option<SubjectRef>,
     /// Creation timestamp (ISO 8601).
@@ -207,6 +247,15 @@ pub struct CognitiveEdgeRecord {
     pub edge_type: CognitiveEdgeType,
     /// Connection weight / strength (0.0 to 1.0).
     pub weight: f64,
+    /// How this relationship entered the graph.
+    #[serde(default)]
+    pub provenance: CognitiveProvenance,
+    /// Canonical evidence identifiers supporting this relationship.
+    #[serde(default)]
+    pub evidence_ids: Vec<String>,
+    /// When the relationship was observed, if it is an observed relationship.
+    #[serde(default)]
+    pub observed_at: Option<String>,
     /// Human-readable explanation of the relationship.
     pub description: String,
 }

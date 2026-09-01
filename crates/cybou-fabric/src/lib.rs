@@ -74,6 +74,14 @@ pub const AGENT: BusEndpoint = BusEndpoint {
     systemd_unit: "cybou-agentd.service",
 };
 
+/// Stable endpoint for the background-operation runtime owner.
+pub const OPERATION: BusEndpoint = BusEndpoint {
+    service: "org.cybou.Runtime.Operation1",
+    object_path: "/org/cybou/Runtime/Operation1",
+    interface: "org.cybou.Runtime.Operation1",
+    systemd_unit: "cybou-operationd.service",
+};
+
 /// Stable system-bus endpoint for the Body executor.
 pub const EXECUTOR: BusEndpoint = BusEndpoint {
     service: "org.cybou.Body.Executor1",

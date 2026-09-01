@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=Cybou Operation1 Background Operation Owner
+PartOf=cybou-mind.target
+
+[Service]
+Type=dbus
+BusName=org.cybou.Runtime.Operation1
+ExecStart=/usr/libexec/cybou/cybou-operationd
+Environment=CYBOU_OPERATION_STORE=%h/.local/state/cybou/operations.sqlite3
+Restart=on-failure
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=default.target

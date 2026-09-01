@@ -63,6 +63,16 @@ pub fn set_freeze_state(unit: &str, state: FreezeState) -> bool {
     if !status.success() {
         return false;
     }
+    freeze_state_is(unit, state)
+}
+
+/// Read the kernel state again without issuing another control request.
+///
+/// This is deliberately separate from [`set_freeze_state`]: Agent1 uses it immediately before
+/// publishing a transition, while holding the capsule's control gate, so its projection describes
+/// the state after every earlier request for that capsule.
+#[must_use]
+pub fn freeze_state_is(unit: &str, state: FreezeState) -> bool {
     let Some(control_group) = control_group(unit) else {
         return false;
     };
@@ -83,8 +93,26 @@ pub fn revoke_egress(unit: &str) -> bool {
     let _ = Command::new("systemctl")
         .args(["--user", "stop", unit])
         .status();
-    let Ok(output) = Command::new("systemctl")
-        .args(["--user", "show", "--property=ActiveState", "--value", unit])
+    unit_inactive(unit, true)
+}
+
+/// Stop the system-owned model gateway, verify it is inactive, and verify systemd removed every
+/// bearer surface from its runtime directory.
+#[must_use]
+pub fn revoke_model(unit: &str, artifacts: &[PathBuf]) -> bool {
+    let _ = Command::new("systemctl").args(["stop", unit]).status();
+    artifacts.len() == 2
+        && unit_inactive(unit, false)
+        && artifacts.iter().all(|artifact| !artifact.exists())
+}
+
+fn unit_inactive(unit: &str, user: bool) -> bool {
+    let mut command = Command::new("systemctl");
+    if user {
+        command.arg("--user");
+    }
+    let Ok(output) = command
+        .args(["show", "--property=ActiveState", "--value", unit])
         .output()
     else {
         return false;

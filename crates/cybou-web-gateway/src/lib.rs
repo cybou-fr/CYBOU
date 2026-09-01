@@ -249,7 +249,16 @@ pub(crate) fn router_in_sandbox(
         operations: Arc::new(crate::operations_hub::OperationsHub::new()),
         notifications: Arc::new(crate::notifications_hub::NotificationsHub::new()),
         system: Arc::new(crate::system_hub::SystemHub::new()),
-        personal: Arc::new(crate::personal_hub::PersonalHub::new()),
+        personal: Arc::new({
+            #[cfg(test)]
+            {
+                crate::personal_hub::PersonalHub::with_optional_store(None)
+            }
+            #[cfg(not(test))]
+            {
+                crate::personal_hub::PersonalHub::new()
+            }
+        }),
         cognitive: Arc::new(crate::cognitive_hub::CognitiveHub::new()),
         meaning: Arc::new(crate::meaning_hub::MeaningHub::new()),
         learning: Arc::new(crate::learning_hub::LearningHub::new()),
@@ -806,6 +815,77 @@ mod tests {
         }
     }
 
+    struct TwoAccounts;
+
+    #[async_trait]
+    impl CredentialVerifier for TwoAccounts {
+        async fn verify(&self, username: &str, password: &str) -> Option<crate::VerifiedAccount> {
+            let uid = match (username, password) {
+                ("alice", "alice-secret") => 1000,
+                ("bob", "bob-secret") => 1001,
+                _ => return None,
+            };
+            Some(crate::VerifiedAccount {
+                username: username.to_owned(),
+                uid,
+                home: format!("/home/{username}"),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn personal_records_never_cross_authenticated_uids() {
+        let app = router_with_verifier_and_access(
+            Arc::new(FixturePresenceSource::nominal()),
+            Some(Arc::new(FixturePresenceSource::nominal())),
+            Some(Arc::new(TwoAccounts)),
+            None,
+            SessionContext::sign_in_required_context(),
+        );
+        let alice = sign_in(&app, "alice", "alice-secret")
+            .await
+            .expect("Alice signs in");
+        let bob = sign_in(&app, "bob", "bob-secret")
+            .await
+            .expect("Bob signs in");
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/personal/notes")
+                    .header("cookie", &alice)
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"title":"Alice only","contentMarkdown":"private","tags":[],"isPinned":false}"#,
+                    ))
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/personal/notes")
+                    .header("cookie", &bob)
+                    .body(Body::empty())
+                    .expect("a request"),
+            )
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("a body");
+        let notes: cybou_web_contracts::NotesProjection =
+            serde_json::from_slice(&body).expect("notes projection");
+        assert!(notes.notes.is_empty(), "Bob received Alice's note");
+    }
+
     async fn cursor_for(app: &Router, cookie: Option<&str>) -> String {
         let mut request = Request::builder().uri("/api/v1/snapshot");
         if let Some(cookie) = cookie {
@@ -1019,6 +1099,24 @@ mod tests {
             .await
             .expect("read response");
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn operation_history_and_notifications_are_not_public_preview_surfaces() {
+        let app = guarded_router();
+        for uri in ["/api/v1/operations", "/api/v1/notifications"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .body(Body::empty())
+                        .expect("read request"),
+                )
+                .await
+                .expect("read response");
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{uri}");
+        }
     }
 
     #[tokio::test]

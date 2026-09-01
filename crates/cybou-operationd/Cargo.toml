@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "cybou-agentd"
-description = "The owner of one agent session: launch, hold, and end"
+name = "cybou-operationd"
+description = "Operation1 owner for durable background-operation lifecycle and cancellation"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,17 +11,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-agent-client-protocol.workspace = true
 ciborium.workspace = true
-cybou-acp = { path = "../cybou-acp" }
 cybou-fabric = { path = "../cybou-fabric" }
-cybou-agent-opencode = { path = "../cybou-agent-opencode" }
-cybou-capsule = { path = "../cybou-capsule" }
 cybou-protocol = { path = "../cybou-protocol" }
 serde.workspace = true
-serde_json.workspace = true
-time.workspace = true
+rusqlite.workspace = true
 tokio = { workspace = true, features = ["sync"] }
+time.workspace = true
 uuid.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]

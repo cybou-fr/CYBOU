@@ -17,7 +17,30 @@ use cybou_web_contracts::{
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::learning_hub::LearningError;
 use crate::state::GatewayState;
+
+fn mutation_error(
+    error: LearningError,
+    not_found: &'static str,
+) -> (StatusCode, Json<crate::state::ErrorBody>) {
+    let (status, code, retryable) = match error {
+        LearningError::NotFound => (StatusCode::NOT_FOUND, not_found, false),
+        LearningError::Persistence(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "learningPersistenceFailed",
+            true,
+        ),
+    };
+    (
+        status,
+        Json(crate::state::ErrorBody {
+            schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+            error: code,
+            retryable,
+        }),
+    )
+}
 
 /// Query parameters for filtering learning candidates.
 #[derive(Debug, Deserialize)]
@@ -66,7 +89,10 @@ pub async fn propose_candidate_handler(
         return Err(GatewayState::sign_in_required());
     }
 
-    let candidate = state.learning.propose_candidate(request);
+    let candidate = state
+        .learning
+        .propose_candidate(request)
+        .map_err(|error| mutation_error(error, "candidateNotFound"))?;
     Ok((StatusCode::CREATED, Json(candidate)))
 }
 
@@ -82,14 +108,7 @@ pub async fn evaluate_candidate_handler(
 
     match state.learning.evaluate_candidate(candidate_id) {
         Ok(projection) => Ok(Json(projection)),
-        Err(_) => Err((
-            StatusCode::NOT_FOUND,
-            Json(crate::state::ErrorBody {
-                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-                error: "candidateNotFound",
-                retryable: false,
-            }),
-        )),
+        Err(error) => Err(mutation_error(error, "candidateNotFound")),
     }
 }
 
@@ -120,18 +139,11 @@ pub async fn revoke_artifact_handler(
     let mut req = request;
     req.artifact_id = artifact_id;
 
-    if state.learning.revoke_artifact(req) {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err((
-            StatusCode::NOT_FOUND,
-            Json(crate::state::ErrorBody {
-                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
-                error: "artifactNotFound",
-                retryable: false,
-            }),
-        ))
-    }
+    state
+        .learning
+        .revoke_artifact(req)
+        .map_err(|error| mutation_error(error, "artifactNotFound"))?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Retrieve active task scopes and capability grants.

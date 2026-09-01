@@ -1577,8 +1577,8 @@ impl MindClient for MockMindClient {
         Ok(cybou_protocol::learning::LearningCandidate {
             candidate_id: uuid::Uuid::new_v4(),
             layer: req.layer,
-            source_evidence: req.source_evidence.clone(),
-            outcome_evidence: req.outcome_evidence.clone(),
+            source_evidence: Vec::new(),
+            outcome_evidence: Vec::new(),
             generalization: req.generalization.clone(),
             scope: req.scope.clone(),
             derivation_version: 1,

@@ -1,179 +1,129 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Operations Hub for tracking and managing server-owned asynchronous tasks.
-
-use cybou_protocol::operation::{
-    OperationLogEntry, OperationProgress, OperationRecord, OperationState,
-};
-use cybou_web_contracts::{OperationLogsProjection, OperationsListProjection, WEB_SCHEMA_V1};
-use std::{collections::HashMap, sync::RwLock};
-use time::OffsetDateTime;
-use uuid::Uuid;
+//! Stateless HTTP-boundary client for Operation1.
 
 use crate::state::GatewayError;
+use cybou_protocol::operation::{OperationLogEntry, OperationRecord};
+use cybou_web_contracts::{OperationLogsProjection, OperationsListProjection, WEB_SCHEMA_V1};
+use serde::Deserialize;
+use uuid::Uuid;
 
-/// Maximum log lines retained per operation in memory.
-const MAX_LOG_LINES_PER_OP: usize = 500;
-
-/// Maximum completed operations retained in history.
-const MAX_HISTORY_OPS: usize = 100;
-
-/// Server-side hub for tracking active and historical operations.
-#[derive(Debug)]
-pub struct OperationsHub {
-    operations: RwLock<Vec<OperationRecord>>,
-    logs: RwLock<HashMap<Uuid, Vec<OperationLogEntry>>>,
+#[derive(Deserialize)]
+enum CancelResult {
+    Cancelled,
+    NotFound,
+    Conflict,
+    Refused,
 }
 
-impl Default for OperationsHub {
-    fn default() -> Self {
-        Self {
-            operations: RwLock::new(Vec::new()),
-            logs: RwLock::new(HashMap::new()),
-        }
-    }
-}
+/// Holds no operation lifecycle, progress, logs, or cancellation state.
+#[derive(Debug, Default)]
+pub struct OperationsHub;
 
 impl OperationsHub {
-    /// Create a new empty `OperationsHub`.
+    /// Create a stateless proxy.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self
     }
 
-    /// List all active and historical operations.
-    #[must_use]
-    pub fn list(&self) -> OperationsListProjection {
-        let ops = self.operations.read().expect("read operations").clone();
-        let active_count = ops.iter().filter(|op| !op.state.is_terminal()).count();
-        OperationsListProjection {
-            schema_version: WEB_SCHEMA_V1,
-            active_count,
-            operations: ops,
-        }
-    }
-
-    /// Retrieve an operation by ID.
-    #[must_use]
-    pub fn get(&self, id: Uuid) -> Option<OperationRecord> {
-        self.operations
-            .read()
-            .expect("read operations")
-            .iter()
-            .find(|op| op.id == id)
-            .cloned()
-    }
-
-    /// Retrieve logs for an operation.
-    #[must_use]
-    pub fn get_logs(&self, id: Uuid) -> OperationLogsProjection {
-        let logs = self
-            .logs
-            .read()
-            .expect("read logs")
-            .get(&id)
-            .cloned()
-            .unwrap_or_default();
-        OperationLogsProjection {
-            schema_version: WEB_SCHEMA_V1,
-            operation_id: id,
-            logs,
-        }
-    }
-
-    /// Register a new operation.
-    pub fn register(&self, op: OperationRecord) {
-        let id = op.id;
-        let mut ops = self.operations.write().expect("write operations");
-        ops.insert(0, op);
-        if ops.len() > MAX_HISTORY_OPS {
-            ops.truncate(MAX_HISTORY_OPS);
-        }
-        let mut logs = self.logs.write().expect("write logs");
-        logs.entry(id).or_default();
-    }
-
-    /// Update progress on an active operation.
-    pub fn update_progress(
+    #[cfg(target_os = "linux")]
+    async fn call(
         &self,
-        id: Uuid,
-        progress: OperationProgress,
-    ) -> Result<(), GatewayError> {
-        let mut ops = self.operations.write().expect("write operations");
-        let op = ops
-            .iter_mut()
-            .find(|op| op.id == id)
-            .ok_or(GatewayError::NotFound)?;
-        op.progress = progress;
-        op.updated_at = OffsetDateTime::now_utc();
-        Ok(())
+        method: &str,
+        body: &(impl serde::Serialize + zbus::zvariant::DynamicType),
+    ) -> Result<Vec<u8>, GatewayError> {
+        zbus::Connection::session()
+            .await
+            .map_err(|_| GatewayError::Unavailable)?
+            .call_method(
+                Some(cybou_fabric::OPERATION.service),
+                cybou_fabric::OPERATION.object_path,
+                Some(cybou_fabric::OPERATION.interface),
+                method,
+                body,
+            )
+            .await
+            .map_err(|_| GatewayError::Unavailable)?
+            .body()
+            .deserialize()
+            .map_err(|_| GatewayError::InvalidProjection)
     }
 
-    /// Append log output to an operation.
-    pub fn append_log(&self, id: Uuid, stream: &str, text: &str) {
-        let mut logs = self.logs.write().expect("write logs");
-        let list = logs.entry(id).or_default();
-        list.push(OperationLogEntry {
-            timestamp: OffsetDateTime::now_utc(),
-            stream: stream.to_owned(),
-            text: text.to_owned(),
-        });
-        if list.len() > MAX_LOG_LINES_PER_OP {
-            list.remove(0);
+    /// List canonical operations.
+    pub async fn list(&self) -> Result<OperationsListProjection, GatewayError> {
+        #[cfg(target_os = "linux")]
+        {
+            let operations: Vec<OperationRecord> =
+                cybou_fabric::decode(&self.call("List", &()).await?)
+                    .map_err(|_| GatewayError::InvalidProjection)?;
+            let active_count = operations.iter().filter(|v| !v.state.is_terminal()).count();
+            Ok(OperationsListProjection {
+                schema_version: WEB_SCHEMA_V1,
+                active_count,
+                operations,
+            })
+        }
+        #[cfg(not(target_os = "linux"))]
+        Err(GatewayError::Unavailable)
+    }
+
+    /// Get one canonical operation.
+    pub async fn get(&self, id: Uuid) -> Result<OperationRecord, GatewayError> {
+        #[cfg(target_os = "linux")]
+        {
+            let bytes = self.call("Get", &(id.to_string(),)).await?;
+            if bytes.is_empty() {
+                return Err(GatewayError::NotFound);
+            }
+            cybou_fabric::decode(&bytes).map_err(|_| GatewayError::InvalidProjection)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = id;
+            Err(GatewayError::Unavailable)
         }
     }
 
-    /// Mark an operation as completed.
-    pub fn complete(&self, id: Uuid) -> Result<(), GatewayError> {
-        let mut ops = self.operations.write().expect("write operations");
-        let op = ops
-            .iter_mut()
-            .find(|op| op.id == id)
-            .ok_or(GatewayError::NotFound)?;
-        op.state = OperationState::Completed;
-        op.progress.percent = Some(100.0);
-        op.updated_at = OffsetDateTime::now_utc();
-        op.finished_at = Some(OffsetDateTime::now_utc());
-        Ok(())
+    /// Get owner-held logs.
+    pub async fn get_logs(&self, id: Uuid) -> Result<OperationLogsProjection, GatewayError> {
+        #[cfg(target_os = "linux")]
+        {
+            let logs: Vec<OperationLogEntry> =
+                cybou_fabric::decode(&self.call("Logs", &(id.to_string(),)).await?)
+                    .map_err(|_| GatewayError::InvalidProjection)?;
+            Ok(OperationLogsProjection {
+                schema_version: WEB_SCHEMA_V1,
+                operation_id: id,
+                logs,
+            })
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = id;
+            Err(GatewayError::Unavailable)
+        }
     }
 
-    /// Mark an operation as failed.
-    pub fn fail(&self, id: Uuid, error: String) -> Result<(), GatewayError> {
-        let mut ops = self.operations.write().expect("write operations");
-        let op = ops
-            .iter_mut()
-            .find(|op| op.id == id)
-            .ok_or(GatewayError::NotFound)?;
-        op.state = OperationState::Failed {
-            error: error.clone(),
-        };
-        op.updated_at = OffsetDateTime::now_utc();
-        op.finished_at = Some(OffsetDateTime::now_utc());
-        drop(ops);
-        self.append_log(id, "stderr", &format!("Operation failed: {error}"));
-        Ok(())
-    }
-
-    /// Cancel a running operation.
-    pub fn cancel(&self, id: Uuid, reason: Option<String>) -> Result<(), GatewayError> {
-        let mut ops = self.operations.write().expect("write operations");
-        let op = ops
-            .iter_mut()
-            .find(|op| op.id == id)
-            .ok_or(GatewayError::NotFound)?;
-        if op.state.is_terminal() {
-            return Err(GatewayError::Conflict);
+    /// Ask Operation1 to signal the real worker's cancellation token.
+    pub async fn cancel(&self, id: Uuid) -> Result<(), GatewayError> {
+        #[cfg(target_os = "linux")]
+        {
+            let result: CancelResult =
+                cybou_fabric::decode(&self.call("Cancel", &(id.to_string(),)).await?)
+                    .map_err(|_| GatewayError::InvalidProjection)?;
+            match result {
+                CancelResult::Cancelled => Ok(()),
+                CancelResult::NotFound => Err(GatewayError::NotFound),
+                CancelResult::Conflict => Err(GatewayError::Conflict),
+                CancelResult::Refused => Err(GatewayError::Refused),
+            }
         }
-        if !op.cancellable {
-            return Err(GatewayError::Refused);
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = id;
+            Err(GatewayError::Unavailable)
         }
-        op.state = OperationState::Cancelled;
-        op.updated_at = OffsetDateTime::now_utc();
-        op.finished_at = Some(OffsetDateTime::now_utc());
-        drop(ops);
-        let msg = reason.unwrap_or_else(|| "Operation cancelled by user".to_owned());
-        self.append_log(id, "system", &msg);
-        Ok(())
     }
 }

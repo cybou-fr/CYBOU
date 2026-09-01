@@ -3,7 +3,11 @@
 
 //! HTTP endpoints for querying and managing desktop notifications.
 
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{
+    Json,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+};
 use cybou_web_contracts::{
     NotificationActionRequest, NotificationDismissRequest, NotificationsListProjection,
 };
@@ -13,15 +17,31 @@ use crate::state::{GatewayError, GatewayState};
 /// GET `/api/v1/notifications`
 pub async fn list_notifications(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
 ) -> Result<Json<NotificationsListProjection>, GatewayError> {
+    if state
+        .session_for(&headers)
+        .and_then(|session| session.uid)
+        .is_none()
+    {
+        return Err(GatewayError::Refused);
+    }
     Ok(Json(state.notifications.list()))
 }
 
 /// POST `/api/v1/notifications/dismiss`
 pub async fn dismiss_notifications(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
     Json(request): Json<NotificationDismissRequest>,
 ) -> Result<StatusCode, GatewayError> {
+    if state
+        .session_for(&headers)
+        .and_then(|session| session.uid)
+        .is_none()
+    {
+        return Err(GatewayError::Refused);
+    }
     state
         .notifications
         .dismiss(request.notification_id, request.dismiss_all);
@@ -31,11 +51,24 @@ pub async fn dismiss_notifications(
 /// POST `/api/v1/notifications/action`
 pub async fn execute_notification_action(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
     Json(request): Json<NotificationActionRequest>,
 ) -> Result<Json<serde_json::Value>, GatewayError> {
+    if state
+        .session_for(&headers)
+        .and_then(|session| session.uid)
+        .is_none()
+    {
+        return Err(GatewayError::Refused);
+    }
     let outcome = state
         .notifications
-        .execute_action(request.notification_id, &request.action_id)?;
+        .execute_action(
+            &state.operations,
+            request.notification_id,
+            &request.action_id,
+        )
+        .await?;
     Ok(Json(serde_json::json!({ "outcome": outcome })))
 }
 
@@ -49,9 +82,10 @@ mod tests {
     use time::OffsetDateTime;
     use uuid::Uuid;
 
-    #[test]
-    fn notifications_hub_filters_and_dismisses() {
+    #[tokio::test]
+    async fn notifications_hub_filters_and_dismisses() {
         let hub = NotificationsHub::new();
+        let operations = crate::operations_hub::OperationsHub::new();
         let list = hub.list();
         assert_eq!(list.notifications.len(), 0);
 
@@ -77,7 +111,7 @@ mod tests {
         let after = hub.list();
         assert_eq!(after.attention_count, 1);
 
-        let result = hub.execute_action(notif_id, "dismiss");
+        let result = hub.execute_action(&operations, notif_id, "dismiss").await;
         assert!(result.is_ok());
 
         let final_list = hub.list();

@@ -1,8 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Learning & Governance Hub: Manages layered lifelong learning candidates,
-//! deterministic promotion gates, durable artifact lineages, and task-scoped capability governance.
+//! Learning candidates, owner-resolved evidence, promotion, and governance.
 
 use cybou_protocol::governance::TaskScope;
 use cybou_protocol::learning::{
@@ -15,8 +14,7 @@ use cybou_web_contracts::{
     WEB_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::{io::Write, path::PathBuf, sync::Mutex};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -32,13 +30,19 @@ struct LearningStore {
     scopes: Vec<TaskScope>,
 }
 
-/// Server-owned engine for candidate evaluation, artifact lineage, and capability grants.
+/// A mutation either could not find its target or could not be made durable.
+#[derive(Debug)]
+pub enum LearningError {
+    /// The target does not exist.
+    NotFound,
+    /// The backing store rejected the state.
+    Persistence(std::io::Error),
+}
+
+/// Server-owned learning state and evidence resolver.
 pub struct LearningHub {
     store_path: Option<PathBuf>,
-    candidates: Mutex<Vec<LearningCandidate>>,
-    demonstrations: Mutex<Vec<(Uuid, Vec<DemonstratedOutcome>)>>,
-    artifacts: Mutex<Vec<LearnedArtifactLineage>>,
-    scopes: Mutex<Vec<TaskScope>>,
+    store: Mutex<LearningStore>,
 }
 
 impl Default for LearningHub {
@@ -48,261 +52,217 @@ impl Default for LearningHub {
 }
 
 impl LearningHub {
-    /// Create a new `LearningHub` initialized with default store path if available.
+    /// Create a hub with the default store.
     #[must_use]
     pub fn new() -> Self {
-        let store_path = Self::default_store_path();
-        Self::with_optional_store(store_path)
+        Self::with_optional_store(Self::default_store_path())
     }
 
-    /// Determine default store path from environment or Linux path.
+    /// Determine the configured durable store.
     #[must_use]
     pub fn default_store_path() -> Option<PathBuf> {
         if let Ok(path) = std::env::var("CYBOU_LEARNING_STORE") {
-            return Some(PathBuf::from(path));
+            return Some(path.into());
         }
         #[cfg(target_os = "linux")]
         {
-            let candidate = PathBuf::from("/var/lib/cybou/learning-store.json");
-            if candidate.parent().is_some_and(std::path::Path::exists) {
-                return Some(candidate);
+            let path = PathBuf::from("/var/lib/cybou/learning-store.json");
+            if path.parent().is_some_and(std::path::Path::exists) {
+                return Some(path);
             }
         }
         None
     }
 
-    /// Construct `LearningHub` with an optional backing store path.
+    /// Construct a hub with an optional store.
     #[must_use]
     pub fn with_optional_store(store_path: Option<PathBuf>) -> Self {
-        let mut loaded = LearningStore::default();
-        if let Some(ref path) = store_path
-            && let Ok(bytes) = std::fs::read(path)
-            && let Ok(parsed) = serde_json::from_slice::<LearningStore>(&bytes)
-        {
-            loaded = parsed;
-        }
-
+        let store = store_path
+            .as_ref()
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
         Self {
             store_path,
-            candidates: Mutex::new(loaded.candidates),
-            demonstrations: Mutex::new(loaded.demonstrations),
-            artifacts: Mutex::new(loaded.artifacts),
-            scopes: Mutex::new(loaded.scopes),
+            store: Mutex::new(store),
         }
     }
 
-    fn persist(&self) {
-        let Some(ref path) = self.store_path else {
-            return;
+    fn persist(&self, store: &LearningStore) -> Result<(), LearningError> {
+        let Some(path) = self.store_path.as_ref() else {
+            return Ok(());
         };
-
-        let store = LearningStore {
-            candidates: self
-                .candidates
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            demonstrations: self
-                .demonstrations
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            artifacts: self
-                .artifacts
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            scopes: self
-                .scopes
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-        };
-
-        if let Ok(json_bytes) = serde_json::to_vec_pretty(&store) {
-            let tmp_path = path.with_extension("tmp");
-            if std::fs::write(&tmp_path, json_bytes).is_ok() {
-                let _ = std::fs::rename(tmp_path, path);
-            }
+        let bytes = serde_json::to_vec_pretty(store)
+            .map_err(|e| LearningError::Persistence(std::io::Error::other(e)))?;
+        let temporary = path.with_extension(format!("{}.tmp", Uuid::new_v4()));
+        let result = (|| {
+            let mut file = std::fs::File::create(&temporary)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+            std::fs::rename(&temporary, path)?;
+            Ok::<(), std::io::Error>(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
         }
+        result.map_err(LearningError::Persistence)
     }
 
-    /// Retrieve active learning candidates filtered by optional layer.
-    pub fn get_candidates(
-        &self,
-        layer_filter: Option<LearningLayer>,
-    ) -> LearningCandidatesProjection {
-        let candidates = self
-            .candidates
+    /// Retrieve candidates, optionally filtered by layer.
+    pub fn get_candidates(&self, layer: Option<LearningLayer>) -> LearningCandidatesProjection {
+        let store = self
+            .store
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let filtered: Vec<LearningCandidate> = candidates
+        let candidates: Vec<_> = store
+            .candidates
             .iter()
-            .filter(|c| layer_filter.is_none_or(|l| c.layer == l))
+            .filter(|c| layer.is_none_or(|l| c.layer == l))
             .cloned()
             .collect();
-        let total_count = filtered.len();
-
         LearningCandidatesProjection {
             schema_version: WEB_SCHEMA_V1,
-            candidates: filtered,
-            total_count,
+            total_count: candidates.len(),
+            candidates,
         }
     }
 
-    /// Propose a new learning candidate.
-    pub fn propose_candidate(&self, req: ProposeLearningCandidateRequest) -> LearningCandidate {
-        let now = OffsetDateTime::now_utc();
+    /// Propose candidate content; evidence is owner-resolved during evaluation.
+    pub fn propose_candidate(
+        &self,
+        request: ProposeLearningCandidateRequest,
+    ) -> Result<LearningCandidate, LearningError> {
         let candidate = LearningCandidate {
             candidate_id: Uuid::new_v4(),
-            layer: req.layer,
-            source_evidence: req.source_evidence,
-            outcome_evidence: req.outcome_evidence,
-            generalization: req.generalization,
-            scope: req.scope,
+            layer: request.layer,
+            source_evidence: Vec::new(),
+            outcome_evidence: Vec::new(),
+            generalization: request.generalization,
+            scope: request.scope,
             derivation_version: 1,
-            created_at: now,
+            created_at: OffsetDateTime::now_utc(),
         };
-
-        {
-            let mut candidates = self
-                .candidates
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            candidates.push(candidate.clone());
-        }
-        self.persist();
-        candidate
+        let mut current = self
+            .store
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut next = current.clone();
+        next.candidates.push(candidate.clone());
+        self.persist(&next)?;
+        *current = next;
+        Ok(candidate)
     }
 
-    /// Evaluate a candidate against demonstrated outcomes and promotion criteria.
+    /// Resolve owner-held evidence and apply the promotion gate.
     pub fn evaluate_candidate(
         &self,
         candidate_id: Uuid,
-    ) -> Result<CandidateEvaluationProjection, String> {
-        let candidates = self
-            .candidates
+    ) -> Result<CandidateEvaluationProjection, LearningError> {
+        let mut current = self
+            .store
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let candidate = candidates
+        let mut next = current.clone();
+        let position = next
+            .candidates
             .iter()
-            .find(|c| c.candidate_id == candidate_id)
-            .cloned()
-            .ok_or_else(|| format!("Candidate {candidate_id} not found"))?;
-        drop(candidates);
-
-        // Demonstrations are owner-held evidence. The browser may ask for evaluation, but it
-        // must never be able to supply the facts used by the promotion gate in that request.
-        let outcomes = {
-            let demos = self
-                .demonstrations
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            demos
-                .iter()
-                .find(|(id, _)| *id == candidate_id)
-                .map(|(_, list)| list.clone())
-                .unwrap_or_default()
-        };
-
+            .position(|c| c.candidate_id == candidate_id)
+            .ok_or(LearningError::NotFound)?;
+        let outcomes = next
+            .demonstrations
+            .iter()
+            .find(|(id, _)| *id == candidate_id)
+            .map(|(_, values)| values.clone())
+            .unwrap_or_default();
+        let candidate = &mut next.candidates[position];
+        candidate.source_evidence = outcomes.iter().map(|v| v.episode).collect();
+        candidate.source_evidence.sort_unstable();
+        candidate.source_evidence.dedup();
+        candidate.outcome_evidence = outcomes.iter().map(|v| v.outcome).collect();
+        candidate.outcome_evidence.sort_unstable();
+        candidate.outcome_evidence.dedup();
+        let candidate = candidate.clone();
         let gate = PromotionGate {
             min_independent_episodes: 2,
             min_success_rate: 0.80,
             evaluation_passed: true,
         };
-
-        let result = match evaluate_promotion(&candidate, &outcomes, &gate) {
+        let projection = match evaluate_promotion(&candidate, &outcomes, &gate) {
             Ok(promoted) => {
-                let now = OffsetDateTime::now_utc();
-                let artifact_id = Uuid::new_v4();
-                let mut all_evidence = candidate.source_evidence.clone();
-                all_evidence.extend(candidate.outcome_evidence.clone());
-
+                let mut evidence = candidate.source_evidence.clone();
+                evidence.extend(candidate.outcome_evidence.iter().copied());
+                evidence.sort_unstable();
+                evidence.dedup();
                 let artifact = LearnedArtifactLineage {
-                    artifact_id,
+                    artifact_id: Uuid::new_v4(),
                     layer: candidate.layer,
                     status: ArtifactStatus::Promoted,
-                    contributing_candidates: vec![candidate.candidate_id],
-                    source_evidence: all_evidence,
-                    promoted_at: Some(now),
+                    contributing_candidates: vec![candidate_id],
+                    source_evidence: evidence,
+                    promoted_at: Some(OffsetDateTime::now_utc()),
                     erasure_epoch: 1,
                 };
-
-                {
-                    let mut artifacts = self
-                        .artifacts
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    artifacts.push(artifact.clone());
-                }
-
-                Ok(CandidateEvaluationProjection {
+                next.artifacts.push(artifact.clone());
+                CandidateEvaluationProjection {
                     schema_version: WEB_SCHEMA_V1,
                     candidate_id,
                     promoted: Some(promoted),
                     refused: None,
                     artifact: Some(artifact),
-                })
+                }
             }
-            Err(refused) => Ok(CandidateEvaluationProjection {
+            Err(refused) => CandidateEvaluationProjection {
                 schema_version: WEB_SCHEMA_V1,
                 candidate_id,
                 promoted: None,
                 refused: Some(refused),
                 artifact: None,
-            }),
+            },
         };
-
-        self.persist();
-        result
+        self.persist(&next)?;
+        *current = next;
+        Ok(projection)
     }
 
-    /// Retrieve list of promoted durable artifacts.
+    /// Retrieve durable artifacts.
     pub fn get_artifacts(&self) -> LearnedArtifactsProjection {
-        let artifacts = self
-            .artifacts
+        let store = self
+            .store
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let total_count = artifacts.len();
-
         LearnedArtifactsProjection {
             schema_version: WEB_SCHEMA_V1,
-            artifacts: artifacts.clone(),
-            total_count,
+            total_count: store.artifacts.len(),
+            artifacts: store.artifacts.clone(),
         }
     }
 
-    /// Revoke or deprecate a promoted artifact.
-    pub fn revoke_artifact(&self, req: RevokeArtifactRequest) -> bool {
-        let mut artifacts = self
-            .artifacts
+    /// Revoke an artifact, committing disk before visible memory.
+    pub fn revoke_artifact(&self, request: RevokeArtifactRequest) -> Result<(), LearningError> {
+        let mut current = self
+            .store
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let revoked = if let Some(art) = artifacts
+        let mut next = current.clone();
+        next.artifacts
             .iter_mut()
-            .find(|a| a.artifact_id == req.artifact_id)
-        {
-            art.status = ArtifactStatus::Revoked;
-            true
-        } else {
-            false
-        };
-        drop(artifacts);
-        if revoked {
-            self.persist();
-        }
-        revoked
+            .find(|a| a.artifact_id == request.artifact_id)
+            .ok_or(LearningError::NotFound)?
+            .status = ArtifactStatus::Revoked;
+        self.persist(&next)?;
+        *current = next;
+        Ok(())
     }
 
-    /// Retrieve active task-scoped capability grants and governance scopes.
+    /// Retrieve task-scoped grants.
     pub fn get_scopes(&self) -> GovernanceScopesProjection {
-        let scopes = self
-            .scopes
+        let store = self
+            .store
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         GovernanceScopesProjection {
             schema_version: WEB_SCHEMA_V1,
-            scopes: scopes.clone(),
+            scopes: store.scopes.clone(),
         }
     }
 }
@@ -310,51 +270,93 @@ impl LearningHub {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn learning_hub_persists_and_reloads() {
-        let tmp_dir = std::env::temp_dir().join(format!("cybou_test_learning_{}", Uuid::new_v4()));
-        let _ = std::fs::create_dir_all(&tmp_dir);
-        let store_path = tmp_dir.join("learning.json");
-
-        let hub = LearningHub::with_optional_store(Some(store_path.clone()));
-        let candidate = hub.propose_candidate(ProposeLearningCandidateRequest {
+    fn request() -> ProposeLearningCandidateRequest {
+        ProposeLearningCandidateRequest {
             layer: LearningLayer::Behavioral,
-            source_evidence: vec![],
-            outcome_evidence: vec![],
-            generalization: "Test generalization".to_owned(),
-            scope: "Test scope".to_owned(),
-        });
-
-        assert_eq!(hub.get_candidates(None).candidates.len(), 1);
-
-        // Reload
-        let reloaded = LearningHub::with_optional_store(Some(store_path));
-        let candidates = reloaded.get_candidates(None).candidates;
-        assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].candidate_id, candidate.candidate_id);
-
-        let _ = std::fs::remove_dir_all(&tmp_dir);
+            generalization: "Test".into(),
+            scope: "scope".into(),
+        }
     }
 
     #[test]
-    fn evaluation_cannot_promote_without_owner_held_demonstrations() {
+    fn persists_and_reloads() {
+        let directory = std::env::temp_dir().join(format!("cybou_learning_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).expect("temporary directory");
+        let path = directory.join("learning.json");
+        let candidate = LearningHub::with_optional_store(Some(path.clone()))
+            .propose_candidate(request())
+            .expect("durable proposal");
+        assert_eq!(
+            LearningHub::with_optional_store(Some(path))
+                .get_candidates(None)
+                .candidates[0]
+                .candidate_id,
+            candidate.candidate_id
+        );
+        std::fs::remove_dir_all(directory).expect("remove temporary directory");
+    }
+
+    #[test]
+    fn browser_cannot_claim_evidence_or_promote_without_owner_evidence() {
         let hub = LearningHub::with_optional_store(None);
-        let candidate = hub.propose_candidate(ProposeLearningCandidateRequest {
-            layer: LearningLayer::Behavioral,
-            source_evidence: vec![Uuid::new_v4()],
-            outcome_evidence: vec![Uuid::new_v4(), Uuid::new_v4()],
-            generalization: "Never trust caller-asserted success".to_owned(),
-            scope: "test".to_owned(),
-        });
+        let candidate = hub.propose_candidate(request()).expect("proposal");
+        assert!(candidate.source_evidence.is_empty() && candidate.outcome_evidence.is_empty());
+        assert!(
+            hub.evaluate_candidate(candidate.candidate_id)
+                .expect("evaluation")
+                .promoted
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn promoted_lineage_is_resolved_from_owner_demonstrations() {
+        let hub = LearningHub::with_optional_store(None);
+        let candidate = hub.propose_candidate(request()).expect("proposal");
+        let episode_a = Uuid::new_v4();
+        let episode_b = Uuid::new_v4();
+        let outcome_a = Uuid::new_v4();
+        let outcome_b = Uuid::new_v4();
+        hub.store
+            .lock()
+            .expect("learning store")
+            .demonstrations
+            .push((
+                candidate.candidate_id,
+                vec![
+                    DemonstratedOutcome {
+                        episode: episode_a,
+                        outcome: outcome_a,
+                        succeeded: true,
+                    },
+                    DemonstratedOutcome {
+                        episode: episode_b,
+                        outcome: outcome_b,
+                        succeeded: true,
+                    },
+                ],
+            ));
 
         let evaluation = hub
             .evaluate_candidate(candidate.candidate_id)
-            .expect("candidate exists");
+            .expect("evaluation");
+        let artifact = evaluation.artifact.expect("promoted artifact");
+        assert!(artifact.source_evidence.contains(&episode_a));
+        assert!(artifact.source_evidence.contains(&episode_b));
+        assert!(artifact.source_evidence.contains(&outcome_a));
+        assert!(artifact.source_evidence.contains(&outcome_b));
+    }
 
-        assert!(evaluation.promoted.is_none());
-        assert!(evaluation.artifact.is_none());
-        assert!(evaluation.refused.is_some());
-        assert!(hub.get_artifacts().artifacts.is_empty());
+    #[test]
+    fn failed_persistence_does_not_publish_memory_mutation() {
+        let directory = std::env::temp_dir().join(format!("cybou_learning_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).expect("temporary directory");
+        let hub = LearningHub::with_optional_store(Some(directory.clone()));
+        assert!(matches!(
+            hub.propose_candidate(request()),
+            Err(LearningError::Persistence(_))
+        ));
+        assert!(hub.get_candidates(None).candidates.is_empty());
+        std::fs::remove_dir_all(directory).expect("remove temporary directory");
     }
 }

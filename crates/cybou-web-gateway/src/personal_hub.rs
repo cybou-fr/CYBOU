@@ -12,9 +12,11 @@ use cybou_web_contracts::{
     CreateNoteRequest, MailProjection, NotesProjection, SendMailRequest, UpdateNoteRequest,
     WEB_SCHEMA_V1,
 };
+use rusqlite::{Connection, OptionalExtension as _, params};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -36,12 +38,9 @@ struct PersonalStore {
 
 /// Hub managing personal email accounts, calendar schedules, notes, and contacts.
 pub struct PersonalHub {
-    store_path: Option<PathBuf>,
-    accounts: RwLock<Vec<MailAccountRecord>>,
-    messages: RwLock<Vec<MailMessageRecord>>,
-    calendar_events: RwLock<Vec<CalendarEventRecord>>,
-    notes: RwLock<Vec<NoteRecord>>,
-    contacts: RwLock<Vec<ContactRecord>>,
+    database: Option<Mutex<Connection>>,
+    database_failed: bool,
+    volatile: RwLock<HashMap<u32, PersonalStore>>,
 }
 
 impl Default for PersonalHub {
@@ -66,7 +65,7 @@ impl PersonalHub {
         }
         #[cfg(target_os = "linux")]
         {
-            let candidate = PathBuf::from("/var/lib/cybou/personal-store.json");
+            let candidate = PathBuf::from("/var/lib/cybou/personal-store.sqlite3");
             if candidate.parent().is_some_and(std::path::Path::exists) {
                 return Some(candidate);
             }
@@ -77,127 +76,154 @@ impl PersonalHub {
     /// Construct `PersonalHub` with an optional backing store path.
     #[must_use]
     pub fn with_optional_store(store_path: Option<PathBuf>) -> Self {
-        let mut loaded = PersonalStore::default();
-        if let Some(ref path) = store_path
-            && let Ok(bytes) = std::fs::read(path)
-            && let Ok(parsed) = serde_json::from_slice::<PersonalStore>(&bytes)
-        {
-            loaded = parsed;
-        }
-
+        let requested_database = store_path.is_some();
+        let database = store_path.and_then(|path| {
+            let connection = Connection::open(path).ok()?;
+            connection
+                .execute_batch(
+                    "PRAGMA journal_mode=WAL;
+                     PRAGMA foreign_keys=ON;
+                     CREATE TABLE IF NOT EXISTS personal_stores (
+                         uid INTEGER PRIMARY KEY NOT NULL,
+                         payload TEXT NOT NULL,
+                         updated_at INTEGER NOT NULL
+                     );",
+                )
+                .ok()?;
+            Some(Mutex::new(connection))
+        });
         Self {
-            store_path,
-            accounts: RwLock::new(loaded.accounts),
-            messages: RwLock::new(loaded.messages),
-            calendar_events: RwLock::new(loaded.calendar_events),
-            notes: RwLock::new(loaded.notes),
-            contacts: RwLock::new(loaded.contacts),
+            database_failed: requested_database && database.is_none(),
+            database,
+            volatile: RwLock::new(HashMap::new()),
         }
     }
 
-    fn persist(&self) {
-        let Some(ref path) = self.store_path else {
-            return;
-        };
-
-        let store = PersonalStore {
-            accounts: self
-                .accounts
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            messages: self
-                .messages
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            calendar_events: self
-                .calendar_events
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            notes: self
-                .notes
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-            contacts: self
-                .contacts
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone(),
-        };
-
-        if let Ok(json_bytes) = serde_json::to_vec_pretty(&store) {
-            let tmp_path = path.with_extension("tmp");
-            if std::fs::write(&tmp_path, json_bytes).is_ok() {
-                let _ = std::fs::rename(tmp_path, path);
-            }
+    fn read_store(&self, uid: u32) -> Result<PersonalStore, GatewayError> {
+        if self.database_failed {
+            return Err(GatewayError::Internal);
         }
+        let Some(database) = &self.database else {
+            return Ok(self
+                .volatile
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(&uid)
+                .cloned()
+                .unwrap_or_default());
+        };
+        let database = database.lock().map_err(|_| GatewayError::Internal)?;
+        let payload: Option<String> = database
+            .query_row(
+                "SELECT payload FROM personal_stores WHERE uid=?1",
+                [uid],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|_| GatewayError::Internal)?;
+        payload.map_or_else(
+            || Ok(PersonalStore::default()),
+            |payload| serde_json::from_str(&payload).map_err(|_| GatewayError::Internal),
+        )
+    }
+
+    fn mutate<T>(
+        &self,
+        uid: u32,
+        change: impl FnOnce(&mut PersonalStore) -> Result<T, GatewayError>,
+    ) -> Result<T, GatewayError> {
+        if self.database_failed {
+            return Err(GatewayError::Internal);
+        }
+        let Some(database) = &self.database else {
+            let mut stores = self
+                .volatile
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            return change(stores.entry(uid).or_default());
+        };
+        let mut database = database.lock().map_err(|_| GatewayError::Internal)?;
+        let transaction = database.transaction().map_err(|_| GatewayError::Internal)?;
+        let payload: Option<String> = transaction
+            .query_row(
+                "SELECT payload FROM personal_stores WHERE uid=?1",
+                [uid],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|_| GatewayError::Internal)?;
+        let mut store = payload.map_or_else(
+            || Ok(PersonalStore::default()),
+            |payload| serde_json::from_str(&payload).map_err(|_| GatewayError::Internal),
+        )?;
+        let answer = change(&mut store)?;
+        let payload = serde_json::to_string(&store).map_err(|_| GatewayError::Internal)?;
+        transaction
+            .execute(
+                "INSERT INTO personal_stores(uid,payload,updated_at) VALUES(?1,?2,?3)
+                 ON CONFLICT(uid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at",
+                params![uid, payload, OffsetDateTime::now_utc().unix_timestamp()],
+            )
+            .map_err(|_| GatewayError::Internal)?;
+        transaction.commit().map_err(|_| GatewayError::Internal)?;
+        Ok(answer)
     }
 
     /// Retrieve email accounts and messages.
     #[must_use]
     pub fn get_mail(
         &self,
+        uid: u32,
         selected_account_id: Option<String>,
         selected_folder: Option<MailFolderKind>,
-    ) -> MailProjection {
-        let accounts = self
-            .accounts
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let all_messages = self
-            .messages
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+    ) -> Result<MailProjection, GatewayError> {
+        let store = self.read_store(uid)?;
 
         let active_account_id = selected_account_id.unwrap_or_default();
         let active_folder = selected_folder.unwrap_or(MailFolderKind::Inbox);
 
         let filtered_messages: Vec<MailMessageRecord> = if active_account_id.is_empty() {
-            all_messages.clone()
+            store.messages.clone()
         } else {
-            all_messages
+            store
+                .messages
                 .iter()
                 .filter(|m| m.account_id == active_account_id && m.folder == active_folder)
                 .cloned()
                 .collect()
         };
 
-        MailProjection {
+        Ok(MailProjection {
             schema_version: WEB_SCHEMA_V1,
-            accounts,
+            accounts: store.accounts,
             messages: filtered_messages,
             active_account_id,
             active_folder,
-        }
+        })
     }
 
     /// Send an email message.
-    pub fn send_mail(&self, _req: SendMailRequest) -> Result<MailMessageRecord, GatewayError> {
+    pub fn send_mail(
+        &self,
+        _uid: u32,
+        _req: SendMailRequest,
+    ) -> Result<MailMessageRecord, GatewayError> {
         Err(GatewayError::Refused)
     }
 
     /// Retrieve calendar events.
     #[must_use]
-    pub fn get_calendar(&self) -> CalendarProjection {
-        let events = self
-            .calendar_events
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-
-        CalendarProjection {
+    pub fn get_calendar(&self, uid: u32) -> Result<CalendarProjection, GatewayError> {
+        Ok(CalendarProjection {
             schema_version: WEB_SCHEMA_V1,
-            events,
-        }
+            events: self.read_store(uid)?.calendar_events,
+        })
     }
 
     /// Create a calendar event.
     pub fn create_calendar_event(
         &self,
+        uid: u32,
         req: CreateCalendarEventRequest,
     ) -> Result<CalendarEventRecord, GatewayError> {
         let event = CalendarEventRecord {
@@ -213,34 +239,28 @@ impl PersonalHub {
             referenced_subject: req.referenced_subject,
         };
 
-        {
-            let mut events = self
-                .calendar_events
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            events.push(event.clone());
-        }
-        self.persist();
+        self.mutate(uid, |store| {
+            store.calendar_events.push(event.clone());
+            Ok(())
+        })?;
         Ok(event)
     }
 
     /// Retrieve notes.
     #[must_use]
-    pub fn get_notes(&self) -> NotesProjection {
-        let notes = self
-            .notes
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-
-        NotesProjection {
+    pub fn get_notes(&self, uid: u32) -> Result<NotesProjection, GatewayError> {
+        Ok(NotesProjection {
             schema_version: WEB_SCHEMA_V1,
-            notes,
-        }
+            notes: self.read_store(uid)?.notes,
+        })
     }
 
     /// Create a new note.
-    pub fn create_note(&self, req: CreateNoteRequest) -> Result<NoteRecord, GatewayError> {
+    pub fn create_note(
+        &self,
+        uid: u32,
+        req: CreateNoteRequest,
+    ) -> Result<NoteRecord, GatewayError> {
         let now_str = OffsetDateTime::now_utc()
             .format(&time::format_description::well_known::Rfc3339)
             .unwrap_or_default();
@@ -255,59 +275,51 @@ impl PersonalHub {
             referenced_subject: req.referenced_subject,
         };
 
-        {
-            let mut notes = self
-                .notes
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            notes.push(note.clone());
-        }
-        self.persist();
+        self.mutate(uid, |store| {
+            store.notes.push(note.clone());
+            Ok(())
+        })?;
         Ok(note)
     }
 
     /// Update an existing note.
-    pub fn update_note(&self, req: UpdateNoteRequest) -> Result<NoteRecord, GatewayError> {
-        let mut notes = self
-            .notes
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let note = notes
-            .iter_mut()
-            .find(|n| n.id == req.id)
-            .ok_or(GatewayError::NotFound)?;
-
-        note.title = req.title;
-        note.content_markdown = req.content_markdown;
-        note.tags = req.tags;
-        note.is_pinned = req.is_pinned;
-        note.updated_at = OffsetDateTime::now_utc()
-            .format(&time::format_description::well_known::Rfc3339)
-            .unwrap_or_default();
-
-        let cloned = note.clone();
-        drop(notes);
-        self.persist();
-        Ok(cloned)
+    pub fn update_note(
+        &self,
+        uid: u32,
+        req: UpdateNoteRequest,
+    ) -> Result<NoteRecord, GatewayError> {
+        self.mutate(uid, |store| {
+            let note = store
+                .notes
+                .iter_mut()
+                .find(|n| n.id == req.id)
+                .ok_or(GatewayError::NotFound)?;
+            note.title = req.title;
+            note.content_markdown = req.content_markdown;
+            note.tags = req.tags;
+            note.is_pinned = req.is_pinned;
+            note.updated_at = OffsetDateTime::now_utc()
+                .format(&time::format_description::well_known::Rfc3339)
+                .unwrap_or_default();
+            Ok(note.clone())
+        })
     }
 
     /// Retrieve contacts directory.
     #[must_use]
-    pub fn get_contacts(&self) -> ContactsProjection {
-        let contacts = self
-            .contacts
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-
-        ContactsProjection {
+    pub fn get_contacts(&self, uid: u32) -> Result<ContactsProjection, GatewayError> {
+        Ok(ContactsProjection {
             schema_version: WEB_SCHEMA_V1,
-            contacts,
-        }
+            contacts: self.read_store(uid)?.contacts,
+        })
     }
 
     /// Create a new contact.
-    pub fn create_contact(&self, req: CreateContactRequest) -> Result<ContactRecord, GatewayError> {
+    pub fn create_contact(
+        &self,
+        uid: u32,
+        req: CreateContactRequest,
+    ) -> Result<ContactRecord, GatewayError> {
         let contact = ContactRecord {
             id: format!("cnt-{}", Uuid::new_v4()),
             name: req.name,
@@ -320,14 +332,10 @@ impl PersonalHub {
             referenced_subject: req.referenced_subject,
         };
 
-        {
-            let mut contacts = self
-                .contacts
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            contacts.push(contact.clone());
-        }
-        self.persist();
+        self.mutate(uid, |store| {
+            store.contacts.push(contact.clone());
+            Ok(())
+        })?;
         Ok(contact)
     }
 }
@@ -344,24 +352,46 @@ mod tests {
 
         let hub = PersonalHub::with_optional_store(Some(store_path.clone()));
         let note = hub
-            .create_note(CreateNoteRequest {
-                title: "Test Note".to_owned(),
-                content_markdown: "Hello World".to_owned(),
-                tags: vec!["test".to_owned()],
-                is_pinned: false,
-                referenced_subject: None,
-            })
+            .create_note(
+                1000,
+                CreateNoteRequest {
+                    title: "Test Note".to_owned(),
+                    content_markdown: "Hello World".to_owned(),
+                    tags: vec!["test".to_owned()],
+                    is_pinned: false,
+                    referenced_subject: None,
+                },
+            )
             .expect("created note");
 
         assert_eq!(note.title, "Test Note");
-        assert_eq!(hub.get_notes().notes.len(), 1);
+        assert_eq!(hub.get_notes(1000).expect("notes").notes.len(), 1);
 
         // Reload in new hub instance
         let reloaded = PersonalHub::with_optional_store(Some(store_path));
-        let notes = reloaded.get_notes().notes;
+        let notes = reloaded.get_notes(1000).expect("notes").notes;
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].title, "Test Note");
 
         let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn personal_records_are_partitioned_by_authenticated_uid() {
+        let hub = PersonalHub::with_optional_store(None);
+        hub.create_note(
+            1000,
+            CreateNoteRequest {
+                title: "Alice only".to_owned(),
+                content_markdown: "private".to_owned(),
+                tags: Vec::new(),
+                is_pinned: false,
+                referenced_subject: None,
+            },
+        )
+        .expect("Alice writes");
+
+        assert_eq!(hub.get_notes(1000).expect("Alice reads").notes.len(), 1);
+        assert!(hub.get_notes(1001).expect("Bob reads").notes.is_empty());
     }
 }

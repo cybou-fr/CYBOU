@@ -701,6 +701,121 @@ tool call and the outcome as one causal record rather than four logs somebody co
 
 Available without Mind's participation. Then explained by it, in that order.
 
+**Implementation complete; deployed-host proof pending.** Agent1 now serializes Freeze, Resume,
+Quarantine and Stop through one per-capsule
+control gate. A transition is published only after a second kernel read confirms `cgroup.freeze`
+while that gate is still held, so concurrent callers cannot leave the registry saying `Paused`
+after a later thaw made the capsule runnable. The gate is covered by a concurrent regression test.
+
+Quarantine now stops and verifies both the user-owned network broker and the system-owned model
+gateway. It also verifies that systemd removed the gateway socket and ephemeral bearer with its
+`RuntimeDirectory`; a partial revoke is reported as `Paused`, never `Quarantined`.
+
+`scripts/test-agent-control-gate.sh` now launches the complete disposable host fixture, proves
+process progress stops and resumes, proves both egress paths and the model bearer are revoked by
+quarantine, then stops the session and proves every unit and authority file is gone. It is wired into
+the main gate and returns `3` rather than passing when the deployed gateway/provider/polkit boundary
+is absent.
+
+Do not call B11 done until that gate has passed on the deployed Debian host.
+
+### Personal Core privacy boundary
+
+**Multi-user isolation closed at the current gateway boundary; owner extraction remains.** Every
+Mail, Calendar, Notes and Contacts route now requires the numeric UID established by the
+authentication owner. Personal records are partitioned by that UID in SQLite, and every mutation is
+one database transaction. A browser cannot supply a principal, an unauthenticated request is
+refused, and an endpoint-level regression proves that a note written by UID 1000 is absent from the
+projection returned to UID 1001.
+
+The old process-wide JSON store is no longer a production source. Do not automatically assign its
+unscoped records to the first account that signs in: those rows have no trustworthy owner and need
+an explicit operator migration decision.
+
+This closes the release-blocking Alice/Bob disclosure in the existing gateway. It does not make the
+gateway the canonical Personal owner. The remaining architecture step is `cybou-personald@UID` with
+a per-user socket and database, following the host-files owner pattern; the gateway should then
+become only the authenticated proxy to that owner.
+
+### Cognitive Graph grounding
+
+**The false grounding and duplicate Journal are removed.** Cognitive nodes and edges now carry a
+typed provenance (`Observed`, `Configured`, `Architectural`, `Derived`, or `Inferred`), evidence IDs,
+and an optional observation instant. Live systemd and `/proc` nodes are observed; daemon relations
+are architectural; Mind beliefs are derived. The desktop inspector renders that provenance instead
+of labelling every node “Observed”.
+
+The gateway no longer creates `/home/demo` or `/etc/cybou` nodes without a reader, and no longer
+asserts that every belief derives directly from Event1 without evidence. An input containing no
+services, processes or Mind projection now produces an empty graph.
+
+`CognitiveHub` physically contains no Journal. `/api/v1/cognitive/journal` projects the canonical
+Event1 view obtained through Presence and fails explicitly when that owner cannot answer. The next
+graph step is to populate `evidenceIds` from canonical contribution identities where the upstream
+Mind projection exposes them; an empty evidence set is visible and is never replaced by an invented
+identifier.
+
+### Meaning1 ownership
+
+**Gateway cognitive ownership removed.** `cybou-web-gateway` no longer calls `interpret()` or
+`realize()`, constructs response plans, invents fallback interpretations, or stores a `Dialogue`.
+Its Meaning hub is now a stateless D-Bus client. If Meaning1 or Event1 cannot accept an utterance,
+the HTTP boundary refuses or reports the owner unavailable rather than producing a plausible local
+answer that no canonical owner holds.
+
+Meaning1 now owns the complete vertical: interpretation, Event1 admission, response planning,
+deterministic realization and bounded referent memory. Dialogue state is partitioned by the
+server-established principal supplied by the gateway, so two authenticated Linux accounts do not
+share referents. The browser cannot choose that principal in its request body.
+
+The remaining proof is to extend the deployed multi-daemon gate through the HTTP routes as well as
+the existing direct Meaning1 calls, including two-principal dialogue isolation and fail-closed
+behaviour while Meaning1 is absent.
+
+### Learning evidence authority and durability
+
+**Browser-authored lineage is removed.** A learning proposal contains only the layer,
+generalization and scope. It cannot submit episode or outcome identifiers. New candidates therefore
+start with empty evidence, and evaluation resolves both evidence sets exclusively from the
+owner-held `DemonstratedOutcome` records before applying the promotion gate. Artifact lineage is
+derived from that resolved evidence, never from a caller assertion.
+
+Learning state is now one locked transaction image rather than four independently sampled vectors.
+Proposal, evaluation and revocation first serialize, flush and atomically rename the complete next
+image; only then does the in-memory state change or the HTTP request succeed. Serialization and I/O
+failures are explicit retryable server errors, and a regression test proves failed persistence does
+not publish a RAM-only candidate.
+
+This closes the gateway correctness gap. The remaining architectural step is to move the same
+owner/resolver and durable transaction boundary behind Learning1, leaving the gateway as an
+authenticated proxy as was done for Meaning1.
+
+### Operation1 ownership
+
+**The gateway is no longer an operation owner.** Its in-process operation and log collections, and
+the local `cancel()` that merely painted a record `Cancelled`, have been removed. The HTTP routes
+are stateless D-Bus clients of `org.cybou.Runtime.Operation1`; an absent owner is unavailable rather
+than an empty successful operation list.
+
+Operation1 registers a real worker together with a cancellation watch token. A cancel request only
+signals that token. It deliberately leaves the record running until the worker reports its actual
+terminal state, so a requested cancellation is never projected as a completed cancellation.
+The typed notification cancel shortcut now dispatches to Operation1 and reports success only after
+that owner signals the worker cancellation token. Custom actions still refuse instead of returning
+an invented “Executed” outcome. Operation records, logs, notification state and both mutation
+surfaces now require an authenticated Mind-readable session rather than being public routes.
+
+The daemon and user unit are wired into the workspace, deployment binary set and Mind target startup
+(as a dependency, while its D-Bus namespace correctly remains `Runtime`). Operation records and log
+entries are transactionally stored in a SQLite WAL database and restored when the owner restarts. A
+restored running operation deliberately has no cancellation token until its worker reattaches, so
+cancellation is refused rather than pretending a detached worker was stopped.
+
+The remaining Operation1 work is worker reattachment/recovery, producer adapters, bounded history
+and a deployed refresh/reconnect
+gate. Until those exist, this is an honest durable owner boundary rather than a complete operations
+substrate.
+
 ### B12. Further agent packs, then A2A
 
 More agents, and agent-to-agent last. An agent that sandboxes itself with Docker runs inside a

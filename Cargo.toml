@@ -27,6 +27,7 @@ members = [
     "crates/cybou-model-brokerd",
     "crates/cybou-model-bridge",
     "crates/cybou-model-gateway",
+    "crates/cybou-operationd",
     "crates/cybou-agent-opencode",
     "crates/cybou-agent-gateway",
     "crates/cybou-agentd",

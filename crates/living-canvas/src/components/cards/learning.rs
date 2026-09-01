@@ -102,8 +102,6 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                 layer,
                 generalization: gen_text,
                 scope,
-                source_evidence: vec![uuid::Uuid::new_v4()],
-                outcome_evidence: vec![uuid::Uuid::new_v4()],
             };
             match client.propose_learning_candidate(&req).await {
                 Ok(_) => {

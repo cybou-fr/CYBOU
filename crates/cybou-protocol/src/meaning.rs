@@ -179,6 +179,30 @@ pub struct ResponsePlan {
     pub qualifications: Vec<Qualification>,
 }
 
+/// Complete answer owned by Meaning1 after an utterance was admitted to Event1.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeaningResponse {
+    /// Typed interpretation recorded by the owner.
+    pub interpretation: MeaningInterpretation,
+    /// Owner-built response plan.
+    pub response_plan: ResponsePlan,
+    /// Deterministic realization of that plan.
+    pub realization: String,
+}
+
+/// Bounded dialogue state held by Meaning1, never by a transport boundary.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DialogueMemory {
+    /// Current dialogue turn.
+    pub current_turn: u64,
+    /// Referents still inside the owner's retention window.
+    pub remembered_referents: Vec<String>,
+    /// Maximum turns retained by this owner.
+    pub turns_bound: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

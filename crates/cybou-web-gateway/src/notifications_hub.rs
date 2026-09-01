@@ -10,7 +10,7 @@ use cybou_web_contracts::{NotificationsListProjection, WEB_SCHEMA_V1};
 use std::sync::RwLock;
 use uuid::Uuid;
 
-use crate::state::GatewayError;
+use crate::{operations_hub::OperationsHub, state::GatewayError};
 
 /// Maximum notifications retained in memory.
 const MAX_NOTIFICATIONS: usize = 200;
@@ -87,27 +87,33 @@ impl NotificationsHub {
     }
 
     /// Execute a notification action.
-    pub fn execute_action(&self, id: Uuid, action_id: &str) -> Result<String, GatewayError> {
-        let mut items = self.items.write().expect("write notifications");
-        let item = items
-            .iter_mut()
-            .find(|n| n.id == id)
-            .ok_or(GatewayError::NotFound)?;
-
-        let action = item
-            .actions
-            .iter()
-            .find(|a| a.id == action_id)
-            .ok_or(GatewayError::NotFound)?
-            .clone();
-
-        item.read = true;
+    pub async fn execute_action(
+        &self,
+        operations: &OperationsHub,
+        id: Uuid,
+        action_id: &str,
+    ) -> Result<String, GatewayError> {
+        let action = {
+            let mut items = self.items.write().expect("write notifications");
+            let item = items
+                .iter_mut()
+                .find(|n| n.id == id)
+                .ok_or(GatewayError::NotFound)?;
+            let action = item
+                .actions
+                .iter()
+                .find(|a| a.id == action_id)
+                .ok_or(GatewayError::NotFound)?
+                .clone();
+            item.read = true;
+            action
+        };
 
         match action.kind {
             NotificationActionKind::ApproveProposal { .. } => Err(GatewayError::Refused),
             NotificationActionKind::RejectProposal { .. } => Err(GatewayError::Refused),
             NotificationActionKind::Dismiss => {
-                item.dismissed = true;
+                self.dismiss(Some(id), false);
                 Ok("Notification dismissed".to_owned())
             }
             NotificationActionKind::InspectSubject { ref subject } => {
@@ -117,10 +123,14 @@ impl NotificationsHub {
                 Ok(format!("Navigating to {deep_link}"))
             }
             NotificationActionKind::CancelOperation { operation_id } => {
-                Ok(format!("Cancelling operation {operation_id}"))
+                operations.cancel(operation_id).await?;
+                Ok(format!(
+                    "Cancellation requested for operation {operation_id}"
+                ))
             }
             NotificationActionKind::Custom { ref verb, .. } => {
-                Ok(format!("Executed action {verb}"))
+                let _ = verb;
+                Err(GatewayError::Refused)
             }
         }
     }

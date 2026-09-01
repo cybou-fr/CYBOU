@@ -213,6 +213,22 @@ case "$runtime_status" in
     *) exit "$runtime_status" ;;
 esac
 
+# Freeze, Resume, Quarantine and Stop against a real cgroup and both outbound runtime units.
+# Exit 3 means the deployed gateway/provider/polkit boundary is absent, never that the proof passed.
+announce "agent physical controls"
+failed="agent physical controls"
+control_status=0
+bash scripts/test-agent-control-gate.sh || control_status=$?
+case "$control_status" in
+    0) failed="" ;;
+    3)
+        announce "agent physical controls not run: this host has no complete deployed session boundary"
+        skipped="$skipped agent-physical-controls"
+        failed=""
+        ;;
+    *) exit "$control_status" ;;
+esac
+
 # One launch, carried out on a real host, leaving nothing behind. Exit 3 means this host has no
 # deployed gateway template, provider or user service manager to launch against — a check that did
 # not run rather than one that passed.

@@ -39,6 +39,7 @@ cybou_ssh "
     cybou-epistemicd
     cybou-contextd
     cybou-meaningd
+    cybou-operationd
     cybou-telemetryd
     cybou-model-brokerd
     cybou-agent-gateway

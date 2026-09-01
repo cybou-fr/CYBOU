@@ -1205,6 +1205,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-operationd"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-fabric",
+ "cybou-protocol",
+ "rusqlite",
+ "serde",
+ "time",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
 name = "cybou-perception"
 version = "0.1.0"
 dependencies = [

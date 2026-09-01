@@ -7,15 +7,18 @@
 // which an `allow` on the impl block cannot reach. Every handler written here is documented.
 #![allow(missing_docs)]
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use cybou_fabric::{CONTEXT, EVENT, event_client::EventClient};
-use cybou_meaning::{Candidate, Language, interpret, realize, resolve_reference};
-use cybou_protocol::meaning::ResponsePlan;
-use time::OffsetDateTime;
+use cybou_meaning::{Candidate, Dialogue, Language, interpret, realize, resolve_reference};
+use cybou_protocol::meaning::{DialogueMemory, MeaningResponse, ResponsePlan};
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 use zbus::interface;
 
@@ -30,13 +33,17 @@ pub struct Meaning1Service {
     /// exists to prevent. It is watched rather than only set on use, so the answer is about now
     /// and not about the last time somebody happened to say something.
     journal_reachable: Arc<AtomicBool>,
+    dialogues: Mutex<HashMap<String, Dialogue>>,
 }
 
 impl Meaning1Service {
     /// Create a new Meaning1 D-Bus service handler around the flag its watcher keeps current.
     #[must_use]
     pub fn new(journal_reachable: Arc<AtomicBool>) -> Self {
-        Self { journal_reachable }
+        Self {
+            journal_reachable,
+            dialogues: Mutex::new(HashMap::new()),
+        }
     }
 
     /// The concepts Context1 currently holds, as candidates a reference can be resolved against.
@@ -183,6 +190,90 @@ impl Meaning1Service {
         source: String,
     ) -> Vec<u8> {
         self.record(&utterance, &source, None, conn).await
+    }
+
+    /// Interpret, record, plan and realize one utterance entirely inside Meaning1.
+    async fn process(
+        &self,
+        #[zbus(connection)] conn: &zbus::Connection,
+        utterance: String,
+        source: String,
+        language: String,
+    ) -> Vec<u8> {
+        let encoded = self.record(&utterance, &source, None, conn).await;
+        let Ok(interpretation) = ciborium::from_reader::<
+            cybou_protocol::meaning::MeaningInterpretation,
+            _,
+        >(encoded.as_slice()) else {
+            return Vec::new();
+        };
+        let plan = ResponsePlan {
+            plan_id: Uuid::new_v4(),
+            intent: format!("handle_{:?}", interpretation.primary_act.kind).to_lowercase(),
+            key_points: vec![format!(
+                "Cognitive act '{:?}' identified for subject '{}'",
+                interpretation.primary_act.kind, interpretation.primary_act.subject
+            )],
+            referenced_evidence: interpretation.primary_act.evidence.clone(),
+            qualifications: Vec::new(),
+        };
+        let language = match language.as_str() {
+            "ru" => Language::Russian,
+            "en" => Language::English,
+            _ => return Vec::new(),
+        };
+        let realization = realize(&plan, language);
+        let now = OffsetDateTime::now_utc();
+        if let Ok(mut dialogues) = self.dialogues.lock() {
+            let dialogue = dialogues
+                .entry(source.clone())
+                .or_insert_with(|| Dialogue::new(20, Duration::hours(2)));
+            dialogue.open_turn(now);
+            if !interpretation.primary_act.subject.is_empty() {
+                dialogue.mention(
+                    &interpretation.primary_act.subject,
+                    &interpretation.primary_act.subject,
+                    0,
+                    now,
+                );
+            }
+        }
+        let response = MeaningResponse {
+            interpretation,
+            response_plan: plan,
+            realization,
+        };
+        let mut encoded = Vec::new();
+        ciborium::into_writer(&response, &mut encoded).map_or_else(|_| Vec::new(), |()| encoded)
+    }
+
+    /// Return bounded dialogue state held by Meaning1.
+    async fn dialogue(&self, source: String) -> Vec<u8> {
+        let now = OffsetDateTime::now_utc();
+        let Ok(dialogues) = self.dialogues.lock() else {
+            return Vec::new();
+        };
+        let Some(dialogue) = dialogues.get(&source) else {
+            let memory = DialogueMemory {
+                current_turn: 0,
+                remembered_referents: Vec::new(),
+                turns_bound: 20,
+            };
+            let mut encoded = Vec::new();
+            return ciborium::into_writer(&memory, &mut encoded)
+                .map_or_else(|_| Vec::new(), |()| encoded);
+        };
+        let memory = DialogueMemory {
+            current_turn: dialogue.turn(),
+            remembered_referents: dialogue
+                .candidates(now)
+                .into_iter()
+                .map(|candidate| candidate.label)
+                .collect(),
+            turns_bound: 20,
+        };
+        let mut encoded = Vec::new();
+        ciborium::into_writer(&memory, &mut encoded).map_or_else(|_| Vec::new(), |()| encoded)
     }
 
     /// Interpret an utterance that corrects an earlier interpretation.

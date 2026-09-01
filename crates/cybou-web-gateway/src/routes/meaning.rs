@@ -3,24 +3,24 @@
 
 //! Meaning & Dialogue HTTP endpoints.
 
-use axum::{Json, extract::State, http::HeaderMap, http::StatusCode};
+use axum::{Json, extract::State, http::HeaderMap};
 use cybou_web_contracts::{
     DialogueMemoryProjection, MeaningInterpretProjection, MeaningInterpretRequest,
 };
 
-use crate::state::GatewayState;
+use crate::state::{GatewayError, GatewayState};
 
 /// Interpret an utterance into a typed cognitive act and produce a qualified response.
 pub async fn interpret_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
     Json(request): Json<MeaningInterpretRequest>,
-) -> Result<Json<MeaningInterpretProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
-    if !state.may_read_mind(&headers) {
-        return Err(GatewayState::sign_in_required());
-    }
+) -> Result<Json<MeaningInterpretProjection>, GatewayError> {
+    let source = state
+        .authenticated_principal(&headers)
+        .ok_or(GatewayError::Refused)?;
 
-    let projection = state.meaning.process_utterance(&request);
+    let projection = state.meaning.process_utterance(&request, &source).await?;
     Ok(Json(projection))
 }
 
@@ -28,11 +28,11 @@ pub async fn interpret_handler(
 pub async fn dialogue_memory_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
-) -> Result<Json<DialogueMemoryProjection>, (StatusCode, Json<crate::state::ErrorBody>)> {
-    if !state.may_read_mind(&headers) {
-        return Err(GatewayState::sign_in_required());
-    }
+) -> Result<Json<DialogueMemoryProjection>, GatewayError> {
+    let source = state
+        .authenticated_principal(&headers)
+        .ok_or(GatewayError::Refused)?;
 
-    let projection = state.meaning.dialogue_memory();
+    let projection = state.meaning.dialogue_memory(&source).await?;
     Ok(Json(projection))
 }

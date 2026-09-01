@@ -40,7 +40,10 @@
 
 #![allow(missing_docs)]
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use cybou_capsule::KernelCapsuleSpec;
 use cybou_fabric::encode;
@@ -120,8 +123,14 @@ pub trait KernelControl: Send + Sync {
     /// Apply the requested state and return only after the kernel reading agrees.
     fn set_freeze_state(&self, unit: &str, state: crate::telemetry::FreezeState) -> bool;
 
+    /// Independently read whether the requested freeze state still holds.
+    fn freeze_state_is(&self, unit: &str, state: crate::telemetry::FreezeState) -> bool;
+
     /// Stop the egress broker and return only after systemd reports it inactive.
     fn revoke_egress(&self, unit: &str) -> bool;
+
+    /// Stop the model gateway and prove its socket and bearer disappeared with its runtime dir.
+    fn revoke_model(&self, unit: &str, artifacts: &[std::path::PathBuf]) -> bool;
 }
 
 struct SystemdKernelControl;
@@ -131,8 +140,16 @@ impl KernelControl for SystemdKernelControl {
         crate::telemetry::set_freeze_state(unit, state)
     }
 
+    fn freeze_state_is(&self, unit: &str, state: crate::telemetry::FreezeState) -> bool {
+        crate::telemetry::freeze_state_is(unit, state)
+    }
+
     fn revoke_egress(&self, unit: &str) -> bool {
         crate::telemetry::revoke_egress(unit)
+    }
+
+    fn revoke_model(&self, unit: &str, artifacts: &[std::path::PathBuf]) -> bool {
+        crate::telemetry::revoke_model(unit, artifacts)
     }
 }
 
@@ -153,6 +170,7 @@ pub struct Agent1Service {
     registry: Arc<Mutex<SessionRegistry>>,
     teardown: Arc<dyn Teardown>,
     kernel_control: Arc<dyn KernelControl>,
+    control_gates: Mutex<HashMap<Uuid, Arc<tokio::sync::Mutex<()>>>>,
     launch: Option<(HostCapacity, Arc<dyn Launcher>)>,
 }
 
@@ -164,6 +182,7 @@ impl Agent1Service {
             registry,
             teardown,
             kernel_control: Arc::new(SystemdKernelControl),
+            control_gates: Mutex::new(HashMap::new()),
             launch: None,
         }
     }
@@ -180,6 +199,7 @@ impl Agent1Service {
             registry,
             teardown,
             kernel_control: Arc::new(SystemdKernelControl),
+            control_gates: Mutex::new(HashMap::new()),
             launch: Some((capacity, launcher)),
         }
     }
@@ -190,11 +210,24 @@ impl Agent1Service {
         self
     }
 
+    fn control_gate(&self, capsule_id: Uuid) -> fdo::Result<Arc<tokio::sync::Mutex<()>>> {
+        let mut gates = self.control_gates.lock().map_err(|_| {
+            fdo::Error::Failed("the capsule control gates are unavailable".to_owned())
+        })?;
+        Ok(Arc::clone(
+            gates
+                .entry(capsule_id)
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(()))),
+        ))
+    }
+
     async fn change_freeze_state(
         &self,
         capsule_id: Uuid,
         state: crate::telemetry::FreezeState,
     ) -> fdo::Result<bool> {
+        let gate = self.control_gate(capsule_id)?;
+        let _control = gate.lock().await;
         let unit = {
             let registry = self.registry.lock().map_err(|_| {
                 fdo::Error::Failed("the session registry is unavailable".to_owned())
@@ -214,13 +247,24 @@ impl Agent1Service {
             format!("{}.service", live.plan.capsule_unit)
         };
         let control = Arc::clone(&self.kernel_control);
+        let controlled_unit = unit.clone();
         let established =
-            tokio::task::spawn_blocking(move || control.set_freeze_state(&unit, state))
+            tokio::task::spawn_blocking(move || control.set_freeze_state(&controlled_unit, state))
                 .await
                 .unwrap_or(false);
         if !established {
             return Err(fdo::Error::Failed(
                 "the requested cgroup freeze state was not established".to_owned(),
+            ));
+        }
+
+        let control = Arc::clone(&self.kernel_control);
+        let verified = tokio::task::spawn_blocking(move || control.freeze_state_is(&unit, state))
+            .await
+            .unwrap_or(false);
+        if !verified {
+            return Err(fdo::Error::Failed(
+                "the cgroup freeze state changed before it could be published".to_owned(),
             ));
         }
 
@@ -240,7 +284,9 @@ impl Agent1Service {
     }
 
     async fn quarantine(&self, capsule_id: Uuid) -> fdo::Result<bool> {
-        let (capsule_unit, egress_unit) = {
+        let gate = self.control_gate(capsule_id)?;
+        let _control = gate.lock().await;
+        let (capsule_unit, egress_unit, model_boundary) = {
             let registry = self.registry.lock().map_err(|_| {
                 fdo::Error::Failed("the session registry is unavailable".to_owned())
             })?;
@@ -250,12 +296,23 @@ impl Agent1Service {
             (
                 format!("{}.service", live.plan.capsule_unit),
                 (!live.plan.hosts.is_empty()).then(|| format!("{}.service", live.plan.egress_unit)),
+                live.plan.gateway_unit.as_ref().map(|unit| {
+                    let artifacts: Vec<std::path::PathBuf> = [
+                        live.plan.model_socket.clone(),
+                        live.plan.model_token.clone(),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                    (unit.clone(), artifacts)
+                }),
             )
         };
 
         let control = Arc::clone(&self.kernel_control);
+        let controlled_unit = capsule_unit.clone();
         let frozen = tokio::task::spawn_blocking(move || {
-            control.set_freeze_state(&capsule_unit, crate::telemetry::FreezeState::Frozen)
+            control.set_freeze_state(&controlled_unit, crate::telemetry::FreezeState::Frozen)
         })
         .await
         .unwrap_or(false);
@@ -274,6 +331,22 @@ impl Agent1Service {
             true
         };
 
+        let model_revoked = if let Some((unit, artifacts)) = model_boundary {
+            let control = Arc::clone(&self.kernel_control);
+            tokio::task::spawn_blocking(move || control.revoke_model(&unit, &artifacts))
+                .await
+                .unwrap_or(false)
+        } else {
+            true
+        };
+
+        let control = Arc::clone(&self.kernel_control);
+        let still_frozen = tokio::task::spawn_blocking(move || {
+            control.freeze_state_is(&capsule_unit, crate::telemetry::FreezeState::Frozen)
+        })
+        .await
+        .unwrap_or(false);
+
         let mut registry = self
             .registry
             .lock()
@@ -281,17 +354,29 @@ impl Agent1Service {
         let Some(live) = registry.get_mut(capsule_id) else {
             return Ok(false);
         };
-        if egress_revoked {
+        if egress_revoked && model_revoked && still_frozen {
             live.session
                 .quarantine()
                 .map_err(|error| fdo::Error::Failed(error.to_string()))?;
             Ok(true)
-        } else {
+        } else if still_frozen {
             live.session
                 .pause()
                 .map_err(|error| fdo::Error::Failed(error.to_string()))?;
             Err(fdo::Error::Failed(
-                "capsule frozen, but egress revocation was not established".to_owned(),
+                match (egress_revoked, model_revoked) {
+                    (false, false) => {
+                        "capsule frozen, but network and model revocation were not established"
+                    }
+                    (false, true) => "capsule frozen, but network revocation was not established",
+                    (true, false) => "capsule frozen, but model revocation was not established",
+                    (true, true) => unreachable!("both boundaries were established"),
+                }
+                .to_owned(),
+            ))
+        } else {
+            Err(fdo::Error::Failed(
+                "the capsule was no longer frozen before quarantine could be published".to_owned(),
             ))
         }
     }
@@ -398,6 +483,8 @@ impl Agent1Service {
     /// callers that need to distinguish those outcomes must read the canonical session listing.
     async fn stop(&self, capsule_id: String) -> fdo::Result<bool> {
         let capsule_id = identity(&capsule_id)?;
+        let gate = self.control_gate(capsule_id)?;
+        let control = gate.lock().await;
         let now = OffsetDateTime::now_utc();
 
         // Marked as ending while it is still held, so a listing taken during the teardown shows a
@@ -424,6 +511,11 @@ impl Agent1Service {
             .lock()
             .map_err(|_| fdo::Error::Failed("the session registry is unavailable".to_owned()))?;
         registry.finish(capsule_id, now);
+        drop(registry);
+        drop(control);
+        if let Ok(mut gates) = self.control_gates.lock() {
+            gates.remove(&capsule_id);
+        }
         Ok(true)
     }
 
@@ -521,7 +613,10 @@ fn identity(value: &str) -> fdo::Result<Uuid> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::{
+        sync::atomic::{AtomicU8, AtomicUsize, Ordering},
+        time::Duration as StdDuration,
+    };
 
     use cybou_capsule::{
         CapabilityProfile, LeaseRequest, ModelGrant, NetworkGrant, ResourceBudget, SpendPolicy,
@@ -612,6 +707,7 @@ mod tests {
     struct RecordingControl {
         establishes: bool,
         revokes_egress: bool,
+        revokes_model: bool,
         calls: Mutex<Vec<crate::telemetry::FreezeState>>,
     }
 
@@ -620,6 +716,7 @@ mod tests {
             Self {
                 establishes: true,
                 revokes_egress: true,
+                revokes_model: true,
                 calls: Mutex::new(Vec::new()),
             }
         }
@@ -631,8 +728,70 @@ mod tests {
             self.establishes
         }
 
+        fn freeze_state_is(&self, _unit: &str, _state: crate::telemetry::FreezeState) -> bool {
+            self.establishes
+        }
+
         fn revoke_egress(&self, _unit: &str) -> bool {
             self.revokes_egress
+        }
+
+        fn revoke_model(&self, _unit: &str, _artifacts: &[std::path::PathBuf]) -> bool {
+            self.revokes_model
+        }
+    }
+
+    struct ConcurrentControl {
+        active: AtomicUsize,
+        max_active: AtomicUsize,
+        state: AtomicU8,
+    }
+
+    impl ConcurrentControl {
+        fn running() -> Self {
+            Self {
+                active: AtomicUsize::new(0),
+                max_active: AtomicUsize::new(0),
+                state: AtomicU8::new(0),
+            }
+        }
+
+        fn enter(&self) {
+            let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+            self.max_active.fetch_max(active, Ordering::SeqCst);
+            std::thread::sleep(StdDuration::from_millis(25));
+        }
+
+        fn leave(&self) {
+            self.active.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
+    impl KernelControl for ConcurrentControl {
+        fn set_freeze_state(&self, _unit: &str, state: crate::telemetry::FreezeState) -> bool {
+            self.enter();
+            self.state.store(
+                u8::from(matches!(state, crate::telemetry::FreezeState::Frozen)),
+                Ordering::SeqCst,
+            );
+            self.leave();
+            true
+        }
+
+        fn freeze_state_is(&self, _unit: &str, state: crate::telemetry::FreezeState) -> bool {
+            self.enter();
+            let established = self.state.load(Ordering::SeqCst)
+                == u8::from(matches!(state, crate::telemetry::FreezeState::Frozen));
+            self.leave();
+            established
+        }
+
+        fn revoke_egress(&self, _unit: &str) -> bool {
+            true
+        }
+
+        fn revoke_model(&self, _unit: &str, _artifacts: &[std::path::PathBuf]) -> bool {
+            true
         }
     }
 
@@ -773,6 +932,7 @@ mod tests {
         let control = Arc::new(RecordingControl {
             establishes: true,
             revokes_egress: false,
+            revokes_model: true,
             calls: Mutex::new(Vec::new()),
         });
         let service = service.with_kernel_control(control);
@@ -781,6 +941,28 @@ mod tests {
             .action(CAPSULE.to_string(), "quarantine".to_owned())
             .await
             .expect_err("egress revocation was not established");
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Paused,
+        );
+    }
+
+    #[tokio::test]
+    async fn quarantine_requires_model_revocation_too() {
+        let (service, _, registry) = serving();
+        let control = Arc::new(RecordingControl {
+            establishes: true,
+            revokes_egress: true,
+            revokes_model: false,
+            calls: Mutex::new(Vec::new()),
+        });
+        let service = service.with_kernel_control(control);
+
+        let error = service
+            .action(CAPSULE.to_string(), "quarantine".to_owned())
+            .await
+            .expect_err("a live model boundary prevents quarantine");
+        assert!(error.to_string().contains("model revocation"));
         assert_eq!(
             registry.lock().expect("held").views()[0].standing,
             crate::view::Standing::Paused,
@@ -823,11 +1005,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn concurrent_controls_are_serialized_per_capsule() {
+        let (service, _, registry) = serving();
+        let control = Arc::new(ConcurrentControl::running());
+        let service = service.with_kernel_control(Arc::clone(&control) as Arc<dyn KernelControl>);
+
+        let (frozen, running) = tokio::join!(
+            service.action(CAPSULE.to_string(), "freeze".to_owned()),
+            service.action(CAPSULE.to_string(), "resume".to_owned()),
+        );
+
+        assert!(frozen.expect("freeze is confirmed"));
+        assert!(running.expect("resume is confirmed"));
+        assert_eq!(
+            control.max_active.load(Ordering::SeqCst),
+            1,
+            "no two physical transitions or final kernel reads may overlap"
+        );
+        assert_eq!(control.state.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            registry.lock().expect("held").views()[0].standing,
+            crate::view::Standing::Running,
+            "the registry follows the last serialized kernel transition"
+        );
+    }
+
+    #[tokio::test]
     async fn unconfirmed_freeze_does_not_change_the_registry_projection() {
         let (service, _, registry) = serving();
         let control = Arc::new(RecordingControl {
             establishes: false,
             revokes_egress: false,
+            revokes_model: false,
             calls: Mutex::new(Vec::new()),
         });
         let service = service.with_kernel_control(control);

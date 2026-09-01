@@ -1774,7 +1774,7 @@ pub struct CreateContactRequest {
 
 pub use cybou_protocol::cognitive::{
     CognitiveEdgeRecord, CognitiveEdgeType, CognitiveGraphRecord, CognitiveNodeRecord,
-    CognitiveNodeType, EventJournalEntry,
+    CognitiveNodeType, CognitiveProvenance, EventJournalEntry,
 };
 
 /// Projection for the deep unified Cognitive Graph and causal relations.
@@ -1918,10 +1918,6 @@ pub struct ProposeLearningCandidateRequest {
     pub generalization: String,
     /// Target applicability scope.
     pub scope: String,
-    /// Source evidence message IDs.
-    pub source_evidence: Vec<Uuid>,
-    /// Outcome evidence message IDs.
-    pub outcome_evidence: Vec<Uuid>,
 }
 
 /// Detailed result of evaluating a candidate against promotion criteria.
@@ -2500,7 +2496,8 @@ mod tests {
     fn cognitive_graph_and_journal_contracts_round_trip() {
         use super::{
             CognitiveEdgeRecord, CognitiveEdgeType, CognitiveGraphProjection, CognitiveGraphRecord,
-            CognitiveNodeRecord, CognitiveNodeType, EventJournalEntry, EventJournalProjection,
+            CognitiveNodeRecord, CognitiveNodeType, CognitiveProvenance, EventJournalEntry,
+            EventJournalProjection,
         };
         use cybou_protocol::epistemic::EpistemicStatus;
         use std::collections::HashMap;
@@ -2519,6 +2516,9 @@ mod tests {
                         },
                         epistemic_status: EpistemicStatus::Observed,
                         confidence: 0.98,
+                        provenance: CognitiveProvenance::Observed,
+                        evidence_ids: vec!["event:agent-started".to_owned()],
+                        observed_at: Some("2026-08-28T23:00:00Z".to_owned()),
                         subject: None,
                         created_at: "2026-08-28T20:00:00Z".to_string(),
                         updated_at: "2026-08-28T23:00:00Z".to_string(),
@@ -2533,6 +2533,9 @@ mod tests {
                         },
                         epistemic_status: EpistemicStatus::Observed,
                         confidence: 1.0,
+                        provenance: CognitiveProvenance::Observed,
+                        evidence_ids: vec!["systemd:cybou-web-gateway.service".to_owned()],
+                        observed_at: Some("2026-08-28T23:00:00Z".to_owned()),
                         subject: None,
                         created_at: "2026-08-28T18:00:00Z".to_string(),
                         updated_at: "2026-08-28T23:00:00Z".to_string(),
@@ -2545,6 +2548,9 @@ mod tests {
                     target_id: "node:service:cybou-web-gateway".to_string(),
                     edge_type: CognitiveEdgeType::Observes,
                     weight: 0.95,
+                    provenance: CognitiveProvenance::Architectural,
+                    evidence_ids: Vec::new(),
+                    observed_at: None,
                     description: "Agent observes gateway REST endpoints and presence stream"
                         .to_string(),
                 }],
@@ -2703,8 +2709,6 @@ mod tests {
             layer: LearningLayer::Procedural,
             generalization: "restart nginx on connection refused".into(),
             scope: "service.nginx".into(),
-            source_evidence: vec![ev1],
-            outcome_evidence: vec![ev2],
         };
         let enc_prop = serde_json::to_string(&propose).expect("serialize propose");
         let dec_prop: ProposeLearningCandidateRequest =

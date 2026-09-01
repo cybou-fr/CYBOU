@@ -5,24 +5,22 @@
 
 use cybou_protocol::cognitive::{
     CognitiveEdgeRecord, CognitiveEdgeType, CognitiveGraphRecord, CognitiveNodeRecord,
-    CognitiveNodeType, EventJournalEntry,
+    CognitiveNodeType, CognitiveProvenance,
 };
 use cybou_protocol::epistemic::EpistemicStatus;
 use cybou_protocol::subject::SubjectRef;
 use cybou_protocol::system::{ProcessRecord, ServiceRecord};
 use cybou_web_contracts::{
-    CognitiveGraphProjection, CognitiveQueryRequest, EventJournalProjection, MindProjection,
-    WEB_SCHEMA_V1,
+    CognitiveGraphProjection, CognitiveQueryRequest, MindProjection, WEB_SCHEMA_V1,
 };
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use time::OffsetDateTime;
 
-/// Hub managing the deep cross-subsystem Cognitive Graph and the Canonical Event1 Journal.
+/// Gateway-side projection builder for the deep cross-subsystem Cognitive Graph.
 pub struct CognitiveHub {
     nodes: RwLock<Vec<CognitiveNodeRecord>>,
     edges: RwLock<Vec<CognitiveEdgeRecord>>,
-    journal: RwLock<Vec<EventJournalEntry>>,
 }
 
 impl Default for CognitiveHub {
@@ -38,7 +36,6 @@ impl CognitiveHub {
         Self {
             nodes: RwLock::new(Vec::new()),
             edges: RwLock::new(Vec::new()),
-            journal: RwLock::new(Vec::new()),
         }
     }
 
@@ -79,30 +76,7 @@ impl CognitiveHub {
         let mut edges = Vec::new();
         let mut node_ids = HashSet::new();
 
-        // 1. Host Root Path nodes
-        let host_roots = [
-            ("/home/demo", "Host Home (/home/demo)"),
-            ("/etc/cybou", "Config Boundary (/etc/cybou)"),
-        ];
-        for (path, label) in host_roots {
-            let id = format!("path:{path}");
-            node_ids.insert(id.clone());
-            nodes.push(CognitiveNodeRecord {
-                id,
-                label: label.to_owned(),
-                node_type: CognitiveNodeType::HostPath {
-                    path: path.to_owned(),
-                },
-                epistemic_status: EpistemicStatus::Observed,
-                confidence: 1.0,
-                subject: None,
-                created_at: now_str.clone(),
-                updated_at: now_str.clone(),
-                metadata: HashMap::new(),
-            });
-        }
-
-        // 2. Real Systemd Services
+        // 1. Real Systemd Services
         for svc in services {
             let id = format!("service:{}", svc.name);
             node_ids.insert(id.clone());
@@ -125,6 +99,9 @@ impl CognitiveHub {
                 },
                 epistemic_status: EpistemicStatus::Observed,
                 confidence: 1.0,
+                provenance: CognitiveProvenance::Observed,
+                evidence_ids: Vec::new(),
+                observed_at: Some(now_str.clone()),
                 subject: Some(SubjectRef::Service {
                     name: svc.name.clone(),
                     node_id: None,
@@ -135,7 +112,7 @@ impl CognitiveHub {
             });
         }
 
-        // 3. Top Host Processes (from live /proc)
+        // 2. Top Host Processes (from live /proc)
         for proc in processes.iter().take(12) {
             let id = format!("process:{}", proc.pid);
             node_ids.insert(id.clone());
@@ -153,6 +130,9 @@ impl CognitiveHub {
                 },
                 epistemic_status: EpistemicStatus::Observed,
                 confidence: 1.0,
+                provenance: CognitiveProvenance::Observed,
+                evidence_ids: Vec::new(),
+                observed_at: Some(now_str.clone()),
                 subject: Some(SubjectRef::Process {
                     pid: proc.pid,
                     name: proc.name.clone(),
@@ -163,7 +143,7 @@ impl CognitiveHub {
             });
         }
 
-        // 4. Epistemic Beliefs from Mind
+        // 3. Epistemic Beliefs from Mind
         if let Some(mind_proj) = mind {
             for belief in &mind_proj.beliefs.beliefs {
                 let id = format!("belief:{}", belief.subject);
@@ -186,6 +166,9 @@ impl CognitiveHub {
                         EpistemicStatus::Stale
                     },
                     confidence: belief.confidence,
+                    provenance: CognitiveProvenance::Derived,
+                    evidence_ids: Vec::new(),
+                    observed_at: Some(belief.last_corroborated_at.clone()),
                     subject: None,
                     created_at: belief.last_corroborated_at.clone(),
                     updated_at: belief.last_corroborated_at.clone(),
@@ -194,7 +177,7 @@ impl CognitiveHub {
             }
         }
 
-        // 5. Connect known architectural daemon edges
+        // 4. Connect declared architectural daemon edges only when both runtime nodes were observed.
         let daemon_relations = [
             (
                 "service:cybou-web-gateway.service",
@@ -220,18 +203,6 @@ impl CognitiveHub {
                 CognitiveEdgeType::Governs,
                 "Action governor authorizes typed execution permits",
             ),
-            (
-                "service:cybou-agentd.service",
-                "path:/home/demo",
-                CognitiveEdgeType::Governs,
-                "Agent daemon confines workspaces under /home/demo",
-            ),
-            (
-                "service:cybou-host-filesd@demo.service",
-                "path:/home/demo",
-                CognitiveEdgeType::Governs,
-                "Host files daemon serves bounded per-user home socket",
-            ),
         ];
 
         let mut edge_seq = 1;
@@ -243,28 +214,12 @@ impl CognitiveHub {
                     target_id: tgt.to_owned(),
                     edge_type,
                     weight: 1.0,
+                    provenance: CognitiveProvenance::Architectural,
+                    evidence_ids: Vec::new(),
+                    observed_at: None,
                     description: desc.to_owned(),
                 });
                 edge_seq += 1;
-            }
-        }
-
-        // Connect belief nodes to eventd
-        let eventd_id = "service:cybou-eventd.service";
-        if node_ids.contains(eventd_id) {
-            for node in &nodes {
-                if node.id.starts_with("belief:") {
-                    edges.push(CognitiveEdgeRecord {
-                        id: format!("edge-{edge_seq}"),
-                        source_id: node.id.clone(),
-                        target_id: eventd_id.to_owned(),
-                        edge_type: CognitiveEdgeType::DerivesFrom,
-                        weight: 0.9,
-                        description: "Epistemic belief derived from canonical event journal"
-                            .to_owned(),
-                    });
-                    edge_seq += 1;
-                }
             }
         }
 
@@ -367,38 +322,5 @@ impl CognitiveHub {
             },
             focus_node_id: req.focus_id,
         }
-    }
-
-    /// Retrieve the Canonical Event1 Journal entries.
-    #[must_use]
-    pub fn get_journal(
-        &self,
-        limit: Option<usize>,
-        offset: Option<usize>,
-    ) -> EventJournalProjection {
-        let all = self
-            .journal
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let off = offset.unwrap_or(0);
-        let lim = limit.unwrap_or(50);
-        let total_count = all.len();
-        let entries: Vec<EventJournalEntry> =
-            all.iter().rev().skip(off).take(lim).cloned().collect();
-
-        EventJournalProjection {
-            schema_version: WEB_SCHEMA_V1,
-            entries,
-            total_count,
-        }
-    }
-
-    /// Record a real canonical Event1 journal entry from observed events.
-    pub fn record_event(&self, entry: EventJournalEntry) {
-        let mut jnl = self
-            .journal
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        jnl.push(entry);
     }
 }
