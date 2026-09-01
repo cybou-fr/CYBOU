@@ -220,6 +220,8 @@ cybou_ssh "
   # something a deploy decides on an operator's behalf.
   sudo systemctl enable --now cybou-host-filesd@demo.service
   sudo systemctl restart cybou-host-filesd@demo.service
+  sudo systemctl enable --now cybou-ptyd@demo.service
+  sudo systemctl restart cybou-ptyd@demo.service
 
   # The shared secret this replaced is removed rather than left lying about. A second way in that
   # nobody maintains is how a temporary arrangement outlives the reason for it.

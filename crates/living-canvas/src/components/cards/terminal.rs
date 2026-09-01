@@ -176,9 +176,13 @@ pub fn TerminalContent(
             return;
         };
         let cell = probe.get_bounding_client_rect();
+        let screen_rect = screen.get_bounding_client_rect();
+        // Account for .terminal-screen padding: 8px left/right (16px), 6px top/bottom (12px)
+        let available_width = (screen_rect.width() - 16.0).max(0.0);
+        let available_height = (screen_rect.height() - 12.0).max(0.0);
         let window = fitting_window(
-            f64::from(screen.client_width()),
-            f64::from(screen.client_height()),
+            available_width,
+            available_height,
             cell.width(),
             cell.height(),
         );
@@ -202,6 +206,15 @@ pub fn TerminalContent(
 
     Effect::new(move |_| {
         gloo_timers::callback::Interval::new(RESIZE_INTERVAL_MS, measure).forget();
+    });
+
+    // Automatically connect when the terminal card is opened.
+    Effect::new(move |_| {
+        if signals.socket.get_untracked().is_none()
+            && signals.status.get_untracked() == "Not connected"
+        {
+            connect(signals);
+        }
     });
 
     let send_key = move |event: KeyboardEvent| {
@@ -265,10 +278,15 @@ pub fn TerminalContent(
                 <span class="terminal-status">{move || signals.status.get()}</span>
                 <button
                     class="terminal-btn"
-                    disabled=move || signals.socket.get().is_some()
+                    disabled=move || signals.socket.get().is_some() || signals.status.get() == "Connecting…"
                     on:click=move |_| connect(signals)
                 >
-                    {move || if signals.socket.get().is_some() { "Connected" } else { "Connect" }}
+                    {move || match signals.status.get().as_str() {
+                        "Connected" => "Connected",
+                        "Connecting…" => "Connecting…",
+                        "Ended" | "Closed" => "Reconnect",
+                        _ => "Connect",
+                    }}
                 </button>
             </div>
 
