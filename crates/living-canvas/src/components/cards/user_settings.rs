@@ -176,7 +176,7 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
                     </div>
 
                     // New User Inline Form
-                    <div style="margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px;">
+                    <div style="margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; background: var(--bg-sunken); padding: 8px; border-radius: 4px;">
                         <input
                             type="text"
                             placeholder="Username..."
@@ -242,7 +242,7 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
                     </div>
 
                     // Add SSH Key Form
-                    <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px;">
+                    <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-sunken); padding: 8px; border-radius: 4px;">
                         <input
                             type="text"
                             placeholder="Key label (e.g. Workstation ED25519)..."

@@ -157,7 +157,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
             </div>
 
             // Navigation Tabs (Candidates / Promoted Artifacts / Governance Scopes)
-            <div style="display: flex; background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--fill-subtle); padding: 0 12px;">
+            <div style="display: flex; background: var(--bg-sunken); border-bottom: 1px solid var(--fill-subtle); padding: 0 12px;">
                 <button
                     style=move || if active_tab.get() == "candidates" {
                         "background: none; border: none; border-bottom: 2px solid var(--accent-solid); color: var(--text-pure); padding: 8px 12px; font-size: 11px; font-weight: 600; cursor: pointer;"
@@ -202,13 +202,13 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
 
             // Proposal Drawer
             <Show when=move || signals.is_proposing.get()>
-                <div style="padding: 10px 12px; background: rgba(0,0,0,0.25); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px;">
+                <div style="padding: 10px 12px; background: var(--bg-sunken-strong); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px;">
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-dim);">"Propose Learning Candidate"</div>
                     <div style="display: flex; gap: 8px;">
                         <select
                             prop:value=move || signals.new_layer.get()
                             on:change=move |e| signals.new_layer.set(event_target_value(&e))
-                            style="background: var(--bg-sunken-strong); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 4px 6px; font-size: 11px; color: inherit;"
+                            style="background: var(--bg-sunken-strong); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; font-size: 11px; color: inherit;"
                         >
                             <option value="procedural">"Procedural (L4)"</option>
                             <option value="behavioral">"Behavioral (L3)"</option>
@@ -220,7 +220,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                             placeholder="Applicability Scope (e.g. 'service.nginx', 'dialogue.concise')..."
                             prop:value=move || signals.new_scope.get()
                             on:input=move |e| signals.new_scope.set(event_target_value(&e))
-                            style="background: var(--bg-sunken-strong); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; width: 220px;"
+                            style="background: var(--bg-sunken-strong); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; width: 220px;"
                         />
                     </div>
                     <input
@@ -228,7 +228,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                         placeholder="Proposed Generalization or Behavior Rule..."
                         prop:value=move || signals.new_generalization.get()
                         on:input=move |e| signals.new_generalization.set(event_target_value(&e))
-                        style="background: var(--bg-sunken-strong); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: inherit;"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: inherit;"
                     />
                     <div style="display: flex; justify-content: flex-end; gap: 6px;">
                         <button
@@ -238,7 +238,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                             "Cancel"
                         </button>
                         <button
-                            style="background: #4f46e5; color: var(--text-pure); border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 600; cursor: pointer;"
+                            style="background: var(--accent-solid); color: var(--text-pure); border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 600; cursor: pointer;"
                             on:click=move |_| submit_proposal()
                         >
                             "Submit Proposal"
@@ -267,7 +267,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                                             </span>
                                         </div>
                                         <button
-                                            style="background: #4f46e5; color: var(--text-pure); border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer;"
+                                            style="background: var(--accent-solid); color: var(--text-pure); border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer;"
                                             on:click=move |_| evaluate_candidate(cand_id)
                                         >
                                             "Evaluate Gate"
@@ -300,13 +300,13 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                                 <div style="background: var(--fill-faint); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
                                         <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;">
+                                            <span style="background: var(--ok-fill); color: var(--ok); border: 1px solid var(--ok-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;">
                                                 {layer_str}
                                             </span>
                                             <span style=move || if is_revoked {
-                                                "background: var(--danger-fill-strong); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;"
+                                                "background: var(--danger-fill-strong); color: var(--danger); border: 1px solid var(--danger-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;"
                                             } else {
-                                                "background: var(--info-fill-strong); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;"
+                                                "background: var(--info-fill-strong); color: var(--info); border: 1px solid var(--info-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;"
                                             }>
                                                 {status_str}
                                             </span>
@@ -314,7 +314,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                                         {(!is_revoked).then(|| {
                                             view! {
                                                 <button
-                                                    style="background: var(--danger-fill); color: #fca5a5; border: 1px solid var(--danger-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer;"
+                                                    style="background: var(--danger-fill); color: var(--danger); border: 1px solid var(--danger-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer;"
                                                     on:click=move |_| revoke_artifact(art_id)
                                                 >
                                                     "Revoke"
@@ -345,7 +345,7 @@ pub fn LearningContent(card: CardId) -> impl IntoView {
                                 <div style="background: var(--fill-faint); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
                                         <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span style="background: var(--caution-fill-strong); color: var(--caution); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;">
+                                            <span style="background: var(--caution-fill-strong); color: var(--caution); border: 1px solid var(--caution-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;">
                                                 {kind_str}
                                             </span>
                                             <span style="font-size: 11px; font-family: monospace; color: var(--text-strong);">

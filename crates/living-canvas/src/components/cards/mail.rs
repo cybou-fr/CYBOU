@@ -83,7 +83,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button
-                        style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                        style="background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                         on:click=move |_| signals.is_composing.update(|c| *c = !*c)
                     >
                         {move || if signals.is_composing.get() { "Cancel" } else { "Compose" }}
@@ -134,7 +134,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                             style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 8px; font-size: 11px; font-family: inherit; color: inherit; resize: vertical; flex: 1;"
                         />
                         <button
-                            style="align-self: flex-end; background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                            style="align-self: flex-end; background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                             on:click=move |_| trigger_send()
                         >
                             "Send Email"
@@ -171,7 +171,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                         // Selected Message Detail Pane
                         {move || signals.selected_message.get().map(|msg| {
                             view! {
-                                <div style="flex: 1; border-left: 1px solid var(--line); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.1);">
+                                <div style="flex: 1; border-left: 1px solid var(--line); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: var(--bg-sunken);">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                         <div>
                                             <div style="font-weight: 700; font-size: 13px; color: var(--text-bright);">{msg.subject}</div>

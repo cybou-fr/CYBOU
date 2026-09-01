@@ -147,7 +147,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                         <span style="font-size: 11px; color: var(--accent-light); font-weight: 600;">
                             {move || format!("CPU: {}", total_cpu())}
                         </span>
-                        <span style="font-size: 11px; color: #38bdf8; font-weight: 600;">
+                        <span style="font-size: 11px; color: var(--info); font-weight: 600;">
                             {move || format!("RAM: {}", total_mem_mb())}
                         </span>
                     </div>
@@ -256,7 +256,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
                                 <span style={if p.cpu_percent > 2.0 { "text-align: right; font-family: monospace; color: var(--accent-light); font-weight: 600;" } else { "text-align: right; font-family: monospace; color: inherit; font-weight: normal;" }}>
                                     {format!("{:.1}%", p.cpu_percent)}
                                 </span>
-                                <span style="text-align: right; font-family: monospace; color: rgba(255,255,255,0.8);">
+                                <span style="text-align: right; font-family: monospace; color: var(--text-second);">
                                     {format!("{mem_mb} MB")}
                                 </span>
                                 <div style="display: flex; justify-content: flex-end; gap: 4px;">

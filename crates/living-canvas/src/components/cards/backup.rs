@@ -163,7 +163,7 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                             </div>
 
                             <button
-                                style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer; box-shadow: 0 2px 8px var(--accent-line);"
+                                style="background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer; box-shadow: 0 2px 8px var(--accent-line);"
                                 on:click=move |_| trigger_backup()
                             >
                                 "Backup Now"
@@ -179,7 +179,7 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                                 </div>
                             </div>
                             <button
-                                style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if is_sched_enabled { "var(--ok-fill-strong)" } else { "rgba(156,163,175,0.2)" }, if is_sched_enabled { "var(--ok)" } else { "#9ca3af" })
+                                style=format!("border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; background: {}; color: {};", if is_sched_enabled { "var(--ok-fill-strong)" } else { "var(--text-dim)" }, if is_sched_enabled { "var(--ok)" } else { "var(--text-dim)" })
                                 on:click=move |_| toggle_schedule(!is_sched_enabled)
                             >
                                 {if is_sched_enabled { "ENABLED" } else { "DISABLED" }}

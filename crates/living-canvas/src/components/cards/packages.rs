@@ -205,7 +205,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                     {if is_upgradable {
                                         view! {
                                             <button
-                                                style="background: var(--caution-fill-strong); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--caution); font-weight: 600; cursor: pointer;"
+                                                style="background: var(--caution-fill-strong); border: 1px solid var(--caution-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--caution); font-weight: 600; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Upgrade)
                                             >
                                                 "Upgrade"
@@ -223,7 +223,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                                     } else {
                                         view! {
                                             <button
-                                                style="background: var(--ok-fill-strong); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--ok); font-weight: 600; cursor: pointer;"
+                                                style="background: var(--ok-fill-strong); border: 1px solid var(--ok-line); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--ok); font-weight: 600; cursor: pointer;"
                                                 on:click=move |_| trigger_action(name_action.clone(), PackageActionKind::Install)
                                             >
                                                 "Install"

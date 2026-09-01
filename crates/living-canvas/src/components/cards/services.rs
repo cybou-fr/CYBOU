@@ -241,7 +241,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         let (badge_bg, badge_color) = match svc.state {
                             ServiceState::Active => ("var(--ok-fill-strong)", "var(--ok)"),
                             ServiceState::Failed => ("var(--danger-fill-strong)", "var(--danger)"),
-                            ServiceState::Inactive => ("rgba(156, 163, 175, 0.2)", "#9ca3af"),
+                            ServiceState::Inactive => ("var(--text-dim)", "var(--text-dim)"),
                             _ => ("var(--caution-fill-strong)", "var(--caution)"),
                         };
 
@@ -271,7 +271,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                 // Action buttons
                                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                                     <button
-                                        style="background: var(--fill-subtle); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #e2e8f0; cursor: pointer;"
+                                        style="background: var(--fill-subtle); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: var(--text-main); cursor: pointer;"
                                         title="Restart service"
                                         on:click=move |_| trigger_action(name_restart.clone(), ServiceAction::Restart)
                                     >

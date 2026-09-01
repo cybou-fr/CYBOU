@@ -107,11 +107,11 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                 let is_selected = move || signals.selected_node_id.get().as_ref() == Some(&node_id);
                                 let (badge_bg, badge_fg) = match node.node_type.category_name() {
                                     "Agent" => ("var(--accent-fill-strong)", "var(--accent-light)"),
-                                    "Service" => ("rgba(16, 185, 129, 0.2)", "#34d399"),
+                                    "Service" => ("var(--ok-fill)", "var(--ok)"),
                                     "Security" => ("var(--danger-fill-strong)", "var(--danger)"),
                                     "Finding" => ("var(--caution-fill-strong)", "var(--caution)"),
-                                    "Mail" | "Note" | "Contact" => ("rgba(236, 72, 153, 0.2)", "#f472b6"),
-                                    _ => ("var(--fill-hover)", "#e5e7eb"),
+                                    "Mail" | "Note" | "Contact" => ("var(--accent-fill)", "var(--accent-text)"),
+                                    _ => ("var(--fill-hover)", "var(--text-main)"),
                                 };
 
                                 view! {
@@ -147,13 +147,13 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                         {move || signals.graph.get().map(|proj| {
                             proj.graph.edges.into_iter().map(|edge| {
                                 view! {
-                                    <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--fill-subtle); border-radius: 4px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+                                    <div style="background: var(--bg-sunken); border: 1px solid var(--fill-subtle); border-radius: 4px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
                                         <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span style="font-family: monospace; color: #93c5fd;">{edge.source_id}</span>
-                                            <span style="font-weight: 700; color: #c084fc; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(192, 132, 252, 0.1);">
+                                            <span style="font-family: monospace; color: var(--info);">{edge.source_id}</span>
+                                            <span style="font-weight: 700; color: var(--accent-text); font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--accent-fill);">
                                                 {edge.edge_type.label()}
                                             </span>
-                                            <span style="font-family: monospace; color: #a7f3d0;">{edge.target_id}</span>
+                                            <span style="font-family: monospace; color: var(--ok);">{edge.target_id}</span>
                                         </div>
                                         <div style="font-size: 10px; color: var(--text-dim);">
                                             {edge.description}
@@ -170,7 +170,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                     signals.graph.get().and_then(|g| {
                         g.graph.nodes.into_iter().find(|n| n.id == sel_id).map(|node| {
                             view! {
-                                <div style="width: 260px; border-left: 1px solid var(--line); padding: 12px; background: rgba(0,0,0,0.15); overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="width: 260px; border-left: 1px solid var(--line); padding: 12px; background: var(--bg-sunken); overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                         <div>
                                             <div style="font-weight: 700; font-size: 13px; color: var(--text-bright);">{node.label}</div>
@@ -186,7 +186,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                     <div style="font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
                                         <div style="color: var(--text-second);">"Category: " <b style="color: var(--text-bright);">{node.node_type.category_name()}</b></div>
                                         <div style="color: var(--text-second);">"Confidence: " <b style="color: var(--text-bright);">{format!("{:.1}%", node.confidence * 100.0)}</b></div>
-                                        <div style="color: var(--text-second);">"Standing: " <b style="color: #34d399;">"Observed"</b></div>
+                                        <div style="color: var(--text-second);">"Standing: " <b style="color: var(--ok);">"Observed"</b></div>
                                     </div>
                                     {if node.metadata.is_empty() {
                                         view! { <div></div> }.into_any()
@@ -197,7 +197,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                                 {node.metadata.into_iter().map(|(k, v)| view! {
                                                     <div style="font-size: 10px; font-family: monospace; display: flex; justify-content: space-between; margin-bottom: 2px;">
                                                         <span style="color: var(--text-dim);">{k}:</span>
-                                                        <span style="color: #e5e7eb;">{v}</span>
+                                                        <span style="color: var(--text-main);">{v}</span>
                                                     </div>
                                                 }).collect::<Vec<_>>()}
                                             </div>

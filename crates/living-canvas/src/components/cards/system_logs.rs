@@ -72,7 +72,7 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
     );
 
     view! {
-        <div class="system-logs-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: #131418; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+        <div class="system-logs-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--surface); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
             // Control Toolbar
             <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg-sunken-strong); border-bottom: 1px solid var(--line); ">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -162,7 +162,7 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
             // half of the host.
             {move || (!signals.system_journal_readable.get() && signals.unavailable.get().is_none()).then(|| {
                 view! {
-                    <div style="background: var(--caution-fill); color: #fcd34d; font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--caution-line); font-family: system-ui;">
+                    <div style="background: var(--caution-fill); color: var(--caution); font-size: 11px; padding: 6px 12px; border-bottom: 1px solid var(--caution-line); font-family: system-ui;">
                         "Only this account's own journal is visible. Add the gateway account to the systemd-journal group to read the whole host."
                     </div>
                 }
@@ -187,8 +187,8 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                         let (sev_color, sev_bg) = match entry.severity.as_str() {
                             "emerg" | "alert" | "crit" | "err" => ("var(--danger)", "var(--danger-fill)"),
                             "warning" => ("var(--caution)", "var(--caution-fill)"),
-                            "notice" => ("#34d399", "rgba(52,211,153,0.15)"),
-                            _ => ("var(--text-muted)", "rgba(148,163,184,0.1)"),
+                            "notice" => ("var(--ok)", "var(--ok-fill)"),
+                            _ => ("var(--text-muted)", "var(--text-dim)"),
                         };
 
                         view! {
@@ -204,7 +204,7 @@ pub fn SystemLogsContent(card: CardId) -> impl IntoView {
                                         {format!("[{u}]")}
                                     </span>
                                 })}
-                                <span style="color: #f1f5f9; flex: 1;">
+                                <span style="color: var(--text-bright); flex: 1;">
                                     {entry.message}
                                 </span>
                             </div>

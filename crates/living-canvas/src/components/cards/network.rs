@@ -112,7 +112,7 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                                         <span style="background: var(--fill-subtle); font-size: 9px; padding: 1px 5px; border-radius: 3px; color: var(--text-second);">
                                             {kind_label}
                                         </span>
-                                        <span style=format!("font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: {}; color: {};", if is_active { "var(--ok-fill-strong)" } else { "rgba(156,163,175,0.2)" }, if is_active { "var(--ok)" } else { "#9ca3af" })>
+                                        <span style=format!("font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: {}; color: {};", if is_active { "var(--ok-fill-strong)" } else { "var(--text-dim)" }, if is_active { "var(--ok)" } else { "var(--text-dim)" })>
                                             {if is_active { "CONNECTED" } else { "DISCONNECTED" }}
                                         </span>
                                     </div>

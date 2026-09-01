@@ -84,9 +84,9 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                         .map(|entry| {
                             let (badge_bg, badge_fg) = match entry.origin_organ.as_str() {
                                 "actiond" => ("var(--accent-fill-strong)", "var(--accent-light)"),
-                                "agentd" => ("rgba(236, 72, 153, 0.2)", "#f472b6"),
+                                "agentd" => ("var(--accent-fill)", "var(--accent-text)"),
                                 "securityd" => ("var(--danger-fill-strong)", "var(--danger)"),
-                                _ => ("rgba(16, 185, 129, 0.2)", "#34d399"),
+                                _ => ("var(--ok-fill)", "var(--ok)"),
                             };
 
                             view! {
@@ -105,7 +105,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                                     <div style="font-size: 12px; margin-top: 2px;">
                                         {entry.summary}
                                     </div>
-                                    <div style="font-size: 10px; font-family: monospace; color: var(--text-dim); background: rgba(0,0,0,0.25); padding: 4px 6px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 10px; font-family: monospace; color: var(--text-dim); background: var(--bg-sunken-strong); padding: 4px 6px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                         {entry.payload_preview}
                                     </div>
                                 </div>

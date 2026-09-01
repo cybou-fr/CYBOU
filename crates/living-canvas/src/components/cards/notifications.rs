@@ -187,8 +187,8 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                         </button>
                         <button
                             style=move || format!(
-                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: #a78bfa; cursor: pointer;",
-                                if signals.selected_category.get() == Some(NotificationCategory::Agent) { "rgba(167, 139, 250, 0.3)" } else { "var(--fill-faintest)" }
+                                "background: {}; border: none; font-size: 11px; padding: 3px 8px; border-radius: 12px; color: var(--accent-text); cursor: pointer;",
+                                if signals.selected_category.get() == Some(NotificationCategory::Agent) { "var(--accent-line)" } else { "var(--fill-faintest)" }
                             )
                             on:click=move |_| signals.selected_category.set(Some(NotificationCategory::Agent))
                         >
@@ -232,14 +232,14 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                             NotificationCategory::Attention => ("var(--danger-fill-strong)", "var(--danger)"),
                             NotificationCategory::Evidence => ("var(--info-fill-strong)", "var(--info)"),
                             NotificationCategory::System => ("var(--caution-fill-strong)", "var(--caution)"),
-                            NotificationCategory::Agent => ("rgba(167, 139, 250, 0.2)", "#a78bfa"),
+                            NotificationCategory::Agent => ("var(--accent-fill)", "var(--accent-text)"),
                             NotificationCategory::Operation => ("var(--ok-fill-strong)", "var(--ok)"),
                         };
 
                         let (sev_border, _sev_icon) = match notif.severity {
-                            NotificationSeverity::Critical => ("#ef4444", view! { <IconAlertCircle size=14 /> }.into_any()),
-                            NotificationSeverity::Warning => ("#f59e0b", view! { <IconAlertTriangle size=14 /> }.into_any()),
-                            NotificationSeverity::Notice => ("#3b82f6", view! { <IconInfo size=14 /> }.into_any()),
+                            NotificationSeverity::Critical => ("var(--danger)", view! { <IconAlertCircle size=14 /> }.into_any()),
+                            NotificationSeverity::Warning => ("var(--caution)", view! { <IconAlertTriangle size=14 /> }.into_any()),
+                            NotificationSeverity::Notice => ("var(--info)", view! { <IconInfo size=14 /> }.into_any()),
                             NotificationSeverity::Info => ("var(--fill-hover)", view! { <IconInfo size=14 /> }.into_any()),
                         };
 
@@ -255,7 +255,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                                         <span style=format!("background: {cat_bg}; color: {cat_color}; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; text-transform: uppercase;")>
                                             {category_label}
                                         </span>
-                                        <span style="font-weight: 600; font-size: 12px; color: var(--text-main, #f9fafb);">
+                                        <span style="font-weight: 600; font-size: 12px; color: var(--text-main, var(--text-bright));">
                                             {notif.title.clone()}
                                         </span>
                                     </div>
@@ -269,7 +269,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                                     </button>
                                 </div>
 
-                                <div style="font-size: 11px; line-height: 1.4; color: rgba(255,255,255,0.75);">
+                                <div style="font-size: 11px; line-height: 1.4; color: var(--text-second);">
                                     {notif.body.clone()}
                                 </div>
 
@@ -280,7 +280,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                                     view! {
                                         <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-dim); margin-top: 2px;">
                                             <span>"Subject: "</span>
-                                            <span style="background: var(--fill-subtle); padding: 1px 5px; border-radius: 3px; color: #cbd5e1; font-family: monospace;">
+                                            <span style="background: var(--fill-subtle); padding: 1px 5px; border-radius: 3px; color: var(--text-second); font-family: monospace;">
                                                 {format!("{kind} » {title}")}
                                             </span>
                                         </div>
@@ -299,7 +299,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                                                 let btn_style = if is_primary {
                                                     "background: var(--accent-solid); color: var(--text-pure); border: none; font-weight: 600;"
                                                 } else {
-                                                    "background: var(--line); color: rgba(255,255,255,0.85); border: 1px solid var(--fill-hover);"
+                                                    "background: var(--line); color: var(--text-second); border: 1px solid var(--fill-hover);"
                                                 };
                                                 view! {
                                                     <button

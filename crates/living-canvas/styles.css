@@ -68,6 +68,19 @@
   --accent-line: rgba(99, 102, 241, 0.3); /* its edge */
   --accent-solid: #6366f1; /* the accent itself */
 
+  /* The washes behind a state's own word. A badge saying ACTIVE has been drawing green text on a
+     green ground since the panels were written, and the ground had no token — so nineteen files
+     spelled it as a number and no theme could change any of them. Named for what they mean, at
+     the two strengths the panels actually used: a fill and an edge. */
+  --ok-fill: rgba(74, 222, 128, 0.18);
+  --ok-line: rgba(74, 222, 128, 0.4);
+  --danger-fill: rgba(248, 113, 113, 0.18);
+  --danger-line: rgba(248, 113, 113, 0.4);
+  --caution-fill: rgba(251, 191, 36, 0.18);
+  --caution-line: rgba(251, 191, 36, 0.4);
+  --info-fill: rgba(96, 165, 250, 0.18);
+  --info-line: rgba(96, 165, 250, 0.4);
+
   /* Tinted surfaces. One shape repeated: a status colour at low alpha as a surface,
      the same colour higher as its edge. Four families, so a theme changes the meaning
      of "this failed" in one place rather than in ninety style attributes. */
@@ -4055,6 +4068,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
     --ok: #1a7f45;
     --info: #1f5fbf;
     --accent-text: #2f3aa8;
+    --ok-fill: rgba(22, 163, 74, 0.14);
+    --ok-line: rgba(22, 163, 74, 0.35);
+    --danger-fill: rgba(220, 38, 38, 0.12);
+    --danger-line: rgba(220, 38, 38, 0.32);
+    --caution-fill: rgba(180, 120, 8, 0.14);
+    --caution-line: rgba(180, 120, 8, 0.34);
+    --info-fill: rgba(37, 99, 235, 0.12);
+    --info-line: rgba(37, 99, 235, 0.32);
     --accent-fill: rgba(99, 102, 241, 0.12);
     --accent-line: rgba(99, 102, 241, 0.35);
 

@@ -182,7 +182,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                 OperationState::Queued => ("var(--caution-fill-strong)", "var(--caution)", "Queued"),
                                 OperationState::Completed => ("var(--ok-fill-strong)", "var(--ok)", "Completed"),
                                 OperationState::Failed { .. } => ("var(--danger-fill-strong)", "var(--danger)", "Failed"),
-                                OperationState::Cancelled => ("rgba(156, 163, 175, 0.2)", "#9ca3af", "Cancelled"),
+                                OperationState::Cancelled => ("var(--text-dim)", "var(--text-dim)", "Cancelled"),
                             };
 
                             view! {
@@ -190,8 +190,8 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                     class=move || if is_selected() { "op-card selected" } else { "op-card" }
                                     style=move || format!(
                                         "background: {}; border: 1px solid {}; border-radius: 6px; padding: 10px; cursor: pointer; transition: all 0.15s ease;",
-                                        if is_selected() { "rgba(99, 102, 241, 0.12)" } else { "var(--fill-faint)" },
-                                        if is_selected() { "var(--accent-line-strong)" } else { "rgba(255,255,255,0.07)" }
+                                        if is_selected() { "var(--accent-fill)" } else { "var(--fill-faint)" },
+                                        if is_selected() { "var(--accent-line-strong)" } else { "var(--line)" }
                                     )
                                     on:click=move |_| {
                                         signals.selected_op_id.set(Some(op_id));
@@ -218,7 +218,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                             style=format!(
                                                 "width: {}%; height: 100%; background: {}; transition: width 0.3s ease;",
                                                 percent,
-                                                if matches!(op.state, OperationState::Completed) { "#22c55e" } else { "var(--accent-solid)" }
+                                                if matches!(op.state, OperationState::Completed) { "var(--ok)" } else { "var(--accent-solid)" }
                                             )
                                         ></div>
                                     </div>
@@ -283,14 +283,14 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                 let stream_color = match log.stream.as_str() {
                                     "stderr" => "var(--danger)",
                                     "system" => "var(--caution)",
-                                    _ => "#9ca3af",
+                                    _ => "var(--text-dim)",
                                 };
                                 view! {
                                     <div style="display: flex; gap: 8px; line-height: 1.4;">
                                         <span style=format!("color: {stream_color}; font-size: 10px; min-width: 48px; user-select: none;")>
                                             {format!("[{}]", log.stream)}
                                         </span>
-                                        <span style="color: #e5e7eb; word-break: break-all;">
+                                        <span style="color: var(--text-main); word-break: break-all;">
                                             {log.text}
                                         </span>
                                     </div>
@@ -300,7 +300,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
 
                         {move || if signals.selected_logs.get().is_empty() {
                             Some(view! {
-                                <div style="text-align: center; color: rgba(255,255,255,0.3); padding: 32px 16px;">
+                                <div style="text-align: center; color: var(--fill-hover); padding: 32px 16px;">
                                     "Select an operation to inspect live execution output."
                                 </div>
                             })

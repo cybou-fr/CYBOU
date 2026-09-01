@@ -114,7 +114,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
             })}
 
             // Natural Language Query Input & Quick Chips
-            <div style="padding: 10px 12px; background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--fill-subtle); display: flex; flex-direction: column; gap: 8px;">
+            <div style="padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--fill-subtle); display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 6px;">
                     <input
                         type="text"
@@ -126,10 +126,10 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                                 submit_query();
                             }
                         }
-                        style="flex: 1; background: var(--bg-sunken-strong); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 7px 10px; font-size: 12px; color: inherit;"
+                        style="flex: 1; background: var(--bg-sunken-strong); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 12px; color: inherit;"
                     />
                     <button
-                        style="background: #4f46e5; color: var(--text-pure); border: none; border-radius: 6px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;"
+                        style="background: var(--accent-solid); color: var(--text-pure); border: none; border-radius: 6px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;"
                         on:click=move |_| submit_query()
                     >
                         <IconSearch size=13 />
@@ -143,7 +143,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                     {quick_queries.into_iter().map(|(q, lang)| {
                         view! {
                             <button
-                                style="background: var(--fill-faintest); border: 1px solid var(--fill-hover); border-radius: 12px; padding: 2px 8px; font-size: 10px; color: rgba(255,255,255,0.75); cursor: pointer;"
+                                style="background: var(--fill-faintest); border: 1px solid var(--fill-hover); border-radius: 12px; padding: 2px 8px; font-size: 10px; color: var(--text-second); cursor: pointer;"
                                 on:click=move |_| {
                                     signals.query.set(q.to_string());
                                     signals.language.set(lang.to_string());
@@ -164,7 +164,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                         <div style="padding: 30px; text-align: center; color: var(--text-faint); font-size: 12px;">
                             <IconBot size=28 />
                             <p style="margin-top: 8px;">"No active interpretation. Enter a natural language question or command above."</p>
-                            <p style="font-size: 11px; color: rgba(255,255,255,0.3);">"Meaning1 deterministically maps language to typed Cognitive Acts without LLM guessing."</p>
+                            <p style="font-size: 11px; color: var(--fill-hover);">"Meaning1 deterministically maps language to typed Cognitive Acts without LLM guessing."</p>
                         </div>
                     }.into_any(),
                     Some(proj) => {
@@ -172,12 +172,12 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                         let act_kind_str = format!("{:?}", act.kind);
                         let plan_view = proj.response_plan.map(|plan| {
                             view! {
-                                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="background: var(--bg-sunken-strong); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
                                         <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-dim);">"Formulated Response Plan"</span>
                                         <span style="font-size: 10px; font-family: monospace; color: var(--accent-light);">{plan.intent}</span>
                                     </div>
-                                    <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: rgba(255,255,255,0.85); display: flex; flex-direction: column; gap: 3px;">
+                                    <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: var(--text-second); display: flex; flex-direction: column; gap: 3px;">
                                         {plan.key_points.into_iter().map(|pt| view! { <li>{pt}</li> }).collect_view()}
                                     </ul>
                                     {(!plan.qualifications.is_empty()).then(|| {
@@ -200,8 +200,8 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
 
                         let realization_view = proj.realization.map(|text| {
                             view! {
-                                <div style="background: rgba(79, 70, 229, 0.12); border: 1px solid rgba(79, 70, 229, 0.3); border-radius: 6px; padding: 12px;">
-                                    <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #a5b4fc; margin-bottom: 4px;">
+                                <div style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 6px; padding: 12px;">
+                                    <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent-text); margin-bottom: 4px;">
                                         "Realized Response (Deterministic)"
                                     </div>
                                     <div style="font-size: 13px; line-height: 1.5; color: var(--text-pure);">
@@ -224,7 +224,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 6px;">
                                             <span style="font-size: 10px; color: var(--text-dim);">"Confidence:"</span>
-                                            <span style="font-size: 11px; font-weight: 700; color: #34d399;">
+                                            <span style="font-size: 11px; font-weight: 700; color: var(--ok);">
                                                 {format!("{:.0}%", proj.interpretation.confidence * 100.0)}
                                             </span>
                                         </div>

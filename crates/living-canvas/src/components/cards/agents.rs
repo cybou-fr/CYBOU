@@ -223,7 +223,7 @@ fn session_line(
                         <button
                             type="button"
                             class="agent-pause"
-                            style="background: var(--caution-fill-strong); color: var(--caution); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            style="background: var(--caution-fill-strong); color: var(--caution); border: 1px solid var(--caution-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                             title="Freeze cgroup processes"
                             on:click=move |_| {
                                 request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Freeze, error, Arc::clone(&mounted_pause));
@@ -234,7 +234,7 @@ fn session_line(
                         <button
                             type="button"
                             class="agent-quarantine"
-                            style="background: var(--danger-fill-strong); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            style="background: var(--danger-fill-strong); color: var(--danger); border: 1px solid var(--danger-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                             title="Freeze & revoke network egress"
                             on:click=move |_| {
                                 request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Quarantine, error, Arc::clone(&mounted_quarantine));
@@ -247,7 +247,7 @@ fn session_line(
                         <button
                             type="button"
                             class="agent-resume"
-                            style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            style="background: var(--ok-fill); color: var(--ok); border: 1px solid var(--ok-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                             title="Thaw / resume cgroup processes"
                             on:click=move |_| {
                                 request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Resume, error, Arc::clone(&mounted_resume));
@@ -258,7 +258,7 @@ fn session_line(
                         <button
                             type="button"
                             class="agent-quarantine"
-                            style="background: var(--danger-fill-strong); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            style="background: var(--danger-fill-strong); color: var(--danger); border: 1px solid var(--danger-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                             title="Freeze & revoke network egress"
                             on:click=move |_| {
                                 request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Quarantine, error, Arc::clone(&mounted_quarantine));
@@ -271,7 +271,7 @@ fn session_line(
                         <button
                             type="button"
                             class="agent-resume"
-                            style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                            style="background: var(--ok-fill); color: var(--ok); border: 1px solid var(--ok-line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                             title="Release quarantine & resume"
                             on:click=move |_| {
                                 request_action(runtime, capsule_id, cybou_protocol::agent::CapsuleAction::Resume, error, Arc::clone(&mounted_resume));
@@ -285,7 +285,7 @@ fn session_line(
                 <button
                     type="button"
                     class="agent-stop"
-                    style="background: var(--line); color: inherit; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                    style="background: var(--line); color: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;"
                     on:click=move |_| {
                         request_stop(runtime, capsule_id, error, Arc::clone(&mounted_stop));
                     }

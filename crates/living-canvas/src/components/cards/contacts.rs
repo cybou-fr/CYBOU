@@ -102,7 +102,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button
-                        style="background: linear-gradient(135deg, #ec4899, #d946ef); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                        style="background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                         on:click=move |_| signals.is_creating.update(|c| *c = !*c)
                     >
                         {move || if signals.is_creating.get() { "Cancel" } else { "+ Contact" }}
@@ -130,7 +130,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
             <div style="padding: 12px; display: flex; flex-direction: column; gap: 12px;">
                 // Create Contact Form
                 <Show when=move || signals.is_creating.get()>
-                    <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--fill-hover); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                         <div style="display: flex; gap: 6px;">
                             <input
                                 type="text"
@@ -171,7 +171,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                             style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: inherit;"
                         />
                         <button
-                            style="align-self: flex-end; background: #ec4899; border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                            style="align-self: flex-end; background: var(--accent-solid); border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                             on:click=move |_| trigger_create_contact()
                         >
                             "Save Contact"
@@ -185,7 +185,7 @@ pub fn ContactsContent(card: CardId) -> impl IntoView {
                         view! {
                             <div style="background: var(--bg-sunken); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
                                 <div style="font-weight: 700; font-size: 12px; color: var(--text-bright);">{c.name}</div>
-                                <div style="font-size: 10px; color: #c084fc;">
+                                <div style="font-size: 10px; color: var(--accent-text);">
                                     {format!("{} • {}", c.role, c.organization)}
                                 </div>
                                 <div style="font-size: 10px; color: var(--text-second); font-family: monospace;">

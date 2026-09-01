@@ -89,7 +89,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button
-                        style="background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                        style="background: linear-gradient(135deg, var(--ok), var(--ok)); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                         on:click=move |_| signals.is_creating.update(|c| *c = !*c)
                     >
                         {move || if signals.is_creating.get() { "Cancel" } else { "+ Event" }}
@@ -117,7 +117,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
             <div style="padding: 12px; display: flex; flex-direction: column; gap: 12px;">
                 // Create Event Inline Form
                 <Show when=move || signals.is_creating.get()>
-                    <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--fill-hover); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                         <input
                             type="text"
                             placeholder="Event Title..."
@@ -149,7 +149,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                             />
                         </div>
                         <button
-                            style="align-self: flex-end; background: #10b981; border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                            style="align-self: flex-end; background: var(--ok); border: none; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                             on:click=move |_| trigger_create_event()
                         >
                             "Save Event"
@@ -162,9 +162,9 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                     {move || signals.calendar.get().map(|c| {
                         c.events.into_iter().map(|evt| {
                             let (bg_color, border_color) = match evt.color_category.as_str() {
-                                "emerald" => ("rgba(16, 185, 129, 0.1)", "rgba(16, 185, 129, 0.3)"),
-                                "amber" => ("rgba(245, 158, 11, 0.1)", "var(--caution-line)"),
-                                _ => ("rgba(99, 102, 241, 0.1)", "var(--accent-line)"),
+                                "emerald" => ("var(--ok-fill)", "var(--ok-fill)"),
+                                "amber" => ("var(--caution-fill)", "var(--caution-line)"),
+                                _ => ("var(--accent-fill)", "var(--accent-line)"),
                             };
 
                             view! {
@@ -177,7 +177,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                                     </div>
                                     <div style="font-size: 11px; color: var(--text-strong);">{evt.description}</div>
                                     {evt.location.map(|loc| view! {
-                                        <div style="font-size: 10px; color: #a7f3d0; font-family: monospace;">
+                                        <div style="font-size: 10px; color: var(--ok); font-family: monospace;">
                                             {format!("📍 {loc}")}
                                         </div>
                                     })}

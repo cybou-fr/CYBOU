@@ -109,7 +109,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                                     }}
                                     {if summary.kernel_update {
                                         Some(view! {
-                                            <span style="background: rgba(147, 51, 234, 0.2); color: #c084fc; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;">
+                                            <span style="background: var(--accent-fill); color: var(--accent-text); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;">
                                                 "Linux Kernel"
                                             </span>
                                         })
@@ -129,7 +129,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
                             {if has_updates {
                                 Some(view! {
                                     <button
-                                        style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 700; color: #fff; cursor: pointer; box-shadow: 0 2px 8px var(--accent-line);"
+                                        style="background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 700; color: var(--text-bright); cursor: pointer; box-shadow: 0 2px 8px var(--accent-line);"
                                         on:click=move |_| apply_all_updates()
                                     >
                                         "Apply All Updates"

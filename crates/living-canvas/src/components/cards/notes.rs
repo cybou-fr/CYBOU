@@ -129,7 +129,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button
-                        style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                        style="background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                         on:click=move |_| new_note()
                     >
                         "+ New Note"
@@ -156,7 +156,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
 
             <div style="display: flex; flex: 1; overflow: hidden;">
                 // Notes Sidebar List
-                <div style="width: 200px; border-right: 1px solid var(--line); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.15);">
+                <div style="width: 200px; border-right: 1px solid var(--line); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: var(--bg-sunken);">
                     {move || signals.notes.get().into_iter().map(|n| {
                         let n_sel = n.clone();
                         let n_click = n.clone();
@@ -203,7 +203,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                         placeholder="Tags (comma-separated, e.g. architecture, canvas)..."
                         prop:value=move || signals.edit_tags.get()
                         on:input=move |e| signals.edit_tags.set(event_target_value(&e))
-                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: rgba(255,255,255,0.8);"
+                        style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 10px; color: var(--text-second);"
                     />
 
                     <textarea
@@ -215,7 +215,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
 
                     <div style="display: flex; justify-content: flex-end;">
                         <button
-                            style="background: linear-gradient(135deg, var(--accent-solid), #8b5cf6); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: #fff; cursor: pointer;"
+                            style="background: linear-gradient(135deg, var(--accent-solid), var(--accent-solid)); border: none; border-radius: 4px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--text-bright); cursor: pointer;"
                             on:click=move |_| trigger_save()
                         >
                             "Save Note"

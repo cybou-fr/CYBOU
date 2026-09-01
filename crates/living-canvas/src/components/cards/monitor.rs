@@ -132,11 +132,11 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                             </div>
                             <div>
                                 <div style="color: var(--text-faint); font-size: 10px;">"OS RELEASE"</div>
-                                <div style="color: rgba(255,255,255,0.8);">{mon.os_release}</div>
+                                <div style="color: var(--text-second);">{mon.os_release}</div>
                             </div>
                             <div>
                                 <div style="color: var(--text-faint); font-size: 10px;">"UPTIME"</div>
-                                <div style="color: #38bdf8; font-weight: 600;">{format!("{uptime_hours} hours")}</div>
+                                <div style="color: var(--info); font-weight: 600;">{format!("{uptime_hours} hours")}</div>
                             </div>
                             <div>
                                 <div style="color: var(--text-faint); font-size: 10px;">"LOAD AVERAGE"</div>
@@ -151,7 +151,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                                 <span style="font-weight: 700; color: var(--accent-light); font-family: monospace;">{format!("{:.1}%", mon.total_cpu_percent)}</span>
                             </div>
                             <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 10px;">
-                                <div style=format!("width: {}%; height: 100%; background: linear-gradient(90deg, var(--accent-solid), #a855f7); border-radius: 3px;", mon.total_cpu_percent.min(100.0)) />
+                                <div style=format!("width: {}%; height: 100%; background: linear-gradient(90deg, var(--accent-solid), var(--accent-solid)); border-radius: 3px;", mon.total_cpu_percent.min(100.0)) />
                             </div>
 
                             // Cores grid
@@ -177,10 +177,10 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                             <div>
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
                                     <span style="font-weight: 600;">"Physical RAM"</span>
-                                    <span style="font-family: monospace; color: #38bdf8;">{format!("{ram_used_gb:.1} / {ram_total_gb:.1} GB ({ram_pct:.0}%)")}</span>
+                                    <span style="font-family: monospace; color: var(--info);">{format!("{ram_used_gb:.1} / {ram_total_gb:.1} GB ({ram_pct:.0}%)")}</span>
                                 </div>
                                 <div style="width: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden;">
-                                    <div style=format!("width: {}%; height: 100%; background: #38bdf8; border-radius: 3px;", ram_pct.min(100.0)) />
+                                    <div style=format!("width: {}%; height: 100%; background: var(--info); border-radius: 3px;", ram_pct.min(100.0)) />
                                 </div>
                             </div>
 
@@ -221,10 +221,10 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                                                     <span style="font-weight: 600; color: var(--text-bright);">{disk.mount_point}</span>
                                                     <span style="font-size: 10px; color: var(--text-faint); margin-left: 6px;">{format!("({} / {})", disk.device, disk.fs_type)}</span>
                                                 </div>
-                                                <span style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.8);">{format!("{used_gb:.0} / {total_gb:.0} GB ({pct:.0}%)")}</span>
+                                                <span style="font-family: monospace; font-size: 10px; color: var(--text-second);">{format!("{used_gb:.0} / {total_gb:.0} GB ({pct:.0}%)")}</span>
                                             </div>
                                             <div style="width: 100%; height: 5px; background: var(--line); border-radius: 2px; overflow: hidden;">
-                                                <div style=format!("width: {}%; height: 100%; background: #10b981; border-radius: 2px;", pct.min(100.0)) />
+                                                <div style=format!("width: {}%; height: 100%; background: var(--ok); border-radius: 2px;", pct.min(100.0)) />
                                             </div>
                                         </div>
                                     }
