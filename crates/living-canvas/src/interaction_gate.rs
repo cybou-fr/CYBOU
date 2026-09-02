@@ -25,7 +25,7 @@ use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 
 use crate::{
     CardId, DesktopItemId, DesktopLayout, LayoutHistory,
-    components::cards::{FileManagerCard, ShellCard},
+    components::cards::{FileManagerCard, GenericToolCard},
     interaction::{DragState, ResizeState},
     state::RuntimeState,
     tool_state::ToolCardStates,
@@ -142,11 +142,11 @@ fn selected_flags(host: &web_sys::HtmlElement, kind: &str) -> Vec<bool> {
 async fn clicking_one_shell_card_does_not_select_the_others() {
     let (_owner, states) = desk_owner();
     // The fault this whole module exists for. Selection compared `CardId::key()`, and every Shell
-    // card answers `"shell"`, so one click marked all of them and the action bar acted on the
+    // card answers `"terminal"`, so one click marked all of them and the action bar acted on the
     // first. Nothing native could see it: all of it is component code.
     let mut layout = DesktopLayout::canonical(None);
-    layout.open_card(CardId::Shell(0), 100.0, 100.0);
-    layout.open_card(CardId::Shell(2), 900.0, 600.0);
+    layout.open_card(CardId::Terminal(0), 100.0, 100.0);
+    layout.open_card(CardId::Terminal(2), 900.0, 600.0);
     let desk = Desk::new(layout);
     let host = stage();
 
@@ -162,49 +162,46 @@ async fn clicking_one_shell_card_does_not_select_the_others() {
     mount_to(host.clone(), move || {
         provide_context(states);
         view! {
-            <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime instance=0 />
-            <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime instance=2 />
+            <GenericToolCard card=CardId::Terminal(0) layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime />
+            <GenericToolCard card=CardId::Terminal(2) layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime />
         }
     })
     .forget();
     settled().await;
 
-    assert_eq!(selected_flags(&host, "shell"), vec![false, false]);
+    assert_eq!(selected_flags(&host, "terminal"), vec![false, false]);
 
-    click_card(&host, "shell", 1);
+    click_card(&host, "terminal", 1);
     settled().await;
     assert_eq!(
-        selected_flags(&host, "shell"),
+        selected_flags(&host, "terminal"),
         vec![false, true],
         "clicking the second Shell card selected more than the second Shell card"
     );
     assert_eq!(
         selected.get_untracked(),
-        Some(DesktopItemId::Card(CardId::Shell(2))),
+        Some(DesktopItemId::Card(CardId::Terminal(2))),
         "selection did not name the card that was clicked"
     );
 
-    click_card(&host, "shell", 0);
+    click_card(&host, "terminal", 0);
     settled().await;
-    assert_eq!(selected_flags(&host, "shell"), vec![true, false]);
+    assert_eq!(selected_flags(&host, "terminal"), vec![true, false]);
 }
 
 #[wasm_bindgen_test]
 async fn collapsing_a_card_does_not_destroy_what_was_typed_into_it() {
     let (_owner, states) = desk_owner();
     // `CardFrame` wraps its body in a `Show`, so collapsing unmounts the content entirely. The
-    // Shell's history used to be created inside that content, which made tidying the desktop a way
+    // Terminal state used to be created inside that content, which made tidying the desktop a way
     // to erase a terminal session with no warning and nothing to undo.
     let mut layout = DesktopLayout::canonical(None);
-    layout.open_card(CardId::Shell(0), 100.0, 100.0);
+    layout.open_card(CardId::Terminal(0), 100.0, 100.0);
     let desk = Desk::new(layout);
     let host = stage();
 
-    let shell_state = states.shell(CardId::Shell(0));
-    shell_state.history.update(|history| {
-        history.push(("cd somewhere".to_owned(), String::new(), 0));
-    });
-    shell_state.cwd.set("/somewhere".to_owned());
+    let terminal_state = states.terminal(CardId::Terminal(0));
+    terminal_state.status.set("Connected to owner".to_owned());
 
     let (layout, selected, set_selected, dragging, resizing, runtime, auth) = (
         desk.layout,
@@ -218,7 +215,7 @@ async fn collapsing_a_card_does_not_destroy_what_was_typed_into_it() {
     mount_to(host.clone(), move || {
         provide_context(states);
         view! {
-            <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime instance=0 />
+            <GenericToolCard card=CardId::Terminal(0) layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime />
         }
     })
     .forget();
@@ -226,7 +223,7 @@ async fn collapsing_a_card_does_not_destroy_what_was_typed_into_it() {
 
     assert!(
         AsRef::<web_sys::Element>::as_ref(&host)
-            .query_selector(".shell-output")
+            .query_selector(".terminal-screen")
             .ok()
             .flatten()
             .is_some(),
@@ -234,11 +231,11 @@ async fn collapsing_a_card_does_not_destroy_what_was_typed_into_it() {
     );
 
     // Collapse: the body goes away entirely.
-    layout.update(|layout| layout.set_collapsed(CardId::Shell(0), true));
+    layout.update(|layout| layout.set_collapsed(CardId::Terminal(0), true));
     settled().await;
     assert!(
         AsRef::<web_sys::Element>::as_ref(&host)
-            .query_selector(".shell-output")
+            .query_selector(".terminal-screen")
             .ok()
             .flatten()
             .is_none(),
@@ -246,36 +243,36 @@ async fn collapsing_a_card_does_not_destroy_what_was_typed_into_it() {
     );
 
     // Expand: what the person had done is still there.
-    layout.update(|layout| layout.set_collapsed(CardId::Shell(0), false));
+    layout.update(|layout| layout.set_collapsed(CardId::Terminal(0), false));
     settled().await;
     let output = AsRef::<web_sys::Element>::as_ref(&host)
-        .query_selector(".shell-output")
+        .query_selector(".terminal-status")
         .ok()
         .flatten()
         .expect("the shell body came back");
     let text = output.text_content().unwrap_or_default();
     assert!(
-        text.contains("cd somewhere"),
-        "the history did not survive a collapse: {text}"
+        text.contains("Connected to owner"),
+        "the terminal state did not survive a collapse: {text}"
     );
-    assert_eq!(shell_state.cwd.get_untracked(), "/somewhere");
+    assert_eq!(terminal_state.status.get_untracked(), "Connected to owner");
 }
 
 #[wasm_bindgen_test]
 fn two_tool_cards_of_one_kind_keep_separate_state() {
     let (_owner, states) = desk_owner();
-    // `CardSpec` says these are not singletons. Two Shell cards are two places a person is
+    // `CardSpec` says these are not singletons. Two Terminal cards are two places a person is
     // standing, and the store is keyed by `CardId` so they cannot share one.
-    let first = states.shell(CardId::Shell(0));
-    let second = states.shell(CardId::Shell(1));
+    let first = states.terminal(CardId::Terminal(0));
+    let second = states.terminal(CardId::Terminal(1));
 
-    first.cwd.set("/somewhere".to_owned());
-    assert_eq!(second.cwd.get_untracked(), "/");
+    first.status.set("Connected".to_owned());
+    assert_eq!(second.status.get_untracked(), "Not connected");
 
     // And the same card asked for twice is the same state, not a new one.
     assert_eq!(
-        states.shell(CardId::Shell(0)).cwd.get_untracked(),
-        "/somewhere"
+        states.terminal(CardId::Terminal(0)).status.get_untracked(),
+        "Connected"
     );
 }
 
@@ -284,9 +281,15 @@ fn closing_a_card_releases_what_it_had_done() {
     let (_owner, states) = desk_owner();
     // Closing is the one action that is a person saying they are finished. Everything else that
     // unmounts a card deliberately does not reach this.
-    states.shell(CardId::Shell(0)).cwd.set("/somewhere".into());
-    states.forget(CardId::Shell(0));
-    assert_eq!(states.shell(CardId::Shell(0)).cwd.get_untracked(), "/");
+    states
+        .terminal(CardId::Terminal(0))
+        .status
+        .set("Connected".into());
+    states.forget(CardId::Terminal(0));
+    assert_eq!(
+        states.terminal(CardId::Terminal(0)).status.get_untracked(),
+        "Not connected"
+    );
 }
 
 #[wasm_bindgen_test]
@@ -296,7 +299,7 @@ async fn a_card_docked_into_a_deck_is_not_drawn_standing_on_its_own() {
     // both would show one card in two places at once.
     let mut layout = DesktopLayout::canonical(None);
     layout.open_card(CardId::FileManager(0), 200.0, 200.0);
-    layout.open_card(CardId::Shell(0), 100.0, 100.0);
+    layout.open_card(CardId::Terminal(0), 100.0, 100.0);
     let desk = Desk::new(layout);
     let host = stage();
 
@@ -312,19 +315,19 @@ async fn a_card_docked_into_a_deck_is_not_drawn_standing_on_its_own() {
     mount_to(host.clone(), move || {
         provide_context(states);
         view! {
-            <ShellCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime instance=0 />
+            <GenericToolCard card=CardId::Terminal(0) layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime />
             <FileManagerCard layout=layout selected=selected set_selected=set_selected dragging=dragging resizing=resizing auth_modal_open=auth runtime=runtime instance=0 />
         }
     })
     .forget();
     settled().await;
 
-    assert_eq!(selected_flags(&host, "shell").len(), 1);
+    assert_eq!(selected_flags(&host, "terminal").len(), 1);
 
     layout.update(|layout| {
         let _ = layout.create_deck(
             "Shell + Files",
-            vec![CardId::Shell(0), CardId::FileManager(0)],
+            vec![CardId::Terminal(0), CardId::FileManager(0)],
             120.0,
             120.0,
         );
@@ -332,7 +335,7 @@ async fn a_card_docked_into_a_deck_is_not_drawn_standing_on_its_own() {
     settled().await;
 
     assert_eq!(
-        selected_flags(&host, "shell").len(),
+        selected_flags(&host, "terminal").len(),
         0,
         "a docked card was still drawn standing on its own"
     );

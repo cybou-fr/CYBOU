@@ -807,14 +807,27 @@ surfaces now require an authenticated Mind-readable session rather than being pu
 
 The daemon and user unit are wired into the workspace, deployment binary set and Mind target startup
 (as a dependency, while its D-Bus namespace correctly remains `Runtime`). Operation records and log
-entries are transactionally stored in a SQLite WAL database and restored when the owner restarts. A
-restored running operation deliberately has no cancellation token until its worker reattaches, so
-cancellation is refused rather than pretending a detached worker was stopped.
+entries are transactionally stored in a SQLite WAL database and restored when the owner restarts.
+Cancellation intent is durable too: a request accepted while a local worker is detached survives
+another owner restart, and `reattach` returns a token already set to the pending value. Only the
+worker's subsequent lifecycle update publishes `Cancelled`.
 
-The remaining Operation1 work is worker reattachment/recovery, producer adapters, bounded history
-and a deployed refresh/reconnect
-gate. Until those exist, this is an honest durable owner boundary rather than a complete operations
-substrate.
+The first real external producer is Agent1. Operation1 reconciles its canonical session views every
+two seconds into stable, deterministic operation identities. Agent progress remains indeterminate;
+the phase comes from Agent1 rather than a simulated percentage. Completed, stopped and failed agent
+sessions remain distinct. Cancelling one dispatches the typed Stop call back to Agent1 and publishes
+`Cancelled` only after Agent1 confirms teardown.
+
+Retention is enforced in the same SQLite transaction as registration or lifecycle update: every
+active operation is retained, only the newest 100 terminal operations remain, and each operation
+keeps its newest 500 log entries. Startup applies the same limits to an older database.
+
+The deployed continuity gate now proves that a real Agent1 session keeps one Operation1 identity
+through both gateway and Operation1 restarts. Living Canvas re-reads that owner every two seconds
+while the Operations card is visible, reconnects after a transient gateway failure, and restores
+the selected operation and its logs by stable identity. The remaining work is more producer
+adapters and wiring each local producer to the reattachment contract. Until those exist, this is an
+honest durable owner boundary rather than a complete operations substrate.
 
 ### B12. Further agent packs, then A2A
 

@@ -565,6 +565,8 @@ pub struct OperationsSignals {
     pub filter_status: RwSignal<Option<String>>,
     /// Whether a background fetch is running.
     pub loading: RwSignal<bool>,
+    /// Whether the card keeps reconciling with Operation1.
+    pub auto_refresh: RwSignal<bool>,
     /// Status message or error toast.
     pub status_msg: RwSignal<Option<String>>,
 }
@@ -577,6 +579,7 @@ impl OperationsSignals {
             selected_logs: RwSignal::new(Vec::new()),
             filter_status: RwSignal::new(None),
             loading: RwSignal::new(false),
+            auto_refresh: RwSignal::new(true),
             status_msg: RwSignal::new(None),
         }
     }

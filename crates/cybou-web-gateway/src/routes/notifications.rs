@@ -19,11 +19,7 @@ pub async fn list_notifications(
     State(state): State<GatewayState>,
     headers: HeaderMap,
 ) -> Result<Json<NotificationsListProjection>, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     Ok(Json(state.notifications.list()))
@@ -35,11 +31,7 @@ pub async fn dismiss_notifications(
     headers: HeaderMap,
     Json(request): Json<NotificationDismissRequest>,
 ) -> Result<StatusCode, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     state
@@ -54,11 +46,7 @@ pub async fn execute_notification_action(
     headers: HeaderMap,
     Json(request): Json<NotificationActionRequest>,
 ) -> Result<Json<serde_json::Value>, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     let outcome = state

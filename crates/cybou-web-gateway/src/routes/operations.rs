@@ -20,11 +20,7 @@ pub async fn list_operations(
     State(state): State<GatewayState>,
     headers: HeaderMap,
 ) -> Result<Json<OperationsListProjection>, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     Ok(Json(state.operations.list().await?))
@@ -36,11 +32,7 @@ pub async fn get_operation(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> Result<Json<cybou_protocol::operation::OperationRecord>, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     Ok(Json(state.operations.get(id).await?))
@@ -52,11 +44,7 @@ pub async fn get_operation_logs(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> Result<Json<OperationLogsProjection>, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     Ok(Json(state.operations.get_logs(id).await?))
@@ -68,11 +56,7 @@ pub async fn cancel_operation(
     headers: HeaderMap,
     Json(request): Json<OperationCancelRequest>,
 ) -> Result<StatusCode, GatewayError> {
-    if state
-        .session_for(&headers)
-        .and_then(|session| session.uid)
-        .is_none()
-    {
+    if !state.has_private_seat(&headers) {
         return Err(GatewayError::Refused);
     }
     let _ = request.reason;

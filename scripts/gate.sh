@@ -229,6 +229,22 @@ case "$control_status" in
     *) exit "$control_status" ;;
 esac
 
+# A live Agent1 record must become durable Operation1 state, while the gateway stays a disposable
+# projection. Exit 3 means this machine has no isolated session boundary on which to run it.
+announce "operation continuity"
+failed="operation continuity"
+operation_status=0
+bash scripts/test-operation-continuity-gate.sh || operation_status=$?
+case "$operation_status" in
+    0) failed="" ;;
+    3)
+        announce "operation continuity not run: this host has no free deployed session boundary"
+        skipped="$skipped operation-continuity"
+        failed=""
+        ;;
+    *) exit "$operation_status" ;;
+esac
+
 # One launch, carried out on a real host, leaving nothing behind. Exit 3 means this host has no
 # deployed gateway template, provider or user service manager to launch against — a check that did
 # not run rather than one that passed.

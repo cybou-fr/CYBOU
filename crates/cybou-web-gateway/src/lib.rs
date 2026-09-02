@@ -1120,6 +1120,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_desktop_seat_can_read_private_runtime_surfaces() {
+        let app = router_with_assets_and_session(
+            Arc::new(FixturePresenceSource::nominal()),
+            None,
+            SessionContext::local_desktop(),
+        );
+
+        let notifications = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/notifications")
+                    .body(Body::empty())
+                    .expect("notification request"),
+            )
+            .await
+            .expect("notification response");
+        assert_eq!(notifications.status(), StatusCode::OK);
+
+        // There is no Operation1 bus owner in this unit test. SERVICE_UNAVAILABLE proves the
+        // request crossed the seat boundary and reached the adapter instead of being forbidden.
+        let operations = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/operations")
+                    .body(Body::empty())
+                    .expect("operation request"),
+            )
+            .await
+            .expect("operation response");
+        assert_eq!(operations.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
     async fn drafts_follow_the_authenticated_account_across_sessions() {
         let app = guarded_router();
         let first = sign_in(&app, "alice", "hunter2")

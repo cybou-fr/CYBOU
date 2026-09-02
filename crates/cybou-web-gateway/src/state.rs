@@ -407,6 +407,12 @@ impl GatewayState {
         None
     }
 
+    /// Whether this request comes from a private seat allowed to see owner-only runtime state.
+    #[must_use]
+    pub fn has_private_seat(&self, headers: &HeaderMap) -> bool {
+        self.authenticated_principal(headers).is_some()
+    }
+
     /// The session token this request carries, whether or not it names a live session.
     fn token_in(headers: &HeaderMap) -> Option<&str> {
         headers

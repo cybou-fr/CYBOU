@@ -9,23 +9,67 @@ use uuid::Uuid;
 
 use crate::{
     CardId, MindClient,
-    components::icons::{IconActivity, IconRefresh, IconStop},
+    components::{
+        freshness::FreshnessControls,
+        icons::{IconActivity, IconStop},
+    },
+    refresh::Freshness,
     tool_state::ToolCardStates,
 };
+
+/// Agent1 reconciliation runs every two seconds, so polling faster would only repeat an owner
+/// projection that cannot yet have changed.
+const OPERATIONS_INTERVAL_MS: u32 = 2_000;
+
+fn retained_selection(
+    selected: Option<Uuid>,
+    operations: &[cybou_protocol::operation::OperationRecord],
+) -> Option<Uuid> {
+    selected.filter(|id| operations.iter().any(|operation| operation.id == *id))
+}
 
 #[component]
 pub fn OperationsContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.operations(card);
+    let freshness = Freshness::new();
+
+    let load_logs = move |id: Uuid| {
+        leptos::task::spawn_local(async move {
+            match client.get_operation_logs(id).await {
+                Ok(projection) => signals.selected_logs.set(projection.logs),
+                Err(error) => {
+                    signals.selected_logs.set(Vec::new());
+                    signals
+                        .status_msg
+                        .set(Some(format!("Failed to restore operation logs: {error}")));
+                }
+            }
+        });
+    };
 
     let load_operations = move || {
+        if signals.loading.get_untracked() {
+            return;
+        }
         signals.loading.set(true);
         leptos::task::spawn_local(async move {
             match client.list_operations().await {
                 Ok(projection) => {
+                    let selected = retained_selection(
+                        signals.selected_op_id.get_untracked(),
+                        &projection.operations,
+                    );
+                    signals.selected_op_id.set(selected);
+                    if let Some(id) = selected {
+                        load_logs(id);
+                    } else {
+                        signals.selected_logs.set(Vec::new());
+                    }
                     signals.operations.set(projection.operations);
                     signals.status_msg.set(None);
+                    freshness.arrived();
                 }
                 Err(err) => {
                     signals
@@ -34,14 +78,6 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                 }
             }
             signals.loading.set(false);
-        });
-    };
-
-    let load_logs = move |id: Uuid| {
-        leptos::task::spawn_local(async move {
-            if let Ok(projection) = client.get_operation_logs(id).await {
-                signals.selected_logs.set(projection.logs);
-            }
         });
     };
 
@@ -70,6 +106,16 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
     Effect::new(move |_| {
         load_operations();
     });
+
+    // A gateway restart is a transient read failure, not a reason to freeze the last operation
+    // state forever. The next tick reconnects through the stateless HTTP adapter and rehydrates the
+    // selected operation and its owner-held logs by stable ID.
+    crate::refresh::keep_reading(
+        OPERATIONS_INTERVAL_MS,
+        signals.auto_refresh,
+        signals.loading,
+        load_operations,
+    );
 
     let filtered_ops = move || {
         let all = signals.operations.get();
@@ -143,13 +189,12 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                         "Completed"
                     </button>
 
-                    <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer; display: flex; align-items: center;"
-                        title="Refresh operations"
-                        on:click=move |_| load_operations()
-                    >
-                        <IconRefresh size=13 />
-                    </button>
+                    <FreshnessControls
+                        freshness=freshness
+                        auto_refresh=signals.auto_refresh
+                        loading=signals.loading
+                        refresh_now=move |()| load_operations()
+                    />
                 </div>
             </div>
 
@@ -311,5 +356,49 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                 </div>
             </div>
         </div>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retained_selection;
+    use cybou_protocol::{
+        action::Proposer,
+        operation::{OperationKind, OperationProgress, OperationRecord, OperationState},
+    };
+    use time::OffsetDateTime;
+    use uuid::Uuid;
+
+    fn operation(id: Uuid) -> OperationRecord {
+        OperationRecord {
+            id,
+            kind: OperationKind::AgentTask,
+            state: OperationState::Running,
+            label: "Agent task".to_owned(),
+            initiator: Proposer::Mind,
+            subject: None,
+            progress: OperationProgress {
+                percent: None,
+                step: "Running".to_owned(),
+                total_steps: None,
+                current_step: None,
+                detail: None,
+            },
+            cancellable: true,
+            started_at: OffsetDateTime::UNIX_EPOCH,
+            updated_at: OffsetDateTime::UNIX_EPOCH,
+            finished_at: None,
+        }
+    }
+
+    #[test]
+    fn reconnect_keeps_only_a_selection_the_owner_still_has() {
+        let selected = Uuid::new_v4();
+        assert_eq!(
+            retained_selection(Some(selected), &[operation(selected)]),
+            Some(selected)
+        );
+        assert_eq!(retained_selection(Some(selected), &[]), None);
+        assert_eq!(retained_selection(None, &[operation(selected)]), None);
     }
 }
