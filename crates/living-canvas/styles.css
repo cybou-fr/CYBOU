@@ -4416,3 +4416,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   color: inherit;
   box-shadow: inset 0 0 0 1px var(--text-dim);
 }
+
+/* Unknown is not zero: an operation whose owner cannot measure progress animates instead of
+   painting a 0% bar that reads as "nothing done". */
+.op-progress.indeterminate > div {
+  animation: op-progress-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes op-progress-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .op-progress.indeterminate > div { animation: none; opacity: 0.6; }
+}

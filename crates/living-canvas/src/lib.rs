@@ -308,12 +308,15 @@ pub trait MindClient {
         id: uuid::Uuid,
     ) -> Result<cybou_web_contracts::OperationLogsProjection, ClientError>;
 
-    /// Cancel a running server operation.
+    /// Ask the operation owner to cancel a running server operation.
+    ///
+    /// A successful call reports whether the request was merely accepted or the teardown was
+    /// confirmed; the desktop must not present the first as the second.
     async fn cancel_operation(
         &self,
         id: uuid::Uuid,
         reason: Option<String>,
-    ) -> Result<(), ClientError>;
+    ) -> Result<cybou_protocol::operation::CancelOutcome, ClientError>;
 
     /// List desktop notifications.
     async fn list_notifications(
@@ -1006,8 +1009,8 @@ impl MindClient for MockMindClient {
         &self,
         _id: uuid::Uuid,
         _reason: Option<String>,
-    ) -> Result<(), ClientError> {
-        Ok(())
+    ) -> Result<cybou_protocol::operation::CancelOutcome, ClientError> {
+        Ok(cybou_protocol::operation::CancelOutcome::CancellationAccepted)
     }
 
     async fn list_notifications(

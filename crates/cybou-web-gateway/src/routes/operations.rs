@@ -8,6 +8,7 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
 };
+use cybou_protocol::operation::CancelOutcome;
 use cybou_web_contracts::{
     OperationCancelRequest, OperationLogsProjection, OperationsListProjection,
 };
@@ -60,6 +61,10 @@ pub async fn cancel_operation(
         return Err(GatewayError::Refused);
     }
     let _ = request.reason;
-    state.operations.cancel(request.operation_id).await?;
-    Ok(StatusCode::OK)
+    // 202 says the request was recorded and signalled; only the worker may publish Cancelled.
+    // 200 is reserved for a teardown the executing authority already confirmed.
+    match state.operations.cancel(request.operation_id).await? {
+        CancelOutcome::CancellationConfirmed => Ok(StatusCode::OK),
+        _ => Ok(StatusCode::ACCEPTED),
+    }
 }

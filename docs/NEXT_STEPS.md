@@ -799,7 +799,20 @@ than an empty successful operation list.
 
 Operation1 registers a real worker together with a cancellation watch token. A cancel request only
 signals that token. It deliberately leaves the record running until the worker reports its actual
-terminal state, so a requested cancellation is never projected as a completed cancellation.
+terminal state, so a requested cancellation is never projected as a completed cancellation. That
+distinction is now typed rather than implied: `CancellationAccepted` and `CancellationConfirmed` are
+separate outcomes, the record carries `cancellationRequested` so every reader sees *cancelling*
+rather than *cancelled*, the HTTP boundary answers `202 Accepted` for a recorded request and `200 OK`
+only for a confirmed teardown, and Living Canvas reports "cancellation requested" until a worker
+publishes the ending.
+
+Lifecycle state and observation state are also separate. A record carries `observation`
+(`Known`/`Stale`/`Detached`/`Unavailable`) and `lastObservedAt` beside its lifecycle state. Restored
+records start `Stale`; agent operations Agent1 no longer establishes become `Detached` while keeping
+the last state a worker actually published; an unreadable Agent1 makes them `Unavailable`. No record
+can sit at `Running` forever on the strength of a memory, and none is given an ending nobody
+observed. The desktop paints an indeterminate bar when the owner reports no percentage, because
+unknown is not zero.
 The typed notification cancel shortcut now dispatches to Operation1 and reports success only after
 that owner signals the worker cancellation token. Custom actions still refuse instead of returning
 an invented “Executed” outcome. Operation records, logs, notification state and both mutation
@@ -817,6 +830,10 @@ two seconds into stable, deterministic operation identities. Agent progress rema
 the phase comes from Agent1 rather than a simulated percentage. Completed, stopped and failed agent
 sessions remain distinct. Cancelling one dispatches the typed Stop call back to Agent1 and publishes
 `Cancelled` only after Agent1 confirms teardown.
+
+Reconciliation that finds no semantic change now refreshes observation freshness in memory only, so a
+steady fleet of agents costs no durable writes every two seconds. Moving the remaining SQLite work
+off the async executor onto a dedicated blocking worker is still open.
 
 Retention is enforced in the same SQLite transaction as registration or lifecycle update: every
 active operation is retained, only the newest 100 terminal operations remain, and each operation

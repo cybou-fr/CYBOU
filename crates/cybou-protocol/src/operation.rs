@@ -103,6 +103,64 @@ impl OperationState {
     }
 }
 
+/// How well the owner can still observe the real work behind an operation.
+///
+/// Lifecycle state answers "what did the work do"; observation answers "can the owner still see
+/// it". Keeping them apart stops a restored `Running` record from claiming, forever, that a
+/// vanished worker is still executing.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ObservationState {
+    /// The executing authority still establishes this operation.
+    #[default]
+    Known,
+    /// The operation was observed recently but the last reconciliation did not confirm it.
+    Stale,
+    /// The executing authority no longer establishes this operation; its outcome is unknown.
+    Detached,
+    /// The executing authority itself cannot be read right now.
+    Unavailable,
+}
+
+impl ObservationState {
+    /// Badge label.
+    #[must_use]
+    pub const fn label(&self) -> &'static str {
+        match self {
+            Self::Known => "Known",
+            Self::Stale => "Stale",
+            Self::Detached => "Detached",
+            Self::Unavailable => "Unavailable",
+        }
+    }
+
+    /// Whether the owner can still vouch for the reported lifecycle state.
+    #[must_use]
+    pub const fn is_established(&self) -> bool {
+        matches!(self, Self::Known)
+    }
+}
+
+/// Outcome of a cancel request, distinguishing an accepted request from a confirmed teardown.
+///
+/// `CancellationAccepted` means the request was recorded and signalled; only the worker may later
+/// publish a terminal state. `CancellationConfirmed` means the executing authority already tore the
+/// work down and the terminal state is published.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CancelOutcome {
+    /// Request durably recorded and signalled; the operation is still running.
+    CancellationAccepted,
+    /// Teardown confirmed by the executing authority; the operation is terminal.
+    CancellationConfirmed,
+    /// No such operation.
+    NotFound,
+    /// The operation is already terminal or the request could not be recorded.
+    Conflict,
+    /// The operation does not accept cancellation.
+    Refused,
+}
+
 /// Step-by-step progress tracking for an operation.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -152,6 +210,15 @@ pub struct OperationRecord {
     pub progress: OperationProgress,
     /// Whether this operation accepts an explicit cancel request.
     pub cancellable: bool,
+    /// Whether a cancel request is recorded and still awaiting a worker-published terminal state.
+    #[serde(default)]
+    pub cancellation_requested: bool,
+    /// How well the owner can still observe the real work.
+    #[serde(default)]
+    pub observation: ObservationState,
+    /// When the executing authority last established this operation.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub last_observed_at: Option<OffsetDateTime>,
     /// When the operation started.
     #[serde(with = "time::serde::rfc3339")]
     pub started_at: OffsetDateTime,

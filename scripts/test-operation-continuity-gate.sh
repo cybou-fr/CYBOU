@@ -139,4 +139,38 @@ start_operation
 for _ in $(seq 1 100); do operation_is_visible && break; sleep 0.1; done
 operation_is_visible
 
-echo "=== Operation continuity gate passed: Agent1 identity survived gateway and Operation1 restarts ==="
+# A session Agent1 no longer establishes must stop claiming a live worker, without being given an
+# ending nobody observed.
+observation_is() {
+    curl -fsS --max-time 2 "$BASE/api/v1/operations/$OPERATION" >"$WORK/observed.json" 2>/dev/null || return 1
+    python3 - "$WORK/observed.json" "$1" <<'PYTHON'
+import json, sys
+operation = json.load(open(sys.argv[1]))
+assert operation['observation'] == sys.argv[2], operation
+# Detachment is an observation verdict: no one witnessed this work ending, so the lifecycle state
+# stays whatever the worker last published.
+assert operation['state']['status'] == 'running', operation
+PYTHON
+}
+
+observation_is known || {
+    echo "an observed Agent1 session was not reported as known" >&2
+    exit 1
+}
+
+kill "$agent_pid"; wait "$agent_pid" 2>/dev/null || true; agent_pid=""
+systemctl --user stop "$CAPSULE_UNIT" "$EGRESS_UNIT" 2>/dev/null || true
+rm -f "$LEASES/$CAPSULE.lease" "$LEASES/$CAPSULE.env"
+"$AGENTD" serve >>"$WORK/agent.log" 2>&1 & agent_pid=$!
+for _ in $(seq 1 100); do name_is_owned org.cybou.Runtime.Agent1 && break; sleep 0.1; done
+name_is_owned org.cybou.Runtime.Agent1 || { cat "$WORK/agent.log" >&2; exit 1; }
+
+for _ in $(seq 1 100); do observation_is detached && break; sleep 0.1; done
+observation_is detached || {
+    echo "a vanished Agent1 session kept claiming a live worker" >&2
+    cat "$WORK/agent.log" "$WORK/operation.log" >&2
+    curl --silent --show-error --max-time 2 "$BASE/api/v1/operations/$OPERATION" >&2 || true
+    exit 1
+}
+
+echo "=== Operation continuity gate passed: Agent1 identity survived gateway and Operation1 restarts, and a vanished session became detached rather than perpetually running ==="

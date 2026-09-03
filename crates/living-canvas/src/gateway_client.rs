@@ -562,7 +562,7 @@ impl MindClient for GatewayMindClient {
         &self,
         id: uuid::Uuid,
         reason: Option<String>,
-    ) -> Result<(), ClientError> {
+    ) -> Result<cybou_protocol::operation::CancelOutcome, ClientError> {
         let response = Request::post("/api/v1/operations/cancel")
             .json(&cybou_web_contracts::OperationCancelRequest {
                 operation_id: id,
@@ -572,13 +572,13 @@ impl MindClient for GatewayMindClient {
             .send()
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        if response.ok() {
-            Ok(())
-        } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/operations/cancel returned HTTP {}",
-                response.status()
-            )))
+        match response.status() {
+            // 202 is the owner accepting a request; only the worker may later publish Cancelled.
+            202 => Ok(cybou_protocol::operation::CancelOutcome::CancellationAccepted),
+            200 => Ok(cybou_protocol::operation::CancelOutcome::CancellationConfirmed),
+            status => Err(ClientError::GatewayRequest(format!(
+                "/api/v1/operations/cancel returned HTTP {status}"
+            ))),
         }
     }
 

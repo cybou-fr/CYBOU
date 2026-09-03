@@ -9,12 +9,12 @@ use cybou_protocol::{
     action::Proposer,
     agent::{SessionView, Standing},
     operation::{
-        OperationKind, OperationLogEntry, OperationProgress, OperationRecord, OperationState,
+        CancelOutcome, ObservationState, OperationKind, OperationLogEntry, OperationProgress,
+        OperationRecord, OperationState,
     },
     subject::SubjectRef,
 };
 use rusqlite::{Connection, params};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
@@ -34,14 +34,6 @@ struct Store {
     logs: HashMap<Uuid, Vec<OperationLogEntry>>,
     cancellation: HashMap<Uuid, watch::Sender<bool>>,
     cancellation_requested: HashSet<Uuid>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub enum CancelResult {
-    Cancelled,
-    NotFound,
-    Conflict,
-    Refused,
 }
 
 /// Sole lifecycle owner for background operations.
@@ -160,7 +152,7 @@ impl Operation1Service {
                 connection.prepare("SELECT record FROM operations ORDER BY rowid DESC")?;
             let rows = statement.query_map([], |row| row.get::<_, Vec<u8>>(0))?;
             for row in rows {
-                let record =
+                let record: OperationRecord =
                     cybou_fabric::decode(&row?).map_err(|_| rusqlite::Error::InvalidQuery)?;
                 operations.push(record);
             }
@@ -188,6 +180,12 @@ impl Operation1Service {
             for row in rows {
                 let id = Uuid::parse_str(&row?).map_err(|_| rusqlite::Error::InvalidQuery)?;
                 cancellation_requested.insert(id);
+            }
+        }
+        for operation in &mut operations {
+            if !operation.state.is_terminal() {
+                // A restored record is a memory of the last publication, not a live observation.
+                operation.observation = ObservationState::Stale;
             }
         }
         let removed = Self::bounded_history(&mut operations);
@@ -283,6 +281,26 @@ impl Operation1Service {
             )?;
         }
         Ok(())
+    }
+
+    /// Publish "a cancel request is in flight" without claiming the work has stopped.
+    async fn mark_cancellation_requested(&self, id: Uuid) {
+        let existing = self
+            .store
+            .lock()
+            .await
+            .operations
+            .iter()
+            .find(|value| value.id == id)
+            .cloned();
+        if let Some(mut record) = existing {
+            if record.cancellation_requested || record.state.is_terminal() {
+                return;
+            }
+            record.cancellation_requested = true;
+            record.updated_at = OffsetDateTime::now_utc();
+            let _ = self.update(record).await;
+        }
     }
 
     async fn request_local_cancellation(&self, id: Uuid) -> rusqlite::Result<()> {
@@ -397,6 +415,32 @@ impl Operation1Service {
     ///
     /// Returns an error when Agent1 cannot be read or a reconciled record cannot be persisted.
     pub async fn reconcile_agents(&self) -> Result<(), String> {
+        let sessions = match self.read_agent_sessions().await {
+            Ok(sessions) => sessions,
+            Err(error) => {
+                // Agent1 itself cannot be read: say so instead of repeating the last projection.
+                self.mark_agents(ObservationState::Unavailable, None).await;
+                return Err(error);
+            }
+        };
+        let mut seen = HashSet::new();
+        for session in sessions {
+            seen.insert(Uuid::new_v5(
+                &Uuid::NAMESPACE_OID,
+                session.capsule_id.as_bytes(),
+            ));
+            self.reconcile_agent(session)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        // Agent1 no longer establishes anything outside `seen`; a restored Running record must not
+        // keep asserting a worker that the canonical owner cannot see.
+        self.mark_agents(ObservationState::Detached, Some(&seen))
+            .await;
+        Ok(())
+    }
+
+    async fn read_agent_sessions(&self) -> Result<Vec<SessionView>, String> {
         let endpoint = cybou_fabric::AGENT;
         let encoded: Vec<u8> = zbus::Connection::session()
             .await
@@ -413,18 +457,56 @@ impl Operation1Service {
             .body()
             .deserialize()
             .map_err(|e| e.to_string())?;
-        let sessions: Vec<SessionView> =
-            cybou_fabric::decode(&encoded).map_err(|e| e.to_string())?;
-        for session in sessions {
-            self.reconcile_agent(session)
-                .await
-                .map_err(|e| e.to_string())?;
+        cybou_fabric::decode(&encoded).map_err(|e| e.to_string())
+    }
+
+    /// Apply an observation verdict to live agent operations, optionally excluding observed ones.
+    ///
+    /// Lifecycle state is left untouched: only the executing worker may publish a terminal state.
+    pub async fn mark_agents(&self, observation: ObservationState, seen: Option<&HashSet<Uuid>>) {
+        let stale: Vec<OperationRecord> = self
+            .store
+            .lock()
+            .await
+            .operations
+            .iter()
+            .filter(|record| {
+                record.kind == OperationKind::AgentTask
+                    && !record.state.is_terminal()
+                    && record.observation != observation
+                    && seen.is_none_or(|seen| !seen.contains(&record.id))
+            })
+            .cloned()
+            .collect();
+        for mut record in stale {
+            record.observation = observation;
+            record.cancellable = false;
+            record.updated_at = OffsetDateTime::now_utc();
+            let _ = self.update(record).await;
         }
-        Ok(())
+    }
+
+    /// Whether two records differ only in when they were observed.
+    fn only_freshness_differs(current: &OperationRecord, next: &OperationRecord) -> bool {
+        let mut probe = next.clone();
+        probe.updated_at = current.updated_at;
+        probe.last_observed_at = current.last_observed_at;
+        probe == *current
+    }
+
+    /// Refresh observation timestamps in memory only, so an unchanged agent costs no disk I/O.
+    async fn touch_observation(&self, id: Uuid, observed_at: OffsetDateTime) {
+        let mut store = self.store.lock().await;
+        if let Some(record) = store.operations.iter_mut().find(|value| value.id == id) {
+            record.updated_at = observed_at;
+            record.last_observed_at = Some(observed_at);
+            record.observation = ObservationState::Known;
+        }
     }
 
     async fn reconcile_agent(&self, session: SessionView) -> rusqlite::Result<()> {
         let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, session.capsule_id.as_bytes());
+        let observed_at = OffsetDateTime::now_utc();
         let state = match session.standing {
             Standing::Ended
                 if session
@@ -478,21 +560,36 @@ impl Operation1Service {
                 detail: None,
             },
             cancellable: session.is_live(),
+            cancellation_requested: false,
+            observation: ObservationState::Known,
+            last_observed_at: Some(observed_at),
             started_at: session.started_at,
-            updated_at: OffsetDateTime::now_utc(),
+            updated_at: observed_at,
             finished_at: session.ended_at,
         };
-        let exists = self
+        let existing = self
             .store
             .lock()
             .await
             .operations
             .iter()
-            .any(|value| value.id == id);
-        if exists {
-            self.update(record).await
-        } else {
-            self.register_external(record).await
+            .find(|value| value.id == id)
+            .cloned();
+        match existing {
+            Some(current) => {
+                let mut record = record;
+                // A pending cancel request belongs to the owner, not to the Agent1 projection.
+                record.cancellation_requested =
+                    current.cancellation_requested && !record.state.is_terminal();
+                if Self::only_freshness_differs(&current, &record) {
+                    // Nothing semantic changed: refreshing memory is honest and costs no fsync.
+                    self.touch_observation(id, observed_at).await;
+                    Ok(())
+                } else {
+                    self.update(record).await
+                }
+            }
+            None => self.register_external(record).await,
         }
     }
 
@@ -572,27 +669,27 @@ impl Operation1Service {
 
     async fn cancel(&self, id: &str) -> Vec<u8> {
         let Ok(id) = Uuid::parse_str(id) else {
-            return cybou_fabric::encode(&CancelResult::NotFound).unwrap_or_default();
+            return cybou_fabric::encode(&CancelOutcome::NotFound).unwrap_or_default();
         };
         let (operation, sender) = {
             let store = self.store.lock().await;
             let Some(operation) = store.operations.iter().find(|v| v.id == id).cloned() else {
-                return cybou_fabric::encode(&CancelResult::NotFound).unwrap_or_default();
+                return cybou_fabric::encode(&CancelOutcome::NotFound).unwrap_or_default();
             };
             (operation, store.cancellation.get(&id).cloned())
         };
         let result = if operation.state.is_terminal() {
-            CancelResult::Conflict
+            CancelOutcome::Conflict
         } else if !operation.cancellable {
-            CancelResult::Refused
+            CancelOutcome::Refused
         } else if let Some(sender) = sender {
             if self.request_local_cancellation(id).await.is_ok() {
                 // A dropped receiver does not lose the request: it is durable and the worker gets
                 // it immediately when it reattaches.
                 let _ = sender.send(true);
-                CancelResult::Cancelled
+                CancelOutcome::CancellationAccepted
             } else {
-                CancelResult::Conflict
+                CancelOutcome::Conflict
             }
         } else if let Some(SubjectRef::Agent { capsule_id, .. }) = &operation.subject {
             let endpoint = cybou_fabric::AGENT;
@@ -612,24 +709,31 @@ impl Operation1Service {
                 Err(_) => false,
             };
             if stopped {
+                // Agent1 confirmed teardown before returning, so the terminal state is observed.
                 let mut cancelled = operation;
                 cancelled.state = OperationState::Cancelled;
                 cancelled.cancellable = false;
+                cancelled.cancellation_requested = false;
+                cancelled.observation = ObservationState::Known;
                 cancelled.updated_at = OffsetDateTime::now_utc();
+                cancelled.last_observed_at = Some(cancelled.updated_at);
                 cancelled.finished_at = Some(cancelled.updated_at);
                 if self.update(cancelled).await.is_ok() {
-                    CancelResult::Cancelled
+                    CancelOutcome::CancellationConfirmed
                 } else {
-                    CancelResult::Conflict
+                    CancelOutcome::Conflict
                 }
             } else {
-                CancelResult::Refused
+                CancelOutcome::Refused
             }
         } else if self.request_local_cancellation(id).await.is_ok() {
-            CancelResult::Cancelled
+            CancelOutcome::CancellationAccepted
         } else {
-            CancelResult::Conflict
+            CancelOutcome::Conflict
         };
+        if matches!(result, CancelOutcome::CancellationAccepted) {
+            self.mark_cancellation_requested(id).await;
+        }
         // Operation1 requests cancellation; only the worker may later publish Cancelled.
         cybou_fabric::encode(&result).unwrap_or_default()
     }
@@ -667,6 +771,9 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                cancellation_requested: false,
+                observation: cybou_protocol::operation::ObservationState::Known,
+                last_observed_at: None,
                 started_at: now,
                 updated_at: now,
                 finished_at: None,
@@ -675,8 +782,8 @@ mod tests {
             .expect("register operation");
         let encoded = service.cancel(&id.to_string()).await;
         assert!(matches!(
-            cybou_fabric::decode::<CancelResult>(&encoded),
-            Ok(CancelResult::Cancelled)
+            cybou_fabric::decode::<CancelOutcome>(&encoded),
+            Ok(CancelOutcome::CancellationAccepted)
         ));
         token.changed().await.expect("cancellation signal");
         assert!(*token.borrow());
@@ -703,6 +810,9 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                cancellation_requested: false,
+                observation: cybou_protocol::operation::ObservationState::Known,
+                last_observed_at: None,
                 started_at: now,
                 updated_at: now,
                 finished_at: None,
@@ -735,8 +845,8 @@ mod tests {
         assert_eq!(restored.store.lock().await.logs[&id][0].text, "durable log");
         let cancel = restored.cancel(&id.to_string()).await;
         assert!(matches!(
-            cybou_fabric::decode::<CancelResult>(&cancel),
-            Ok(CancelResult::Conflict)
+            cybou_fabric::decode::<CancelOutcome>(&cancel),
+            Ok(CancelOutcome::Conflict)
         ));
         std::fs::remove_dir_all(directory).expect("remove database");
     }
@@ -756,6 +866,9 @@ mod tests {
             subject: None,
             progress: OperationProgress::default(),
             cancellable: true,
+            cancellation_requested: false,
+            observation: cybou_protocol::operation::ObservationState::Known,
+            last_observed_at: None,
             started_at: now,
             updated_at: now,
             finished_at: None,
@@ -770,8 +883,8 @@ mod tests {
         let restored = Operation1Service::with_database(&path).expect("restore owner");
         let encoded = restored.cancel(&id.to_string()).await;
         assert!(matches!(
-            cybou_fabric::decode::<CancelResult>(&encoded),
-            Ok(CancelResult::Cancelled)
+            cybou_fabric::decode::<CancelOutcome>(&encoded),
+            Ok(CancelOutcome::CancellationAccepted)
         ));
         assert!(restored.cancellation_requested(&id.to_string()).await);
         drop(restored);
@@ -841,6 +954,128 @@ mod tests {
         );
     }
 
+    fn live_agent_operation(id: Uuid, now: OffsetDateTime) -> OperationRecord {
+        OperationRecord {
+            id,
+            kind: OperationKind::AgentTask,
+            state: OperationState::Running,
+            label: "opencode agent task".into(),
+            initiator: Proposer::Mind,
+            subject: None,
+            progress: OperationProgress::default(),
+            cancellable: true,
+            cancellation_requested: false,
+            observation: ObservationState::Known,
+            last_observed_at: Some(now),
+            started_at: now,
+            updated_at: now,
+            finished_at: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn accepted_cancellation_is_published_as_a_request_not_as_an_ending() {
+        let service = Operation1Service::new();
+        let id = Uuid::new_v4();
+        let now = OffsetDateTime::now_utc();
+        let _token = service
+            .register(OperationRecord {
+                id,
+                kind: OperationKind::IndexWorkspace,
+                state: OperationState::Running,
+                label: "index".into(),
+                initiator: Proposer::Mind,
+                subject: None,
+                progress: OperationProgress::default(),
+                cancellable: true,
+                cancellation_requested: false,
+                observation: ObservationState::Known,
+                last_observed_at: None,
+                started_at: now,
+                updated_at: now,
+                finished_at: None,
+            })
+            .await
+            .expect("register operation");
+
+        let encoded = service.cancel(&id.to_string()).await;
+        assert!(matches!(
+            cybou_fabric::decode::<CancelOutcome>(&encoded),
+            Ok(CancelOutcome::CancellationAccepted)
+        ));
+
+        let store = service.store.lock().await;
+        let record = &store.operations[0];
+        assert_eq!(record.state, OperationState::Running);
+        assert!(record.cancellation_requested);
+    }
+
+    #[tokio::test]
+    async fn a_vanished_agent_session_stops_claiming_a_worker_that_agent1_cannot_see() {
+        let service = Operation1Service::new();
+        let now = OffsetDateTime::now_utc();
+        let vanished = Uuid::new_v4();
+        let still_running = Uuid::new_v4();
+        service
+            .register_external(live_agent_operation(vanished, now))
+            .await
+            .expect("register vanished agent operation");
+        service
+            .register_external(live_agent_operation(still_running, now))
+            .await
+            .expect("register observed agent operation");
+
+        let seen = HashSet::from([still_running]);
+        service
+            .mark_agents(ObservationState::Detached, Some(&seen))
+            .await;
+
+        let store = service.store.lock().await;
+        let detached = store
+            .operations
+            .iter()
+            .find(|record| record.id == vanished)
+            .expect("vanished operation retained");
+        // Detached is an observation verdict: the lifecycle state stays whatever the worker last
+        // published, because no one observed this work ending.
+        assert_eq!(detached.observation, ObservationState::Detached);
+        assert_eq!(detached.state, OperationState::Running);
+        assert!(!detached.cancellable);
+        let observed = store
+            .operations
+            .iter()
+            .find(|record| record.id == still_running)
+            .expect("observed operation retained");
+        assert_eq!(observed.observation, ObservationState::Known);
+    }
+
+    #[tokio::test]
+    async fn an_unchanged_agent_projection_refreshes_freshness_without_touching_disk() {
+        let directory = std::env::temp_dir().join(format!("cybou_operation_{}", Uuid::new_v4()));
+        let path = directory.join("operations.sqlite3");
+        let service = Operation1Service::with_database(&path).expect("open database");
+        let id = Uuid::new_v4();
+        let now = OffsetDateTime::now_utc();
+        let record = live_agent_operation(id, now);
+        service
+            .register_external(record.clone())
+            .await
+            .expect("register agent operation");
+
+        let mut repeat = record.clone();
+        repeat.updated_at = now + time::Duration::seconds(2);
+        repeat.last_observed_at = Some(repeat.updated_at);
+        assert!(Operation1Service::only_freshness_differs(&record, &repeat));
+
+        service.touch_observation(id, repeat.updated_at).await;
+        let store = service.store.lock().await;
+        let refreshed = &store.operations[0];
+        assert_eq!(refreshed.last_observed_at, Some(repeat.updated_at));
+        assert_eq!(refreshed.observation, ObservationState::Known);
+        drop(store);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[tokio::test]
     async fn retention_bounds_terminal_history_and_logs_but_never_active_work() {
         let service = Operation1Service::new();
@@ -856,6 +1091,9 @@ mod tests {
                     subject: None,
                     progress: OperationProgress::default(),
                     cancellable: false,
+                    cancellation_requested: false,
+                    observation: cybou_protocol::operation::ObservationState::Known,
+                    last_observed_at: None,
                     started_at: now,
                     updated_at: now,
                     finished_at: Some(now),
@@ -874,6 +1112,9 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                cancellation_requested: false,
+                observation: cybou_protocol::operation::ObservationState::Known,
+                last_observed_at: None,
                 started_at: now,
                 updated_at: now,
                 finished_at: None,

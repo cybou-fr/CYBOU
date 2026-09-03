@@ -3,7 +3,7 @@
 
 //! Operations Manager card component for monitoring server-owned background tasks.
 
-use cybou_protocol::operation::OperationState;
+use cybou_protocol::operation::{CancelOutcome, ObservationState, OperationState};
 use leptos::prelude::*;
 use uuid::Uuid;
 
@@ -87,10 +87,18 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                 .cancel_operation(id, Some("Cancelled by user".to_owned()))
                 .await
             {
-                Ok(()) => {
+                // The owner distinguishes a recorded request from an observed teardown, and so
+                // does the desktop: a signalled worker may still be running.
+                Ok(CancelOutcome::CancellationConfirmed) => {
                     signals
                         .status_msg
                         .set(Some("Operation cancelled".to_owned()));
+                    load_operations();
+                }
+                Ok(_) => {
+                    signals.status_msg.set(Some(
+                        "Cancellation requested; waiting for the worker to stop".to_owned(),
+                    ));
                     load_operations();
                 }
                 Err(err) => {
@@ -218,11 +226,15 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                         children=move |op| {
                             let op_id = op.id;
                             let is_selected = move || signals.selected_op_id.get() == Some(op_id);
-                            let percent = op.progress.percent.unwrap_or(0.0);
+                            // An owner that cannot measure progress reports None. Painting a 0%
+                            // bar would read as "nothing done"; unknown is not zero.
+                            let percent = op.progress.percent;
+                            let observation = op.observation;
                             let is_terminal = op.state.is_terminal();
                             let cancellable = op.cancellable && !is_terminal;
 
                             let (badge_bg, badge_color, badge_text) = match &op.state {
+                                OperationState::Running if op.cancellation_requested => ("var(--caution-fill-strong)", "var(--caution)", "Cancelling"),
                                 OperationState::Running => ("var(--info-fill-strong)", "var(--info)", "Running"),
                                 OperationState::Queued => ("var(--caution-fill-strong)", "var(--caution)", "Queued"),
                                 OperationState::Completed => ("var(--ok-fill-strong)", "var(--ok)", "Completed"),
@@ -257,12 +269,18 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                         </span>
                                     </div>
 
-                                    // Progress bar
-                                    <div style="width: 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 6px 0;">
+                                    // Progress bar; indeterminate when the owner cannot measure it.
+                                    <div
+                                        class=move || if percent.is_none() && !is_terminal { "op-progress indeterminate" } else { "op-progress" }
+                                        style="width: 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 6px 0;"
+                                    >
                                         <div
                                             style=format!(
-                                                "width: {}%; height: 100%; background: {}; transition: width 0.3s ease;",
-                                                percent,
+                                                "width: {}; height: 100%; background: {}; transition: width 0.3s ease;",
+                                                percent.map_or_else(
+                                                    || if is_terminal { "0%".to_owned() } else { "40%".to_owned() },
+                                                    |value| format!("{value}%"),
+                                                ),
                                                 if matches!(op.state, OperationState::Completed) { "var(--ok)" } else { "var(--accent-solid)" }
                                             )
                                         ></div>
@@ -273,7 +291,20 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">
                                             {op.progress.step.clone()}
                                         </span>
-                                        {op.progress.percent.map(|p| view! { <span style="font-weight: 600; font-size: 10px;">{format!("{p:.0}%")}</span> })}
+                                        {percent.map_or_else(
+                                            || view! { <span style="font-weight: 600; font-size: 10px; color: var(--text-dim);">{if is_terminal { "" } else { "in progress" }}</span> }.into_any(),
+                                            |p| view! { <span style="font-weight: 600; font-size: 10px;">{format!("{p:.0}%")}</span> }.into_any(),
+                                        )}
+                                    </div>
+
+                                    // Observation line: whether the owner can still see the work.
+                                    <div style="font-size: 10px; margin-top: 4px; color: var(--text-dim);">
+                                        {match observation {
+                                            ObservationState::Known => String::new(),
+                                            ObservationState::Stale => "Not confirmed by the executing authority in the last reconciliation".to_owned(),
+                                            ObservationState::Detached => "Detached: the executing authority no longer establishes this operation".to_owned(),
+                                            ObservationState::Unavailable => "The executing authority cannot be read right now".to_owned(),
+                                        }}
                                     </div>
 
                                     // Footer actions
@@ -385,6 +416,9 @@ mod tests {
                 detail: None,
             },
             cancellable: true,
+            cancellation_requested: false,
+            observation: cybou_protocol::operation::ObservationState::Known,
+            last_observed_at: None,
             started_at: OffsetDateTime::UNIX_EPOCH,
             updated_at: OffsetDateTime::UNIX_EPOCH,
             finished_at: None,

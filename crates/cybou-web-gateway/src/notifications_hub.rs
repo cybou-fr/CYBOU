@@ -123,10 +123,14 @@ impl NotificationsHub {
                 Ok(format!("Navigating to {deep_link}"))
             }
             NotificationActionKind::CancelOperation { operation_id } => {
-                operations.cancel(operation_id).await?;
-                Ok(format!(
-                    "Cancellation requested for operation {operation_id}"
-                ))
+                match operations.cancel(operation_id).await? {
+                    cybou_protocol::operation::CancelOutcome::CancellationConfirmed => {
+                        Ok(format!("Operation {operation_id} cancelled"))
+                    }
+                    _ => Ok(format!(
+                        "Cancellation requested for operation {operation_id}"
+                    )),
+                }
             }
             NotificationActionKind::Custom { ref verb, .. } => {
                 let _ = verb;

@@ -64,6 +64,7 @@ Beside them, and deliberately not among them:
 | `cybou-model-brokerd` | `org.cybou.Faculty.ModelBroker1` — a faculty, owning no part of Mind |
 | `cybou-web-gateway` | the HTTP boundary; not a Mind owner and holds no cognitive state |
 | `cybou-agentd` | `org.cybou.Runtime.Agent1` — owns bounded agent launches, live sessions, teardown and recent final views; not Mind |
+| `cybou-operationd` | `org.cybou.Runtime.Operation1` — the sole lifecycle owner of long-running work: durable records, logs and cancellation intent; not Mind |
 
 **The sandboxed Safe Shell is gone**, and ADR-0047's Neutral note that kept it is reversed there.
 The card, the two routes, `cybou-shelld` and its unit are removed. Keeping it produced two cards a
@@ -937,6 +938,38 @@ policy and credentials remain an explicit operator decision, and their absence i
 Confirmed endings release live admission and retain the most recent 32 canonical final views in the
 owner process. This is operational context, not durable biography. After an owner restart the host
 can recover what is still running but cannot honestly reconstruct why an already-gone unit ended.
+
+## Operation ownership
+
+`cybou-operationd` owns `org.cybou.Runtime.Operation1`, the sole lifecycle authority for long-running
+work. The gateway holds no operation, log or cancellation state; its routes are stateless D-Bus
+clients, and an absent owner is *unavailable* rather than an empty list. Records, logs and
+cancellation intent live in a SQLite WAL database written with `synchronous=FULL`, so an owner
+restart restores what was in flight instead of forgetting it.
+
+Two questions are kept apart, because they have different answers:
+
+- **Lifecycle state** — what the work did. Only the executing worker publishes a terminal state.
+- **Observation state** — whether the owner can still see the work: `Known`, `Stale`, `Detached`,
+  `Unavailable`.
+
+A restored record starts `Stale`: it is a memory of the last publication, not a live observation.
+Agent operations that Agent1 no longer establishes become `Detached` while keeping the last
+lifecycle state the worker actually published — a vanished capsule never leaves a record claiming
+`Running` forever, and it never invents an ending nobody witnessed. When Agent1 itself cannot be
+read, its operations report `Unavailable` rather than repeating the previous projection.
+
+Cancellation is likewise split. `CancellationAccepted` means the request is durable and the worker's
+token is signalled; the record stays running and is published as *cancelling*. `CancellationConfirmed`
+means the executing authority — today, Agent1's `Stop` — confirmed teardown before returning. The
+HTTP boundary answers `202 Accepted` for the first and `200 OK` for the second, and the desktop says
+"cancellation requested" until a worker publishes the ending.
+
+Agent1 is the first real producer: its canonical sessions are reconciled every two seconds into
+stable, deterministic operation identities. Reconciliation that finds no semantic change refreshes
+observation freshness in memory only, so a steady fleet costs no durable writes. Agent progress stays
+indeterminate — the phase comes from Agent1 and the percentage stays unknown rather than being drawn
+as zero.
 
 ## Model brokerage
 

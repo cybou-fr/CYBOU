@@ -4,18 +4,9 @@
 //! Stateless HTTP-boundary client for Operation1.
 
 use crate::state::GatewayError;
-use cybou_protocol::operation::{OperationLogEntry, OperationRecord};
+use cybou_protocol::operation::{CancelOutcome, OperationLogEntry, OperationRecord};
 use cybou_web_contracts::{OperationLogsProjection, OperationsListProjection, WEB_SCHEMA_V1};
-use serde::Deserialize;
 use uuid::Uuid;
-
-#[derive(Deserialize)]
-enum CancelResult {
-    Cancelled,
-    NotFound,
-    Conflict,
-    Refused,
-}
 
 /// Holds no operation lifecycle, progress, logs, or cancellation state.
 #[derive(Debug, Default)]
@@ -107,17 +98,21 @@ impl OperationsHub {
     }
 
     /// Ask Operation1 to signal the real worker's cancellation token.
-    pub async fn cancel(&self, id: Uuid) -> Result<(), GatewayError> {
+    ///
+    /// Returns the owner's distinction between an accepted request and a confirmed teardown; the
+    /// gateway never upgrades one into the other.
+    pub async fn cancel(&self, id: Uuid) -> Result<CancelOutcome, GatewayError> {
         #[cfg(target_os = "linux")]
         {
-            let result: CancelResult =
+            let result: CancelOutcome =
                 cybou_fabric::decode(&self.call("Cancel", &(id.to_string(),)).await?)
                     .map_err(|_| GatewayError::InvalidProjection)?;
             match result {
-                CancelResult::Cancelled => Ok(()),
-                CancelResult::NotFound => Err(GatewayError::NotFound),
-                CancelResult::Conflict => Err(GatewayError::Conflict),
-                CancelResult::Refused => Err(GatewayError::Refused),
+                outcome @ (CancelOutcome::CancellationAccepted
+                | CancelOutcome::CancellationConfirmed) => Ok(outcome),
+                CancelOutcome::NotFound => Err(GatewayError::NotFound),
+                CancelOutcome::Conflict => Err(GatewayError::Conflict),
+                CancelOutcome::Refused => Err(GatewayError::Refused),
             }
         }
         #[cfg(not(target_os = "linux"))]
