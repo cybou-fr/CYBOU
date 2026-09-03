@@ -1025,6 +1025,20 @@ told to retry an isolation this host had already refused to establish. The gatew
 explanation of somebody else's refusal; the `detail` field is where the owner's own goes, and it is
 absent when there is none.
 
+## A provider that answers
+
+A real completion has now been served through the deployed arrangement: LiteLLM in front of Mistral,
+the model group an operator declared, priced so the proxy can reserve before a call. That is the
+thing every model claim in this repository rested on and nothing had exercised — `ModelBroker1` and
+its worker were tested against a fake proxy, and the agent vertical's own note said a real provider
+answer had not happened.
+
+What is proven is the provider path itself: the proxy, the key an operator installed, the model group
+and its usage accounting. What is not yet proven is a capsule getting that answer — the launch gate
+now says why rather than failing three layers down. It writes the lease the per-capsule gateway must
+read, so it has to run as the account that gateway runs as; run as anybody else the lease lands
+unreadable and the failure reads like a broken product rather than a proof run by the wrong user.
+
 ## The loop a person watches
 
 A finding this host reached about itself, the readings behind it, the question it raises, a person's

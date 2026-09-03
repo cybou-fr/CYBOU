@@ -35,6 +35,18 @@ grep -q '^CYBOU_LITELLM_BASE_URL=.' /etc/cybou/provider.env ||
     not_run "the provider policy is still fail-closed"
 test -s /etc/cybou/litellm-master-key || not_run "no provider credential is installed"
 test -w /run/cybou-agent-leases || not_run "this user cannot write the session launch directory"
+# The lease this run writes has to be readable by the account the gateway unit runs as, which is the
+# account that owns the launch directory in a deployment. Run by anybody else — root included — the
+# lease lands unreadable and the gateway fails with a permission error three layers down, which
+# reads like a broken product rather than a proof run by the wrong user.
+gateway_user="$(sed -n 's/^User=//p' /etc/systemd/system/cybou-agent-gateway@.service | head -1)"
+launch_owner="$(stat -c '%U' /run/cybou-agent-leases)"
+if [ -n "$gateway_user" ] && [ "$launch_owner" != "$gateway_user" ]; then
+    not_run "the launch directory belongs to $launch_owner and the gateway runs as $gateway_user"
+fi
+if [ -n "$gateway_user" ] && [ "$(id -un)" != "$gateway_user" ]; then
+    not_run "this proof writes leases the gateway must read, so it runs as $gateway_user"
+fi
 for program in cybou-capsule-enter cybou-model-bridge cybou-egress-bridge cybou-egressd; do
     test -x "/usr/libexec/cybou/$program" || not_run "$program is not deployed"
 done
