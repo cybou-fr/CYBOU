@@ -565,6 +565,12 @@ pub struct BeliefProjection {
     pub status: String,
     /// RFC 3339 instant the belief was last corroborated.
     pub last_corroborated_at: String,
+    /// The canonical contributions this belief was formed from.
+    ///
+    /// Empty means the owner accounted for no contributions, and it stays empty: an identifier
+    /// invented to make a belief look sourced is worse than a belief that admits it cannot say.
+    #[serde(default)]
+    pub evidence_ids: Vec<Uuid>,
 }
 
 /// What the system currently believes, as reported by Epistemic1.

@@ -337,6 +337,9 @@ impl ZbusPresenceSource {
                         confidence: belief.confidence,
                         status: belief.status,
                         last_corroborated_at: belief.last_corroborated_at,
+                        // The owner already names what it formed the belief from; dropping it here
+                        // was what left the graph unable to say where a belief came from.
+                        evidence_ids: belief.evidence,
                     })
                     .collect(),
             },

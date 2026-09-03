@@ -189,7 +189,24 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                         <div style="color: var(--text-second);">"Category: " <b style="color: var(--text-bright);">{node.node_type.category_name()}</b></div>
                                         <div style="color: var(--text-second);">"Confidence: " <b style="color: var(--text-bright);">{format!("{:.1}%", node.confidence * 100.0)}</b></div>
                                         <div style="color: var(--text-second);">"Provenance: " <b style="color: var(--ok);">{node.provenance.label()}</b></div>
-                                        <div style="color: var(--text-second);">"Evidence: " <b style="color: var(--text-bright);">{node.evidence_ids.len()}</b></div>
+                                        // "0" would read as a count of something absent. An owner
+                                        // that accounted for no contributions is saying it cannot
+                                        // show where this came from, and that is what is written.
+                                        {if node.evidence_ids.is_empty() {
+                                            view! {
+                                                <div style="color: var(--text-second);">"Evidence: " <b style="color: var(--text-dim);">"none accounted for"</b></div>
+                                            }.into_any()
+                                        } else {
+                                            let citations = node.evidence_ids.clone();
+                                            view! {
+                                                <div style="color: var(--text-second);">
+                                                    {format!("Evidence ({}): ", citations.len())}
+                                                    <b style="color: var(--text-bright); font-family: monospace; word-break: break-all;">
+                                                        {citations.join(", ")}
+                                                    </b>
+                                                </div>
+                                            }.into_any()
+                                        }}
                                         {node.observed_at.as_ref().map(|observed| view! {
                                             <div style="color: var(--text-second);">"Observed at: " <b style="color: var(--text-bright);">{observed.clone()}</b></div>
                                         })}

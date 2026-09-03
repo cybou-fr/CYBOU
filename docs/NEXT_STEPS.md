@@ -770,10 +770,13 @@ expansion exactly as far as the requested depth; a type constraint is not widene
 an edge is returned only when the projection contains both of its endpoints.
 
 `CognitiveHub` physically contains no Journal. `/api/v1/cognitive/journal` projects the canonical
-Event1 view obtained through Presence and fails explicitly when that owner cannot answer. The next
-graph step is to populate `evidenceIds` from canonical contribution identities where the upstream
-Mind projection exposes them; an empty evidence set is visible and is never replaced by an invented
-identifier.
+Event1 view obtained through Presence and fails explicitly when that owner cannot answer.
+
+`evidenceIds` are now real. Epistemic1 already named the contributions each belief was formed from,
+and the gateway was dropping them on the way to the web contract, which is what left the graph
+unable to say where a belief came from. The belief projection carries them and derived nodes cite
+them. An owner that accounted for nothing still cites nothing, and the desktop says "none accounted
+for" instead of the "0" that read like a count of something absent.
 
 ### Meaning1 ownership
 

@@ -167,7 +167,14 @@ impl CognitiveHub {
                     },
                     confidence: belief.confidence,
                     provenance: CognitiveProvenance::Derived,
-                    evidence_ids: Vec::new(),
+                    // Real Event1 contribution identities, carried from the owner that formed the
+                    // belief. An owner that accounted for none leaves this empty rather than
+                    // acquiring an invented citation on the way to the desktop.
+                    evidence_ids: belief
+                        .evidence_ids
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
                     observed_at: Some(belief.last_corroborated_at.clone()),
                     subject: None,
                     created_at: belief.last_corroborated_at.clone(),
@@ -465,6 +472,52 @@ mod tests {
             edges.push(edge("edge:2", "node:process:41", "node:service:agentd"));
         }
         hub
+    }
+
+    fn nominal_mind() -> cybou_web_contracts::MindProjection {
+        serde_json::from_str(include_str!("../../../fixtures/web/v1/mind-nominal.json"))
+            .expect("checked nominal mind fixture")
+    }
+
+    #[test]
+    fn a_belief_node_cites_the_contributions_its_owner_accounted_for() {
+        let mut mind = nominal_mind();
+        let first = uuid::Uuid::new_v4();
+        let second = uuid::Uuid::new_v4();
+        let belief = mind.beliefs.beliefs.first_mut().expect("a nominal belief");
+        belief.evidence_ids = vec![first, second];
+
+        let graph = CognitiveHub::new().build_grounded_graph(&[], &[], Some(&mind), None);
+        let node = graph
+            .graph
+            .nodes
+            .iter()
+            .find(|node| node.provenance == CognitiveProvenance::Derived)
+            .expect("a derived belief node");
+        assert_eq!(
+            node.evidence_ids,
+            vec![first.to_string(), second.to_string()]
+        );
+    }
+
+    #[test]
+    fn a_belief_whose_owner_accounted_for_nothing_cites_nothing() {
+        let mind = nominal_mind();
+        assert!(
+            mind.beliefs
+                .beliefs
+                .iter()
+                .all(|belief| belief.evidence_ids.is_empty())
+        );
+        let graph = CognitiveHub::new().build_grounded_graph(&[], &[], Some(&mind), None);
+        let node = graph
+            .graph
+            .nodes
+            .iter()
+            .find(|node| node.provenance == CognitiveProvenance::Derived)
+            .expect("a derived belief node");
+        // Nothing is invented to fill the gap: a belief that cannot say where it came from says so.
+        assert!(node.evidence_ids.is_empty());
     }
 
     #[test]
