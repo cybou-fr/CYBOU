@@ -916,6 +916,31 @@ disclose that it exists.
 Persistence and the producers themselves are still open, and per-principal notifications should move
 to a canonical owner when they carry real personal content rather than living in the gateway.
 
+### Real system surfaces
+
+**Packages and Network are read, not declared.** Both surfaces reported `Unknown` and an empty list,
+and the desktop said so honestly — "no package database reader is implemented". Two readers now
+exist, both read-only and neither needing any privilege the gateway did not already have.
+
+Packages come from `/var/lib/dpkg/status`: only entries dpkg itself calls installed, sorted by name,
+verified on a live host against `grep -c '^Status: install ok installed'`. Nothing consults the
+repositories, so no package is reported upgradable and `upgradableCount` is now `Option`, left
+unestablished rather than reported as zero — "up to date" and "did not look" are different answers.
+A candidate version is left absent for the same reason, and the originating repository stays empty
+because dpkg records what is installed, not where it came from.
+
+Network comes from the kernel's own accounting: `/sys/class/net` for interfaces, link state and byte
+counters, `/proc/net/route` for the default gateway of each interface, `/etc/resolv.conf` for
+nameservers. An interface the reader cannot classify is `Other` carrying the host's own word for it
+rather than being called Ethernet, and an address nothing established is `None` rather than a blank
+that reads like an address. Where the kernel cannot be read the surface stays `Unknown`.
+
+Storage, Security, Users and Backup still report `Unknown`, and every mutation on all of these
+surfaces still refuses. Installing, upgrading, connecting and snapshotting are new powers over the
+host, and they belong behind an Action1 proposal, an operator decision and an Executor1 permit —
+`ExecutableAction` has no variant for any of them yet, which is the honest state and an explicit
+decision rather than an oversight.
+
 ### B12. Further agent packs, then A2A
 
 More agents, and agent-to-agent last. An agent that sandboxes itself with Docker runs inside a

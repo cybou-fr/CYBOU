@@ -224,15 +224,30 @@ impl SystemHub {
     /// Get network status.
     #[must_use]
     pub fn get_network(&self) -> NetworkProjection {
-        let connections = self
+        // Operator-declared connections, plus whatever the kernel itself says exists. When the
+        // kernel cannot be read the surface stays unknown rather than reporting a host with no
+        // network at all.
+        let declared = self
             .connections
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-
+        let Some(observed) = system_reader::read_real_network() else {
+            return NetworkProjection {
+                schema_version: WEB_SCHEMA_V1,
+                state: SystemSurfaceState::Unknown,
+                connections: declared,
+            };
+        };
+        let mut connections = observed;
+        for connection in declared {
+            if !connections.iter().any(|value| value.id == connection.id) {
+                connections.push(connection);
+            }
+        }
         NetworkProjection {
             schema_version: WEB_SCHEMA_V1,
-            state: SystemSurfaceState::Unknown,
+            state: SystemSurfaceState::Known,
             connections,
         }
     }
@@ -249,17 +264,28 @@ impl SystemHub {
     /// Get package repository and installation status.
     #[must_use]
     pub fn get_packages(&self) -> PackagesProjection {
-        let packages = self
-            .packages
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let installed_count = packages.len();
+        let Some(packages) = system_reader::read_real_packages() else {
+            let packages = self
+                .packages
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            let installed_count = packages.len();
+            return PackagesProjection {
+                schema_version: WEB_SCHEMA_V1,
+                state: SystemSurfaceState::Unknown,
+                installed_count,
+                upgradable_count: None,
+                packages,
+            };
+        };
         PackagesProjection {
             schema_version: WEB_SCHEMA_V1,
-            state: SystemSurfaceState::Unknown,
-            installed_count,
-            upgradable_count: 0,
+            state: SystemSurfaceState::Known,
+            installed_count: packages.len(),
+            // dpkg says what is installed. Nothing here consults the repositories, so how many
+            // packages could be upgraded is not established, and is not reported as none.
+            upgradable_count: None,
             packages,
         }
     }

@@ -1448,8 +1448,11 @@ pub struct PackagesProjection {
     pub state: SystemSurfaceState,
     /// Total installed packages count.
     pub installed_count: usize,
-    /// Total upgradable packages count.
-    pub upgradable_count: usize,
+    /// Total upgradable packages count, when a reader could establish it.
+    ///
+    /// `None` where nothing consulted the repositories. Zero would say the host is up to date,
+    /// which is a different answer from not having looked.
+    pub upgradable_count: Option<usize>,
     /// Packages list matching query.
     pub packages: Vec<PackageRecord>,
 }
@@ -2306,7 +2309,7 @@ mod tests {
             schema_version: WEB_SCHEMA_V1,
             state: SystemSurfaceState::Known,
             installed_count: 1,
-            upgradable_count: 0,
+            upgradable_count: Some(0),
             packages: vec![PackageRecord {
                 name: "ripgrep".to_string(),
                 installed_version: Some("14.1.0".to_string()),

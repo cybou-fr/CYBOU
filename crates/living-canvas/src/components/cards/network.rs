@@ -29,7 +29,7 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                     } else {
                         signals.connections.set(Vec::new());
                         signals.status_msg.set(Some(
-                            "Network state is unknown: no host network reader is implemented."
+                            "Network state is unknown: this host's interfaces could not be read."
                                 .to_owned(),
                         ));
                     }
@@ -104,12 +104,15 @@ pub fn NetworkContent(card: CardId) -> impl IntoView {
                         let rx_mb = conn.rx_bytes / (1024 * 1024);
                         let tx_mb = conn.tx_bytes / (1024 * 1024);
 
-                        let kind_label = match conn.kind {
-                            NetworkConnectionKind::Ethernet => "Ethernet",
-                            NetworkConnectionKind::Wifi => "Wi-Fi",
-                            NetworkConnectionKind::Tailscale => "Tailscale Mesh",
-                            NetworkConnectionKind::Wireguard => "WireGuard VPN",
-                            NetworkConnectionKind::Loopback => "Loopback",
+                        let kind_label = match &conn.kind {
+                            NetworkConnectionKind::Ethernet => "Ethernet".to_owned(),
+                            NetworkConnectionKind::Wifi => "Wi-Fi".to_owned(),
+                            NetworkConnectionKind::Tailscale => "Tailscale Mesh".to_owned(),
+                            NetworkConnectionKind::Wireguard => "WireGuard VPN".to_owned(),
+                            NetworkConnectionKind::Loopback => "Loopback".to_owned(),
+                            // The host saw the interface and described it as something this
+                            // desktop has no name for. Its own word is better than a guess.
+                            NetworkConnectionKind::Other { described_as } => described_as.clone(),
                         };
 
                         view! {

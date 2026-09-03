@@ -7,8 +7,9 @@ use std::{collections::HashMap, fs, path::Path};
 
 use cybou_protocol::system::LogsUnavailable;
 use cybou_protocol::system::{
-    CpuCoreStat, DiskPartitionInfo, NetworkInterfaceInfo, ProcessRecord, ServiceRecord,
-    ServiceState, ServiceUnitType,
+    CpuCoreStat, DiskPartitionInfo, NetworkConnectionKind, NetworkConnectionRecord,
+    NetworkInterfaceInfo, PackageRecord, PackageStatus, ProcessRecord, ServiceRecord, ServiceState,
+    ServiceUnitType,
 };
 use cybou_web_contracts::{
     ProcessesListProjection, ServicesListProjection, SystemLogsProjection, SystemLogsQueryRequest,
@@ -862,6 +863,287 @@ fn query_unit_status(name: &str) -> (ServiceState, String, Option<u32>, Option<u
     }
 
     (ServiceState::Inactive, "dead".to_owned(), None, None)
+}
+
+/// The installed packages a Debian host records about itself, or `None` where no dpkg database is
+/// readable.
+///
+/// dpkg is the authority on what is installed. It is not an authority on what could be upgraded:
+/// that needs the repository lists, which nothing here consults, so no package is reported as
+/// upgradable and the count is left unestablished rather than reported as zero.
+#[cfg(target_os = "linux")]
+#[must_use]
+pub fn read_real_packages() -> Option<Vec<PackageRecord>> {
+    let status = std::fs::read_to_string("/var/lib/dpkg/status").ok()?;
+    Some(parse_dpkg_status(&status))
+}
+
+#[cfg(not(target_os = "linux"))]
+#[must_use]
+pub fn read_real_packages() -> Option<Vec<PackageRecord>> {
+    None
+}
+
+/// Parse a dpkg status database into the packages it says are present on this host.
+///
+/// Only entries dpkg itself calls installed are returned. A half-configured or removed-but-
+/// config-files entry is a different state, and reporting it as installed would say the host has
+/// software it does not have.
+fn parse_dpkg_status(status: &str) -> Vec<PackageRecord> {
+    let mut packages = Vec::new();
+    for block in status.split("\n\n") {
+        let mut name = None;
+        let mut version = None;
+        let mut architecture = None;
+        let mut description = None;
+        let mut installed = false;
+        for line in block.lines() {
+            // Continuation lines of a folded field start with whitespace and are not fields.
+            let Some((field, value)) = line.split_once(": ") else {
+                continue;
+            };
+            if line.starts_with(char::is_whitespace) {
+                continue;
+            }
+            match field {
+                "Package" => name = Some(value.trim().to_owned()),
+                "Version" => version = Some(value.trim().to_owned()),
+                "Architecture" => architecture = Some(value.trim().to_owned()),
+                "Description" => description = Some(value.trim().to_owned()),
+                "Status" => installed = value.trim() == "install ok installed",
+                _ => {}
+            }
+        }
+        let (Some(name), true) = (name, installed) else {
+            continue;
+        };
+        packages.push(PackageRecord {
+            name,
+            installed_version: version,
+            // Nothing consulted the repositories, so there is no candidate to name.
+            candidate_version: None,
+            description: description.unwrap_or_default(),
+            architecture: architecture.unwrap_or_default(),
+            // dpkg records what is installed, not where it came from.
+            repository: String::new(),
+            status: PackageStatus::Installed,
+            download_size_bytes: None,
+        });
+    }
+    packages.sort_by(|left, right| left.name.cmp(&right.name));
+    packages
+}
+
+/// The network interfaces this host has, or `None` where the kernel's interface directory is not
+/// readable.
+///
+/// Everything here is read from the kernel's own accounting. An address is reported only where the
+/// host stated one; an interface with no address reported carries `None` rather than a blank that
+/// reads like an address of nothing.
+#[cfg(target_os = "linux")]
+#[must_use]
+pub fn read_real_network() -> Option<Vec<NetworkConnectionRecord>> {
+    let entries = std::fs::read_dir("/sys/class/net").ok()?;
+    let routes = std::fs::read_to_string("/proc/net/route").unwrap_or_default();
+    let resolv = std::fs::read_to_string("/etc/resolv.conf").unwrap_or_default();
+    let dns = parse_resolv_conf(&resolv);
+
+    let mut connections = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let path = entry.path();
+        let read = |leaf: &str| {
+            std::fs::read_to_string(path.join(leaf))
+                .ok()
+                .map(|value| value.trim().to_owned())
+        };
+        let operstate = read("operstate").unwrap_or_default();
+        let uevent = read("uevent").unwrap_or_default();
+        let is_wireless = path.join("wireless").exists();
+        connections.push(NetworkConnectionRecord {
+            id: name.clone(),
+            kind: interface_kind(&name, &uevent, is_wireless),
+            // "unknown" is what the kernel says for interfaces that do not carry a carrier state,
+            // loopback among them; only "up" is a statement that the link is up.
+            is_active: operstate == "up" || (name == "lo" && operstate == "unknown"),
+            ip_address: None,
+            gateway: default_gateway_for(&routes, &name),
+            dns: dns.clone(),
+            rx_bytes: read("statistics/rx_bytes")
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(0),
+            tx_bytes: read("statistics/tx_bytes")
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(0),
+            name,
+        });
+    }
+    connections.sort_by(|left, right| left.name.cmp(&right.name));
+    Some(connections)
+}
+
+#[cfg(not(target_os = "linux"))]
+#[must_use]
+pub fn read_real_network() -> Option<Vec<NetworkConnectionRecord>> {
+    None
+}
+
+/// Classify one interface from what the kernel says about it, never from a guess.
+fn interface_kind(name: &str, uevent: &str, is_wireless: bool) -> NetworkConnectionKind {
+    let devtype = uevent
+        .lines()
+        .find_map(|line| line.strip_prefix("DEVTYPE="))
+        .map(str::trim);
+    if name == "lo" {
+        return NetworkConnectionKind::Loopback;
+    }
+    if is_wireless || devtype == Some("wlan") {
+        return NetworkConnectionKind::Wifi;
+    }
+    if devtype == Some("wireguard") {
+        return NetworkConnectionKind::Wireguard;
+    }
+    if name.starts_with("tailscale") {
+        return NetworkConnectionKind::Tailscale;
+    }
+    match devtype {
+        None => NetworkConnectionKind::Ethernet,
+        Some(described) => NetworkConnectionKind::Other {
+            described_as: described.to_owned(),
+        },
+    }
+}
+
+/// The default gateway one interface carries, from the kernel routing table.
+fn default_gateway_for(routes: &str, interface: &str) -> Option<String> {
+    for line in routes.lines().skip(1) {
+        let mut columns = line.split_whitespace();
+        let (Some(name), Some(destination), Some(gateway)) =
+            (columns.next(), columns.next(), columns.next())
+        else {
+            continue;
+        };
+        if name != interface || destination != "00000000" {
+            continue;
+        }
+        let raw = u32::from_str_radix(gateway, 16).ok()?;
+        if raw == 0 {
+            return None;
+        }
+        // The table is little-endian hexadecimal, so the first octet is the low byte.
+        let octets = raw.to_le_bytes();
+        return Some(format!(
+            "{}.{}.{}.{}",
+            octets[0], octets[1], octets[2], octets[3]
+        ));
+    }
+    None
+}
+
+/// The nameservers this host is configured to ask.
+fn parse_resolv_conf(resolv: &str) -> Vec<String> {
+    resolv
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| line.strip_prefix("nameserver "))
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+#[cfg(test)]
+mod host_reader_tests {
+
+    #[test]
+    fn dpkg_reports_what_is_installed_and_not_what_merely_has_an_entry() {
+        let status = concat!(
+            "Package: ripgrep\n",
+            "Status: install ok installed\n",
+            "Architecture: amd64\n",
+            "Version: 14.1.0-1\n",
+            "Description: fast recursive grep\n",
+            " a folded continuation line: not a field\n",
+            "\n",
+            "Package: removed-but-configured\n",
+            "Status: deinstall ok config-files\n",
+            "Version: 1.0\n",
+            "\n",
+            "Package: half-installed\n",
+            "Status: install ok half-configured\n",
+            "Version: 2.0\n",
+        );
+
+        let packages = super::parse_dpkg_status(status);
+        assert_eq!(packages.len(), 1);
+        assert_eq!(packages[0].name, "ripgrep");
+        assert_eq!(packages[0].installed_version.as_deref(), Some("14.1.0-1"));
+        assert_eq!(packages[0].architecture, "amd64");
+        assert_eq!(packages[0].description, "fast recursive grep");
+        // Nothing consulted the repositories, so nothing is claimed about an upgrade.
+        assert_eq!(packages[0].candidate_version, None);
+        assert_eq!(
+            packages[0].status,
+            cybou_protocol::system::PackageStatus::Installed
+        );
+    }
+
+    #[test]
+    fn an_interface_the_host_describes_otherwise_is_not_called_ethernet() {
+        use cybou_protocol::system::NetworkConnectionKind;
+        assert_eq!(
+            super::interface_kind("lo", "", false),
+            NetworkConnectionKind::Loopback
+        );
+        assert_eq!(
+            super::interface_kind("wlan0", "", true),
+            NetworkConnectionKind::Wifi
+        );
+        assert_eq!(
+            super::interface_kind("wg0", "DEVTYPE=wireguard\n", false),
+            NetworkConnectionKind::Wireguard
+        );
+        assert_eq!(
+            super::interface_kind("tailscale0", "", false),
+            NetworkConnectionKind::Tailscale
+        );
+        assert_eq!(
+            super::interface_kind("eth0", "INTERFACE=eth0\n", false),
+            NetworkConnectionKind::Ethernet
+        );
+        assert_eq!(
+            super::interface_kind("docker0", "DEVTYPE=bridge\n", false),
+            NetworkConnectionKind::Other {
+                described_as: "bridge".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn the_default_gateway_is_read_from_the_kernel_table_in_its_own_byte_order() {
+        let routes = concat!(
+            "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\n",
+            "eth0\t00000000\t0101A8C0\t0003\t0\t0\t0\t00000000\n",
+            "eth0\t0001A8C0\t00000000\t0001\t0\t0\t0\t00FFFFFF\n",
+            "lo\t0000007F\t00000000\t0001\t0\t0\t0\t000000FF\n",
+        );
+        assert_eq!(
+            super::default_gateway_for(routes, "eth0").as_deref(),
+            Some("192.168.1.1")
+        );
+        // An interface with no default route has no gateway, rather than 0.0.0.0.
+        assert_eq!(super::default_gateway_for(routes, "lo"), None);
+        assert_eq!(super::default_gateway_for(routes, "absent0"), None);
+    }
+
+    #[test]
+    fn nameservers_come_from_the_configured_lines_only() {
+        let resolv = "# generated\nnameserver 1.1.1.1\nsearch example.org\nnameserver 9.9.9.9\n";
+        assert_eq!(
+            super::parse_resolv_conf(resolv),
+            vec!["1.1.1.1".to_owned(), "9.9.9.9".to_owned()]
+        );
+    }
 }
 
 #[cfg(test)]

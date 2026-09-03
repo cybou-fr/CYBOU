@@ -30,7 +30,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                     } else {
                         signals.packages.set(Vec::new());
                         signals.status_msg.set(Some(
-                            "Package state is unknown: no package database reader is implemented."
+                            "Package state is unknown: this host has no readable package database."
                                 .to_owned(),
                         ));
                     }

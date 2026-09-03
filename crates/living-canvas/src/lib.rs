@@ -1172,7 +1172,7 @@ impl MindClient for MockMindClient {
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             state: cybou_web_contracts::SystemSurfaceState::Known,
             installed_count: 0,
-            upgradable_count: 0,
+            upgradable_count: None,
             packages: Vec::new(),
         })
     }

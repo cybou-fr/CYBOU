@@ -348,18 +348,26 @@ mod tests {
         let snap = hub.create_snapshot("@home", "test-backup", true);
         assert!(snap.is_err());
 
+        // Both surfaces now have real readers, so what they report depends on the host the tests
+        // run on. What must hold everywhere is that a surface only claims to be established when a
+        // reader established it, and that reading changes nothing about what may be mutated.
         let network = hub.get_network();
         assert_eq!(network.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
-        assert_eq!(
-            network.state,
-            cybou_web_contracts::SystemSurfaceState::Unknown
-        );
+        if network.state == cybou_web_contracts::SystemSurfaceState::Unknown {
+            assert!(network.connections.is_empty());
+        }
         let conn_res = hub.connect_network("conn-wg0", true);
         assert!(conn_res.is_err());
 
         let pkgs = hub.get_packages();
         assert_eq!(pkgs.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
-        assert_eq!(pkgs.state, cybou_web_contracts::SystemSurfaceState::Unknown);
+        // Nothing consulted the repositories, so the upgradable count is never established.
+        assert_eq!(pkgs.upgradable_count, None);
+        if pkgs.state == cybou_web_contracts::SystemSurfaceState::Unknown {
+            assert!(pkgs.packages.is_empty());
+        } else {
+            assert_eq!(pkgs.installed_count, pkgs.packages.len());
+        }
         let pkg_res = hub.execute_package_action("borgbackup", PackageActionKind::Install);
         assert!(pkg_res.is_err());
 

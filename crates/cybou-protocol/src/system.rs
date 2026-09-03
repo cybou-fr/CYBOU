@@ -265,7 +265,7 @@ pub struct SnapshotRecord {
 // -------------------------------------------------------------------------------------------------
 
 /// Network connection type.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NetworkConnectionKind {
     /// Wired Ethernet.
@@ -278,6 +278,14 @@ pub enum NetworkConnectionKind {
     Wireguard,
     /// Local Loopback.
     Loopback,
+    /// Something the host reader could see but could not classify.
+    ///
+    /// A bridge, a container veth, a tunnel: real interfaces that are none of the above. Calling
+    /// one of them Ethernet would be a guess presented as a reading.
+    Other {
+        /// The kind as the host described it, or the interface's own name when it did not.
+        described_as: String,
+    },
 }
 
 /// Network connection profile and active state.
