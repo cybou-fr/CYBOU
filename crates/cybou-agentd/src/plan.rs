@@ -9,14 +9,11 @@
 //! each one did. Here they are derived once, from the lease, and the teardown that undoes them is
 //! derived from the same place rather than written out separately and kept in step by hand.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use cybou_capsule::{CannotCompile, Ended, Lease};
 use time::OffsetDateTime;
 use uuid::Uuid;
-
-/// Where a session's launch decision is written for the gateway unit to read.
-const LEASE_ROOT: &str = "/run/cybou-agent-leases";
 
 /// Prefix of the runtime directory systemd creates for one gateway instance.
 const RUNTIME_PREFIX: &str = "/run/cybou-agent-";
@@ -111,6 +108,14 @@ impl core::error::Error for CannotPlan {}
 /// noticing.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TeardownStep {
+    /// Let a frozen capsule run again, so it can be ended.
+    ///
+    /// A frozen cgroup cannot act on being asked to exit: systemd sends its terminate signal, the
+    /// processes never wake to handle it, and the stop waits out its whole timeout before killing
+    /// anything. So the one thing that must happen before a paused or quarantined session can be
+    /// ended is letting it run — for as long as it takes to die, and no longer. Thawing something
+    /// that was never frozen changes nothing.
+    ThawCapsule(String),
     /// End the capsule holding the agent.
     StopCapsule(String),
     /// End the private model gateway.
@@ -195,7 +200,7 @@ pub fn plan(launch: &Launch, now: OffsetDateTime) -> Result<SessionPlan, CannotP
     let instance = launch.lease.grant().capsule_id.to_string();
     let runtime = wants_a_model.then(|| PathBuf::from(format!("{RUNTIME_PREFIX}{instance}")));
     let session_runtime = PathBuf::from(format!("{SESSION_PREFIX}{instance}"));
-    let root = Path::new(LEASE_ROOT);
+    let root = crate::lease_root();
 
     Ok(SessionPlan {
         lease: launch.lease.clone(),
@@ -247,7 +252,10 @@ impl SessionPlan {
     /// read back.
     #[must_use]
     pub fn teardown(&self) -> Vec<TeardownStep> {
-        let mut steps = vec![TeardownStep::StopCapsule(self.capsule_unit.clone())];
+        let mut steps = vec![
+            TeardownStep::ThawCapsule(self.capsule_unit.clone()),
+            TeardownStep::StopCapsule(self.capsule_unit.clone()),
+        ];
         // Only what was started. Stopping a unit that never existed is a failure a person would go
         // and investigate, and what they would find is a grant correctly withheld.
         if let Some(gateway) = &self.gateway_unit {
@@ -406,11 +414,17 @@ mod tests {
         let steps = plan.teardown();
 
         assert_eq!(
-            steps[0],
-            TeardownStep::StopCapsule(plan.capsule_unit.clone())
+            &steps[..2],
+            &[
+                // Nothing can be ended while it is frozen, so the thaw comes before the stop and
+                // before anything else: a capsule that cannot act on being asked to exit is one
+                // whose teardown waits out a timeout instead of happening.
+                TeardownStep::ThawCapsule(plan.capsule_unit.clone()),
+                TeardownStep::StopCapsule(plan.capsule_unit.clone()),
+            ]
         );
         assert_eq!(
-            &steps[1..3],
+            &steps[2..4],
             &[
                 TeardownStep::StopGateway(plan.gateway_unit.clone().expect("a gateway")),
                 TeardownStep::StopEgress(plan.egress_unit.clone()),
@@ -418,7 +432,7 @@ mod tests {
             "the surfaces the capsule was using go after the capsule itself"
         );
         assert_eq!(
-            &steps[3..],
+            &steps[4..],
             &[
                 TeardownStep::Remove(plan.egress_socket.clone()),
                 TeardownStep::Remove(plan.launch_file.clone()),

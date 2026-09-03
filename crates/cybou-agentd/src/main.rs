@@ -258,6 +258,7 @@ fn show_plan(selection: &Selection) -> Result<(), String> {
     }
     for step in plan.teardown() {
         match step {
+            TeardownStep::ThawCapsule(unit) => println!("teardown thaw-capsule {unit}"),
             TeardownStep::StopCapsule(unit) => println!("teardown stop-capsule {unit}"),
             TeardownStep::StopGateway(unit) => println!("teardown stop-gateway {unit}"),
             TeardownStep::StopEgress(unit) => println!("teardown stop-egress {unit}"),
@@ -592,6 +593,14 @@ fn status_of(argv: &[String]) -> Result<bool, String> {
 fn teardown(plan: &SessionPlan) {
     for step in plan.teardown() {
         let result = match &step {
+            // Thawing a capsule that was never frozen is a no-op, and thawing one that was is
+            // the difference between a stop that takes a moment and one that waits out its timeout.
+            TeardownStep::ThawCapsule(_) => {
+                let _ = std::process::Command::new(&runtime::thaw_capsule(plan)[0])
+                    .args(&runtime::thaw_capsule(plan)[1..])
+                    .status();
+                Ok(())
+            }
             TeardownStep::StopCapsule(_) => stop_unit(&runtime::stop_capsule(plan), plan, &step),
             TeardownStep::StopGateway(_) => {
                 runtime::stop_gateway(plan).map_or(Ok(()), |stop| stop_unit(&stop, plan, &step))
@@ -638,10 +647,6 @@ fn announce(session: &Session, plan: &SessionPlan) {
 /// stops showing a session as running and its leftovers get cleared.
 const EXPIRY_POLL: StdDuration = StdDuration::from_secs(15);
 
-/// Where sessions write the two files that describe them.
-#[cfg(target_os = "linux")]
-const LEASE_ROOT: &str = "/run/cybou-agent-leases";
-
 /// Where an operator writes down what this whole host will promise.
 #[cfg(target_os = "linux")]
 const CAPACITY: &str = "/etc/cybou/agent-capacity.json";
@@ -654,7 +659,7 @@ async fn serve() -> Result<(), String> {
     use cybou_agentd::service::Agent1Service;
     use cybou_fabric::AGENT;
 
-    let recovered = discover(Path::new(LEASE_ROOT), OffsetDateTime::now_utc());
+    let recovered = discover(&cybou_agentd::lease_root(), OffsetDateTime::now_utc());
     for (capsule_id, why) in &recovered.unreadable {
         eprintln!("[cybou-agentd] Session {capsule_id} could not be read back: {why}");
     }

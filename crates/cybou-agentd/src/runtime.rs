@@ -134,6 +134,17 @@ pub fn stop_gateway(plan: &SessionPlan) -> Option<Vec<String>> {
 /// Stopping the unit, not signalling the process. The capsule is a cgroup with a kill switch on it;
 /// asking whatever is inside to leave is a request, and a boundary made of requests is not one.
 #[must_use]
+pub fn thaw_capsule(plan: &SessionPlan) -> Vec<String> {
+    vec![
+        "systemctl".to_owned(),
+        "--user".to_owned(),
+        "thaw".to_owned(),
+        format!("{}.service", plan.capsule_unit),
+    ]
+}
+
+/// How to end the capsule.
+#[must_use]
 pub fn stop_capsule(plan: &SessionPlan) -> Vec<String> {
     vec![
         "systemctl".to_owned(),
@@ -160,7 +171,10 @@ pub fn still_running(plan: &SessionPlan, step: &TeardownStep) -> Option<Vec<Stri
             (true, format!("{unit}.service"))
         }
         TeardownStep::StopGateway(unit) => (false, unit.clone()),
-        TeardownStep::Remove(_) => return None,
+        // Neither is a thing to check for afterwards. A removed file is gone or it is not, and a
+        // thaw's whole purpose is to make the stop that follows it possible — the stop is what
+        // gets checked.
+        TeardownStep::ThawCapsule(_) | TeardownStep::Remove(_) => return None,
     };
     let _ = plan;
     let mut argv = vec!["systemctl".to_owned()];

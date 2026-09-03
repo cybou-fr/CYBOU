@@ -967,6 +967,21 @@ owner is not running is *unavailable* rather than an empty mailbox. Without that
 gateway falls back to its own UID-partitioned SQLite store, which isolates accounts but is not owned
 by them. Mail sending refuses while no real provider exists, rather than inventing a "Sent" item.
 
+## A capsule, driven from the desktop
+
+`scripts/test-agent-desktop-gate.sh` drives one capsule through HTTP and nothing else — list,
+telemetry, freeze, resume, quarantine, refuse, stop — and checks every claim against the kernel
+rather than against Agent1's projection: a freeze is `cgroup.freeze` reading 1 *and* the capsule's
+own output stopping. It needs no provider credential and no root, so it runs where the D-Bus control
+gate reports `NOT RUN`.
+
+It found two things. A quarantined capsule could not be ended: teardown asked systemd to stop a
+frozen cgroup, whose processes cannot wake to act on the request, so the stop waited out its whole
+timeout. Teardown now thaws first — the same reasoning as freezing before killing, in the other
+direction. And the boundary answered `204 No Content` for a teardown Agent1 had not confirmed,
+because Agent1 marks a session *ending* before tearing it down and the gateway was asking whether
+the session was still *live*. Anything the owner still knows that has not ended is now `409`.
+
 ## What a refusal says
 
 A refusal carries the words of whoever refused. The HTTP boundary answers `409` with the owner's own

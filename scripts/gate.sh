@@ -247,6 +247,22 @@ case "$operation_status" in
     *) exit "$operation_status" ;;
 esac
 
+# One capsule, driven through the HTTP boundary and checked against the kernel. Needs no provider
+# and no root. Exit 3 means this host has no user service manager or session bus.
+announce "agent desktop controls"
+failed="agent desktop controls"
+agent_desktop_status=0
+bash scripts/test-agent-desktop-gate.sh || agent_desktop_status=$?
+case "$agent_desktop_status" in
+    0) failed="" ;;
+    3)
+        announce "agent desktop controls not run: this host has no user session boundary"
+        skipped="$skipped agent-desktop-controls"
+        failed=""
+        ;;
+    *) exit "$agent_desktop_status" ;;
+esac
+
 # The whole attended loop, through the HTTP boundary a person's browser uses and nothing else.
 # Exit 3 means this host has no root systemd to run it on.
 announce "attended remediation"

@@ -33,9 +33,6 @@ use cybou_protocol::model::ModelUsageSnapshot;
 use crate::plan::Ceilings;
 use crate::registry::Found;
 
-/// Where a session's launch decision is written. Matches `crate::plan`.
-const LEASE_ROOT: &str = "/run/cybou-agent-leases";
-
 /// Why one session on the host could not be read.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CannotRead {
@@ -137,7 +134,7 @@ pub struct LaunchFiles {
 /// Where this build expects a session's files to be.
 #[must_use]
 pub fn files_for(capsule_id: Uuid) -> LaunchFiles {
-    let root = Path::new(LEASE_ROOT);
+    let root = crate::lease_root();
     LaunchFiles {
         capsule_id,
         lease: root.join(format!("{capsule_id}.lease")),

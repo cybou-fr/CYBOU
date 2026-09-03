@@ -34,6 +34,19 @@
 //! filesystem and a service manager, and it does nothing these modules have not already described —
 //! so what a session did is answerable by reading rather than by running.
 
+/// Where a session's two files live: the lease it was granted and the launch it was given.
+///
+/// `/run/cybou-agent-leases` on a deployed host, and that is what a deployment uses. The override
+/// exists so this owner can be exercised by somebody who is not root — a proof that needs root to
+/// run is a proof that runs rarely — and a deployment never sets it.
+#[must_use]
+pub fn lease_root() -> std::path::PathBuf {
+    std::env::var_os("CYBOU_AGENT_LEASE_ROOT").map_or_else(
+        || std::path::PathBuf::from("/run/cybou-agent-leases"),
+        std::path::PathBuf::from,
+    )
+}
+
 pub mod capacity;
 pub mod discovery;
 pub mod plan;

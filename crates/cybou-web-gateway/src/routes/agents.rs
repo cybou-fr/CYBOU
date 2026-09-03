@@ -169,11 +169,16 @@ pub async fn stop_agent_handler(
 
     match stop(&capsule_id.to_string()).await {
         Ok(true) => Ok(StatusCode::NO_CONTENT),
+        // Agent1 answering `false` is it saying the teardown is unproven — something is still there,
+        // or could not be asked about. It marks the session as ending first, so asking whether the
+        // session is still *live* answered no for a capsule that was still running, and a person was
+        // told the thing was gone. Anything the owner still knows that has not ended is unconfirmed.
         Ok(false) => match sessions().await {
             Ok(sessions)
-                if sessions
-                    .iter()
-                    .any(|session| session.capsule_id == capsule_id && session.is_live()) =>
+                if sessions.iter().any(|session| {
+                    session.capsule_id == capsule_id
+                        && !matches!(session.standing, cybou_protocol::agent::Standing::Ended)
+                }) =>
             {
                 Err(agent_error(
                     StatusCode::CONFLICT,
