@@ -67,6 +67,32 @@ pub struct LearningCandidate {
     pub created_at: OffsetDateTime,
 }
 
+impl LearningCandidate {
+    /// Whether an action carried out on this host falls inside the candidate's scope.
+    ///
+    /// A scope is dotted (`service.restart`, `service`, `systemd:demo-api.service`), and matching
+    /// is by whole segments against the operation verb, or by equality against the target. Substring
+    /// matching would let `service.restart` claim evidence from `service.restart-preflight`, which
+    /// is a different thing that happened, and evidence is the one place where nearly-right is
+    /// wrong.
+    #[must_use]
+    pub fn scope_admits(&self, operation: &str, target: &str) -> bool {
+        let scope = self.scope.trim();
+        if scope.is_empty() {
+            // A candidate that names no scope has nothing to gather evidence about. Treating that
+            // as "everything" would promote on outcomes it never claimed anything about.
+            return false;
+        }
+        if scope == target {
+            return true;
+        }
+        operation == scope
+            || operation
+                .strip_prefix(scope)
+                .is_some_and(|rest| rest.starts_with('.'))
+    }
+}
+
 /// Governance criteria required to promote a learning candidate into active use.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -133,5 +159,48 @@ mod tests {
 
         assert_eq!(candidate.layer, LearningLayer::Procedural);
         assert_eq!(candidate.source_evidence.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod scope_tests {
+    use super::{LearningCandidate, LearningLayer};
+    use time::OffsetDateTime;
+    use uuid::Uuid;
+
+    fn candidate(scope: &str) -> LearningCandidate {
+        LearningCandidate {
+            candidate_id: Uuid::new_v4(),
+            layer: LearningLayer::Procedural,
+            source_evidence: Vec::new(),
+            outcome_evidence: Vec::new(),
+            generalization: "restarting the service relieves the finding".to_owned(),
+            scope: scope.to_owned(),
+            derivation_version: 1,
+            created_at: OffsetDateTime::UNIX_EPOCH,
+        }
+    }
+
+    #[test]
+    fn a_scope_matches_whole_segments_and_exact_targets() {
+        assert!(candidate("service.restart").scope_admits("service.restart", "systemd:demo-api.service"));
+        assert!(candidate("service").scope_admits("service.restart", "systemd:demo-api.service"));
+        assert!(
+            candidate("systemd:demo-api.service")
+                .scope_admits("service.restart", "systemd:demo-api.service")
+        );
+    }
+
+    #[test]
+    fn a_scope_never_claims_evidence_from_a_neighbouring_verb() {
+        let scoped = candidate("service.restart");
+        assert!(!scoped.scope_admits("service.restart-preflight", "systemd:demo-api.service"));
+        assert!(!scoped.scope_admits("service.stop", "systemd:demo-api.service"));
+        assert!(!scoped.scope_admits("package.install", "apt:build-essential"));
+    }
+
+    #[test]
+    fn a_candidate_that_names_no_scope_gathers_no_evidence() {
+        assert!(!candidate("   ").scope_admits("service.restart", "systemd:demo-api.service"));
     }
 }

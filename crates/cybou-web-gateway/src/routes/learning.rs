@@ -26,6 +26,11 @@ fn mutation_error(
 ) -> (StatusCode, Json<crate::state::ErrorBody>) {
     let (status, code, retryable) = match error {
         LearningError::NotFound => (StatusCode::NOT_FOUND, not_found, false),
+        LearningError::EvidenceUnavailable => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "actionEvidenceUnavailable",
+            true,
+        ),
         LearningError::Persistence(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             "learningPersistenceFailed",
@@ -97,6 +102,10 @@ pub async fn propose_candidate_handler(
 }
 
 /// Evaluate a candidate against demonstrated episodic outcomes and promotion criteria.
+///
+/// The evidence is read from Action1 at evaluation time. When that owner cannot be read the
+/// evaluation refuses with `503`: promoting against evidence nobody can currently produce would be
+/// a durable claim resting on a memory.
 pub async fn evaluate_candidate_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -106,7 +115,11 @@ pub async fn evaluate_candidate_handler(
         return Err(GatewayState::sign_in_required());
     }
 
-    match state.learning.evaluate_candidate(candidate_id) {
+    let records = state.presence.recent_actions().await;
+    match state
+        .learning
+        .evaluate_candidate(candidate_id, records.as_deref())
+    {
         Ok(projection) => Ok(Json(projection)),
         Err(error) => Err(mutation_error(error, "candidateNotFound")),
     }

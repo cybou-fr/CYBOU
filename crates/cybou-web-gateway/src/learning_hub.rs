@@ -9,9 +9,9 @@ use cybou_protocol::learning::{
 };
 use cybou_protocol::promotion::{DemonstratedOutcome, evaluate_promotion};
 use cybou_web_contracts::{
-    CandidateEvaluationProjection, GovernanceScopesProjection, LearnedArtifactsProjection,
-    LearningCandidatesProjection, ProposeLearningCandidateRequest, RevokeArtifactRequest,
-    WEB_SCHEMA_V1,
+    ActionRecordProjection, CandidateEvaluationProjection, GovernanceScopesProjection,
+    LearnedArtifactsProjection, LearningCandidatesProjection, ProposeLearningCandidateRequest,
+    RevokeArtifactRequest, WEB_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
 use std::{io::Write, path::PathBuf, sync::Mutex};
@@ -30,11 +30,17 @@ struct LearningStore {
     scopes: Vec<TaskScope>,
 }
 
-/// A mutation either could not find its target or could not be made durable.
+/// A mutation either could not find its target, could not read its evidence, or could not be made
+/// durable.
 #[derive(Debug)]
 pub enum LearningError {
     /// The target does not exist.
     NotFound,
+    /// The owner of the evidence could not be read.
+    ///
+    /// Evaluation stops here rather than falling back on demonstrations resolved earlier: a
+    /// promotion granted on a memory of evidence is a promotion nobody can check now.
+    EvidenceUnavailable,
     /// The backing store rejected the state.
     Persistence(std::io::Error),
 }
@@ -153,11 +159,53 @@ impl LearningHub {
         Ok(candidate)
     }
 
+    /// Derive what a candidate has actually demonstrated from canonical Action1 records.
+    ///
+    /// An episode is one proposal, so two outcomes of the same proposal are one occasion rather
+    /// than two. A record only demonstrates something when the effect was established and the
+    /// executor's claim and the telemetry agree; a disagreement, or an effect nothing established,
+    /// is evidence of nothing and is left out rather than counted as either a success or a failure.
+    #[must_use]
+    pub fn demonstrations_in(
+        candidate: &LearningCandidate,
+        records: &[ActionRecordProjection],
+    ) -> Vec<DemonstratedOutcome> {
+        let mut demonstrations: Vec<DemonstratedOutcome> = Vec::new();
+        for record in records {
+            if !candidate.scope_admits(&record.operation, &record.target_resource) {
+                continue;
+            }
+            let Some(outcome) = record.outcome.as_ref() else {
+                continue;
+            };
+            if outcome.relief == "not-established" || outcome.agreement == "not-comparable" {
+                continue;
+            }
+            if demonstrations
+                .iter()
+                .any(|value| value.outcome == outcome.outcome_id)
+            {
+                continue;
+            }
+            demonstrations.push(DemonstratedOutcome {
+                episode: record.proposal_id,
+                outcome: outcome.outcome_id,
+                succeeded: outcome.relief == "relieved" && outcome.agreement == "agree",
+            });
+        }
+        demonstrations
+    }
+
     /// Resolve owner-held evidence and apply the promotion gate.
+    ///
+    /// `records` is what Action1 currently establishes; `None` means Action1 could not be read, and
+    /// evaluation refuses rather than promoting against whatever was resolved last time.
     pub fn evaluate_candidate(
         &self,
         candidate_id: Uuid,
+        records: Option<&[ActionRecordProjection]>,
     ) -> Result<CandidateEvaluationProjection, LearningError> {
+        let records = records.ok_or(LearningError::EvidenceUnavailable)?;
         let mut current = self
             .store
             .lock()
@@ -168,12 +216,13 @@ impl LearningHub {
             .iter()
             .position(|c| c.candidate_id == candidate_id)
             .ok_or(LearningError::NotFound)?;
-        let outcomes = next
-            .demonstrations
-            .iter()
-            .find(|(id, _)| *id == candidate_id)
-            .map(|(_, values)| values.clone())
-            .unwrap_or_default();
+        // Demonstrations are derived from the canonical record, not accumulated here, so evidence
+        // that Action1 no longer establishes stops supporting a promotion.
+        let outcomes = Self::demonstrations_in(&next.candidates[position], records);
+        next.demonstrations
+            .retain(|(id, _)| *id != candidate_id);
+        next.demonstrations
+            .push((candidate_id, outcomes.clone()));
         let candidate = &mut next.candidates[position];
         candidate.source_evidence = outcomes.iter().map(|v| v.episode).collect();
         candidate.source_evidence.sort_unstable();
@@ -296,13 +345,49 @@ mod tests {
         std::fs::remove_dir_all(directory).expect("remove temporary directory");
     }
 
+    fn action(
+        operation: &str,
+        target: &str,
+        relief: &str,
+        agreement: &str,
+    ) -> ActionRecordProjection {
+        let proposal_id = Uuid::new_v4();
+        ActionRecordProjection {
+            proposal_id,
+            decision_id: Uuid::new_v4(),
+            cause_id: None,
+            proposer: "mind".into(),
+            intent: "relieve".into(),
+            operation: operation.into(),
+            target_resource: target.into(),
+            risk_level: "low".into(),
+            reversible: true,
+            proposed_at: "2026-01-01T00:00:00Z".into(),
+            checks: Vec::new(),
+            verdict: "granted".into(),
+            verdict_reason: None,
+            execution_started: None,
+            attempt: None,
+            outcome: Some(cybou_web_contracts::ActionOutcomeProjection {
+                outcome_id: Uuid::new_v4(),
+                proposal_id,
+                relief: relief.into(),
+                agreement: agreement.into(),
+                disagreement: None,
+                observation_before: None,
+                observation_after: None,
+                concluded_at: "2026-01-01T00:01:00Z".into(),
+            }),
+        }
+    }
+
     #[test]
     fn browser_cannot_claim_evidence_or_promote_without_owner_evidence() {
         let hub = LearningHub::with_optional_store(None);
         let candidate = hub.propose_candidate(request()).expect("proposal");
         assert!(candidate.source_evidence.is_empty() && candidate.outcome_evidence.is_empty());
         assert!(
-            hub.evaluate_candidate(candidate.candidate_id)
+            hub.evaluate_candidate(candidate.candidate_id, Some(&[]))
                 .expect("evaluation")
                 .promoted
                 .is_none()
@@ -310,41 +395,94 @@ mod tests {
     }
 
     #[test]
-    fn promoted_lineage_is_resolved_from_owner_demonstrations() {
+    fn an_unreadable_evidence_owner_stops_the_evaluation() {
         let hub = LearningHub::with_optional_store(None);
         let candidate = hub.propose_candidate(request()).expect("proposal");
-        let episode_a = Uuid::new_v4();
-        let episode_b = Uuid::new_v4();
-        let outcome_a = Uuid::new_v4();
-        let outcome_b = Uuid::new_v4();
-        hub.store
-            .lock()
-            .expect("learning store")
-            .demonstrations
-            .push((
-                candidate.candidate_id,
-                vec![
-                    DemonstratedOutcome {
-                        episode: episode_a,
-                        outcome: outcome_a,
-                        succeeded: true,
-                    },
-                    DemonstratedOutcome {
-                        episode: episode_b,
-                        outcome: outcome_b,
-                        succeeded: true,
-                    },
-                ],
-            ));
+        assert!(matches!(
+            hub.evaluate_candidate(candidate.candidate_id, None),
+            Err(LearningError::EvidenceUnavailable)
+        ));
+    }
+
+    #[test]
+    fn demonstrations_come_from_canonical_action_records_in_scope() {
+        let hub = LearningHub::with_optional_store(None);
+        let candidate = hub
+            .propose_candidate(ProposeLearningCandidateRequest {
+                layer: LearningLayer::Procedural,
+                generalization: "restarting relieves it".into(),
+                scope: "service.restart".into(),
+            })
+            .expect("proposal");
+        let records = vec![
+            action("service.restart", "systemd:a.service", "relieved", "agree"),
+            action("service.restart", "systemd:b.service", "relieved", "agree"),
+            // Out of scope, so it is not this candidate's evidence.
+            action("package.install", "apt:tree", "relieved", "agree"),
+            // Nothing was established, so it demonstrates neither success nor failure.
+            action(
+                "service.restart",
+                "systemd:c.service",
+                "not-established",
+                "agree",
+            ),
+            // The executor and the telemetry tell different stories.
+            action(
+                "service.restart",
+                "systemd:d.service",
+                "relieved",
+                "not-comparable",
+            ),
+        ];
 
         let evaluation = hub
-            .evaluate_candidate(candidate.candidate_id)
+            .evaluate_candidate(candidate.candidate_id, Some(&records))
             .expect("evaluation");
-        let artifact = evaluation.artifact.expect("promoted artifact");
-        assert!(artifact.source_evidence.contains(&episode_a));
-        assert!(artifact.source_evidence.contains(&episode_b));
-        assert!(artifact.source_evidence.contains(&outcome_a));
-        assert!(artifact.source_evidence.contains(&outcome_b));
+        let promoted = evaluation.promoted.expect("promotion");
+        assert_eq!(promoted.independent_episodes, 2);
+        let artifact = evaluation.artifact.expect("artifact");
+        assert!(artifact.source_evidence.contains(&records[0].proposal_id));
+        assert!(artifact.source_evidence.contains(&records[1].proposal_id));
+        assert!(!artifact.source_evidence.contains(&records[2].proposal_id));
+        assert!(!artifact.source_evidence.contains(&records[3].proposal_id));
+    }
+
+    #[test]
+    fn evidence_action1_no_longer_establishes_stops_supporting_a_promotion() {
+        let hub = LearningHub::with_optional_store(None);
+        let candidate = hub
+            .propose_candidate(ProposeLearningCandidateRequest {
+                layer: LearningLayer::Procedural,
+                generalization: "restarting relieves it".into(),
+                scope: "service.restart".into(),
+            })
+            .expect("proposal");
+        let records = vec![
+            action("service.restart", "systemd:a.service", "relieved", "agree"),
+            action("service.restart", "systemd:b.service", "relieved", "agree"),
+        ];
+        assert!(
+            hub.evaluate_candidate(candidate.candidate_id, Some(&records))
+                .expect("evaluation")
+                .promoted
+                .is_some()
+        );
+
+        // Re-evaluated against a record set that no longer contains those episodes, the candidate
+        // is refused again rather than living on the demonstrations resolved the first time.
+        let refused = hub
+            .evaluate_candidate(candidate.candidate_id, Some(&[]))
+            .expect("evaluation");
+        assert!(refused.promoted.is_none());
+        assert!(refused.refused.is_some());
+        let stored = hub
+            .get_candidates(None)
+            .candidates
+            .into_iter()
+            .find(|value| value.candidate_id == candidate.candidate_id)
+            .expect("candidate");
+        assert!(stored.source_evidence.is_empty());
+        assert!(stored.outcome_evidence.is_empty());
     }
 
     #[test]

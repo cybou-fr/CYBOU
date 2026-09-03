@@ -792,9 +792,26 @@ image; only then does the in-memory state change or the HTTP request succeed. Se
 failures are explicit retryable server errors, and a regression test proves failed persistence does
 not publish a RAM-only candidate.
 
-This closes the gateway correctness gap. The remaining architectural step is to move the same
-owner/resolver and durable transaction boundary behind Learning1, leaving the gateway as an
-authenticated proxy as was done for Meaning1.
+**The evidence now has a real producer.** Until now nothing ever wrote a `DemonstratedOutcome`, so
+the resolver was correct and empty: a safe skeleton rather than a learning pipeline. Demonstrations
+are now derived, at evaluation time, from the canonical Action1 records the host actually holds.
+One proposal is one episode, so two outcomes of the same proposal are one occasion rather than two.
+A record contributes only when it falls inside the candidate's scope — matched by whole dotted
+segments against the operation verb, or exactly against the target, never by substring, because
+`service.restart` must not claim the evidence of `service.restart-preflight`. An outcome whose
+effect was never established, or where the executor's claim and the telemetry disagree, is evidence
+of nothing and counts as neither a success nor a failure.
+
+Because demonstrations are derived rather than accumulated, evidence Action1 no longer establishes
+stops supporting a promotion: re-evaluating the same candidate against a record set that lost those
+episodes refuses it again. And when Action1 cannot be read at all, evaluation refuses with `503`
+instead of falling back on the demonstrations resolved last time — a promotion granted on a memory
+of evidence is one nobody can check now.
+
+The remaining architectural step is to move the same owner/resolver and durable transaction boundary
+behind Learning1, leaving the gateway as an authenticated proxy as was done for Meaning1, and to add
+producers beyond Action1 (agent task outcomes and Operation1 terminal records are the obvious next
+two).
 
 ### Operation1 ownership
 
