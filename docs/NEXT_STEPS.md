@@ -749,6 +749,12 @@ The gateway no longer creates `/home/demo` or `/etc/cybou` nodes without a reade
 asserts that every belief derives directly from Event1 without evidence. An input containing no
 services, processes or Mind projection now produces an empty graph.
 
+The graph query contract now does what it declares. `nodeTypes` and `maxDepth` were accepted and
+ignored, so a control could constrain nothing while appearing to work. A query now selects starting
+nodes by term (or by an explicit `focusId`), constrains categories, and walks a typed breadth-first
+expansion exactly as far as the requested depth; a type constraint is not widened by traversal, and
+an edge is returned only when the projection contains both of its endpoints.
+
 `CognitiveHub` physically contains no Journal. `/api/v1/cognitive/journal` projects the canonical
 Event1 view obtained through Presence and fails explicitly when that owner cannot answer. The next
 graph step is to populate `evidenceIds` from canonical contribution identities where the upstream

@@ -27,7 +27,9 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                     .query_cognitive_graph(cybou_web_contracts::CognitiveQueryRequest {
                         query: query_text,
                         node_types: None,
-                        focus_id: signals.selected_node_id.get(),
+                        // The typed search term picks the starting nodes. A previously selected
+                        // node must not silently override what the person just typed.
+                        focus_id: None,
                         max_depth: Some(2),
                     })
                     .await

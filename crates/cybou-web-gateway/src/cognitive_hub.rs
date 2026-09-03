@@ -281,6 +281,11 @@ impl CognitiveHub {
     }
 
     /// Query and filter the Cognitive Graph by term, node type, and traversal depth.
+    ///
+    /// Every declared parameter is honoured, so the control a person sees means what it says:
+    /// a term (or an explicit focus) picks the starting nodes, `node_types` constrains which
+    /// categories may appear at all, and `max_depth` bounds a typed breadth-first walk outwards
+    /// from those starting nodes. Edges are returned only between nodes the projection contains.
     #[must_use]
     pub fn query_graph(&self, req: CognitiveQueryRequest) -> CognitiveGraphProjection {
         let q = req.query.trim().to_lowercase();
@@ -293,34 +298,249 @@ impl CognitiveHub {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-        let matching_nodes: Vec<CognitiveNodeRecord> = all_nodes
-            .iter()
-            .filter(|n| {
-                if q.is_empty() {
-                    return true;
-                }
-                n.id.to_lowercase().contains(&q)
-                    || n.label.to_lowercase().contains(&q)
-                    || n.node_type.category_name().to_lowercase().contains(&q)
+        let permitted: Option<Vec<String>> = req.node_types.as_ref().map(|types| {
+            types
+                .iter()
+                .map(|value| value.trim().to_lowercase())
+                .collect()
+        });
+        let type_permitted = |node: &CognitiveNodeRecord| {
+            permitted.as_ref().is_none_or(|types| {
+                let category = node.node_type.category_name().to_lowercase();
+                types.iter().any(|value| *value == category)
             })
-            .cloned()
+        };
+
+        let focus = req
+            .focus_id
+            .as_ref()
+            .map(|value| value.trim().to_lowercase())
+            .filter(|value| !value.is_empty());
+        let matches_term = |node: &CognitiveNodeRecord| {
+            if let Some(focus) = focus.as_ref() {
+                return node.id.to_lowercase() == *focus
+                    || node.id.to_lowercase().contains(focus)
+                    || node.label.to_lowercase().contains(focus);
+            }
+            q.is_empty()
+                || node.id.to_lowercase().contains(&q)
+                || node.label.to_lowercase().contains(&q)
+                || node.node_type.category_name().to_lowercase().contains(&q)
+        };
+
+        let mut selected: HashSet<String> = all_nodes
+            .iter()
+            .filter(|node| type_permitted(node) && matches_term(node))
+            .map(|node| node.id.clone())
             .collect();
 
-        let matching_ids: HashSet<String> = matching_nodes.iter().map(|n| n.id.clone()).collect();
+        // Typed breadth-first expansion: a neighbour joins only if its own category is permitted,
+        // so a type constraint is not silently widened by traversal.
+        let mut frontier: Vec<String> = selected.iter().cloned().collect();
+        for _ in 0..req.max_depth.unwrap_or(0) {
+            if frontier.is_empty() {
+                break;
+            }
+            let mut next = Vec::new();
+            for edge in all_edges.iter() {
+                let neighbour = if frontier.contains(&edge.source_id) {
+                    Some(&edge.target_id)
+                } else if frontier.contains(&edge.target_id) {
+                    Some(&edge.source_id)
+                } else {
+                    None
+                };
+                let Some(neighbour) = neighbour else { continue };
+                if selected.contains(neighbour) {
+                    continue;
+                }
+                let permitted_neighbour = all_nodes
+                    .iter()
+                    .find(|node| node.id == *neighbour)
+                    .is_some_and(type_permitted);
+                if permitted_neighbour {
+                    selected.insert(neighbour.clone());
+                    next.push(neighbour.clone());
+                }
+            }
+            frontier = next;
+        }
 
-        let matching_edges: Vec<CognitiveEdgeRecord> = all_edges
+        let nodes: Vec<CognitiveNodeRecord> = all_nodes
             .iter()
-            .filter(|e| matching_ids.contains(&e.source_id) || matching_ids.contains(&e.target_id))
+            .filter(|node| selected.contains(&node.id))
+            .cloned()
+            .collect();
+        // An edge to a node this projection does not contain would draw a relation to nothing.
+        let edges: Vec<CognitiveEdgeRecord> = all_edges
+            .iter()
+            .filter(|edge| {
+                selected.contains(&edge.source_id) && selected.contains(&edge.target_id)
+            })
             .cloned()
             .collect();
 
         CognitiveGraphProjection {
             schema_version: WEB_SCHEMA_V1,
-            graph: CognitiveGraphRecord {
-                nodes: matching_nodes,
-                edges: matching_edges,
-            },
+            graph: CognitiveGraphRecord { nodes, edges },
             focus_node_id: req.focus_id,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CognitiveHub;
+    use cybou_protocol::{
+        cognitive::{
+            CognitiveEdgeRecord, CognitiveEdgeType, CognitiveNodeRecord, CognitiveNodeType,
+            CognitiveProvenance,
+        },
+        epistemic::EpistemicStatus,
+    };
+    use cybou_web_contracts::CognitiveQueryRequest;
+    use std::collections::HashMap;
+
+    fn node(id: &str, label: &str, node_type: CognitiveNodeType) -> CognitiveNodeRecord {
+        CognitiveNodeRecord {
+            id: id.to_owned(),
+            label: label.to_owned(),
+            node_type,
+            epistemic_status: EpistemicStatus::Observed,
+            confidence: 1.0,
+            provenance: CognitiveProvenance::Observed,
+            evidence_ids: Vec::new(),
+            observed_at: None,
+            subject: None,
+            created_at: "2026-01-01T00:00:00Z".to_owned(),
+            updated_at: "2026-01-01T00:00:00Z".to_owned(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    fn edge(id: &str, source: &str, target: &str) -> CognitiveEdgeRecord {
+        CognitiveEdgeRecord {
+            id: id.to_owned(),
+            source_id: source.to_owned(),
+            target_id: target.to_owned(),
+            edge_type: CognitiveEdgeType::Observes,
+            weight: 1.0,
+            provenance: CognitiveProvenance::Observed,
+            evidence_ids: Vec::new(),
+            observed_at: None,
+            description: String::new(),
+        }
+    }
+
+    fn populated() -> CognitiveHub {
+        let hub = CognitiveHub::new();
+        {
+            let mut nodes = hub.nodes.write().expect("write nodes");
+            nodes.push(node(
+                "node:service:gateway",
+                "cybou-web-gateway",
+                CognitiveNodeType::Service {
+                    name: "cybou-web-gateway".to_owned(),
+                    state: "active".to_owned(),
+                },
+            ));
+            nodes.push(node(
+                "node:process:41",
+                "gateway worker",
+                CognitiveNodeType::Process {
+                    pid: 41,
+                    name: "cybou-web-gateway".to_owned(),
+                },
+            ));
+            nodes.push(node(
+                "node:service:agentd",
+                "cybou-agentd",
+                CognitiveNodeType::Service {
+                    name: "cybou-agentd".to_owned(),
+                    state: "active".to_owned(),
+                },
+            ));
+            let mut edges = hub.edges.write().expect("write edges");
+            edges.push(edge("edge:1", "node:service:gateway", "node:process:41"));
+            edges.push(edge("edge:2", "node:process:41", "node:service:agentd"));
+        }
+        hub
+    }
+
+    #[test]
+    fn a_depth_of_zero_returns_only_what_the_term_itself_matched() {
+        let queried = populated().query_graph(CognitiveQueryRequest {
+            query: "cybou-web-gateway".to_owned(),
+            node_types: None,
+            focus_id: None,
+            max_depth: None,
+        });
+        let ids: Vec<&str> = queried
+            .graph
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["node:service:gateway"]);
+        // Its neighbour was not selected, so no relation is drawn to a node this projection does
+        // not contain.
+        assert!(queried.graph.edges.is_empty());
+    }
+
+    #[test]
+    fn traversal_walks_exactly_as_far_as_the_requested_depth() {
+        let hub = populated();
+        let one = hub.query_graph(CognitiveQueryRequest {
+            query: "node:service:gateway".to_owned(),
+            node_types: None,
+            focus_id: None,
+            max_depth: Some(1),
+        });
+        assert_eq!(one.graph.nodes.len(), 2);
+        let two = hub.query_graph(CognitiveQueryRequest {
+            query: "node:service:gateway".to_owned(),
+            node_types: None,
+            focus_id: None,
+            max_depth: Some(2),
+        });
+        assert_eq!(two.graph.nodes.len(), 3);
+    }
+
+    #[test]
+    fn a_type_constraint_is_not_widened_by_traversal() {
+        let queried = populated().query_graph(CognitiveQueryRequest {
+            query: String::new(),
+            node_types: Some(vec!["Service".to_owned()]),
+            focus_id: None,
+            max_depth: Some(3),
+        });
+        assert!(
+            queried
+                .graph
+                .nodes
+                .iter()
+                .all(|node| node.node_type.category_name() == "Service")
+        );
+        // The two services are only related through a process the constraint excludes, so no edge
+        // may be drawn between them.
+        assert!(queried.graph.edges.is_empty());
+    }
+
+    #[test]
+    fn an_explicit_focus_selects_the_starting_node() {
+        let queried = populated().query_graph(CognitiveQueryRequest {
+            query: "cybou".to_owned(),
+            node_types: None,
+            focus_id: Some("node:service:agentd".to_owned()),
+            max_depth: None,
+        });
+        let ids: Vec<&str> = queried
+            .graph
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["node:service:agentd"]);
+        assert_eq!(queried.focus_node_id.as_deref(), Some("node:service:agentd"));
     }
 }
