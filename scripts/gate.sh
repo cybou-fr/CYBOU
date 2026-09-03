@@ -247,6 +247,22 @@ case "$operation_status" in
     *) exit "$operation_status" ;;
 esac
 
+# Somebody's own files, read and written from a browser. Exit 3 means this host cannot make
+# accounts or run PAM.
+announce "host files"
+failed="host files"
+host_files_status=0
+bash scripts/test-host-files-gate.sh || host_files_status=$?
+case "$host_files_status" in
+    0) failed="" ;;
+    3)
+        announce "host files not run: this host cannot make accounts or run PAM"
+        skipped="$skipped host-files"
+        failed=""
+        ;;
+    *) exit "$host_files_status" ;;
+esac
+
 # Two accounts, two Personal Core owners, and the number that decides which one answers. Exit 3
 # means this host cannot make accounts or run PAM.
 announce "personal privacy"

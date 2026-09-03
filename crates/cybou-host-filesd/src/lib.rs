@@ -93,7 +93,26 @@ pub enum Response {
     Written(FileWriteProjection),
     /// Successful completion of a mutation (mkdir, rename, delete, copy).
     Success,
+    /// The file is not what the writer thought it was.
+    ///
+    /// The one refusal worth telling apart. Everything else is deliberately indistinguishable — a
+    /// caller learning whether a path exists from the shape of a refusal is a caller reading the
+    /// filesystem through the error channel — but a writer who supplied a digest has already read
+    /// this file and already knows it is there, so saying that it changed since then reveals
+    /// nothing new, and not saying it turns a conflict into "try again", which is advice that
+    /// either fails forever or overwrites somebody's work.
+    Conflict,
     /// Indistinguishable filesystem refusal.
+    Refused,
+}
+
+/// What one conditional write did.
+enum Written {
+    /// It was written, and this describes what is now on the disk.
+    Wrote(FileWriteProjection),
+    /// The file is not what the writer thought it was, so nothing was written.
+    Changed,
+    /// Something else refused, and which thing is deliberately not said.
     Refused,
 }
 
@@ -131,9 +150,11 @@ impl Owner {
                 path,
                 expected_sha256,
                 text,
-            } => self
-                .write_file(&path, &text, expected_sha256.as_deref())
-                .map_or(Response::Refused, Response::Written),
+            } => match self.write_file(&path, &text, expected_sha256.as_deref()) {
+                Written::Wrote(projection) => Response::Written(projection),
+                Written::Changed => Response::Conflict,
+                Written::Refused => Response::Refused,
+            },
             Request::CreateFile {
                 path,
                 text,
@@ -220,41 +241,44 @@ impl Owner {
         })
     }
 
-    fn write_file(
-        &self,
-        requested: &str,
-        text: &str,
-        expected_sha256: Option<&str>,
-    ) -> Option<FileWriteProjection> {
-        let relative = self.relative_path(requested)?;
-        let relative_str = relative.to_str()?;
+    fn write_file(&self, requested: &str, text: &str, expected_sha256: Option<&str>) -> Written {
+        let Some(relative) = self.relative_path(requested) else {
+            return Written::Refused;
+        };
+        let Some(relative_str) = relative.to_str() else {
+            return Written::Refused;
+        };
 
         if let Some(expected) = expected_sha256 {
-            let current_bytes = self
-                .jail
-                .read_bytes(relative_str, FILE_READ_MAX_BYTES)
-                .ok()?;
-            let current_sha = Self::compute_sha256(&current_bytes);
-            if current_sha != expected {
-                return None;
+            let Ok(current_bytes) = self.jail.read_bytes(relative_str, FILE_READ_MAX_BYTES) else {
+                return Written::Refused;
+            };
+            if Self::compute_sha256(&current_bytes) != expected {
+                return Written::Changed;
             }
         }
 
-        self.jail
-            .replace_bytes_atomic(relative_str, text.as_bytes(), FILE_WRITE_MAX_BYTES)
-            .ok()?;
-
-        let re_read = self
+        if self
             .jail
-            .read_bytes(relative_str, FILE_READ_MAX_BYTES)
-            .ok()?;
-        let content_sha256 = Self::compute_sha256(&re_read);
-        let size_bytes = u64::try_from(re_read.len()).ok()?;
+            .replace_bytes_atomic(relative_str, text.as_bytes(), FILE_WRITE_MAX_BYTES)
+            .is_err()
+        {
+            return Written::Refused;
+        }
 
-        Some(FileWriteProjection {
+        // Read back rather than reported from what was sent: the digest a caller is given is of
+        // what is on the disk now, which is the thing their next write will be conditional on.
+        let Ok(re_read) = self.jail.read_bytes(relative_str, FILE_READ_MAX_BYTES) else {
+            return Written::Refused;
+        };
+        let Ok(size_bytes) = u64::try_from(re_read.len()) else {
+            return Written::Refused;
+        };
+
+        Written::Wrote(FileWriteProjection {
             schema_version: WEB_SCHEMA_V1,
             location: LocationRef::HostUserPath(requested.to_owned()),
-            content_sha256,
+            content_sha256: Self::compute_sha256(&re_read),
             size_bytes,
         })
     }
@@ -391,13 +415,25 @@ mod tests {
         });
         assert!(matches!(res, Response::Written(_)));
 
-        // Write with mismatched sha -> Refused
+        // A digest that no longer matches is its own answer, and nothing is written. Reported as a
+        // conflict rather than as the indistinguishable refusal everything else gets: the writer
+        // supplied a digest, so they have already read this file and already know it is there.
         let res = owner.answer(Request::WriteFile {
             path: file_path.clone(),
             expected_sha256: Some("bad_sha".to_string()),
             text: "bad".to_string(),
         });
-        assert_eq!(res, Response::Refused);
+        assert_eq!(res, Response::Conflict);
+        let unchanged = owner.answer(Request::ReadFile {
+            path: file_path.clone(),
+        });
+        let Response::File(unchanged) = unchanged else {
+            panic!("the file should still be readable after a refused write");
+        };
+        assert_eq!(
+            unchanged.text, "updated",
+            "a refused write changed the file"
+        );
 
         // Delete
         let res = owner.answer(Request::DeletePath {

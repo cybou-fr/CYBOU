@@ -88,6 +88,10 @@ impl HostUserFileSource for SocketHostUserFiles {
             Response::File(_) | Response::Written(_) | Response::Success => {
                 Err(GatewayError::InvalidProjection)
             }
+            // Only a conditional write can conflict; anything else saying so is not an
+
+            // answer this boundary can pass on.
+            Response::Conflict => Err(GatewayError::InvalidProjection),
             Response::Refused => Err(GatewayError::Unavailable),
         }
     }
@@ -111,6 +115,10 @@ impl HostUserFileSource for SocketHostUserFiles {
             Response::Directory(_) | Response::Written(_) | Response::Success => {
                 Err(GatewayError::InvalidProjection)
             }
+            // Only a conditional write can conflict; anything else saying so is not an
+
+            // answer this boundary can pass on.
+            Response::Conflict => Err(GatewayError::InvalidProjection),
             Response::Refused => Err(GatewayError::Unavailable),
         }
     }
@@ -135,6 +143,8 @@ impl HostUserFileSource for SocketHostUserFiles {
             .await?
         {
             Response::Written(projection) => Ok(projection),
+            // The file changed since it was read. Not unavailability, and not something to retry.
+            Response::Conflict => Err(GatewayError::Conflict),
             Response::File(_) | Response::Directory(_) | Response::Success => {
                 Err(GatewayError::InvalidProjection)
             }
@@ -165,6 +175,10 @@ impl HostUserFileSource for SocketHostUserFiles {
             Response::File(_) | Response::Directory(_) | Response::Success => {
                 Err(GatewayError::InvalidProjection)
             }
+            // Only a conditional write can conflict; anything else saying so is not an
+
+            // answer this boundary can pass on.
+            Response::Conflict => Err(GatewayError::InvalidProjection),
             Response::Refused => Err(GatewayError::Unavailable),
         }
     }

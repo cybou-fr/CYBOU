@@ -996,6 +996,25 @@ direction. And the boundary answered `204 No Content` for a teardown Agent1 had 
 because Agent1 marks a session *ending* before tearing it down and the gateway was asking whether
 the session was still *live*. Anything the owner still knows that has not ended is now `409`.
 
+## Editing a person's own files
+
+`scripts/test-host-files-gate.sh` drives the file surface as a signed-in account: what is read
+carries the digest of what is on the disk, a save conditional on that digest lands and leaves the
+file owned by the person, a save conditional on a digest that no longer matches writes nothing, and
+a path leaving the home is refused before the owner is asked. A request with no session reaches
+nothing at all.
+
+The conflict was the defect. `cybou-host-filesd` answered every refusal with one indistinguishable
+`Refused` — deliberate, because a caller learning whether a path exists from the shape of an error
+is reading the filesystem through the error channel — and the gateway turned that into *the host is
+unavailable, try again*. So an editor whose file had changed under it told the person to retry, which
+either fails forever or, if the retry drops the digest, overwrites the change that caused the
+conflict. The desktop had been written for `409` all along and never received one.
+
+A digest that no longer matches is now its own answer, and only that one: a writer who supplied a
+digest has already read the file and already knows it exists, so saying it changed reveals nothing
+new. Everything else stays indistinguishable.
+
 ## What a refusal says
 
 A refusal carries the words of whoever refused. The HTTP boundary answers `409` with the owner's own

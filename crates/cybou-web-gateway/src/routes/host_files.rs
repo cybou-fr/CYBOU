@@ -32,6 +32,23 @@ fn unavailable() -> Refusal {
     )
 }
 
+/// The file is not what the writer thought it was.
+///
+/// Its own answer, because the alternative was telling a person their host was unavailable and to
+/// try again — advice that either fails forever or, if the retry drops the digest, overwrites the
+/// change that caused the conflict.
+fn conflict() -> Refusal {
+    (
+        StatusCode::CONFLICT,
+        Json(ErrorBody {
+            schema_version: WEB_SCHEMA_V1,
+            error: "hostUserFileChanged",
+            retryable: false,
+            detail: Some("the file changed since it was read; nothing was written".to_owned()),
+        }),
+    )
+}
+
 fn invalid_owner_projection() -> Refusal {
     (
         StatusCode::BAD_GATEWAY,
@@ -156,7 +173,10 @@ pub async fn write_host_file_handler(
             &payload.text,
         )
         .await
-        .map_err(|_| unavailable())?;
+        .map_err(|error| match error {
+            crate::state::GatewayError::Conflict => conflict(),
+            _ => unavailable(),
+        })?;
     if !is_matching_host_location(&projection.location, &payload.path) {
         return Err(invalid_owner_projection());
     }
