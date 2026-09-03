@@ -963,11 +963,21 @@ host that may be depending on it, which wants its own decision about risk before
 Every such action appears in Operation1 through the Action1 producer, with no cancel offered,
 because an executing permit cannot be recalled.
 
-One deliberate cost: the executor's unit had `ProtectSystem=full` and a Unix-only address family,
-which together make a package manager impossible. Both are relaxed. The next thing worth doing here
-is running apt in its own transient unit with its own sandbox, so the executor can go back to
-`full`. The other missing halves are an `apt-get update` operation and a repository reader — until
-one exists, no package is reported upgradable and the count stays unestablished.
+The executor's own sandbox stayed shut. A package manager has to write `/usr` and reach the network,
+and relaxing the executor's unit to allow that would have handed every adapter in that process what
+one of them needs. So apt runs somewhere else: the executor asks systemd to start it as a transient
+unit with its own confinement, waits for the job it was given, and reads the unit's own verdict.
+`ProtectSystem=full` and the Unix-only address family are back.
+
+Reading that verdict is the part worth being careful about. `StartTransientUnit` returns when the
+job is *enqueued*, so the wait is subscribed before anything starts; and a command that ran and
+exited non-zero makes the job "failed" too, so the exit status is read separately from the job
+result. Three outcomes stay three sentences: ran, ran and exited *n*, and could not execute its
+command at all. `scripts/test-transient-unit-gate.sh` proves all three against a real service
+manager, and that nothing is left loaded afterwards.
+
+The missing halves are an `apt-get update` operation and a repository reader — until one exists, no
+package is reported upgradable and the count stays unestablished.
 
 Security and Backup still report `Unknown`, and every remaining mutation on these surfaces still
 refuses. Installing, upgrading, connecting and snapshotting are new powers over the

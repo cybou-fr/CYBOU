@@ -14,6 +14,8 @@ use uuid::Uuid;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "linux")]
+pub mod transient;
+#[cfg(target_os = "linux")]
 pub mod service;
 
 /// Executor transport or adapter failure.

@@ -101,42 +101,39 @@ impl LinuxBody {
         })
     }
 
-    /// Run one apt operation on one named package.
+    /// Run one apt operation on one named package, in a unit of its own.
     ///
     /// The package name is checked against Debian's own rule for what a package may be called
     /// before it goes anywhere near a command line, and the arguments end with `--` so a name can
     /// never be read as an option. A name this refuses is refused here rather than passed on: the
     /// executor is the last place that could still tell the difference between a package and an
     /// instruction.
+    ///
+    /// The command itself runs as a transient systemd unit rather than as a child of this process.
+    /// A package manager has to write `/usr` and reach the network; letting this process do that
+    /// would give every adapter in it what one of them needs.
     async fn apt(&self, package: &str, verbs: &[&str]) -> Result<Vec<BodyReading>, ExecutorError> {
         let package = valid_package_name(package)?;
-        let verbs: Vec<String> = verbs.iter().map(|verb| (*verb).to_owned()).collect();
-        tokio::task::spawn_blocking(move || {
-            Command::new("/usr/bin/apt-get")
-                .args(&verbs)
-                .arg("--yes")
-                .arg("--no-install-recommends")
-                // apt must never stop to ask: nobody is at this terminal, and a prompt would hang
-                // the permit until it expired.
-                .arg("--option=Dpkg::Options::=--force-confold")
-                .arg("--")
-                .arg(&package)
-                .env_clear()
-                .env("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
-                .env("DEBIAN_FRONTEND", "noninteractive")
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::piped())
-                .output()
-        })
+        let mut argv: Vec<String> = vec!["/usr/bin/apt-get".to_owned()];
+        argv.extend(verbs.iter().map(|verb| (*verb).to_owned()));
+        argv.push("--yes".to_owned());
+        argv.push("--no-install-recommends".to_owned());
+        // apt must never stop to ask: nobody is at this terminal, and a prompt would hold the unit
+        // open until the wait gave up on it.
+        argv.push("--option=Dpkg::Options::=--force-confold".to_owned());
+        argv.push("--".to_owned());
+        argv.push(package);
+        crate::transient::run(
+            &self.system_bus,
+            &crate::transient::unit_name("package"),
+            &argv,
+            &[
+                "DEBIAN_FRONTEND=noninteractive".to_owned(),
+                "PATH=/usr/sbin:/usr/bin:/sbin:/bin".to_owned(),
+            ],
+        )
         .await
-        .map_err(|error| ExecutorError::Adapter(error.to_string()))?
-        .map_err(|error| ExecutorError::Adapter(error.to_string()))
-        .and_then(|output| {
-            output.status.success().then(Vec::new).ok_or_else(|| {
-                ExecutorError::Adapter(String::from_utf8_lossy(&output.stderr).trim().to_owned())
-            })
-        })
+        .map(|()| Vec::new())
     }
 
     async fn manager(&self) -> Result<Proxy<'_>, ExecutorError> {

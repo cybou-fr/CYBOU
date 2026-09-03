@@ -245,6 +245,22 @@ case "$operation_status" in
     *) exit "$operation_status" ;;
 esac
 
+# A command runs as its own systemd unit, and this host can say whether it succeeded, ran and
+# disagreed, or never ran. Exit 3 means there is no service manager to prove it against.
+announce "transient unit execution"
+failed="transient unit execution"
+transient_status=0
+bash scripts/test-transient-unit-gate.sh || transient_status=$?
+case "$transient_status" in
+    0) failed="" ;;
+    3)
+        announce "transient unit execution not run: this host has no user service manager"
+        skipped="$skipped transient-unit-execution"
+        failed=""
+        ;;
+    *) exit "$transient_status" ;;
+esac
+
 # Each Linux account's personal records answer from that account's own owner, and from no other.
 # Exit 3 means this host cannot run the owner unprivileged.
 announce "personal owner isolation"

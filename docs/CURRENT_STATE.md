@@ -976,9 +976,11 @@ decides, and the executor holds the only adapter — one named package, checked 
 rule where the proposal becomes a typed action and again in the adapter, with `--` ending the
 argument list before the name. Removing and reinstalling have no operation and are refused by name.
 
-The executor's sandbox was relaxed to make this possible: a package manager cannot run under
-`ProtectSystem=full` with a Unix-only address family. It authorizes nothing more than before — every
-apt invocation exists because Action1 issued a permit for one named package.
+The executor's own sandbox is untouched by this. A package manager cannot run under
+`ProtectSystem=full` with a Unix-only address family, so it does not run in that process: systemd
+starts it as a transient unit with its own confinement, and the executor waits for the job and reads
+the unit's exit status. A command that ran and disagreed, and one that never ran, are reported as
+different things, because they are.
 
 ## Operation ownership
 

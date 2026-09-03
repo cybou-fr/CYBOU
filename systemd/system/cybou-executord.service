@@ -24,20 +24,15 @@ User=root
 NoNewPrivileges=yes
 PrivateTmp=yes
 PrivateDevices=yes
-# Installing and upgrading software writes to /usr, /var/lib/dpkg and /etc and fetches over the
-# network. `ProtectSystem=full` and a Unix-only address family made both impossible, so the two
-# protections that stand between this process and a package manager are relaxed — deliberately, and
-# only because the host now has typed operations that need them. The executor still authorizes
-# nothing: every apt invocation it makes exists because Action1 issued a permit for one named
-# package, and the package name is checked against Debian's own naming rule before it can reach a
-# command line. Moving apt into its own transient unit with its own sandbox would let this one go
-# back to `full`, and is the next thing worth doing here.
-ProtectSystem=no
+# Installing software needs to write /usr and reach the network, and this process does neither: it
+# asks systemd to run the package manager as a transient unit with its own confinement, and reads
+# the result. So the protection that would otherwise have to be given up for one adapter stays.
+ProtectSystem=full
 ProtectHome=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictAddressFamilies=AF_UNIX
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes

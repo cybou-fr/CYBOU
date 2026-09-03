@@ -27,6 +27,7 @@ uuid.workspace = true
 cybou-telemetryd = { path = "../cybou-telemetryd" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+futures-util.workspace = true
 zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
 
 [lints]

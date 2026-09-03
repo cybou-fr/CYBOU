@@ -1020,6 +1020,7 @@ dependencies = [
  "cybou-fabric",
  "cybou-protocol",
  "cybou-telemetryd",
+ "futures-util",
  "rustix",
  "thiserror 2.0.20",
  "time",
