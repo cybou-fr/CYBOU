@@ -30,7 +30,11 @@ test -f /etc/systemd/system/cybou-agent-gateway@.service || not_run "the gateway
 test -s /etc/cybou/provider.env || not_run "no provider policy is configured"
 test -s /etc/cybou/litellm-master-key || not_run "no provider credential is installed"
 
-LEASES=/run/cybou-agent-leases
+# The directory a deployment keeps under /run, or wherever this run can write one. The owner reads
+# the same override, so a gate that hard-coded the path would test a directory the owner is not
+# reading the moment anybody sets it.
+LEASES="${CYBOU_AGENT_LEASE_ROOT:-/run/cybou-agent-leases}"
+export CYBOU_AGENT_LEASE_ROOT="$LEASES"
 mkdir -p "$LEASES" 2>/dev/null || not_run "$LEASES cannot be created"
 [ -w "$LEASES" ] || not_run "$LEASES is not writable"
 

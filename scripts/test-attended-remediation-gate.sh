@@ -183,10 +183,14 @@ echo "==> waiting for the finding to reach the panel"
 finding=""
 for _ in $(seq 1 120); do
     curl -fsS --max-time 3 "$BASE/api/v1/insight" >"$WORK/insight.json" 2>/dev/null || { sleep 1; continue; }
-    finding="$(python3 - "$WORK/insight.json" <<'PYTHON'
+    finding="$(python3 - "$WORK/insight.json" "$UNIT_NAME" <<'PYTHON'
 import json, sys
 insight = json.load(open(sys.argv[1]))
+# This gate's own unit and nothing else. A host with something else unhealthy — a unit left failed
+# by an earlier run, say — would otherwise have the gate answering a question about that instead.
 for item in insight.get("findings", []):
+    if item.get("about") != sys.argv[2]:
+        continue
     offers = item.get("offers", [])
     if not any(offer.get("verdict") == "requires-confirmation" for offer in offers):
         continue

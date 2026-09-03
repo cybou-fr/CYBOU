@@ -58,10 +58,13 @@ for authority in CYBOU_CAPSULE_ID CYBOU_AGENT_WORKSPACE CYBOU_AGENT_LEASE_SECOND
 done
 grep -q "^launch-env CYBOU_AGENT_TASK_ID=$TASK\$" "$work/plan"
 
-# The capsule stops first. Taking its gateway away first is a refusal it can see and retry; taking
-# the capsule away first is an ending it cannot.
+# The capsule is thawed and then stopped, before anything it was using. Thawing first because a
+# frozen capsule cannot act on being asked to exit — the stop would wait out its whole timeout —
+# and stopping the capsule before its gateway because taking the gateway away first is a refusal
+# the agent can see and retry, while taking the capsule away is an ending it cannot.
 grep '^teardown ' "$work/plan" | cut -d' ' -f2 >"$work/order"
-expected=$'stop-capsule
+expected=$'thaw-capsule
+stop-capsule
 stop-gateway
 stop-egress
 remove

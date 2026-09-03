@@ -36,7 +36,11 @@ command -v python3 >/dev/null || not_run "no python3 to read a listing with"
 systemctl --user is-system-running >/dev/null 2>&1 || not_run "there is no user service manager"
 [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || not_run "there is no session bus to take a name on"
 
-LEASES=/run/cybou-agent-leases
+# The directory a deployment keeps under /run, or wherever this run can write one. The owner reads
+# the same override, so a gate that hard-coded the path would test a directory the owner is not
+# reading the moment anybody sets it.
+LEASES="${CYBOU_AGENT_LEASE_ROOT:-/run/cybou-agent-leases}"
+export CYBOU_AGENT_LEASE_ROOT="$LEASES"
 mkdir -p "$LEASES" 2>/dev/null || not_run "$LEASES cannot be created here"
 [ -w "$LEASES" ] || not_run "$LEASES is not writable by this user"
 

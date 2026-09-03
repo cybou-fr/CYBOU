@@ -121,6 +121,19 @@ wait_for_system_name() {
 export XDG_CONFIG_HOME="$WORK/config"
 mkdir -p "$XDG_CONFIG_HOME/cybou"
 printf 'service %s\n' "$UNIT_NAME" >"$XDG_CONFIG_HOME/cybou/telemetry.watch"
+# The Journal, first. This gate runs on a session bus of its own, so whatever a host keeps is not
+# here, and an execution that cannot be made durable is correctly refused by Action1 — which would
+# make this gate fail for a reason that has nothing to do with what it is proving.
+spawn "$BIN/cybou-eventd"
+for _ in $(seq 1 100); do
+    busctl --user list --no-legend 2>/dev/null | grep -q '^org.cybou.Mind.Event1 ' && break
+    sleep 0.1
+done
+busctl --user list --no-legend 2>/dev/null | grep -q '^org.cybou.Mind.Event1 ' || {
+    echo "the Journal never came up, so nothing here could be made durable" >&2
+    exit 1
+}
+
 spawn "$BIN/cybou-telemetryd"
 for _ in $(seq 1 100); do
     busctl --user list --no-legend 2>/dev/null | grep -q '^org.cybou.Mind.Telemetry1 ' && break
