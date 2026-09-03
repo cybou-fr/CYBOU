@@ -916,6 +916,20 @@ disclose that it exists.
 Persistence and the producers themselves are still open, and per-principal notifications should move
 to a canonical owner when they carry real personal content rather than living in the gateway.
 
+### The attended loop, end to end
+
+**A person's answer now carries.** Three gates proved parts of this vertical and all three drove
+D-Bus: a host repairing itself unattended, a confirmation reaching the Body, a person asking for
+something directly. None of them was the thing a person actually does, and the path that was only
+ever exercised in pieces turned out to be broken in the middle — `confirm_action` dropped the permit
+Action1 issued, so the desktop reported *authorized* for an act nothing carried out.
+
+`scripts/test-attended-remediation-gate.sh` runs the whole thing through HTTP and nothing else, and
+it fails on the old code at exactly that step. What remains is the same loop driven by a real model
+rather than by this host's own deterministic conclusion: the finding, the readings and the question
+are all real today, and the sentence explaining them is deterministic prose rather than an
+explanation anyone asked a model for.
+
 ### Real system surfaces
 
 **Packages and Network are read, not declared.** Both surfaces reported `Unknown` and an empty list,

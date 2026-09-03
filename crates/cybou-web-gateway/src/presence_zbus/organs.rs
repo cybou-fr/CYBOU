@@ -510,7 +510,7 @@ impl ZbusPresenceSource {
         decision_seen: uuid::Uuid,
         confirmed_by: &str,
     ) -> Option<cybou_web_contracts::ActionRecordProjection> {
-        let (encoded, _permit_id) = self
+        let (encoded, permit_id) = self
             .read_with::<(Vec<u8>, String), (String, String, String)>(
                 ACTION,
                 "Confirm",
@@ -524,7 +524,36 @@ impl ZbusPresenceSource {
         let record: cybou_protocol::action::ActionRecord = decode(&encoded)
             .or_else(|_| ciborium::from_reader(encoded.as_slice()))
             .ok()?;
-        Some(project_action_record(&record))
+
+        if permit_id.is_empty() {
+            // Action1 refused the answer, and the record says why.
+            return Some(project_action_record(&record));
+        }
+
+        // The permit is carried, exactly as it is for a person who asks for something directly.
+        // Until this existed the two entrances behaved differently for no reason anyone could
+        // state: asking for a restart ran it, and answering *yes* to the host's own proposal
+        // authorized one that nothing then claimed — so the desktop showed a permission granted
+        // and an act that never happened. The permit still does not reach the browser; it goes
+        // from Action1 to the executor inside this boundary and no further.
+        let _: Option<Vec<u8>> = self
+            .read_with::<Vec<u8>, (String,)>(EXECUTOR, "Execute", &(permit_id,))
+            .await;
+
+        // Read back, so the browser is told what Action1 recorded rather than what this function
+        // remembers having asked for. The independent outcome arrives later, from whatever looks
+        // again; this returns the lifecycle as its owner holds it now.
+        let settled = self
+            .read_with::<Vec<u8>, (String,)>(ACTION, "Record", &(proposal_id.to_string(),))
+            .await
+            .and_then(|encoded| {
+                decode::<cybou_protocol::action::ActionRecord>(&encoded)
+                    .or_else(|_| ciborium::from_reader(encoded.as_slice()))
+                    .ok()
+            })
+            .unwrap_or(record);
+
+        Some(project_action_record(&settled))
     }
 
     /// Recent lifecycle records held by Action1.

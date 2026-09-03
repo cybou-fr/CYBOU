@@ -15,7 +15,8 @@
 //! of a deterministic path.
 //!
 //! **Nothing here can carry anything out.** The verdicts are shown so a person can see what the gate
-//! would say. There is no executor behind any of them, and this module has no way to reach one.
+//! would say. This module reaches no executor and carries nothing out: an offer here is what the
+//! gate would answer, and a person answering it is a different act, on a different route.
 
 use cybou_protocol::action::{AuthorizationVerdict, RiskLevel};
 use cybou_protocol::telemetry::{

@@ -146,9 +146,9 @@ pub struct OfferProjection {
     pub reversible: bool,
     /// What the authorization gate decided: `granted`, `requires-confirmation` or `denied`.
     ///
-    /// Nothing is `granted` on an installation nobody has configured, and nothing is carried out at
-    /// all: there is no executor. The verdict is shown so a person can see what the gate would say
-    /// before anything can act on it.
+    /// Nothing is `granted` on an installation nobody has configured. The verdict is shown before
+    /// anything is asked, so a person can see what the gate would say while the answer is still
+    /// theirs to give; answering it is what carries a proposal to the executor.
     pub verdict: String,
     /// Why, when the gate refused or wants asking.
     pub reason: String,

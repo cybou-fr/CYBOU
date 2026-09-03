@@ -967,6 +967,20 @@ owner is not running is *unavailable* rather than an empty mailbox. Without that
 gateway falls back to its own UID-partitioned SQLite store, which isolates accounts but is not owned
 by them. Mail sending refuses while no real provider exists, rather than inventing a "Sent" item.
 
+## The loop a person watches
+
+A finding this host reached about itself, the readings behind it, the question it raises, a person's
+answer, the act, and what looking again established — all of it through the HTTP boundary the
+browser uses and nothing else. `scripts/test-attended-remediation-gate.sh` proves it on a real host:
+a watched unit is stopped, the panel shows the finding with its readings and an offer marked
+*requires confirmation*, a person answers through `/api/v1/actions/confirm`, and the unit is running
+again when systemd itself is asked.
+
+It did not work until 2026-09-03. Asking for a restart directly carried its permit to the executor;
+answering *yes* to the host's own proposal issued a permit nothing claimed, so the desktop showed a
+permission granted and an act that never happened. The two entrances behaved differently for no
+reason anyone could state. They no longer do, and the permit still never reaches the browser.
+
 ## Installing software
 
 `package.install` and `package.upgrade` are typed operations in the closed table, High risk and not

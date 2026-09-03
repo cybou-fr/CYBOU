@@ -16,9 +16,11 @@
 //! - **What was never looked at.** An all-clear on a kernel with no pressure accounting is an
 //!   all-clear about a subset, and a card that did not say so would be answering a question it was
 //!   not asked.
-//! - **What the host would offer to do, and what the gate says about doing it.** None of it can be
-//!   carried out — there is no executor — and showing the verdict now is deliberate: a person should
-//!   see what the system would ask permission for while the answer is still theoretical.
+//! - **What the host would offer to do, and what the gate says about doing it.** The verdict is
+//!   shown before anything is asked, so a person sees what the system would ask permission for
+//!   while the answer is still theirs to give. Answering *yes* is now carried out: Action1 issues
+//!   one permit, the executor spends it, and the timeline below the offer shows what was attempted
+//!   and what looking again afterwards established.
 
 use cybou_protocol::KnowledgeState;
 use cybou_web_contracts::{FindingProjection, InsightProjection};

@@ -247,6 +247,22 @@ case "$operation_status" in
     *) exit "$operation_status" ;;
 esac
 
+# The whole attended loop, through the HTTP boundary a person's browser uses and nothing else.
+# Exit 3 means this host has no root systemd to run it on.
+announce "attended remediation"
+failed="attended remediation"
+attended_status=0
+bash scripts/test-attended-remediation-gate.sh || attended_status=$?
+case "$attended_status" in
+    0) failed="" ;;
+    3)
+        announce "attended remediation not run: this host has no root systemd"
+        skipped="$skipped attended-remediation"
+        failed=""
+        ;;
+    *) exit "$attended_status" ;;
+esac
+
 # A command runs as its own systemd unit, and this host can say whether it succeeded, ran and
 # disagreed, or never ran. Exit 3 means there is no service manager to prove it against.
 announce "transient unit execution"
