@@ -917,10 +917,15 @@ this desktop's own interaction code without the element firing anything a browse
 a measurement that changed nothing sends nothing: a resize frame reaches `TIOCSWINSZ` and every
 program in the session gets `SIGWINCH`.
 
-**No browser has driven one end to end.** The card compiles and its logic is covered natively;
-the socket, the keyboard and the grid have not been exercised in a real browser, because the
-browser gate needs `chromedriver` and this workspace has none installed. The vertical is built
-and unproven at its last inch.
+**The wire is proven; the browser is not.** `scripts/test-terminal-gate.sh` now carries the whole
+exchange a browser makes: PAM accepts an account it created, the gateway turns that into a session
+holding that account's uid, a WebSocket to `/api/v1/terminal` reaches that uid's owner, and a
+command typed into it comes back having run as that account. Accepting the upgrade used to be where
+the gate stopped, and a gateway that switched protocols and carried nothing would have passed every
+line of it.
+
+What is still unproven is the browser's own half — the card's keyboard handling and its grid, in a
+real browser — because that gate needs `chromedriver` and this workspace has none installed.
 
 ## Agent runtime
 

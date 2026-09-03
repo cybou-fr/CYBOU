@@ -164,6 +164,20 @@ case "$upgrade" in
         ;;
 esac
 
+# The upgrade is not the proof. A gateway that accepted the socket and carried nothing would pass
+# every line above, and "the terminal does not work" would still be a sentence nobody could answer.
+echo "=== And the bytes actually travel: a shell, through the gateway, as this account ==="
+cookie_header="$(awk '/cybou/ {print $6 "=" $7}' "$cookie_jar" | head -1)"
+if [ -z "$cookie_header" ]; then
+    echo "ERROR: the login left no session cookie to carry" >&2
+    exit 1
+fi
+if ! python3 scripts/terminal-websocket-probe.py "$PORT" "$cookie_header" "$ACCOUNT_UID"; then
+    echo "ERROR: the gateway upgraded the socket and no terminal came back through it" >&2
+    exit 1
+fi
+echo "    ok      the command ran as the account and its output came back through the WebSocket"
+
 echo "=== A stranger gets no terminal ==="
 refused="$(curl -s -i -N --max-time 10 \
     -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
