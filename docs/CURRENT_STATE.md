@@ -939,6 +939,30 @@ Confirmed endings release live admission and retain the most recent 32 canonical
 owner process. This is operational context, not durable biography. After an owner restart the host
 can recover what is still running but cannot honestly reconstruct why an already-gone unit ended.
 
+**Capsule control is serialized and verified, not merely requested.** Freeze, Resume, Quarantine and
+Stop take a per-capsule gate, so two controls for one capsule cannot interleave and publish a
+standing that contradicts the kernel. Each action reads `cgroup.freeze` back while it still holds
+that gate, and Quarantine additionally requires the egress broker and the system model gateway to be
+inactive and the model socket and bearer to be gone before it publishes `Quarantined`. An unverified
+revoke leaves the session `Paused` and returns an error rather than claiming an isolation the host
+does not have. `scripts/test-agent-control-gate.sh` proves all of this against real cgroups and real
+units; it is written, and its deployed-host run is still outstanding, which is why B11 is not closed.
+
+## Meaning and personal data ownership
+
+`cybou-meaningd` owns the whole Meaning1 vertical: interpretation, Event1 admission, response
+planning, deterministic realization and bounded referent memory. The gateway's Meaning hub keeps no
+dialogue, interpretation, referent or response plan; when Meaning1 or Event1 cannot accept an
+utterance, the boundary refuses instead of producing a plausible local answer no owner holds.
+Dialogue is partitioned by the principal the authenticating boundary established, never by one the
+browser named for itself.
+
+Personal Core data — mail, calendar, notes, contacts — is partitioned by numeric Linux UID taken
+from the authenticated session, and stored transactionally in SQLite WAL. Two accounts on one host do
+not see each other's records. Mail sending refuses while no real provider exists, rather than
+inventing a "Sent" item. The remaining move is a per-user owner (`cybou-personald@UID`) so the
+gateway proxies personal data the way it already proxies meaning and operations.
+
 ## Operation ownership
 
 `cybou-operationd` owns `org.cybou.Runtime.Operation1`, the sole lifecycle authority for long-running
