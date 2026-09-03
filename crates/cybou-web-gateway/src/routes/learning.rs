@@ -43,6 +43,7 @@ fn mutation_error(
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             error: code,
             retryable,
+            detail: None,
         }),
     )
 }

@@ -70,6 +70,7 @@ fn no_seat() -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: "shellExecutionForbiddenInPublicPreview",
             retryable: false,
+            detail: None,
         }),
     )
 }
@@ -96,6 +97,7 @@ fn boundary(error: &JailError) -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: code,
             retryable,
+            detail: None,
         }),
     )
 }
@@ -117,6 +119,7 @@ fn conflict() -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: "fileChangedSinceRead",
             retryable: false,
+            detail: None,
         }),
     )
 }
@@ -425,6 +428,7 @@ pub async fn upload_file_handler(
                     schema_version: WEB_SCHEMA_V1,
                     error: "uploadNotBase64",
                     retryable: false,
+                    detail: None,
                 }),
             )
         })?;

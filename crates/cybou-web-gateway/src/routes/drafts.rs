@@ -365,6 +365,7 @@ fn no_seat() -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: "shellExecutionForbiddenInPublicPreview",
             retryable: false,
+            detail: None,
         }),
     )
 }
@@ -392,6 +393,7 @@ fn draft_refusal(error: DraftStoreError) -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: code,
             retryable,
+            detail: None,
         }),
     )
 }

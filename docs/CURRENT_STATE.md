@@ -967,6 +967,16 @@ owner is not running is *unavailable* rather than an empty mailbox. Without that
 gateway falls back to its own UID-partitioned SQLite store, which isolates accounts but is not owned
 by them. Mail sending refuses while no real provider exists, rather than inventing a "Sent" item.
 
+## What a refusal says
+
+A refusal carries the words of whoever refused. The HTTP boundary answers `409` with the owner's own
+sentence when Agent1 looked at the kernel and said no — a freeze that was not established, a
+quarantine that cannot be released without restoring what it revoked — and `503` only when Agent1
+could not be reached at all. Those were one status and one message until 2026-09-03, so a person was
+told to retry an isolation this host had already refused to establish. The gateway never writes an
+explanation of somebody else's refusal; the `detail` field is where the owner's own goes, and it is
+absent when there is none.
+
 ## The loop a person watches
 
 A finding this host reached about itself, the readings behind it, the question it raises, a person's

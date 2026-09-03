@@ -56,6 +56,7 @@ pub async fn actions_handler(
                 schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                 error: "action1Unavailable",
                 retryable: true,
+                detail: None,
             }),
         )),
     }
@@ -89,6 +90,7 @@ pub async fn confirm_action_handler(
                 schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                 error: "confirmationRequiresASeat",
                 retryable: false,
+                detail: None,
             }),
         ));
     };
@@ -108,6 +110,7 @@ pub async fn confirm_action_handler(
                 schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                 error: "confirmationNotAccepted",
                 retryable: false,
+                detail: None,
             }),
         ))
 }
@@ -133,6 +136,7 @@ pub async fn recent_actions_handler(
                 schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                 error: "action1Unavailable",
                 retryable: true,
+                detail: None,
             }),
         )),
     }

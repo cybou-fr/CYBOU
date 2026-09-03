@@ -229,13 +229,23 @@ impl MindClient for GatewayMindClient {
             .await
             .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
         if response.ok() {
-            Ok(())
-        } else {
-            Err(ClientError::GatewayRequest(format!(
-                "{path} returned HTTP {}",
-                response.status()
-            )))
+            return Ok(());
         }
+        // A refusal from the owner carries the owner's own words. Showing a person "HTTP 409" for
+        // an isolation this host could not establish tells them a number instead of the reason.
+        let status = response.status();
+        let detail = response
+            .json::<serde_json::Value>()
+            .await
+            .ok()
+            .and_then(|body| {
+                body.get("detail")
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToOwned::to_owned)
+            });
+        Err(ClientError::GatewayRequest(detail.unwrap_or_else(|| {
+            format!("{path} returned HTTP {status}")
+        })))
     }
 
     async fn agent_telemetry(

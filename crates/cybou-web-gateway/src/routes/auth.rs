@@ -65,6 +65,7 @@ pub async fn login_handler(
                 schema_version: WEB_SCHEMA_V1,
                 error: "sessionCouldNotBeIssued",
                 retryable: true,
+                detail: None,
             }),
         )
             .into_response();

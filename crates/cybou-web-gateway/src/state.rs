@@ -190,6 +190,14 @@ pub struct ErrorBody {
     pub error: &'static str,
     /// Whether the client may retry the operation.
     pub retryable: bool,
+    /// What the owner said, when the refusal came from one rather than from this boundary.
+    ///
+    /// Never composed here. A boundary that wrote its own explanation of somebody else's refusal
+    /// would be putting words in the mouth of the one party that knows why, and "the runtime is
+    /// unavailable, try again" for an isolation that could not be established is exactly the
+    /// sentence this field exists to stop.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 impl IntoResponse for GatewayError {
@@ -212,6 +220,7 @@ impl IntoResponse for GatewayError {
                 schema_version: WEB_SCHEMA_V1,
                 error,
                 retryable,
+                detail: None,
             }),
         )
             .into_response()
@@ -542,6 +551,7 @@ impl GatewayState {
                 schema_version: WEB_SCHEMA_V1,
                 error: "signInRequired",
                 retryable: false,
+                detail: None,
             }),
         )
     }

@@ -27,6 +27,7 @@ fn unavailable() -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: "hostUserFilesystemUnavailable",
             retryable: true,
+            detail: None,
         }),
     )
 }
@@ -38,6 +39,7 @@ fn invalid_owner_projection() -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: "invalidHostUserFilesystemProjection",
             retryable: false,
+            detail: None,
         }),
     )
 }

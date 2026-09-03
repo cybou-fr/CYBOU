@@ -63,6 +63,7 @@ pub async fn agents_handler(
                     schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                     error: "agentRuntimeUnavailable",
                     retryable: true,
+                    detail: None,
                 }),
             ))
         }
@@ -98,6 +99,7 @@ pub async fn agent_offers_handler(
                     schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                     error: "agentRuntimeUnavailable",
                     retryable: true,
+                    detail: None,
                 }),
             ))
         }
@@ -140,6 +142,7 @@ pub async fn launch_agent_handler(
                     schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                     error,
                     retryable,
+                    detail: None,
                 }),
             ))
         }
@@ -210,6 +213,7 @@ fn agent_error(
             schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
             error,
             retryable,
+            detail: None,
         }),
     )
 }
@@ -328,8 +332,20 @@ pub async fn capsule_action_handler(
             "agentSessionNotFound",
             false,
         )),
-        Err(why) => {
-            eprintln!("[cybou-web-gateway] Agent1 Action failed: {why}");
+        // The owner looked and said no. Not retryable, and its reason is carried rather than
+        // replaced: an isolation that could not be established is a different thing from a runtime
+        // nobody could reach, and a person deciding what to do next needs to know which happened.
+        Err(ControlRefusal::Owner(reason)) => Err((
+            StatusCode::CONFLICT,
+            axum::Json(crate::state::ErrorBody {
+                schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
+                error: "agentActionNotEstablished",
+                retryable: false,
+                detail: Some(reason),
+            }),
+        )),
+        Err(ControlRefusal::Unreachable(why)) => {
+            eprintln!("[cybou-web-gateway] Agent1 could not be reached: {why}");
             Err(agent_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "agentRuntimeUnavailable",
@@ -374,10 +390,25 @@ pub async fn capsule_telemetry_handler(
     }
 }
 
-async fn action(capsule_id: &str, action: &str) -> Result<bool, String> {
-    zbus::Connection::session()
+/// Why a capsule control did not happen.
+///
+/// The two are different answers and were being given the same one. An owner that refused has
+/// looked at the kernel and found the state it was asked for was not established — or is refusing
+/// by design, as it does for releasing a quarantine. A runtime that cannot be reached has not
+/// looked at anything. Telling a person to retry the first is telling them to keep asking a
+/// question that has been answered.
+enum ControlRefusal {
+    /// Agent1 answered, and said no. Its own words travel with it.
+    Owner(String),
+    /// Agent1 could not be reached at all.
+    Unreachable(String),
+}
+
+async fn action(capsule_id: &str, action: &str) -> Result<bool, ControlRefusal> {
+    let connection = zbus::Connection::session()
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| ControlRefusal::Unreachable(error.to_string()))?;
+    let reply = connection
         .call_method(
             Some(AGENT.service),
             AGENT.object_path,
@@ -386,10 +417,17 @@ async fn action(capsule_id: &str, action: &str) -> Result<bool, String> {
             &(capsule_id.to_owned(), action.to_owned()),
         )
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| match error {
+            // A method error is the owner's answer, carried back as it wrote it.
+            zbus::Error::MethodError(_, detail, _) => ControlRefusal::Owner(
+                detail.unwrap_or_else(|| "the owner refused without saying why".to_owned()),
+            ),
+            other => ControlRefusal::Unreachable(other.to_string()),
+        })?;
+    reply
         .body()
         .deserialize()
-        .map_err(|error| error.to_string())
+        .map_err(|error| ControlRefusal::Unreachable(error.to_string()))
 }
 
 async fn telemetry(
@@ -411,4 +449,50 @@ async fn telemetry(
         .deserialize()
         .map_err(|error| error.to_string())?;
     cybou_fabric::decode(&reply).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod control_refusal_tests {
+    use super::ControlRefusal;
+
+    /// The mapping the route makes, on its own, so the distinction is testable without a bus.
+    fn classify(error: zbus::Error) -> ControlRefusal {
+        match error {
+            zbus::Error::MethodError(_, detail, _) => ControlRefusal::Owner(
+                detail.unwrap_or_else(|| "the owner refused without saying why".to_owned()),
+            ),
+            other => ControlRefusal::Unreachable(other.to_string()),
+        }
+    }
+
+    #[test]
+    fn an_owner_that_answered_no_carries_its_own_words() {
+        // The two used to arrive as one string and leave as one status: a person told to retry an
+        // isolation the kernel refused to establish is being asked to keep asking a question that
+        // has already been answered.
+        let message = zbus::message::Message::method_call("/org/cybou/Runtime/Agent1", "Action")
+            .expect("a method call")
+            .build(&())
+            .expect("a message");
+        let refused = zbus::Error::MethodError(
+            zbus::names::OwnedErrorName::try_from("org.freedesktop.DBus.Error.Failed")
+                .expect("a well-known error name"),
+            Some("the requested cgroup freeze state was not established".to_owned()),
+            message,
+        );
+        let ControlRefusal::Owner(reason) = classify(refused) else {
+            panic!("an answered refusal was reported as an unreachable runtime");
+        };
+        assert_eq!(
+            reason,
+            "the requested cgroup freeze state was not established"
+        );
+    }
+
+    #[test]
+    fn a_runtime_nobody_could_reach_is_not_an_answer() {
+        let ControlRefusal::Unreachable(_) = classify(zbus::Error::InvalidField) else {
+            panic!("a transport failure was reported as the owner's answer");
+        };
+    }
 }

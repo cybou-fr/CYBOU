@@ -82,6 +82,7 @@ pub async fn terminal_handler(
                 schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                 error: "terminalRequiresAnAuthenticatedAccount",
                 retryable: false,
+                detail: None,
             }),
         ))?;
 
@@ -93,6 +94,7 @@ pub async fn terminal_handler(
             // Not retryable by the browser. What is missing is an operator enabling
             // `cybou-ptyd@` for this account, which no amount of asking again produces.
             retryable: false,
+            detail: None,
         }),
     ))?;
 
@@ -107,6 +109,7 @@ pub async fn terminal_handler(
                     schema_version: cybou_web_contracts::WEB_SCHEMA_V1,
                     error: "terminalUnavailable",
                     retryable: false,
+                    detail: None,
                 }),
             )
         })?;

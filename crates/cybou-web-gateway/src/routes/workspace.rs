@@ -161,6 +161,7 @@ fn no_seat() -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: "workspaceRequiresSeat",
             retryable: false,
+            detail: None,
         }),
     )
 }
@@ -184,6 +185,7 @@ fn store_refusal(error: WorkspaceStoreError) -> Refusal {
             schema_version: WEB_SCHEMA_V1,
             error: code,
             retryable,
+            detail: None,
         }),
     )
 }
