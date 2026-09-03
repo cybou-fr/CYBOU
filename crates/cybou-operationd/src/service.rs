@@ -80,10 +80,23 @@ impl Operation1Service {
         Ok(())
     }
 
-    fn database_lock(
-        database: &SyncMutex<Connection>,
-    ) -> rusqlite::Result<std::sync::MutexGuard<'_, Connection>> {
-        database.lock().map_err(|_| rusqlite::Error::InvalidQuery)
+    /// Run one durable unit of work off the async executor.
+    ///
+    /// These transactions run with `synchronous=FULL`, so they wait on the disk. Doing that on a
+    /// runtime worker would stall every other caller of this owner while one record is committed.
+    async fn durably<F>(&self, work: F) -> rusqlite::Result<()>
+    where
+        F: FnOnce(&mut Connection) -> rusqlite::Result<()> + Send + 'static,
+    {
+        let Some(database) = self.database.clone() else {
+            return Ok(());
+        };
+        tokio::task::spawn_blocking(move || {
+            let mut connection = database.lock().map_err(|_| rusqlite::Error::InvalidQuery)?;
+            work(&mut connection)
+        })
+        .await
+        .map_err(|_| rusqlite::Error::InvalidQuery)?
     }
 
     #[must_use]
@@ -222,21 +235,25 @@ impl Operation1Service {
         let mut operations = store.operations.clone();
         operations.insert(0, record.clone());
         let removed = Self::bounded_history(&mut operations);
-        if let Some(database) = &self.database {
+        {
             let encoded =
                 cybou_fabric::encode(&record).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            let mut connection = Self::database_lock(database)?;
-            let transaction = connection.transaction()?;
-            transaction.execute(
-                "INSERT INTO operations(id, record) VALUES (?1, ?2)",
-                params![record.id.to_string(), encoded],
-            )?;
-            transaction.execute(
-                "DELETE FROM cancellation_requests WHERE operation_id = ?1",
-                [record.id.to_string()],
-            )?;
-            Self::delete_history(&transaction, &removed)?;
-            transaction.commit()?;
+            let id = record.id.to_string();
+            let removed = removed.clone();
+            self.durably(move |connection| {
+                let transaction = connection.transaction()?;
+                transaction.execute(
+                    "INSERT INTO operations(id, record) VALUES (?1, ?2)",
+                    params![id, encoded],
+                )?;
+                transaction.execute(
+                    "DELETE FROM cancellation_requests WHERE operation_id = ?1",
+                    [id],
+                )?;
+                Self::delete_history(&transaction, &removed)?;
+                transaction.commit()
+            })
+            .await?;
         }
         store.cancellation.insert(record.id, sender);
         store.cancellation_requested.remove(&record.id);
@@ -273,14 +290,16 @@ impl Operation1Service {
         Ok(receiver)
     }
 
-    fn persist_cancellation_request(&self, id: Uuid) -> rusqlite::Result<()> {
-        if let Some(database) = &self.database {
-            Self::database_lock(database)?.execute(
-                "INSERT OR IGNORE INTO cancellation_requests(operation_id) VALUES (?1)",
-                [id.to_string()],
-            )?;
-        }
-        Ok(())
+    async fn persist_cancellation_request(&self, id: Uuid) -> rusqlite::Result<()> {
+        self.durably(move |connection| {
+            connection
+                .execute(
+                    "INSERT OR IGNORE INTO cancellation_requests(operation_id) VALUES (?1)",
+                    [id.to_string()],
+                )
+                .map(|_| ())
+        })
+        .await
     }
 
     /// Publish "a cancel request is in flight" without claiming the work has stopped.
@@ -304,7 +323,7 @@ impl Operation1Service {
     }
 
     async fn request_local_cancellation(&self, id: Uuid) -> rusqlite::Result<()> {
-        self.persist_cancellation_request(id)?;
+        self.persist_cancellation_request(id).await?;
         self.store.lock().await.cancellation_requested.insert(id);
         Ok(())
     }
@@ -332,29 +351,32 @@ impl Operation1Service {
         if next.len() > MAX_LOG_ENTRIES_PER_OPERATION {
             next.drain(..next.len() - MAX_LOG_ENTRIES_PER_OPERATION);
         }
-        if let Some(database) = &self.database {
+        {
             let encoded =
                 cybou_fabric::encode(&entry).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            let mut connection = Self::database_lock(database)?;
-            let transaction = connection.transaction()?;
-            let sequence: i64 = transaction.query_row(
-                "SELECT COALESCE(MAX(sequence), -1) + 1 FROM operation_logs WHERE operation_id = ?1",
-                [operation_id.to_string()],
-                |row| row.get(0),
-            )?;
-            transaction.execute(
-                "INSERT INTO operation_logs(operation_id, sequence, entry) VALUES (?1, ?2, ?3)",
-                params![operation_id.to_string(), sequence, encoded],
-            )?;
-            transaction.execute(
-                "DELETE FROM operation_logs
-                 WHERE operation_id = ?1 AND sequence NOT IN (
-                     SELECT sequence FROM operation_logs
-                     WHERE operation_id = ?1 ORDER BY sequence DESC LIMIT 500
-                 )",
-                [operation_id.to_string()],
-            )?;
-            transaction.commit()?;
+            let id = operation_id.to_string();
+            self.durably(move |connection| {
+                let transaction = connection.transaction()?;
+                let sequence: i64 = transaction.query_row(
+                    "SELECT COALESCE(MAX(sequence), -1) + 1 FROM operation_logs WHERE operation_id = ?1",
+                    [&id],
+                    |row| row.get(0),
+                )?;
+                transaction.execute(
+                    "INSERT INTO operation_logs(operation_id, sequence, entry) VALUES (?1, ?2, ?3)",
+                    params![id, sequence, encoded],
+                )?;
+                transaction.execute(
+                    "DELETE FROM operation_logs
+                     WHERE operation_id = ?1 AND sequence NOT IN (
+                         SELECT sequence FROM operation_logs
+                         WHERE operation_id = ?1 ORDER BY sequence DESC LIMIT 500
+                     )",
+                    [&id],
+                )?;
+                transaction.commit()
+            })
+            .await?;
         }
         store.logs.insert(operation_id, next);
         Ok(())
@@ -375,26 +397,31 @@ impl Operation1Service {
         let mut operations = store.operations.clone();
         operations[position] = record.clone();
         let removed = Self::bounded_history(&mut operations);
-        if let Some(database) = &self.database {
+        {
             let encoded =
                 cybou_fabric::encode(&record).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            let mut connection = Self::database_lock(database)?;
-            let transaction = connection.transaction()?;
-            let changed = transaction.execute(
-                "UPDATE operations SET record = ?2 WHERE id = ?1",
-                params![record.id.to_string(), encoded],
-            )?;
-            if changed != 1 {
-                return Err(rusqlite::Error::QueryReturnedNoRows);
-            }
-            if record.state.is_terminal() {
-                transaction.execute(
-                    "DELETE FROM cancellation_requests WHERE operation_id = ?1",
-                    [record.id.to_string()],
+            let id = record.id.to_string();
+            let terminal = record.state.is_terminal();
+            let removed = removed.clone();
+            self.durably(move |connection| {
+                let transaction = connection.transaction()?;
+                let changed = transaction.execute(
+                    "UPDATE operations SET record = ?2 WHERE id = ?1",
+                    params![id, encoded],
                 )?;
-            }
-            Self::delete_history(&transaction, &removed)?;
-            transaction.commit()?;
+                if changed != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
+                if terminal {
+                    transaction.execute(
+                        "DELETE FROM cancellation_requests WHERE operation_id = ?1",
+                        [id],
+                    )?;
+                }
+                Self::delete_history(&transaction, &removed)?;
+                transaction.commit()
+            })
+            .await?;
         }
         store.operations = operations;
         if record.state.is_terminal() {
@@ -600,17 +627,21 @@ impl Operation1Service {
             operations.insert(0, record.clone());
         }
         let removed = Self::bounded_history(&mut operations);
-        if let Some(database) = &self.database {
+        {
             let encoded =
                 cybou_fabric::encode(&record).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            let mut connection = Self::database_lock(database)?;
-            let transaction = connection.transaction()?;
-            transaction.execute(
-                "INSERT OR IGNORE INTO operations(id, record) VALUES (?1, ?2)",
-                params![record.id.to_string(), encoded],
-            )?;
-            Self::delete_history(&transaction, &removed)?;
-            transaction.commit()?;
+            let id = record.id.to_string();
+            let removed = removed.clone();
+            self.durably(move |connection| {
+                let transaction = connection.transaction()?;
+                transaction.execute(
+                    "INSERT OR IGNORE INTO operations(id, record) VALUES (?1, ?2)",
+                    params![id, encoded],
+                )?;
+                Self::delete_history(&transaction, &removed)?;
+                transaction.commit()
+            })
+            .await?;
         }
         store.operations = operations;
         for id in removed {

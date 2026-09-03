@@ -838,8 +838,9 @@ sessions remain distinct. Cancelling one dispatches the typed Stop call back to 
 `Cancelled` only after Agent1 confirms teardown.
 
 Reconciliation that finds no semantic change now refreshes observation freshness in memory only, so a
-steady fleet of agents costs no durable writes every two seconds. Moving the remaining SQLite work
-off the async executor onto a dedicated blocking worker is still open.
+steady fleet of agents costs no durable writes every two seconds. The durable transactions that do
+run now execute on a blocking worker rather than on the async executor, so a `synchronous=FULL`
+commit waiting on the disk no longer stalls every other caller of this owner.
 
 Retention is enforced in the same SQLite transaction as registration or lifecycle update: every
 active operation is retained, only the newest 100 terminal operations remain, and each operation
