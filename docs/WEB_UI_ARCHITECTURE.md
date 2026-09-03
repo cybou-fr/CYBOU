@@ -89,17 +89,21 @@ crates/
       design-system/     tokens, typography, components, icons
   web-contracts/         shared HTTP/event DTOs and schema generation
   web-gateway/           Axum browser boundary and zbus Presence adapters
-  desktop-shell/         Chromium/session policy launcher
+  (no desktop-shell crate: the session launcher is scripts/cybou-desktop-session.sh)
 
 modules/
   cybou-web-gateway.service
   living-canvas.service
 
 packages/
-  cybou-web-ui/
+  living-canvas/
+  cybou-web-contracts/
   cybou-web-gateway/
-  cybou-desktop-shell/
 ```
+
+This tree is the plan as it was drawn. What exists is `crates/living-canvas`,
+`crates/cybou-web-contracts` and `crates/cybou-web-gateway`; there is no desktop-shell package, and
+the session launcher ships as `scripts/cybou-desktop-session.sh` with its unit installed disabled.
 
 The production Rust/WASM shell lives in `crates/living-canvas`. The earlier React `living-canvas/`
 prototype has been removed; its visual and interaction evidence is preserved in the design
@@ -244,7 +248,7 @@ CYBOU Shell is an isolated, unprivileged capability surface to the Debian 13 hos
   - ┤
   Zone 2: Desktop Presentation (Card geometry, decks, collapse, pinning)  |
   - ┤
-  Zone 3: Bounded Body Capabilities (CYBOU Shell, cybou-jailfs, shelld)   |
+  Zone 3: Bounded Body Capabilities (cybou-ptyd@uid, cybou-jailfs)        |
   - ┤
   Zone 4: Governed Actions (Future authorized mutation/execution runtime) |
   - 
@@ -499,7 +503,7 @@ when distinctions are removed.
 
 ### The read-only gateway
 
-- package `cybou-web-ui` and `cybou-web-gateway`;
+- package `living-canvas` and `cybou-web-gateway`;
 - expose session, snapshot, capabilities, and SSE events on loopback;
 - render Dashboard, Identity, Intentions, Activity, Self, Predictor, Workspace, health, and lifecycle
   as Living Canvas objects;

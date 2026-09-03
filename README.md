@@ -47,7 +47,7 @@ AI models and autonomous agents in CYBOU are **untrusted guests, not system owne
 | ⏳ **Attention ≠ Biography** | Ephemeral workspace focus coalitions decay; persistent autobiographical memories are explicitly committed. |
 
 ### 1. 🧠 Deterministic Cognitive Control Plane (Mind)
-- **14 Process-Isolated Micro-Daemons**: Operating on the D-Bus session bus (`org.cybou.Mind.*`), each owning a distinct cognitive domain: biography (`identityd`), epistemic truth & beliefs (`epistemicd`), associative context (`contextd`), attention (`workspaced`), natural language meaning (`meaningd`), prediction (`predictord`), capability health (`healthd`), and homeostatic lifecycle (`lifecycled`).
+- **One Process Per Cognitive Domain**: Mind owners run on the D-Bus session bus (`org.cybou.Mind.*`), each owning one thing and failing separately: biography (`identityd`), the canonical journal (`eventd`), epistemic truth and beliefs (`epistemicd`), associative context (`contextd`), attention (`workspaced`), natural language meaning (`meaningd`), prediction (`predictord`), perception (`perceptiond`), intention (`intentiond`), self-assessment (`selfd`), capability health (`healthd`), homeostatic lifecycle (`lifecycled`), telemetry (`telemetryd`), remediation (`remediationd`), the presentation projection (`presenced`) and governance (`actiond`). [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) is the authority on which of them are proven and which are not; this page does not keep a count that goes stale.
 - **100% Local-Sufficient**: Core cognition requires **no cloud connection, no GPU accelerator, and no probabilistic model**. It runs deterministically with sub-millisecond response times even during complete network isolation.
 - **Natural Language Meaning & Dialogue Memory (`cybou-meaningd`)**: Deterministically parses user utterances into structured cognitive acts (`Ask`, `Instruct`, `Assert`), formulates verified `ResponsePlan` structures, and realizes answers without hallucination.
 
@@ -64,7 +64,7 @@ AI models and autonomous agents in CYBOU are **untrusted guests, not system owne
 ### 4. 🌌 Living Canvas Spatial Desktop (Rust / WASM)
 - **Zero-Latency Spatial UI**: A GPU-accelerated, infinite-canvas desktop written in **Leptos and WebAssembly**, offering sub-millisecond rendering with zero compiler warnings.
 - **20+ Specialized Reactive Cards**:
-  - 🖥️ **Sandboxed Shell (`cybou-shelld`)**: Isolated per-session `JailFs` terminal environments.
+  - 🖥️ **Terminal (`cybou-ptyd@<uid>`)**: A real PTY, run as the authenticated account and enabled per account, never as the gateway.
   - 📁 **Host File Manager & Editor**: Authenticated, unprivileged host browsing via `cybou-host-filesd@<uid>`.
   - 🌐 **Dynamic Cognitive Graph**: Real-time visualization of host services, `/proc` processes, and epistemic beliefs.
   - 📊 **System Monitor**: Live hardware metrics (CPU load, memory pressure, disk I/O, network bandwidth).
@@ -94,7 +94,7 @@ graph TD
 
     Gateway -->|D-Bus Session Bus| Mind[🧠 Mind Control Plane]
 
-    subgraph Mind_Plane [Mind Control Plane: 14 D-Bus Daemons]
+    subgraph Mind_Plane [Mind Control Plane: one owner per cognitive domain]
         EventD[📜 cybou-eventd :: Event1 Ledger]
         PresenceD[👁️ cybou-presenced :: Presence1 Projection]
         EpistemicD[⚖️ cybou-epistemicd :: Epistemic1 Truth & Beliefs]
@@ -119,6 +119,10 @@ graph TD
 
 ## 📊 Subsystem Capability Matrix
 
+This table is a summary and goes stale faster than the code. [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)
+is the authority on what is implemented, what is proven on a deployed host, and what is neither;
+where the two disagree, that document is right and this one is behind.
+
 | Subsystem | Daemon / Component | Status | Architectural Invariant |
 |---|---|---|---|
 | **Cognitive Journal** | `cybou-eventd` (`Event1`) | **Implemented & Tested** | Append-only, SHA-256 hash-chained SQLite v3 ledger; single canonical writer. |
@@ -130,9 +134,10 @@ graph TD
 | **Agent Capsules** | `cybou-agentd` (`Agent1`) | **Implemented & Tested** | Kernel-enforced Landlock + cgroups v2 sandbox with ACP agent pack integration. |
 | **Action & Governance** | `cybou-actiond` / `executord` | **Implemented & Tested** | Typed proposal &rarr; policy evaluation &rarr; opaque single-use permit &rarr; execution. |
 | **Host Files Boundary**| `cybou-host-filesd@<uid>` | **Implemented & Tested** | Unprivileged per-UID socket (`/run/cybou-host-files/<uid>/owner.sock`). |
-| **Sandboxed Shell** | `cybou-shelld` / `cybou-jailfs` | **Implemented & Tested** | Per-session isolated working directory state; zero state leakage across seats. |
-| **Lifelong Learning** | `LearningHub` (`learning-store`)| **Implemented & Tested** | Layered candidate induction, empirical promotion gates, durable artifact lineages. |
-| **Personal Hub** | `PersonalHub` (`personal-store`)| **Implemented & Tested** | Sovereign local persistence for notes, contacts, calendar events, and mail. |
+| **Terminal** | `cybou-ptyd@<uid>` / `cybou-jailfs` | **Implemented & Tested** | A real PTY owned by the authenticated Linux account, enabled per account by an operator. |
+| **Long-Running Operations** | `cybou-operationd` (`Operation1`) | **Implemented & Tested** | Durable lifecycle, logs and cancellation intent; observation kept separate from lifecycle state. |
+| **Lifelong Learning** | `LearningHub` (`learning-store`)| **Owner boundary implemented; not proven end to end** | Promotion gate and durable lineage are real; demonstrations derive from canonical Action1 records, and no promotion has yet been earned on a deployed host. |
+| **Personal Core** | `cybou-personald@<uid>` | **Implemented & Tested** | One owner per Linux account, running as that person, with no UID field in its protocol to name another. |
 | **Living Canvas UI** | `living-canvas` (WASM) | **Implemented & Tested** | Zero-warning Leptos spatial desktop with 20+ responsive cards & snap guides. |
 
 ---
@@ -196,7 +201,9 @@ crates/
 ├── cybou-runtime/        Process management, cgroups v2, Landlock, and bubblewrap sandboxing
 ├── cybou-authd/          Privileged PAM authentication daemon
 ├── cybou-host-filesd/    Unprivileged per-UID host filesystem owner daemon
-├── cybou-shelld/         Sandboxed shell engine and per-session state manager
+├── cybou-ptyd/           Per-account PTY owner: a real terminal, run as the person
+├── cybou-personald/      Per-account Personal Core owner: mail, calendar, notes, contacts
+├── cybou-operationd/     Durable owner of long-running operations (Operation1)
 ├── cybou-jailfs/         Virtual sandboxed filesystem tree implementation
 ├── cybou-eventd/         Canonical Journal writer daemon (Event1)
 ├── cybou-presenced/      Presentation-ready cognitive projection daemon (Presence1)

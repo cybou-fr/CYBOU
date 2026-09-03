@@ -322,7 +322,7 @@ graph TD
 
     subgraph Hosts [Mind & Body Daemons]
         Presenced[cybou-presenced :: Mind]
-        Shelld[cybou-shelld / jailfs :: Body]
+        Ptyd[cybou-ptyd@uid :: Body]
     end
 ```
 
@@ -330,7 +330,7 @@ CYBOU Desktop establishes:
 - **Generic Cards**: Every surface is a `CardInstance` governed by a static `CardSpec`.
 - **Layout v9 Schema**: Persisted spatial positions with transparent migration from legacy v8.
 - **Spatial Dynamics**: Real-time bounded resize, collapse/expand pills, pinning, and deterministic multi-mode arrangement (`Free`, `Compact`, `Grid`, `Relations`, `Focus`).
-- **Bounded Body Capabilities**: Interactive exploration of host state via `CYBOU Shell` powered by `cybou-jailfs` (`DemoReadOnly` profile, builtins only, strict jail isolation, refused in public preview).
+- **Bounded Body Capabilities**: A real terminal owned by the authenticated Linux account through `cybou-ptyd@<uid>`, enabled per account by an operator and refused in public preview. The sandboxed shell that stood here is gone: it answered six builtins inside a demonstration root and called itself a shell, which is the confusion this system refuses in the other direction.
 
 ### Four Isolated Security Zones
 
@@ -338,7 +338,7 @@ CYBOU Desktop establishes:
 |---|---|
 | **Zone 1: Mind Projection** | Read-only aggregation of canonical daemon owners via D-Bus session bus. |
 | **Zone 2: Desktop Presentation** | Card geometry, infinite canvas coordinates, snap guides, collapse, and pinning. |
-| **Zone 3: Bounded Body Capabilities** | Interactive sandboxed shell via `cybou-jailfs` and `cybou-shelld` (zero host filesystem escape). |
+| **Zone 3: Bounded Body Capabilities** | A real PTY via `cybou-ptyd@<uid>`, running as the authenticated account and never as the gateway; `cybou-jailfs` still bounds what the gateway itself reads. |
 | **Zone 4: Governed Actions** | Two-phase Action1 / Executor1 policy criticism and single-use execution permits. |
 
 ## Next
