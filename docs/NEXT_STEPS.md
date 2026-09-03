@@ -852,6 +852,23 @@ the selected operation and its logs by stable identity. The remaining work is mo
 adapters and wiring each local producer to the reattachment contract. Until those exist, this is an
 honest durable owner boundary rather than a complete operations substrate.
 
+### Notification audience isolation
+
+Notifications carried no audience. Every authenticated seat read one process-wide collection, and a
+"dismiss all" from one account reached every other account's items. No producer had filled that
+collection yet, so this was a latent disclosure rather than a live one — and the right time to fix
+it is before mail, calendar, agent and personal producers start writing into it.
+
+Each notification now names its audience: `Operator` for notices about the host, which reach every
+authenticated seat, or `Principal` for one account's own work, which reaches nobody else. The routes
+resolve the server-established principal instead of merely asserting that someone is authenticated.
+Listing shows only what that principal may see, "dismiss all" means all of theirs, and acting on
+another principal's notification is *not found* rather than refused, because a refusal would itself
+disclose that it exists.
+
+Persistence and the producers themselves are still open, and per-principal notifications should move
+to a canonical owner when they carry real personal content rather than living in the gateway.
+
 ### B12. Further agent packs, then A2A
 
 More agents, and agent-to-agent last. An agent that sandboxes itself with Docker runs inside a

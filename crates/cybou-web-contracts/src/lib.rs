@@ -2123,6 +2123,7 @@ mod tests {
                     },
                     primary: true,
                 }],
+                audience: cybou_protocol::notification::NotificationAudience::Operator,
             }],
         };
 

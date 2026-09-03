@@ -109,6 +109,34 @@ pub struct NotificationAction {
     pub primary: bool,
 }
 
+/// Who a notification belongs to.
+///
+/// Notifications about the host as a whole are for whoever is operating it; notifications drawn
+/// from one account's mail, calendar, agents or personal work belong to that account alone. Mixing
+/// them would let one authenticated person read, or dismiss, another's.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "scope")]
+pub enum NotificationAudience {
+    /// About the host itself; readable by any authenticated seat.
+    Operator,
+    /// About one principal's own work; readable only by that principal.
+    Principal {
+        /// The server-established principal, as the authenticating boundary named it.
+        principal: String,
+    },
+}
+
+impl NotificationAudience {
+    /// Whether the given authenticated principal may see and act on this notification.
+    #[must_use]
+    pub fn admits(&self, principal: &str) -> bool {
+        match self {
+            Self::Operator => true,
+            Self::Principal { principal: owner } => owner == principal,
+        }
+    }
+}
+
 /// A structured notification record displayed in the Notification Center and toasts.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -134,4 +162,6 @@ pub struct NotificationItem {
     pub dismissed: bool,
     /// Interactive action triggers.
     pub actions: Vec<NotificationAction>,
+    /// Who this notification belongs to.
+    pub audience: NotificationAudience,
 }

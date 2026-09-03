@@ -36,10 +36,20 @@ impl NotificationsHub {
         Self::default()
     }
 
-    /// List active notifications.
+    /// List the notifications this principal is entitled to see.
+    ///
+    /// Operator notices are about the host and reach every authenticated seat; everything else
+    /// belongs to one principal and is invisible to the others.
     #[must_use]
-    pub fn list(&self) -> NotificationsListProjection {
-        let items = self.items.read().expect("read notifications").clone();
+    pub fn list(&self, principal: &str) -> NotificationsListProjection {
+        let items: Vec<NotificationItem> = self
+            .items
+            .read()
+            .expect("read notifications")
+            .iter()
+            .filter(|item| item.audience.admits(principal))
+            .cloned()
+            .collect();
         let unread_count = items.iter().filter(|n| !n.read && !n.dismissed).count();
         let attention_count = items
             .iter()
@@ -62,26 +72,37 @@ impl NotificationsHub {
         }
     }
 
-    /// Dismiss one or all notifications.
-    pub fn dismiss(&self, id: Option<Uuid>, dismiss_all: bool) {
+    /// Dismiss one, or all, of this principal's own notifications.
+    ///
+    /// "All" means all of theirs. Dismissing never reaches another principal's notification, and
+    /// naming one that is not theirs changes nothing.
+    pub fn dismiss(&self, principal: &str, id: Option<Uuid>, dismiss_all: bool) {
         let mut items = self.items.write().expect("write notifications");
         if dismiss_all {
-            for item in items.iter_mut() {
+            for item in items
+                .iter_mut()
+                .filter(|item| item.audience.admits(principal))
+            {
                 item.dismissed = true;
                 item.read = true;
             }
         } else if let Some(target_id) = id
-            && let Some(item) = items.iter_mut().find(|n| n.id == target_id)
+            && let Some(item) = items
+                .iter_mut()
+                .find(|n| n.id == target_id && n.audience.admits(principal))
         {
             item.dismissed = true;
             item.read = true;
         }
     }
 
-    /// Mark a notification as read.
-    pub fn mark_read(&self, id: Uuid) {
+    /// Mark one of this principal's own notifications as read.
+    pub fn mark_read(&self, principal: &str, id: Uuid) {
         let mut items = self.items.write().expect("write notifications");
-        if let Some(item) = items.iter_mut().find(|n| n.id == id) {
+        if let Some(item) = items
+            .iter_mut()
+            .find(|n| n.id == id && n.audience.admits(principal))
+        {
             item.read = true;
         }
     }
@@ -90,14 +111,17 @@ impl NotificationsHub {
     pub async fn execute_action(
         &self,
         operations: &OperationsHub,
+        principal: &str,
         id: Uuid,
         action_id: &str,
     ) -> Result<String, GatewayError> {
         let action = {
             let mut items = self.items.write().expect("write notifications");
+            // A notification this principal may not see does not exist for them, so acting on it
+            // is not found rather than refused: the refusal would itself disclose that it exists.
             let item = items
                 .iter_mut()
-                .find(|n| n.id == id)
+                .find(|n| n.id == id && n.audience.admits(principal))
                 .ok_or(GatewayError::NotFound)?;
             let action = item
                 .actions
@@ -113,7 +137,7 @@ impl NotificationsHub {
             NotificationActionKind::ApproveProposal { .. } => Err(GatewayError::Refused),
             NotificationActionKind::RejectProposal { .. } => Err(GatewayError::Refused),
             NotificationActionKind::Dismiss => {
-                self.dismiss(Some(id), false);
+                self.dismiss(principal, Some(id), false);
                 Ok("Notification dismissed".to_owned())
             }
             NotificationActionKind::InspectSubject { ref subject } => {
