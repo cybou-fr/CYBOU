@@ -64,6 +64,7 @@ Beside them, and deliberately not among them:
 | `cybou-model-brokerd` | `org.cybou.Faculty.ModelBroker1` — a faculty, owning no part of Mind |
 | `cybou-web-gateway` | the HTTP boundary; not a Mind owner and holds no cognitive state |
 | `cybou-agentd` | `org.cybou.Runtime.Agent1` — owns bounded agent launches, live sessions, teardown and recent final views; not Mind |
+| `cybou-personald@<account>` | one Linux account's own Personal Core, on a per-UID socket; the gateway proxies to it and owns none of it |
 | `cybou-operationd` | `org.cybou.Runtime.Operation1` — the sole lifecycle owner of long-running work: durable records, logs and cancellation intent; not Mind |
 
 **The sandboxed Safe Shell is gone**, and ADR-0047's Neutral note that kept it is reversed there.
@@ -957,11 +958,14 @@ utterance, the boundary refuses instead of producing a plausible local answer no
 Dialogue is partitioned by the principal the authenticating boundary established, never by one the
 browser named for itself.
 
-Personal Core data — mail, calendar, notes, contacts — is partitioned by numeric Linux UID taken
-from the authenticated session, and stored transactionally in SQLite WAL. Two accounts on one host do
-not see each other's records. Mail sending refuses while no real provider exists, rather than
-inventing a "Sent" item. The remaining move is a per-user owner (`cybou-personald@UID`) so the
-gateway proxies personal data the way it already proxies meaning and operations.
+Personal Core data — mail, calendar, notes, contacts — belongs to the account it is about.
+`cybou-personald@<account>` runs as that person, keeps their records in a SQLite database under their
+own home, and answers on a per-UID socket; its protocol has no UID field, because the process is the
+partition. It refuses to run as root. The gateway is the authenticated proxy: with
+`CYBOU_PERSONAL_SOCKET_DIR` configured it holds no personal records at all, and an account whose
+owner is not running is *unavailable* rather than an empty mailbox. Without that configuration the
+gateway falls back to its own UID-partitioned SQLite store, which isolates accounts but is not owned
+by them. Mail sending refuses while no real provider exists, rather than inventing a "Sent" item.
 
 ## Operation ownership
 

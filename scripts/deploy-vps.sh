@@ -32,6 +32,7 @@ cybou_ssh "
     cybou-identityd
     cybou-healthd
     cybou-host-filesd
+    cybou-personald
     cybou-ptyd
     cybou-intentiond
     cybou-predictord
@@ -102,6 +103,7 @@ cybou_ssh "
   # have one.
   sudo install -m 0755 scripts/cybou-desktop-session.sh /usr/libexec/cybou/cybou-desktop-session.sh
   sudo install -m 0755 scripts/cybou-host-filesd-runner.sh /usr/libexec/cybou/cybou-host-filesd-runner.sh
+  sudo install -m 0755 scripts/cybou-personald-runner.sh /usr/libexec/cybou/cybou-personald-runner.sh
   sudo install -m 0755 scripts/cybou-ptyd-runner.sh /usr/libexec/cybou/cybou-ptyd-runner.sh
   sudo install -m 0755 scripts/cybou-action-policy.sh /usr/sbin/cybou-action-policy
 
@@ -166,6 +168,7 @@ cybou_ssh "
   # group-owned by cybou, so only the gateway can attempt a password.
   sudo install -m 0644 systemd/system/cybou-authd.service \
     systemd/system/cybou-host-filesd@.service \
+    systemd/system/cybou-personald@.service \
     systemd/system/cybou-ptyd@.service \
     systemd/system/cybou-executord.service systemd/system/cybou-agent-gateway@.service \
     /etc/systemd/system/
@@ -221,6 +224,10 @@ cybou_ssh "
   # something a deploy decides on an operator's behalf.
   sudo systemctl enable --now cybou-host-filesd@demo.service
   sudo systemctl restart cybou-host-filesd@demo.service
+  # Personal Core is owned by the account it belongs to, so it is enabled per account for the
+  # same reason and with the same explicitness as HostUserPath.
+  sudo systemctl enable --now cybou-personald@demo.service
+  sudo systemctl restart cybou-personald@demo.service
   sudo systemctl enable --now cybou-ptyd@demo.service
   sudo systemctl restart cybou-ptyd@demo.service
 

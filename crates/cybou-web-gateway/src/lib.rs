@@ -41,6 +41,9 @@ pub mod notifications_hub;
 pub mod operations_hub;
 /// Personal pack (Mail, Calendar, Notes, Contacts).
 pub mod personal_hub;
+
+/// Transport to a deployed per-user Personal Core owner.
+pub mod personal_socket;
 /// Real-time D-Bus presence subscription.
 pub mod presence_zbus;
 /// Sensitive information redaction.
@@ -249,16 +252,7 @@ pub(crate) fn router_in_sandbox(
         operations: Arc::new(crate::operations_hub::OperationsHub::new()),
         notifications: Arc::new(crate::notifications_hub::NotificationsHub::new()),
         system: Arc::new(crate::system_hub::SystemHub::new()),
-        personal: Arc::new({
-            #[cfg(test)]
-            {
-                crate::personal_hub::PersonalHub::with_optional_store(None)
-            }
-            #[cfg(not(test))]
-            {
-                crate::personal_hub::PersonalHub::new()
-            }
-        }),
+        personal: personal_source(),
         cognitive: Arc::new(crate::cognitive_hub::CognitiveHub::new()),
         meaning: Arc::new(crate::meaning_hub::MeaningHub::new()),
         learning: Arc::new(crate::learning_hub::LearningHub::new()),
@@ -453,6 +447,26 @@ pub(crate) fn router_in_sandbox(
         )),
         None => app,
     }
+}
+
+/// The deployed per-user owner when one is configured, and the in-gateway store otherwise.
+///
+/// The fallback still partitions by authenticated UID, so it is not a privacy regression; it is
+/// simply not owned by the person whose records it holds, which is what the deployed owner fixes.
+#[cfg(all(target_os = "linux", not(test)))]
+fn personal_source() -> Arc<dyn state::PersonalSource> {
+    std::env::var_os("CYBOU_PERSONAL_SOCKET_DIR").map_or_else(
+        || Arc::new(crate::personal_hub::PersonalHub::new()) as Arc<dyn state::PersonalSource>,
+        |directory| {
+            Arc::new(personal_socket::SocketPersonal::in_directory(directory))
+                as Arc<dyn state::PersonalSource>
+        },
+    )
+}
+
+#[cfg(any(not(target_os = "linux"), test))]
+fn personal_source() -> Arc<dyn state::PersonalSource> {
+    Arc::new(crate::personal_hub::PersonalHub::with_optional_store(None))
 }
 
 #[cfg(all(target_os = "linux", not(test)))]

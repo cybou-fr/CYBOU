@@ -245,6 +245,22 @@ case "$operation_status" in
     *) exit "$operation_status" ;;
 esac
 
+# Each Linux account's personal records answer from that account's own owner, and from no other.
+# Exit 3 means this host cannot run the owner unprivileged.
+announce "personal owner isolation"
+failed="personal owner isolation"
+personal_status=0
+bash scripts/test-personal-owner-gate.sh || personal_status=$?
+case "$personal_status" in
+    0) failed="" ;;
+    3)
+        announce "personal owner isolation not run: this host cannot run an unprivileged owner"
+        skipped="$skipped personal-owner-isolation"
+        failed=""
+        ;;
+    *) exit "$personal_status" ;;
+esac
+
 # One launch, carried out on a real host, leaving nothing behind. Exit 3 means this host has no
 # deployed gateway template, provider or user service manager to launch against — a check that did
 # not run rather than one that passed.

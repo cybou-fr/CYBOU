@@ -249,14 +249,84 @@ pub struct GatewayState {
     pub notifications: Arc<crate::notifications_hub::NotificationsHub>,
     /// System services, processes, hardware telemetry, and log substrate.
     pub system: Arc<crate::system_hub::SystemHub>,
-    /// Personal desktop pack (Mail, Calendar, Notes, Contacts).
-    pub personal: Arc<crate::personal_hub::PersonalHub>,
+    /// The authenticated person's own Personal Core owner (Mail, Calendar, Notes, Contacts).
+    pub personal: Arc<dyn PersonalSource>,
     /// Deep Cognitive Graph & Canonical Event1 Journal.
     pub cognitive: Arc<crate::cognitive_hub::CognitiveHub>,
     /// Deterministic language interpretation, dialogue memory, and realization.
     pub meaning: Arc<crate::meaning_hub::MeaningHub>,
     /// Lifelong learning candidate evaluation, artifact lineages, and capability governance.
     pub learning: Arc<crate::learning_hub::LearningHub>,
+}
+
+/// Owner boundary for one Linux account's personal records.
+///
+/// Every method takes the UID the gateway authenticated, and no caller may name another: the
+/// gateway holds a seat, not a person's mailbox. Where a per-user owner is deployed this is a
+/// transport to that account's own process; otherwise it is the in-gateway store, which partitions
+/// by the same UID but is not owned by the person it holds records for.
+#[async_trait]
+pub trait PersonalSource: Send + Sync {
+    /// Mail accounts and the messages of one folder.
+    async fn get_mail(
+        &self,
+        uid: u32,
+        account_id: Option<String>,
+        folder: Option<cybou_protocol::personal::MailFolderKind>,
+    ) -> Result<cybou_web_contracts::MailProjection, GatewayError>;
+
+    /// Send a message.
+    async fn send_mail(
+        &self,
+        uid: u32,
+        request: cybou_web_contracts::SendMailRequest,
+    ) -> Result<cybou_protocol::personal::MailMessageRecord, GatewayError>;
+
+    /// Calendar events.
+    async fn get_calendar(
+        &self,
+        uid: u32,
+    ) -> Result<cybou_web_contracts::CalendarProjection, GatewayError>;
+
+    /// Create one calendar event.
+    async fn create_calendar_event(
+        &self,
+        uid: u32,
+        request: cybou_web_contracts::CreateCalendarEventRequest,
+    ) -> Result<cybou_protocol::personal::CalendarEventRecord, GatewayError>;
+
+    /// Notes.
+    async fn get_notes(
+        &self,
+        uid: u32,
+    ) -> Result<cybou_web_contracts::NotesProjection, GatewayError>;
+
+    /// Create one note.
+    async fn create_note(
+        &self,
+        uid: u32,
+        request: cybou_web_contracts::CreateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, GatewayError>;
+
+    /// Replace the content of one existing note.
+    async fn update_note(
+        &self,
+        uid: u32,
+        request: cybou_web_contracts::UpdateNoteRequest,
+    ) -> Result<cybou_protocol::personal::NoteRecord, GatewayError>;
+
+    /// Contacts.
+    async fn get_contacts(
+        &self,
+        uid: u32,
+    ) -> Result<cybou_web_contracts::ContactsProjection, GatewayError>;
+
+    /// Create one contact.
+    async fn create_contact(
+        &self,
+        uid: u32,
+        request: cybou_web_contracts::CreateContactRequest,
+    ) -> Result<cybou_protocol::personal::ContactRecord, GatewayError>;
 }
 
 /// Owner boundary for filesystem operations that must execute as the authenticated Linux user.

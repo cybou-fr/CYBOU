@@ -34,6 +34,7 @@ members = [
     "crates/cybou-provider-catalogue",
     "crates/cybou-provider-litellm",
     "crates/cybou-perception",
+    "crates/cybou-personald",
     "crates/cybou-perceptiond",
     "crates/cybou-predictord",
     "crates/cybou-presenced",

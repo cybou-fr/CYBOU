@@ -732,10 +732,24 @@ The old process-wide JSON store is no longer a production source. Do not automat
 unscoped records to the first account that signs in: those rows have no trustworthy owner and need
 an explicit operator migration decision.
 
-This closes the release-blocking Alice/Bob disclosure in the existing gateway. It does not make the
-gateway the canonical Personal owner. The remaining architecture step is `cybou-personald@UID` with
-a per-user socket and database, following the host-files owner pattern; the gateway should then
-become only the authenticated proxy to that owner.
+**`cybou-personald` now exists and the gateway is its proxy.** One instance per admitted Linux
+account, started as that account, holding that account's records in a SQLite database under their own
+home, answering on a per-UID socket the gateway reaches the way it already reaches the host-files
+owner. Its protocol carries no UID field at all: the process identity *is* the partition, so there
+is no request a caller could form that names somebody else's mailbox, and no code path that could
+answer from another store. It refuses to start as root, because one root process owning everybody's
+personal records is the arrangement this daemon exists to end.
+
+Where `CYBOU_PERSONAL_SOCKET_DIR` is configured the gateway holds no personal records of its own; an
+account whose owner is not running is reported unavailable rather than as an empty mailbox. Without
+it, the in-gateway UID-partitioned store remains as the fallback: not a privacy regression, simply
+not owned by the person whose records it holds. `scripts/test-personal-owner-gate.sh` proves the
+separation against real processes and real sockets — one account's note is unreachable through
+another's owner, is absent from the other's store on disk, and survives its own owner restarting.
+
+The old process-wide JSON records still have no trustworthy owner and still need an explicit
+operator migration decision rather than being assigned to whoever signs in first. Real Mail and
+Calendar providers remain the next step, and `send_mail` keeps refusing until one exists.
 
 ### Cognitive Graph grounding
 

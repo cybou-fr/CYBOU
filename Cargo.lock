@@ -1251,6 +1251,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-personald"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "cybou-protocol",
+ "cybou-web-contracts",
+ "rusqlite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "cybou-predictord"
 version = "0.1.0"
 dependencies = [
@@ -1445,6 +1461,7 @@ dependencies = [
  "cybou-jailfs",
  "cybou-meaning",
  "cybou-perception",
+ "cybou-personald",
  "cybou-protocol",
  "cybou-remediation",
  "cybou-telemetryd",

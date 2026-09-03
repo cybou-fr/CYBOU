@@ -340,6 +340,70 @@ impl PersonalHub {
     }
 }
 
+#[async_trait::async_trait]
+impl crate::state::PersonalSource for PersonalHub {
+    async fn get_mail(
+        &self,
+        uid: u32,
+        account_id: Option<String>,
+        folder: Option<MailFolderKind>,
+    ) -> Result<MailProjection, GatewayError> {
+        Self::get_mail(self, uid, account_id, folder)
+    }
+
+    async fn send_mail(
+        &self,
+        uid: u32,
+        request: SendMailRequest,
+    ) -> Result<MailMessageRecord, GatewayError> {
+        Self::send_mail(self, uid, request)
+    }
+
+    async fn get_calendar(&self, uid: u32) -> Result<CalendarProjection, GatewayError> {
+        Self::get_calendar(self, uid)
+    }
+
+    async fn create_calendar_event(
+        &self,
+        uid: u32,
+        request: CreateCalendarEventRequest,
+    ) -> Result<CalendarEventRecord, GatewayError> {
+        Self::create_calendar_event(self, uid, request)
+    }
+
+    async fn get_notes(&self, uid: u32) -> Result<NotesProjection, GatewayError> {
+        Self::get_notes(self, uid)
+    }
+
+    async fn create_note(
+        &self,
+        uid: u32,
+        request: CreateNoteRequest,
+    ) -> Result<NoteRecord, GatewayError> {
+        Self::create_note(self, uid, request)
+    }
+
+    async fn update_note(
+        &self,
+        uid: u32,
+        request: UpdateNoteRequest,
+    ) -> Result<NoteRecord, GatewayError> {
+        Self::update_note(self, uid, request)
+    }
+
+    async fn get_contacts(&self, uid: u32) -> Result<ContactsProjection, GatewayError> {
+        Self::get_contacts(self, uid)
+    }
+
+    async fn create_contact(
+        &self,
+        uid: u32,
+        request: CreateContactRequest,
+    ) -> Result<ContactRecord, GatewayError> {
+        Self::create_contact(self, uid, request)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -42,11 +42,13 @@ pub async fn get_mail(
     headers: HeaderMap,
     Query(query): Query<MailQuery>,
 ) -> Result<Json<MailProjection>, GatewayError> {
-    Ok(Json(state.personal.get_mail(
-        authenticated_uid(&state, &headers)?,
-        query.account_id,
-        query.folder,
-    )?))
+    let uid = authenticated_uid(&state, &headers)?;
+    Ok(Json(
+        state
+            .personal
+            .get_mail(uid, query.account_id, query.folder)
+            .await?,
+    ))
 }
 
 /// POST `/api/v1/personal/mail/send`
@@ -57,7 +59,8 @@ pub async fn send_mail(
 ) -> Result<Json<MailMessageRecord>, GatewayError> {
     let msg = state
         .personal
-        .send_mail(authenticated_uid(&state, &headers)?, request)?;
+        .send_mail(authenticated_uid(&state, &headers)?, request)
+        .await?;
     Ok(Json(msg))
 }
 
@@ -69,7 +72,8 @@ pub async fn get_calendar(
     Ok(Json(
         state
             .personal
-            .get_calendar(authenticated_uid(&state, &headers)?)?,
+            .get_calendar(authenticated_uid(&state, &headers)?)
+            .await?,
     ))
 }
 
@@ -81,7 +85,8 @@ pub async fn create_calendar_event(
 ) -> Result<Json<CalendarEventRecord>, GatewayError> {
     let event = state
         .personal
-        .create_calendar_event(authenticated_uid(&state, &headers)?, request)?;
+        .create_calendar_event(authenticated_uid(&state, &headers)?, request)
+        .await?;
     Ok(Json(event))
 }
 
@@ -93,7 +98,8 @@ pub async fn get_notes(
     Ok(Json(
         state
             .personal
-            .get_notes(authenticated_uid(&state, &headers)?)?,
+            .get_notes(authenticated_uid(&state, &headers)?)
+            .await?,
     ))
 }
 
@@ -105,7 +111,8 @@ pub async fn create_note(
 ) -> Result<Json<NoteRecord>, GatewayError> {
     let note = state
         .personal
-        .create_note(authenticated_uid(&state, &headers)?, request)?;
+        .create_note(authenticated_uid(&state, &headers)?, request)
+        .await?;
     Ok(Json(note))
 }
 
@@ -117,7 +124,8 @@ pub async fn update_note(
 ) -> Result<Json<NoteRecord>, GatewayError> {
     let note = state
         .personal
-        .update_note(authenticated_uid(&state, &headers)?, request)?;
+        .update_note(authenticated_uid(&state, &headers)?, request)
+        .await?;
     Ok(Json(note))
 }
 
@@ -129,7 +137,8 @@ pub async fn get_contacts(
     Ok(Json(
         state
             .personal
-            .get_contacts(authenticated_uid(&state, &headers)?)?,
+            .get_contacts(authenticated_uid(&state, &headers)?)
+            .await?,
     ))
 }
 
@@ -141,7 +150,8 @@ pub async fn create_contact(
 ) -> Result<Json<ContactRecord>, GatewayError> {
     let contact = state
         .personal
-        .create_contact(authenticated_uid(&state, &headers)?, request)?;
+        .create_contact(authenticated_uid(&state, &headers)?, request)
+        .await?;
     Ok(Json(contact))
 }
 
