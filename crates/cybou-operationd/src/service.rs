@@ -6,7 +6,7 @@
 #![allow(missing_docs)]
 
 use cybou_protocol::{
-    action::Proposer,
+    action::{ActionRecord, AttemptReport, Proposer},
     agent::{SessionView, Standing},
     operation::{
         CancelOutcome, ObservationState, OperationKind, OperationLogEntry, OperationProgress,
@@ -24,6 +24,10 @@ use time::OffsetDateTime;
 use tokio::sync::{Mutex, watch};
 use uuid::Uuid;
 use zbus::interface;
+
+/// Owners that establish operations this one only reflects.
+const AGENT1: &str = "Agent1";
+const ACTION1: &str = "Action1";
 
 const MAX_TERMINAL_OPERATIONS: usize = 100;
 const MAX_LOG_ENTRIES_PER_OPERATION: usize = 500;
@@ -446,7 +450,8 @@ impl Operation1Service {
             Ok(sessions) => sessions,
             Err(error) => {
                 // Agent1 itself cannot be read: say so instead of repeating the last projection.
-                self.mark_agents(ObservationState::Unavailable, None).await;
+                self.mark_established_by(AGENT1, ObservationState::Unavailable, None)
+                    .await;
                 return Err(error);
             }
         };
@@ -462,9 +467,174 @@ impl Operation1Service {
         }
         // Agent1 no longer establishes anything outside `seen`; a restored Running record must not
         // keep asserting a worker that the canonical owner cannot see.
-        self.mark_agents(ObservationState::Detached, Some(&seen))
+        self.mark_established_by(AGENT1, ObservationState::Detached, Some(&seen))
             .await;
         Ok(())
+    }
+
+    /// Reconcile the operation projection from Action1's canonical lifecycle records.
+    ///
+    /// Only a record that has crossed the durable execution boundary is background work: a proposal
+    /// still waiting on a decision is something asking for attention, not something running.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when Action1 cannot be read or a reconciled record cannot be persisted.
+    pub async fn reconcile_actions(&self) -> Result<(), String> {
+        let records = match self.read_action_records().await {
+            Ok(records) => records,
+            Err(error) => {
+                self.mark_established_by(ACTION1, ObservationState::Unavailable, None)
+                    .await;
+                return Err(error);
+            }
+        };
+        let mut seen = HashSet::new();
+        for record in records {
+            if record.execution_started.is_none() {
+                continue;
+            }
+            let id = Self::action_operation_id(record.proposal.proposal_id);
+            seen.insert(id);
+            self.reconcile_action(id, record)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        self.mark_established_by(ACTION1, ObservationState::Detached, Some(&seen))
+            .await;
+        Ok(())
+    }
+
+    async fn read_action_records(&self) -> Result<Vec<ActionRecord>, String> {
+        let endpoint = cybou_fabric::ACTION;
+        let encoded: Vec<u8> = zbus::Connection::session()
+            .await
+            .map_err(|e| e.to_string())?
+            .call_method(
+                Some(endpoint.service),
+                endpoint.object_path,
+                Some(endpoint.interface),
+                "RecentRecords",
+                &(),
+            )
+            .await
+            .map_err(|e| e.to_string())?
+            .body()
+            .deserialize()
+            .map_err(|e| e.to_string())?;
+        cybou_fabric::decode(&encoded).map_err(|e| e.to_string())
+    }
+
+    /// One proposal is one operation, for as long as the record exists.
+    fn action_operation_id(proposal_id: Uuid) -> Uuid {
+        let namespace = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"cybou.operation.action");
+        Uuid::new_v5(&namespace, proposal_id.as_bytes())
+    }
+
+    /// The operation category for a typed action verb, without guessing at one it does not know.
+    fn action_kind(operation: &str) -> OperationKind {
+        match operation {
+            "service.restart" => OperationKind::ServiceRestart,
+            "service.stop" => OperationKind::ServiceStop,
+            other => OperationKind::Custom(other.to_owned()),
+        }
+    }
+
+    async fn reconcile_action(&self, id: Uuid, record: ActionRecord) -> rusqlite::Result<()> {
+        let observed_at = OffsetDateTime::now_utc();
+        let started = record
+            .execution_started
+            .as_ref()
+            .ok_or(rusqlite::Error::InvalidQuery)?;
+        // The attempt is what the executor says it did; the outcome is what the host saw afterwards.
+        // Whether the work ran is the first question, so the lifecycle follows the attempt.
+        let (state, observation, step) = match record.attempt.as_ref().map(|a| &a.report) {
+            None => (
+                OperationState::Running,
+                ObservationState::Known,
+                "Executing".to_owned(),
+            ),
+            Some(AttemptReport::Completed) => (
+                OperationState::Completed,
+                ObservationState::Known,
+                if record.outcome.is_some() {
+                    "Concluded".to_owned()
+                } else {
+                    "Carried out; awaiting independent observation".to_owned()
+                },
+            ),
+            Some(AttemptReport::Failed { because }) => (
+                OperationState::Failed {
+                    error: because.clone(),
+                },
+                ObservationState::Known,
+                "Failed".to_owned(),
+            ),
+            Some(AttemptReport::Refused { because }) => (
+                OperationState::Refused {
+                    because: because.clone(),
+                },
+                ObservationState::Known,
+                "Declined before anything ran".to_owned(),
+            ),
+            // Action1 establishes that it began and that nobody knows how it ended. The lifecycle
+            // stays what was last published, and the observation says why it stopped being visible.
+            Some(AttemptReport::DidNotFinish) => (
+                OperationState::Running,
+                ObservationState::Detached,
+                "Began; this host does not know how it ended".to_owned(),
+            ),
+        };
+        let subject = started
+            .target_resource
+            .strip_prefix("systemd:")
+            .map(|unit| SubjectRef::Service {
+                name: unit.to_owned(),
+                node_id: None,
+            });
+        let finished_at = record.attempt.as_ref().and_then(|attempt| attempt.ended_at);
+        let operation = OperationRecord {
+            id,
+            kind: Self::action_kind(&started.operation),
+            state,
+            label: format!("{} on {}", started.operation, started.target_resource),
+            initiator: record.proposal.proposed_by.clone(),
+            subject,
+            progress: OperationProgress {
+                // Nothing between Action1 and the Body reports a fraction of an action done.
+                percent: None,
+                step,
+                total_steps: None,
+                current_step: None,
+                detail: None,
+            },
+            // A permit that is already executing has no cancel. Offering a button that does nothing
+            // is exactly the thing this owner exists to stop doing.
+            cancellable: false,
+            establisher: Some(ACTION1.to_owned()),
+            cancellation_requested: false,
+            observation,
+            last_observed_at: Some(observed_at),
+            started_at: started.started_at,
+            updated_at: observed_at,
+            finished_at,
+        };
+        let existing = self
+            .store
+            .lock()
+            .await
+            .operations
+            .iter()
+            .find(|value| value.id == id)
+            .cloned();
+        match existing {
+            Some(current) if Self::only_freshness_differs(&current, &operation) => {
+                self.touch_observation(id, observed_at).await;
+                Ok(())
+            }
+            Some(_) => self.update(operation).await,
+            None => self.register_external(operation).await,
+        }
     }
 
     async fn read_agent_sessions(&self) -> Result<Vec<SessionView>, String> {
@@ -487,10 +657,15 @@ impl Operation1Service {
         cybou_fabric::decode(&encoded).map_err(|e| e.to_string())
     }
 
-    /// Apply an observation verdict to live agent operations, optionally excluding observed ones.
+    /// Apply an observation verdict to one owner's live operations, excluding those just observed.
     ///
     /// Lifecycle state is left untouched: only the executing worker may publish a terminal state.
-    pub async fn mark_agents(&self, observation: ObservationState, seen: Option<&HashSet<Uuid>>) {
+    pub async fn mark_established_by(
+        &self,
+        establisher: &str,
+        observation: ObservationState,
+        seen: Option<&HashSet<Uuid>>,
+    ) {
         let stale: Vec<OperationRecord> = self
             .store
             .lock()
@@ -498,7 +673,7 @@ impl Operation1Service {
             .operations
             .iter()
             .filter(|record| {
-                record.kind == OperationKind::AgentTask
+                record.establisher.as_deref() == Some(establisher)
                     && !record.state.is_terminal()
                     && record.observation != observation
                     && seen.is_none_or(|seen| !seen.contains(&record.id))
@@ -527,7 +702,6 @@ impl Operation1Service {
         if let Some(record) = store.operations.iter_mut().find(|value| value.id == id) {
             record.updated_at = observed_at;
             record.last_observed_at = Some(observed_at);
-            record.observation = ObservationState::Known;
         }
     }
 
@@ -587,6 +761,7 @@ impl Operation1Service {
                 detail: None,
             },
             cancellable: session.is_live(),
+            establisher: Some(AGENT1.to_owned()),
             cancellation_requested: false,
             observation: ObservationState::Known,
             last_observed_at: Some(observed_at),
@@ -802,6 +977,7 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                establisher: None,
                 cancellation_requested: false,
                 observation: cybou_protocol::operation::ObservationState::Known,
                 last_observed_at: None,
@@ -841,6 +1017,7 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                establisher: None,
                 cancellation_requested: false,
                 observation: cybou_protocol::operation::ObservationState::Known,
                 last_observed_at: None,
@@ -897,6 +1074,7 @@ mod tests {
             subject: None,
             progress: OperationProgress::default(),
             cancellable: true,
+            establisher: None,
             cancellation_requested: false,
             observation: cybou_protocol::operation::ObservationState::Known,
             last_observed_at: None,
@@ -995,6 +1173,7 @@ mod tests {
             subject: None,
             progress: OperationProgress::default(),
             cancellable: true,
+            establisher: Some(AGENT1.to_owned()),
             cancellation_requested: false,
             observation: ObservationState::Known,
             last_observed_at: Some(now),
@@ -1019,6 +1198,7 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                establisher: None,
                 cancellation_requested: false,
                 observation: ObservationState::Known,
                 last_observed_at: None,
@@ -1058,7 +1238,7 @@ mod tests {
 
         let seen = HashSet::from([still_running]);
         service
-            .mark_agents(ObservationState::Detached, Some(&seen))
+            .mark_established_by(AGENT1, ObservationState::Detached, Some(&seen))
             .await;
 
         let store = service.store.lock().await;
@@ -1107,6 +1287,174 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
     }
 
+    fn executing_action(report: Option<AttemptReport>) -> ActionRecord {
+        use cybou_protocol::action::{
+            ActionProposal, AuthorizationDecision, AuthorizationVerdict, ExecutionAttempt,
+            ExecutionStarted, RiskLevel,
+        };
+        let proposal_id = Uuid::new_v4();
+        let decision_id = Uuid::new_v4();
+        let attempt_id = Uuid::new_v4();
+        let now = OffsetDateTime::now_utc();
+        ActionRecord {
+            proposal: ActionProposal {
+                proposal_id,
+                proposed_by: Proposer::Mind,
+                cause_id: None,
+                intent: "recover the database".into(),
+                operation: "service.restart".into(),
+                target_resource: "systemd:postgresql.service".into(),
+                parameters: Vec::new(),
+                risk_level: RiskLevel::Medium,
+                reversible: true,
+                proposed_at: now,
+            },
+            checks: Vec::new(),
+            decision: AuthorizationDecision {
+                decision_id,
+                proposal_id,
+                verdict: AuthorizationVerdict::Granted,
+                checked_capabilities: Vec::new(),
+                decided_at: now,
+            },
+            permit_id: Some(Uuid::new_v4()),
+            execution_started: Some(ExecutionStarted {
+                attempt_id,
+                proposal_id,
+                decision_id,
+                operation: "service.restart".into(),
+                target_resource: "systemd:postgresql.service".into(),
+                started_at: now,
+            }),
+            attempt: report.map(|report| ExecutionAttempt {
+                attempt_id,
+                proposal_id,
+                decision_id,
+                operation: "service.restart".into(),
+                target_resource: "systemd:postgresql.service".into(),
+                report,
+                body_readings: Vec::new(),
+                started_at: now,
+                ended_at: Some(now),
+            }),
+            outcome: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn an_executing_action_becomes_one_operation_that_offers_no_cancel() {
+        let service = Operation1Service::new();
+        let record = executing_action(None);
+        let id = Operation1Service::action_operation_id(record.proposal.proposal_id);
+        service
+            .reconcile_action(id, record.clone())
+            .await
+            .expect("reconcile an executing action");
+
+        let store = service.store.lock().await;
+        let operation = &store.operations[0];
+        assert_eq!(operation.state, OperationState::Running);
+        assert_eq!(operation.kind, OperationKind::ServiceRestart);
+        assert_eq!(operation.establisher.as_deref(), Some(ACTION1));
+        // A permit that is already executing cannot be recalled, so no cancel is offered.
+        assert!(!operation.cancellable);
+        // Nothing between Action1 and the Body reports a fraction of an action done.
+        assert_eq!(operation.progress.percent, None);
+        assert_eq!(
+            operation.subject,
+            Some(SubjectRef::Service {
+                name: "postgresql.service".to_owned(),
+                node_id: None,
+            })
+        );
+        // The identity is derived from the proposal, so the same action is the same operation.
+        assert_eq!(
+            operation.id,
+            Operation1Service::action_operation_id(record.proposal.proposal_id)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refusal_is_not_recorded_as_a_failure_and_an_unknown_ending_is_not_recorded_at_all() {
+        let service = Operation1Service::new();
+
+        let refused = executing_action(Some(AttemptReport::Refused {
+            because: "policy declined it".to_owned(),
+        }));
+        let refused_id = Operation1Service::action_operation_id(refused.proposal.proposal_id);
+        service
+            .reconcile_action(refused_id, refused)
+            .await
+            .expect("reconcile a refusal");
+
+        let unfinished = executing_action(Some(AttemptReport::DidNotFinish));
+        let unfinished_id = Operation1Service::action_operation_id(unfinished.proposal.proposal_id);
+        service
+            .reconcile_action(unfinished_id, unfinished)
+            .await
+            .expect("reconcile an unknown ending");
+
+        let store = service.store.lock().await;
+        let refused = store
+            .operations
+            .iter()
+            .find(|record| record.id == refused_id)
+            .expect("the refusal");
+        // Nothing ran, so there is nothing to have failed.
+        assert_eq!(
+            refused.state,
+            OperationState::Refused {
+                because: "policy declined it".to_owned()
+            }
+        );
+
+        let unfinished = store
+            .operations
+            .iter()
+            .find(|record| record.id == unfinished_id)
+            .expect("the unknown ending");
+        // Something may well have happened, so it is neither completed nor failed; what is known is
+        // that it can no longer be observed.
+        assert_eq!(unfinished.state, OperationState::Running);
+        assert_eq!(unfinished.observation, ObservationState::Detached);
+    }
+
+    #[tokio::test]
+    async fn one_owner_going_quiet_does_not_detach_the_other_owner_s_operations() {
+        let service = Operation1Service::new();
+        let now = OffsetDateTime::now_utc();
+        let agent = Uuid::new_v4();
+        service
+            .register_external(live_agent_operation(agent, now))
+            .await
+            .expect("register an agent operation");
+        let action = executing_action(None);
+        let action_id = Operation1Service::action_operation_id(action.proposal.proposal_id);
+        service
+            .reconcile_action(action_id, action)
+            .await
+            .expect("register an action operation");
+
+        // Action1 cannot be read; Agent1 can.
+        service
+            .mark_established_by(ACTION1, ObservationState::Unavailable, None)
+            .await;
+
+        let store = service.store.lock().await;
+        let agent = store
+            .operations
+            .iter()
+            .find(|record| record.id == agent)
+            .expect("the agent operation");
+        assert_eq!(agent.observation, ObservationState::Known);
+        let action = store
+            .operations
+            .iter()
+            .find(|record| record.id == action_id)
+            .expect("the action operation");
+        assert_eq!(action.observation, ObservationState::Unavailable);
+    }
+
     #[tokio::test]
     async fn retention_bounds_terminal_history_and_logs_but_never_active_work() {
         let service = Operation1Service::new();
@@ -1122,6 +1470,7 @@ mod tests {
                     subject: None,
                     progress: OperationProgress::default(),
                     cancellable: false,
+                    establisher: None,
                     cancellation_requested: false,
                     observation: cybou_protocol::operation::ObservationState::Known,
                     last_observed_at: None,
@@ -1143,6 +1492,7 @@ mod tests {
                 subject: None,
                 progress: OperationProgress::default(),
                 cancellable: true,
+                establisher: None,
                 cancellation_requested: false,
                 observation: cybou_protocol::operation::ObservationState::Known,
                 last_observed_at: None,

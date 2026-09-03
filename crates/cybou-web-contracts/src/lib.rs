@@ -2092,6 +2092,7 @@ mod tests {
                     detail: Some("4.2 MB / 8.5 MB".to_string()),
                 },
                 cancellable: true,
+                establisher: None,
                 cancellation_requested: false,
                 observation: cybou_protocol::operation::ObservationState::Known,
                 last_observed_at: None,

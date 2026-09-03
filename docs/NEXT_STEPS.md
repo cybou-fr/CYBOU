@@ -876,6 +876,18 @@ steady fleet of agents costs no durable writes every two seconds. The durable tr
 run now execute on a blocking worker rather than on the async executor, so a `synchronous=FULL`
 commit waiting on the disk no longer stalls every other caller of this owner.
 
+**Action1 is the second producer.** Every action that has crossed the durable execution boundary is
+now one operation, with an identity derived from its proposal, so the Operations Monitor shows the
+system work a host actually does rather than agents alone. A proposal still waiting on a decision is
+not included: that is something asking for attention, not something running. The lifecycle follows
+the attempt — whether the work ran is the first question — while the independent outcome is reported
+as the step. Three distinctions are kept that a single "failed" would have flattened: a refusal never
+ran and is published as `Refused` rather than as a failure; an attempt that began and whose ending
+nobody knows keeps its last lifecycle state and is marked `Detached`; and an executing permit offers
+no cancel button, because Action1 has no way to recall one and a button that does nothing is the
+thing this owner exists to stop. Each producer is reconciled and marked independently, so one owner
+going quiet never detaches the other's operations.
+
 Retention is enforced in the same SQLite transaction as registration or lifecycle update: every
 active operation is retained, only the newest 100 terminal operations remain, and each operation
 keeps its newest 500 log entries. Startup applies the same limits to an older database.

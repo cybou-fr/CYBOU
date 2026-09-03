@@ -142,7 +142,9 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                 .filter(|op| {
                     matches!(
                         op.state,
-                        OperationState::Failed { .. } | OperationState::Cancelled
+                        OperationState::Failed { .. }
+                            | OperationState::Cancelled
+                            | OperationState::Refused { .. }
                     )
                 })
                 .collect(),
@@ -240,6 +242,8 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                 OperationState::Completed => ("var(--ok-fill-strong)", "var(--ok)", "Completed"),
                                 OperationState::Failed { .. } => ("var(--danger-fill-strong)", "var(--danger)", "Failed"),
                                 OperationState::Cancelled => ("var(--text-dim)", "var(--text-dim)", "Cancelled"),
+                                // Nothing ran, so this is not a failure and must not be painted as one.
+                                OperationState::Refused { .. } => ("var(--caution-fill-strong)", "var(--caution)", "Refused"),
                             };
 
                             view! {
@@ -416,6 +420,7 @@ mod tests {
                 detail: None,
             },
             cancellable: true,
+            establisher: None,
             cancellation_requested: false,
             observation: cybou_protocol::operation::ObservationState::Known,
             last_observed_at: None,

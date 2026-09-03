@@ -993,11 +993,18 @@ means the executing authority — today, Agent1's `Stop` — confirmed teardown 
 HTTP boundary answers `202 Accepted` for the first and `200 OK` for the second, and the desktop says
 "cancellation requested" until a worker publishes the ending.
 
+Records name the owner that establishes them, so a `Detached` verdict says who would have known.
 Agent1 is the first real producer: its canonical sessions are reconciled every two seconds into
 stable, deterministic operation identities. Reconciliation that finds no semantic change refreshes
 observation freshness in memory only, so a steady fleet costs no durable writes. Agent progress stays
 indeterminate — the phase comes from Agent1 and the percentage stays unknown rather than being drawn
 as zero.
+
+Action1 is the second: every action past the durable execution boundary is one operation, identified
+by its proposal. A refusal never ran and is published as `Refused` rather than as a failure; an
+attempt whose ending nobody knows keeps its last state and is marked `Detached`; an executing permit
+offers no cancel, because Action1 cannot recall one. The two producers are reconciled and marked
+independently, so one owner being unreadable never detaches the other's operations.
 
 ## Model brokerage
 

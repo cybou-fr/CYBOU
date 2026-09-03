@@ -78,6 +78,14 @@ pub enum OperationState {
     },
     /// Operation was cancelled before completion.
     Cancelled,
+    /// Nothing was carried out, because something declined to carry it out.
+    ///
+    /// Distinct from failing: a failure ran and went wrong, and may have left something behind. A
+    /// refusal never started, so there is nothing to undo and nothing to observe afterwards.
+    Refused {
+        /// What declined it, and why.
+        because: String,
+    },
 }
 
 impl OperationState {
@@ -86,7 +94,7 @@ impl OperationState {
     pub const fn is_terminal(&self) -> bool {
         matches!(
             self,
-            Self::Completed | Self::Failed { .. } | Self::Cancelled
+            Self::Completed | Self::Failed { .. } | Self::Cancelled | Self::Refused { .. }
         )
     }
 
@@ -99,6 +107,7 @@ impl OperationState {
             Self::Completed => "Completed",
             Self::Failed { .. } => "Failed",
             Self::Cancelled => "Cancelled",
+            Self::Refused { .. } => "Refused",
         }
     }
 }
@@ -210,6 +219,12 @@ pub struct OperationRecord {
     pub progress: OperationProgress,
     /// Whether this operation accepts an explicit cancel request.
     pub cancellable: bool,
+    /// The owner that establishes this operation, when it is not this owner's own worker.
+    ///
+    /// Names who would know if the work stopped, which is what makes a `Detached` verdict something
+    /// a reader can act on rather than a shrug.
+    #[serde(default)]
+    pub establisher: Option<String>,
     /// Whether a cancel request is recorded and still awaiting a worker-published terminal state.
     #[serde(default)]
     pub cancellation_requested: bool,

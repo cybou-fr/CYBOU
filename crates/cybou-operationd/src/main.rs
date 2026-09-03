@@ -17,6 +17,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(error) = reconciler.reconcile_agents().await {
                     eprintln!("[cybou-operationd] Agent1 reconciliation failed: {error}");
                 }
+                // Two owners, reconciled independently: one being unreadable must not make the
+                // other's operations disappear from the projection.
+                if let Err(error) = reconciler.reconcile_actions().await {
+                    eprintln!("[cybou-operationd] Action1 reconciliation failed: {error}");
+                }
             }
         });
         let _connection = zbus::connection::Builder::session()?
