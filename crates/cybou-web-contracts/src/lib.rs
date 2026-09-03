@@ -2337,7 +2337,7 @@ mod tests {
                 shell: "/bin/bash".to_string(),
                 groups: vec!["wheel".to_string(), "sudo".to_string()],
                 is_admin: true,
-                is_locked: false,
+                is_locked: Some(false),
             }],
             ssh_keys: vec![SshKeyRecord {
                 id: "ssh-key-01".to_string(),

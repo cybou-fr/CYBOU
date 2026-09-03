@@ -9,7 +9,7 @@ use cybou_protocol::system::LogsUnavailable;
 use cybou_protocol::system::{
     CpuCoreStat, DiskPartitionInfo, NetworkConnectionKind, NetworkConnectionRecord,
     NetworkInterfaceInfo, PackageRecord, PackageStatus, ProcessRecord, ServiceRecord, ServiceState,
-    ServiceUnitType,
+    ServiceUnitType, UserAccountRecord,
 };
 use cybou_web_contracts::{
     ProcessesListProjection, ServicesListProjection, SystemLogsProjection, SystemLogsQueryRequest,
@@ -1143,6 +1143,125 @@ mod host_reader_tests {
             super::parse_resolv_conf(resolv),
             vec!["1.1.1.1".to_owned(), "9.9.9.9".to_owned()]
         );
+    }
+}
+
+/// The people with accounts on this host, or `None` where the account database is not readable.
+///
+/// System accounts are left out: this surface is about who can sign in, and a host with sixty
+/// daemon accounts is not a host with sixty users. Whether an account is locked lives in the shadow
+/// database, which an unprivileged reader cannot open, so that stays unestablished rather than
+/// being reported as unlocked.
+#[cfg(target_os = "linux")]
+#[must_use]
+pub fn read_real_users() -> Option<Vec<UserAccountRecord>> {
+    let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
+    let group = std::fs::read_to_string("/etc/group").unwrap_or_default();
+    Some(parse_accounts(&passwd, &group))
+}
+
+#[cfg(not(target_os = "linux"))]
+#[must_use]
+pub fn read_real_users() -> Option<Vec<UserAccountRecord>> {
+    None
+}
+
+/// Groups that make an account an administrator of this host, as Debian and its neighbours spell it.
+const ADMIN_GROUPS: [&str; 3] = ["sudo", "admin", "wheel"];
+
+/// The lowest identity a Debian installation gives to a person rather than to a daemon.
+const FIRST_HUMAN_UID: u32 = 1000;
+
+/// The identity reserved for `nobody`, which is not a person either.
+const NOBODY_UID: u32 = 65_534;
+
+/// Parse the account and group databases into the people who have accounts here.
+fn parse_accounts(passwd: &str, group: &str) -> Vec<UserAccountRecord> {
+    let mut memberships: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for line in group.lines() {
+        let fields: Vec<&str> = line.split(':').collect();
+        let [name, _, _, members] = fields.as_slice() else {
+            continue;
+        };
+        for member in members.split(',').filter(|member| !member.is_empty()) {
+            memberships
+                .entry(member.to_owned())
+                .or_default()
+                .push((*name).to_owned());
+        }
+    }
+
+    let mut accounts = Vec::new();
+    for line in passwd.lines() {
+        let fields: Vec<&str> = line.split(':').collect();
+        let [username, _, uid, _, gecos, home, shell] = fields.as_slice() else {
+            continue;
+        };
+        let Ok(uid) = uid.parse::<u32>() else {
+            continue;
+        };
+        if uid < FIRST_HUMAN_UID || uid >= NOBODY_UID {
+            continue;
+        }
+        let mut groups = memberships.get(*username).cloned().unwrap_or_default();
+        groups.sort();
+        accounts.push(UserAccountRecord {
+            uid,
+            username: (*username).to_owned(),
+            // GECOS is comma-separated and the name is its first field.
+            full_name: gecos.split(',').next().unwrap_or_default().to_owned(),
+            home_dir: (*home).to_owned(),
+            shell: (*shell).to_owned(),
+            is_admin: groups
+                .iter()
+                .any(|group| ADMIN_GROUPS.contains(&group.as_str())),
+            groups,
+            // The shadow database is root-only, so nothing here can say.
+            is_locked: None,
+        });
+    }
+    accounts.sort_by_key(|account| account.uid);
+    accounts
+}
+
+#[cfg(test)]
+mod account_tests {
+
+    #[test]
+    fn accounts_are_the_people_who_can_sign_in_and_not_the_daemons() {
+        let passwd = concat!(
+            "root:x:0:0:root:/root:/bin/bash\n",
+            "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n",
+            "alice:x:1000:1000:Alice Example,,,:/home/alice:/bin/bash\n",
+            "bob:x:1001:1001::/home/bob:/bin/sh\n",
+            "nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\n",
+        );
+        let group = concat!(
+            "sudo:x:27:alice\n",
+            "cybou:x:1002:alice,bob\n",
+            "docker:x:998:\n",
+        );
+
+        let accounts = super::parse_accounts(passwd, group);
+        let names: Vec<&str> = accounts
+            .iter()
+            .map(|account| account.username.as_str())
+            .collect();
+        assert_eq!(names, vec!["alice", "bob"]);
+
+        let alice = &accounts[0];
+        assert_eq!(alice.uid, 1000);
+        assert_eq!(alice.full_name, "Alice Example");
+        assert_eq!(alice.home_dir, "/home/alice");
+        assert_eq!(alice.groups, vec!["cybou".to_owned(), "sudo".to_owned()]);
+        assert!(alice.is_admin);
+        // The shadow database is root-only, so no claim is made about signing in.
+        assert_eq!(alice.is_locked, None);
+
+        let bob = &accounts[1];
+        assert!(!bob.is_admin);
+        assert_eq!(bob.full_name, "");
     }
 }
 

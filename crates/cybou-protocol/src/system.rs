@@ -402,8 +402,12 @@ pub struct UserAccountRecord {
     pub groups: Vec<String>,
     /// Whether the user has administrative/sudo rights.
     pub is_admin: bool,
-    /// Account lock status.
-    pub is_locked: bool,
+    /// Account lock status, when a reader could establish it.
+    ///
+    /// `None` where the shadow database was not readable. `false` would say the account can be
+    /// signed into, which is a claim about access that an unprivileged reader cannot make.
+    #[serde(default)]
+    pub is_locked: Option<bool>,
 }
 
 /// An authorized SSH public key record.

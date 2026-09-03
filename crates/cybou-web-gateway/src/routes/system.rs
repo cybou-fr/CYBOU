@@ -341,10 +341,15 @@ mod tests {
 
         let storage = hub.get_storage();
         assert_eq!(storage.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
-        assert_eq!(
-            storage.state,
-            cybou_web_contracts::SystemSurfaceState::Unknown
-        );
+        // Established only where a filesystem read produced a capacity; a host that answered
+        // nothing must not report a pool of zero bytes as a fact about itself.
+        if storage.state == cybou_web_contracts::SystemSurfaceState::Unknown {
+            assert_eq!(storage.total_space_bytes, 0);
+        } else {
+            assert!(storage.total_space_bytes > 0);
+        }
+        // Subvolume listing needs a privileged btrfs query this gateway does not make.
+        assert!(storage.subvolumes.is_empty());
         let snap = hub.create_snapshot("@home", "test-backup", true);
         assert!(snap.is_err());
 
@@ -382,10 +387,16 @@ mod tests {
 
         let users = hub.get_users_settings();
         assert_eq!(users.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);
-        assert_eq!(
-            users.state,
-            cybou_web_contracts::SystemSurfaceState::Unknown
-        );
+        if users.state == cybou_web_contracts::SystemSurfaceState::Unknown {
+            assert!(users.users.is_empty());
+        } else {
+            // Every account is a person's, and no account's lock state is claimed from an
+            // unprivileged read.
+            assert!(users.users.iter().all(|account| account.uid >= 1000));
+            assert!(users.users.iter().all(|account| account.is_locked.is_none()));
+        }
+        // Authorized keys belong to the account that holds them; this gateway reads none.
+        assert!(users.ssh_keys.is_empty());
         let new_user = hub.create_user("bob", "Bob Smith", false);
         assert!(new_user.is_err());
 

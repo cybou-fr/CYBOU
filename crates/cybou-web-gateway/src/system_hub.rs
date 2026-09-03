@@ -198,7 +198,13 @@ impl SystemHub {
 
         StorageProjection {
             schema_version: WEB_SCHEMA_V1,
-            state: SystemSurfaceState::Unknown,
+            // The capacity figures come from a real filesystem read. Subvolumes need a btrfs query
+            // this gateway cannot make unprivileged, so that list stays empty on every host.
+            state: if total_space_bytes == 0 {
+                SystemSurfaceState::Unknown
+            } else {
+                SystemSurfaceState::Known
+            },
             subvolumes: Vec::new(),
             snapshots,
             total_space_bytes,
@@ -337,9 +343,20 @@ impl SystemHub {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
+        // Authorized keys live in each person's own home and are readable by that person. This
+        // gateway does not hold them, so the list stays empty rather than being filled from
+        // somewhere it has no business reading.
+        let Some(users) = system_reader::read_real_users() else {
+            return UsersSettingsProjection {
+                schema_version: WEB_SCHEMA_V1,
+                state: SystemSurfaceState::Unknown,
+                users,
+                ssh_keys,
+            };
+        };
         UsersSettingsProjection {
             schema_version: WEB_SCHEMA_V1,
-            state: SystemSurfaceState::Unknown,
+            state: SystemSurfaceState::Known,
             users,
             ssh_keys,
         }

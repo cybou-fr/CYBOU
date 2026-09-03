@@ -1234,7 +1234,7 @@ impl MindClient for MockMindClient {
             shell: "/bin/bash".to_owned(),
             groups: vec![username.to_owned()],
             is_admin,
-            is_locked: false,
+            is_locked: None,
         })
     }
 

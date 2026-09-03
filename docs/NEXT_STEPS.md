@@ -935,8 +935,16 @@ nameservers. An interface the reader cannot classify is `Other` carrying the hos
 rather than being called Ethernet, and an address nothing established is `None` rather than a blank
 that reads like an address. Where the kernel cannot be read the surface stays `Unknown`.
 
-Storage, Security, Users and Backup still report `Unknown`, and every mutation on all of these
-surfaces still refuses. Installing, upgrading, connecting and snapshotting are new powers over the
+Users and Storage are read too. Accounts come from `/etc/passwd` and `/etc/group`: only identities a
+person can sign in as, with administrator status decided by real membership of `sudo`, `admin` or
+`wheel`. Whether an account is locked lives in the shadow database, which an unprivileged reader
+cannot open, so `isLocked` became an `Option` and stays unestablished rather than being reported as
+unlocked. Authorized SSH keys belong to the account that holds them and this gateway reads none.
+Storage reports `Known` only where a filesystem read produced a capacity; its subvolume list stays
+empty everywhere, because that needs a privileged btrfs query this gateway does not make.
+
+Security and Backup still report `Unknown`, and every mutation on all of these surfaces still
+refuses. Installing, upgrading, connecting and snapshotting are new powers over the
 host, and they belong behind an Action1 proposal, an operator decision and an Executor1 permit —
 `ExecutableAction` has no variant for any of them yet, which is the honest state and an explicit
 decision rather than an oversight.
