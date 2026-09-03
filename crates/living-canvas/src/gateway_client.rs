@@ -932,7 +932,7 @@ impl MindClient for GatewayMindClient {
         &self,
         name: &str,
         action: cybou_protocol::system::PackageActionKind,
-    ) -> Result<String, ClientError> {
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
         let response = Request::post("/api/v1/system/packages/action")
             .json(&cybou_web_contracts::PackageActionRequest {
                 name: name.to_owned(),
@@ -948,14 +948,11 @@ impl MindClient for GatewayMindClient {
                 response.status()
             )));
         }
-        let outcome: serde_json::Value = response
+        // What comes back is the proposal's record, not a report that anything was installed.
+        response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
-        Ok(outcome["outcome"]
-            .as_str()
-            .unwrap_or("Package action executed")
-            .to_owned())
+            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
     }
 
     async fn get_system_updates(

@@ -551,6 +551,69 @@ mod tests {
         proposal
     }
 
+    /// A person asking this host to install one named package.
+    fn a_person_asks(verb: &str) -> ActionProposal {
+        let operation = ALL_OPERATIONS
+            .iter()
+            .copied()
+            .find(|candidate| candidate.verb() == verb)
+            .expect("a known verb");
+        ActionProposal {
+            proposal_id: Uuid::from_u128(1001),
+            proposed_by: Proposer::Person {
+                seat: "linux-account:alice".to_owned(),
+            },
+            cause_id: None,
+            intent: format!("{verb} because I asked for it"),
+            operation: verb.to_owned(),
+            target_resource: "apt:ripgrep".to_owned(),
+            parameters: Vec::new(),
+            risk_level: operation.risk(),
+            reversible: operation.reversible(),
+            proposed_at: at(),
+        }
+    }
+
+    #[test]
+    fn installing_and_upgrading_reach_a_person_rather_than_happening_unattended() {
+        for verb in ["package.install", "package.upgrade"] {
+            let proposal = a_person_asks(verb);
+            let checks = criticise_request(&proposal);
+            let verdict = authorize(
+                &proposal,
+                &checks,
+                false,
+                &StandingPolicy::nothing_pre_authorized(),
+                at(),
+            )
+            .verdict;
+            let AuthorizationVerdict::RequiresUserConfirmation { prompt } = verdict else {
+                panic!("{verb} did not reach a person: {verdict:?}");
+            };
+            // The prompt says what it costs and that it cannot be undone, because both are true and
+            // a person confirming needs to know which question they are answering.
+            assert!(prompt.contains("apt:ripgrep"), "{prompt}");
+            assert!(prompt.contains("High"), "{prompt}");
+            assert!(prompt.contains("cannot be undone"), "{prompt}");
+        }
+    }
+
+    #[test]
+    fn nothing_this_host_concludes_reaches_for_installing_software() {
+        // Neither verb relieves any finding, so no insight can produce a proposal for one. A host
+        // that could install software to relieve its own conclusion would do it while nobody is
+        // present, which is exactly the decision a person keeps.
+        for operation in [Operation::InstallPackage, Operation::UpgradePackage] {
+            assert!(
+                operation.relieves().is_empty(),
+                "{} advertises itself as a remedy",
+                operation.verb()
+            );
+            assert!(!operation.reversible());
+            assert!(!operation.forbidden());
+        }
+    }
+
     #[test]
     fn a_permission_given_to_this_host_is_not_a_permission_given_to_an_agent() {
         // The defect this closes, and it would have been a bad one. A person pre-authorizes

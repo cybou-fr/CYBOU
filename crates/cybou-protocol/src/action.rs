@@ -221,6 +221,16 @@ pub enum ExecutableAction {
     },
     /// Delete only the package manager's downloaded archive cache.
     PackageCacheClean,
+    /// Install one named package from the configured repositories.
+    PackageInstall {
+        /// One concrete package name, as the archive spells it.
+        package: String,
+    },
+    /// Upgrade one named installed package, and nothing else.
+    PackageUpgrade {
+        /// One concrete package name, as the archive spells it.
+        package: String,
+    },
     /// Restart one concrete systemd service.
     ServiceRestart {
         /// A concrete unit name ending in `.service`.
@@ -343,6 +353,12 @@ impl ExecutionStarted {
             }
             ExecutableAction::PackageCacheClean => {
                 ("package.cache.clean", "apt:archives".to_owned())
+            }
+            ExecutableAction::PackageInstall { package } => {
+                ("package.install", format!("apt:{package}"))
+            }
+            ExecutableAction::PackageUpgrade { package } => {
+                ("package.upgrade", format!("apt:{package}"))
             }
             ExecutableAction::ServiceRestart { unit } => {
                 ("service.restart", format!("systemd:{unit}"))

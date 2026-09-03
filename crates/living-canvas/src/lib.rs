@@ -410,12 +410,12 @@ pub trait MindClient {
     /// List software packages.
     async fn get_packages(&self) -> Result<cybou_web_contracts::PackagesProjection, ClientError>;
 
-    /// Execute a package operation (install/upgrade/remove).
+    /// Ask Action1 to authorize a package operation. Nothing here installs anything.
     async fn execute_package_action(
         &self,
         name: &str,
         action: cybou_protocol::system::PackageActionKind,
-    ) -> Result<String, ClientError>;
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError>;
 
     /// Get system update status summary.
     async fn get_system_updates(
@@ -1181,8 +1181,11 @@ impl MindClient for MockMindClient {
         &self,
         name: &str,
         action: cybou_protocol::system::PackageActionKind,
-    ) -> Result<String, ClientError> {
-        Ok(format!("Mock package action on {name}: {action:?}"))
+    ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
+        let _ = action;
+        Err(ClientError::GatewayRequest(format!(
+            "no Action1 to propose a package action on {name}"
+        )))
     }
 
     async fn get_system_updates(

@@ -101,6 +101,44 @@ impl LinuxBody {
         })
     }
 
+    /// Run one apt operation on one named package.
+    ///
+    /// The package name is checked against Debian's own rule for what a package may be called
+    /// before it goes anywhere near a command line, and the arguments end with `--` so a name can
+    /// never be read as an option. A name this refuses is refused here rather than passed on: the
+    /// executor is the last place that could still tell the difference between a package and an
+    /// instruction.
+    async fn apt(&self, package: &str, verbs: &[&str]) -> Result<Vec<BodyReading>, ExecutorError> {
+        let package = valid_package_name(package)?;
+        let verbs: Vec<String> = verbs.iter().map(|verb| (*verb).to_owned()).collect();
+        tokio::task::spawn_blocking(move || {
+            Command::new("/usr/bin/apt-get")
+                .args(&verbs)
+                .arg("--yes")
+                .arg("--no-install-recommends")
+                // apt must never stop to ask: nobody is at this terminal, and a prompt would hang
+                // the permit until it expired.
+                .arg("--option=Dpkg::Options::=--force-confold")
+                .arg("--")
+                .arg(&package)
+                .env_clear()
+                .env("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
+                .env("DEBIAN_FRONTEND", "noninteractive")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped())
+                .output()
+        })
+        .await
+        .map_err(|error| ExecutorError::Adapter(error.to_string()))?
+        .map_err(|error| ExecutorError::Adapter(error.to_string()))
+        .and_then(|output| {
+            output.status.success().then(Vec::new).ok_or_else(|| {
+                ExecutorError::Adapter(String::from_utf8_lossy(&output.stderr).trim().to_owned())
+            })
+        })
+    }
+
     async fn manager(&self) -> Result<Proxy<'_>, ExecutorError> {
         Proxy::new(
             &self.system_bus,
@@ -167,6 +205,16 @@ impl Body for LinuxBody {
                 ExecutorError::Adapter(String::from_utf8_lossy(&output.stderr).trim().to_owned())
             })
         })
+    }
+
+    async fn install_package(&self, package: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        self.apt(package, &["install"]).await
+    }
+
+    async fn upgrade_package(&self, package: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+        // `--only-upgrade` is what keeps this one package rather than whatever apt would pull in
+        // to satisfy a fresh install of it.
+        self.apt(package, &["install", "--only-upgrade"]).await
     }
 
     async fn restart_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {
@@ -369,5 +417,62 @@ mod tests {
         assert_eq!(owner_of("Name:\tsleep\nState:\tS (sleeping)\n"), None);
         assert_eq!(owner_of("Uid:\n"), None);
         assert_eq!(owner_of("Uid:\tnobody\n"), None);
+    }
+}
+
+/// One package name, or a refusal.
+///
+/// Debian policy: a name is at least two characters, starts with a letter or digit, and otherwise
+/// holds only lowercase letters, digits, `+`, `-` and `.`. Everything that makes a name into
+/// something else — a leading dash, an `=` pinning a version, a path separator, whitespace — is
+/// outside that set, so this one rule is also the rule that stops a package name being an argument.
+fn valid_package_name(package: &str) -> Result<String, ExecutorError> {
+    let refused = || ExecutorError::Adapter(format!("not a package name: {package}"));
+    if package.len() < 2 || package.len() > 128 {
+        return Err(refused());
+    }
+    let mut characters = package.chars();
+    let first = characters.next().ok_or_else(refused)?;
+    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
+        return Err(refused());
+    }
+    if !characters
+        .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '+' | '-' | '.'))
+    {
+        return Err(refused());
+    }
+    Ok(package.to_owned())
+}
+
+#[cfg(test)]
+mod package_name_tests {
+    use super::valid_package_name;
+
+    #[test]
+    fn a_package_name_is_a_package_name_and_never_an_argument() {
+        assert_eq!(valid_package_name("ripgrep").as_deref().ok(), Some("ripgrep"));
+        assert_eq!(
+            valid_package_name("libssl3t64").as_deref().ok(),
+            Some("libssl3t64")
+        );
+        assert_eq!(valid_package_name("g++").as_deref().ok(), Some("g++"));
+
+        // Each of these is a way of saying something other than "this package".
+        for refused in [
+            "--reinstall",
+            "-y",
+            "ripgrep=14.0",
+            "../etc/passwd",
+            "ripgrep ripgrep",
+            "Ripgrep",
+            "rip;grep",
+            "a",
+            "",
+        ] {
+            assert!(
+                valid_package_name(refused).is_err(),
+                "accepted {refused:?} as a package name"
+            );
+        }
     }
 }

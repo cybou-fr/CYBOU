@@ -536,6 +536,9 @@ impl Operation1Service {
         match operation {
             "service.restart" => OperationKind::ServiceRestart,
             "service.stop" => OperationKind::ServiceStop,
+            "package.install" => OperationKind::PackageInstall,
+            // Upgrading is not removal, and the table has no separate category for it. Its own verb
+            // is more honest than borrowing one that means something else.
             other => OperationKind::Custom(other.to_owned()),
         }
     }

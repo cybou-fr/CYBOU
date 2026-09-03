@@ -943,7 +943,33 @@ unlocked. Authorized SSH keys belong to the account that holds them and this gat
 Storage reports `Known` only where a filesystem read produced a capacity; its subvolume list stays
 empty everywhere, because that needs a privileged btrfs query this gateway does not make.
 
-Security and Backup still report `Unknown`, and every mutation on all of these surfaces still
+**Installing and upgrading are typed operations now.** `package.install` and `package.upgrade` join
+the closed operation table, both High risk and neither reversible: they bring code onto this host and
+run maintainer scripts as root, and removing a package afterwards does not undo what those scripts
+did. Neither relieves any finding, so nothing this host concludes about itself can reach for one —
+the machine cannot install software on its own conclusion while nobody is present. Neither is
+pre-authorizable through the standing policy file either; the parser there still knows three verbs
+and refuses the rest by name.
+
+The path is the ordinary one: the gateway establishes the seat and nothing else, Action1 decides,
+and the executor holds the only adapter. A person asking from their own authenticated seat is the
+confirmation, exactly as it already is for restarting a service, and the record names whose seat it
+was. A package name is checked against Debian's own naming rule twice — once where the proposal
+becomes a typed action and once in the adapter — so a placeholder, an option, a version pin or a
+path never becomes a permit, and `--` ends the argument list before the name is reached. Removing and
+reinstalling stay refused by name: neither has an operation, and removal takes software away from a
+host that may be depending on it, which wants its own decision about risk before it gets a verb.
+
+Every such action appears in Operation1 through the Action1 producer, with no cancel offered,
+because an executing permit cannot be recalled.
+
+One deliberate cost: the executor's unit had `ProtectSystem=full` and a Unix-only address family,
+which together make a package manager impossible. Both are relaxed. The next thing worth doing here
+is running apt in its own transient unit with its own sandbox, so the executor can go back to
+`full`. The other missing halves are an `apt-get update` operation and a repository reader — until
+one exists, no package is reported upgradable and the count stays unestablished.
+
+Security and Backup still report `Unknown`, and every remaining mutation on these surfaces still
 refuses. Installing, upgrading, connecting and snapshotting are new powers over the
 host, and they belong behind an Action1 proposal, an operator decision and an Executor1 permit —
 `ExecutableAction` has no variant for any of them yet, which is the honest state and an explicit

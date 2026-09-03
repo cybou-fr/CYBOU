@@ -296,13 +296,40 @@ impl SystemHub {
         }
     }
 
-    /// Execute a package operation.
-    pub fn execute_package_action(
-        &self,
-        _package: &str,
-        _action: cybou_protocol::system::PackageActionKind,
-    ) -> Result<String, GatewayError> {
-        Err(GatewayError::Refused)
+    /// Which operation, if any, this build can carry out for a package action.
+    ///
+    /// A pure mapping, like the service one: the hub decides nothing about whether it may happen.
+    /// Installing and upgrading are typed operations with an executor adapter behind them, both
+    /// High risk and neither undoable, so both reach a person for confirmation unless an operator
+    /// pre-authorized them.
+    ///
+    /// Removing and reinstalling are refused here by name. Neither is in the closed operation table
+    /// and neither has an adapter, and a refusal that says what is missing is worth more than one
+    /// that arrives three layers down. Removal in particular is a different act: it takes software
+    /// away from a host that may be depending on it, and it wants its own decision about risk
+    /// before it gets a verb.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an action this build cannot express as a typed operation.
+    pub fn verb_for_package(
+        action: cybou_protocol::system::PackageActionKind,
+    ) -> Result<&'static str, GatewayError> {
+        match action {
+            cybou_protocol::system::PackageActionKind::Install => Ok("package.install"),
+            cybou_protocol::system::PackageActionKind::Upgrade => Ok("package.upgrade"),
+            cybou_protocol::system::PackageActionKind::Remove
+            | cybou_protocol::system::PackageActionKind::Reinstall => Err(GatewayError::Refused),
+        }
+    }
+
+    /// How a package name reaches the executor.
+    ///
+    /// The prefix is what tells Action1 this names an archive package rather than something else
+    /// spelled the same way, and both Action1 and the executor refuse a name that is not concrete.
+    #[must_use]
+    pub fn package_target(name: &str) -> String {
+        format!("apt:{name}")
     }
 
     /// Get pending system updates.

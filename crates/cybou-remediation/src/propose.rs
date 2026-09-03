@@ -118,6 +118,10 @@ fn target_for(operation: Operation, insight: &SystemInsight) -> String {
         | Operation::KillProcess
         | Operation::PauseProcess
         | Operation::ResumeProcess => "process:<uid>:<pid>".to_owned(),
+        // Nothing this host concludes about itself names a package to install or upgrade: neither
+        // relieves a finding, so no insight reaches here with one in mind. The placeholder keeps
+        // the match total and is a target `concrete_package` refuses.
+        Operation::InstallPackage | Operation::UpgradePackage => "apt:<package>".to_owned(),
         Operation::FormatFilesystem => "filesystem:<device>".to_owned(),
         Operation::PowerOff => "system:self".to_owned(),
     }

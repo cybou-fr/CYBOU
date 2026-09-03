@@ -158,14 +158,27 @@ pub async fn get_packages(
 }
 
 /// POST `/api/v1/system/packages/action`
+///
+/// Installing or upgrading software is an authorized action like any other, and this route does the
+/// one part only the gateway can do: establish who is asking. Whether the verb exists, what it
+/// costs, whether a person must confirm it and whether a permit follows all belong to `Action1`
+/// (ADR-0048). Nothing here installs anything.
 pub async fn execute_package_action(
     State(state): State<GatewayState>,
+    headers: HeaderMap,
     Json(request): Json<PackageActionRequest>,
-) -> Result<Json<serde_json::Value>, GatewayError> {
-    let outcome = state
-        .system
-        .execute_package_action(&request.name, request.action)?;
-    Ok(Json(serde_json::json!({ "outcome": outcome })))
+) -> Result<Json<cybou_web_contracts::ActionRecordProjection>, GatewayError> {
+    let seat = state
+        .authenticated_principal(&headers)
+        .ok_or(GatewayError::Refused)?;
+    let verb = SystemHub::verb_for_package(request.action)?;
+
+    state
+        .presence
+        .request_action(verb, &SystemHub::package_target(&request.name), &seat)
+        .await
+        .map(Json)
+        .ok_or(GatewayError::Unavailable)
 }
 
 /// GET `/api/v1/system/updates`
@@ -373,8 +386,19 @@ mod tests {
         } else {
             assert_eq!(pkgs.installed_count, pkgs.packages.len());
         }
-        let pkg_res = hub.execute_package_action("borgbackup", PackageActionKind::Install);
-        assert!(pkg_res.is_err());
+        // Installing and upgrading are typed operations now; removing and reinstalling are not,
+        // and are refused by name rather than proposed and refused three layers down.
+        assert_eq!(
+            SystemHub::verb_for_package(PackageActionKind::Install).expect("a verb"),
+            "package.install"
+        );
+        assert_eq!(
+            SystemHub::verb_for_package(PackageActionKind::Upgrade).expect("a verb"),
+            "package.upgrade"
+        );
+        assert!(SystemHub::verb_for_package(PackageActionKind::Remove).is_err());
+        assert!(SystemHub::verb_for_package(PackageActionKind::Reinstall).is_err());
+        assert_eq!(SystemHub::package_target("ripgrep"), "apt:ripgrep");
 
         let updates = hub.get_system_updates();
         assert_eq!(updates.schema_version, cybou_web_contracts::WEB_SCHEMA_V1);

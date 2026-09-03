@@ -57,6 +57,10 @@ pub enum Operation {
     DisableService,
     /// Delete downloaded package archives that can be fetched again.
     CleanPackageCache,
+    /// Install one named package from the configured repositories.
+    InstallPackage,
+    /// Upgrade one named installed package to the version the repositories offer.
+    UpgradePackage,
     /// Rotate and compress logs that are past their retention.
     RotateLogs,
     /// Delete temporary files nothing has opened.
@@ -83,6 +87,8 @@ pub const ALL_OPERATIONS: &[Operation] = &[
     Operation::PauseProcess,
     Operation::ResumeProcess,
     Operation::CleanPackageCache,
+    Operation::InstallPackage,
+    Operation::UpgradePackage,
     Operation::RotateLogs,
     Operation::TrimTemporaryFiles,
     Operation::DeleteServiceData,
@@ -107,6 +113,8 @@ impl Operation {
             Self::ResumeProcess => "process.resume",
             Self::StopService => "service.stop",
             Self::CleanPackageCache => "package.cache.clean",
+            Self::InstallPackage => "package.install",
+            Self::UpgradePackage => "package.upgrade",
             Self::RotateLogs => "log.rotate",
             Self::TrimTemporaryFiles => "tmp.trim",
             Self::DeleteServiceData => "service.data.delete",
@@ -154,6 +162,11 @@ impl Operation {
             | Self::RotateLogs => RiskLevel::Medium,
             // Higher than the cache because something may be using a temporary file this cannot see.
             Self::TrimTemporaryFiles => RiskLevel::High,
+            // Both bring code onto this host and run maintainer scripts as root, which may start,
+            // stop or reconfigure anything. An upgrade is not the safer of the two: it replaces
+            // software that is currently working, and the version that arrives is decided by a
+            // repository rather than by anyone here.
+            Self::InstallPackage | Self::UpgradePackage => RiskLevel::High,
             Self::DeleteServiceData | Self::FormatFilesystem | Self::PowerOff => {
                 RiskLevel::Critical
             }
@@ -235,6 +248,10 @@ impl Operation {
             | Self::KillProcess
             | Self::PauseProcess
             | Self::ResumeProcess => &[],
+            // Neither relieves a finding this host can observe, and that is the entry rather than
+            // an omission. Listing one would let the machine install or upgrade software on its
+            // own conclusion while nobody is present, which is the decision a person keeps.
+            Self::InstallPackage | Self::UpgradePackage => &[],
             // Reading a unit's state relieves nothing and is worth proposing anyway: it is how a
             // person finds out more without changing anything, and a system that could only offer
             // mutations would push every investigation toward one. The forbidden three relieve

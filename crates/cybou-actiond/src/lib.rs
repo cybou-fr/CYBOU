@@ -656,6 +656,31 @@ fn concrete_process(target: &str) -> Result<(u32, u32), ActionError> {
     Ok((uid, pid))
 }
 
+/// One concrete package name from a proposal's target, or a refusal.
+///
+/// The target is `apt:<package>`, and the name inside it must be one Debian would recognise. A
+/// placeholder such as `apt:<package>` is refused here rather than reaching the executor, which is
+/// the same treatment `concrete_process` gives a placeholder process: a proposal that names nothing
+/// concrete is not a proposal to act on something.
+fn concrete_package(target: &str) -> Result<String, ActionError> {
+    let invalid = || ActionError::InvalidTarget(target.to_owned());
+    let package = target.strip_prefix("apt:").ok_or_else(invalid)?;
+    if package.len() < 2 || package.len() > 128 {
+        return Err(invalid());
+    }
+    let mut characters = package.chars();
+    let first = characters.next().ok_or_else(invalid)?;
+    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
+        return Err(invalid());
+    }
+    if !characters.all(|character| {
+        character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '+' | '-' | '.')
+    }) {
+        return Err(invalid());
+    }
+    Ok(package.to_owned())
+}
+
 fn permit_for(
     proposal: &ActionProposal,
     decision: &AuthorizationDecision,
@@ -686,6 +711,12 @@ fn executable_action(
             }
             ExecutableAction::PackageCacheClean
         }
+        Operation::InstallPackage => ExecutableAction::PackageInstall {
+            package: concrete_package(&proposal.target_resource)?,
+        },
+        Operation::UpgradePackage => ExecutableAction::PackageUpgrade {
+            package: concrete_package(&proposal.target_resource)?,
+        },
         Operation::RestartService => ExecutableAction::ServiceRestart {
             unit: concrete_service(&proposal.target_resource)?,
         },
@@ -887,6 +918,68 @@ mod tests {
 
         assert!(matches!(
             core.request("service.restart", UNIT, "  ", OffsetDateTime::UNIX_EPOCH),
+            Err(ActionError::InvalidTarget(_))
+        ));
+    }
+
+    #[test]
+    fn a_package_name_that_is_not_a_package_name_never_reaches_the_executor() {
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        // Each of these is a way of saying something other than "this package": a placeholder, an
+        // option, a version pin, a path. None may become a permit.
+        for target in [
+            "apt:<package>",
+            "apt:--reinstall",
+            "apt:ripgrep=14.0",
+            "apt:../etc/passwd",
+            "ripgrep",
+        ] {
+            let record = core
+                .request(
+                    "package.install",
+                    target,
+                    SEAT,
+                    OffsetDateTime::UNIX_EPOCH,
+                )
+                .expect("a refusal is still a lifecycle record");
+            assert!(
+                record.permit_id.is_none(),
+                "{target} produced a permit to install something"
+            );
+        }
+    }
+
+    #[test]
+    fn installing_is_authorized_by_the_person_who_asked_and_by_nobody_else() {
+        let core = ActionCore::new(StandingPolicy::nothing_pre_authorized());
+        let record = core
+            .request(
+                "package.install",
+                "apt:ripgrep",
+                SEAT,
+                OffsetDateTime::UNIX_EPOCH,
+            )
+            .expect("a lifecycle record");
+        // A person at an authenticated seat asking for it is the confirmation, and the record says
+        // whose seat it was. What is not permitted is anything asking without one.
+        assert!(matches!(
+            record.decision.verdict,
+            AuthorizationVerdict::GrantedOnConfirmation { ref confirmed_by } if confirmed_by == SEAT
+        ));
+        assert!(record.permit_id.is_some());
+        assert_eq!(
+            record.proposal.risk_level,
+            cybou_protocol::action::RiskLevel::High
+        );
+        assert!(!record.proposal.reversible);
+
+        assert!(matches!(
+            core.request(
+                "package.install",
+                "apt:ripgrep",
+                "   ",
+                OffsetDateTime::UNIX_EPOCH
+            ),
             Err(ActionError::InvalidTarget(_))
         ));
     }

@@ -967,6 +967,19 @@ owner is not running is *unavailable* rather than an empty mailbox. Without that
 gateway falls back to its own UID-partitioned SQLite store, which isolates accounts but is not owned
 by them. Mail sending refuses while no real provider exists, rather than inventing a "Sent" item.
 
+## Installing software
+
+`package.install` and `package.upgrade` are typed operations in the closed table, High risk and not
+reversible. Neither relieves a finding, so no conclusion this host reaches can propose one: installing
+software is a decision a person makes while present. The gateway establishes the seat, Action1
+decides, and the executor holds the only adapter — one named package, checked against Debian's naming
+rule where the proposal becomes a typed action and again in the adapter, with `--` ending the
+argument list before the name. Removing and reinstalling have no operation and are refused by name.
+
+The executor's sandbox was relaxed to make this possible: a package manager cannot run under
+`ProtectSystem=full` with a Unix-only address family. It authorizes nothing more than before — every
+apt invocation exists because Action1 issued a permit for one named package.
+
 ## Operation ownership
 
 `cybou-operationd` owns `org.cybou.Runtime.Operation1`, the sole lifecycle authority for long-running

@@ -84,6 +84,10 @@ pub trait Body: Send + Sync {
         pid: u32,
         owner_uid: u32,
     ) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Install one named package from the configured repositories.
+    async fn install_package(&self, package: &str) -> Result<Vec<BodyReading>, ExecutorError>;
+    /// Upgrade one named installed package, and nothing else.
+    async fn upgrade_package(&self, package: &str) -> Result<Vec<BodyReading>, ExecutorError>;
 }
 
 /// Send one typed action to the one adapter that performs it.
@@ -98,6 +102,8 @@ async fn perform(
     match action {
         ExecutableAction::ServiceStatus { unit } => body.service_status(unit).await,
         ExecutableAction::PackageCacheClean => body.clean_package_cache().await,
+        ExecutableAction::PackageInstall { package } => body.install_package(package).await,
+        ExecutableAction::PackageUpgrade { package } => body.upgrade_package(package).await,
         ExecutableAction::ServiceRestart { unit } => body.restart_service(unit).await,
         ExecutableAction::ServiceStart { unit } => body.start_service(unit).await,
         ExecutableAction::ServiceStop { unit } => body.stop_service(unit).await,
@@ -219,6 +225,20 @@ mod tests {
         }
         async fn clean_package_cache(&self) -> Result<Vec<BodyReading>, ExecutorError> {
             self.0.lock().expect("body lock").push("clean".to_owned());
+            Ok(Vec::new())
+        }
+        async fn install_package(&self, package: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("install:{package}"));
+            Ok(Vec::new())
+        }
+        async fn upgrade_package(&self, package: &str) -> Result<Vec<BodyReading>, ExecutorError> {
+            self.0
+                .lock()
+                .expect("body lock")
+                .push(format!("upgrade:{package}"));
             Ok(Vec::new())
         }
         async fn restart_service(&self, unit: &str) -> Result<Vec<BodyReading>, ExecutorError> {

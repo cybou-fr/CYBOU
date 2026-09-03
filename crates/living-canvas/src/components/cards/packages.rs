@@ -48,7 +48,27 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
     let trigger_action = move |name: String, action: PackageActionKind| {
         leptos::task::spawn_local(async move {
             match client.execute_package_action(&name, action).await {
-                Ok(outcome) => {
+                // What comes back is a proposal Action1 recorded, not an installation. The card
+                // says what the decision was, and nothing about software having changed.
+                Ok(record) => {
+                    let outcome = match record.verdict.as_str() {
+                        "granted" => format!(
+                            "{} on {} is authorized; the executor carries it out.",
+                            record.operation, record.target_resource
+                        ),
+                        "requires-confirmation" => format!(
+                            "{} on {} is waiting for your confirmation: {}",
+                            record.operation,
+                            record.target_resource,
+                            record.verdict_reason.clone().unwrap_or_default()
+                        ),
+                        _ => format!(
+                            "{} on {} was refused: {}",
+                            record.operation,
+                            record.target_resource,
+                            record.verdict_reason.clone().unwrap_or_default()
+                        ),
+                    };
                     signals.status_msg.set(Some(outcome));
                     load_packages();
                 }
