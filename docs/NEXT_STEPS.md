@@ -871,6 +871,20 @@ the phase comes from Agent1 rather than a simulated percentage. Completed, stopp
 sessions remain distinct. Cancelling one dispatches the typed Stop call back to Agent1 and publishes
 `Cancelled` only after Agent1 confirms teardown.
 
+**Cancelling is proven from the panel.** The continuity gate now cancels a live agent operation
+through `/api/v1/operations/cancel` and checks the host afterwards: `200`, because Agent1 confirms
+the teardown before answering, a record that says cancelled because something observed it, and a
+capsule that is gone from this machine.
+
+**There is no way for another process to register an operation, and that is the boundary rather than
+an omission.** `Operation1` exposes List, Get, Logs, Cancel and CancellationRequested on the bus, and
+nothing else: `register`, `update`, `append_log` and `reattach` are Rust APIs inside the owner's own
+process, which is why both producers so far are reconcilers living there. Opening a registration
+method would let anything on the session bus invent operations and publish progress about work that
+does not exist — the desktop would show it, and nobody could tell it from the real ones. So a new
+producer either runs inside this owner, or the surface it registers through has to answer who may
+use it first. Until one of those is decided, the reattachment contract stays real and unused.
+
 Reconciliation that finds no semantic change now refreshes observation freshness in memory only, so a
 steady fleet of agents costs no durable writes every two seconds. The durable transactions that do
 run now execute on a blocking worker rather than on the async executor, so a `synchronous=FULL`

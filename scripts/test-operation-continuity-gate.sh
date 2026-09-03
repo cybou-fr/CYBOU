@@ -28,7 +28,10 @@ name_is_owned() {
 name_is_owned org.cybou.Runtime.Agent1 && not_run "Agent1 already owns this session bus"
 name_is_owned org.cybou.Runtime.Operation1 && not_run "Operation1 already owns this session bus"
 
-LEASES=/run/cybou-agent-leases
+# The directory a deployment keeps under /run, or wherever this run can write one. The owner reads
+# the same override, so a proof of it does not need root; nothing deployed sets it.
+LEASES="${CYBOU_AGENT_LEASE_ROOT:-/run/cybou-agent-leases}"
+export CYBOU_AGENT_LEASE_ROOT="$LEASES"
 mkdir -p "$LEASES" 2>/dev/null || not_run "$LEASES cannot be created"
 [ -w "$LEASES" ] || not_run "$LEASES is not writable"
 CAPSULE="$(cat /proc/sys/kernel/random/uuid)"
@@ -52,6 +55,9 @@ cleanup() {
     test -z "$operation_pid" || kill "$operation_pid" 2>/dev/null || true
     test -z "$agent_pid" || kill "$agent_pid" 2>/dev/null || true
     systemctl --user stop "$CAPSULE_UNIT" "$EGRESS_UNIT" 2>/dev/null || true
+    test -z "${SECOND:-}" || systemctl --user stop "cybou-capsule-$SECOND.service" \
+        "cybou-egress-$SECOND.service" 2>/dev/null || true
+    test -z "${SECOND:-}" || rm -f "$LEASES/$SECOND.lease" "$LEASES/$SECOND.env"
     rm -rf "$LEASES/$CAPSULE.lease" "$LEASES/$CAPSULE.env" "$WORK"
 }
 trap cleanup EXIT
@@ -158,6 +164,25 @@ observation_is known || {
     exit 1
 }
 
+# A second session, so one restart can serve both halves of what is left to prove: the first
+# capsule is gone and must detach, and this one is live and must be cancellable from the panel.
+SECOND="$(cat /proc/sys/kernel/random/uuid)"
+SECOND_CAPSULE_UNIT="cybou-capsule-$SECOND.service"
+SECOND_EGRESS_UNIT="cybou-egress-$SECOND.service"
+CYBOU_PROFILE_ID=operation-continuity-gate CYBOU_CAPSULE_ID="$SECOND" CYBOU_AGENT=opencode \
+CYBOU_AGENT_WORKSPACE="$WORK" CYBOU_AGENT_LEASE_SECONDS=600 CYBOU_CAPSULE_MEMORY_MIB=256 \
+CYBOU_CAPSULE_CPUS=1 CYBOU_CAPSULE_TASKS_MAX=32 CYBOU_CAPSULE_MAY_EXECUTE=yes \
+CYBOU_EGRESS_HOSTS=example.com CYBOU_MODEL_CLASS=Strong CYBOU_MODEL_SPEND_LIMIT=100 \
+    cargo run --quiet --locked -p cybou-capsule --example issue-lease -- "$LEASES/$SECOND.lease"
+cat >"$LEASES/$SECOND.env" <<ENV
+CYBOU_AGENT_TASK_ID=$(cat /proc/sys/kernel/random/uuid)
+CYBOU_MODEL_TOKEN_LIMIT=1000
+CYBOU_MODEL_MAX_OUTPUT_TOKENS=32
+CYBOU_MODEL_SENSITIVITY=1
+ENV
+systemd-run --user --quiet --collect --unit="${SECOND_CAPSULE_UNIT%.service}" -- /bin/sleep 600
+systemd-run --user --quiet --collect --unit="${SECOND_EGRESS_UNIT%.service}" -- /bin/sleep 600
+
 kill "$agent_pid"; wait "$agent_pid" 2>/dev/null || true; agent_pid=""
 systemctl --user stop "$CAPSULE_UNIT" "$EGRESS_UNIT" 2>/dev/null || true
 rm -f "$LEASES/$CAPSULE.lease" "$LEASES/$CAPSULE.env"
@@ -173,4 +198,56 @@ observation_is detached || {
     exit 1
 }
 
-echo "=== Operation continuity gate passed: Agent1 identity survived gateway and Operation1 restarts, and a vanished session became detached rather than perpetually running ==="
+# Cancelling from the panel, which is the only thing a person can do to an operation. Agent1 is the
+# executing authority here and confirms the teardown before answering, so this is the confirmed
+# case: `200`, and a record that says cancelled because something observed it, not because somebody
+# asked.
+echo "==> cancelling the live operation the way the panel does"
+for _ in $(seq 1 100); do
+    curl -fsS --max-time 2 "$BASE/api/v1/operations" >"$WORK/list.json" 2>/dev/null || { sleep 0.1; continue; }
+    SECOND_OPERATION="$(python3 - "$WORK/list.json" "$SECOND" <<'PYTHON'
+import json, sys
+matches = [item for item in json.load(open(sys.argv[1]))['operations']
+           if item.get('subject', {}).get('type') == 'agent'
+           and item['subject']['payload'].get('capsule_id') == sys.argv[2]]
+if len(matches) == 1 and matches[0]['cancellable']:
+    print(matches[0]['id'])
+PYTHON
+)" || SECOND_OPERATION=""
+    [ -n "$SECOND_OPERATION" ] && break
+    sleep 0.1
+done
+[ -n "$SECOND_OPERATION" ] || {
+    echo "the second session never became a cancellable operation" >&2
+    cat "$WORK/list.json" >&2
+    exit 1
+}
+
+status="$(curl -sS --max-time 20 -o "$WORK/cancelled.json" -w '%{http_code}' \
+    -X POST "$BASE/api/v1/operations/cancel" \
+    -H 'content-type: application/json' \
+    -d "{\"operationId\":\"$SECOND_OPERATION\"}")"
+[ "$status" = "200" ] || {
+    echo "cancelling an operation Agent1 tears down answered $status, not the confirmed 200" >&2
+    cat "$WORK/cancelled.json" >&2
+    exit 1
+}
+
+curl -fsS --max-time 5 "$BASE/api/v1/operations/$SECOND_OPERATION" >"$WORK/after-cancel.json"
+python3 - "$WORK/after-cancel.json" <<'PYTHON'
+import json, sys
+operation = json.load(open(sys.argv[1]))
+assert operation['state']['status'] == 'cancelled', operation
+assert operation['cancellable'] is False, operation
+assert operation['finishedAt'] is not None, operation
+PYTHON
+
+# And the host agrees: a cancellation that left the capsule running would be the panel saying an
+# ending it did not get.
+systemctl --user is-active --quiet "$SECOND_CAPSULE_UNIT" && {
+    echo "the capsule is still running after its operation was cancelled" >&2
+    exit 1
+}
+echo "    ok      200, the record says cancelled, and the capsule is gone from this host"
+
+echo "=== Operation continuity gate passed: Agent1 identity survived gateway and Operation1 restarts, a vanished session became detached, and a cancellation from the panel reached the host ==="

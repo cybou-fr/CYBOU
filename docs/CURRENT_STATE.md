@@ -1087,6 +1087,12 @@ observation freshness in memory only, so a steady fleet costs no durable writes.
 indeterminate — the phase comes from Agent1 and the percentage stays unknown rather than being drawn
 as zero.
 
+Nothing outside this owner can register an operation. The bus surface is List, Get, Logs, Cancel and
+CancellationRequested; registering, updating and reattaching are in-process APIs, so both producers
+are reconcilers running inside `cybou-operationd`. A registration method would let anything on the
+session bus publish progress about work that does not exist, and the desktop would have no way to
+tell it from the rest.
+
 Action1 is the second: every action past the durable execution boundary is one operation, identified
 by its proposal. A refusal never ran and is published as `Refused` rather than as a failure; an
 attempt whose ending nobody knows keeps its last state and is marked `Detached`; an executing permit
