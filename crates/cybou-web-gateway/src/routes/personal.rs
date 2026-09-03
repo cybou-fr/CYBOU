@@ -37,6 +37,10 @@ pub struct MailQuery {
 }
 
 /// GET `/api/v1/personal/mail`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn get_mail(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -52,6 +56,10 @@ pub async fn get_mail(
 }
 
 /// POST `/api/v1/personal/mail/send`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn send_mail(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -65,6 +73,10 @@ pub async fn send_mail(
 }
 
 /// GET `/api/v1/personal/calendar`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn get_calendar(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -78,6 +90,10 @@ pub async fn get_calendar(
 }
 
 /// POST `/api/v1/personal/calendar/events`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn create_calendar_event(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -91,6 +107,10 @@ pub async fn create_calendar_event(
 }
 
 /// GET `/api/v1/personal/notes`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn get_notes(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -104,6 +124,10 @@ pub async fn get_notes(
 }
 
 /// POST `/api/v1/personal/notes`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn create_note(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -117,6 +141,10 @@ pub async fn create_note(
 }
 
 /// POST `/api/v1/personal/notes/update`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn update_note(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -130,6 +158,10 @@ pub async fn update_note(
 }
 
 /// GET `/api/v1/personal/contacts`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn get_contacts(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -143,6 +175,10 @@ pub async fn get_contacts(
 }
 
 /// POST `/api/v1/personal/contacts`
+///
+/// # Errors
+///
+/// Refuses when no authenticated Linux account is at the request.
 pub async fn create_contact(
     State(state): State<GatewayState>,
     headers: HeaderMap,

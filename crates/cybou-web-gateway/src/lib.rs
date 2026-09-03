@@ -190,6 +190,10 @@ pub fn router_recording_disclosures(
 /// # Panics
 ///
 /// If the sandbox the shell surface runs in cannot be created.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one line per route; the whole HTTP surface of this boundary is meant to be readable               in one place"
+)]
 pub(crate) fn router_in_sandbox(
     presence: Arc<dyn PresenceSource>,
     privileged: Option<Arc<dyn PresenceSource>>,

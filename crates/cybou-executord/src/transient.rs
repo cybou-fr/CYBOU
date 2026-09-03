@@ -128,7 +128,9 @@ pub async fn run(
     let started = tokio::time::timeout(MAX_WAIT, async {
         while let Some(signal) = jobs.next().await {
             let Ok((_id, path, _unit, result)) =
-                signal.body().deserialize::<(u32, zbus::zvariant::OwnedObjectPath, String, String)>()
+                signal
+                    .body()
+                    .deserialize::<(u32, zbus::zvariant::OwnedObjectPath, String, String)>()
             else {
                 continue;
             };
@@ -194,8 +196,7 @@ async fn unit_result(connection: &zbus::Connection, unit: &str) -> Option<String
 /// What the command itself exited with, as distinct from what the job did.
 async fn exit_status(connection: &zbus::Connection, unit: &str) -> Option<i32> {
     let manager = manager_proxy(connection).await.ok()?;
-    let path: zbus::zvariant::OwnedObjectPath =
-        manager.call("GetUnit", &(unit,)).await.ok()?;
+    let path: zbus::zvariant::OwnedObjectPath = manager.call("GetUnit", &(unit,)).await.ok()?;
     let service = Proxy::new(
         connection,
         "org.freedesktop.systemd1",

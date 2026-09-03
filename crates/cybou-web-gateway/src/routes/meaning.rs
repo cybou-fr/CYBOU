@@ -11,6 +11,10 @@ use cybou_web_contracts::{
 use crate::state::{GatewayError, GatewayState};
 
 /// Interpret an utterance into a typed cognitive act and produce a qualified response.
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn interpret_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -25,6 +29,10 @@ pub async fn interpret_handler(
 }
 
 /// Retrieve dialogue memory state.
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn dialogue_memory_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

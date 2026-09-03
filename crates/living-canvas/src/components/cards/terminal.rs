@@ -204,9 +204,25 @@ pub fn TerminalContent(
         }
     };
 
+    // The ticker is held rather than forgotten, and dropped when the card goes. A forgotten
+    // interval outlives the card it measures: it keeps firing at a screen that is no longer on the
+    // page, touching state whose owner has been disposed, and re-opening the card adds another one
+    // beside it. Cancelling on cleanup is what makes closing a card actually stop the work it
+    // started.
+    // The ticker is held rather than forgotten, and dropped when the card goes. A forgotten
+    // interval outlives the card it measures: it keeps firing at a screen that is no longer on the
+    // page, touching state whose owner has been disposed, and re-opening the card adds another one
+    // beside it. Cancelling on cleanup is what makes closing a card actually stop the work it
+    // started. The handle is stored locally because a browser timer belongs to the one thread there
+    // is here and is not `Send`.
+    let ticker = StoredValue::new_local(None);
     Effect::new(move |_| {
-        gloo_timers::callback::Interval::new(RESIZE_INTERVAL_MS, measure).forget();
+        ticker.set_value(Some(gloo_timers::callback::Interval::new(
+            RESIZE_INTERVAL_MS,
+            measure,
+        )));
     });
+    on_cleanup(move || ticker.update_value(|slot| drop(slot.take())));
 
     // Automatically connect when the terminal card is opened.
     Effect::new(move |_| {

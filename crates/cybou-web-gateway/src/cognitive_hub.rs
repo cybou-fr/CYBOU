@@ -61,6 +61,10 @@ impl CognitiveHub {
 
     /// Build a grounded live graph synthesizing real observed host services, processes, and Mind state.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one block per kind of thing the graph is built from; splitting it would scatter                   what each node's provenance is across functions that only make sense together"
+    )]
     pub fn build_grounded_graph(
         &self,
         services: &[ServiceRecord],
@@ -314,7 +318,7 @@ impl CognitiveHub {
         let type_permitted = |node: &CognitiveNodeRecord| {
             permitted.as_ref().is_none_or(|types| {
                 let category = node.node_type.category_name().to_lowercase();
-                types.iter().any(|value| *value == category)
+                types.contains(&category)
             })
         };
 
@@ -381,9 +385,7 @@ impl CognitiveHub {
         // An edge to a node this projection does not contain would draw a relation to nothing.
         let edges: Vec<CognitiveEdgeRecord> = all_edges
             .iter()
-            .filter(|edge| {
-                selected.contains(&edge.source_id) && selected.contains(&edge.target_id)
-            })
+            .filter(|edge| selected.contains(&edge.source_id) && selected.contains(&edge.target_id))
             .cloned()
             .collect();
 
@@ -594,6 +596,9 @@ mod tests {
             .map(|node| node.id.as_str())
             .collect();
         assert_eq!(ids, vec!["node:service:agentd"]);
-        assert_eq!(queried.focus_node_id.as_deref(), Some("node:service:agentd"));
+        assert_eq!(
+            queried.focus_node_id.as_deref(),
+            Some("node:service:agentd")
+        );
     }
 }

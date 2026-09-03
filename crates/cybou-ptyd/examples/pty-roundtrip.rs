@@ -91,7 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(Ok(other)) => return Err(format!("unexpected frame: {other:?}").into()),
             Ok(Err(error)) => return Err(error),
-            Err(_) => continue,
+            // A read that timed out is the loop's own waiting, not an answer; the next turn asks
+            // again until the deadline above gives up.
+            Err(_) => {}
         }
     }
 

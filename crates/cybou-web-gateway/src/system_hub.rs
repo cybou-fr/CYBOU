@@ -71,6 +71,10 @@ impl SystemHub {
     /// verb. They are refused here by name rather than proposed and refused three layers down,
     /// because a refusal that says what is missing is worth more than one that arrives from
     /// somewhere else.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn verb_for(action: ServiceAction) -> Result<&'static str, GatewayError> {
         match action {
             ServiceAction::Restart => Ok("service.restart"),
@@ -129,6 +133,10 @@ impl SystemHub {
     ///
     /// Refuses rather than guesses. A signal aimed at a process whose owner cannot be read is a
     /// signal aimed at something nobody can name.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn signalling_seat_owns(seat: &str, pid: u32) -> Result<u32, GatewayError> {
         let account = seat
             .strip_prefix("linux-account:")
@@ -213,6 +221,10 @@ impl SystemHub {
     }
 
     /// Create a storage snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn create_snapshot(
         &self,
         _subvolume: &str,
@@ -223,6 +235,10 @@ impl SystemHub {
     }
 
     /// Restore a storage snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn restore_snapshot(&self, _snapshot_id: &str) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
@@ -259,6 +275,10 @@ impl SystemHub {
     }
 
     /// Connect to a network.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn connect_network(
         &self,
         _connection_id: &str,
@@ -350,6 +370,10 @@ impl SystemHub {
     }
 
     /// Apply system updates.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn apply_system_updates(
         &self,
         _package_names: Option<Vec<String>>,
@@ -390,6 +414,10 @@ impl SystemHub {
     }
 
     /// Create a new user account.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn create_user(
         &self,
         _username: &str,
@@ -400,6 +428,10 @@ impl SystemHub {
     }
 
     /// Add an authorized SSH key.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn add_ssh_key(
         &self,
         _name: &str,
@@ -409,6 +441,10 @@ impl SystemHub {
     }
 
     /// Delete an authorized SSH key.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn delete_ssh_key(&self, _key_id: &str) -> Result<String, GatewayError> {
         Err(GatewayError::Refused)
     }
@@ -430,6 +466,10 @@ impl SystemHub {
     }
 
     /// Update security policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn update_security_policy(
         &self,
         _req: UpdateSecurityPolicyRequest,
@@ -455,6 +495,10 @@ impl SystemHub {
     }
 
     /// Trigger a backup job.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn trigger_backup(
         &self,
         _comment: Option<String>,
@@ -463,6 +507,10 @@ impl SystemHub {
     }
 
     /// Restore a backup archive.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn restore_archive(
         &self,
         _archive_id: &str,
@@ -472,6 +520,10 @@ impl SystemHub {
     }
 
     /// Update backup schedule.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn update_backup_schedule(
         &self,
         _req: UpdateBackupScheduleRequest,

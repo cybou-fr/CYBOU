@@ -17,6 +17,10 @@ use uuid::Uuid;
 use crate::state::{GatewayError, GatewayState};
 
 /// GET `/api/v1/operations`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn list_operations(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -28,6 +32,10 @@ pub async fn list_operations(
 }
 
 /// GET `/api/v1/operations/{id}`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn get_operation(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -40,6 +48,10 @@ pub async fn get_operation(
 }
 
 /// GET `/api/v1/operations/{id}/logs`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn get_operation_logs(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -52,6 +64,10 @@ pub async fn get_operation_logs(
 }
 
 /// POST `/api/v1/operations/cancel`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn cancel_operation(
     State(state): State<GatewayState>,
     headers: HeaderMap,

@@ -170,7 +170,10 @@ impl PersonalHub {
     }
 
     /// Retrieve email accounts and messages.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn get_mail(
         &self,
         uid: u32,
@@ -203,6 +206,10 @@ impl PersonalHub {
     }
 
     /// Send an email message.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn send_mail(
         &self,
         _uid: u32,
@@ -212,7 +219,10 @@ impl PersonalHub {
     }
 
     /// Retrieve calendar events.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn get_calendar(&self, uid: u32) -> Result<CalendarProjection, GatewayError> {
         Ok(CalendarProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -221,6 +231,10 @@ impl PersonalHub {
     }
 
     /// Create a calendar event.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn create_calendar_event(
         &self,
         uid: u32,
@@ -247,7 +261,10 @@ impl PersonalHub {
     }
 
     /// Retrieve notes.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn get_notes(&self, uid: u32) -> Result<NotesProjection, GatewayError> {
         Ok(NotesProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -256,6 +273,10 @@ impl PersonalHub {
     }
 
     /// Create a new note.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn create_note(
         &self,
         uid: u32,
@@ -283,6 +304,10 @@ impl PersonalHub {
     }
 
     /// Update an existing note.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when the named record does not exist.
     pub fn update_note(
         &self,
         uid: u32,
@@ -306,7 +331,10 @@ impl PersonalHub {
     }
 
     /// Retrieve contacts directory.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn get_contacts(&self, uid: u32) -> Result<ContactsProjection, GatewayError> {
         Ok(ContactsProjection {
             schema_version: WEB_SCHEMA_V1,
@@ -315,6 +343,10 @@ impl PersonalHub {
     }
 
     /// Create a new contact.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the owner gave, unchanged.
     pub fn create_contact(
         &self,
         uid: u32,

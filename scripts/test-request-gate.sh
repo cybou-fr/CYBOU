@@ -22,7 +22,7 @@ set -euo pipefail
 # would be reporting the absence of a Journal as a failure of confirmation.
 if [ -z "${CYBOU_REQUEST_GATE_DBUS:-}" ]; then
     if command -v dbus-run-session >/dev/null 2>&1; then
-        exec env CYBOU_REQUEST_GATE_DBUS=1 dbus-run-session -- "$0" "$@"
+        exec env CYBOU_REQUEST_GATE_DBUS=1 dbus-run-session -- bash "$0" "$@"
     fi
     echo "==> request gate NOT RUN: dbus-run-session is required" >&2
     exit 3

@@ -181,7 +181,7 @@ impl DesktopLayout {
         // Nothing is free: cascade from the top-left of the view by however many cards are already
         // out, so a fourth card does not land exactly under the third. Overlapping deliberately,
         // in view, beats a tidy coordinate nobody can see.
-        let overlap = (taken.len() % 8) as f64 * STEP;
+        let overlap = f64::from(u16::try_from(taken.len() % 8).unwrap_or(0)) * STEP;
         (left + overlap, top + overlap)
     }
 

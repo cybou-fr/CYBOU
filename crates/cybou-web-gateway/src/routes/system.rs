@@ -25,6 +25,10 @@ use cybou_web_contracts::{
 use crate::state::{GatewayError, GatewayState};
 
 /// GET `/api/v1/system/services`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat, and reports unavailable when the owner cannot be read.
 pub async fn list_services(
     State(state): State<GatewayState>,
 ) -> Result<Json<ServicesListProjection>, GatewayError> {
@@ -32,6 +36,10 @@ pub async fn list_services(
 }
 
 /// POST `/api/v1/system/services/action`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat, and reports unavailable when the owner cannot be read.
 pub async fn execute_service_action(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -54,6 +62,10 @@ pub async fn execute_service_action(
 }
 
 /// GET `/api/v1/system/processes`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat, and reports unavailable when the owner cannot be read.
 pub async fn list_processes(
     State(state): State<GatewayState>,
 ) -> Result<Json<ProcessesListProjection>, GatewayError> {
@@ -66,6 +78,10 @@ pub async fn list_processes(
 /// of it that only the gateway can do: establish who is asking, and that the process they named is
 /// theirs. Everything after that — whether the verb exists, what it costs, whether a permit
 /// follows — belongs to `Action1` (ADR-0048).
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat, and reports unavailable when the owner cannot be read.
 pub async fn send_process_signal(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -90,6 +106,10 @@ pub async fn send_process_signal(
 }
 
 /// GET `/api/v1/system/monitor`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_system_monitor(
     State(state): State<GatewayState>,
 ) -> Result<Json<SystemMonitorProjection>, GatewayError> {
@@ -97,6 +117,10 @@ pub async fn get_system_monitor(
 }
 
 /// GET `/api/v1/system/logs`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_system_logs(
     State(state): State<GatewayState>,
     Query(query): Query<SystemLogsQueryRequest>,
@@ -105,6 +129,10 @@ pub async fn get_system_logs(
 }
 
 /// GET `/api/v1/system/storage`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_storage(
     State(state): State<GatewayState>,
 ) -> Result<Json<StorageProjection>, GatewayError> {
@@ -112,6 +140,10 @@ pub async fn get_storage(
 }
 
 /// POST `/api/v1/system/storage/snapshots`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn create_snapshot(
     State(state): State<GatewayState>,
     Json(request): Json<CreateSnapshotRequest>,
@@ -124,6 +156,10 @@ pub async fn create_snapshot(
 }
 
 /// POST `/api/v1/system/storage/restore`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn restore_snapshot(
     State(state): State<GatewayState>,
     Json(request): Json<RestoreSnapshotRequest>,
@@ -133,6 +169,10 @@ pub async fn restore_snapshot(
 }
 
 /// GET `/api/v1/system/network`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_network(
     State(state): State<GatewayState>,
 ) -> Result<Json<NetworkProjection>, GatewayError> {
@@ -140,6 +180,10 @@ pub async fn get_network(
 }
 
 /// POST `/api/v1/system/network/connect`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn connect_network(
     State(state): State<GatewayState>,
     Json(request): Json<NetworkConnectRequest>,
@@ -151,6 +195,10 @@ pub async fn connect_network(
 }
 
 /// GET `/api/v1/system/packages`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat, and reports unavailable when the owner cannot be read.
 pub async fn get_packages(
     State(state): State<GatewayState>,
 ) -> Result<Json<PackagesProjection>, GatewayError> {
@@ -163,6 +211,10 @@ pub async fn get_packages(
 /// one part only the gateway can do: establish who is asking. Whether the verb exists, what it
 /// costs, whether a person must confirm it and whether a permit follows all belong to `Action1`
 /// (ADR-0048). Nothing here installs anything.
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat, and reports unavailable when the owner cannot be read.
 pub async fn execute_package_action(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -182,6 +234,10 @@ pub async fn execute_package_action(
 }
 
 /// GET `/api/v1/system/updates`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_system_updates(
     State(state): State<GatewayState>,
 ) -> Result<Json<SystemUpdatesProjection>, GatewayError> {
@@ -189,6 +245,10 @@ pub async fn get_system_updates(
 }
 
 /// POST `/api/v1/system/updates/apply`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn apply_system_updates(
     State(state): State<GatewayState>,
     Json(request): Json<ApplyUpdatesRequest>,
@@ -198,6 +258,10 @@ pub async fn apply_system_updates(
 }
 
 /// GET `/api/v1/system/users`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_users_settings(
     State(state): State<GatewayState>,
 ) -> Result<Json<UsersSettingsProjection>, GatewayError> {
@@ -205,6 +269,10 @@ pub async fn get_users_settings(
 }
 
 /// POST `/api/v1/system/users`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn create_user(
     State(state): State<GatewayState>,
     Json(request): Json<CreateUserRequest>,
@@ -217,6 +285,10 @@ pub async fn create_user(
 }
 
 /// POST `/api/v1/system/users/ssh-keys`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn add_ssh_key(
     State(state): State<GatewayState>,
     Json(request): Json<AddSshKeyRequest>,
@@ -228,6 +300,10 @@ pub async fn add_ssh_key(
 }
 
 /// POST `/api/v1/system/users/ssh-keys/delete`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn delete_ssh_key(
     State(state): State<GatewayState>,
     Json(request): Json<DeleteSshKeyRequest>,
@@ -237,6 +313,10 @@ pub async fn delete_ssh_key(
 }
 
 /// GET `/api/v1/system/security`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_security_settings(
     State(state): State<GatewayState>,
 ) -> Result<Json<SecuritySettingsProjection>, GatewayError> {
@@ -244,6 +324,10 @@ pub async fn get_security_settings(
 }
 
 /// POST `/api/v1/system/security/policy`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn update_security_policy(
     State(state): State<GatewayState>,
     Json(request): Json<UpdateSecurityPolicyRequest>,
@@ -253,6 +337,10 @@ pub async fn update_security_policy(
 }
 
 /// GET `/api/v1/system/backup`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_backup_settings(
     State(state): State<GatewayState>,
 ) -> Result<Json<BackupSettingsProjection>, GatewayError> {
@@ -260,6 +348,10 @@ pub async fn get_backup_settings(
 }
 
 /// POST `/api/v1/system/backup/trigger`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn trigger_backup(
     State(state): State<GatewayState>,
     Json(request): Json<TriggerBackupRequest>,
@@ -269,6 +361,10 @@ pub async fn trigger_backup(
 }
 
 /// POST `/api/v1/system/backup/restore`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn restore_archive(
     State(state): State<GatewayState>,
     Json(request): Json<RestoreArchiveRequest>,
@@ -280,6 +376,10 @@ pub async fn restore_archive(
 }
 
 /// POST `/api/v1/system/backup/schedule`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn update_backup_schedule(
     State(state): State<GatewayState>,
     Json(request): Json<UpdateBackupScheduleRequest>,
@@ -295,6 +395,10 @@ mod tests {
     use cybou_web_contracts::{UpdateBackupScheduleRequest, UpdateSecurityPolicyRequest};
 
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one surface per block; the point of the test is that every one of them is here"
+    )]
     fn system_hub_manages_services_and_processes() {
         let hub = SystemHub::new();
         let svcs = hub.list_services();
@@ -417,7 +521,12 @@ mod tests {
             // Every account is a person's, and no account's lock state is claimed from an
             // unprivileged read.
             assert!(users.users.iter().all(|account| account.uid >= 1000));
-            assert!(users.users.iter().all(|account| account.is_locked.is_none()));
+            assert!(
+                users
+                    .users
+                    .iter()
+                    .all(|account| account.is_locked.is_none())
+            );
         }
         // Authorized keys belong to the account that holds them; this gateway reads none.
         assert!(users.ssh_keys.is_empty());

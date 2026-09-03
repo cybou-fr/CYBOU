@@ -190,7 +190,8 @@ mod tests {
 
     #[tokio::test]
     async fn an_absent_owner_is_unavailable_rather_than_an_empty_mailbox() {
-        let directory = std::env::temp_dir().join(format!("cybou_personal_{}", uuid::Uuid::new_v4()));
+        let directory =
+            std::env::temp_dir().join(format!("cybou_personal_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&directory).expect("directory");
         let client = SocketPersonal::in_directory(&directory);
         assert!(matches!(

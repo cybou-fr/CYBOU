@@ -1775,8 +1775,17 @@ impl ToolCardStates {
     }
 
     /// Forget everything a card had done, because the card itself is gone.
+    ///
+    /// Every map of card state belongs here. One that does not is a card whose contents outlive the
+    /// person closing it — a terminal that comes back still saying `Connected`, a mail panel that
+    /// still holds what was in it. `scripts/validate-card-release.py` refuses a field that this
+    /// method does not release, because the way this goes wrong is a new card kind being added and
+    /// this one method being the place nobody thought to change.
     pub fn forget(&self, card: CardId) {
         self.shells.update_value(|held| {
+            held.remove(&card);
+        });
+        self.terminals.update_value(|held| {
             held.remove(&card);
         });
         self.file_managers.update_value(|held| {
@@ -1789,6 +1798,63 @@ impl ToolCardStates {
             held.remove(&card);
         });
         self.inspectors.update_value(|held| {
+            held.remove(&card);
+        });
+        self.operations.update_value(|held| {
+            held.remove(&card);
+        });
+        self.notifications.update_value(|held| {
+            held.remove(&card);
+        });
+        self.services.update_value(|held| {
+            held.remove(&card);
+        });
+        self.processes.update_value(|held| {
+            held.remove(&card);
+        });
+        self.monitors.update_value(|held| {
+            held.remove(&card);
+        });
+        self.system_logs.update_value(|held| {
+            held.remove(&card);
+        });
+        self.storage.update_value(|held| {
+            held.remove(&card);
+        });
+        self.networks.update_value(|held| {
+            held.remove(&card);
+        });
+        self.packages.update_value(|held| {
+            held.remove(&card);
+        });
+        self.updates.update_value(|held| {
+            held.remove(&card);
+        });
+        self.user_settings.update_value(|held| {
+            held.remove(&card);
+        });
+        self.security.update_value(|held| {
+            held.remove(&card);
+        });
+        self.backups.update_value(|held| {
+            held.remove(&card);
+        });
+        self.mails.update_value(|held| {
+            held.remove(&card);
+        });
+        self.calendars.update_value(|held| {
+            held.remove(&card);
+        });
+        self.notes.update_value(|held| {
+            held.remove(&card);
+        });
+        self.contacts.update_value(|held| {
+            held.remove(&card);
+        });
+        self.cognitive_graphs.update_value(|held| {
+            held.remove(&card);
+        });
+        self.event_journals.update_value(|held| {
             held.remove(&card);
         });
         self.meanings.update_value(|held| {
@@ -1996,6 +2062,62 @@ mod tests {
     use super::*;
     use cybou_protocol::LocationRef;
     use cybou_web_contracts::UserDraftProjection;
+
+    /// Closing a card must leave nothing of it behind, whatever kind of card it was.
+    ///
+    /// The browser gate proves it for a terminal, which is where the defect was found. This proves
+    /// it for the kinds that hold a person's own content, because those are the ones where state
+    /// surviving a close is more than a wrong label.
+    #[test]
+    fn closing_a_card_releases_every_kind_of_state_it_held() {
+        let owner = Owner::new();
+        owner.set();
+        let states = ToolCardStates::new();
+
+        // One card of each kind that holds either a claim about the host or a person's own content.
+        states
+            .terminal(CardId::Terminal(0))
+            .status
+            .set("Connected".into());
+        states
+            .notes(CardId::Notes(0))
+            .status_msg
+            .set(Some("a private note was open".into()));
+        states
+            .mail(CardId::Mail(0))
+            .status_msg
+            .set(Some("a mailbox was open".into()));
+        states
+            .operations(CardId::Operations(0))
+            .status_msg
+            .set(Some("an operation was being watched".into()));
+
+        states.forget(CardId::Terminal(0));
+        states.forget(CardId::Notes(0));
+        states.forget(CardId::Mail(0));
+        states.forget(CardId::Operations(0));
+
+        // What comes back is a fresh card, not the one that was closed still saying what it said.
+        assert_eq!(
+            states.terminal(CardId::Terminal(0)).status.get_untracked(),
+            "Not connected"
+        );
+        assert_eq!(
+            states.notes(CardId::Notes(0)).status_msg.get_untracked(),
+            None
+        );
+        assert_eq!(
+            states.mail(CardId::Mail(0)).status_msg.get_untracked(),
+            None
+        );
+        assert_eq!(
+            states
+                .operations(CardId::Operations(0))
+                .status_msg
+                .get_untracked(),
+            None
+        );
+    }
 
     #[test]
     fn recovered_file_buffer_stays_dirty_until_a_verified_save() {

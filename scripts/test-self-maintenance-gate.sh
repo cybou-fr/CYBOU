@@ -35,7 +35,7 @@ systemctl show --property=Version --value >/dev/null 2>&1 || not_run "systemd is
 if [ -z "${CYBOU_SELF_MAINTENANCE_SESSION:-}" ]; then
     command -v dbus-run-session >/dev/null 2>&1 ||
         not_run "dbus-run-session is needed for the telemetry organ's bus"
-    exec env CYBOU_SELF_MAINTENANCE_SESSION=1 dbus-run-session -- "$0" "$@"
+    exec env CYBOU_SELF_MAINTENANCE_SESSION=1 dbus-run-session -- bash "$0" "$@"
 fi
 
 UNIT_NAME=cybou-self-maintenance-gate.service

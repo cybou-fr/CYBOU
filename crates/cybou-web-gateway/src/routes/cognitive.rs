@@ -37,6 +37,10 @@ pub struct JournalQuery {
 }
 
 /// GET `/api/v1/cognitive/graph`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_cognitive_graph(
     State(state): State<GatewayState>,
     Query(query): Query<GraphQuery>,
@@ -54,6 +58,10 @@ pub async fn get_cognitive_graph(
 }
 
 /// POST `/api/v1/cognitive/query`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn query_cognitive_graph(
     State(state): State<GatewayState>,
     Json(request): Json<CognitiveQueryRequest>,
@@ -103,6 +111,10 @@ pub async fn query_cognitive_graph(
 }
 
 /// GET `/api/v1/cognitive/journal`
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn get_event_journal(
     State(state): State<GatewayState>,
     Query(query): Query<JournalQuery>,
@@ -111,7 +123,9 @@ pub async fn get_event_journal(
     let journal = &mind.journal;
     let total_count = journal
         .contribution_count
-        .map_or(journal.recent.len(), |count| count as usize);
+        .map_or(journal.recent.len(), |count| {
+            usize::try_from(count).unwrap_or(usize::MAX)
+        });
     let entries = journal
         .recent
         .iter()

@@ -21,10 +21,10 @@ use crate::learning_hub::LearningError;
 use crate::state::GatewayState;
 
 fn mutation_error(
-    error: LearningError,
+    error: &LearningError,
     not_found: &'static str,
 ) -> (StatusCode, Json<crate::state::ErrorBody>) {
-    let (status, code, retryable) = match error {
+    let (status, code, retryable) = match *error {
         LearningError::NotFound => (StatusCode::NOT_FOUND, not_found, false),
         LearningError::EvidenceUnavailable => (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -55,6 +55,10 @@ pub struct CandidateFilterQuery {
 }
 
 /// Retrieve learning candidates.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind.
 pub async fn get_candidates_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -79,6 +83,10 @@ pub async fn get_candidates_handler(
 }
 
 /// Propose a new learning candidate.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind, and reports not found when the named record does not exist.
 pub async fn propose_candidate_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -97,7 +105,7 @@ pub async fn propose_candidate_handler(
     let candidate = state
         .learning
         .propose_candidate(request)
-        .map_err(|error| mutation_error(error, "candidateNotFound"))?;
+        .map_err(|error| mutation_error(&error, "candidateNotFound"))?;
     Ok((StatusCode::CREATED, Json(candidate)))
 }
 
@@ -106,6 +114,10 @@ pub async fn propose_candidate_handler(
 /// The evidence is read from Action1 at evaluation time. When that owner cannot be read the
 /// evaluation refuses with `503`: promoting against evidence nobody can currently produce would be
 /// a durable claim resting on a memory.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind, and reports not found when the named record does not exist.
 pub async fn evaluate_candidate_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -121,11 +133,15 @@ pub async fn evaluate_candidate_handler(
         .evaluate_candidate(candidate_id, records.as_deref())
     {
         Ok(projection) => Ok(Json(projection)),
-        Err(error) => Err(mutation_error(error, "candidateNotFound")),
+        Err(error) => Err(mutation_error(&error, "candidateNotFound")),
     }
 }
 
 /// Retrieve promoted durable artifacts and lineages.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind, and reports not found when the named record does not exist.
 pub async fn get_artifacts_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -139,6 +155,10 @@ pub async fn get_artifacts_handler(
 }
 
 /// Revoke or deprecate a promoted artifact.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind, and reports not found when the named record does not exist.
 pub async fn revoke_artifact_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -154,12 +174,16 @@ pub async fn revoke_artifact_handler(
 
     state
         .learning
-        .revoke_artifact(req)
-        .map_err(|error| mutation_error(error, "artifactNotFound"))?;
+        .revoke_artifact(&req)
+        .map_err(|error| mutation_error(&error, "artifactNotFound"))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Retrieve active task scopes and capability grants.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind.
 pub async fn get_governance_scopes_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

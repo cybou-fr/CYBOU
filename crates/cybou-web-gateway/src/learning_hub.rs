@@ -134,6 +134,10 @@ impl LearningHub {
     }
 
     /// Propose candidate content; evidence is owner-resolved during evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the durable store rejects the change.
     pub fn propose_candidate(
         &self,
         request: ProposeLearningCandidateRequest,
@@ -200,6 +204,11 @@ impl LearningHub {
     ///
     /// `records` is what Action1 currently establishes; `None` means Action1 could not be read, and
     /// evaluation refuses rather than promoting against whatever was resolved last time.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when no candidate carries that identity, stops when Action1 cannot be read,
+    /// and fails when the durable store rejects the change.
     pub fn evaluate_candidate(
         &self,
         candidate_id: Uuid,
@@ -219,10 +228,8 @@ impl LearningHub {
         // Demonstrations are derived from the canonical record, not accumulated here, so evidence
         // that Action1 no longer establishes stops supporting a promotion.
         let outcomes = Self::demonstrations_in(&next.candidates[position], records);
-        next.demonstrations
-            .retain(|(id, _)| *id != candidate_id);
-        next.demonstrations
-            .push((candidate_id, outcomes.clone()));
+        next.demonstrations.retain(|(id, _)| *id != candidate_id);
+        next.demonstrations.push((candidate_id, outcomes.clone()));
         let candidate = &mut next.candidates[position];
         candidate.source_evidence = outcomes.iter().map(|v| v.episode).collect();
         candidate.source_evidence.sort_unstable();
@@ -287,7 +294,12 @@ impl LearningHub {
     }
 
     /// Revoke an artifact, committing disk before visible memory.
-    pub fn revoke_artifact(&self, request: RevokeArtifactRequest) -> Result<(), LearningError> {
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when no artifact carries that identity, and fails when the durable store
+    /// rejects the change — in which case nothing in memory changed either.
+    pub fn revoke_artifact(&self, request: &RevokeArtifactRequest) -> Result<(), LearningError> {
         let mut current = self
             .store
             .lock()

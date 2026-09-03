@@ -15,6 +15,10 @@ use cybou_web_contracts::{
 use crate::state::{GatewayError, GatewayState};
 
 /// GET `/api/v1/notifications`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn list_notifications(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -26,6 +30,10 @@ pub async fn list_notifications(
 }
 
 /// POST `/api/v1/notifications/dismiss`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn dismiss_notifications(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -41,6 +49,10 @@ pub async fn dismiss_notifications(
 }
 
 /// POST `/api/v1/notifications/action`
+///
+/// # Errors
+///
+/// Refuses when the request holds no authenticated seat.
 pub async fn execute_notification_action(
     State(state): State<GatewayState>,
     headers: HeaderMap,

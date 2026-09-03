@@ -298,6 +298,10 @@ async fn stop(capsule_id: &str) -> Result<bool, String> {
 }
 
 /// Ask the owner to perform an action (Freeze, Resume, Quarantine, Stop) on a live capsule.
+///
+/// # Errors
+///
+/// Reports the owner unavailable when it cannot be read.
 pub async fn capsule_action_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -336,6 +340,10 @@ pub async fn capsule_action_handler(
 }
 
 /// Retrieve live telemetry for an active capsule.
+///
+/// # Errors
+///
+/// Refuses when the request may not read Mind, and reports unavailable when the owner cannot be read.
 pub async fn capsule_telemetry_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

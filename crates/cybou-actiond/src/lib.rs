@@ -674,7 +674,9 @@ fn concrete_package(target: &str) -> Result<String, ActionError> {
         return Err(invalid());
     }
     if !characters.all(|character| {
-        character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '+' | '-' | '.')
+        character.is_ascii_lowercase()
+            || character.is_ascii_digit()
+            || matches!(character, '+' | '-' | '.')
     }) {
         return Err(invalid());
     }
@@ -935,12 +937,7 @@ mod tests {
             "ripgrep",
         ] {
             let record = core
-                .request(
-                    "package.install",
-                    target,
-                    SEAT,
-                    OffsetDateTime::UNIX_EPOCH,
-                )
+                .request("package.install", target, SEAT, OffsetDateTime::UNIX_EPOCH)
                 .expect("a refusal is still a lifecycle record");
             assert!(
                 record.permit_id.is_none(),

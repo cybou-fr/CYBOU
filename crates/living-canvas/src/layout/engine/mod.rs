@@ -274,7 +274,9 @@ impl DesktopLayout {
         {
             return base;
         }
-        (2..)
+        // Bounded: a desktop cannot hold more anchors than this, so the search ends even if every
+        // name below the bound is taken.
+        (2..=1_000_u32)
             .map(|nth| format!("{base} {nth}"))
             .find(|candidate| {
                 !self

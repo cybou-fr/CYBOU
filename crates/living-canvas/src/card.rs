@@ -376,6 +376,10 @@ impl CardId {
 
     /// Return static specification for this card type.
     #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::match_same_arms,
+        reason = "each card's size is its own decision; two of them coming out the same is a                   coincidence of numbers, and merging the arms would make the next change to one                   silently change the other"
+    )]
     #[must_use]
     pub const fn spec(self) -> CardSpec {
         match self {

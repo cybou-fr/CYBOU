@@ -40,6 +40,10 @@ impl NotificationsHub {
     ///
     /// Operator notices are about the host and reach every authenticated seat; everything else
     /// belongs to one principal and is invisible to the others.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the in-process notification lock is poisoned, which means another thread failed while holding it.
     #[must_use]
     pub fn list(&self, principal: &str) -> NotificationsListProjection {
         let items: Vec<NotificationItem> = self
@@ -64,6 +68,10 @@ impl NotificationsHub {
     }
 
     /// Push a new notification item.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the in-process notification lock is poisoned, which means another thread failed while holding it.
     pub fn push(&self, item: NotificationItem) {
         let mut items = self.items.write().expect("write notifications");
         items.insert(0, item);
@@ -76,6 +84,10 @@ impl NotificationsHub {
     ///
     /// "All" means all of theirs. Dismissing never reaches another principal's notification, and
     /// naming one that is not theirs changes nothing.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the in-process notification lock is poisoned, which means another thread failed while holding it.
     pub fn dismiss(&self, principal: &str, id: Option<Uuid>, dismiss_all: bool) {
         let mut items = self.items.write().expect("write notifications");
         if dismiss_all {
@@ -97,6 +109,10 @@ impl NotificationsHub {
     }
 
     /// Mark one of this principal's own notifications as read.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the in-process notification lock is poisoned, which means another thread failed while holding it.
     pub fn mark_read(&self, principal: &str, id: Uuid) {
         let mut items = self.items.write().expect("write notifications");
         if let Some(item) = items
@@ -108,6 +124,14 @@ impl NotificationsHub {
     }
 
     /// Execute a notification action.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the in-process notification lock is poisoned, which means another thread failed while holding it.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when the named record does not exist.
     pub async fn execute_action(
         &self,
         operations: &OperationsHub,
@@ -134,8 +158,10 @@ impl NotificationsHub {
         };
 
         match action.kind {
-            NotificationActionKind::ApproveProposal { .. } => Err(GatewayError::Refused),
-            NotificationActionKind::RejectProposal { .. } => Err(GatewayError::Refused),
+            // Answering a proposal is Action1's, and it needs the seat and the decision the
+            // person was shown; a notification carries neither.
+            NotificationActionKind::ApproveProposal { .. }
+            | NotificationActionKind::RejectProposal { .. } => Err(GatewayError::Refused),
             NotificationActionKind::Dismiss => {
                 self.dismiss(principal, Some(id), false);
                 Ok("Notification dismissed".to_owned())

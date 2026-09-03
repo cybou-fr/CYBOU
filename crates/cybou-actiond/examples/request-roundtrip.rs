@@ -105,6 +105,10 @@ async fn settles_at(unit: &Proxy<'_>, expected: &str) -> Result<(), Box<dyn std:
 }
 
 #[tokio::main]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one request carried end to end; the steps are the proof and splitting them would hide the order they must happen in"
+)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session = if std::env::var_os("CYBOU_ACTION_SYSTEM_BUS").is_some() {
         zbus::Connection::system().await?

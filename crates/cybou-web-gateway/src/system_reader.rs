@@ -42,7 +42,8 @@ pub fn read_real_monitor() -> SystemMonitorProjection {
         let total_cpu_percent = if cores.is_empty() {
             0.0f32
         } else {
-            cores.iter().map(|c| c.usage_percent).sum::<f32>() / cores.len() as f32
+            let count = u16::try_from(cores.len()).unwrap_or(u16::MAX);
+            cores.iter().map(|c| c.usage_percent).sum::<f32>() / f32::from(count)
         };
 
         let disk_partitions = read_disk_partitions();
@@ -107,7 +108,8 @@ pub fn read_real_processes() -> ProcessesListProjection {
             }
         }
 
-        processes.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes));
+        // Largest first, so a truncated list is the part of the answer that matters.
+        processes.sort_by_key(|process| std::cmp::Reverse(process.memory_bytes));
 
         let total_cpu = processes.iter().map(|p| p.cpu_percent).sum();
         let total_mem = processes.iter().map(|p| p.memory_bytes).sum();
@@ -386,6 +388,10 @@ fn journal_text(value: &serde_json::Value) -> Option<String> {
 
 /// Reads real status of Cybou systemd services.
 #[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the declared unit table and the read of each unit belong next to each other; a               reader has to see which units this host claims to know about"
+)]
 pub fn read_real_services() -> ServicesListProjection {
     let known_services = [
         (
@@ -557,7 +563,20 @@ fn read_uptime_seconds() -> u64 {
         && let Some(first) = content.split_whitespace().next()
         && let Ok(secs) = first.parse::<f64>()
     {
-        return secs as u64;
+        // Uptime is never negative and never larger than this host has been on for; a reading
+        // that is either is not an uptime, and zero says so.
+        // Uptime is never negative and never longer than this host has been on for. A reading
+        // that is neither is not an uptime, and zero says so rather than a number nothing measured.
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "guarded above: finite, non-negative, and below the seconds this host could                       plausibly have been running"
+        )]
+        return if secs.is_finite() && (0.0..1.0e18).contains(&secs) {
+            secs.trunc() as u64
+        } else {
+            0
+        };
     }
     0
 }
@@ -631,8 +650,15 @@ fn read_cpu_cores() -> Vec<CpuCoreStat> {
                     let idle: u64 = parts[4].parse().unwrap_or(0);
                     let total = user + nice + system + idle;
                     let busy = user + nice + system;
+                    // Jiffies since boot exceed what an f32 counts exactly, and a percentage does
+                    // not need that precision: the ratio is taken in f64 and narrowed once.
+                    #[expect(
+                        clippy::cast_precision_loss,
+                        clippy::cast_possible_truncation,
+                        reason = "a percentage, not a count: the digits lost are below what any                                   reader of a CPU figure can act on"
+                    )]
                     let usage_percent = if total > 0 {
-                        (busy as f32 / total as f32) * 100.0
+                        ((busy as f64 / total as f64) * 100.0) as f32
                     } else {
                         0.0
                     };
@@ -786,7 +812,7 @@ fn read_single_process(pid: u32, users_map: &HashMap<u32, String>) -> Option<Pro
     }
     .to_owned();
 
-    let ppid = stat_parts[3].parse::<u32>().unwrap_or(0);
+    let parent_pid = stat_parts[3].parse::<u32>().unwrap_or(0);
     let threads = stat_parts[19].parse::<u32>().unwrap_or(1);
     let rss_pages = stat_parts[23].parse::<u64>().unwrap_or(0);
     let memory_bytes = rss_pages * 4096;
@@ -821,7 +847,7 @@ fn read_single_process(pid: u32, users_map: &HashMap<u32, String>) -> Option<Pro
 
     Some(ProcessRecord {
         pid,
-        ppid,
+        ppid: parent_pid,
         name: raw_name,
         cmdline: display_cmd,
         user,
@@ -1201,7 +1227,7 @@ fn parse_accounts(passwd: &str, group: &str) -> Vec<UserAccountRecord> {
         let Ok(uid) = uid.parse::<u32>() else {
             continue;
         };
-        if uid < FIRST_HUMAN_UID || uid >= NOBODY_UID {
+        if !(FIRST_HUMAN_UID..NOBODY_UID).contains(&uid) {
             continue;
         }
         let mut groups = memberships.get(*username).cloned().unwrap_or_default();

@@ -183,7 +183,10 @@ mod scope_tests {
 
     #[test]
     fn a_scope_matches_whole_segments_and_exact_targets() {
-        assert!(candidate("service.restart").scope_admits("service.restart", "systemd:demo-api.service"));
+        assert!(
+            candidate("service.restart")
+                .scope_admits("service.restart", "systemd:demo-api.service")
+        );
         assert!(candidate("service").scope_admits("service.restart", "systemd:demo-api.service"));
         assert!(
             candidate("systemd:demo-api.service")

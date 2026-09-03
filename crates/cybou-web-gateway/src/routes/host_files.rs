@@ -126,6 +126,10 @@ pub async fn read_host_file_handler(
 }
 
 /// Conditionally write an existing host file.
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn write_host_file_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -158,6 +162,10 @@ pub async fn write_host_file_handler(
 }
 
 /// Create a new file in the user's home authority domain.
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn create_host_file_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -184,6 +192,10 @@ pub async fn create_host_file_handler(
 }
 
 /// Create a directory in the user's home authority domain.
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn create_host_directory_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -207,6 +219,10 @@ pub async fn create_host_directory_handler(
 }
 
 /// Rename or move a path in the user's home authority domain.
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn rename_host_path_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -230,6 +246,10 @@ pub async fn rename_host_path_handler(
 }
 
 /// Delete a path in the user's home authority domain.
+///
+/// # Errors
+///
+/// Returns the refusal the owner gave, unchanged.
 pub async fn delete_host_path_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,
@@ -253,6 +273,10 @@ pub async fn delete_host_path_handler(
 }
 
 /// Copy a path in the user's home authority domain.
+///
+/// # Errors
+///
+/// Reports the owner unavailable when it cannot be read.
 pub async fn copy_host_path_handler(
     State(state): State<GatewayState>,
     headers: HeaderMap,

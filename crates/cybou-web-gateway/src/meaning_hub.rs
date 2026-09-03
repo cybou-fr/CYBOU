@@ -27,6 +27,10 @@ impl MeaningHub {
     }
 
     /// Ask Meaning1 to interpret, record, plan and realize an utterance.
+    ///
+    /// # Errors
+    ///
+    /// Reports the owner unavailable when it cannot be read.
     pub async fn process_utterance(
         &self,
         request: &MeaningInterpretRequest,
@@ -55,12 +59,12 @@ impl MeaningHub {
             }
             let response: MeaningResponse = ciborium::from_reader(encoded.as_slice())
                 .map_err(|_| GatewayError::InvalidProjection)?;
-            return Ok(MeaningInterpretProjection {
+            Ok(MeaningInterpretProjection {
                 schema_version: WEB_SCHEMA_V1,
                 interpretation: response.interpretation,
                 response_plan: Some(response.response_plan),
                 realization: Some(response.realization),
-            });
+            })
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -70,6 +74,10 @@ impl MeaningHub {
     }
 
     /// Ask Meaning1 for the bounded dialogue state it owns.
+    ///
+    /// # Errors
+    ///
+    /// Reports the owner unavailable when it cannot be read.
     pub async fn dialogue_memory(
         &self,
         source: &str,
@@ -93,12 +101,12 @@ impl MeaningHub {
                 .map_err(|_| GatewayError::InvalidProjection)?;
             let memory: DialogueMemory = ciborium::from_reader(encoded.as_slice())
                 .map_err(|_| GatewayError::InvalidProjection)?;
-            return Ok(DialogueMemoryProjection {
+            Ok(DialogueMemoryProjection {
                 schema_version: WEB_SCHEMA_V1,
                 current_turn: memory.current_turn,
                 remembered_referents: memory.remembered_referents,
                 turns_bound: memory.turns_bound,
-            });
+            })
         }
         #[cfg(not(target_os = "linux"))]
         {

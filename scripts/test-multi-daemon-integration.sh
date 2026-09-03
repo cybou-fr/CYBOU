@@ -13,7 +13,7 @@ set -euo pipefail
 
 if [ -z "${CYBOU_TEST_DBUS_SESSION:-}" ]; then
     if command -v dbus-run-session >/dev/null 2>&1; then
-        exec env CYBOU_TEST_DBUS_SESSION=1 dbus-run-session -- "$0" "$@"
+        exec env CYBOU_TEST_DBUS_SESSION=1 dbus-run-session -- bash "$0" "$@"
     fi
     if [ "$(uname -s)" = "Linux" ]; then
         echo "ERROR: dbus-run-session not found; install dbus-daemon before running this gate." >&2

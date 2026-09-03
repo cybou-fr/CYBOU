@@ -433,9 +433,11 @@ fn valid_package_name(package: &str) -> Result<String, ExecutorError> {
     if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
         return Err(refused());
     }
-    if !characters
-        .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '+' | '-' | '.'))
-    {
+    if !characters.all(|character| {
+        character.is_ascii_lowercase()
+            || character.is_ascii_digit()
+            || matches!(character, '+' | '-' | '.')
+    }) {
         return Err(refused());
     }
     Ok(package.to_owned())
@@ -447,7 +449,10 @@ mod package_name_tests {
 
     #[test]
     fn a_package_name_is_a_package_name_and_never_an_argument() {
-        assert_eq!(valid_package_name("ripgrep").as_deref().ok(), Some("ripgrep"));
+        assert_eq!(
+            valid_package_name("ripgrep").as_deref().ok(),
+            Some("ripgrep")
+        );
         assert_eq!(
             valid_package_name("libssl3t64").as_deref().ok(),
             Some("libssl3t64")

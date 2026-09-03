@@ -43,6 +43,10 @@ impl OperationsHub {
     }
 
     /// List canonical operations.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when no such operation exists, and unavailable when the owner cannot be read.
     pub async fn list(&self) -> Result<OperationsListProjection, GatewayError> {
         #[cfg(target_os = "linux")]
         {
@@ -61,6 +65,10 @@ impl OperationsHub {
     }
 
     /// Get one canonical operation.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when no such operation exists, and unavailable when the owner cannot be read.
     pub async fn get(&self, id: Uuid) -> Result<OperationRecord, GatewayError> {
         #[cfg(target_os = "linux")]
         {
@@ -78,6 +86,10 @@ impl OperationsHub {
     }
 
     /// Get owner-held logs.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when no such operation exists, and unavailable when the owner cannot be read.
     pub async fn get_logs(&self, id: Uuid) -> Result<OperationLogsProjection, GatewayError> {
         #[cfg(target_os = "linux")]
         {
@@ -101,6 +113,10 @@ impl OperationsHub {
     ///
     /// Returns the owner's distinction between an accepted request and a confirmed teardown; the
     /// gateway never upgrades one into the other.
+    ///
+    /// # Errors
+    ///
+    /// Reports not found when no such operation exists, and unavailable when the owner cannot be read.
     pub async fn cancel(&self, id: Uuid) -> Result<CancelOutcome, GatewayError> {
         #[cfg(target_os = "linux")]
         {

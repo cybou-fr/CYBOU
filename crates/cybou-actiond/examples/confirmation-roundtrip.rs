@@ -34,6 +34,10 @@ const UNIT: &str = "cybou-confirmation-gate.service";
 const SEAT: &str = "gate-operator";
 
 #[tokio::main]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one confirmation carried end to end; the steps are the proof and splitting them would hide the order they must happen in"
+)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session = if std::env::var_os("CYBOU_ACTION_SYSTEM_BUS").is_some() {
         zbus::Connection::system().await?

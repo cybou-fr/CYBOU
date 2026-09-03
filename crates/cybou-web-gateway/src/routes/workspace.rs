@@ -54,6 +54,10 @@ pub struct WorkspaceStore {
 
 impl WorkspaceStore {
     /// An arrangement store that lives only as long as the process. Used by tests.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the in-process notification lock is poisoned, which means another thread failed while holding it.
     #[must_use]
     pub fn new() -> Self {
         Self::from_connection(

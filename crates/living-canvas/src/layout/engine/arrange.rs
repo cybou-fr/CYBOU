@@ -207,7 +207,9 @@ impl DesktopLayout {
             }
 
             let mut place_y = min_height;
-            let place_x = start_x + (best_track as f64) * (track_width + col_gap);
+            let place_x = start_x
+                + f64::from(u16::try_from(best_track).unwrap_or(u16::MAX))
+                    * (track_width + col_gap);
 
             // Obstacle resolution: shift downwards until no collision with pinned or placed items
             loop {
@@ -356,6 +358,10 @@ impl DesktopLayout {
 
     /// Arrange items in canonical Home layout adapted to viewport.
     #[allow(clippy::cast_precision_loss)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one placement rule after another for one layout; the order they run in is the                   layout, and naming halves of it would not make either half readable alone"
+    )]
     fn arrange_home(&mut self, viewport: UsableViewport) {
         let items = self.desktop_items();
         let pinned_rects: Vec<Rect> = items

@@ -26,7 +26,7 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/cybou-target}"
 
 if [ -z "${CYBOU_ACTION_DURABILITY_SESSION:-}" ]; then
     if command -v dbus-run-session >/dev/null 2>&1; then
-        exec env CYBOU_ACTION_DURABILITY_SESSION=1 dbus-run-session -- "$0" "$@"
+        exec env CYBOU_ACTION_DURABILITY_SESSION=1 dbus-run-session -- bash "$0" "$@"
     fi
     echo "==> action durability gate NOT RUN: dbus-run-session is not installed here" >&2
     exit 3

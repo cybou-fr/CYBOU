@@ -193,14 +193,22 @@ impl Session {
     }
 
     /// Pause / freeze the capsule processes.
+    ///
+    /// Idempotent from either frozen standing. A paused session is already what this asks for, and
+    /// a quarantined one is frozen with its network and model access revoked as well — pausing it
+    /// again must not quietly give any of that back, so this leaves it as it is.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CannotTransition::AlreadyEnding`] for a session whose ending has begun. Freezing
+    /// something that is being torn down would show a person a paused agent that has no capsule.
     pub fn pause(&mut self) -> Result<(), CannotTransition> {
         match &self.state {
             SessionState::Launching | SessionState::Running => {
                 self.state = SessionState::Paused;
                 Ok(())
             }
-            SessionState::Paused => Ok(()),
-            SessionState::Quarantined => Ok(()),
+            SessionState::Paused | SessionState::Quarantined => Ok(()),
             SessionState::Ending(end) | SessionState::Ended(end) => {
                 Err(CannotTransition::AlreadyEnding(end.clone()))
             }
@@ -208,6 +216,14 @@ impl Session {
     }
 
     /// Quarantine the capsule (freeze and isolate).
+    ///
+    /// Idempotent: a session already quarantined stays quarantined.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CannotTransition::AlreadyEnding`] for a session whose ending has begun. There is
+    /// nothing left to isolate once teardown is under way, and saying otherwise would report an
+    /// isolation this host is not holding.
     pub fn quarantine(&mut self) -> Result<(), CannotTransition> {
         match &self.state {
             SessionState::Launching | SessionState::Running | SessionState::Paused => {
