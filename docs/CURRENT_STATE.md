@@ -963,6 +963,15 @@ utterance, the boundary refuses instead of producing a plausible local answer no
 Dialogue is partitioned by the principal the authenticating boundary established, never by one the
 browser named for itself.
 
+The deployed arrangement is proven whole. `scripts/test-personal-privacy-gate.sh` makes two real
+Linux accounts, gives each its own owner, and asks the gateway for each of them over HTTP: what one
+account wrote comes back to that account, the other account's mailbox is empty because it is a
+different owner rather than the same store filtered, each account's records are in that account's
+own storage on disk, a request with no session is refused before any owner is asked anything, and an
+account whose owner is not running is reported *unavailable* rather than as having no records. The
+join between PAM's numeric identity and the socket that answers had never been exercised, and it is
+the one place where getting a number wrong means one person reading another's mail.
+
 Personal Core data — mail, calendar, notes, contacts — belongs to the account it is about.
 `cybou-personald@<account>` runs as that person, keeps their records in a SQLite database under their
 own home, and answers on a per-UID socket; its protocol has no UID field, because the process is the

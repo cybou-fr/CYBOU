@@ -247,6 +247,22 @@ case "$operation_status" in
     *) exit "$operation_status" ;;
 esac
 
+# Two accounts, two Personal Core owners, and the number that decides which one answers. Exit 3
+# means this host cannot make accounts or run PAM.
+announce "personal privacy"
+failed="personal privacy"
+personal_privacy_status=0
+bash scripts/test-personal-privacy-gate.sh || personal_privacy_status=$?
+case "$personal_privacy_status" in
+    0) failed="" ;;
+    3)
+        announce "personal privacy not run: this host cannot make accounts or run PAM"
+        skipped="$skipped personal-privacy"
+        failed=""
+        ;;
+    *) exit "$personal_privacy_status" ;;
+esac
+
 # One capsule, driven through the HTTP boundary and checked against the kernel. Needs no provider
 # and no root. Exit 3 means this host has no user service manager or session bus.
 announce "agent desktop controls"
