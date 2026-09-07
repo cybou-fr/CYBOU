@@ -15,6 +15,7 @@ pub mod freshness;
 pub mod icons;
 pub mod minimap;
 pub mod relations;
+pub mod suggestions;
 pub mod topbar;
 pub mod viewport;
 
@@ -29,5 +30,6 @@ pub use freshness::FreshnessControls;
 pub use icons::*;
 pub use minimap::Minimap;
 pub use relations::{RelationshipEdge, RelationshipsLayer};
+pub use suggestions::{AttentionSuggestions, SpatialEngagement};
 pub use topbar::Topbar;
 pub use viewport::CanvasViewport;

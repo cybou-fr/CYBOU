@@ -7,6 +7,7 @@
 //! system-level Mind projections (System cards), interactive tools (Tool cards, e.g. CYBOU Shell),
 //! or temporary previews (Ephemeral cards).
 
+use cybou_protocol::SubjectKind;
 use serde::{Deserialize, Serialize};
 
 /// Stable identifier for a Card instance on the Desktop.
@@ -241,6 +242,91 @@ impl CardId {
             | Self::Meaning(instance)
             | Self::Learning(instance) => format!("{}:{instance}", self.key()),
             _ => self.key().to_string(),
+        }
+    }
+
+    /// The same kind of card, numbered differently.
+    #[must_use]
+    pub const fn with_instance(self, instance: u32) -> Self {
+        match self {
+            Self::Terminal(_) => Self::Terminal(instance),
+            Self::FileManager(_) => Self::FileManager(instance),
+            Self::JournalFeed(_) => Self::JournalFeed(instance),
+            Self::Editor(_) => Self::Editor(instance),
+            Self::Diff(_) => Self::Diff(instance),
+            Self::Inspector(_) => Self::Inspector(instance),
+            Self::Operations(_) => Self::Operations(instance),
+            Self::Notifications(_) => Self::Notifications(instance),
+            Self::Services(_) => Self::Services(instance),
+            Self::Processes(_) => Self::Processes(instance),
+            Self::Monitor(_) => Self::Monitor(instance),
+            Self::SystemLogs(_) => Self::SystemLogs(instance),
+            Self::Storage(_) => Self::Storage(instance),
+            Self::Network(_) => Self::Network(instance),
+            Self::Packages(_) => Self::Packages(instance),
+            Self::Updates(_) => Self::Updates(instance),
+            Self::UserSettings(_) => Self::UserSettings(instance),
+            Self::Security(_) => Self::Security(instance),
+            Self::Backup(_) => Self::Backup(instance),
+            Self::Mail(_) => Self::Mail(instance),
+            Self::Calendar(_) => Self::Calendar(instance),
+            Self::Notes(_) => Self::Notes(instance),
+            Self::Contacts(_) => Self::Contacts(instance),
+            Self::CognitiveGraph(_) => Self::CognitiveGraph(instance),
+            Self::EventJournal(_) => Self::EventJournal(instance),
+            Self::Meaning(_) => Self::Meaning(instance),
+            Self::Learning(_) => Self::Learning(instance),
+            other => other,
+        }
+    }
+
+    /// Resolve a key written by [`Self::instance_key`] back to the exact card it named.
+    ///
+    /// The inverse matters where [`Self::from_key`] is not enough: a key that came back as
+    /// instance zero would send an action to the first Services panel while the person was looking
+    /// at their fourth.
+    #[must_use]
+    pub fn from_instance_key(key: &str) -> Option<Self> {
+        match key.split_once(':') {
+            None => Self::from_key(key),
+            Some((kind, instance)) => {
+                let instance = instance.parse::<u32>().ok()?;
+                Self::from_key(kind).map(|card| card.with_instance(instance))
+            }
+        }
+    }
+
+    /// The kinds of subject this card can present.
+    ///
+    /// Read by the desktop when it describes itself to the spatial policy, which holds no table of
+    /// its own: a second copy of this list living in another crate would drift from this one in
+    /// silence, and a card added here would keep working while quietly becoming un-suggestible.
+    ///
+    /// Most cards present no subject at all and say so with an empty slice. That is not a gap to be
+    /// filled later with a plausible guess — the Journal is about contributions, not about
+    /// services, and claiming otherwise would have the desktop offer to open it for a failing unit.
+    #[must_use]
+    pub const fn shows(self) -> &'static [SubjectKind] {
+        match self {
+            Self::Services(_) => &[SubjectKind::Service],
+            Self::Processes(_) => &[SubjectKind::Process],
+            Self::FileManager(_) | Self::Editor(_) => &[SubjectKind::File],
+            Self::Agents => &[SubjectKind::Agent],
+            Self::Packages(_) => &[SubjectKind::Package],
+            Self::Operations(_) => &[SubjectKind::Operation],
+            // The one surface that is about whatever it is pointed at, which is why it is last
+            // resort rather than first: a desktop that offered the inspector for everything would
+            // never offer the panel a person actually wanted.
+            Self::Inspector(_) => &[
+                SubjectKind::Service,
+                SubjectKind::Process,
+                SubjectKind::File,
+                SubjectKind::Agent,
+                SubjectKind::Package,
+                SubjectKind::Anchor,
+                SubjectKind::Operation,
+            ],
+            _ => &[],
         }
     }
 

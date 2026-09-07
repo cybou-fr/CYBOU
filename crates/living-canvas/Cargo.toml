@@ -20,6 +20,7 @@ ciborium.workspace = true
 # it brings `vte`, `itoa` and `unicode-width` and holds no capability of any kind.
 vt100 = "0.16.2"
 cybou-protocol = { path = "../cybou-protocol" }
+cybou-spatial-policy = { path = "../cybou-spatial-policy" }
 cybou-web-contracts = { path = "../cybou-web-contracts" }
 serde_json.workspace = true
 serde.workspace = true

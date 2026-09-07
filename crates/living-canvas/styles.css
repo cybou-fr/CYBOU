@@ -753,6 +753,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .insight-said summary { color: var(--accent); cursor: pointer; }
 .insight-said pre { margin: 6px 0 0; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.22); color: var(--muted); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .attention-subjects { display: grid; gap: 3px; margin-left: 8px; }
+/* One line per offer: what it is about, what it rests on, and two answers. The grounds are dimmed
+   and the buttons are small on purpose -- this is an offer at the edge of a card, not a dialog. */
+.attention-suggestions { display: grid; gap: 4px; margin-left: 8px; }
+.attention-suggestion { display: grid; grid-template-columns: 1fr auto auto; align-items: center; column-gap: 8px; font-size: 11px; }
+.attention-suggestion b { color: #dfe8ed; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attention-suggestion-why { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+.attention-suggestion button { padding: 2px 8px; border: 1px solid rgba(154,167,184,.24); border-radius: 6px; background: transparent; color: var(--accent); font-size: 10px; cursor: pointer; }
+.attention-suggestion-dismiss { color: var(--muted) !important; }
+.attention-suggestion button:hover { border-color: rgba(112,225,200,.4); }
 /* The label is the thing itself and gets the room; what read it is secondary and may be clipped. */
 .attention-subject b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attention-focus { padding: 8px 10px; border: 1px solid rgba(112,225,200,.28); border-radius: 8px; color: var(--accent); font-size: 11px; word-break: break-all; }

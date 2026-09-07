@@ -104,6 +104,10 @@ pub fn App() -> impl IntoView {
     provide_context(set_pan);
     provide_context(zoom);
     provide_context(set_zoom);
+    // What the person has already answered about a spatial suggestion. Owned by the root so a
+    // dismissal holds wherever the Attention card happens to be mounted, and session-local because
+    // the grounds for an offer will have changed by the next time this desktop is opened.
+    provide_context::<living_canvas::components::SpatialEngagement>(RwSignal::new(Vec::new()));
     let history = RwSignal::new(LayoutHistory::new());
     let camera_history = RwSignal::new(CameraHistory::new());
     provide_context(camera_history);

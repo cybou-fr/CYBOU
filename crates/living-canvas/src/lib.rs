@@ -32,6 +32,7 @@ pub mod instant;
 pub mod layout;
 pub mod markdown;
 pub mod refresh;
+pub mod spatial;
 pub mod terminal;
 pub mod workspace_sync;
 

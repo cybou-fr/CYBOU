@@ -2715,6 +2715,7 @@ dependencies = [
  "ciborium",
  "console_error_panic_hook",
  "cybou-protocol",
+ "cybou-spatial-policy",
  "cybou-web-contracts",
  "gloo-net",
  "gloo-timers",

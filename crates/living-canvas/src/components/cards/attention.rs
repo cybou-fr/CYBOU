@@ -13,6 +13,7 @@ use std::sync::Arc;
 use crate::{
     CardId, DesktopItemId, DesktopLayout,
     components::card_frame::CardFrame,
+    components::suggestions::AttentionSuggestions,
     interaction::{DragState, ResizeState},
     state::{RuntimeState, unread},
 };
@@ -100,6 +101,7 @@ pub fn AttentionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                         .collect_view()}
                 </div>
             </Show>
+            <AttentionSuggestions runtime=runtime />
         </div>
     }
 }
